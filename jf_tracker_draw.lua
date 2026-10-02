@@ -656,6 +656,8 @@ end
 -- квадратики, hex только у точек
 local env_col_cache = {}
 local ai_col_cache = {}
+-- смена темы / Theme Adjuster (2 окт): сбросить кэши цветов огибающих
+function D.reset_colours() env_col_cache = {}; ai_col_cache = {} end
 -- цвет огибающих — исходный цвет темы (флаг 1), без обработки Theme Adjuster:
 -- так их рисует аранжировка (2 окт: громкость зелёная, а не жёлтая после Tint)
 local function theme_orig(key, fb)

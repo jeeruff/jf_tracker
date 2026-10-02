@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.23'
+V.VERSION = '0.5.24'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.24', d = '2026-10-02', items = {
+    'theme changes and the Theme Adjuster colour controls are picked up live (palette rebuilt within a second)',
+    'oscilloscopes / spectrum removed: the JSFX bridge is no longer added; :scopes only takes old bridges off the tracks; jf_grid finds the tracker by its heartbeat',
+  } },
   { v = '0.5.23', d = '2026-10-02', items = {
     'notes: button in the control block opens an editor left of the DSP panel - project notes or the notes of the item under the cursor (track notes with SWS), saved on leave and a second after typing',
     'browser: *.* shows all file types, .* hidden files; Enter on MIDI / video / images inserts them at the cursor, other files open in their app',

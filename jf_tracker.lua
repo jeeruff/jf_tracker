@@ -90,7 +90,7 @@ local state = {
   poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (1 с)
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
-  scopes = flag('scopes', false),               -- JSFX-мост осциллоскопов на треках
+  scopes = false,                               -- скопы убраны (2 окт): JSFX-мост больше не ставится
   scopemode = (function() local v = reaper.GetExtState(EXT, 'scopemode'); return (v == 'spec' or v == 'sgram') and v or 'scope' end)(),
   icons = flag('icons', true),                    -- Nerd-иконки (TTF или гибрид с битмапом, :icons)
   glyphface = (function() local v = reaper.GetExtState(EXT, 'glyphface'); return v ~= '' and v or nil end)(),
@@ -247,7 +247,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -961,11 +961,12 @@ ctx = {
     return items
   end,
   toggle_dsp = function() state.dsp = not state.dsp; if not state.dsp and state.focus == 'dsp' then ctx.set_focus('tracker') end end,
+  -- скопы убраны (2 окт): живой звук шины читает только JSFX, а мост больше не
+  -- нужен; :scopes только снимает старые мосты jf_tracker_scope с треков
   toggle_scopes = function()
-    state.scopes = not state.scopes
-    edit.scopes(snap.cols, state.scopes)
-    state.toptab = 'master'
-    vim.msg = 'scopes ' .. (state.scopes and 'on (jf_tracker_scope added)' or 'off')
+    state.scopes = false
+    edit.scopes(snap.cols, false)
+    vim.msg = 'scopes removed: old jf_tracker_scope bridges taken off the tracks'
   end,
   -- fzf по всем параметрам автоматизации трека курсора: огибающие трека
   -- (действия «Toggle track … envelope visible», найденные по тексту) и
@@ -2073,6 +2074,33 @@ edit.after = function(desc)
   alias.trim(regions)
 end
 draw.init(U, model.peaks, MX)
+-- Theme Adjuster / смена темы (2 окт): раз в секунду подпись темы; изменилась —
+-- палитра перечитывается (jf_looper_ui не трогаем: свежая копия, поля в U),
+-- draw заново выводит свои цвета, кэши картинок текста и цветов сброшены
+local theme_watch = { t = 0, sig = nil }
+local function theme_sig()
+  local parts = { reaper.GetLastColorThemeFile and reaper.GetLastColorThemeFile() or '' }
+  for _, k in ipairs({ 'col_main_bg2', 'col_main_text2', 'col_tr1_bg', 'col_env1', 'col_seltrack' }) do
+    parts[#parts + 1] = tostring(reaper.GetThemeColor(k, 0))
+  end
+  return table.concat(parts, '|')
+end
+local function theme_check()
+  local now = reaper.time_precise()
+  if now - theme_watch.t < 1 then return end
+  theme_watch.t = now
+  local sig = theme_sig()
+  if theme_watch.sig == nil then theme_watch.sig = sig; return end
+  if sig == theme_watch.sig then return end
+  theme_watch.sig = sig
+  local ok, fresh = pcall(dofile, RES .. '/Scripts/jf_looper/jf_looper_ui.lua')
+  if not ok or type(fresh) ~= 'table' then return end
+  for k, v in pairs(fresh) do if type(v) == 'table' then U[k] = v end end
+  draw.init(U, model.peaks, MX)
+  if draw.reset_colours then draw.reset_colours() end
+  draw.set_font(state)                          -- сброс кэша картинок текста (цвета в ключе)
+  vim.msg = 'theme colours updated'
+end
 OPT.init(U, ctx)
 draw.hint = HN.add
 ctx.hint = HN.add
@@ -2233,7 +2261,7 @@ local function view_actions()
   return {
     { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
-    { (state.scopes and '!' or '') .. 'Oscilloscopes via JSFX bridge (:scopes)', key = 'o', fn = ctx.toggle_scopes },
+    { 'Remove old scope bridges (:scopes)', key = 'o', fn = ctx.toggle_scopes },
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
     { 'Loop region under cursor', key = 'l', fn = function()
@@ -3095,6 +3123,7 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  theme_check()
   -- заметки: автозапись через секунду после правки; context следует за item под курсором
   if state.notes_open then
     NT.edit_t = NT.dirty and (NT.edit_t or reaper.time_precise()) or nil
@@ -3426,7 +3455,7 @@ local function frame()
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
-  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters, analyzer, fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
