@@ -242,6 +242,8 @@ function A.ensure_lib(regions)
   local t = R.GetProjectLength(0)
   for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
   t = bar_ceil(t) + R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, 0) + 4) -- +такт
+  local endp = model.marker_pos and model.marker_pos(model.END_MARKER)
+  if endp and t < endp then t = endp end                    -- библиотека не раньше =END (2 окт)
   R.AddProjectMarker2(0, false, t, 0, model.LIB_MARKER, -1, 0)
   return t
 end

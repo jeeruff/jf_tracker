@@ -634,7 +634,7 @@ function M.track_pool(tr, depot_tr, lib_pos, end_pos)
   for i = 0, R.CountTrackMediaItems(tr) - 1 do
     local it = R.GetTrackMediaItem(tr, i)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-    local in_lib = lib_pos ~= nil and pos >= lib_pos - 1e-6
+    local in_lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6)
     local after_end = end_pos ~= nil and pos >= end_pos - 1e-6
     if in_lib or not after_end then pool_add(pool, seen, it, in_lib) end
   end
@@ -903,13 +903,14 @@ function M.regions(lpb)
   local out = {}
   local markers = {}      -- маркеры для линейки трекера (2 окт): имя, строка (дробная), цвет
   -- библиотека паттернов: всё после маркера =LIB не входит в последовательность
-  local lib_pos
+  local lib_pos, end_pos
   local i = 0
   while true do
     local ret, isrgn, pos, _, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
     if not isrgn then
       if name == M.LIB_MARKER then lib_pos = pos end
+      if name == M.END_MARKER then end_pos = pos end
       markers[#markers + 1] = { idx = idx, name = name or '', pos = pos, row_f = R.TimeMap2_timeToQN(0, pos) * lpb, color = color }
     end
     i = i + 1
@@ -924,7 +925,9 @@ function M.regions(lpb)
       local r1 = M.row_of_qn(qn1, lpb)
       out[#out + 1] = { idx = idx, name = name or '', pos = pos, rgnend = rgnend,
                         qn0 = qn0, qn1 = qn1, r0 = r0, r1 = r1, color = color,
-                        lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 }
+                        -- библиотека — после =LIB И после =END (2 окт: =LIB, поставленный
+                        -- раньше =END, прятал регионы последовательности)
+                        lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6) }
     end
     i = i + 1
   end

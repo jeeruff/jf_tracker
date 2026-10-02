@@ -1177,6 +1177,8 @@ function E.ensure_lib()
   local qn = R.TimeMap2_timeToQN(0, len)
   local _, _, qme = R.TimeMap_QNToMeasures(0, qn)
   pos = R.TimeMap2_QNToTime(0, (qme or (qn + 4)) + 4)
+  local endp = model.marker_pos(model.END_MARKER)
+  if endp and pos < endp then pos = endp end                -- библиотека не раньше =END (2 окт)
   R.AddProjectMarker2(0, false, pos, 0, model.LIB_MARKER, -1, 0)
   return pos
 end

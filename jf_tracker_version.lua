@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.12'
+V.VERSION = '0.5.13'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.13', d = '2026-10-02', items = {
+    'fix: an =LIB marker before =END hid sequence regions from the matrix; library is now only after =LIB and =END, and =LIB is never created before =END',
+    'time selection shown in the tracker: faint row tint and a bracket at the ruler edge',
+    'cursor region name always visible above the row numbers (colour strip + name or #N)',
+    'BPM entry shows [...] while waiting for digits',
+  } },
   { v = '0.5.12', d = '2026-10-02', items = {
     'smart quantize (button quantize, Q, :quantize): loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo',
     'ruler: region and marker names as vertical text along their rows',

@@ -2542,6 +2542,18 @@ local function frame()
     status_left = left, status_right = state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
+    timesel = (function()
+      local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+      if b - a < 1e-6 then return nil end
+      return { model.row_of_time(a, state.lpb), model.row_of_time(b, state.lpb) }
+    end)(),
+    cur_region_full = (function()
+      local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+      if not rg then return nil end
+      local rgb
+      if rg.color and rg.color ~= 0 then local r, g, b = reaper.ColorFromNative(rg.color & 0xFFFFFF); rgb = { r / 255, g / 255, b / 255 } end
+      return { name = rg.name, idx = rg.idx, rgb = rgb }
+    end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,

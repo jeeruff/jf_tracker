@@ -734,7 +734,7 @@ local function draw_topbar(L, info)
   -- контрол: сетка 3 колонки × 4 строки
   local items = {
     { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
-    { 'bpm', c.bpm_edit and ('BPM [%s_]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
+    { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
     { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
     { 'vel', ('vel %d'):format(c.vel or 100) },
     { 'follow', D.ic('follow', 'follow ' .. (c.follow and 'on' or 'off')), c.follow and U.CYAN or U.GREY },
@@ -1367,6 +1367,20 @@ function D.frame(L, snap, rows, state, info)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 2, 1)
+  -- имя региона курсора — всегда видно на зарезервированном месте над
+  -- номерами строк (2 окт): полоса цвета региона + имя (или #N)
+  do
+    local rg = info.cur_region_full
+    local bx, bw = tx0 + 1, L.label_w - 2
+    if rg then
+      local c = rg.rgb or U.LINE
+      set(U.tint(c, 0.30)); gfx.rect(bx, hy + 1, bw, L.rh, 1)
+      set(c); gfx.rect(bx, hy + 1, 3, L.rh, 1)
+      text(bx + 5, hy + 1, fit(rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), bw - 7), U.TEXT)
+    else
+      text(bx + 5, hy + 1, fit('no region', bw - 7), U.DIM)
+    end
+  end
   -- длина региона курсора в шагах — квадрат над номерами строк: число на
   -- 2-й строке шапки, «<» «>» на 3-й (клик / колесо = ±1 шаг, ripple как :len)
   if info.cur_region then
@@ -1548,6 +1562,20 @@ function D.frame(L, snap, rows, state, info)
       for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (si - 1) * L.sub_w, L.body_y, 1, L.body_h, 1) end
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
+  end
+  -- time selection REAPER (2 окт): бледная подсветка строк и голубая скобка
+  -- у правого края линейки
+  if info.timesel and #rows > 0 then
+    local row0, nr = rows[1].row, #rows
+    local a, b = math.max(info.timesel[1], row0), math.min(info.timesel[2], row0 + nr)
+    if b > a then
+      local y0, y1 = L.body_y + (a - row0) * L.rh, L.body_y + (b - row0) * L.rh
+      set(U.CYAN); gfx.a = 0.07; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1); gfx.a = 1
+      local bx = tx0 + L.ruler_w - 3
+      gfx.rect(bx, y0, 2, y1 - y0, 1)
+      if info.timesel[1] >= row0 then gfx.rect(bx - 4, y0, 6, 1, 1) end
+      if info.timesel[2] <= row0 + nr then gfx.rect(bx - 4, y1 - 1, 6, 1, 1) end
+    end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
   if L.ruler_w > 0 and info.ruler and #rows > 0 then
