@@ -790,13 +790,25 @@ function M.track_fx(tr)
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       local names = {}
       for pi = 0, np - 1 do local _, pn = A.GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
+      local wa, wb
       for _, spec in ipairs(lay.params) do
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
-          if names[pi]:find(want, 1, true) then params[#params + 1] = param_entry(tr, fx, pi, spec[2]); break end
+          if names[pi]:find(want, 1, true) then
+            params[#params + 1] = param_entry(tr, fx, pi, spec[2])
+            if lay.wave and want == lay.wave.start then wa = #params end
+            if lay.wave and want == lay.wave.stop then wb = #params end
+            break
+          end
         end
       end
-      out[#out + 1] = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
+      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
+      -- волна сэмплера (RS5K): файл FILE0, индексы start / end в params
+      if lay.wave and A.GetNamedConfigParm then
+        local ok, file = A.GetNamedConfigParm(tr, fx, 'FILE0')
+        e.wave, e.file, e.wave_a, e.wave_b = true, ok and file ~= '' and file or nil, wa, wb
+      end
+      out[#out + 1] = e
     else
     for pi = 0, math.min(M.DSP_MAXP, np) - 1 do
       local _, pname = A.GetParamName(tr, fx, pi, '')

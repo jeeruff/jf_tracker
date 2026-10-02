@@ -35,6 +35,32 @@ DM.modules = {
     },
   },
   {
+    -- ReaSamplOmatic5000 (2 окт): первая колонка — волна сэмпла с ручками
+    -- start / end (wave = подстроки этих параметров), правее — главное
+    match = 'reasamplomatic5000',
+    title = 'RS5K',
+    cols = 3,
+    wave = { start = 'sample start offset', stop = 'sample end offset' },
+    params = {
+      { 'Volume',              'volume' },
+      { 'Pan',                 'pan' },
+      { 'Note range start',    'note lo' },
+      { 'Note range end',      'note hi' },
+      { 'Pitch for start',     'root' },
+      { 'Pitch offset',        'pitch' },
+      { 'Mode',                'mode' },
+      { '# of voices',         'voices' },
+      { 'Attack',              'attack' },
+      { 'Decay',               'decay' },
+      { 'Sustain',             'sustain' },
+      { 'Release',             'release' },
+      { 'Obey note-offs',      'note-off' },
+      { 'Loop',                'loop' },
+      { 'Sample start offset', 'start' },
+      { 'Sample end offset',   'end' },
+    },
+  },
+  {
     match = 'reaeq',
     title = 'ReaEQ',
     cols = 2,

@@ -2089,6 +2089,46 @@ function D.frame(L, snap, rows, state, info)
           ky = ky + L.rh
         end
       end
+      if f.wave then
+        -- сэмплер (RS5K): волна файла с зоной start..end, ручки тянутся мышью,
+        -- бросок файла из браузера — новый сэмпл
+        pcol0 = 1
+        local wx, wy = bx + L.pad, by + L.rh + 1
+        local ww, wh = pw, bh - L.rh - 4
+        local na = f.wave_a and vals[f.wave_a] and vals[f.wave_a].n or 0
+        local nb = f.wave_b and vals[f.wave_b] and vals[f.wave_b].n or 1
+        set(U.PANEL); gfx.rect(wx, wy, ww, wh, 1)
+        set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
+        local name = f.file and (f.file:match('[^/]+$') or f.file) or 'no sample - drop a file from the browser here'
+        local th = L.rh
+        text(wx + 2, wy + 1, fit(name, ww - 4), f.file and U.GREY or U.DIM)
+        local gy, gh = wy + th + 1, wh - th - 2
+        if f.file and gh > 4 and ww > 8 then
+          local pk = info.file_peaks and info.file_peaks(f.file, ww)
+          local cy, hh = gy + math.floor(gh / 2), math.floor(gh / 2) - 1
+          for px = 0, ww - 1 do
+            local fr = px / ww
+            local inside = fr >= na and fr <= nb
+            set(inside and U.TEXT or U.DIM)
+            if pk and pk.n > 0 then
+              local i = math.floor(fr * pk.n) + 1
+              local a, b = pk.min[i] or 0, pk.max[i] or 0
+              if b - a < 0.03 then a, b = -0.015, 0.015 end
+              gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
+            end
+          end
+          for _, e in ipairs({ { na, 'a' }, { nb, 'b' } }) do
+            local lx = wx + math.floor(e[1] * (ww - 1) + 0.5)
+            set(U.AMBER); gfx.rect(lx, gy, 1, gh, 1)
+            local tri = math.max(3, math.floor(L.rh / 3))
+            gfx.triangle(lx, gy + tri, lx - tri, gy, lx + tri, gy)
+          end
+        end
+        if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
+          local fr = math.max(0, math.min(1, (mx - wx) / math.max(1, ww - 1)))
+          hover.dspwave = { fx = k, f = f, frac = fr, x = wx, w = ww, edge = math.abs(fr - na) <= math.abs(fr - nb) and 'a' or 'b' }
+        end
+      end
       for pi, p in ipairs(f.params) do
         if pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)

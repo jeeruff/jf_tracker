@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.32'
+V.VERSION = '0.5.33'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.33', d = '2026-10-02', items = {
+    'DSP: ReaSamplOmatic5000 module - the sample wave with start / end handles (drag the nearest one), drop a browser file on the wave to load it; volume, pan, note range, root, pitch, mode, voices, ADSR, note-off, loop in two columns',
+  } },
   { v = '0.5.32', d = '2026-10-02', items = {
     'fix: an XRNI / REX dragged from the browser onto a track column became an empty item (no wave, no slices) - it is now imported with its slices into that track library and the instrument is placed at the drop row',
     'control block: control / options / help simply start on new rows (no lines or labels)',

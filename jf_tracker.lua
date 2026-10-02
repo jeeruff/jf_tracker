@@ -163,6 +163,7 @@ local resize_drag = nil                                     -- ресайз: 'si
 local lock_sync = {}                                        -- lock: последнее синхронное состояние
 local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов матрицы
 local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- размер / доли для контрола
+local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -1850,6 +1851,18 @@ ctx = {
   end,
   drop_at_cursor = function(path) ctx.drop_to(vim.cur.fi, vim.cur.row, path) end,
   file_peaks = function(path, npix) return model.file_peaks(path, npix) end,
+  -- сэмпл RS5K из файла (бросок на волну): FILE0 + DONE, один undo
+  rs5k_file = function(f, path)
+    local col = dsp_target(); if not (col and f) then return end
+    if model.is_take(col.track) then vim.msg = 'RS5K: take FX - open the plugin window to load a sample'; return end
+    path = edit.media_copy(path)
+    edit.run('RS5K sample', function()
+      reaper.TrackFX_SetNamedConfigParm(col.track, f.i, 'FILE0', path)
+      reaper.TrackFX_SetNamedConfigParm(col.track, f.i, 'DONE', '')
+    end)
+    model.invalidate()
+    vim.msg = 'RS5K sample: ' .. (path:match('[^/]+$') or path)
+  end,
   -- трек из проекта pm (chunk) → новый трек после трека курсора
   drop_track = function(e, proj_e)
     local c = cur_col()
@@ -3625,6 +3638,7 @@ local function frame()
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
+    file_peaks = ctx.file_peaks,
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
@@ -3784,6 +3798,7 @@ local function frame()
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
+  elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
   elseif hover.garden and hover.garden.ri then
@@ -4184,6 +4199,11 @@ local function frame()
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
       click = { t = now2, zone = 'dsptarget' }
+    elseif hover.dspwave then
+      -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
+      dspwave_drag = { f = hover.dspwave.f, edge = hover.dspwave.edge, x = hover.dspwave.x, w = hover.dspwave.w }
+      click = { t = now2, zone = 'dspwave' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end
@@ -4547,6 +4567,23 @@ local function frame()
       if hover.row and hover.fi and vim.mode == 'visual' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
     else body_drag = nil end
   end
+  -- ручки start / end на волне сэмплера (RS5K)
+  if dspwave_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d = dspwave_drag
+      local col = dsp_target()
+      local f = d.f
+      local A = col and model.fxapi(col.track)
+      local pa, pb = f.params[f.wave_a or 0], f.params[f.wave_b or 0]
+      if A and pa and pb then
+        local fr = math.max(0, math.min(1, (gfx.mouse_x - d.x) / math.max(1, d.w - 1)))
+        local na, nb = A.GetParamNormalized(col.track, f.i, pa.i), A.GetParamNormalized(col.track, f.i, pb.i)
+        if d.edge == 'a' then edit.fx_param(col.track, f.i, pa.i, math.min(fr, nb - 0.001))
+        else edit.fx_param(col.track, f.i, pb.i, math.max(fr, na + 0.001)) end
+        state.status = ('%s: %s %.1f%%'):format(f.name, d.edge == 'a' and 'start' or 'end', fr * 100)
+      end
+    else dspwave_drag = nil end
+  end
   -- протяжка по слайдеру DSP
   if hover.dsp and hover.dsp.param and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
     local col = dsp_target()
@@ -4592,7 +4629,9 @@ local function frame()
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column' end
       end
     else
-      if B.drag.active and hover.pool and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark then
+      if B.drag.active and hover.dspwave and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
+        ctx.rs5k_file(hover.dspwave.f, B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))   -- файл на волну RS5K — его сэмпл
+      elseif B.drag.active and hover.pool and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark then
         ctx.add_to_depot(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))       -- бросок на инструменты — в библиотеку трека
       elseif B.drag.active and hover.fi and hover.row then
         local e = B.drag.e
