@@ -2089,6 +2089,25 @@ function D.frame(L, snap, rows, state, info)
           ky = ky + L.rh
         end
       end
+      if f.xy then
+        -- XY-пэд (TG33 vector): квадрат в первой колонке, точка — X / Y, Y вверх
+        pcol0 = 1
+        local side = math.max(L.rh * 2, math.min(pw, bh - L.rh - 4))
+        local px0, py0 = bx + L.pad + math.floor((pw - side) / 2), by + L.rh + 1
+        local nx = vals[f.xy_x] and vals[f.xy_x].n or 0.5
+        local ny = vals[f.xy_y] and vals[f.xy_y].n or 0.5
+        set(U.PANEL); gfx.rect(px0, py0, side, side, 1)
+        set(U.LINE); gfx.rect(px0, py0, side, side, 0)
+        set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
+        local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
+        set(U.AMBER); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
+        if side >= L.cw * 6 then
+          text(px0 + 2, py0 + side - L.rh, fit(('%d / %d'):format(math.floor(nx * 127 + 0.5), math.floor(ny * 127 + 0.5)), side - 4), U.GREY)
+        end
+        if not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
+          hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side }
+        end
+      end
       if f.wave then
         -- сэмплер (RS5K): волна файла с зоной start..end, ручки тянутся мышью,
         -- бросок файла из браузера — новый сэмпл

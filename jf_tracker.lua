@@ -165,6 +165,7 @@ local lock_sync = {}                                        -- lock: после�
 local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов матрицы
 local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- размер / доли для контрола
 local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
+local dspxy_drag = nil        -- XY-пэд модуля DSP (TG33 vector, 2 окт)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
@@ -3993,6 +3994,7 @@ local function frame()
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
+  elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
@@ -4404,6 +4406,11 @@ local function frame()
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
       click = { t = now2, zone = 'dsptarget' }
+    elseif hover.dspxy then
+      -- XY-пэд (TG33 vector): точка едет за мышью, X и Y одним жестом
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.dspxy.fx
+      dspxy_drag = { f = hover.dspxy.f, x = hover.dspxy.x, y = hover.dspxy.y, s = hover.dspxy.s }
+      click = { t = now2, zone = 'dspxy' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
@@ -4771,6 +4778,20 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if hover.row and hover.fi and vim.mode == 'visual' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
     else body_drag = nil end
+  end
+  -- XY-пэд модуля DSP
+  if dspxy_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d = dspxy_drag
+      local col = dsp_target()
+      local px, py = d.f.params[d.f.xy_x], d.f.params[d.f.xy_y]
+      if col and px and py then
+        local nx = math.max(0, math.min(1, (gfx.mouse_x - d.x) / math.max(1, d.s - 1)))
+        local ny = 1 - math.max(0, math.min(1, (gfx.mouse_y - d.y) / math.max(1, d.s - 1)))
+        edit.fx_param(col.track, d.f.i, px.i, nx); edit.fx_param(col.track, d.f.i, py.i, ny)
+        state.status = ('%s: x %d  y %d'):format(d.f.name, math.floor(nx * 127 + 0.5), math.floor(ny * 127 + 0.5))
+      end
+    else dspxy_drag = nil end
   end
   -- ручки start / end на волне сэмплера (RS5K)
   if dspwave_drag then

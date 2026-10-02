@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.35'
+V.VERSION = '0.5.36'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.36', d = '2026-10-02', items = {
+    'DSP: TG33 vector module (jf_tg33_xy) with an XY pad - drag moves vector X and Y together; gesture loop / record / speed, beatsync, variate, glitch, return, program, FX next to it',
+    'DSP: chord latch module (jf_chord_latch, the harmony generator) - complexity, style, voicing order / window / spread, hold, octave, velocity, articulation, attack / release, full auto, slow arp, latch wall',
+    'DSP: XY pad widget for any curated module (xy = { x, y } in jf_tracker_dspmods.lua)',
+  } },
   { v = '0.5.35', d = '2026-10-02', items = {
     'curve generator (modulation tab, L): types lfo / podkat / follow. podkat brings Anticipate into the tracker - a lead curve before every hit of a source track (its events or the transients of its audio), hold, exponential release, duck or swell, lengths in rows; follow draws a curve from another envelope (pick it) or from the audio level of a track, with attack, release, shift (lookahead) and invert; dense curves are thinned (Ramer-Douglas-Peucker)',
   } },

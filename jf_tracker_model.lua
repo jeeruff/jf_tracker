@@ -790,7 +790,7 @@ function M.track_fx(tr)
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       local names = {}
       for pi = 0, np - 1 do local _, pn = A.GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
-      local wa, wb
+      local wa, wb, e_xy_x, e_xy_y
       for _, spec in ipairs(lay.params) do
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
@@ -798,11 +798,15 @@ function M.track_fx(tr)
             params[#params + 1] = param_entry(tr, fx, pi, spec[2])
             if lay.wave and want == lay.wave.start then wa = #params end
             if lay.wave and want == lay.wave.stop then wb = #params end
+            if lay.xy and want == lay.xy.x then e_xy_x = #params end
+            if lay.xy and want == lay.xy.y then e_xy_y = #params end
             break
           end
         end
       end
       local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
+      -- XY-пэд (TG33 vector): индексы параметров X / Y
+      if lay.xy and e_xy_x and e_xy_y then e.xy, e.xy_x, e.xy_y = true, e_xy_x, e_xy_y end
       -- волна сэмплера (RS5K): файл FILE0, индексы start / end в params
       if lay.wave and A.GetNamedConfigParm then
         local ok, file = A.GetNamedConfigParm(tr, fx, 'FILE0')
