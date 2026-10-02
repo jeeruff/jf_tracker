@@ -257,5 +257,19 @@ do
   eq('midi sub 2 is not audio', lane.audio_sub and lane.audio_sub[2] or false, false)
   eq('audio sub 3 flagged', lane.audio_sub and lane.audio_sub[3], true)
 end
+-- цвета огибающих как в аранжировке (2 окт): ключи из пар «Envelope: …»
+do
+  eq('env key volume', M.env_key('Volume', 0), 'col_env2')
+  eq('env key volume pre', M.env_key('Volume (Pre-FX)', 0), 'col_env1')
+  eq('env key pan', M.env_key('Pan', 0), 'col_env4')
+  eq('env key pan pre', M.env_key('Pan (Pre-FX)', 0), 'col_env3')
+  eq('env key trim', M.env_key('Trim Volume', 0), 'env_trim_vol')
+  eq('env key width', M.env_key('Width', 0), 'col_env7')
+  eq('env key mute', M.env_key('Mute', 0), 'env_track_mute')
+  eq('env key send pan', M.env_key('Send Pan', 0), 'col_env8')
+  eq('env key fx 1', M.env_key('Freq / ReaEQ', 0), 'col_env13')
+  eq('env key fx 5 wraps', M.env_key('Gain / ReaEQ', 4), 'col_env13')
+  eq('env key fx pan param is fx', M.env_key('Pan / ReaSurround', 1), 'col_env14')
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

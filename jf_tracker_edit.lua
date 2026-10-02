@@ -35,11 +35,17 @@ E.after = nil
 E.keep_samples = true
 E.rescued = nil
 local depth = 0
+-- имя файла по источнику — кэш на одну правку (census до и после)
+local rf_cache
 local function root_file(src)
+  if rf_cache and src and rf_cache[src] then return rf_cache[src] end
+  local key = src
   local p = src and R.GetMediaSourceParent and R.GetMediaSourceParent(src)
   local n = 0
   while p and n < 8 do src = p; p = R.GetMediaSourceParent(src); n = n + 1 end
-  return src and R.GetMediaSourceFileName(src, '') or ''
+  local fn = src and R.GetMediaSourceFileName(src, '') or ''
+  if rf_cache and key then rf_cache[key] = fn end
+  return fn
 end
 local function census()
   local out = {}
@@ -84,11 +90,14 @@ local function rescue(pre)
   if #saved > 0 then E.rescued = saved end
 end
 
+E.last_ms, E.last_desc = 0, ''     -- длительность последней внешней правки (пульс hb)
 local function run(desc, fn)
   depth = depth + 1
   local pre
+  local t_run = R.time_precise and R.time_precise()
   if depth == 1 then
     E.rescued = nil
+    rf_cache = {}
     if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
   end
   R.Undo_BeginBlock2(0)
@@ -102,11 +111,12 @@ local function run(desc, fn)
   end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil end
+  if depth == 0 then E.no_rescue = nil; rf_cache = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()
   if model then model.invalidate() end
+  if depth == 0 and t_run then E.last_ms = (R.time_precise() - t_run) * 1000; E.last_desc = desc end
   if not ok then error(err, 0) end
 end
 E.run = run

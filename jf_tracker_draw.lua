@@ -914,8 +914,8 @@ local function draw_topbar(L, info)
   local tab = info.toptab or 'scope'
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
-  for _, t in ipairs({ 'sample', 'modulation', 'retro', 'garden', 'master' }) do
-    local lbl = D.ic(t, t)
+  for _, t in ipairs({ 'sample', 'modulation', 'retro', 'garden', 'master' }) do   -- garden подписан «orca» (2 окт)
+    local lbl = D.ic(t, t == 'garden' and 'orca' or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
     local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
@@ -929,7 +929,7 @@ local function draw_topbar(L, info)
   -- режим анализатора (scope / spec / sgram) — для вкладок scope и master, как
   -- переключатель режима пиков в REAPER
   local amode = info.scopemode or 'scope'
-  if tab == 'master' then
+  if tab == 'master' and info.scope then                 -- скопы убраны: без моста кнопок режима нет
     local bx = sx1 - L.pad
     for _, m in ipairs({ 'sgram', 'spec', 'scope' }) do
       local bw = ms(m) + 2 * L.pad
@@ -1862,7 +1862,7 @@ function D.frame(L, snap, rows, state, info)
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   if MX and L.matrix_w > 0 and not state.mx_hidden then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
   end
   -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,

@@ -102,7 +102,7 @@ KH.PAGES = {
     { k = '< >', d = 'switch pattern of slot (previous / next)' },
     { k = 'm Enter', d = 'mute / unmute cell' },
     { k = 'Space', d = 'play from slot, or queue it while playing' },
-    { k = '+', d = 'new region at the end' },
+    { k = '+ N+', d = 'new region at the end (N+: N regions, one undo); n names it' },
     { k = 'v HJKL', d = 'block select; in block: y copy, d x cut, m mute', t = { 'v', 'H', 'J', 'K', 'L' } },
     { k = '^C ^X ^V ^N', d = 'block copy / cut / paste / mute' },
     { k = 'u ^R', d = 'undo / redo' },

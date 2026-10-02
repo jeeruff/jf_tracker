@@ -13,7 +13,9 @@
 -- Без reaper.*: данные через ctx (garden_loop / garden_fit / garden_mute /
 -- region_space / garden_cmd / garden_field / garden_save).
 
-local GD = { cur = { ri = 1, ci = 1 }, scroll = 0, page = 'grid', numbuf = nil, ocur = { x = 0, y = 0 }, oscroll = 0, glow = {} }
+-- 2 окт: сетка лупов переехала в матрицу (слой «loops»), вкладка — только поле
+-- Orca (подпись «orca»); страница grid осталась для совместимости
+local GD = { cur = { ri = 1, ci = 1 }, scroll = 0, page = 'orca', numbuf = nil, ocur = { x = 0, y = 0 }, oscroll = 0, glow = {} }
 local U, ctx
 local LADDER = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32 }
 
@@ -42,6 +44,20 @@ function GD.cells(snap, seq, targets)
   end
   return grid
 end
+
+-- клавиши лупов из матрицы (слой loops): цифры, Enter (с числом), > < + - =
+-- на ячейке (ri, ci) матрицы; true — съедено
+function GD.loop_key(c, snap, seq, ri, ci)
+  local ch = c < 256 and string.char(c) or ''
+  if not (ch:match('^%d$') or ch == '>' or ch == '<' or ch == '+' or ch == '-' or ch == '=' or (c == 13 and GD.numbuf)) then return false end
+  GD.cur.ri, GD.cur.ci = ri, ci
+  local page = GD.page
+  GD.page = 'grid'
+  local r = GD.key(c, snap, seq)
+  GD.page = page
+  return r
+end
+function GD.cell_text(g) return g and (g.muted and 'x' or (g.per and tostring(math.min(99, math.floor(g.per + 0.5))) or (g.has and '-' or nil))) or nil end
 
 local function cell_text(g)
   if g.muted then return 'x' end
@@ -147,9 +163,9 @@ function GD.key(c, snap, seq)
   local ch = c < 256 and string.char(c) or ''
   if GD.page == 'orca' then
     local f = ctx.garden_field()
-    if not f then GD.page = 'grid'; return true end
+    if not f then return false end
     local mods = ctx.mods and ctx.mods() or {}
-    if c == 27 then GD.page = 'grid'
+    if c == 27 then return false                        -- Esc — main уводит фокус в трекер
     elseif c == UP or (mods.ctrl and c == 11) then GD.ocur.y = math.max(0, GD.ocur.y - 1)
     elseif c == DOWN or (mods.ctrl and c == 10) then GD.ocur.y = math.min(f.h - 1, GD.ocur.y + 1)
     elseif c == LEFT or (mods.ctrl and c == 8) then GD.ocur.x = math.max(0, GD.ocur.x - 1)

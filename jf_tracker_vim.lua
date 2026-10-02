@@ -512,7 +512,8 @@ V.COMMANDS = {
   { 'quantize', '', 'smart quantize the instrument: loud transients to beats, soft to 16ths, length to whole bars / beats (stretch markers)' },
   { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
-  { 'garden', '[on|off|clear|pin|reset|size WxH|load]', 'Garden tab: loops grid + Orca field (plants notes into the timeline while playing)' },
+  { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
+  { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
   { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Insert / I / Shift)' },
@@ -609,7 +610,8 @@ local function run_cmd(line)
   elseif cmd == 'quantize' or cmd == 'squant' then ctx.smart_quantize()
   elseif cmd == 'tname' then ctx.rename_track(arg)
   elseif cmd == 'iname' then ctx.rename_inst(arg)
-  elseif cmd == 'garden' then ctx.garden_cmd(arg ~= '' and arg or 'show')
+  elseif cmd == 'garden' or cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
+  elseif cmd == 'loops' then if ctx.mx_loops_toggle then ctx.mx_loops_toggle() end
   elseif cmd == 'vel' and n then V.vel = math.max(1, math.min(127, math.floor(n))); V.msg = 'velocity ' .. V.vel
   elseif cmd == 'loop' then
     if n then ctx.loop('item', math.max(1, math.floor(n)))

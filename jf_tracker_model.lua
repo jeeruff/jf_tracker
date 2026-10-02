@@ -837,8 +837,33 @@ end
 -- без SWS — 0..1 и все огибающие. Точки и значения не кешируются: считаются
 -- только для видимых строк (M.env_values), это дёшево.
 -- lpb — для automation items (дробные строки начала/конца, цвет темы env_item_*)
+-- ключ темы огибающей — как у аранжировки (пары «Envelope: …» / ключ из
+-- бинарника REAPER): громкость col_env2 (pre-FX col_env1), панорама col_env4
+-- (pre-FX col_env3), ширина и громкость посыла col_env7, панорама посыла
+-- col_env8, playrate / tempo мастера col_env5 / 6, параметры FX — по кругу
+-- col_env13..16 (nfx — сколько FX-огибающих уже было на треке).
+function M.env_key(name, nfx)
+  local nm = (name or ''):lower()
+  local pre = nm:find('pre%-fx') ~= nil
+  if nm:find('/') then return 'col_env' .. (13 + (nfx or 0) % 4) end   -- «Параметр / FX»
+  if nm:find('trim') then return 'env_trim_vol' end
+  if nm:find('send') then
+    if nm:find('mute') then return 'env_sends_mute' end
+    if nm:find('pan') then return 'col_env8' end
+    return 'col_env7'
+  end
+  if nm:find('volume') then return pre and 'col_env1' or 'col_env2' end
+  if nm:find('pan') then return pre and 'col_env3' or 'col_env4' end
+  if nm:find('width') then return 'col_env7' end
+  if nm:find('mute') then return 'env_track_mute' end
+  if nm:find('playrate') then return 'col_env5' end
+  if nm:find('tempo') then return 'col_env6' end
+  return 'col_env' .. (13 + (nfx or 0) % 4)
+end
+
 function M.track_envs(tr, lpb)
   local out = {}
+  local nfx = 0
   if not R.CountTrackEnvelopes then return out end
   for i = 0, R.CountTrackEnvelopes(tr) - 1 do
     local env = R.GetTrackEnvelope(tr, i)
@@ -856,13 +881,8 @@ function M.track_envs(tr, lpb)
     if vis then
       -- цвет как в аранжировке: ключ темы по типу огибающей
       local nm = (name or ''):lower()
-      local key
-      if nm:find('volume') and nm:find('trim') then key = 'env_trim_vol'
-      elseif nm:find('volume') then key = 'col_env1'
-      elseif nm:find('pan') then key = 'col_env2'
-      elseif nm:find('width') then key = 'col_env3'
-      elseif nm:find('mute') then key = 'env_track_mute'
-      else key = 'col_env' .. (4 + (#out % 12)) end
+      local key = M.env_key(name, nfx)
+      if key:match('^col_env1[3-6]$') then nfx = nfx + 1 end
       local e = { env = env, name = name or '', min = mn, max = mx, key = key, idx = i, ais = {} }
       -- automation items: как в аранжировке — цвет темы по типу огибающей
       e.ai_key = (nm:find('volume') and 'env_item_vol') or (nm:find('pan') and 'env_item_pan')
@@ -951,7 +971,7 @@ function M.regions(lpb)
   local out = {}
   local markers = {}      -- маркеры для линейки трекера (2 окт): имя, строка (дробная), цвет
   -- библиотека паттернов: всё после маркера =LIB не входит в последовательность
-  local lib_pos, end_pos
+  local lib_pos, end_pos, start_pos
   local i = 0
   while true do
     local ret, isrgn, pos, _, name, idx, color = R.EnumProjectMarkers3(0, i)
@@ -959,6 +979,7 @@ function M.regions(lpb)
     if not isrgn then
       if name == M.LIB_MARKER then lib_pos = pos end
       if name == M.END_MARKER then end_pos = pos end
+      if name == M.START_MARKER and not start_pos then start_pos = pos end
       markers[#markers + 1] = { idx = idx, name = name or '', pos = pos, row_f = R.TimeMap2_timeToQN(0, pos) * lpb, color = color }
     end
     i = i + 1
@@ -981,6 +1002,7 @@ function M.regions(lpb)
   end
   table.sort(out, function(a, b) return a.pos < b.pos end)
   out.lib_pos = lib_pos
+  out.end_pos, out.start_pos = end_pos, start_pos   -- для последовательности без перебора маркеров каждый кадр
   out.markers = markers
   rcache.key, rcache.list = key, out
   return out

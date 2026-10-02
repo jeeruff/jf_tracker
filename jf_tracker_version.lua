@@ -1,9 +1,18 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.24'
+V.VERSION = '0.5.25'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.25', d = '2026-10-02', items = {
+    'live speed: hard pattern bounds (trim) take one pass over each track instead of regions x tracks x items (about 67x fewer REAPER calls per edit)',
+    'live speed: pattern autosync only rewrites tracks whose content differs from the source (no delete / recreate of identical items, smaller undo steps)',
+    'matrix: + no longer stops for a name prompt; N+ adds N regions in one undo step; adding a region skips the sample census and the autosync',
+    'the matrix sequence reads =START / =END from the region cache instead of scanning markers every frame',
+    'heartbeat shows the worst frame of the second and the duration of the last edit',
+    'envelope colours follow the arrange: volume col_env2, pre-FX col_env1, pan col_env4, width / send col_env7, FX parameters col_env13..16',
+    'matrix loops layer (button loops, :loops): cells show item loop periods and take digits+Enter, > < + -; :orca opens the Orca tab',
+  } },
   { v = '0.5.24', d = '2026-10-02', items = {
     'theme changes and the Theme Adjuster colour controls are picked up live (palette rebuilt within a second)',
     'oscilloscopes / spectrum removed: the JSFX bridge is no longer added; :scopes only takes old bridges off the tracks; jf_grid finds the tracker by its heartbeat',

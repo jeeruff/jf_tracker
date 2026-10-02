@@ -140,7 +140,7 @@ local MY_ID = ('%d-%06d'):format(os.time(), math.floor((reaper.time_precise() % 
 local snap, regions, L, rows = nil, {}, nil, {}
 local seq = {}      -- регионы последовательности (без библиотеки =LIB)
 local fps = { n = 0, t = reaper.time_precise(), v = 0 }
-local prof = { snap = 0, layout = 0, draw = 0, upd = 0, n = 0 }
+local prof = { snap = 0, layout = 0, draw = 0, upd = 0, n = 0, max = 0 }
 local click = { t = 0, fi = nil, row = nil, zone = nil }   -- для двойного клика
 local browse_last = nil                                     -- строка браузера, которую уже слушали (auto)
 local inject_last = reaper.GetExtState(EXT, 'inject')       -- стартовое значение не исполняем
@@ -156,6 +156,7 @@ local dsp_drag = nil                                        -- перетаск�
 local fxb_drag = nil                                        -- перетаскивание FX из браузера эффектов
 local resize_drag = nil                                     -- ресайз: 'side' | 'top'
 local lock_sync = {}                                        -- lock: последнее синхронное состояние
+local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов матрицы
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -1107,8 +1108,8 @@ ctx = {
   -- имя такой строки (n / dblclick) создаёт регион на этом такте. Кэш по
   -- таблице регионов, LPB и маркерам.
   sequence = function()
-    local s0 = model.marker_pos(model.START_MARKER) or 0
-    local s1 = model.marker_pos(model.END_MARKER)
+    local s0 = regions.start_pos or 0
+    local s1 = regions.end_pos
     local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1)
     if seq_cache.key == key then return seq_cache.seq end
     local out, real = {}, {}
@@ -1152,20 +1153,59 @@ ctx = {
   -- :name — имя региона курсора; :len N|Ns|Nb — длина (шаги по LPB /
   -- секунды / такты): следующие регионы, маркеры (=END, =LIB) и items всех
   -- треков едут на разницу, их длины сохраняются.
+  -- слой лупов в матрице (2 окт, бывший Garden): ячейка = период лупа item
+  mx_loops_toggle = function()
+    MX.loops = not MX.loops
+    vim.msg = MX.loops and 'matrix loops: digits+Enter loop N steps, > to region end, < fit, + - period, m mute' or 'matrix loops: off'
+  end,
+  mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
+  loop_cells = function()
+    if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
+      loop_cache.snap, loop_cache.seq, loop_cache.grid = snap, seq, GD.cells(snap, seq)
+    end
+    return loop_cache.grid
+  end,
   mx_refresh = function()
     model.invalidate()
     regions = model.regions(state.lpb)
     seq = ctx.sequence()
   end,
-  mx_add = function(bars, name)
-    local n = #seq + 1
-    name = (name and name ~= '') and name or ('%02d'):format(n)
-    edit.run('add region', function() alias.add_region(ctx.real_seq(), name, bars or 1) end)
+  -- Лайв (2 окт): count регионов одним undo-шагом, без страховки сэмплов
+  -- (items не удаляются) и без автосинка; курсор остаётся в матрице —
+  -- имя потом (n), а не обязательный вопрос посреди игры.
+  mx_add = function(bars, name, count)
+    count = math.max(1, math.min(64, count or 1))
+    local n0 = #seq
+    local names = {}
+    local used = {}
+    for _, r in ipairs(regions) do used[r.name] = true end
+    for k = 1, count do
+      local nm = (name and name ~= '') and (count > 1 and (name .. ' ' .. k) or name) or nil
+      if not nm then
+        local j = n0 + k
+        while used[('%02d'):format(j)] do j = j + 1 end
+        nm = ('%02d'):format(j)
+      end
+      used[nm] = true
+      names[k] = nm
+    end
+    edit.no_rescue = true
+    edit.run('add region', function()
+      local list = ctx.real_seq()
+      local rs = {}
+      for i, r in ipairs(list) do rs[i] = r end
+      for k = 1, count do
+        -- =LIB мог уехать на прошлой итерации — позиция с проекта, не из кэша
+        rs.lib_pos = model.lib_pos()
+        local t0, t1 = alias.add_region(rs, names[k], bars or 1)
+        rs[#rs + 1] = { pos = t0, rgnend = t1, name = names[k] }
+      end
+    end)
     ctx.mx_refresh()
     MX.goto_cell(seq, snap, #seq, MX.cur.ci)
     ctx.set_focus('matrix')
-    vim.msg = ('region %d "%s" added - name it'):format(#seq, name)
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. name
+    vim.msg = count > 1 and ('%d regions added (%s..%s) - n: name'):format(count, names[1], names[count])
+      or ('region %d "%s" added - n: name, = / [ ]: length'):format(#seq, names[1])
   end,
   -- ── слоты матрицы как строки Vim (2 окт) ────────────────────────────
   -- Регистр матрицы state.mx_reg: { kind = 'slot', sl = снимок } после yy / dd,
@@ -2067,6 +2107,8 @@ edit.after = function(desc)
     end
   end
   if not state.autosync or not regions or #regions == 0 then return end
+  -- новый регион пуст: синк не нужен, только жёсткие границы
+  if desc == 'add region' then model.invalidate(); alias.trim(model.regions(state.lpb)); return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
   local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
   if rg then alias.sync(regions, rg) end
@@ -2138,7 +2180,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() end
+    if d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -3243,10 +3285,12 @@ local function frame()
   if now - fps.t >= 1 then
     fps.v = fps.n / (now - fps.t); fps.n = 0; fps.t = now
     local n = math.max(1, prof.n)
-    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms',
+    -- лайв (2 окт): кроме средних — худший кадр секунды и последняя правка
+    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s)',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
-      prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000), false)
-    prof.snap, prof.layout, prof.draw, prof.upd, prof.n = 0, 0, 0, 0, 0
+      prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or ''), false)
+    prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
   -- набранные клавиши, фокус, очередь, сообщение); остальное — описание того,
@@ -3291,6 +3335,7 @@ local function frame()
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
+    loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = snap.cols, peaks = track_peaks, poolsort = state.poolsort,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
@@ -3461,7 +3506,8 @@ local function frame()
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
-  elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar; then name it (+, :add [bars] [name])'
+  elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
+  elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'select: play the sample when an instrument is selected - ' .. (state.poolprev and 'on' or 'off') .. ' (:poolprev)'
   elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the instruments have focus'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
@@ -3757,6 +3803,7 @@ local function frame()
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
+      elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
       elseif hover.matrix.btn == 'add' then ctx.mx_add() end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
@@ -4435,6 +4482,7 @@ local function frame()
   local t_4 = reaper.time_precise()
   prof.snap = prof.snap + (t_1 - t_0); prof.layout = prof.layout + (t_2 - t_1)
   prof.draw = prof.draw + (t_3 - t_2); prof.upd = prof.upd + (t_4 - t_3); prof.n = prof.n + 1
+  if t_4 - t_0 > prof.max then prof.max = t_4 - t_0 end
 
   local c = gfx.getchar()
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры

@@ -32,6 +32,7 @@ eq('B bass muted', g[2][2].muted, true)
 eq('A bass empty', g[1][2].has, false)
 eq('pad orca target', g[1][3].orca, true)
 
+GD.page = 'grid'   -- по умолчанию теперь orca (2 окт)
 GD.cur = { ri = 1, ci = 1 }
 GD.key(('1'):byte(), snap, seq); GD.key(('6'):byte(), snap, seq); GD.key(13, snap, seq)
 eq('16 Enter -> loop 16', last(), 'loop:1:1:16')
@@ -45,6 +46,6 @@ GD.key(('+'):byte(), snap, seq); eq('+ next period after 4', last(), 'loop:1:1:6
 GD.key(('-'):byte(), snap, seq); eq('- previous period before 4', last(), 'loop:1:1:3')
 GD.key(('O'):byte(), snap, seq); eq('O toggles orca', last(), 'cmd:toggle')
 GD.key(('o'):byte(), snap, seq); eq('o -> orca page', GD.page, 'orca')
-GD.key(27, snap, seq); eq('Esc on orca page without field -> grid', GD.page, 'grid')
+eq('Esc on orca page is not eaten (back to tracker)', GD.key(27, snap, seq), false)
 eq('unknown key not eaten', GD.key(('q'):byte(), snap, seq), false)
 print(('%d checks, %d failed'):format(n, bad))

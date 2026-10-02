@@ -76,16 +76,41 @@ end
 
 -- Переписать все одноимённые регионы содержимым src. Без своего undo-блока:
 -- зовётся из edit.run (хук) или из A.append (свой блок).
+-- Лайв (2 окт): хук зовётся после каждой правки, а пересоздание items
+-- (Delete + AddMediaItem + SetItemStateChunk) — самое дорогое и раздувает
+-- undo. Поэтому трек копируется, только если содержимое отличается: отпечаток
+-- спана — чанки items без GUID / IID / SEL / POSITION плюс позиция от начала
+-- региона. Чанки источника читаются один раз на трек.
+local function norm_chunk(chunk)
+  return (strip_guids(chunk):gsub('\n%s*POSITION [^\n]*', ''):gsub('\n%s*IID [^\n]*', ''):gsub('\n%s*SEL [^\n]*', ''))
+end
+local function span_print(tr, t0, t1)
+  local parts = {}
+  for _, it in ipairs(items_in(tr, t0, t1)) do
+    local ok, chunk = R.GetItemStateChunk(it, '', false)
+    local rel = R.GetMediaItemInfo_Value(it, 'D_POSITION') - t0
+    parts[#parts + 1] = ('%.6f|'):format(rel) .. (ok and norm_chunk(chunk) or '?')
+  end
+  table.sort(parts)
+  return table.concat(parts, '\0'), #parts
+end
+A._norm_chunk = norm_chunk
 function A.sync(regions, src)
   if not src or src.name == '' then return 0 end
-  local n = 0
+  local dsts = {}
   for _, dst in ipairs(regions) do
-    if dst ~= src and dst.name == src.name and dst.idx ~= src.idx then
-      for _, tr in ipairs(tracks()) do
+    if dst ~= src and dst.name == src.name and dst.idx ~= src.idx then dsts[#dsts + 1] = dst end
+  end
+  if #dsts == 0 then return 0 end
+  local n = 0
+  for _, tr in ipairs(tracks()) do
+    local sp = span_print(tr, src.pos, src.rgnend)
+    for _, dst in ipairs(dsts) do
+      if span_print(tr, dst.pos, dst.rgnend) ~= sp then
         for _, it in ipairs(items_in(tr, dst.pos, dst.rgnend)) do R.DeleteTrackMediaItem(tr, it) end
         copy_span(tr, src, dst, src.name)
+        n = n + 1
       end
-      n = n + 1
     end
   end
   return n
@@ -97,32 +122,51 @@ end
 -- содержимое каждого региона самодостаточно, и алиасы/слоты копируют ровно
 -- то, что видно. Без своего undo-блока (зовётся из хука или из edit.run).
 -- Возвращает число правок. Библиотека (=LIB) не трогается.
+-- Лайв (2 окт): один проход по items трека, регион item — бинарным поиском
+-- по отсортированным регионам (было регионы × треки × items × items).
 function A.trim(regions)
-  local n = 0
-  local trs = tracks()
-  for _, rg in ipairs(regions) do
-    if not rg.lib then
-      for _, tr in ipairs(trs) do
-        -- 1) входящие из-за начала — разрезать на границе
-        for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
-          local it = R.GetTrackMediaItem(tr, i)
-          local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-          local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-          if pos < rg.pos - EPS and fin > rg.pos + EPS then
-            if R.SplitMediaItem(it, rg.pos) then n = n + 1 end
-          end
-        end
-        -- 2) начинающиеся внутри и вылезающие за конец — укоротить
-        for _, it in ipairs(items_in(tr, rg.pos, rg.rgnend)) do
-          local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-          local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-          if fin > rg.rgnend + EPS then
-            R.SetMediaItemInfo_Value(it, 'D_LENGTH', rg.rgnend - pos)
-            n = n + 1
-          end
-        end
-      end
+  local regs = {}
+  for _, rg in ipairs(regions) do if not rg.lib then regs[#regs + 1] = rg end end
+  if #regs == 0 then return 0 end
+  table.sort(regs, function(a, b) return a.pos < b.pos end)
+  -- последний регион с началом ≤ t
+  local function at_or_before(t)
+    local lo, hi, k = 1, #regs, 0
+    while lo <= hi do
+      local m = (lo + hi) // 2
+      if regs[m].pos <= t + EPS then k = m; lo = m + 1 else hi = m - 1 end
     end
+    return k
+  end
+  local n = 0
+  local function fix(it, pos, fin, depth)
+    local k = at_or_before(pos)
+    -- начинается внутри региона: вылезает за конец — укоротить
+    -- (перекрытые регионы: самый ранний конец среди содержащих)
+    local cut
+    for j = k, math.max(1, k - 4), -1 do
+      local rg = regs[j]
+      if pos >= rg.pos - EPS and pos < rg.rgnend - EPS and (not cut or rg.rgnend < cut) then cut = rg.rgnend end
+    end
+    if cut then
+      if fin > cut + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut - pos); n = n + 1 end
+      return
+    end
+    -- вне регионов: входит в следующий из-за его начала — разрезать на границе
+    local nx = regs[k + 1]
+    if nx and fin > nx.pos + EPS and depth < 64 then
+      local right = R.SplitMediaItem(it, nx.pos)
+      if right then n = n + 1; fix(right, nx.pos, fin, depth + 1) end
+    end
+  end
+  for _, tr in ipairs(tracks()) do
+    local list = {}
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+      list[#list + 1] = { it, pos, pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') }
+    end
+    for _, e in ipairs(list) do fix(e[1], e[2], e[3], 0) end
   end
   return n
 end
