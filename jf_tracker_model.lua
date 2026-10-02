@@ -163,8 +163,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'L00' end
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
   if cm and cm ~= 0 then fx[#fx + 1] = 'M0' .. tostring(math.floor(cm)) end
-  local _, sl = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
-  if sl and sl ~= '' and tonumber(sl) then fx[#fx + 1] = 'S' .. M.hex2(tonumber(sl)) end
+  -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
+  -- ячейка — нота и номер инструмента, а у каждого слайса свой номер в пуле
   if ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'T' .. M.hex2((qn1 - qn0) * lpb) end
   if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.01 then fx[#fx + 1] = 'P' .. M.hex2(128 + pitch) end
   -- команды-огибающие и генераторы (P_EXT:jf_cmds) — как записаны

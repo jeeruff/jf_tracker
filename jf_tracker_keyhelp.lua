@@ -192,6 +192,7 @@ KH.PAGES = {
     { k = '+ -', d = 'transient sensitivity' },
     { k = 'x', d = 'clear slices' },
     { k = 'Q', d = 'smart quantize: strong hits to strong beats' },
+    { k = 'z', d = 'autotrim: cut the silence at the start and the end (button autotrim)' },
     { k = '< >', d = 'volume -1 / +1 dB' },
     { k = 'n', d = 'normalize' },
     { k = '[ ]', d = 'widen selection left / right' },

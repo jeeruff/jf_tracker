@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.27'
+V.VERSION = '0.5.28'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.28', d = '2026-10-02', items = {
+    'sample tab: autotrim (button, z, MIDI target) cuts the silence at the start and the end (-48 dB from the peak, 5 ms before the attack and 20 ms of tail kept) - all notes of the instrument, slices shifted, one undo',
+    'cells no longer show the slice command Sxx: like Renoise, note + volume and the row with the instrument number and name (typing Sxx still works)',
+  } },
   { v = '0.5.27', d = '2026-10-02', items = {
     'midi tab (next to modulation, :midi): MIDI learn for the slicer - knobs for slice start / end / move, sensitivity, volume, instrument (abs or relative encoders), pads = slices, buttons for equal / transients / detect / clear / snap / quantize / preview / insert / to library / play; knob edits land as one undo 0.5 s after the knob stops; bound CC / notes do not reach note recording',
     'browser: the <> and hide buttons are gone (the sidebar has > and =)',

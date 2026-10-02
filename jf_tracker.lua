@@ -530,6 +530,39 @@ ctx = {
     reselect_item = e.item             -- ключ инструмента сменился: курсор пула вернуть на него
     vim.msg = ('slice %s: %.3f - %.3fs (%.3fs), %d note(s) of this instrument updated'):format(e.slice_k and ('s' .. e.slice_k) or '', zd.a, zd.b, zd.b - zd.a, #items)
   end,
+  -- autotrim (2 окт): [a, b] секунд инструмента e — offset и длина всех его
+  -- нот (один ключ пула, как правка зоны слайса), нарезка сдвигается на a
+  autotrim = function(e, a, b)
+    local col = cur_col()
+    local idx
+    for i, pe in ipairs(col and col.pool or {}) do if pe.item == e.item then idx = i end end
+    local items = idx and ctx.inst_items(idx) or {}
+    if #items == 0 then items = { e.item } end
+    local rate = (e.rate and e.rate ~= 0) and e.rate or 1
+    local sl
+    if e.slices and #e.slices > 0 then
+      sl = {}
+      for _, t in ipairs(e.slices) do local u = t - a; if u > -1e-4 and u < b - a - 1e-4 then sl[#sl + 1] = math.max(0, u) end end
+      if #sl == 0 or sl[1] > 1e-4 then table.insert(sl, 1, 0) end
+    end
+    edit.run('autotrim', function()
+      for _, it in ipairs(items) do
+        local tk = reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+        if tk then
+          reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + a * rate)
+          reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
+        end
+      end
+      if sl then edit.set_slices(e.item, sl) end
+    end)
+    -- слайсер — на обрезанный сэмпл (огибающая заново)
+    local old_len = e.len or b
+    e.offs = (e.offs or 0) + a * rate; e.len = b - a; e.slices = sl
+    if SL.entry == e then SL.open(e, col and col.track) end
+    model.invalidate()
+    reselect_item = e.item
+    vim.msg = ('autotrim: cut %.3fs at the start, %.3fs at the end - %d item(s)%s'):format(a, math.max(0, old_len - b), #items, sl and (', ' .. #sl .. ' slices kept') or '')
+  end,
   -- t в DSP / кнопки шапки: цепочка трека ↔ take FX инструмента
   dsp_toggle_target = function(to)
     if to == nil then to = not state.dsp_take end
@@ -2572,7 +2605,7 @@ local function mm_zone(field, a)
   SL.sel = { a = sa, b = sb }
   vim.msg = ('midi selection %.3f - %.3fs'):format(sa, sb)
 end
-local MM_TRIG = { eq2 = 'eq2', eq4 = 'eq4', eq8 = 'eq8', eq16 = 'eq16', eq32 = 'eq32', trans = 'trans', clear = 'clear', quant = 'quant', snap = 'snap' }
+local MM_TRIG = { eq2 = 'eq2', eq4 = 'eq4', eq8 = 'eq8', eq16 = 'eq16', eq32 = 'eq32', trans = 'trans', clear = 'clear', quant = 'quant', snap = 'snap', autotrim = 'autotrim' }
 local function mm_apply(a)
   if a.learned then
     mm_save()
@@ -3804,7 +3837,7 @@ local function frame()
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
-  elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
+  elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move'):format(hover.sample.slice)

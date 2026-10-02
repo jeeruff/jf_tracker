@@ -36,6 +36,7 @@ MM.TARGETS = {
   { id = 'clear', kind = 'trigger', label = 'clear slices', d = 'remove the slicing' },
   { id = 'snap', kind = 'trigger', label = 'snap', d = 'snap on / off' },
   { id = 'quant', kind = 'trigger', label = 'quantize', d = 'smart quantize' },
+  { id = 'autotrim', kind = 'trigger', label = 'autotrim', d = 'cut the silence at the start and the end' },
   { id = 'all', kind = 'trigger', label = 'select all', d = 'selection = whole sample' },
   { id = 'preview', kind = 'trigger', label = 'preview', d = 'play the zone / selection' },
   { id = 'insert', kind = 'trigger', label = 'insert', d = 'insert the selection at the tracker cursor (Enter)' },

@@ -266,6 +266,7 @@ function S.key(c)
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
+  elseif ch == 'z' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
   elseif ch == 't' or ch == 's' then S.use_transients()                -- s: нарезать по транзиентам (2 окт)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
@@ -334,7 +335,8 @@ function S.button(id)
     S.sens = math.max(0, math.min(1, S.sens + (id == 'sens+' and 0.05 or -0.05)))
     S.use_transients()
   elseif id == 'clear' then S.clear()
-  elseif id == 'quant' then S.smart_quantize() end
+  elseif id == 'quant' then S.smart_quantize()
+  elseif id == 'autotrim' then S.autotrim() end
 end
 
 -- smart quantize (2 окт): транзиенты сэмпла → stretch-маркеры, сильные к
@@ -348,6 +350,34 @@ function S.smart_quantize()
   for k, t in ipairs(S.trans) do hits[#hits + 1] = { t = t, amp = (S.trans_amp or {})[k] or 0 } end
   local n, kept, newlen = ctx.edit.smart_quantize(e.item, hits)
   S.msg = n and ('quantized: %d of %d transients, length %.3fs'):format(kept or 0, #hits, newlen or 0) or 'quantize failed'
+end
+
+-- autotrim (2 окт): срезать тишину в начале и в конце по огибающей пиков
+-- (порог −48 дБ от пика, не ниже −60 дБ); 5 мс до атаки и 20 мс хвоста
+-- оставляются, чтобы не щёлкало. Правку (offset / длина всех нот этого
+-- инструмента, сдвиг слайсов) делает main — ctx.autotrim, один undo.
+function S.trim_bounds(env, len, rate)
+  if not env or (env.n or 0) == 0 then return nil, 'no peaks yet' end
+  local mx = 0
+  for i = 1, env.n do if env.v[i] > mx then mx = env.v[i] end end
+  if mx <= 0 then return nil, 'silent' end
+  local thr = math.max(0.001, mx * 10 ^ (-48 / 20))
+  local i0, i1
+  for i = 1, env.n do if env.v[i] > thr then i0 = i; break end end
+  for i = env.n, 1, -1 do if env.v[i] > thr then i1 = i; break end end
+  if not i0 then return nil, 'silent' end
+  rate = (rate and rate ~= 0) and rate or 1
+  local a = math.max(0, (i0 - 1) / env.rate - 0.005) / rate
+  local b = math.min(len, (i1 / env.rate + 0.02) / rate)
+  if a < 0.002 and len - b < 0.002 then return nil, 'no silence to cut' end
+  return a, b
+end
+function S.autotrim()
+  local e = S.entry
+  if not e or e.file or not e.item then S.msg = 'autotrim: open an instrument (not a browser file)'; return end
+  local a, b = S.trim_bounds(S.env, e.len, e.rate)
+  if not a then S.msg = 'autotrim: ' .. tostring(b); return end
+  ctx.autotrim(e, a, b)
 end
 
 function S.cycle_view()
@@ -417,7 +447,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local hover_sbtn
   if not e.file and e.item then
     local bx = x
-    local BTN = { { 'snap', 'snap' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
+    local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
                   { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' } }
     U.text(bx, y + rh, 'slice', U.GREY); bx = bx + U.measure('slice') + L.pad
     for _, b in ipairs(BTN) do
