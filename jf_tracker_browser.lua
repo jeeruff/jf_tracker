@@ -394,6 +394,8 @@ end
 function B.click(what)
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
+  elseif what == 'pvvol' then B.vol_drag = true
+  elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
   elseif what == 'wave' then B.wave = not B.wave
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
@@ -533,6 +535,57 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, by, b[1], b[2], b[3])
     end
     h = h - L.rh - 4
+  end
+  -- над кнопками (2 окт): мини-волна проигрываемого / выбранного файла с
+  -- позицией (клик — играть с этого места) и слайдер громкости прослушивания
+  do
+    local sy = y + h - L.rh - 2                     -- строка слайдера
+    local wh = 2 * L.rh                             -- высота мини-волны
+    local wy = sy - wh - 2
+    local x0, ww = x + L.pad + 2, w - 2 * L.pad - 4
+    local pos, len, ppath
+    if ctx.preview_pos then pos, len, ppath = ctx.preview_pos() end      -- (a and f() отрезал бы хвост значений)
+    local path = ppath or B.preview_path(B.entries[B.cur])
+    U.set(U.BG); gfx.rect(x0, wy, ww, wh, 1)
+    U.set(U.LINE); gfx.rect(x0, wy, ww, wh, 0)
+    local pk = path and ww > 8 and ctx.file_peaks and ctx.file_peaks(path, ww)
+    local cy, hh = wy + math.floor(wh / 2), math.floor(wh / 2) - 1
+    U.set(ppath and U.CYAN or U.GREY)
+    if pk and pk.n > 0 then
+      for px = 0, ww - 1 do
+        local i = math.floor(px / ww * pk.n) + 1
+        local a, b = pk.min[i] or 0, pk.max[i] or 0
+        if b - a < 0.03 then a, b = -0.015, 0.015 end
+        gfx.line(x0 + px, cy - b * hh, x0 + px, cy - a * hh)
+      end
+    else gfx.line(x0, cy, x0 + ww - 1, cy) end
+    if pos and len and len > 0 then
+      local px = x0 + math.floor(math.max(0, math.min(1, pos / len)) * (ww - 1))
+      U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
+    end
+    if mx >= x0 and mx < x0 + ww and my >= wy and my < wy + wh and path then
+      hover = 'pvwave'; B.pv_frac = (mx - x0) / ww; B.pv_path = path
+    end
+    -- слайдер громкости: подпись | дорожка | dB
+    local vol = ctx.preview_vol and ctx.preview_vol() or 1
+    local db = vol > 1e-6 and 20 * math.log(vol, 10) or -60
+    local frac = (math.max(-40, math.min(6, db)) + 40) / 46
+    local lbl, vs = 'vol', db <= -40 and '-inf' or ('%+.1f'):format(db)
+    local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
+    local sx0, sw = x0 + lw, math.max(8, ww - lw - vw)
+    local hot = mx >= sx0 - 2 and mx < sx0 + sw + 2 and my >= sy and my < sy + L.rh
+    U.text(x0, sy, lbl, U.GREY)
+    U.set(U.DIM); gfx.rect(sx0, sy + math.floor(L.rh / 2) - 1, sw, 2, 1)
+    U.set(hot and U.AMBER or U.TEXT); gfx.rect(sx0, sy + 4, math.max(1, math.floor(frac * sw + 0.5)), L.rh - 8, 1)
+    U.text(sx0 + sw + L.pad, sy, vs, U.GREY)
+    if hot then hover = 'pvvol'; B.pv_vol_frac = math.max(0, math.min(1, (mx - sx0) / sw)) end
+    if B.vol_drag then
+      if gfx.mouse_cap & 1 == 1 then
+        local f = math.max(0, math.min(1, (mx - sx0) / sw))
+        ctx.preview_set_vol(f <= 0.001 and 0 or 10 ^ ((f * 46 - 40) / 20))
+      else B.vol_drag = false end
+    end
+    h = h - wh - L.rh - 6
   end
   y = y + L.rh + 2; h = h - L.rh - 2
   -- путь / база / фильтр

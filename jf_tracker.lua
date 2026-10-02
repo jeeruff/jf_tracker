@@ -102,6 +102,8 @@ if tostring(ext('font_v', '')) ~= '3' then state.font = 0; state.fontscale = 2 e
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
+state.pvvol = tonumber(ext('pvvol', 1)) or 1
+PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
 model.OVERSAMPLE = state.wave_os
 vim.step_auto = tostring(ext('step_auto', '0')) == '1'
@@ -163,7 +165,7 @@ local function save_win()
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed' }) do S(k, state[k] and '1' or '0') end
-  S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
+  S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
@@ -1113,6 +1115,16 @@ ctx = {
     state.top = true; state.toptab = 'sample'
     local c = cur_col()
     if SL.open_file(path, c and c.track) then vim.msg = 'sample: ' .. (path:match('[^/]+$') or path) end
+  end,
+  -- мини-плеер внизу браузера (2 окт): позиция, громкость, старт с места
+  preview_pos = function() return PV.position() end,
+  preview_vol = function() return PV.vol end,
+  preview_set_vol = function(v) PV.set_vol(v); state.pvvol = PV.vol end,
+  preview_from = function(path, frac)
+    local c = cur_col()
+    local len = 0
+    do local src = reaper.PCM_Source_CreateFromFile(path); if src then len = reaper.GetMediaSourceLength(src) or 0; reaper.PCM_Source_Destroy(src) end end
+    PV.file(c and c.track, path, nil, frac * len)
   end,
   preview_file = function(path, sec)
     local c = cur_col(); PV.file(c and c.track, path, sec or 1.0)
@@ -2502,7 +2514,7 @@ local function frame()
     state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to depot; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
   elseif type(hover.browser) == 'string' then
-    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
+    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif hover.header_col or hover.col then
     local c = hover.header_col or hover.col
@@ -2692,9 +2704,11 @@ local function frame()
         end
       end
       click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
+    elseif hover.browser == 'pvvol' and dbl and click.zone == 'pvvol' then
+      ctx.preview_set_vol(1); vim.msg = 'preview volume 0 dB'
     elseif type(hover.browser) == 'string' then
       B.click(hover.browser)
-      click = { t = now2, zone = 'browserbtn' }
+      click = { t = now2, zone = hover.browser == 'pvvol' and 'pvvol' or 'browserbtn' }
     elseif hover.browser then
       ctx.set_focus('browser')
       B.cur = hover.browser
@@ -2915,6 +2929,11 @@ local function frame()
     local e = cur_col() and (cur_col().pool or {})[vim.inst]
     SPROP.sel = SPROP.hover.row
     if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
+    gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover.browser == 'pvvol' then
+    local v = PV.vol; local db = v > 1e-6 and 20 * math.log(v, 10) or -40
+    ctx.preview_set_vol(10 ^ (math.max(-40, math.min(6, db + (gfx.mouse_wheel > 0 and 1 or -1))) / 20))
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.trs then

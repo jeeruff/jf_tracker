@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.4'
+V.VERSION = '0.5.5'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.5', d = '2026-10-02', items = {
+    'browser mini player: peaks of the playing / selected file with the play position, click plays from that point',
+    'browser preview volume slider (drag, wheel 1 dB, dblclick 0 dB), remembered between runs',
+  } },
   { v = '0.5.4', d = '2026-10-02', items = {
     'browser search right in the list (/, f or find): folder - recursive from the current folder, open db - the db, otherwise the current list',
     'fzf syntax: words (fuzzy, all must match), ^start, end$, \'exact, !not; arrows move, Enter keeps results, Esc clears',

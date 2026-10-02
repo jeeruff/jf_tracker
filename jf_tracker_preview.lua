@@ -15,8 +15,25 @@ local stop_at, restore_cur    -- MIDI-превью через транспорт
 
 function P.available() return R.CF_CreatePreview ~= nil end
 
+P.vol = 1                     -- громкость прослушивания файлов браузера (линейная, слайдер внизу браузера)
+P.cur_path, P.cur_len = nil, 0  -- что играет из браузера (мини-волна с позицией)
+
 local function stop_audio()
   if cur then pcall(R.CF_Preview_Stop, cur); cur = nil end
+  P.cur_path = nil
+end
+
+function P.set_vol(v)
+  P.vol = math.max(0, math.min(4, v))
+  if cur and P.cur_path then pcall(R.CF_Preview_SetValue, cur, 'D_VOLUME', P.vol) end
+end
+
+-- позиция проигрываемого файла: секунды, длина, путь (nil — ничего не играет)
+function P.position()
+  if not (cur and P.cur_path) then return nil end
+  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ok then return nil end
+  return pos, P.cur_len, P.cur_path
 end
 
 local audio_stop_at
@@ -69,18 +86,22 @@ function P.midi(t0, t1)
 end
 
 -- файл с диска (браузер): через трек, лимит секунд
-function P.file(track, path, max_sec)
+function P.file(track, path, max_sec, from)
   if not P.available() or not path then return false end
   local src = R.PCM_Source_CreateFromFile(path)
   if not src then return false end
   stop_audio()
   audio_stop_at = max_sec and (R.time_precise() + max_sec) or nil
+  local len = R.GetMediaSourceLength(src) or 0
   local pv = R.CF_CreatePreview(src)
   R.PCM_Source_Destroy(src)          -- превью держит свою ссылку
   if not pv then return false end
   if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  R.CF_Preview_SetValue(pv, 'D_VOLUME', P.vol)
+  if from and from > 0 then R.CF_Preview_SetValue(pv, 'D_POSITION', from) end
   R.CF_Preview_Play(pv)
   cur = pv
+  P.cur_path, P.cur_len = path, len
   return true
 end
 
