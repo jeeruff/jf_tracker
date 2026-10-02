@@ -89,6 +89,8 @@ local state = {
   side_px = tonumber(reaper.GetExtState(EXT, 'side_px')),   -- ширина браузера мышью (nil = авто)
   top_px = tonumber(reaper.GetExtState(EXT, 'top_px')),     -- высота верхней панели мышью
   inst_px = tonumber(reaper.GetExtState(EXT, 'inst_px')),   -- высота инструментов в сайдбаре
+  mx_px = tonumber(reaper.GetExtState(EXT, 'mx_px')),       -- ширина матрицы мышью (nil = авто)
+  mx_hidden = reaper.GetExtState(EXT, 'mx_hidden') == '1',  -- матрица свёрнута в полосу
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
   dsp = flag('dsp', false),                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
@@ -168,6 +170,7 @@ local function save_win()
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
+  S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
   S('glyphface', state.glyphface or ''); S('fontface', state.fontface or '')
   local pm = {}
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
@@ -1114,7 +1117,7 @@ ctx = {
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
     if state.dsp then order[#order + 1] = 'dsp' end
-    if #seq > 0 then order[#order + 1] = 'matrix' end
+    if not state.mx_hidden then order[#order + 1] = 'matrix' end
     if state.top then order[#order + 1] = 'top' end
     local i = 1
     for k, v in ipairs(order) do if v == state.focus then i = k end end
@@ -1320,6 +1323,7 @@ local function hint_go(t)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
     if d == 'zoom' then ctx.mx_zoom() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() end
+  elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
@@ -2424,6 +2428,8 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
+  elseif hover.mxctl then
+    state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.trs then
@@ -2487,10 +2493,11 @@ local function frame()
     elseif state.top and math.abs(gfx.mouse_y - L.top_h) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
-        if resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
+        if resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
+        elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
         else state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), gfx.mouse_y)) end
-        state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px))
+        if resize_drag ~= 'mx' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
       state.status = edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: instruments / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
@@ -2580,6 +2587,13 @@ local function frame()
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
+    elseif hover.mxctl then
+      if hover.mxctl == 'open' then state.mx_hidden = false; vim.msg = 'matrix shown'
+      elseif hover.mxctl == 'close' then state.mx_hidden = true; if state.focus == 'matrix' then ctx.set_focus('tracker') end; vim.msg = 'matrix folded (> to open)'
+      elseif hover.mxctl == 'grip' then
+        if dbl and click.zone == 'mxgrip' then state.mx_px = nil; vim.msg = 'matrix width: auto' else resize_drag = 'mx' end
+      end
+      click = { t = now2, zone = hover.mxctl == 'grip' and 'mxgrip' or 'mxctl' }
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
@@ -2975,7 +2989,8 @@ local function frame()
     state.last_key = c
     vim.msg = ''
     local ok, r = pcall(function()
-      if state.focus == 'matrix' and #seq > 0 then
+      if state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
+      elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not MX.key(c, seq, snap) then return vim.key(c) end

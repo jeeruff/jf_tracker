@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.1'
+V.VERSION = '0.5.2'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.2', d = '2026-10-02', items = {
+    'matrix is always shown (also with no regions, + adds the first one)',
+    'divider buttons: < folds the matrix to a strip, > opens it, = drags its width (dblclick: auto)',
+  } },
   { v = '0.5.1', d = '2026-10-02', items = {
     'instruments list is a tree per track: source sample, its slices / cuts indented below (no library group)',
     'sample tab: properties panel right of the wave (volume, pan, transpose, finetune, rate, keep pitch, stretch mode, loop, fades, take fx, normalize)',

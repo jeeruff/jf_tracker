@@ -206,6 +206,10 @@ function D.layout(snap, state, nregions)
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   L.win_w = gfx.w - L.side_w
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
+  -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
+  L.mx_strip_w = ms('>') + 2 * L.pad + 6
+  if state.mx_hidden then L.matrix_w = L.mx_strip_w
+  elseif state.mx_px and MX then L.matrix_w = math.max((MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
   L.label_w = ms('0000') + 2 * L.pad
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
@@ -1509,9 +1513,31 @@ function D.frame(L, snap, rows, state, info)
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 1, hy, 2, L.body_y + L.body_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
-  if MX and L.matrix_w > 0 then
+  if MX and L.matrix_w > 0 and not state.mx_hidden then
     hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
+  end
+  -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,
+  -- над ней = — ручка ширины (тянуть, двойной клик — авто)
+  if MX and L.matrix_w > 0 then
+    local bot = L.body_y + L.body_h
+    local bw = ms('>') + 2 * L.pad
+    local lx = L.matrix_w - 1
+    if state.mx_hidden then
+      set(U.PANEL); gfx.rect(0, hy, L.matrix_w - 1, bot - hy, 1)
+      set(D.SEP); gfx.rect(lx - 1, hy, 2, bot - hy, 1)
+    end
+    local function knob(y, lbl, what)
+      local bx = math.max(1, lx - bw - 1)          -- целиком слева от линии: не налезает на номера строк
+      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
+      set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
+      text(bx + L.pad, y, lbl, hot and U.AMBER or U.TEXT)
+      if hot then hover.mxctl = what end
+      hint('mxctl', bx, y, bw, L.rh, what)
+    end
+    knob(bot - L.rh - 2, state.mx_hidden and '>' or '<', state.mx_hidden and 'open' or 'close')
+    if not state.mx_hidden then knob(bot - 2 * L.rh - 4, '=', 'grip') end
   end
 
   if L.side_w > 0 and info.browser_draw then

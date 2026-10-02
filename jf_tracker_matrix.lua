@@ -103,7 +103,6 @@ MX.name_h = 0
 MX.DETAIL_ROWS = 4
 
 function MX.width(L, nregions, ncols)
-  if nregions == 0 then L.mx_row_h = L.rh; return 0 end
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
   L.mx_arrow_w = U.measure('<')
   L.mx_idx_w = L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
@@ -134,7 +133,7 @@ end
 -- Возвращает hover = { ri=, ci=, prev=, next=, btn= }.
 
 function MX.draw(L, snap, regions, info)
-  if #regions == 0 then return {} end
+  -- пустой проект (нет регионов) — матрица всё равно видна: кнопки, + (2 окт)
   local grid = MX.grid(snap, regions)
   local W = L.matrix_w
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -161,6 +160,7 @@ function MX.draw(L, snap, regions, info)
   local ny = hy + L.rh + 3
   for ci, col in ipairs(snap.cols) do
     local x = L.mx_label_w + (ci - 1) * L.mx_cell_w
+    if x + L.mx_cell_w > W - 4 then break end
     local is_cur = (info.cur_ci == ci)
     ctx.vtext(x + (L.mx_cell_w - L.th) / 2, ny, MX.name_h - 2, col.name ~= '' and col.name or tostring(ci),
       is_cur and U.AMBER or U.TEXT, U.PANEL)
@@ -224,6 +224,7 @@ function MX.draw(L, snap, regions, info)
     end
     for ci = 1, #snap.cols do
       local x = L.mx_label_w + (ci - 1) * L.mx_cell_w
+      if x + L.mx_cell_w > W - 4 then break end              -- узкая матрица (ширина мышью): не лезть в трекер
       local g = grid[ri][ci]
       local col = snap.cols[ci]
       U.set(U.DIM); gfx.rect(x, y, L.mx_cell_w, rh, 0)
