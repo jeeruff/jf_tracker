@@ -108,6 +108,9 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   mxruler = flag('mxruler', true),
+  -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
+  -- включена, если установлен демон jf_grid
+  gridtab = flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')),
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
@@ -159,6 +162,7 @@ local fxb_drag = nil                                        -- перетаск�
 local resize_drag = nil                                     -- ресайз: 'side' | 'top'
 local lock_sync = {}                                        -- lock: последнее синхронное состояние
 local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов матрицы
+local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- размер / доли для контрола
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -250,7 +254,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -1189,6 +1193,13 @@ ctx = {
   -- секунды / такты): следующие регионы, маркеры (=END, =LIB) и items всех
   -- треков едут на разницу, их длины сохраняются.
   -- слой лупов в матрице (2 окт, бывший Garden): ячейка = период лупа item
+  -- вкладки верхней панели; grid — по опции (monome есть не у всех)
+  top_tabs = function()
+    local t = { 'sample', 'modulation', 'midi' }
+    if state.gridtab then t[#t + 1] = 'grid' end
+    for _, x in ipairs({ 'retro', 'garden', 'master' }) do t[#t + 1] = x end
+    return t
+  end,
   mx_loops_toggle = function()
     MX.loops = not MX.loops
     vim.msg = MX.loops and 'matrix loops: digits+Enter loop N steps, > to region end, < fit, + - period, m mute' or 'matrix loops: off'
@@ -1555,6 +1566,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('icons', 'nerd icons', 'icons on buttons (TTF font only)'),
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
+      flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = 4, desc = 'x1..x4 (Ctrl +/-)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
       { key = 'font', label = 'ttf font size', kind = 'num', min = 0, max = 40, desc = '0 = bitmap font; N = Nerd font size', get = function() return state.font or 0 end, set = function(v) ctx.set_font(math.floor(v)) end },
@@ -3133,6 +3145,9 @@ local function ctrl_action(name, delta)
     else ctx.set_font(math.max(0, state.font + (delta ~= 0 and delta or 1))) end
   elseif name == 'fx' then state.fxcols = math.max(0, math.min(4, state.fxcols + (delta ~= 0 and delta or 1)))
   elseif name == 'meters' then state.meters = not state.meters
+  elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  elseif name == 'sig' or name == 'beats' then
+    vim.msg = ('time signature %d/%d at the cursor: %d rows per bar at LPB %d (change it with a REAPER tempo marker)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
   end
 end
 
@@ -3416,6 +3431,7 @@ end
 
 local function frame()
   theme_check()
+  if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end   -- вкладка grid выключена в опциях
   -- заметки: автозапись через секунду после правки; context следует за item под курсором
   if state.notes_open then
     NT.edit_t = NT.dirty and (NT.edit_t or reaper.time_precise()) or nil
@@ -3451,6 +3467,13 @@ local function frame()
   local is_playing = playing()
   local playpos = is_playing and reaper.GetPlayPosition() or nil
   local curpos = reaper.GetCursorPosition()
+  do
+    local t = playpos or curpos
+    local b, meas, cml, _, cdenom = reaper.TimeMap2_timeToBeats(0, t)
+    beat_info.bar, beat_info.beat = (meas or 0) + 1, b or 0
+    beat_info.num, beat_info.den = math.floor((cml or 4) + 0.5), math.floor((cdenom or 4) + 0.5)
+    beat_info.rows_bar = math.floor(beat_info.num * 4 / math.max(1, beat_info.den) * state.lpb + 0.5)
+  end
   local changed
   snap, changed = model.snapshot(state.lpb)
   draw.inst_of = snap and snap.inst_of
@@ -3592,7 +3615,7 @@ local function frame()
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
-    mono = state.top and mono_read() or nil,
+    mono = (state.top and state.gridtab and state.toptab == 'grid') and mono_read() or nil,
     master = (state.top and (state.toptab == 'master' or state.toptab == 'scope') and snap.master) and {
       peaks = { reaper.Track_GetPeakInfo(snap.master.track, 0), reaper.Track_GetPeakInfo(snap.master.track, 1) },
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
@@ -3612,7 +3635,11 @@ local function frame()
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
       xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
+      metro = reaper.GetToggleCommandState(40364) == 1,
+      -- размер и доли (2 окт): такт, доля в такте, строк на такт
+      sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
+    tabs = ctx.top_tabs(),
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
     inspreview = state.preview,
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
@@ -3786,6 +3813,9 @@ local function frame()
     fx = 'fx: effect command, letter + hex hex (9xx offset, Sxx slice, Bxx beatsync ...)',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
+  elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
+  elseif hover.ctrl == 'sig' then state.status = ('time signature at the cursor %d/%d - %d rows per bar, %d per beat (LPB)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
+  elseif hover.ctrl == 'beats' then state.status = ('bar %d, beat %d of %d - squares: beats of the bar (amber edge = downbeat), lit = current; %d rows/beat, %d rows/bar'):format(beat_info.bar, math.floor(beat_info.beat) + 1, beat_info.num, state.lpb, beat_info.rows_bar)
   elseif hover.ctrl == 'xfade' then state.status = 'x-fade of inserted notes: click on/off, wheel: length (ms); off = overlaps without crossfade; \\x: menu'
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
@@ -4822,7 +4852,7 @@ local function frame()
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Option-Tab / Option-Shift-Tab: вкладки верхнего дока по кругу (sample → … → master → sample)
   if (c == 9 or c == 25) and ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    local TABS = { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }
+    local TABS = ctx.top_tabs()
     local i = 1
     for k, t in ipairs(TABS) do if t == state.toptab then i = k end end
     local back = c == 25 or ctx.mods().shift

@@ -206,6 +206,13 @@ KH.PAGES = {
     { k = 'zone', d = 'slice of a big sample: top triangles = start / end, bottom strip = move it' },
     { k = 'Esc', d = 'clear selection / close' },
   } },
+  grid = { title = 'monome grid / arc (jf_grid)', e = {
+    { k = 'take', d = 'give the grid to the tracker module (rows 1-7: slots x tracks, row 8: transport)' },
+    { k = 'grid', d = 'return the grid to the GRID mixer mod' },
+    { k = 'arc', d = 'ring 1 lpb, 2 oct, 3 step, 4 inst' },
+    { k = 'options', d = 'the tab can be switched off in options (grid tab) if you have no monome' },
+    { k = 'Esc', d = 'back to tracker' },
+  } },
   midi = { title = 'MIDI learn (slicer from a controller)', e = {
     { k = 'j k g G', d = 'target down / up / first / last' },
     { k = 'Enter l', d = 'learn: the next CC / note becomes the binding (Esc cancels)' },
@@ -296,11 +303,12 @@ KH.BARS = {
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },
   orca = { { 'arrows', 'move' }, { 'A-Z', 'operator' }, { '!', 'bang' }, { '.', 'erase' }, { 'Space', 'play' }, { 'Esc', 'back' } },
+  grid = { { 'take', 'grid to tracker' }, { 'grid', 'back to mixer' }, { 'Esc', 'back' } },
   midi = { { 'j k', 'target' }, { 'Enter', 'learn' }, { 'd', 'clear' }, { 'm', 'abs/rel' }, { 'Esc', 'back' } },
   master = { { 'm', 'scope mode' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

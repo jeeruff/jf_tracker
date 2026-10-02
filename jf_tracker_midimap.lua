@@ -78,7 +78,7 @@ end
 --   { t = 'pads', k = номер слайса, vel = }          пэд
 --   { eaten = true }                                 наше, но без действия (note-off, отпускание)
 -- или nil — событие не наше.
-function MM.feed(st, d1, d2, dev)
+local function feed0(st, d1, d2, dev)
   if not st then return nil end
   local hi, ch = st & 0xF0, st & 0x0F
   local kind
@@ -131,6 +131,32 @@ function MM.feed(st, d1, d2, dev)
     end
   end
   return nil
+end
+
+-- монитор (2 окт): последние события со своей судьбой — цель / learn / мимо
+MM.log = {}
+MM.LOG_MAX = 64
+function MM.feed(st, d1, d2, dev)
+  local a = feed0(st, d1, d2, dev)
+  if st and (st & 0xF0) >= 0x80 then
+    local hi = st & 0xF0
+    local what
+    if hi == 0xB0 then what = ('CC  %3d = %3d'):format(d1 or 0, d2 or 0)
+    elseif hi == 0x90 and (d2 or 0) > 0 then what = ('on  %3d v%3d'):format(d1 or 0, d2 or 0)
+    elseif hi == 0x80 or hi == 0x90 then what = ('off %3d'):format(d1 or 0)
+    elseif hi == 0xE0 then what = ('bend %5d'):format(((d2 or 0) << 7 | (d1 or 0)) - 8192)
+    elseif hi == 0xD0 then what = ('aftertouch %3d'):format(d1 or 0)
+    elseif hi == 0xA0 then what = ('poly at %3d %3d'):format(d1 or 0, d2 or 0)
+    elseif hi == 0xC0 then what = ('program %3d'):format(d1 or 0)
+    else what = ('%02X %d %d'):format(st, d1 or 0, d2 or 0) end
+    local fate
+    if a and a.learned then fate = 'learned ' .. BY_ID[a.learned].label
+    elseif a and a.t then fate = BY_ID[a.t] and BY_ID[a.t].label or a.t
+    elseif a then fate = '(bound)' end
+    table.insert(MM.log, 1, { ch = (st & 0x0F) + 1, what = what, dev = dev or '', fate = fate })
+    while #MM.log > MM.LOG_MAX do table.remove(MM.log) end
+  end
+  return a
 end
 
 -- ── хранение ────────────────────────────────────────────────────────────
@@ -187,10 +213,32 @@ end
 function MM.draw(U, L, x, y, w, h, focused, fit)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
+  -- слева — монитор входа (2 окт), справа — привязки
+  local lw = math.max(L.cw * 22, math.floor(w * 0.36))
+  if w - lw < L.cw * 30 then lw = 0 end                -- узко: только привязки
+  if lw > 0 then
+    U.text(x, y, fit('monitor  (all MIDI inputs)', lw - L.pad), U.GREY)
+    local nrow = math.max(1, math.floor((h - L.rh - 2) / L.rh))
+    for i = 1, math.min(nrow, #MM.log) do
+      local e = MM.log[i]
+      local ry = y + L.rh + 2 + (i - 1) * L.rh
+      local head = ('ch%-2d %s'):format(e.ch, e.what)
+      local hw = U.measure(head)
+      U.text(x, ry + 1, fit(head, lw - L.pad), i == 1 and U.TEXT or U.GREY)
+      local rest = e.fate and ('-> ' .. e.fate) or e.dev
+      local rx = x + hw + L.pad
+      if rest ~= '' and rx + U.measure('-> ab') < x + lw - L.pad then
+        U.text(rx, ry + 1, fit(rest, x + lw - L.pad - rx), e.fate and U.AMBER or U.DIM)
+      end
+    end
+    if #MM.log == 0 then U.text(x, y + L.rh + 3, fit('move a knob / hit a pad: events show here', lw - L.pad), U.DIM) end
+    U.set(U.LINE); gfx.rect(x + lw - math.floor(L.pad / 2) - 1, y, 1, h, 1)
+    x, w = x + lw + L.pad, w - lw - L.pad
+  end
   local head = MM.learning and ('learn: ' .. BY_ID[MM.learning].label .. ' - move a knob / hit a pad or key (Esc cancels)')
     or 'midi learn - Enter: learn, d: clear, m: abs / rel / rel64'
-  U.text(x, y, fit(head, math.floor(w * 0.62)), MM.learning and U.AMBER or U.GREY)
-  U.text(x + math.floor(w * 0.64), y, fit('in: ' .. (MM.last ~= '' and MM.last or '-'), w - math.floor(w * 0.64)), U.GREY)
+  U.text(x, y, fit(head, lw > 0 and w or math.floor(w * 0.62)), MM.learning and U.AMBER or U.GREY)
+  if lw == 0 then U.text(x + math.floor(w * 0.64), y, fit('in: ' .. (MM.last ~= '' and MM.last or '-'), w - math.floor(w * 0.64)), U.GREY) end
   local top = y + L.rh + 2
   local nvis = math.max(1, math.floor((h - L.rh - 2) / L.rh))
   -- две колонки, если влезают: имя | привязка | режим

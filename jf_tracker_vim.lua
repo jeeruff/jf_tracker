@@ -593,7 +593,7 @@ local function run_cmd(line)
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
     local a = arg == 'mod' and 'modulation' or arg
-    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or a == 'retro' or a == 'garden') and a or 'master'
+    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or a == 'garden') and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
     st.top = true; st.toptab = 'retro'

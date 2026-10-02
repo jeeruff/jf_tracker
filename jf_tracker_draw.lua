@@ -800,57 +800,20 @@ function D.ghost(label)
   text(x + 6, y + 1, label, U.BG, U.AMBER)
 end
 
-local function draw_topbar(L, info)
-  local hover = {}
-  local H = L.top_h
-  set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
-  set(D.SEP); gfx.rect(0, H - 2, gfx.w, 2, 1)
+local function draw_mono(L, info, X0, Y0, MW, H, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local c = info.ctrl or {}
-
-  -- контрол: сетка 3 колонки × 4 строки
-  local items = {
-    { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
-    { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
-    { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
-    { 'vel', ('vel %d'):format(c.vel or 100) },
-    { 'follow', D.ic('follow', 'follow ' .. (c.follow and 'on' or 'off')), c.follow and U.CYAN or U.GREY },
-    { 'loop', D.ic('loop', 'loop ' .. (c.loop and 'on' or 'off')), c.loop and U.CYAN or U.GREY },
-    { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
-    { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
-    { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
-    { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
-    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
-    { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
-    { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
-    { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
-  }
-  local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
-  local rows_fit = math.max(1, math.floor((H - 4) / L.rh))
-  for i, it in ipairs(items) do
-    local ci, ri = (i - 1) % 3, math.floor((i - 1) / 3)
-    if ri >= rows_fit then break end
-    local x, y = L.pad + ci * colw, 2 + ri * L.rh
-    local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
-    if hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1); hover.ctrl = it[1] end
-    D.ctrl_rect = D.ctrl_rect or {}
-    D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
-    text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
-    hint('ctrl', x, y, colw, L.rh, it[1])
-  end
-  -- mono-модуль (jf_grid): состояние шины, владелец, мини-грид того, что
+  -- mono-модуль (jf_grid), вкладка grid (2 окт: из блока управления): состояние шины, владелец, мини-грид того, что
   -- показывает мод трекера, легенда. Кнопки take / grid — владение поверхностью.
   do
     local mo = info.mono
-    local y0 = 2 + math.min(rows_fit, math.ceil(#items / 3)) * L.rh + 2
+    local y0 = Y0
+    if not mo then text(X0, y0, 'no monome data (jf_grid)', U.GREY) end
     if mo and H - y0 > 2 * L.rh then
-      set(D.SEP); gfx.rect(L.pad, y0, L.ctrl_w - 2 * L.pad, 1, 1)
-      y0 = y0 + 2
       local st = mo.alive and ('grid ' .. (mo.grid and 'ok' or '--') .. '  arc ' .. (mo.arc and 'ok' or '--') .. '  owner ' .. (mo.owner_name or '-'))
                  or 'daemon jf_grid: not running'
-      text(L.pad + 2, y0 + 1, fit('mono  ' .. st, L.ctrl_w - 2 * L.pad - ms('[take][grid]') - L.pad), mo.alive and (mo.owner_id == 9 and U.AMBER or U.TEXT) or U.GREY)
+      text(X0 + 2, y0 + 1, fit('mono  ' .. st, MW - 2 * L.pad - ms('[take][grid]') - L.pad), mo.alive and (mo.owner_id == 9 and U.AMBER or U.TEXT) or U.GREY)
       -- кнопки справа
-      local bx = L.ctrl_w - L.pad
+      local bx = (X0 + MW) - L.pad
       for _, b in ipairs({ { 'grid', 'grid' }, { 'take', 'take' } }) do
         local bw = ms(b[1]) + 2 * L.pad
         bx = bx - bw
@@ -866,13 +829,13 @@ local function draw_topbar(L, info)
       y0 = y0 + L.rh + 2
       -- мини-грид 16×8 (яркость как на устройстве) + легенда справа
       local avail = H - 2 - y0
-      local cs = math.max(2, math.min(math.floor((L.ctrl_w * 0.45) / 16), math.floor(avail / 8)))
+      local cs = math.max(2, math.min(math.floor((MW * 0.45) / 16), math.floor(avail / 8)))
       if mo.leds then
         for ry = 1, 8 do
           for cx = 1, 16 do
             local v = (mo.leds[ry] and mo.leds[ry][cx]) or 0
             set(U.mix(U.BG, U.AMBER, 0.08 + v / 15 * 0.92))
-            gfx.rect(L.pad + (cx - 1) * cs, y0 + (ry - 1) * cs, cs - 1, cs - 1, 1)
+            gfx.rect(X0 + (cx - 1) * cs, y0 + (ry - 1) * cs, cs - 1, cs - 1, 1)
           end
         end
       end
@@ -880,12 +843,12 @@ local function draw_topbar(L, info)
       if mo.cols then
         for cx = 1, math.min(15, #mo.cols) do
           local ch = (mo.cols[cx] or '?'):sub(1, 1)
-          if cs >= L.cw then text(L.pad + (cx - 1) * cs, y0 - L.rh, ch, U.GREY) end
+          if cs >= L.cw then text(X0 + (cx - 1) * cs, y0 - L.rh, ch, U.GREY) end
         end
       end
       -- легенда — горизонтально справа от мини-грида
-      local lx = L.pad + 16 * cs + L.pad
-      local lw = L.ctrl_w - lx - L.pad
+      local lx = X0 + 16 * cs + L.pad
+      local lw = (X0 + MW) - lx - L.pad
       local lines = { 'rows 1-7: slots x tracks', 'lit: events  X: muted', 'arc: 1 lpb 2 oct 3 step 4 inst', 'col 16: host (mod list)' }
       for i, ln in ipairs(lines) do
         local ly = y0 + (i - 1) * L.rh
@@ -900,11 +863,121 @@ local function draw_topbar(L, info)
       if cs >= L.th + 1 and vh >= L.cw * 3 then
         for cx = 1, 16 do
           if names[cx] ~= '' then
-            D.vtext(L.pad + (cx - 1) * cs + math.floor((cs - L.th) / 2), vy, vh, names[cx], cx == 16 and U.DIM or U.GREY, U.PANEL)
+            D.vtext(X0 + (cx - 1) * cs + math.floor((cs - L.th) / 2), vy, vh, names[cx], cx == 16 and U.DIM or U.GREY, U.PANEL)
           end
         end
       end
     end
+  end
+end
+
+local function draw_topbar(L, info)
+  local hover = {}
+  local H = L.top_h
+  set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
+  set(D.SEP); gfx.rect(0, H - 2, gfx.w, 2, 1)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local c = info.ctrl or {}
+
+  -- контрол (2 окт): три группы — control (транспорт, размер и доли,
+  -- метроном, ввод), options (вид), help; группы разделены линией, подпись
+  -- группы — если хватает высоты. monome переехал во вкладку grid.
+  local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
+  local groups = {
+    { name = 'control', items = {
+      { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
+      { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
+      { 'sig', 'sig ' .. sig }, { 'metro', D.ic('metro', 'metro ' .. (c.metro and 'on' or 'off')), c.metro and U.CYAN or U.GREY },
+      { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
+      { 'beats', nil },                                             -- строка долей во всю ширину
+      { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
+      { 'vel', ('vel %d'):format(c.vel or 100) },
+      { 'follow', D.ic('follow', 'follow ' .. (c.follow and 'on' or 'off')), c.follow and U.CYAN or U.GREY },
+      { 'loop', D.ic('loop', 'loop ' .. (c.loop and 'on' or 'off')), c.loop and U.CYAN or U.GREY },
+      { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
+      { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
+      { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
+    } },
+    { name = 'options', items = {
+      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
+      { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
+      { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
+      { 'notes', 'notes', c.notes and U.AMBER or U.GREY }, { 'options', 'options', U.AMBER },
+    } },
+    { name = 'help', items = {
+      { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
+    } },
+  }
+  local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
+  -- строк нужно: ряды групп + строка долей; подписи групп — если влезают
+  local need = 0
+  for _, g in ipairs(groups) do
+    local n = 0
+    for _, it in ipairs(g.items) do if it[1] == 'beats' then need = need + 1 + math.ceil(n / 3); n = 0 else n = n + 1 end end
+    need = need + math.ceil(n / 3)
+  end
+  local labels = (H - 4) >= (need + #groups - 1) * L.rh + (#groups - 1) * 4
+  D.ctrl_rect = D.ctrl_rect or {}
+  local y = 2
+  local function cell(it, ci)
+    local x = L.pad + ci * colw
+    if y + L.rh > H - 2 then return end
+    local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
+    if hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1); hover.ctrl = it[1] end
+    D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
+    text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
+    hint('ctrl', x, y, colw, L.rh, it[1])
+  end
+  -- доли: размер, такт, квадраты долей (текущая горит), строк на долю / такт
+  local function beats_row()
+    if y + L.rh > H - 2 then return end
+    local x = L.pad + 2
+    local num = math.max(1, math.min(16, c.sig_num or 4))
+    local cur = c.beat and (math.floor(c.beat) + 1) or 0
+    local bs = math.max(4, L.rh - 6)
+    local lbl = ('bar %d  beat %d/%d'):format(c.bar or 1, math.max(1, cur), num)
+    text(x, y + 1, lbl, U.TEXT)
+    x = x + ms(lbl) + L.pad
+    local sq_w = num * (bs + 2)
+    local tail = ('%d/beat %d/bar'):format(c.lpb or 4, c.rows_bar or 16)
+    local room = L.ctrl_w - L.pad - x
+    if sq_w <= room then
+      for k = 1, num do
+        local bx = x + (k - 1) * (bs + 2)
+        local by = y + math.floor((L.rh - bs) / 2)
+        local on = k == cur
+        set(on and (c.playing and U.AMBER or U.TEXT) or U.BG); gfx.rect(bx, by, bs, bs, 1)
+        set(k == 1 and U.AMBER or U.LINE); gfx.rect(bx, by, bs, bs, 0)
+      end
+      x = x + sq_w + L.pad
+      if ms(tail) <= L.ctrl_w - L.pad - x then text(x, y + 1, tail, U.GREY) end
+    end
+    local hot = mx >= L.pad and mx < L.ctrl_w - L.pad and my >= y and my < y + L.rh
+    if hot then hover.ctrl = 'beats' end
+    y = y + L.rh
+  end
+  for gi, g in ipairs(groups) do
+    if gi > 1 then
+      if y + 4 > H - 2 then break end
+      set(D.SEP); gfx.rect(L.pad, y + 1, L.ctrl_w - 2 * L.pad, 1, 1)
+      y = y + 3
+      if labels and y + L.rh <= H - 2 then
+        text(L.pad + 2, y, g.name, U.DIM)
+        y = y + L.rh
+      end
+    end
+    local ci = 0
+    for _, it in ipairs(g.items) do
+      if it[1] == 'beats' then
+        if ci > 0 then y = y + L.rh; ci = 0 end
+        beats_row()
+      else
+        cell(it, ci)
+        ci = ci + 1
+        if ci == 3 then ci = 0; y = y + L.rh end
+      end
+    end
+    if ci > 0 then y = y + L.rh end
   end
   set(D.SEP); gfx.rect(L.ctrl_w, 0, 2, H - 2, 1)
 
@@ -914,7 +987,7 @@ local function draw_topbar(L, info)
   local tab = info.toptab or 'scope'
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
-  for _, t in ipairs({ 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca» (2 окт), midi — learn (2 окт)
+  for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
     local lbl = D.ic(t, t == 'garden' and 'orca' or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
@@ -983,6 +1056,9 @@ local function draw_topbar(L, info)
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK
     if info.mm_draw then hover.mm = info.mm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
+  elseif tab == 'grid' then
+    -- monome (jf_grid): шина, владелец, мини-грид, легенда
+    draw_mono(L, info, sx0, cy0, sx1 - sx0, H - 2, hover)
   elseif tab == 'midi' then
     -- MIDI learn (jf_tracker_midimap.lua): цели слайсера и их CC / ноты
     if info.midi_draw then hover.midimap = info.midi_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
