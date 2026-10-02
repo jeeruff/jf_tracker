@@ -975,21 +975,38 @@ function E.mod_set(track, fx, param, what, on, src_fx, src_param)
 end
 
 -- ── DSP-панель: параметры и bypass FX ────────────────────────────────────
+-- Все правки FX принимают obj = MediaTrack* или MediaItem_Take* (take FX
+-- инструмента, 2 окт); функции API выбирает model.fxapi.
+local function FA(obj) return model.fxapi(obj), model.is_take(obj) end
+-- копия / перенос между любыми объектами (трек ↔ take)
+local function copy_fx(src, si, dst, di, move)
+  local st, dt = model.is_take(src), model.is_take(dst)
+  if st and dt then R.TakeFX_CopyToTake(src, si, dst, di, move)
+  elseif st then R.TakeFX_CopyToTrack(src, si, dst, di, move)
+  elseif dt then R.TrackFX_CopyToTake(src, si, dst, di, move)
+  else R.TrackFX_CopyToTrack(src, si, dst, di, move) end
+end
+local function add_fx(obj, name, inst)
+  if model.is_take(obj) then return R.TakeFX_AddByName(obj, name, inst) end
+  return R.TrackFX_AddByName(obj, name, false, inst)
+end
+
 function E.fx_param(track, fx, param, v01)
-  R.TrackFX_SetParamNormalized(track, fx, param, math.max(0, math.min(1, v01)))
+  local A = FA(track)
+  A.SetParamNormalized(track, fx, param, math.max(0, math.min(1, v01)))
   if model then model.invalidate() end
 end
 -- переставить FX: src → позиция dst (как drag в цепи REAPER; в трекере слева направо)
 function E.fx_move(track, src, dst)
   if src == dst then return end
-  run('fx move', function() R.TrackFX_CopyToTrack(track, src, track, dst, true) end)
+  run('fx move', function() copy_fx(track, src, track, dst, true) end)
   if model then model.invalidate() end
 end
 -- ── контейнеры (2 окт): упаковать / распаковать, копия эффекта ───────────
 -- Адрес ребёнка контейнера c (верхний уровень, с 0) на позиции k (с 0):
--- 0x2000000 + (k + 1) * (TrackFX_GetCount + 1) + (c + 1) — схема REAPER 7.
-local function child_addr(track, c, k)
-  return 0x2000000 + (k + 1) * (R.TrackFX_GetCount(track) + 1) + (c + 1)
+-- 0x2000000 + (k + 1) * (GetCount + 1) + (c + 1) — схема REAPER 7.
+local function child_addr(obj, c, k)
+  return 0x2000000 + (k + 1) * (FA(obj).GetCount(obj) + 1) + (c + 1)
 end
 -- эффекты верхнего уровня i0..i1 (индексы REAPER) → в новый контейнер на месте i0
 function E.fx_pack(track, i0, i1)
@@ -997,11 +1014,11 @@ function E.fx_pack(track, i0, i1)
   if n < 1 then return false end
   local ok = false
   run('fx pack into container', function()
-    local c = R.TrackFX_AddByName(track, 'Container', false, -1000 - i0)
+    local c = add_fx(track, 'Container', -1000 - i0)
     if not c or c < 0 then return end
     for k = 0, n - 1 do
       -- после каждого переноса следующий эффект встаёт сразу за контейнером
-      R.TrackFX_CopyToTrack(track, c + 1, track, child_addr(track, c, k), true)
+      copy_fx(track, c + 1, track, child_addr(track, c, k), true)
     end
     ok = true
   end)
@@ -1011,45 +1028,60 @@ end
 -- контейнер c (верхний уровень) → его дети в цепочку сразу за ним, контейнер долой
 function E.fx_unpack(track, c)
   local ok = false
+  local A = FA(track)
   run('fx unpack container', function()
-    local okc, cnt = R.TrackFX_GetNamedConfigParm(track, c, 'container_count')
+    local okc, cnt = A.GetNamedConfigParm(track, c, 'container_count')
     cnt = okc and tonumber(cnt) or nil
     if not cnt then return end
     for j = 0, cnt - 1 do
-      local ok2, id = R.TrackFX_GetNamedConfigParm(track, c, 'container_item.0')
+      local ok2, id = A.GetNamedConfigParm(track, c, 'container_item.0')
       id = ok2 and tonumber(id)
       if not id then break end
-      R.TrackFX_CopyToTrack(track, id, track, c + 1 + j, true)
+      copy_fx(track, id, track, c + 1 + j, true)
     end
-    R.TrackFX_Delete(track, c)
+    A.Delete(track, c)
     ok = true
   end)
   if model then model.invalidate() end
   return ok
 end
--- копия эффекта (с трека src, индекс si) на трек dst в позицию di
+-- копия эффекта (с объекта src, индекс si) на объект dst в позицию di
 function E.fx_copy(src, si, dst, di)
-  run('fx copy', function() R.TrackFX_CopyToTrack(src, si, dst, di, false) end)
+  run('fx copy', function() copy_fx(src, si, dst, di, false) end)
   if model then model.invalidate() end
 end
 -- огибающая параметра (автоматизация): создать и показать
 function E.fx_envelope(track, fx, param)
   local env
-  run('show fx envelope', function() env = R.GetFXEnvelope(track, fx, param, true) end)
+  run('show fx envelope', function()
+    if model.is_take(track) then env = R.TakeFX_GetEnvelope(track, fx, param, true)
+    else env = R.GetFXEnvelope(track, fx, param, true) end
+  end)
   if model then model.invalidate() end
   return env
 end
 function E.fx_bypass(track, fx)
-  run('fx bypass', function() R.TrackFX_SetEnabled(track, fx, not R.TrackFX_GetEnabled(track, fx)) end)
+  local A = FA(track)
+  run('fx bypass', function() A.SetEnabled(track, fx, not A.GetEnabled(track, fx)) end)
 end
-function E.fx_show(track, fx) R.TrackFX_Show(track, fx, 3) end
+function E.fx_show(track, fx) FA(track).Show(track, fx, 3) end
+-- окно цепочки take (и пустой): выделить item и «show FX chain for item take»
+function E.take_chain_window(take)
+  local it = R.GetMediaItemTake_Item(take)
+  if not it then return end
+  if R.TakeFX_GetCount(take) > 0 then R.TakeFX_Show(take, 0, 1); return end
+  R.SelectAllMediaItems(0, false)
+  R.SetMediaItemSelected(it, true)
+  R.SetActiveTake(take)
+  R.Main_OnCommand(40638, 0)                 -- Item: Show FX chain for item take
+end
 -- pos — место в цепочке (0 = первым), nil — в конец
 function E.fx_add(track, name, pos)
-  run('fx add', function() R.TrackFX_AddByName(track, name, false, pos and (-1000 - pos) or -1) end)
+  run('fx add', function() add_fx(track, name, pos and (-1000 - pos) or -1) end)
   if model then model.invalidate() end
 end
 function E.fx_remove(track, fx)
-  run('fx remove', function() R.TrackFX_Delete(track, fx) end)
+  run('fx remove', function() FA(track).Delete(track, fx) end)
 end
 
 -- ── осциллоскопы: JSFX-мост jf_tracker_scope на треках ───────────────────
@@ -1367,7 +1399,7 @@ function E.media_copy(path)
   if path:lower():match('%.rpp$') then return path end
   local _, proj = R.EnumProjects(-1, '')
   if not proj or proj == '' then return path end           -- несохранённый проект: папки нет
-  local dir = R.GetProjectPath('')
+  local dir = R.GetProjectPath()
   if not dir or dir == '' then return path end
   if path:sub(1, #dir + 1) == dir .. '/' then return path end
   local projdir = proj:match('^(.*)/[^/]+$')

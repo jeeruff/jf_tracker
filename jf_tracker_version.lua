@@ -1,9 +1,19 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.17'
+V.VERSION = '0.5.18'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.18', d = '2026-10-02', items = {
+    'DSP shows take fx of the instrument: take fx row in sample props (click / select), t or the track / take buttons switch back',
+    'empty take fx: the click jumps to the fx list, Enter adds to the take; dblclick opens the REAPER take fx window',
+    'every DSP block has O (window), B (bypass) and x (delete) buttons',
+    'slices in the instrument tree are drawn as branches of their sample (|- `-)',
+    'slice zone on the big sample: drag the handles at the bottom to move the slice start / end (all notes of that slice instrument)',
+    'sample editor: snap button - selection, slice markers and the slice zone stick to transients and slice markers',
+    'import REX / RX2 (REAPER decodes, slice points read from the file) and Renoise / Redux XRNI instruments with their slices: Enter in the browser',
+    'review fixes: / and af add to the take in take mode, header shows the real target, range does not carry over, double-click on x deletes one fx',
+  } },
   { v = '0.5.17', d = '2026-10-02', items = {
     'hydra \\P project: s save (same as :w), S save as',
   } },

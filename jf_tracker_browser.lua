@@ -58,7 +58,8 @@ local function load_marks()
   end
 end
 
-local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true }
+local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true,
+                rx2 = true, rex = true, xrni = true }   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
 
 function B.init(c, root)
   ctx = c
@@ -499,6 +500,7 @@ end
 -- путь для прослушивания строки (nil — нечего слушать)
 function B.preview_path(e)
   if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
+  if (e.name or ''):lower():match('%.xrni$') then return nil end       -- архив инструмента, не звук
   if e.pm then return B.pm_preview(e) end
   return B.full(e)
 end

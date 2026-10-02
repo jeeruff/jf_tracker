@@ -41,6 +41,7 @@ local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
+local IMP = dofile(DIR .. '/jf_tracker_import.lua')      -- импорт REX / XRNI (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
@@ -214,6 +215,8 @@ local item_drag = nil                                       -- протяжка 
 local inject_cap = nil                                      -- модификаторы инъецированной клавиши
 local env_drag = { key = nil }                             -- протяжка по огибающей
 local modsel = 1                                          -- строка во вкладке modulation (фокус top)
+local reselect_item = nil                                   -- после правки слайса: выбрать инструмент этого item
+local sp_on_fx = false                                      -- строка take fx свойств выбрана (прошлый кадр)
 local dsp_sel = { fx = 1, param = 1 }                     -- выбор в DSP-панели (фокус dsp)
 local fxv_cache = {}
 
@@ -316,6 +319,22 @@ end
 -- Объявление отдельно от конструктора: функции внутри таблицы ссылаются на
 -- ctx.*, а `local ctx = {…}` не виден в собственном инициализаторе (они
 -- брали глобальный ctx = nil — так падал Tab на ctx.set_focus).
+-- цель DSP-панели (2 окт): цепочка трека курсора или take FX инструмента
+-- (state.dsp_take — включается строкой «take fx» в свойствах сэмпла, t в DSP)
+local dspt_cache = {}
+local function dsp_target()
+  local col = cur_col()
+  if not col then return nil end
+  if state.dsp_take then
+    local e = (col.pool or {})[vim.inst]
+    local tk = e and e.take
+    if tk and reaper.ValidatePtr(tk, 'MediaItem_Take*') then
+      if dspt_cache.snap ~= snap or dspt_cache.take ~= tk then dspt_cache = { snap = snap, take = tk, fx = model.take_fx(tk) } end
+      return { track = tk, fx = dspt_cache.fx, name = e.name or 'take', take = true, col = col }
+    end
+  end
+  return { track = col.track, fx = col.fx or {}, name = col.name, col = col }
+end
 local ctx
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
@@ -417,13 +436,56 @@ ctx = {
   end,
   browser_mkdir = function(name) B.mkdir(name) end,
   -- ── DSP: действия грамматики эффектов (jf_tracker_dspkeys.lua) ─────────
-  dsp_fx = function(k) local col = cur_col(); return col, col and col.fx and col.fx[k] end,
+  dsp_fx = function(k) local t = dsp_target(); return t, t and t.fx[k] end,
+  -- границы слайса-инструмента по зоне на большом сэмпле: offset take и длина item
+  -- (уже вставленные ноты — свои копии item, их это не трогает)
+  slice_bounds = function(zd)
+    local e, p = zd.e, zd.p
+    if not (e.item and e.take and reaper.ValidatePtr(e.item, 'MediaItem*')) then vim.msg = 'slice item is gone'; return end
+    local pr = (p.rate and p.rate ~= 0) and p.rate or 1
+    local offs = p.offs + zd.a * pr
+    local len = (zd.b - zd.a) * pr / ((e.rate and e.rate ~= 0) and e.rate or 1)
+    -- все items этого слайса-инструмента (одинаковые offset и длина — один
+    -- ключ пула), как правка слайса в Renoise: меняются все его ноты (ревью 2 окт)
+    local items = {}
+    for it, i in pairs((snap and snap.inst_of) or {}) do if i == zd.inst then items[#items + 1] = it end end
+    if #items == 0 then items[1] = e.item end
+    edit.run('slice bounds', function()
+      for _, it in ipairs(items) do
+        local tk = reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+        if tk then
+          reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', offs)
+          reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
+        end
+      end
+    end)
+    model.invalidate()
+    reselect_item = e.item             -- ключ инструмента сменился: курсор пула вернуть на него
+    vim.msg = ('slice %s: %.3f - %.3fs (%.3fs), %d note(s) of this instrument updated'):format(e.slice_k and ('s' .. e.slice_k) or '', zd.a, zd.b, zd.b - zd.a, #items)
+  end,
+  -- t в DSP / кнопки шапки: цепочка трека ↔ take FX инструмента
+  dsp_toggle_target = function(to)
+    if to == nil then to = not state.dsp_take end
+    state.dsp_take = to and true or nil
+    dsp_sel.fx, dsp_sel.param = 1, 1
+    DK.anchor, DK.pending = nil, nil      -- диапазон / оператор не переезжают на другую цепочку
+    local t = dsp_target()
+    vim.msg = 'DSP: ' .. (t and (t.take and ('take fx of ' .. t.name) or ('track ' .. t.name)) or 'nothing')
+  end,
+  -- строка «take fx» свойств сэмпла: DSP показывает take FX; пустая цепочка —
+  -- фокус в список эффектов (Enter добавит в take)
+  take_fx_focus = function(e)
+    state.dsp = true; state.dsp_take = true; dsp_sel.fx, dsp_sel.param = 1, 1; DK.anchor, DK.pending = nil, nil
+    local n = (e and e.take and reaper.ValidatePtr(e.take, 'MediaItem_Take*')) and reaper.TakeFX_GetCount(e.take) or 0
+    if n == 0 and state.fxb then ctx.set_focus('fxb'); vim.msg = 'take fx of ' .. (e and e.name or '?') .. ' is empty - pick an fx: Enter adds it to the take (dblclick on take fx: REAPER window)'
+    else ctx.set_focus('dsp'); vim.msg = ('take fx of %s: %d fx (t: track fx)'):format(e and e.name or '?', n) end
+  end,
   dsp_delete = function(k0, k1)
-    local col = cur_col(); local fxs = col and col.fx or {}
+    local col = dsp_target(); local fxs = col and col.fx or {}
     if not fxs[k0] then vim.msg = 'dsp: no fx'; return end
     local names = {}
     edit.run('fx delete', function()
-      for k = math.min(k1, #fxs), k0, -1 do names[#names + 1] = fxs[k].name; reaper.TrackFX_Delete(col.track, fxs[k].i) end
+      for k = math.min(k1, #fxs), k0, -1 do names[#names + 1] = fxs[k].name; model.fxapi(col.track).Delete(col.track, fxs[k].i) end
     end)
     model.invalidate()
     dsp_sel.fx = math.max(1, k0 - 1); dsp_sel.param = 1
@@ -432,24 +494,25 @@ ctx = {
   dsp_yank = function(k)
     local col, f = ctx.dsp_fx(k)
     if not f then vim.msg = 'dsp: no fx'; return end
-    state.fx_reg = { track = col.track, guid = reaper.TrackFX_GetFXGUID(col.track, f.i), name = f.name }
+    state.fx_reg = { track = col.track, guid = model.fxapi(col.track).GetFXGUID(col.track, f.i), name = f.name }
     vim.msg = 'yank fx ' .. f.name .. ' - p after, P before (any track)'
   end,
   dsp_paste = function(k, after)
     local reg = state.fx_reg
     local col, f = ctx.dsp_fx(k)
     if not (reg and col) then vim.msg = 'fx register empty (yy)'; return end
-    if not reaper.ValidatePtr(reg.track, 'MediaTrack*') then vim.msg = 'yanked fx track is gone'; return end
+    if not (reaper.ValidatePtr(reg.track, 'MediaTrack*') or model.is_take(reg.track)) then vim.msg = 'yanked fx owner is gone'; return end
+    local RA = model.fxapi(reg.track)
     local si
-    for i = 0, reaper.TrackFX_GetCount(reg.track) - 1 do if reaper.TrackFX_GetFXGUID(reg.track, i) == reg.guid then si = i end end
+    for i = 0, RA.GetCount(reg.track) - 1 do if RA.GetFXGUID(reg.track, i) == reg.guid then si = i end end
     if not si then vim.msg = 'yanked fx is gone'; return end
-    local di = f and (after and f.i + 1 or f.i) or reaper.TrackFX_GetCount(col.track)
+    local di = f and (after and f.i + 1 or f.i) or model.fxapi(col.track).GetCount(col.track)
     edit.fx_copy(reg.track, si, col.track, di)
     dsp_sel.fx = f and (after and k + 1 or k) or 1
     vim.msg = 'fx copy: ' .. reg.name
   end,
   dsp_pack = function(k0, k1)
-    local col = cur_col(); local fxs = col and col.fx or {}
+    local col = dsp_target(); local fxs = col and col.fx or {}
     if not (fxs[k0] and fxs[k1]) then vim.msg = 'dsp: no fx'; return end
     if edit.fx_pack(col.track, fxs[k0].i, fxs[k1].i) then dsp_sel.fx = k0; vim.msg = ('packed %d fx into a container'):format(k1 - k0 + 1)
     else vim.msg = 'pack failed (REAPER 7 containers)' end
@@ -463,22 +526,28 @@ ctx = {
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
     if not p then vim.msg = 'aa: no parameter'; return end
-    if edit.fx_envelope(col.track, p.fx or f.i, p.i) then state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. p.name .. ' (envelope column shown)' end
+    if edit.fx_envelope(col.track, p.fx or f.i, p.i) then
+      if col.take then vim.msg = 'take envelope on the instrument item: ' .. f.name .. ' / ' .. p.name .. ' (see it in REAPER; placed notes are copies)'
+      else state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. p.name .. ' (envelope column shown)' end
+    end
   end,
   dsp_pick_param = function(k)
     local col, f = ctx.dsp_fx(k)
     if not f then vim.msg = 'dsp: no fx'; return end
     vim.open_picker('automate ' .. f.name, (function()
       local items = {}
-      for pi = 0, f.np - 1 do local _, pn = reaper.TrackFX_GetParamName(col.track, f.i, pi, ''); items[#items + 1] = { label = pn or ('p' .. pi), data = pi } end
-      return items end)(), function(it) if edit.fx_envelope(col.track, f.i, it.data) then state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. it.label end end)
+      for pi = 0, f.np - 1 do local _, pn = model.fxapi(col.track).GetParamName(col.track, f.i, pi, ''); items[#items + 1] = { label = pn or ('p' .. pi), data = pi } end
+      return items end)(), function(it) if edit.fx_envelope(col.track, f.i, it.data) then
+        if col.take then vim.msg = 'take envelope on the instrument item: ' .. f.name .. ' / ' .. it.label
+        else state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. it.label end
+      end end)
   end,
   dsp_value = function(k, pi, d, coarse)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
     if not p then return end
     local id = p.fx or f.i
-    local v = reaper.TrackFX_GetParamNormalized(col.track, id, p.i)
+    local v = model.fxapi(col.track).GetParamNormalized(col.track, id, p.i)
     if p.kind == 'toggle' then edit.fx_param(col.track, id, p.i, v >= 0.5 and 0 or 1)
     elseif p.kind == 'steps' and p.nsteps then edit.fx_param(col.track, id, p.i, v + d / (p.nsteps - 1))
     else edit.fx_param(col.track, id, p.i, v + d * (coarse and 0.1 or 0.02)) end
@@ -493,11 +562,11 @@ ctx = {
   -- браузер эффектов: добавить выбранный FX на трек курсора (pos — место в цепочке)
   fxb_add = function(it, pos)
     it = it or FB.selected()
-    local col = cur_col()
+    local col = dsp_target()
     if not (it and col) then vim.msg = 'fx: nothing selected'; return end
     edit.fx_add(col.track, it.data, pos)
     state.dsp = true
-    vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. col.name .. (pos and (' @' .. (pos + 1)) or '')
+    vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
   end,
   -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
   delete_item_at_cursor = function()
@@ -769,8 +838,8 @@ ctx = {
   -- осциллоскопы: JSFX-мост на всех треках (кроме DEPOT), чтение gmem
   -- fzf по всем установленным эффектам → добавить на трек курсора (DSP: a или /, hydra \f)
   fx_picker = function()
-    local col = cur_col(); if not col then return end
-    vim.open_picker('add fx to ' .. col.name, ctx.fx_list(), function(it)
+    local col = dsp_target(); if not col then return end
+    vim.open_picker('add fx to ' .. (col.take and ('take fx of ' .. col.name) or col.name), ctx.fx_list(), function(it)
       edit.fx_add(col.track, it.data); state.dsp = true
       vim.msg = '+ ' .. it.label
     end)
@@ -1129,7 +1198,7 @@ ctx = {
     elseif k == 'fin' or k == 'fout' then
       local key = k == 'fin' and 'D_FADEINLEN' or 'D_FADEOUTLEN'
       edit.item_set(it, key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'sample fade')
-    elseif k == 'fx' then reaper.TakeFX_Show(tk, 0, 1)                   -- окно цепочки take FX
+    elseif k == 'fx' then ctx.take_fx_focus(e)                          -- DSP показывает take FX (2 окт)
     elseif k == 'norm' then edit.normalize(it); vim.msg = 'normalized (peak 0 dB)' end
     model.invalidate()
   end,
@@ -1382,9 +1451,73 @@ ctx = {
   browse = function(path) B.init(ctx, path or B.root); state.side = true end,
   -- файл → депо трека курсора (зона после маркера =LIB на самом треке)
   add_to_depot = function(path)
+    if IMP.kind(path) then ctx.import_sliced(path); return end
     local c = cur_col()
     local it = edit.depot_add(path, c and c.track)
     vim.msg = it and ('→ lib ' .. (c and c.name or 'DEPOT') .. ': ' .. path:match('[^/]+$')) or 'depot add failed'
+  end,
+  -- импорт нарезанного инструмента (2 окт): REX/RX2 — звук декодирует REAPER,
+  -- позиции слайсов из файла; XRNI (Renoise / Redux) — распаковка в папку
+  -- проекта (несохранённый — ~/samples/_imported), каждый настоящий сэмпл —
+  -- инструмент в библиотеке трека со своими слайсами. Один undo-шаг.
+  import_sliced = function(path)
+    local c = cur_col()
+    if not c then vim.msg = 'import: no track'; return end
+    local kind = IMP.kind(path)
+    local name = (path:match('([^/]+)%.[^.]+$') or path)
+    if kind == 'rex' then
+      local r, why = IMP.rx2_slices(path)
+      local it
+      edit.run('import REX ' .. name, function()
+        it = edit.depot_add(path, c.track)
+        if it and r and #r.slices > 1 then edit.set_slices(it, r.slices) end
+      end)
+      vim.msg = it and ('REX → lib %s: %s, %s'):format(c.name, name, r and (#r.slices .. ' slices') or ('no slices: ' .. tostring(why)))
+        or 'REX import failed (REAPER could not open the file)'
+      return
+    end
+    if kind ~= 'xrni' then return end
+    local _, proj = reaper.EnumProjects(-1, '')
+    local base = (proj and proj ~= '' and reaper.GetProjectPath()) or (os.getenv('HOME') .. '/samples/_imported')
+    local dir = base .. '/xrni/' .. name:gsub('[/:]', '-')
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local q = function(x) return "'" .. x:gsub("'", "'\\''") .. "'" end
+    reaper.ExecProcess('/usr/bin/unzip -o -q ' .. q(path) .. ' -d ' .. q(dir), 20000)
+    local fx = io.open(dir .. '/Instrument.xml', 'rb')
+    if not fx then vim.msg = 'XRNI: cannot unpack ' .. name; return end
+    local xml = fx:read('*a'); fx:close()
+    local list = {}
+    local i = 0
+    while true do local f = reaper.EnumerateFiles(dir .. '/SampleData', i); if not f then break end; list[#list + 1] = 'SampleData/' .. f; i = i + 1 end
+    local listing = table.concat(list, '\n')
+    local samples = IMP.xrni_samples(xml)
+    local n, ns = 0, 0
+    edit.run('import XRNI ' .. name, function()
+      for si, smp in ipairs(samples) do
+        local rel = not smp.alias and IMP.xrni_file(listing, si - 1)
+        if rel then
+          local file = dir .. '/' .. rel
+          local it = edit.depot_add(file, c.track)
+          if it then
+            n = n + 1
+            local tk = reaper.GetActiveTake(it)
+            if tk and smp.name ~= '' then reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', smp.name, true) end
+            if #smp.slices > 1 then
+              local src = reaper.PCM_Source_CreateFromFile(file)
+              local sr = src and reaper.GetMediaSourceSampleRate(src) or 0
+              if src then reaper.PCM_Source_Destroy(src) end
+              if sr > 0 then
+                local t = {}
+                for _, fr in ipairs(smp.slices) do t[#t + 1] = fr / sr end
+                table.sort(t)
+                edit.set_slices(it, t); ns = ns + #t
+              end
+            end
+          end
+        end
+      end
+    end)
+    vim.msg = ('XRNI → lib %s: %s, %d sample(s), %d slice(s)'):format(c.name, name, n, ns)
   end,
   -- drag & drop из браузера: файл → item / .rpp → сабпроект на трек в строке
   drop_to = function(fi, row, path)
@@ -1967,10 +2100,11 @@ local function context_menu(hover)
     for _, a in ipairs(track_actions(hover.header_col)) do add(a[1], a.fn, a.key) end
   elseif hover.dsp then
     -- DSP: модуляция параметра (нативные свойства REAPER) и действия с FX
-    local col = cur_col()
+    -- (модуляция — только у FX трека; у take FX меню без неё)
+    local col = dsp_target()
     local f, pidx = hover.dsp.f, hover.dsp.param
     local p = pidx and f.params[pidx]
-    if col and p then
+    if col and p and not col.take then
       local id = p.fx or f.i
       local function flag(what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s.active'):format(p.i, what)); return ok and v == '1' end
       add((flag('lfo') and '!' or '') .. 'Modulate: LFO', function() edit.mod_set(col.track, id, p.i, 'lfo') end)
@@ -2784,6 +2918,17 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  if reselect_item and snap and snap.inst_of and snap.inst_of[reselect_item] then
+    vim.inst = snap.inst_of[reselect_item]; reselect_item = nil
+  end
+  -- строка «take fx» ВЫБРАНА в свойствах сэмпла (момент перехода на неё) — DSP
+  -- на take; t / кнопка track возвращает трек, пока строка остаётся выбранной
+  do
+    -- переход строки на take fx (не возврат фокуса в док — ревью 2 окт)
+    local on_fx = state.toptab == 'sample' and (SPROP.ROWS[SPROP.sel] or {}).k == 'fx'
+    if on_fx and not sp_on_fx then state.dsp_take = true; dsp_sel.fx, dsp_sel.param = 1, 1; DK.anchor, DK.pending = nil, nil end
+    sp_on_fx = on_fx
+  end
   edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
   if edit.rescued then
@@ -2922,8 +3067,12 @@ local function frame()
     retro = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad))) or nil,
     dsp_sel = state.focus == 'dsp' and dsp_sel or nil,
     dsp_range = (state.focus == 'dsp' and DK.anchor) and { DK.range(dsp_sel) } or nil,
-    fx_values = function(f) local col = cur_col(); if not col then return {} end
+    fx_values = function(f) local col = dsp_target(); if not col then return {} end
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
+    dsp_fxs = (function() local t = dsp_target(); return t and t.fx or {} end)(),
+    dsp_title = (function() local t = dsp_target(); if not t then return nil end
+      return t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name end)(),
+    dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     ctrl = {
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
       lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_auto and 'auto' or vim.step, inst = vim.inst,
@@ -2965,6 +3114,8 @@ local function frame()
       if e and e.parent and not (SL.active and SL.entry == e) then
         local p = e.parent
         zone = { (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1), (e.offs - p.offs + e.len * e.rate) / (p.rate ~= 0 and p.rate or 1), vim.inst }
+        -- тянется край — зона живая
+        if SL.zone_drag and SL.zone_drag.e.item == e.item then zone = { SL.zone_drag.a, SL.zone_drag.b, vim.inst } end
         e = p
       end
       -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
@@ -3025,6 +3176,8 @@ local function frame()
   elseif cell and cell.kind == 'midi' then
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
   elseif hover.env then state.status = ('%s %s  %.0f%%'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
+  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
+  elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
   elseif hover.garden and hover.garden.ri then
@@ -3118,6 +3271,8 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
+  elseif hover.sample and SL.zone_hot then state.status = ('slice %s - drag the handle at the bottom of the wave: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
+  elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
   elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
@@ -3252,6 +3407,16 @@ local function frame()
     elseif hover.sample and hover.sample.view then
       ctx.set_focus('top'); SL.view = hover.sample.view
       click = { t = now2, zone = 'sampleview' }
+    elseif hover.sample and SL.zone_hot then
+      -- край зоны слайса: тянуть начало / конец слайса по большому сэмплу (2 окт)
+      ctx.set_focus('top')
+      local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+      if e and e.parent and e.item then
+        local p = e.parent; local pr = (p.rate and p.rate ~= 0) and p.rate or 1
+        local a0, b0 = (e.offs - p.offs) / pr, (e.offs - p.offs + e.len * (e.rate or 1)) / pr
+        SL.zone_drag = { edge = SL.zone_hot, e = e, p = p, a = a0, b = b0, a0 = a0, b0 = b0, inst = vim.inst }
+      end
+      click = { t = now2, zone = 'slicezone' }
     elseif hover.sample then
       ctx.set_focus('top')
       -- просмотр инструмента без правки: открыть его в модуле, чтобы выделять
@@ -3294,7 +3459,8 @@ local function frame()
       if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
       local same = click.zone == 'sprop' and click.row == SPROP.hover.row
       SPROP.sel = SPROP.hover.row
-      if e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
+      if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
+      elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
@@ -3367,15 +3533,26 @@ local function frame()
         else local it = FB.selected(); if it then fxb_drag = { it = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end end
       end
       click = { t = now2, zone = 'fxb' }
+    elseif hover.dspbtn then
+      -- кнопки блока: O окно, B bypass, x удалить
+      ctx.set_focus('dsp')
+      dsp_sel.fx = hover.dspbtn.fx
+      if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx) end   -- двойной клик не удаляет второй
+      click = { t = now2, zone = 'dspbtn' }
+    elseif hover.dsptarget then
+      ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
+      click = { t = now2, zone = 'dsptarget' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
-      local col = cur_col()
+      local col = dsp_target()
       if hover.dsp.param and col then
         local p = hover.dsp.f.params[hover.dsp.param]
         if p and p.kind == 'toggle' then
-          edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, reaper.TrackFX_GetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i) >= 0.5 and 0 or 1)
+          edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, model.fxapi(col.track).GetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i) >= 0.5 and 0 or 1)
         elseif p and hover.dsp.onwidget then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
       elseif dbl and click.zone == 'dsp' and col then
         edit.fx_show(col.track, hover.dsp.f.i)
@@ -3482,7 +3659,7 @@ local function frame()
   end
   -- протяжка по слайдеру DSP
   if hover.dsp and hover.dsp.param and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
-    local col = cur_col()
+    local col = dsp_target()
     local p = col and hover.dsp.f.params[hover.dsp.param]
     if p and p.kind ~= 'toggle' and hover.dsp.sv then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
   end
@@ -3524,6 +3701,21 @@ local function frame()
     end
   end
   -- сэмпл-модуль: протяжка выделения / вынос выделения на колонку трекера
+  -- край зоны слайса: тянется, на отпускании правит item-инструмент (один undo)
+  if SL.zone_drag then
+    local zd, wv = SL.zone_drag, SL.wave
+    if gfx.mouse_cap & 1 == 1 then
+      if wv and wv.w > 0 then
+        local t = SL.snap_t(math.max(0, math.min(wv.len, (gfx.mouse_x - wv.x) / wv.w * wv.len)))
+        if zd.edge == 'a' then zd.a = math.min(t, zd.b - 0.005) else zd.b = math.max(t, zd.a + 0.005) end
+        state.status = ('slice: %.3f - %.3fs of %s (%.3fs) - release to apply'):format(zd.a, zd.b, zd.p.name or 'sample', zd.b - zd.a)
+      end
+    else
+      -- простой клик без сдвига — не правка (без undo-точки)
+      if math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6 then ctx.slice_bounds(zd) end
+      SL.zone_drag = nil
+    end
+  end
   if SL.drag then
     if gfx.mouse_cap & 1 == 1 then
       SL.mouse_move(hover.sample and hover.sample.frac)
@@ -3561,7 +3753,7 @@ local function frame()
     else
       local g, s = hover.dsp_gap, dsp_drag.fx
       if dsp_drag.active and g and g ~= s and g ~= s - 1 then
-        local col = cur_col()
+        local col = dsp_target()
         local fxs = col and col.fx or {}
         local dst = (g < s - 1) and fxs[g + 1] or fxs[g]
         if col and dst then
@@ -3654,8 +3846,8 @@ local function frame()
   if gfx.mouse_wheel ~= 0 then
     local step = gfx.mouse_wheel > 0 and -3 or 3
     if hover.dsp and hover.dsp.param then
-      local col = cur_col(); local p = col and hover.dsp.f.params[hover.dsp.param]
-      if p then edit.fx_param(col.track, hover.dsp.f.i, p.i, reaper.TrackFX_GetParamNormalized(col.track, hover.dsp.f.i, p.i) + (step > 0 and -0.02 or 0.02)) end
+      local col = dsp_target(); local p = col and hover.dsp.f.params[hover.dsp.param]
+      if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
     elseif hover.env and hover.row then ctx.env_nudge(hover.env, hover.row.row, (step > 0 and -1 or 1) / 64)
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
@@ -3821,8 +4013,9 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
-        local col = cur_col(); local fxs = col and col.fx or {}
+        local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
+        if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
         if r == 'leave' then ctx.set_focus('tracker') end
       elseif state.focus == 'top' and state.top and (vim.mode == 'cmd' or vim.mode == 'search') then

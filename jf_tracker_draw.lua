@@ -1218,7 +1218,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local child = (e.depth or 0) > 0
       local marks = (here and '@' or ' ') .. (e.slices and '$' or ' ')
       local body
-      if child then body = ' ' .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut') .. ' ' .. ('%.2fs'):format(e.len)
+      if child then
+        -- ветка дерева: |- у среднего ребёнка, `- у последнего (2 окт: видно, что слайс — часть сэмпла)
+        -- ветки только в дереве (сортировка по трекам): в len / mark соседи — не братья
+        local tree = (info.poolsort or 'track') == 'track'
+        local nxt = pool[i + 1]
+        local last = not (nxt and (nxt.depth or 0) > 0 and nxt.parent == e.parent)
+        body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut') .. ' ' .. ('%.2fs'):format(e.len)
       else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
       local lbl = ('%02d %s %s%s'):format(i, marks, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
@@ -1759,7 +1765,7 @@ function D.frame(L, snap, rows, state, info)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     local col = info.pool_col
-    local fxs = col and col.fx or {}
+    local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
     if info.fxb_draw then
@@ -1767,7 +1773,22 @@ function D.frame(L, snap, rows, state, info)
       hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
-    text(fbw + L.pad, dy + 3, fit('dsp ' .. (col and col.name or '') .. (#fxs == 0 and '  (no fx; a - add, or drag from the fx list)' or ''), gfx.w - fbw - 2 * L.pad), U.GREY)
+    -- шапка: [track] [take] — чья цепочка показана (t переключает), затем имя
+    do
+      local hx = fbw + L.pad
+      for _, b in ipairs({ { 'track', false }, { 'take', true } }) do
+        local on = (info.dsp_is_take or false) == b[2]
+        local bw = ms(b[1]) + 2 * L.pad
+        local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
+        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(hx, dy + 2, bw, L.rh, 1)
+        set(on and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
+        text(hx + L.pad, dy + 3, b[1], on and U.AMBER or (hot and U.TEXT or U.GREY))
+        if hot then hover.dsptarget = b[1] end
+        hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
+        hx = hx + bw + L.pad
+      end
+      text(hx, dy + 3, fit((info.dsp_title or (col and col.name) or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
+    end
     local bx = fbw + L.pad
     local drag = info.dsp_drag                 -- { k = блок } | { new = true } — идёт перетаскивание
     local blocks = {}
@@ -1785,8 +1806,24 @@ function D.frame(L, snap, rows, state, info)
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
       set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, by, bw, bh, 0)
-      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), bw - 2 * L.pad), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
-      if not drag and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
+      -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
+      local kb = ms('O') + 2 * L.pad
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'O', 'open', bx + bw - 3 * kb - 5 } }
+      local tw = bw - 2 * L.pad - 3 * kb - 6
+      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      local on_btn = false
+      if tw > 0 then
+        for _, b in ipairs(bxs) do
+          local kx = b[3]
+          local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
+          local lit = (b[2] == 'bypass' and not f.enabled)
+          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
+          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or U.LINE); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
+          text(kx + L.pad, by + 1, b[1], hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+          if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
+        end
+      end
+      if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
       local pw = bw1 - 2 * L.pad

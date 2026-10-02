@@ -699,15 +699,34 @@ end
 -- M.fx_values(tr, fx, n) по запросу (кадр).
 M.DSP_MAXP = 8
 M.dspmods = nil      -- реестр кураторских модулей (jf_tracker_dspmods.lua), ставит main
+-- ── адаптер FX (2 окт): цепочка трека или take одним кодом ────────────────
+-- obj — MediaTrack* или MediaItem_Take*; M.fxapi(obj) даёт таблицу функций
+-- TrackFX_* / TakeFX_* с общими именами (GetCount, GetFXName, …). Отличаются
+-- только AddByName, огибающая и копирование — их разбирает edit.
+local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
+  'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
+  'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen' }
+local function fx_table(prefix)
+  local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
+  for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end
+  return t
+end
+M.FXT, M.FXK = fx_table('TrackFX_'), fx_table('TakeFX_')
+function M.is_take(obj) return obj ~= nil and R.ValidatePtr ~= nil and R.ValidatePtr(obj, 'MediaItem_Take*') end
+function M.fxapi(obj) if M.is_take(obj) then return M.FXK end return M.FXT end
+-- цепочка take (те же записи, что у трека)
+function M.take_fx(take) return M.track_fx(take) end
+
 local function param_entry(tr, fx, pi, label)
-  local _, pname = R.TrackFX_GetParamName(tr, fx, pi, '')
+  local A = M.fxapi(tr)
+  local _, pname = A.GetParamName(tr, fx, pi, '')
   local kind, nsteps = 'slider', nil
-  if R.TrackFX_GetParameterStepSizes then
-    local ok, step, small, large, istoggle = R.TrackFX_GetParameterStepSizes(tr, fx, pi)
+  if A.GetParameterStepSizes then
+    local ok, step, small, large, istoggle = A.GetParameterStepSizes(tr, fx, pi)
     if ok then
       if istoggle then kind = 'toggle'
       elseif step and step > 0 then
-        local _, mn, mx = R.TrackFX_GetParamEx(tr, fx, pi)
+        local _, mn, mx = A.GetParamEx(tr, fx, pi)
         local n = (mx and mn) and math.floor((mx - mn) / step + 0.5) or 0
         if n >= 1 and n <= 16 then kind, nsteps = 'steps', n + 1 end
       end
@@ -721,19 +740,20 @@ end
 -- 1 — параллельно ему, 2 — параллельно с суммированием). Параметры детей
 -- собираются в один список с префиксом имени — виджеты и клавиши те же.
 local function container_children(tr, fx)
-  local ok, n = R.TrackFX_GetNamedConfigParm(tr, fx, 'container_count')
+  local A = M.fxapi(tr)
+  local ok, n = A.GetNamedConfigParm(tr, fx, 'container_count')
   if not ok then return nil end
   n = tonumber(n) or 0
   local kids = {}
   for k = 0, n - 1 do
-    local ok2, id = R.TrackFX_GetNamedConfigParm(tr, fx, 'container_item.' .. k)
+    local ok2, id = A.GetNamedConfigParm(tr, fx, 'container_item.' .. k)
     id = ok2 and tonumber(id)
     if id then
-      local _, nm = R.TrackFX_GetFXName(tr, id, '')
-      local _, par = R.TrackFX_GetNamedConfigParm(tr, id, 'parallel')
-      local kid = { i = id, name = (nm or ''):gsub('^[^:]*: ', ''), enabled = R.TrackFX_GetEnabled(tr, id),
-                    parallel = tonumber(par) or 0, np = R.TrackFX_GetNumParams(tr, id) }
-      local ok3 = R.TrackFX_GetNamedConfigParm(tr, id, 'container_count')
+      local _, nm = A.GetFXName(tr, id, '')
+      local _, par = A.GetNamedConfigParm(tr, id, 'parallel')
+      local kid = { i = id, name = (nm or ''):gsub('^[^:]*: ', ''), enabled = A.GetEnabled(tr, id),
+                    parallel = tonumber(par) or 0, np = A.GetNumParams(tr, id) }
+      local ok3 = A.GetNamedConfigParm(tr, id, 'container_count')
       if ok3 then kid.container = true end
       kids[#kids + 1] = kid
     end
@@ -743,14 +763,15 @@ end
 
 function M.track_fx(tr)
   local out = {}
-  if not R.TrackFX_GetCount then return out end
-  for fx = 0, R.TrackFX_GetCount(tr) - 1 do
-    local _, name = R.TrackFX_GetFXName(tr, fx, '')
-    local np = R.TrackFX_GetNumParams(tr, fx)
+  local A = M.fxapi(tr)
+  if not A.GetCount then return out end
+  for fx = 0, A.GetCount(tr) - 1 do
+    local _, name = A.GetFXName(tr, fx, '')
+    local np = A.GetNumParams(tr, fx)
     local params = {}
     local short = (name or ''):gsub('^[^:]*: ', '')
     local lay = M.dspmods and M.dspmods.match(short)
-    local kids = R.TrackFX_GetNamedConfigParm and container_children(tr, fx)
+    local kids = A.GetNamedConfigParm and container_children(tr, fx)
     if kids then
       -- контейнер: дети + их первые параметры (по 4 на ребёнка), 2 колонки
       for _, kid in ipairs(kids) do
@@ -761,30 +782,30 @@ function M.track_fx(tr)
           params[#params + 1] = e
         end
       end
-      out[#out + 1] = { i = fx, name = short, enabled = R.TrackFX_GetEnabled(tr, fx), np = np, params = params,
+      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
                         cols = 2, container = true, kids = kids }
     elseif lay then
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       local names = {}
-      for pi = 0, np - 1 do local _, pn = R.TrackFX_GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
+      for pi = 0, np - 1 do local _, pn = A.GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
       for _, spec in ipairs(lay.params) do
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
           if names[pi]:find(want, 1, true) then params[#params + 1] = param_entry(tr, fx, pi, spec[2]); break end
         end
       end
-      out[#out + 1] = { i = fx, name = lay.title or short, enabled = R.TrackFX_GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
+      out[#out + 1] = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
     else
     for pi = 0, math.min(M.DSP_MAXP, np) - 1 do
-      local _, pname = R.TrackFX_GetParamName(tr, fx, pi, '')
+      local _, pname = A.GetParamName(tr, fx, pi, '')
       -- тип виджета: тоггл / ступени (≤ 16) / непрерывный — по шагам параметра
       local kind, nsteps = 'slider', nil
-      if R.TrackFX_GetParameterStepSizes then
-        local ok, step, small, large, istoggle = R.TrackFX_GetParameterStepSizes(tr, fx, pi)
+      if A.GetParameterStepSizes then
+        local ok, step, small, large, istoggle = A.GetParameterStepSizes(tr, fx, pi)
         if ok then
           if istoggle then kind = 'toggle'
           elseif step and step > 0 then
-            local _, mn, mx = R.TrackFX_GetParamEx(tr, fx, pi)
+            local _, mn, mx = A.GetParamEx(tr, fx, pi)
             local n = (mx and mn) and math.floor((mx - mn) / step + 0.5) or 0
             if n >= 1 and n <= 16 then kind, nsteps = 'steps', n + 1 end
           end
@@ -792,18 +813,19 @@ function M.track_fx(tr)
       end
       params[#params + 1] = { i = pi, name = pname or ('p' .. pi), kind = kind, nsteps = nsteps }
     end
-    out[#out + 1] = { i = fx, name = short, enabled = R.TrackFX_GetEnabled(tr, fx), np = np, params = params, cols = 1 }
+    out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = 1 }
     end
   end
   return out
 end
 
 function M.fx_values(tr, f)
+  local A = M.fxapi(tr)
   local v = {}
   for k, p in ipairs(f.params) do
     local id = p.fx or f.i
-    local ok, str = R.TrackFX_GetFormattedParamValue(tr, id, p.i, '')
-    v[k] = { n = R.TrackFX_GetParamNormalized(tr, id, p.i), s = ok and str or '' }
+    local ok, str = A.GetFormattedParamValue(tr, id, p.i, '')
+    v[k] = { n = A.GetParamNormalized(tr, id, p.i), s = ok and str or '' }
   end
   return v
 end

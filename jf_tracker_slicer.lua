@@ -22,6 +22,7 @@ S.entry = nil
 S.track = nil
 S.slices = {}        -- секунды от начала item
 S.trans = {}         -- найденные транзиенты (секунды)
+S.snap = false       -- кнопка snap (2 окт): края выделения, маркеры и зона липнут к транзиентам / маркерам
 S.sens = 0.5
 S.mode = ''
 S.env = nil          -- огибающая |пик| для волны и детекции
@@ -93,6 +94,20 @@ function S.open_file(path, track)
   return true
 end
 
+-- притяжение: ближайший транзиент или маркер слайса в пределах 8 px волны;
+-- skip — номер маркера, который сейчас тянется (к себе не липнет)
+function S.snap_t(t, skip)
+  if not S.snap or not t then return t end
+  local w = S.wave and S.wave.w or 0
+  local thr = (w > 0 and S.wave.len and S.wave.len > 0) and (8 / w * S.wave.len) or 0.02
+  local best, bd = t, thr
+  local function try(c) local dd = math.abs(c - t); if dd < bd then best, bd = c, dd end end
+  for _, c in ipairs(S.trans or {}) do try(c) end
+  local sl = (S.active and S.slices) or (S.entry and S.entry.slices) or {}
+  for k, c in ipairs(sl) do if k ~= skip then try(c) end end
+  return best
+end
+
 function S.select_all() if S.entry then S.sel = { a = 0, b = S.entry.len } end end
 
 -- мышь по волне: доля ширины → секунды; down внутри выделения = вынос
@@ -102,6 +117,7 @@ function S.mouse_down(frac)
   if S.sel and t >= math.min(S.sel.a, S.sel.b) and t <= math.max(S.sel.a, S.sel.b) and S.sel.b ~= S.sel.a then
     S.drag = { kind = 'out', x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false }
   else
+    t = S.snap_t(t)
     S.sel = { a = t, b = t }
     S.drag = { kind = 'sel' }
   end
@@ -116,9 +132,9 @@ function S.mouse_move(frac)
     local k = S.drag.k
     local lo = (S.slices[k - 1] or 0) + 0.002
     local hi = (S.slices[k + 1] or S.entry.len) - 0.002
-    S.slices[k] = math.max(lo, math.min(hi, frac * S.entry.len))
+    S.slices[k] = math.max(lo, math.min(hi, S.snap_t(frac * S.entry.len, k)))
   end
-  if S.drag and S.drag.kind == 'sel' and S.entry and frac then S.sel.b = math.max(0, math.min(S.entry.len, frac * S.entry.len)) end
+  if S.drag and S.drag.kind == 'sel' and S.entry and frac then S.sel.b = math.max(0, math.min(S.entry.len, S.snap_t(frac * S.entry.len))) end
   if S.drag and S.drag.kind == 'out' and not S.drag.active and (math.abs(gfx.mouse_x - S.drag.x0) > 6 or math.abs(gfx.mouse_y - S.drag.y0) > 6) then S.drag.active = true end
 end
 function S.mouse_up()
@@ -304,6 +320,12 @@ end
 
 -- кнопка нарезки (2 окт): равные части / транзиенты / чувствительность / сброс
 function S.button(id)
+  if id == 'snap' then
+    S.snap = not S.snap
+    if S.snap and S.entry and #S.trans == 0 and S.detect then S.detect() end   -- транзиенты для притяжения
+    S.msg = 'snap ' .. (S.snap and ('on: ' .. #S.trans .. ' transients + slice markers') or 'off')
+    return
+  end
   if not S.entry or S.entry.file then return end
   local n = id:match('^eq(%d+)$')
   if n then S.equal(tonumber(n))
@@ -395,16 +417,17 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local hover_sbtn
   if not e.file and e.item then
     local bx = x
-    local BTN = { { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
+    local BTN = { { 'snap', 'snap' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
                   { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' } }
     U.text(bx, y + rh, 'slice', U.GREY); bx = bx + U.measure('slice') + L.pad
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y + rh, bw, rh, 1)
-      U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y + rh, bw, rh, 0)
-      U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or U.TEXT)
+      local on = b[2] == 'snap' and S.snap
+      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, y + rh, bw, rh, 1)
+      U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y + rh, bw, rh, 0)
+      U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
       if hot then hover_sbtn = b[2] end
       if ctx.hint then ctx.hint('slicebtn', bx, y + rh, bw, rh, b[2]) end
       bx = bx + bw + 2
@@ -475,11 +498,33 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
   end
   -- играемая зона исходника: чуть светлее фон и края
+  -- края зоны слайса тянутся мышью (2 окт): S.zone_hot = 'a' | 'b' под мышью,
+  -- S.wave = прямоугольник волны и длина — main считает долю и правит item
+  S.zone_hot = nil
+  S.wave = { x = x, y = wy, w = w, h = wh, len = len }
   if zone then
     local za, zb = math.max(0, math.min(len, zone[1])), math.max(0, math.min(len, zone[2]))
     local px0, px1 = x + math.floor(za / len * w), x + math.floor(zb / len * w)
-    U.set(U.TEXT); gfx.a = 0.10; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 0.55
-    gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1); gfx.a = 1
+    local mxw, myw = gfx.mouse_x, gfx.mouse_y
+    local inw = myw >= wy and myw < wy + wh
+    local dragging = S.zone_drag and S.zone_drag.edge
+    -- ручки внизу волны (сверху подписи маркеров слайсов): маркеры исходника
+    -- тянутся за верх, зона — за низ; ближайший край (короткая зона — оба)
+    local HH = 10
+    if not S.drag and inw and myw >= wy + wh - HH then
+      local da, db = math.abs(mxw - px0), math.abs(mxw - px1)
+      if math.min(da, db) <= 5 then S.zone_hot = (da <= db) and 'a' or 'b' end
+    end
+    U.set(U.TEXT); gfx.a = 0.10; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
+    for _, ed in ipairs({ { 'a', px0 }, { 'b', math.max(px0, px1 - 1) } }) do
+      local hot = S.zone_hot == ed[1] or dragging == ed[1]
+      U.set(hot and U.AMBER or U.TEXT); gfx.a = hot and 1 or 0.55
+      gfx.rect(hot and ed[2] - 1 or ed[2], wy, hot and 3 or 1, wh, 1)
+      gfx.a = 1
+      -- ручка внизу: треугольник-флажок внутрь зоны
+      local d = ed[1] == 'a' and 1 or -1
+      for k = 0, 5 do gfx.rect(ed[2] + (d > 0 and 0 or -k), wy + wh - 1 - k, k + 1, 1, 1) end
+    end
   end
   local slices = editing and S.slices or (e.slices or {})
   local hover_slice
