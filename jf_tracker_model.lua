@@ -659,11 +659,35 @@ end
 M.MOD_KEYS = { 'mod.baseline', 'lfo.active', 'lfo.shape', 'lfo.speed', 'lfo.temposync', 'lfo.strength',
   'acs.active', 'acs.attack', 'acs.release', 'acs.strength', 'plink.active', 'plink.effect', 'plink.param',
   'plink.scale', 'plink.offset' }
+-- адреса всех FX трека, включая детей контейнеров (0x2000000…, v7.06+:
+-- container_item.X) — модуляция нативна и на них (2 окт); prefix — путь имён
+function M.fx_addresses(tr)
+  local out = {}
+  if not R.TrackFX_GetNamedConfigParm then return out end
+  local function walk(id, prefix, depth)
+    out[#out + 1] = { fx = id, prefix = prefix }
+    local ok, n = R.TrackFX_GetNamedConfigParm(tr, id, 'container_count')
+    if ok and depth < 4 then
+      local _, nm = R.TrackFX_GetFXName(tr, id, '')
+      local short = (nm or ''):gsub('^[^:]*: ', ''):sub(1, 8)
+      for k = 0, (tonumber(n) or 0) - 1 do
+        local ok2, cid = R.TrackFX_GetNamedConfigParm(tr, id, 'container_item.' .. k)
+        cid = ok2 and tonumber(cid)
+        if cid then walk(cid, prefix .. short .. '>', depth + 1) end
+      end
+    end
+  end
+  for fx = 0, R.TrackFX_GetCount(tr) - 1 do walk(fx, '', 0) end
+  return out
+end
+
 function M.track_mods(tr)
   local out = {}
   if not R.TrackFX_GetNamedConfigParm then return out end
-  for fx = 0, R.TrackFX_GetCount(tr) - 1 do
+  for _, fa in ipairs(M.fx_addresses(tr)) do
+    local fx = fa.fx
     local _, fxname = R.TrackFX_GetFXName(tr, fx, '')
+    fxname = fa.prefix .. (fxname or ''):gsub('^[^:]*: ', '')
     local np = math.min(64, R.TrackFX_GetNumParams(tr, fx))
     for pi = 0, np - 1 do
       local ok, act = R.TrackFX_GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(pi))
@@ -775,7 +799,18 @@ function M.track_fx(tr)
     local lay = M.dspmods and M.dspmods.match(short)
     local kids = A.GetNamedConfigParm and container_children(tr, fx)
     if kids then
-      -- контейнер: дети + их первые параметры (по 4 на ребёнка), 2 колонки
+      -- контейнер: сначала его макросы (нативные container_map — параметры
+      -- детей, выведенные наружу; на них работает обычная модуляция), затем
+      -- дети + их первые параметры (по 4 на ребёнка), 2 колонки
+      for pi = 0, np - 1 do
+        local _, pn = A.GetParamName(tr, fx, pi, '')
+        if pn and pn ~= '' and pn ~= 'Bypass' and pn ~= 'Wet' and pn ~= 'Delta' then
+          local e = param_entry(tr, fx, pi)
+          e.name = 'M ' .. e.name
+          e.macro = true
+          params[#params + 1] = e
+        end
+      end
       for _, kid in ipairs(kids) do
         for pi = 0, math.min(4, kid.np) - 1 do
           local e = param_entry(tr, kid.i, pi)

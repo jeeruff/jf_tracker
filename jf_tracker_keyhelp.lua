@@ -174,6 +174,7 @@ KH.PAGES = {
     { k = 'ap A', d = 'pick a parameter to automate (fzf)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
     { k = 'ai', d = 'automation item over the item under the tracker cursor (track fx)' },
+    { k = 'am', d = 'container: map the selected child parameter to a native container macro (M ...); modulate the macro natively (right-click: LFO / ACS / link)' },
     { k = 'af /', d = 'add fx (fzf)', t = { 'af', '/' } },
     { k = 'v', d = 'select a range of fx (h l extend), Esc clears' },
     { k = 'Enter b', d = 'toggle parameter / bypass fx' },

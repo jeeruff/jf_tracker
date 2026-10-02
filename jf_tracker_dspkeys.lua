@@ -9,6 +9,8 @@
 --   cc           упаковать эффект (v — диапазон) в новый контейнер
 --   aa           огибающая выбранного параметра (автоматизация)
 --   ap           выбрать параметр для автоматизации (fzf)
+--   am           параметр ребёнка контейнера → нативный макрос контейнера
+--                (container_map; модуляция макроса — нативная, LFO / ACS / link)
 --   af /         добавить эффект (fzf)
 --   v            выделить диапазон эффектов (h l тянут), Esc — снять
 --   o            окно эффекта, Space play, Esc — назад в трекер
@@ -30,7 +32,7 @@ local HINT = {
   d = 'd: d delete fx (v: range) | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | Esc',
-  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | p pick parameter | f add fx | Esc',
+  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | Esc',
 }
 function DK.pending_hint() return DK.pending and HINT[DK.pending] or nil end
 
@@ -60,6 +62,7 @@ function DK.key(c, sel, n, np, mods)
     elseif op == 'a' and ch == 'f' then ctx.fx_picker()
     elseif op == 'a' and ch == 'd' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'i' then ctx.dsp_autoitem(sel.fx, sel.param)
+    elseif op == 'a' and ch == 'm' then ctx.dsp_map_macro(sel.fx, sel.param)
     else ctx.msg(op .. ch .. ': not a DSP command (? - help)') end
     return true
   end

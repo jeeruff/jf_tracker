@@ -667,6 +667,25 @@ ctx = {
     edit.env_remove(env)
     vim.msg = 'automation removed: ' .. f.name .. ' / ' .. p.name
   end,
+  -- параметр ребёнка контейнера → нативный макрос контейнера (container_map,
+  -- REAPER 7.06+): макрос — обычный параметр контейнера, его модулируют
+  -- нативные LFO / ACS / link (правый клик) и матрица modulate
+  dsp_map_macro = function(k, pi)
+    local t = dsp_target()
+    local f = t and t.fx and t.fx[k]
+    local p = f and f.params[pi]
+    if not (f and f.container) then vim.msg = 'am: select a parameter inside a container block'; return end
+    if not p or p.macro then vim.msg = 'am: pick a child parameter (not a macro)'; return end
+    local A = model.fxapi(t.track)
+    local idx
+    edit.run('container macro', function()
+      local ok, v = A.GetNamedConfigParm(t.track, f.i, ('container_map.add.%d.%d'):format(p.fx or f.i, p.i))
+      idx = ok and tonumber(v)
+    end)
+    model.invalidate()
+    vim.msg = idx and ('macro %d of %s = %s - right-click it: native LFO / ACS / link'):format(idx + 1, f.name, p.name)
+      or 'am: REAPER refused the mapping (needs REAPER 7.06+)'
+  end,
   dsp_autoitem = function(k, pi)
     local t = dsp_target()
     if t and t.take then vim.msg = 'ai: automation items exist only on track envelopes (switch DSP to track: t)'; return end
@@ -832,8 +851,10 @@ ctx = {
   mod_param_items = function(skip)
     local col = cur_col(); if not col then return {} end
     local items = {}
-    for fx = 0, reaper.TrackFX_GetCount(col.track) - 1 do
-      local _, fn = reaper.TrackFX_GetFXName(col.track, fx, ''); fn = (fn or ''):gsub('^[^:]*: ', '')
+    -- все FX, включая детей контейнеров (адреса 0x2000000…): модуляция нативна и на них
+    for _, fa in ipairs(model.fx_addresses(col.track)) do
+      local fx = fa.fx
+      local _, fn = reaper.TrackFX_GetFXName(col.track, fx, ''); fn = fa.prefix .. (fn or ''):gsub('^[^:]*: ', '')
       for pi = 0, reaper.TrackFX_GetNumParams(col.track, fx) - 1 do
         if not (skip and skip.fx == fx and skip.param == pi) then
           local _, pn = reaper.TrackFX_GetParamName(col.track, fx, pi, '')

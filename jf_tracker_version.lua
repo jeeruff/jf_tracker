@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.39'
+V.VERSION = '0.5.40'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.40', d = '2026-10-02', items = {
+    'modulation inside DSP containers, native first: the modulate matrix and the parameter picker see FX inside containers (0x2000000 addresses, nested); container blocks show their native macros (M ...) first; am maps the selected child parameter to a new container macro (container_map) - the macro takes native LFO / ACS / link like any parameter',
+  } },
   { v = '0.5.39', d = '2026-10-02', items = {
     'one modulate tab: the native modulation matrix and the curve generator (lfo / podkat = Anticipate / follow) - side by side when the panel is wide, pages [matrix] [curves] when narrow (L switches); before, the generator was hidden in a narrow top panel',
   } },
