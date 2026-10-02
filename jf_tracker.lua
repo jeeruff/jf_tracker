@@ -167,6 +167,7 @@ local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- р
 local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
+local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -857,13 +858,135 @@ ctx = {
     local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
     return t, reaper.TimeMap2_QNToTime(0, (qme and qms) and (qn + (qme - qms)) or (qn + 4)), 'one bar'
   end,
+  -- follow env: огибающая-источник из всех огибающих проекта (fzf)
+  lfo_pick_env = function()
+    local items = {}
+    for _, c in ipairs(snap and snap.cols or {}) do
+      for _, e in ipairs(c.envs or {}) do items[#items + 1] = { label = c.name .. ' / ' .. e.name, data = e } end
+    end
+    if #items == 0 then vim.msg = 'follow: no visible envelopes (A on a track shows them)'; return end
+    vim.open_picker('follow envelope', items, function(it) lfo_src_env = it.data; LG.src_env = it.label end)
+  end,
+  -- хиты подката (строки, дробные): события колонки или транзиенты её аудио
+  lfo_hits = function(col, r0, r1)
+    local hits = {}
+    local lo, hi = r0 - LG.hold - LG.release, r1 + LG.lead
+    if LG.hits == 'events' then
+      for _, lane in ipairs(col.lanes or {}) do
+        for _, sub in ipairs(lane.subs or {}) do
+          for r, cell in pairs(sub) do
+            if (cell.kind == 'audio' or cell.kind == 'midi') and cell.row0 == r then
+              local h = r + (cell.delay or 0) / 256
+              if h >= lo and h < hi then hits[#hits + 1] = h end
+            end
+          end
+        end
+      end
+    else
+      -- транзиенты аудио items трека: пики 200 Гц, рост над порогом (как anticipate)
+      local t_lo, t_hi = edit.row_time(math.floor(lo), state.lpb, 0), edit.row_time(math.ceil(hi), state.lpb, 0)
+      local thr = 0.02 + (1 - LG.sens) ^ 2 * 0.6
+      for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+        local it = reaper.GetTrackMediaItem(col.track, i)
+        local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        local tk = reaper.GetActiveTake(it)
+        if tk and not reaper.TakeIsMIDI(tk) and pos < t_hi and pos + len > t_lo then
+          local src = reaper.GetMediaItemTake_Source(tk)
+          local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+          local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+          local n = math.max(1, math.min(200000, math.floor(len * rate * 200)))
+          local buf = reaper.new_array(n * 2)
+          local rv = reaper.PCM_Source_GetPeaks(src, 200, offs, 1, n, 0, buf)
+          local spl = rv & 0xfffff
+          if spl > 0 then
+            local t = buf.table()
+            local prev, last = 0, -1e9
+            for k = 1, spl do
+              local a = math.max(math.abs(t[k] or 0), math.abs(t[spl + k] or 0))
+              local tm = pos + (k - 1) / 200 / (rate ~= 0 and rate or 1)
+              if a - prev > thr and a > 0.05 and tm - last > 0.06 then
+                local h = model.row_of_time(tm, state.lpb)
+                if h >= lo and h < hi then hits[#hits + 1] = h end
+                last = tm
+              end
+              prev = a
+            end
+          end
+        end
+      end
+    end
+    table.sort(hits)
+    local out = {}
+    for _, h in ipairs(hits) do if #out == 0 or h - out[#out] > 0.05 then out[#out + 1] = h end end
+    return out
+  end,
+  -- источник follow: функция строка → 0..1 (огибающая или громкость аудио трека)
+  lfo_follow_src = function(col, r0, r1)
+    if LG.fsrc == 'env' then
+      local e = lfo_src_env
+      if not (e and e.env and reaper.ValidatePtr(e.env, 'TrackEnvelope*')) then return nil, 'pick the source envelope (Enter on source)' end
+      local lo, hi = e.min or 0, e.max or 1
+      return function(row)
+        local _, v = reaper.Envelope_Evaluate(e.env, edit.row_time(row, state.lpb, 0), 0, 0)
+        return ((v or lo) - lo) / ((hi - lo) ~= 0 and (hi - lo) or 1)
+      end
+    end
+    -- громкость аудио: пики 100 Гц по items трека, нормализация по пику
+    local t_lo, t_hi = edit.row_time(r0 - 16, state.lpb, 0), edit.row_time(r1 + 16, state.lpb, 0)
+    local segs, peak = {}, 1e-6
+    for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+      local it = reaper.GetTrackMediaItem(col.track, i)
+      local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local tk = reaper.GetActiveTake(it)
+      if tk and not reaper.TakeIsMIDI(tk) and pos < t_hi and pos + len > t_lo then
+        local src = reaper.GetMediaItemTake_Source(tk)
+        local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+        local n = math.max(1, math.min(200000, math.floor(len * rate * 100)))
+        local buf = reaper.new_array(n * 2)
+        local rv = reaper.PCM_Source_GetPeaks(src, 100, reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'), 1, n, 0, buf)
+        local spl = rv & 0xfffff
+        if spl > 0 then
+          local t, a = buf.table(), {}
+          for k = 1, spl do a[k] = math.max(math.abs(t[k] or 0), math.abs(t[spl + k] or 0)); if a[k] > peak then peak = a[k] end end
+          segs[#segs + 1] = { pos = pos, len = len, rate = (rate ~= 0 and rate or 1), a = a }
+        end
+      end
+    end
+    if #segs == 0 then return nil, 'no audio on ' .. col.name end
+    return function(row)
+      local tm = edit.row_time(row, state.lpb, 0)
+      for _, sg in ipairs(segs) do
+        if tm >= sg.pos and tm < sg.pos + sg.len then
+          local k = math.floor((tm - sg.pos) * sg.rate * 100) + 1
+          return (sg.a[k] or 0) / peak
+        end
+      end
+      return 0
+    end
+  end,
   lfo_make = function(mode)
     local tg = ctx.lfo_target()
     if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope column (or select an envelope in REAPER)'; return end
     local e = tg.e
     local t0, t1, where = ctx.lfo_span()
     local r0, r1 = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
-    local pts = LG.points(r0, r1)
+    local pts
+    if LG.type == 'lfo' then pts = LG.points(r0, r1)
+    else
+      local scol = snap and snap.cols[LG.src_i]
+      if not scol and not (LG.type == 'follow' and LG.fsrc == 'env') then vim.msg = LG.type .. ': no source track'; return end
+      if LG.type == 'podkat' then
+        local hits = ctx.lfo_hits(scol, r0, r1)
+        if #hits == 0 then vim.msg = ('podkat: no %s on %s in the span'):format(LG.hits, scol.name); return end
+        pts = LG.podkat_points(hits, r0, r1)
+      else
+        local fn, why = ctx.lfo_follow_src(scol, r0, r1)
+        if not fn then vim.msg = 'follow: ' .. tostring(why); return end
+        pts = LG.follow_points(fn, r0, r1)
+      end
+    end
     local lo, hi = e.min or 0, e.max or 1
     local function raw(v) return lo + math.max(0, math.min(1, v)) * (hi - lo) end
     local n = 0
@@ -884,7 +1007,10 @@ ctx = {
       reaper.Envelope_SortPointsEx(e.env, idx)
     end)
     state.envs = true
-    vim.msg = ('LFO %s %d rows -> %s: %s, %d points (%s)'):format(LG.shape, LG.period, mode == 'ai' and 'automation item' or 'envelope', tg.label, n, where)
+    local what = LG.type == 'lfo' and ('LFO %s %d rows'):format(LG.shape, LG.period)
+      or (LG.type == 'podkat' and ('podkat %s from %s'):format(LG.hits, LG.src_names[LG.src_i] or '?'))
+      or ('follow %s'):format(LG.fsrc == 'env' and (LG.src_env or '?') or ('audio of ' .. (LG.src_names[LG.src_i] or '?')))
+    vim.msg = ('%s -> %s: %s, %d points (%s)'):format(what, mode == 'ai' and 'automation item' or 'envelope', tg.label, n, where)
   end,
   mod_add_pick = function()
     local col = cur_col(); if not col then return end
@@ -3760,6 +3886,10 @@ local function frame()
       lfo_hover = nil
       if lw > 0 then
         local tgt = ctx.lfo_target()
+        local names = {}
+        for i, c in ipairs(snap and snap.cols or {}) do names[i] = c.name end
+        LG.src_names = names
+        if LG.src_i > #names then LG.src_i = math.max(1, #names) end
         lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, state.focus == 'top' and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
         U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
       elseif mod_pane == 'lfo' then mod_pane = 'matrix' end
@@ -4080,7 +4210,9 @@ local function frame()
       if lfo_hover.field then
         LG.sel = lfo_hover.field
         local f = LG.FIELDS[lfo_hover.field]
-        if f.button then ctx.lfo_make(f.key) elseif f.key == 'shape' then LG.adjust(LG.sel, 1) end
+        if f.button then ctx.lfo_make(f.key)
+        elseif f.key == 'src' and LG.type == 'follow' and LG.fsrc == 'env' then ctx.lfo_pick_env()
+        elseif f.enum or f.toggle then LG.adjust(LG.sel, 1) end
       end
       click = { t = now2, zone = 'lfo' }
     elseif hover.mm then
@@ -5125,6 +5257,7 @@ local function frame()
           local r = LG.key(c, ctx.mods().shift and 10 or 1)
           if r == 'leave' then mod_pane = 'matrix'
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
+          elseif r == 'pick' then ctx.lfo_pick_env()
           elseif not r then return vim.key(c) end
         elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g make AI, p write points, L back'
         elseif state.toptab == 'modulation' then

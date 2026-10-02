@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.34'
+V.VERSION = '0.5.35'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.35', d = '2026-10-02', items = {
+    'curve generator (modulation tab, L): types lfo / podkat / follow. podkat brings Anticipate into the tracker - a lead curve before every hit of a source track (its events or the transients of its audio), hold, exponential release, duck or swell, lengths in rows; follow draws a curve from another envelope (pick it) or from the audio level of a track, with attack, release, shift (lookahead) and invert; dense curves are thinned (Ramer-Douglas-Peucker)',
+  } },
   { v = '0.5.34', d = '2026-10-02', items = {
     'modulation tab: LFO generator panel (L) - sin / tri / saw+ / saw- / sqr / rnd, period in rows (follows LPB and tempo), depth, center, phase, points per period, live preview; g makes an automation item with the curve, p writes points into the envelope at the tracker cursor (time selection, else the cursor region, else one bar)',
   } },

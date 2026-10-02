@@ -56,10 +56,58 @@ LG.shape = 'rnd'
 local a = LG.points(0, 16); local b = LG.points(0, 16)
 eq('rnd repeatable', a[3].v, b[3].v); eq('rnd 4 steps', #a, 4)
 
--- поля
-LG.shape = 'sin'; LG.adjust(1, 1); eq('shape cycles', LG.shape, 'tri')
-LG.period = 16; LG.adjust(2, -100); eq('period clamps', LG.period, 1)
-LG.sel = 7; eq('Enter on button -> ai', LG.key(13), 'ai')
+-- поля (1 — type, 2 — shape, 3 — period, 8 — make AI)
+LG.shape = 'sin'; LG.adjust(2, 1); eq('shape cycles', LG.shape, 'tri')
+LG.period = 16; LG.adjust(3, -100); eq('period clamps', LG.period, 1)
+LG.sel = 8; eq('Enter on button -> ai', LG.key(13), 'ai')
+LG.period = 16
+
+-- тип: podkat меняет набор полей
+LG.adjust(1, 1); eq('type podkat', LG.type, 'podkat')
+local has = {}; for _, f in ipairs(LG.FIELDS) do has[f.key] = true end
+eq('podkat has lead', has.lead, true); eq('podkat has no shape', has.shape, nil); eq('events: no sens', has.sens, nil)
+LG.hits = 'transients'; LG.FIELDS = LG.fields(); has = {}; for _, f in ipairs(LG.FIELDS) do has[f.key] = true end
+eq('transients: sens shown', has.sens, true)
+-- подкат: duck вниз от center; к хиту достигает center - depth; потом возврат
+LG.lead, LG.hold, LG.release, LG.curve, LG.depth, LG.center, LG.dir = 4, 1, 2, 0, 0.5, 1, 'duck'
+local pk = LG.podkat_points({ 8 }, 0, 16)
+-- значение кривой в строке: линейно между точками (как огибающая с формой lin)
+local function at(pts, row)
+  for i = 1, #pts do
+    local a, b = pts[i], pts[i + 1]
+    if not b or row < b.row - 1e-9 then
+      if not b or a.shape == 1 or row <= a.row then return { v = a.v } end
+      return { v = a.v + (b.v - a.v) * (row - a.row) / (b.row - a.row) }
+    end
+  end
+  return pts[#pts]
+end
+near('podkat rest before lead', at(pk, 3).v, 1)
+near('podkat bottom at hit', at(pk, 8).v, 0.5)
+eq('podkat recovers after release', at(pk, 15).v > 0.95, true)
+eq('podkat thinned (rdp)', #pk < 16 / 0.125, true)
+-- линейная кривая: середина lead — полпути
+pk = LG.podkat_points({ 8 }, 0, 16)
+near('podkat linear mid-lead', at(pk, 6).v, 0.75)
+-- swell вверх
+LG.dir, LG.center = 'swell', 0
+pk = LG.podkat_points({ 8 }, 0, 16)
+near('swell peak at hit', at(pk, 8).v, 0.5)
+-- follow: источник — ступенька 0 → 1 на строке 4, без сглаживания
+LG.type = 'follow'; LG.FIELDS = LG.fields()
+LG.attack, LG.frel, LG.shift, LG.invert, LG.depth, LG.center = 0, 0, 0, false, 1, 0.5
+local src = function(r) return r >= 4 and 1 or 0 end
+local fp = LG.follow_points(src, 0, 8)
+near('follow low before', at(fp, 2).v, 0); near('follow high after', at(fp, 6).v, 1)
+LG.invert = true; fp = LG.follow_points(src, 0, 8)
+near('follow invert', at(fp, 6).v, 0)
+LG.invert = false; LG.shift = 2; fp = LG.follow_points(src, 0, 8)
+near('follow shift = lookahead', at(fp, 2.5).v, 1)
+LG.shift = 0
+-- Enter на источнике follow env — выбор огибающей
+LG.fsrc = 'env'; for i, f in ipairs(LG.FIELDS) do if f.key == 'src' then LG.sel = i end end
+eq('Enter on env source -> pick', LG.key(13), 'pick')
+LG.type = 'lfo'; LG.FIELDS = LG.fields()
 eq('g -> ai', LG.key(('g'):byte()), 'ai'); eq('p -> points', LG.key(('p'):byte()), 'points')
 eq('L leaves', LG.key(('L'):byte()), 'leave')
 

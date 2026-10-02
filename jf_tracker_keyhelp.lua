@@ -226,6 +226,7 @@ KH.PAGES = {
   modulation = { title = 'modulation matrix + LFO generator', e = {
     { k = 'L', d = 'LFO generator panel on the right / back to the matrix' },
     { k = 'LFO j k h l', d = 'field / value: shape (sin tri saw+ saw- sqr rnd), period in rows, depth, center, phase, points per period' },
+    { k = 'type', d = 'lfo | podkat (Anticipate: lead curve before every hit of a source track - its events or audio transients, hold, release, duck / swell) | follow (curve from another envelope or the audio level of a track: attack, release, shift = lookahead, invert)' },
     { k = 'LFO g p', d = 'g: new automation item with the curve, p: write points into the envelope - envelope at the tracker cursor (or selected in REAPER); time selection, else cursor region, else one bar' },
     { k = 'h j k l', d = 'cell' },
     { k = 'g G 0 $', d = 'first / last row, first / last column' },

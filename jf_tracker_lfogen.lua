@@ -1,4 +1,18 @@
--- jf_tracker_lfogen.lua — генератор LFO в точки огибающей (2 окт).
+-- jf_tracker_lfogen.lua — генератор кривых в точки огибающей (2 окт).
+--
+-- Три типа (поле type):
+--   lfo     форма по периоду (ниже)
+--   podkat  подкат Anticipate: перед каждым хитом источника кривая за lead
+--           строк (curve: −1 быстрый старт … +1 медленный), на хите hold,
+--           затем экспоненциальный release; duck — вниз от center, swell —
+--           вверх. Хиты: события трека-источника (ноты / items) или
+--           транзиенты его аудио (sens). Наложения — максимум, как в
+--           anticipate.lua (~/code/reascript).
+--   follow  кривая от другой автоматизации (env) или громкости аудио трека
+--           (audio): follower attack / release в строках, shift (> 0 —
+--           раньше, lookahead), invert. Источник выбирает main (fzf).
+-- Длительности — в строках трекера (следуют LPB и темпу). Плотные отсчёты
+-- прореживаются (Рамер — Дуглас — Пекер, допуск LG.tol).
 --
 -- Панель справа во вкладке modulation: форма, период (строки трекера —
 -- следует темпу и LPB), глубина, центр, фаза, точек на период. Кнопки:
@@ -23,17 +37,66 @@ LG.phase = 0            -- 0..1 периода
 LG.res = 16             -- точек на период (sin / tri)
 LG.seed = 1             -- случайность rnd (повторяемая)
 LG.sel = 1
+LG.type = 'lfo'
+LG.TYPES = { 'lfo', 'podkat', 'follow' }
+-- podkat
+LG.hits = 'events'      -- 'events' | 'transients'
+LG.sens = 0.6
+LG.lead = 4             -- строк до хита
+LG.curve = 0.5          -- −1 … +1
+LG.hold = 0.5
+LG.release = 2
+LG.dir = 'duck'         -- 'duck' | 'swell'
+-- follow
+LG.fsrc = 'env'         -- 'env' | 'audio'
+LG.attack = 0.25
+LG.frel = 2
+LG.shift = 0
+LG.invert = false
+-- источник: номер колонки (podkat, follow audio) / подпись огибающей (follow env)
+LG.src_i = 1
+LG.src_names = {}
+LG.src_env = nil        -- подпись выбранной огибающей-источника (main хранит указатель)
+LG.tol = 0.004
 
-LG.FIELDS = {
-  { key = 'shape', label = 'shape' },
-  { key = 'period', label = 'period', min = 1, max = 256, step = 1, fmt = '%d rows' },
-  { key = 'depth', label = 'depth', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
-  { key = 'center', label = 'center', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
-  { key = 'phase', label = 'phase', min = 0, max = 1, step = 0.125, fmt = '%.3f' },
-  { key = 'res', label = 'points', min = 4, max = 64, step = 4, fmt = '%d / period' },
-  { key = 'ai', label = 'make AI', button = true },
-  { key = 'points', label = 'write points', button = true },
+local F = {
+  type = { key = 'type', label = 'type', enum = 'TYPES' },
+  shape = { key = 'shape', label = 'shape', enum = 'SHAPES' },
+  period = { key = 'period', label = 'period', min = 1, max = 256, step = 1, fmt = '%d rows' },
+  depth = { key = 'depth', label = 'depth', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
+  center = { key = 'center', label = 'center', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
+  phase = { key = 'phase', label = 'phase', min = 0, max = 1, step = 0.125, fmt = '%.3f' },
+  res = { key = 'res', label = 'points', min = 4, max = 64, step = 4, fmt = '%d / period' },
+  src = { key = 'src', label = 'source' },
+  hits = { key = 'hits', label = 'hits', enum = { 'events', 'transients' } },
+  sens = { key = 'sens', label = 'sens', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
+  lead = { key = 'lead', label = 'lead', min = 0.25, max = 64, step = 0.25, fmt = '%.2f rows' },
+  curve = { key = 'curve', label = 'curve', min = -1, max = 1, step = 0.25, fmt = '%+.2f' },
+  hold = { key = 'hold', label = 'hold', min = 0, max = 32, step = 0.25, fmt = '%.2f rows' },
+  release = { key = 'release', label = 'release', min = 0.25, max = 64, step = 0.25, fmt = '%.2f rows' },
+  dir = { key = 'dir', label = 'dir', enum = { 'duck', 'swell' } },
+  fsrc = { key = 'fsrc', label = 'from', enum = { 'env', 'audio' } },
+  attack = { key = 'attack', label = 'attack', min = 0, max = 32, step = 0.25, fmt = '%.2f rows' },
+  frel = { key = 'frel', label = 'release', min = 0, max = 64, step = 0.25, fmt = '%.2f rows' },
+  shift = { key = 'shift', label = 'shift', min = -16, max = 16, step = 0.25, fmt = '%+.2f rows' },
+  invert = { key = 'invert', label = 'invert', toggle = true },
+  ai = { key = 'ai', label = 'make AI', button = true },
+  points = { key = 'points', label = 'write points', button = true },
 }
+local LAYOUT = {
+  lfo = { 'type', 'shape', 'period', 'depth', 'center', 'phase', 'res', 'ai', 'points' },
+  podkat = { 'type', 'src', 'hits', 'sens', 'lead', 'curve', 'hold', 'release', 'dir', 'depth', 'center', 'ai', 'points' },
+  follow = { 'type', 'fsrc', 'src', 'attack', 'frel', 'shift', 'invert', 'depth', 'center', 'ai', 'points' },
+}
+-- поля текущего типа (transients — со sens, events — без)
+function LG.fields()
+  local out = {}
+  for _, k in ipairs(LAYOUT[LG.type] or LAYOUT.lfo) do
+    if not (k == 'sens' and LG.hits ~= 'transients') then out[#out + 1] = F[k] end
+  end
+  return out
+end
+LG.FIELDS = LG.fields()
 
 -- форма: x — доля периода 0..1 → −1..1
 function LG.wave(shape, x)
@@ -112,16 +175,91 @@ function LG.points(r0, r1)
   return out
 end
 
+-- Рамер — Дуглас — Пекер по { row, v }: точки, без которых линия уходит
+-- больше чем на tol
+local function rdp(pts, tol)
+  if #pts <= 2 then return pts end
+  local keep = { [1] = true, [#pts] = true }
+  local function rec(a, b)
+    local pa, pb = pts[a], pts[b]
+    local best, bi = 0, nil
+    for i = a + 1, b - 1 do
+      local p = pts[i]
+      local t = (pb.row - pa.row) > 0 and (p.row - pa.row) / (pb.row - pa.row) or 0
+      local d = math.abs(p.v - (pa.v + (pb.v - pa.v) * t))
+      if d > best then best, bi = d, i end
+    end
+    if bi and best > tol then keep[bi] = true; rec(a, bi); rec(bi, b) end
+  end
+  rec(1, #pts)
+  local out = {}
+  for i, p in ipairs(pts) do if keep[i] then out[#out + 1] = p end end
+  return out
+end
+LG.rdp = rdp
+
+local STEP = 0.125      -- шаг отсчётов, строк
+
+-- подкат: hits — строки хитов (дробные, по возрастанию); точки на [r0, r1)
+function LG.podkat_points(hits, r0, r1)
+  local k = 2 ^ (LG.curve * 2)
+  local tau = math.max(0.05, LG.release) / 3            -- ~5 % к концу release
+  local sgn = LG.dir == 'swell' and 1 or -1
+  local pts = {}
+  local r = r0
+  while r < r1 - 1e-9 do
+    local duck = 0
+    for _, h in ipairs(hits) do
+      local ts = h - LG.lead
+      local v = 0
+      if r >= ts and r < h then v = ((r - ts) / math.max(1e-6, LG.lead)) ^ k
+      elseif r >= h and r < h + LG.hold then v = 1
+      elseif r >= h + LG.hold then v = math.exp(-(r - h - LG.hold) / tau); if v < 0.005 then v = 0 end end
+      if v > duck then duck = v end
+      if ts > r then break end
+    end
+    pts[#pts + 1] = { row = r, v = clamp01(LG.center + sgn * LG.depth * duck), shape = 0 }
+    r = r + STEP
+  end
+  return rdp(pts, LG.tol)
+end
+
+-- follow: src(row) → 0..1 (main: огибающая или громкость аудио); точки на [r0, r1)
+function LG.follow_points(src, r0, r1)
+  local ca = LG.attack > 0 and (1 - math.exp(-STEP / LG.attack)) or 1
+  local cr = LG.frel > 0 and (1 - math.exp(-STEP / LG.frel)) or 1
+  local pts = {}
+  local v
+  local r = r0
+  while r < r1 - 1e-9 do
+    local x = clamp01(src(r + LG.shift) or 0)
+    if LG.invert then x = 1 - x end
+    if not v then v = x elseif x > v then v = v + (x - v) * ca else v = v + (x - v) * cr end
+    pts[#pts + 1] = { row = r, v = clamp01(LG.center + (v * 2 - 1) * LG.depth / 2), shape = 0 }
+    r = r + STEP
+  end
+  return rdp(pts, LG.tol)
+end
+
 -- изменить поле i на d шагов (shape — по кругу)
 function LG.adjust(i, d)
   local f = LG.FIELDS[i]
   if not f or f.button then return end
-  if f.key == 'shape' then
+  if f.enum then
+    local list = type(f.enum) == 'string' and LG[f.enum] or f.enum
     local k = 1
-    for j, s in ipairs(LG.SHAPES) do if s == LG.shape then k = j end end
-    k = ((k - 1 + (d >= 0 and 1 or -1)) % #LG.SHAPES) + 1
-    LG.shape = LG.SHAPES[k]
-    if LG.shape == 'rnd' then LG.seed = LG.seed + 1 end
+    for j, s in ipairs(list) do if s == LG[f.key] then k = j end end
+    k = ((k - 1 + (d >= 0 and 1 or -1)) % #list) + 1
+    LG[f.key] = list[k]
+    if f.key == 'shape' and LG.shape == 'rnd' then LG.seed = LG.seed + 1 end
+    if f.key == 'type' or f.key == 'hits' then LG.FIELDS = LG.fields(); LG.sel = math.min(LG.sel, #LG.FIELDS) end
+    return
+  end
+  if f.toggle then LG[f.key] = not LG[f.key]; return end
+  if f.key == 'src' then
+    if LG.type == 'follow' and LG.fsrc == 'env' then return end      -- огибающая — выбором (Enter, main)
+    local n = math.max(1, #LG.src_names)
+    LG.src_i = ((LG.src_i - 1 + (d >= 0 and 1 or -1)) % n) + 1
     return
   end
   local v = LG[f.key] + d * f.step
@@ -142,6 +280,7 @@ function LG.key(c, mult)
   elseif c == 13 or ch == ' ' then
     local f = LG.FIELDS[LG.sel]
     if f.button then return f.key end
+    if f.key == 'src' and LG.type == 'follow' and LG.fsrc == 'env' then return 'pick' end
     LG.adjust(LG.sel, 1)
   elseif ch == 'g' then return 'ai'
   elseif ch == 'p' then return 'points'
@@ -151,7 +290,12 @@ end
 
 local function field_text(f)
   if f.button then return '' end
-  if f.key == 'shape' then return LG.shape end
+  if f.enum then return tostring(LG[f.key]) end
+  if f.toggle then return LG[f.key] and 'on' or 'off' end
+  if f.key == 'src' then
+    if LG.type == 'follow' and LG.fsrc == 'env' then return LG.src_env or 'Enter: pick envelope' end
+    return LG.src_names[LG.src_i] or '(no tracks)'
+  end
   return f.fmt:format(LG[f.key])
 end
 
@@ -159,7 +303,7 @@ end
 function LG.draw(U, L, x, y, w, h, focused, fit, target)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
-  U.text(x, y, fit('LFO -> ' .. (target or 'envelope at the cursor'), w), focused and U.AMBER or U.GREY)
+  U.text(x, y, fit(LG.type .. ' -> ' .. (target or 'envelope at the cursor'), w), focused and U.AMBER or U.GREY)
   local fy = y + L.rh + 2
   local lw = U.measure('points ') + L.pad
   for i, f in ipairs(LG.FIELDS) do
@@ -183,7 +327,7 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target)
   -- предпросмотр: два периода
   local py = fy + #LG.FIELDS * L.rh + 4
   local ph = y + h - py
-  if ph >= 3 * L.rh / 2 and w > 16 then
+  if LG.type == 'lfo' and ph >= 3 * L.rh / 2 and w > 16 then
     U.set(U.PANEL); gfx.rect(x, py, w, ph, 1)
     U.set(U.LINE); gfx.rect(x, py, w, ph, 0)
     local pts = LG.points(0, LG.period * 2)
