@@ -50,6 +50,8 @@ B.wave = false      -- мини-волны у файлов (кнопка wave)
 B.back, B.fwd = {}, {}
 -- *.* — все файлы, не только звук; .* — скрытые (имя с точки); 2 окт, сохраняются
 B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or false
+-- прослушивание через выделенный трек (кнопка track, 2 окт); по умолчанию включено
+B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '0')
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 B.marks = {}
 B.crumbs = {}       -- сегменты пути последней отрисовки { label=, path= }
@@ -476,6 +478,10 @@ function B.click(what)
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
   elseif what == 'wave' then B.wave = not B.wave
+  elseif what == 'track' then
+    B.via_track = not B.via_track
+    if R.SetExtState then R.SetExtState('jf_tracker', 'brtrack', B.via_track and '1' or '0', true) end
+    if ctx.msg then ctx.msg(B.via_track and 'listen through the selected track (its FX)' or 'listen direct (no track FX)') end
   elseif what == 'allfiles' or what == 'hidden' then
     if what == 'allfiles' then B.all_files = not B.all_files else B.hidden = not B.hidden end
     if R.SetExtState then
@@ -651,7 +657,7 @@ function B.draw(U, L, x, y, w, h)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto },
-                         { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
+                         { 'track', 'track', B.via_track }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

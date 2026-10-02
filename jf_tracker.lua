@@ -1952,14 +1952,20 @@ ctx = {
   preview_pos = function() return PV.position() end,
   preview_vol = function() return PV.vol end,
   preview_set_vol = function(v) PV.set_vol(v); state.pvvol = PV.vol end,
+  -- кнопка track браузера (2 окт): файлы слушаются через выделенный трек
+  -- (его FX), выключена — мимо треков, прямо в выход
+  preview_track = function()
+    if not B.via_track then return nil end
+    return reaper.GetSelectedTrack(0, 0) or (cur_col() and cur_col().track)
+  end,
   preview_from = function(path, frac)
     local c = cur_col()
     local len = 0
     do local src = reaper.PCM_Source_CreateFromFile(path); if src then len = reaper.GetMediaSourceLength(src) or 0; reaper.PCM_Source_Destroy(src) end end
-    PV.file(c and c.track, path, nil, frac * len)
+    PV.file(ctx.preview_track(), path, nil, frac * len)
   end,
   preview_file = function(path, sec)
-    local c = cur_col(); PV.file(c and c.track, path, sec)               -- без лимита: файл целиком, следующий выбор останавливает
+    PV.file(ctx.preview_track(), path, sec)               -- без лимита: файл целиком, следующий выбор останавливает
     -- проигрываемый файл сразу открывается в сэмпл-модуле
     if state.top and SL.open_file then
       if state.toptab ~= 'sample' then state.toptab = 'sample' end
@@ -3853,7 +3859,7 @@ local function frame()
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
     state.status = 'go to ' .. (c and c.path or '?')
   elseif type(hover.browser) == 'string' then
-    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
+    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
@@ -4838,6 +4844,16 @@ local function frame()
     c = 0
   elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
+    c = 0
+  end
+  -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
+  -- только его длина (слайс — свой кусок), через трек курсора
+  if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes') then
+    local col = cur_col()
+    local e = col and (col.pool or {})[vim.inst]
+    if e and (e.take or e.src) then PV.slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
+    else vim.msg = 'no instrument selected (empty slot)' end
     c = 0
   end
   -- справка (2 окт): ? включает / выключает; фокус на справке — поиск и

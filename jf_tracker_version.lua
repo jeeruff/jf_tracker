@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.28'
+V.VERSION = '0.5.29'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.29', d = '2026-10-02', items = {
+    'Shift+1 (!) listens to the selected instrument from any module (its own length, a slice plays only its piece)',
+    'browser: track button - files are heard through the selected track and its FX (on, default) or directly to the output (off)',
+  } },
   { v = '0.5.28', d = '2026-10-02', items = {
     'sample tab: autotrim (button, z, MIDI target) cuts the silence at the start and the end (-48 dB from the peak, 5 ms before the attack and 20 ms of tail kept) - all notes of the instrument, slices shifted, one undo',
     'cells no longer show the slice command Sxx: like Renoise, note + volume and the row with the instrument number and name (typing Sxx still works)',

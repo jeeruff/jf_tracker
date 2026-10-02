@@ -111,6 +111,7 @@ KH.PAGES = {
     { k = 'Esc Tab', d = 'next module' },
   } },
   inst = { title = 'instruments', e = {
+    { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'g G', d = 'first / last' },
     { k = 'h l', d = 'track left / right' },
