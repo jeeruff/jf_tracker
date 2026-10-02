@@ -44,6 +44,7 @@ local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
 local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
 local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
+local LG = dofile(DIR .. '/jf_tracker_lfogen.lua')        -- генератор LFO в точки / automation item (2 окт)
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
@@ -164,6 +165,8 @@ local lock_sync = {}                                        -- lock: после�
 local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов матрицы
 local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- размер / доли для контрола
 local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
+local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
+local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -828,6 +831,60 @@ ctx = {
       end
     end
     return items
+  end,
+  -- ── LFO → automation item / точки (2 окт, jf_tracker_lfogen.lua) ─────
+  -- огибающая: колонка огибающей под курсором трекера, иначе выбранная в
+  -- REAPER (своя запись из снимка, если трек виден). Где: time selection,
+  -- иначе регион курсора, иначе такт от строки курсора.
+  lfo_target = function()
+    local f = L and L.flat[vim.cur.fi]
+    if f and f.env then return { e = f.env, label = (f.col and f.col.name or '') .. ' / ' .. (f.env.name or 'env') } end
+    local se = reaper.GetSelectedEnvelope(0)
+    if not se then return nil end
+    for _, c in ipairs(snap and snap.cols or {}) do
+      for _, e in ipairs(c.envs or {}) do if e.env == se then return { e = e, label = c.name .. ' / ' .. e.name } end end
+    end
+    local _, nm = reaper.GetEnvelopeName(se, '')
+    return { e = { env = se, name = nm or 'env', min = 0, max = 1 }, label = (nm or 'env') .. ' (selected)' }
+  end,
+  lfo_span = function()
+    local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    if t1 > t0 + 1e-6 then return t0, t1, 'time selection' end
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if rg then return rg.pos, rg.rgnend, 'region ' .. (rg.name ~= '' and rg.name or rg.idx) end
+    local t = edit.row_time(vim.cur.row, state.lpb, 0)
+    local qn = reaper.TimeMap2_timeToQN(0, t)
+    local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
+    return t, reaper.TimeMap2_QNToTime(0, (qme and qms) and (qn + (qme - qms)) or (qn + 4)), 'one bar'
+  end,
+  lfo_make = function(mode)
+    local tg = ctx.lfo_target()
+    if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope column (or select an envelope in REAPER)'; return end
+    local e = tg.e
+    local t0, t1, where = ctx.lfo_span()
+    local r0, r1 = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
+    local pts = LG.points(r0, r1)
+    local lo, hi = e.min or 0, e.max or 1
+    local function raw(v) return lo + math.max(0, math.min(1, v)) * (hi - lo) end
+    local n = 0
+    edit.run(mode == 'ai' and 'LFO automation item' or 'LFO points', function()
+      local idx = -1
+      if mode == 'ai' then
+        idx = reaper.InsertAutomationItem(e.env, -1, t0, t1 - t0)
+        if not idx or idx < 0 then return end
+      end
+      reaper.DeleteEnvelopePointRangeEx(e.env, idx, t0 - 1e-6, t1 - 1e-6)
+      for _, p in ipairs(pts) do
+        local t = edit.row_time(p.row, state.lpb, 0)
+        if t >= t0 - 1e-6 and t < t1 - 1e-6 then
+          reaper.InsertEnvelopePointEx(e.env, idx, t, raw(p.v), p.shape, 0, false, true)
+          n = n + 1
+        end
+      end
+      reaper.Envelope_SortPointsEx(e.env, idx)
+    end)
+    state.envs = true
+    vim.msg = ('LFO %s %d rows -> %s: %s, %d points (%s)'):format(LG.shape, LG.period, mode == 'ai' and 'automation item' or 'envelope', tg.label, n, where)
   end,
   mod_add_pick = function()
     local col = cur_col(); if not col then return end
@@ -3698,7 +3755,15 @@ local function frame()
     end,
     mm_draw = function(Lx, x, y, w, h)
       local col = cur_col()
-      return MMX.draw(Lx, x, y, w, h, col and col.mods or {}, state.focus == 'top', col and (col.name .. ' modulation') or 'modulation')
+      -- справа — генератор LFO (2 окт), если влезает рядом с матрицей
+      local lw = (w >= Lx.cw * 70) and math.min(Lx.cw * 30, math.floor(w * 0.34)) or 0
+      lfo_hover = nil
+      if lw > 0 then
+        local tgt = ctx.lfo_target()
+        lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, state.focus == 'top' and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
+        U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
+      elseif mod_pane == 'lfo' then mod_pane = 'matrix' end
+      return MMX.draw(Lx, x, y, w - (lw > 0 and lw + 2 * Lx.pad or 0), h, col and col.mods or {}, state.focus == 'top' and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
     end,
     sample_draw = function(x, y, w, h)
       local col = cur_col()
@@ -4010,6 +4075,14 @@ local function frame()
       elseif MM.cur == i then MM.key(13)          -- второй клик по строке — learn
       else MM.cur = i end
       click = { t = now2, zone = 'midimap' }
+    elseif lfo_hover and state.top and state.toptab == 'modulation' then
+      ctx.set_focus('top'); mod_pane = 'lfo'
+      if lfo_hover.field then
+        LG.sel = lfo_hover.field
+        local f = LG.FIELDS[lfo_hover.field]
+        if f.button then ctx.lfo_make(f.key) elseif f.key == 'shape' then LG.adjust(LG.sel, 1) end
+      end
+      click = { t = now2, zone = 'lfo' }
     elseif hover.mm then
       ctx.set_focus('top')
       local same = click.zone == 'mm' and click.row == hover.mm.row and click.ci == hover.mm.col
@@ -4810,6 +4883,11 @@ local function frame()
     SL.vol_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
   end
+  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'modulation' then
+    LG.sel = lfo_hover.field
+    LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
+    gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and hover.mm then
     MMX.row, MMX.col = hover.mm.row, hover.mm.col
     MMX.adjust(cur_col() and cur_col().mods or {}, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
@@ -5043,6 +5121,12 @@ local function frame()
           if r == 'leave' then ctx.set_focus('tracker')
           elseif r == 'save' then mm_save()
           elseif not r then return vim.key(c) end
+        elseif state.toptab == 'modulation' and mod_pane == 'lfo' then
+          local r = LG.key(c, ctx.mods().shift and 10 or 1)
+          if r == 'leave' then mod_pane = 'matrix'
+          elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
+          elseif not r then return vim.key(c) end
+        elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g make AI, p write points, L back'
         elseif state.toptab == 'modulation' then
           local col = cur_col(); local mods = col and col.mods or {}
           if c == 27 then ctx.set_focus('tracker')

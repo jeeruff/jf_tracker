@@ -223,7 +223,10 @@ KH.PAGES = {
     { k = 'buttons', d = 'equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play' },
     { k = 'Esc', d = 'back to tracker' },
   } },
-  modulation = { title = 'modulation matrix', e = {
+  modulation = { title = 'modulation matrix + LFO generator', e = {
+    { k = 'L', d = 'LFO generator panel on the right / back to the matrix' },
+    { k = 'LFO j k h l', d = 'field / value: shape (sin tri saw+ saw- sqr rnd), period in rows, depth, center, phase, points per period' },
+    { k = 'LFO g p', d = 'g: new automation item with the curve, p: write points into the envelope - envelope at the tracker cursor (or selected in REAPER); time selection, else cursor region, else one bar' },
     { k = 'h j k l', d = 'cell' },
     { k = 'g G 0 $', d = 'first / last row, first / last column' },
     { k = 'Enter Space', d = 'toggle, next shape, pick link source' },
