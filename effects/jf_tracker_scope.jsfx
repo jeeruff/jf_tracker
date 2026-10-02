@@ -1,0 +1,98 @@
+desc:jf_tracker_scope (oscilloscope + spectrum bridge for jf_tracker)
+//tags: analysis utility
+//author: jeeruff
+options:gmem=jf_tracker_scope
+
+// Мост осциллоскопа и спектра для трекера jf_tracker: пишет децимированный
+// моно-сигнал трека и 48 логарифмических полос спектра в gmem, трекер
+// рисует «квадраскоп», анализатор спектра или спектрограмму во вкладке scope
+// (и во вкладке master — слот 31).
+// Раскладка gmem (на слот 512 чисел): база = slot*512,
+//   [0..255]   кольцо сэмплов (−1..1), децимация до ~8 кГц
+//   [256]      указатель записи (0..255)
+//   [257]      heartbeat (номер блока) — трекер видит, жив ли мост
+//   [259]      номер кадра спектра (растёт на каждый готовый FFT)
+//   [260..307] 48 полос: 30 Гц … Найквист (лог), 0..1 = −60..0 дБ
+// Слот ставит трекер (TrackFX_SetParam slider1 = индекс трека).
+// FFT 1024 точек с окном Ханна, раз в 1024 сэмпла (~47 кадров/с на 48 кГц).
+
+slider1:0<0,31,1>Slot
+
+in_pin:left
+in_pin:right
+out_pin:left
+out_pin:right
+
+@init
+RING = 256;
+base = 0;
+wp = 0;
+dec = max(1, floor(srate / 8000));
+cnt = 0;
+blk = 0;
+// спектр
+FFTN = 1024; NB = 48;
+fin = 0;                 // буфер накопления, FFTN чисел
+fwork = 2048;            // рабочий буфер FFT, FFTN чисел (re/im вперемешку)
+fedge = 4096;            // границы полос в бинах, NB+1 чисел
+fpos = 0;
+sframe = 0;
+b = 0;
+while (b <= NB) (
+  f = 30 * pow((srate * 0.5) / 30, b / NB);
+  fedge[b] = max(1, min(FFTN / 2 - 1, floor(f / srate * FFTN)));
+  b += 1;
+);
+
+@slider
+base = floor(slider1) * 512;
+wp = 0;
+
+@block
+blk += 1;
+gmem[base + 257] = blk;
+// готов буфер — FFT, полосы в gmem
+fpos >= FFTN ? (
+  fpos = 0;
+  i = 0;
+  while (i < FFTN) (
+    fwork[i] = fin[i] * (0.5 - 0.5 * cos(2 * $pi * i / FFTN));   // Ханн
+    i += 1;
+  );
+  fft_real(fwork, FFTN);
+  fft_permute(fwork, FFTN / 2);
+  b = 0;
+  while (b < NB) (
+    k0 = fedge[b]; k1 = max(k0 + 1, fedge[b + 1]);
+    m = 0;
+    k = k0;
+    while (k < k1) (
+      re = fwork[2 * k]; im = fwork[2 * k + 1];
+      mg = sqrt(re * re + im * im);
+      mg > m ? m = mg;
+      k += 1;
+    );
+    // амплитуда → дБ относительно полной шкалы (FFTN/4 — пик синуса с окном Ханна)
+    db = 20 * log10(max(m / (FFTN * 0.25), 0.000001));
+    v = (db + 60) / 60;
+    v < 0 ? v = 0; v > 1 ? v = 1;
+    gmem[base + 260 + b] = v;
+    b += 1;
+  );
+  sframe += 1;
+  gmem[base + 259] = sframe;
+);
+
+@sample
+cnt += 1;
+cnt >= dec ? (
+  cnt = 0;
+  gmem[base + wp] = (spl0 + spl1) * 0.5;
+  wp += 1;
+  wp >= RING ? wp = 0;
+  gmem[base + 256] = wp;
+);
+fpos < FFTN ? (
+  fin[fpos] = (spl0 + spl1) * 0.5;
+  fpos += 1;
+);

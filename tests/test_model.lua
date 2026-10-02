@@ -1,0 +1,251 @@
+-- test_model.lua — модель трекера на стабах reaper.*, без REAPER.
+-- Запуск из папки jf_tracker:  lua tests/test_model.lua
+--
+-- Проверяет: строки/доли от QN, разбор потока MIDI, раскладку по
+-- подколонкам (полифония и перекрытие), lanes, разворот цикла, кеш.
+
+local DIR = (arg and arg[0] or ''):match('(.*)/tests/') or '.'
+package.path = DIR .. '/?.lua;' .. package.path
+
+-- ── стабы ─────────────────────────────────────────────────────────────────
+-- Проект: темп 120 (1 QN = 0.5 с), 4/4. Треки и items — таблицы.
+local BPM = 120
+local function qn2t(qn) return qn * 60 / BPM end
+local function t2qn(t) return t * BPM / 60 end
+
+local tracks = {}
+local state_count = 1
+
+local function midi_stream(events)   -- {{dppq, flag, bytes}, …} → строка
+  local parts = {}
+  for _, e in ipairs(events) do
+    parts[#parts + 1] = string.pack('<i4Bs4', e[1], e[2], string.char(table.unpack(e[3])))
+  end
+  return table.concat(parts)
+end
+
+_G.reaper = {
+  CountTracks = function() return #tracks end,
+  GetTrack = function(_, i) return tracks[i + 1] end,
+  GetTrackName = function(tr) return true, tr.name end,
+  GetTrackColor = function(tr) return tr.color or 0 end,
+  GetMediaTrackInfo_Value = function(tr, k)
+    if k == 'I_FREEMODE' then return tr.freemode or 0 end
+    if k == 'I_NUMFIXEDLANES' then return tr.nlanes or 1 end
+    if k == 'B_MUTE' then return 0 end
+    return 0
+  end,
+  GetSetMediaTrackInfo_String = function(tr, k)
+    local n = tonumber(k:match('P_LANENAME:(%d+)'))
+    return true, (tr.lanenames or {})[n + 1] or ''
+  end,
+  CountTrackMediaItems = function(tr) return #tr.items end,
+  GetTrackMediaItem = function(tr, i) return tr.items[i + 1] end,
+  GetMediaItemInfo_Value = function(it, k)
+    if k == 'D_POSITION' then return it.pos end
+    if k == 'D_LENGTH' then return it.len end
+    if k == 'I_FIXEDLANE' then return it.lane or 0 end
+    if k == 'D_VOL' then return it.vol or 1 end
+    if k == 'B_MUTE_ACTUAL' then return it.muted and 1 or 0 end
+    if k == 'B_LOOPSRC' then return it.loop and 1 or 0 end
+    return 0
+  end,
+  GetActiveTake = function(it) return it.take end,
+  GetSetMediaItemInfo_String = function(it, k) return true, (it.ext or {})[k] or '' end,
+  TakeIsMIDI = function(tk) return tk.midi ~= nil end,
+  GetMediaItemTake_Source = function(tk) return tk.src or { len = tk.srclen or 1, qn = tk.midi ~= nil } end,
+  GetMediaItemTakeInfo_Value = function(tk, k)
+    if k == 'D_PITCH' then return tk.pitch or 0 end
+    if k == 'D_PLAYRATE' then return tk.rate or 1 end
+    if k == 'B_PPITCH' then return tk.ppitch and 1 or 0 end
+    if k == 'D_VOL' then return tk.vol or 1 end
+    if k == 'D_STARTOFFS' then return tk.offs or 0 end
+    if k == 'D_PAN' then return tk.pan or 0 end
+    if k == 'I_CHANMODE' then return tk.chanmode or 0 end
+    return 0
+  end,
+  GetTakeName = function(tk) return tk.name or '' end,
+  GetMediaSourceLength = function(src) return src.len, src.qn end,
+  MIDI_GetHash = function(tk) return true, tk.hash or 'h' end,
+  MIDI_GetTrackHash = function(tr) return true, tr.hash or 'th' end,
+  MIDI_GetAllEvts = function(tk) return true, midi_stream(tk.midi) end,
+  -- PPQ 960 на QN; item.pos + offset — как в REAPER
+  MIDI_GetProjQNFromPPQPos = function(tk, ppq) return t2qn(tk.item.pos) + ppq / 960 end,
+  TimeMap2_timeToQN = function(_, t) return t2qn(t) end,
+  TimeMap2_QNToTime = function(_, qn) return qn2t(qn) end,
+  TimeMap_QNToMeasures = function(_, qn)
+    local m = math.floor(qn / 4 + 1e-9)
+    return m, m * 4, (m + 1) * 4
+  end,
+  GetProjectStateChangeCount = function() return state_count end,
+  time_precise = function() return os.clock() end,
+}
+
+local M = dofile(DIR .. '/jf_tracker_model.lua')
+
+-- ── помощники ─────────────────────────────────────────────────────────────
+local fails, checks = 0, 0
+local function eq(name, got, want)
+  checks = checks + 1
+  if got ~= want then
+    fails = fails + 1
+    print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want)))
+  end
+end
+
+-- ── 1. строки и доли ──────────────────────────────────────────────────────
+do
+  local r, d = M.row_of_qn(0, 4);      eq('row 0', r, 0); eq('delay 0', d, 0)
+  r, d = M.row_of_qn(0.5, 4);          eq('row qn.5', r, 2); eq('delay qn.5', d, 0)
+  r, d = M.row_of_qn(1/3, 4);          eq('row 1/3', r, 1); eq('delay 1/3', d, 85)   -- 4/3 = 1.333 → 0.333*256
+  r, d = M.row_of_qn(0.9999999, 4);    eq('row rounding', r, 4); eq('delay rounding', d, 0)
+  eq('note 60', M.note_name(60), 'C-4')
+  eq('note 61', M.note_name(61), 'C#4')
+  eq('note 48', M.note_name(48), 'C-3')
+  eq('note 71', M.note_name(71), 'B-4')
+  eq('hex 128', M.hex2(128), '80')
+  eq('hex clamp', M.hex2(999), 'FF')
+  eq('semis resample', math.floor(M.take_semitones(0, 2, false) + 0.5), 12)
+  eq('semis stretch', M.take_semitones(0, 2, true), 0)
+  eq('semis pitch', M.take_semitones(-3, 1, true), -3)
+end
+
+-- ── 2. разбор MIDI ────────────────────────────────────────────────────────
+do
+  -- C4 vel 100 на 0, длина 1 QN; E4 на 0 (полифония), длина 2 QN; D4 на 1 QN
+  local s = midi_stream{
+    { 0,   0, { 0x90, 60, 100 } },
+    { 0,   0, { 0x90, 64, 90 } },
+    { 960, 0, { 0x80, 60, 0 } },
+    { 0,   2, { 0x90, 62, 80 } },   -- muted
+    { 960, 0, { 0x90, 64, 0 } },    -- note-on vel 0 = off
+    { 480, 0, { 0x80, 62, 0 } },
+  }
+  local notes = M.parse_midi(s)
+  eq('notes count', #notes, 3)
+  eq('n1 pitch', notes[1].pitch, 60); eq('n1 end', notes[1].ppq_end, 960)
+  eq('n2 pitch', notes[2].pitch, 64); eq('n2 end', notes[2].ppq_end, 1920)
+  eq('n3 pitch', notes[3].pitch, 62); eq('n3 start', notes[3].ppq, 960); eq('n3 muted', notes[3].muted, true)
+  eq('n3 end', notes[3].ppq_end, 2400)
+end
+
+-- ── 3. снимок: аудио, lanes, перекрытие ───────────────────────────────────
+do
+  local a = { name = 'A', items = {} }
+  -- item на 0 с, 1 такт (2 с = 4 QN = 16 строк), питч +2 через rate
+  a.items[1] = { pos = 0, len = 2, loop = true, take = { name = 'kick.wav', rate = 2 ^ (2 / 12) } }
+  -- item на 0.75 QN (строка 3), перекрывает первый → вторая подколонка
+  a.items[2] = { pos = qn2t(0.75), len = 0.5, take = { name = 'snare.wav', pitch = -12 } }
+  -- item ровно на границе строки 20, длина 1 строка → без cont
+  a.items[3] = { pos = qn2t(5), len = qn2t(0.25), take = { name = 'hat.wav', pan = 0.5, chanmode = 2 }, loop = false }
+  local b = { name = 'B', freemode = 2, nlanes = 2, lanenames = { 'one', 'two' }, items = {} }
+  b.items[1] = { pos = 0, len = 0.5, lane = 1, take = { name = 'x.wav' } }
+  local depot = { name = 'DEPOT', items = { { pos = 0, len = 1, take = { name = 'd' } } } }
+  tracks = { a, b, depot }
+
+  local snap = M.build(4)
+  eq('cols (без DEPOT)', #snap.cols, 2)
+  local la = snap.cols[1].lanes[1]
+  eq('A subs', #la.subs, 2)
+  local h = la.subs[1][0]
+  eq('A head kind', h and h.kind, 'audio')
+  eq('A head note', h and h.note, 'D-4')
+  eq('A head name', h and h.name, 'kick.wav')
+  eq('A head rows', h and h.rows, 16)
+  eq('A cont 15', la.subs[1][15] and la.subs[1][15].kind, 'cont')
+  eq('A row 16 free', la.subs[1][16], nil)
+  local s2 = la.subs[2][3]
+  eq('A sub2 snare', s2 and s2.name, 'snare.wav')
+  eq('A snare note', s2 and s2.note, 'C-3')
+  eq('A snare rows', s2 and s2.rows, 4)          -- 0.5 с = 1 QN = 4 строки
+  local hat = la.subs[1][20]
+  do
+    local kick = la.subs[1][0]
+    eq('kick loop_rows set', kick and kick.loop_rows ~= nil, true)
+    eq('kick loop_rows < rows', kick and kick.loop_rows < kick.rows_f, true)
+    eq('kick loop_first == loop_rows (offs 0)', kick and math.abs(kick.loop_first - kick.loop_rows) < 1e-6, true)
+    eq('hat no loop', hat and hat.loop_rows, nil)
+  end
+  eq('hat head', hat and hat.kind, 'audio')
+  eq('hat rows', hat and hat.rows, 1)
+  eq('hat next free', la.subs[1][21], nil)
+  eq('hat fx', table.concat(hat and hat.fx or {}, ' '), '8BF L00 M02')
+  eq('kick fx (resample, no fx)', #(h and h.fx or {}), 0)
+  local lb = snap.cols[2].lanes
+  eq('B lanes', #lb, 2)
+  eq('B lane2 name', lb[2].name, 'two')
+  eq('B lane1 empty', next(lb[1].subs[1]), nil)
+  eq('B lane2 item', lb[2].subs[1][0] and lb[2].subs[1][0].name, 'x.wav')
+  eq('last_row', snap.last_row, 20)
+end
+
+-- ── 4. снимок: MIDI, полифония, цикл, OFF ─────────────────────────────────
+do
+  local it = { pos = qn2t(4), len = qn2t(4), loop = true }
+  it.take = { item = it, srclen = 2, midi = {
+    { 0,   0, { 0x90, 60, 100 } },
+    { 0,   0, { 0x90, 64, 90 } },
+    { 480, 0, { 0x80, 60, 0 } },       -- C4: 0.5 QN = 2 строки → OFF в строке 2
+    { 480, 0, { 0x80, 64, 0 } },       -- E4: 1 QN → OFF в строке 4
+    { 0,   0, { 0x90, 67, 70 } },
+    { 240, 0, { 0x80, 67, 0 } },       -- G4 1..1.25 QN — короче строки: только голова
+  } }
+  local m = { name = 'M', items = { it } }
+  tracks = { m }
+  local snap = M.build(4)
+  local lane = snap.cols[1].lanes[1]
+  eq('M subs', #lane.subs, 2)
+  local s1, s2 = lane.subs[1], lane.subs[2]
+  -- item начинается в строке 16 (4 QN); источник 2 QN → повтор в строке 24
+  eq('M C4 head', s1[16] and s1[16].note, 'C-4')
+  eq('M C4 vel', s1[16] and s1[16].vol, '64')
+  eq('M C4 cont', s1[17] and s1[17].kind, 'cont')
+  eq('M C4 off', s1[18] and s1[18].kind, 'off')
+  eq('M E4 in sub2', s2[16] and s2[16].note, 'E-4')
+  eq('M E4 off', s2[20] and s2[20].kind, 'off')
+  eq('M G4 head', s1[20] and s1[20].note, 'G-4')
+  eq('M G4 off next row', s1[21] and s1[21].kind, 'off')   -- нота ровно в строку: OFF в следующей
+  eq('M loop repeat', s1[24] and s1[24].note, 'C-4')
+  eq('M loop E4', s2[24] and s2[24].note, 'E-4')
+  eq('M no third rep', s1[32], nil)
+  eq('M last_row', snap.last_row, 29)
+end
+
+-- ── 5. кеш ────────────────────────────────────────────────────────────────
+do
+  local s1, ch1 = M.snapshot(4)
+  local s2, ch2 = M.snapshot(4)
+  eq('cache first', ch1, true); eq('cache hit', ch2, false); eq('cache same', s1, s2)
+  state_count = state_count + 1
+  local _, ch3 = M.snapshot(4)
+  eq('cache miss on state', ch3, true)
+  local _, ch4 = M.snapshot(8)
+  eq('cache miss on lpb', ch4, true)
+end
+
+-- ── 6. строки вида ────────────────────────────────────────────────────────
+do
+  local rows = M.rows(14, 4, 4)
+  eq('rows n', #rows, 4)
+  eq('row 16 bar', rows[3].bar, true)
+  eq('row 16 label', rows[3].label, '0016')
+  eq('row 15 not beat', rows[2].beat, false)
+  eq('row 16 t', rows[3].t, 2.0)
+end
+
+-- рамки items: дробные строки начала/конца, аудио — подколонка, MIDI — вся lane
+do
+  local snap = M.build(4)
+  local nit, nmidi, naud = 0, 0, 0
+  for _, col in ipairs(snap.cols) do for _, lane in ipairs(col.lanes) do
+    for _, it in ipairs(lane.items or {}) do
+      nit = nit + 1
+      eq('item r0<r1', it.r1 > it.r0, true)
+      if it.midi then nmidi = nmidi + 1; eq('midi item spans lane (si nil)', it.si, nil)
+      else naud = naud + 1; eq('audio item has sub index', type(it.si), 'number') end
+    end
+  end end
+  eq('items recorded', nit > 0, true); eq('midi items recorded', nmidi > 0, true)
+end
+print(('%d checks, %d failed'):format(checks, fails))
+os.exit(fails == 0 and 0 or 1)

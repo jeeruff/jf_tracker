@@ -1,0 +1,48 @@
+-- jf_tracker_version.lua — версия и список изменений (Options → about).
+-- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
+local V = {}
+V.VERSION = '0.5.0'
+V.DATE = '2026-10-02'
+V.CHANGES = {
+  { v = '0.5.0', d = '2026-10-02', items = {
+    'Garden tab: loop grid region x track, Orca field (A-Z operators) planting notes / slices while playing',
+    'loops in regions: > item to region end, N> loop period N steps (section source), < region to item end',
+    'INSERT = Ableton layout: piano on the top row + digits, z/x octave, c/C velocity; Shift+note plays, Option+note beside',
+    'd in INSERT is a Vim operator (d3w, dd) and returns to INSERT',
+    'track header: name row, R I M S A buttons, volume and pan / width / dual pan sliders',
+    'matrix shows =START..=END with free bars; items after =END are hidden',
+    'Tab cycle tracker > instruments > browser > dsp > matrix > dock; Option-Tab cycles dock tabs',
+    'wave column follows stretch markers; spectral peaks + stretch / loop ticks',
+    'instruments: groups by track, marks @ $ * sN with status explanations, select / insert play toggles',
+    'MIDI input auditions slices in the Sample tab; Options window; version + about',
+  } },
+  { v = '0.4.0', d = '2026-10-01', items = {
+    'sample module: volume, normalize, draggable slice markers, parent sample with played zone',
+    'matrix: + / :add, rename, length in steps, region length box above row numbers',
+    'note on a busy row cuts the previous item (x-fade off) or crossfades (x-fade on)',
+    'pool from all tracks + library after =LIB; browser tabs files / db / pm / proj',
+  } },
+  { v = '0.3.0', d = '2026-10-01', items = {
+    'recording from MIDI and audio input (jf_rec, first transient), retro sampler tab',
+    'lock to REAPER cursor, fixed cursor, beatsync =, mouse trim / move of items',
+    'modulation matrix tab, DSP panel with containers, analyzer in master tab',
+  } },
+  { v = '0.2.0', d = '2026-09-30', items = {
+    'Vim layer (NORMAL / INSERT / VISUAL / cmd), hints f, hydra \\, macros, search',
+    'pattern matrix, aliases by region name, library after =LIB, monome grid module',
+  } },
+  { v = '0.1.0', d = '2026-09-30', items = {
+    'read-only tracker view of the REAPER timeline: lanes, MIDI and audio cells, vertical waves',
+  } },
+}
+-- строки для окна about
+function V.lines()
+  local out = { ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
+  for _, c in ipairs(V.CHANGES) do
+    out[#out + 1] = ('%s  %s'):format(c.v, c.d)
+    for _, it in ipairs(c.items) do out[#out + 1] = '  - ' .. it end
+    out[#out + 1] = ''
+  end
+  return out
+end
+return V

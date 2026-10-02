@@ -1,0 +1,429 @@
+-- test_vim.lua — Vim-слой на стабах: снимок и раскладка — таблицы,
+-- edit — заглушка, записывающая вызовы. Запуск: lua tests/test_vim.lua
+
+local DIR = (arg and arg[0] or ''):match('(.*)/tests/') or '.'
+local keys = dofile(DIR .. '/jf_tracker_keys.lua')
+local V = dofile(DIR .. '/jf_tracker_vim.lua')
+
+local fails, checks = 0, 0
+local function eq(name, got, want)
+  checks = checks + 1
+  if got ~= want then fails = fails + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
+end
+
+-- ── снимок ────────────────────────────────────────────────────────────────
+local function head(kind, row, rows, extra)
+  local h = { kind = kind, row0 = row, rows = rows, note = 'C-4', vol = '80', delay = 0 }
+  for k, v in pairs(extra or {}) do h[k] = v end
+  return h
+end
+local function put(sub, h)
+  sub[h.row0] = h
+  for r = h.row0 + 1, h.row0 + h.rows - 1 do sub[r] = { kind = 'cont', of = h, i = r - h.row0 } end
+end
+
+local snap, state, L, calls, folds
+local function build()
+  snap = { cols = {}, last_row = 40 }
+  local a = { name = 'A', guid = 'A', track = 'trA', lanes = { { idx = 0, subs = { {}, {} } } },
+              pool = { { item = 'depot1', name = 'd1' } } }
+  put(a.lanes[1].subs[1], head('audio', 0, 4, { name = 'kick', fx = { '9A0' } }))
+  put(a.lanes[1].subs[1], head('audio', 8, 2, { name = 'snare' }))
+  put(a.lanes[1].subs[1], head('audio', 16, 1, { name = 'hat' }))
+  put(a.lanes[1].subs[2], head('audio', 2, 2, { name = 'ov' }))
+  local m = { name = 'M', guid = 'M', track = 'trM', lanes = { { idx = 0, subs = { {} } } } }
+  put(m.lanes[1].subs[1], head('midi', 4, 2, { pitch = 60, ch = 0 }))
+  put(m.lanes[1].subs[1], head('midi', 12, 4, { pitch = 64, ch = 0 }))
+  snap.cols = { a, m }
+end
+
+local function layout()
+  L = { nrows = 16, win_w = 10000, flat = {} }
+  for ci, col in ipairs(snap.cols) do
+    if folds[col.guid] then
+      L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, x = 0, w = 10 }
+    else
+      for li, lane in ipairs(col.lanes) do
+        for si, sub in ipairs(lane.subs) do
+          L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = sub, x = 0, w = 10 }
+        end
+      end
+    end
+  end
+end
+
+-- ── edit-заглушка ─────────────────────────────────────────────────────────
+local function names(heads)
+  local t = {}
+  for _, h in ipairs(heads) do t[#t + 1] = h.name or ('n' .. h.pitch) end
+  table.sort(t); return table.concat(t, ',')
+end
+local E = {}
+function E.delete(heads) calls[#calls + 1] = 'delete:' .. names(heads)
+  for _, h in ipairs(heads) do
+    for _, col in ipairs(snap.cols) do for _, lane in ipairs(col.lanes) do for _, sub in ipairs(lane.subs) do
+      for r = h.row0, h.row0 + h.rows - 1 do if sub[r] == h or (sub[r] and sub[r].of == h) then sub[r] = nil end end
+    end end end
+  end
+end
+function E.yank(heads, lpb, r0, f0) calls[#calls + 1] = 'yank:' .. names(heads); return { rows = 1, cells = { { drow = 0, dfi = 0, kind = 'audio', chunk = 'x', n = #heads } } } end
+function E.paste(reg, lpb, row, targets) local tg = targets(0); calls[#calls + 1] = ('paste:%d@%d:%s'):format(reg and reg.cells[1].n or 0, row, tg and tg.track or '-') end
+function E.mute(heads) calls[#calls + 1] = 'mute:' .. names(heads) end
+function E.split(heads, lpb, row) calls[#calls + 1] = ('split:%s@%d'):format(names(heads), row) end
+function E.transpose(heads, lpb, s) calls[#calls + 1] = ('transpose:%s:%+d'):format(names(heads), s) end
+function E.set_pitch(heads, lpb, p) calls[#calls + 1] = ('pitch:%s:%d'):format(names(heads), p) end
+function E.note_off(heads, lpb, row) calls[#calls + 1] = ('off:%s@%d'):format(names(heads), row) end
+function E.insert_note(track, lane, lpb, row, pitch, vel, len, depot) calls[#calls + 1] = ('ins:%s@%d:%d:%d'):format(track, row, pitch, len) end
+function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), v) end
+function E.set_delay(heads, lpb, d) calls[#calls + 1] = ('delay:%s:%d'):format(names(heads), d) end
+function E.set_fx(heads, lpb, cmd, xx) calls[#calls + 1] = ('fx:%s:%s%02X'):format(names(heads), cmd, xx) end
+function E.clear_fx(heads, lpb, cmd) calls[#calls + 1] = ('clearfx:%s:%s'):format(names(heads), cmd) end
+function E.undo() calls[#calls + 1] = 'undo' end
+function E.redo() calls[#calls + 1] = 'redo' end
+function E.save() calls[#calls + 1] = 'save' end
+function E.play_stop() calls[#calls + 1] = 'play' end
+function E.cursor_to(t) calls[#calls + 1] = 'cursor:' .. t end
+function E.beatsync(heads, lpb, unit) calls[#calls + 1] = ('beatsync:%s:%s'):format(names(heads), unit); return #heads end
+
+local lpb_calls = {}
+local ctrl_down, alt_down, cmd_down, shift_down = false, false, false, false
+local function reset()
+  folds = {}; calls = {}
+  state = { lpb = 4, row0 = 0, hscroll = 1, follow = true, folds = folds, fxcols = 1 }
+  build(); layout()
+  V.mode = 'normal'; V.cur = { fi = 1, row = 0, field = 1 }; V.count = nil; V.pending = nil; V.op = nil; V.hexbuf = nil
+  V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
+  V.init({
+    edit = E, state = state, piano = keys.piano,
+    snap = function() return snap end, layout = function() return L end, relayout = layout,
+    bar_of_row = function(row) local b = math.floor(row / 16) * 16; return b, b + 16 end,
+    row_time = function(row) return row * 0.125 end,
+    set_lpb = function(n, dir) lpb_calls[#lpb_calls + 1] = n or dir end,
+    fold = function(col, v) folds[col.guid] = v or nil end,
+    fold_all = function(v) for _, c in ipairs(snap.cols) do folds[c.guid] = v or nil end end,
+    depot = function() return { { item = 'depot1', name = 'd1' } } end,
+    toggle_focus = function() calls[#calls + 1] = 'focus' end,
+    set_pitchmode = function(col, m) calls[#calls + 1] = 'pitchmode:' .. col.name .. ':' .. m end,
+    sync_here = function() calls[#calls + 1] = 'sync'; return 1 end,
+    pool_select = function(n) calls[#calls + 1] = 'pool:' .. n; V.inst = n end,
+    set_font = function(n) calls[#calls + 1] = 'font:' .. n end,
+    browse = function(p) calls[#calls + 1] = 'browse:' .. tostring(p) end,
+    hydra_root = function() return { title = 'root', items = {
+      { key = 'e', label = 'event', sub = { title = 'event', items = { { key = 'x', label = 'del', fn = function() calls[#calls + 1] = 'hydra:x' end } } } },
+      { key = 'v', label = 'view', fn = function() calls[#calls + 1] = 'hydra:v' end },
+    } } end,
+    hydra_keys = function() return { title = 'keys', items = { { key = 'h', label = 'move' } } } end,
+    ctrl_held = function() return ctrl_down end,
+    mods = function() return { ctrl = ctrl_down, alt = alt_down, cmd = cmd_down, shift = shift_down } end,
+    preview = function(tr, p) calls[#calls + 1] = 'prev:' .. tostring(p) end,
+    toggle_envs = function() calls[#calls + 1] = 'envs' end,
+    loop = function(w, n) calls[#calls + 1] = 'loop:' .. tostring(w) .. ':' .. tostring(n) end,
+    automation_picker = function()
+      V.open_picker('auto', { { label = 'track: volume' }, { label = 'ReaEQ / Gain' }, { label = 'ReaComp / Threshold' } },
+        function(it) calls[#calls + 1] = 'pick:' .. it.label end)
+    end,
+    matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
+    env_set = function(e, row, v) calls[#calls + 1] = ('envset:%s@%d:%.3f'):format(e.name, row, v) end,
+    env_del = function(e, row) calls[#calls + 1] = ('envdel:%s@%d'):format(e.name, row) end,
+    env_nudge = function(e, row, d) calls[#calls + 1] = ('envnudge:%s@%d:%+.4f'):format(e.name, row, d) end,
+    env_ramp = function(e, r0, r1, v0, v1) calls[#calls + 1] = ('envramp:%s@%d-%d:%s>%.2f'):format(e.name, r0, r1, v0 and ('%.2f'):format(v0) or 'cur', v1) end,
+  })
+end
+local function keysin(s) for ch in s:gmatch('.') do V.key(ch:byte()) end end
+local function last() return calls[#calls] or '' end
+
+-- ── движения ──────────────────────────────────────────────────────────────
+reset()
+keysin('w');   eq('w → snare', V.cur.row, 8)
+keysin('w');   eq('w → hat', V.cur.row, 16)
+keysin('w');   eq('w stays at last', V.cur.row, 16)
+keysin('b');   eq('b → snare', V.cur.row, 8)
+keysin('2b');  eq('2b → kick', V.cur.row, 0)
+keysin('e');   eq('e → boundary after kick', V.cur.row, 4)
+keysin('2j');  eq('2j', V.cur.row, 6)
+keysin('k');   eq('k', V.cur.row, 5)
+keysin('l');   eq('l → vol field', V.cur.field, 2); eq('l same sub', V.cur.fi, 1)
+keysin('lll'); eq('4 fields then next sub', V.cur.fi, 2); eq('field wraps to 1', V.cur.field, 1)
+keysin('h');   eq('h back → delay field of sub1 (visual order nt vl fx dl)', V.cur.fi, 1); eq('h field', V.cur.field, 3)
+keysin('L');   eq('L → track M', V.cur.fi, 3)
+keysin('H');   eq('H → track A', V.cur.fi, 1)
+keysin('$');   eq('$ → last col', V.cur.fi, 3); eq('$ last field (delay)', V.cur.field, 3)
+keysin('0');   eq('0 → first col', V.cur.fi, 1); eq('0 first field', V.cur.field, 1)
+keysin('G');   eq('G → last row', V.cur.row, 40)
+keysin('gg');  eq('gg → 0', V.cur.row, 0)
+keysin('10G'); eq('10G', V.cur.row, 9)
+keysin('}');   eq('} → next bar', V.cur.row, 16)
+keysin('{');   eq('{ → bar start', V.cur.row, 0)
+V.cur.fi = 3; V.cur.row = 0
+keysin('W');   eq('W in track M', V.cur.row, 4)
+-- прокрутка держит курсор
+V.cur.fi = 1; V.cur.row = 0; state.row0 = 0
+keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
+keysin('zt');  eq('zt', state.row0, 20)
+keysin('zz');  eq('zz', state.row0, 12)
+
+-- ── операторы ─────────────────────────────────────────────────────────────
+reset()
+keysin('x');       eq('x deletes kick', last(), 'delete:kick')
+eq('x yanks first', calls[1], 'yank:kick')
+reset()
+keysin('8jdd');    eq('dd at 8 → snare', last(), 'delete:snare')
+reset()
+keysin('dw');      eq('dw: kick only (exclusive)', last(), 'delete:kick')
+V.cur.row = 6; keysin('dw'); eq('dw from empty space before snare → snare', last(), 'delete:snare')
+reset()
+keysin('d9j');     eq('d9j: kick+snare', last(), 'delete:kick,snare')
+reset()
+keysin('dG');      eq('dG: all in sub', last(), 'delete:hat,kick,snare')
+reset()
+keysin('yy');      eq('yy', last(), 'yank:kick'); eq('yy no delete', #calls, 1)
+keysin('4jp');     eq('p pastes at 4 on A', last(), 'paste:1@4:trA')
+reset()
+keysin('m');       eq('m mutes kick', last(), 'mute:kick')
+reset()
+keysin('2js');     eq('s splits kick at 2', last(), 'split:kick@2')
+reset()
+V.key(1);          eq('^A transposes', last(), 'transpose:kick:+1')
+keysin('3'); V.key(24); eq('3^X', last(), 'transpose:kick:-3')
+reset()
+keysin('r3');      eq('r3 → D#4 (63)', last(), 'pitch:kick:63')
+reset()
+keysin('u'); V.key(18); eq('undo/redo', calls[1] .. ',' .. calls[2], 'undo,redo')
+reset()
+keysin('cc');      eq('cc deletes', last(), 'delete:kick'); eq('cc → insert', V.mode, 'insert')
+
+-- ── visual ────────────────────────────────────────────────────────────────
+reset()
+keysin('v9jd');    eq('v9jd', last(), 'delete:kick,snare'); eq('visual → normal', V.mode, 'normal')
+reset()
+keysin('vLL4jd');  eq('v across cols', last(), 'delete:kick,n60,ov')
+reset()
+keysin('Vjjjjd');  eq('V-line all cols', last(), 'delete:kick,n60,ov')
+reset()
+keysin('vllll4jy'); eq('vy', last(), 'yank:kick,ov')
+reset()
+keysin('4jLLvjm'); eq('visual m', last(), 'mute:n60')
+reset()
+keysin('vjo');     eq('o swaps', V.cur.row, 0); eq('anchor moved', V.anchor.row, 1)
+V.key(27);         eq('esc in VISUAL → normal', V.mode, 'normal')
+
+-- ── insert ────────────────────────────────────────────────────────────────
+reset()
+keysin('iq');      eq('i q → C-4 at 0 on A', last(), 'ins:trA@0:60:1'); eq('step advance', V.cur.row, 1)
+eq('note over kick overwrites (kick deleted first)', calls[#calls - 1], 'delete:kick')
+V.cur.row = 8; alt_down = true; keysin('q'); alt_down = false
+eq('Option+note beside snare: no delete', calls[#calls - 1] ~= 'delete:snare', true); eq('Option+note inserted', last(), 'ins:trA@8:60:1')
+V.cur.row = 8; local nc = #calls; keysin('Q'); eq('Shift+note only auditions', last(), 'prev:60'); eq('Shift+note: nothing inserted', #calls, nc + 1)
+keysin('#'); eq('Shift+3 auditions D#', last(), 'prev:63')
+ctrl_down = true; V.key(17); ctrl_down = false; eq('Ctrl+q auditions (capture planned)', last(), 'prev:60')
+V.cur.row = 1
+keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
+keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
+keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
+keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
+cmd_down = true; V.key(51); eq('⌘3 → pool slot 3', last(), 'pool:3'); V.key(48); eq('⌘0 → slot 10', last(), 'pool:10'); cmd_down = false
+V.key(27);         eq('esc → normal', V.mode, 'normal')
+keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
+keysin('iq');      eq('len = step', last(), 'ins:trA@5:72:2'); eq('advance by step', V.cur.row, 7)
+V.key(27)
+keysin(':lpb 8'); V.key(13); eq('lpb cmd', lpb_calls[#lpb_calls], 8)
+keysin(':w'); V.key(13); eq(':w saves', last(), 'save')
+eq(':q quits', (function() keysin(':q'); return V.key(13) end)(), 'quit')
+
+-- ── поля: ^A/^X, hex-ввод, r ─────────────────────────────────────────────
+reset()
+keysin('l'); V.key(1);      eq('^A on vol → +1', last(), 'vol:kick:129')
+keysin('l'); V.key(1);      eq('^A on fx → 9A1 (visual order nt vl fx dl)', last(), 'fx:kick:9A1')
+keysin('l'); keysin('3'); V.key(24); eq('3^X on delay', last(), 'delay:kick:-3')
+reset()
+keysin('li7f');             eq('insert hex vol 7F', last(), 'vol:kick:127'); eq('advance', V.cur.row, 1)
+V.key(27)
+reset()
+keysin('llli80');           eq('insert delay 80', last(), 'delay:kick:128')
+V.key(27)
+reset()
+keysin('lli8ff');           eq('insert fx 8FF', last(), 'fx:kick:8FF')
+eq('status hexbuf clear', V.hexbuf, nil)
+keysin('k'); V.key(27)
+reset()
+keysin('lli'); V.key(8);    eq('backspace on fx clears', last(), 'clearfx:kick:9')
+V.key(27)
+reset()
+keysin('lr40');             eq('r on vol', last(), 'vol:kick:64'); eq('r no advance', V.cur.row, 0); eq('back to normal', V.mode, 'normal')
+reset()
+keysin(':pitchmode resample'); V.key(13); eq('pitchmode', last(), 'pitchmode:A:resample')
+keysin(':sync'); V.key(13); eq('sync', last(), 'sync')
+
+-- ── повтор и макросы ──────────────────────────────────────────────────────
+reset()
+keysin('x');  keysin('8j.');  eq('. repeats x', last(), 'delete:snare')
+reset()
+keysin('qa'); eq('recording', V.macro and V.macro.name, 'a')
+keysin('mwq'); eq('macro stored', #V.regs['@a'], 2); eq('rec mute kick', calls[1], 'mute:kick')
+keysin('@a'); eq('@a replays mute', last(), 'mute:snare'); eq('@a moved', V.cur.row, 16)
+keysin('@@'); eq('@@', last(), 'mute:hat')
+
+-- ── свёртка ───────────────────────────────────────────────────────────────
+reset()
+keysin('za');  eq('za folds A', folds['A'], true); eq('flat shrinks', #L.flat, 2); eq('cursor on A', V.cur.fi, 1)
+keysin('x');   eq('x in folded → all subs at row', last(), 'delete:kick')
+keysin('2jx'); eq('folded row 2 → ov', last(), 'delete:ov')
+keysin('za');  eq('za unfolds', folds['A'], nil); eq('flat restored', #L.flat, 3)
+keysin('zM');  eq('zM', #L.flat, 2)
+keysin('zR');  eq('zR', #L.flat, 3)
+
+-- ── русская раскладка ─────────────────────────────────────────────────────
+reset()
+local function ru(str) for _, cp in utf8.codes(str) do V.key(keys.translate(cp)) end end
+ru('ц');   eq('ц = w → snare', V.cur.row, 8)
+ru('цци'); eq('цци = wwb → snare', V.cur.row, 8)
+ru('пп');  eq('пп = gg', V.cur.row, 0)
+ru('ч');   eq('ч = x deletes', last(), 'delete:kick')
+ru('шй');  eq('шй = iq inserts C-4', last(), 'ins:trA@0:60:1'); V.key(27)
+ru('ввв'); eq('ввв = ddd → pending count ignored, dd deletes row 1', last(), 'delete:')
+eq('Ж = :', keys.translate(utf8.codepoint('Ж')), (':'):byte())
+eq('latin passthrough', keys.translate(104), 104)
+
+-- ── : подсказка и Tab, / поиск, hydra ─────────────────────────────────────
+reset()
+keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); eq('cmd matches l* (lpb, lanes, lock, len, loop)', #pp.lines, 5)
+V.key(9);      eq('tab completes lpb', V.cmdline, 'lpb ')
+V.key(27)
+keysin(':');   pp = V.popup(); eq('all commands listed (max 14)', #pp.lines, 14)
+V.key(27)
+reset()
+keysin('/sna'); eq('search mode', V.mode, 'search'); pp = V.popup(); eq('search popup', pp and pp.title, '/sna')
+V.key(13);     eq('found snare', V.cur.row, 8); eq('back to normal', V.mode, 'normal')
+keysin('n');   eq('n wraps to snare again', V.cur.row, 8)
+keysin('/hat'); V.key(13); eq('found hat', V.cur.row, 16)
+keysin('/C-4'); V.key(13); eq('note search', V.cur.row, 0)
+keysin('N');   eq('N backwards → hat (все стаб-ноты C-4)', V.cur.row, 16)
+keysin('/zzz'); V.key(13); eq('not found stays', V.cur.row, 16); eq('msg', V.msg, 'not found: zzz')
+reset()
+keysin('8j*'); eq('* searches name under cursor', V.search, 'snare')
+reset()
+V.key(92);     eq('\\ opens hydra', V.hydra and V.hydra.title, 'root')
+pp = V.popup(); eq('hydra popup', pp and pp.kind, 'hydra'); eq('hydra lines', #pp.lines, 2)
+keysin('e');   eq('sub hydra', V.hydra.title, 'event')
+V.key(8);      eq('backspace → parent', V.hydra.title, 'root')
+keysin('ex');  eq('hydra action ran', last(), 'hydra:x'); eq('hydra closed', V.hydra, nil)
+V.key(92); keysin('v'); eq('direct action', last(), 'hydra:v')
+V.key(92); V.key(27); eq('esc closes', V.hydra, nil)
+keysin('?');   eq('? cheat sheet', V.hydra and V.hydra.title, 'keys'); V.key(27)
+
+-- ── Ctrl+HJKL → матрица ───────────────────────────────────────────────────
+reset()
+ctrl_down = true
+V.key(10); eq('^J → matrix down', last(), 'mx:0,1')
+V.key(11); eq('^K → matrix up', last(), 'mx:0,-1')
+V.key(12); eq('^L → matrix right', last(), 'mx:1,0')
+V.key(8);  eq('^H → matrix left', last(), 'mx:-1,0')
+keysin('3'); V.key(10); eq('3^J', last(), 'mx:0,3')
+ctrl_down = false
+keysin('i'); V.key(8); eq('plain backspace in INSERT deletes', last(), 'delete:kick'); V.key(27)
+reset()
+alt_down = true
+V.key(108); eq('⌥L → next track', V.cur.fi, 3)
+V.key(729); eq('⌥H (˙) → prev track', V.cur.fi, 1)
+V.key(8710); eq('⌥J (∆) → next event in track', V.cur.row, 2)
+V.key(730); eq('⌥K (˚) → prev event', V.cur.row, 0)
+alt_down = false
+cmd_down = true
+V.key(106); eq('⌘J → inst 2', last(), 'pool:2')
+V.key(107); eq('⌘K → inst 1', last(), 'pool:1')
+cmd_down = false
+
+-- ── a / A: огибающие и fzf ────────────────────────────────────────────────
+reset()
+keysin('a');  eq('a toggles envelopes', last(), 'envs'); eq('a not insert', V.mode, 'normal')
+keysin('A');  eq('A opens picker', V.picker and V.picker.title, 'auto'); eq('all items', #V.picker.matches, 3)
+keysin('thr'); eq('fuzzy filters', #V.picker.matches, 1); eq('match', V.picker.matches[1].label, 'ReaComp / Threshold')
+local pp2 = V.popup(); eq('picker popup', pp2 and pp2.kind, 'picker')
+V.key(13); eq('enter picks', last(), 'pick:ReaComp / Threshold'); eq('picker closed', V.picker, nil)
+keysin('A'); keysin('ga'); eq('subsequence g..a', #V.picker.matches >= 1, true)
+V.key(14); V.key(27); eq('esc closes', V.picker, nil)
+
+-- ── прочее ────────────────────────────────────────────────────────────────
+reset()
+keysin(' '); eq('space plays', last(), 'play')
+V.key(13);   eq('enter → cursor', last(), 'cursor:0.0')
+V.key(9);    eq('tab → focus', last(), 'focus')
+keysin('F'); eq('F follow', state.follow, false)
+
+
+-- ── колонка огибающей и текстовые макросы (этап 10) ───────────────────────
+reset()
+L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Volume' }, sub = {} }
+local efi = #L.flat
+V.cur = { fi = efi, row = 4, field = 1 }
+keysin('i80');     eq('hex on env → point 0x80', last(), 'envset:Volume@4:0.502'); eq('step after point', V.cur.row, 5)
+keysin('/');       eq('/ → ramp to max over 1 beat', last(), 'envramp:Volume@5-9:cur>1.00'); eq('cursor at ramp end', V.cur.row, 9)
+keysin('\\');      eq('\\ → ramp to min', last(), 'envramp:Volume@9-13:cur>0.00')
+V.key(8);          eq('BS deletes point', last(), 'envdel:Volume@13')
+V.key(27)
+keysin('x');       eq('NORMAL x on env → del', last(), 'envdel:Volume@13')
+V.key(1);          eq('^A nudges +1/64', last(), 'envnudge:Volume@13:+0.0156')
+keysin('2'); V.key(24); eq('2^X nudges −2/64', last(), 'envnudge:Volume@13:-0.0312')
+keysin(':ramp 40 2b'); V.key(13); eq(':ramp 40 2b → 8 rows', last(), 'envramp:Volume@13-21:cur>0.25')
+keysin(':ramp ff 3'); V.key(13); eq(':ramp ff 3 → 3 rows', last(), 'envramp:Volume@13-16:cur>1.00')
+V.cur.row = 0; keysin('V'); keysin('6j'); keysin(':ramp 00'); V.key(13)
+eq(':ramp in V-LINE uses selection', last(), 'envramp:Volume@0-6:cur>0.00'); eq('back to normal', V.mode, 'normal')
+-- vol-поле аудио: / \ = фейды за 1 бит (Ixx/Oxx, xx = LPB·16)
+reset()
+V.cur = { fi = 1, row = 0, field = 2 }
+keysin('i/');      eq('/ on vol → fade-in 1 beat', last(), 'fx:kick:I40')
+keysin('\\');      eq('\\ on vol → fade-out 1 beat', last(), 'fx:kick:O40')
+V.key(27)
+keysin(':fade out 2'); V.key(13); eq(':fade out 2 rows', last(), 'fx:kick:O20')
+keysin(':fade in 1b'); V.key(13); eq(':fade in 1b', last(), 'fx:kick:I40')
+
+
+
+-- нота на строке-продолжении: событие обрезается в этой строке, нота — туда же
+reset()
+V.cur = { fi = 1, row = 2, field = 1 }       -- kick 0..3, строка 2 = продолжение
+keysin('iq'); V.key(27)
+eq('note on cont row cuts kick at row 2', calls[#calls - 1], 'off:kick@2'); eq('then inserts', last(), 'ins:trA@2:60:1')
+reset()
+V.cur = { fi = 1, row = 2, field = 1 }
+keysin('i'); alt_down = true; keysin('q'); alt_down = false; V.key(27)
+eq('Option+note on cont row: no cut', calls[#calls - 1] ~= 'off:kick@2', true); eq('Option+note inserted beside', last(), 'ins:trA@2:60:1')
+-- ── INSERT (Ableton-раскладка, 2 окт): верхний ряд = пианино, нижние = управление ──
+reset(); V.mode = 'insert'; V.vel = 100
+keysin('j');  eq('KEYS j moves', V.cur.row, 1)
+keysin('k');  eq('KEYS k moves', V.cur.row, 0)
+keysin('x');  eq('KEYS x → octave up', V.octave, 5)
+keysin('z');  eq('KEYS z → octave down', V.octave, 4)
+keysin('c');  eq('KEYS c → vel -8', V.vel, 92)
+keysin('C');  eq('KEYS C → vel +8', V.vel, 100)
+keysin('c'); V.cur.row = 4; keysin('q'); eq('note carries vel', last(), 'ins:trA@4:60:1'); eq('vel 92 used', V.vel, 92); V.vel = 100
+keysin('.');  eq('KEYS . → next instrument', last(), 'pool:2')
+keysin(',');  eq('KEYS , → prev instrument', last(), 'pool:1')
+keysin('a');  eq('KEYS a → step auto', V.step_auto, true); keysin('a')
+V.cur.row = 0; keysin('dd'); eq('INSERT dd deletes the event', last(), 'delete:kick'); eq('back in INSERT after dd', V.mode, 'insert')
+V.cur.row = 0; local nc0 = #calls; keysin('d3'); eq('INSERT d3 waits (no note)', #calls, nc0); keysin('w'); eq('d3w → back in INSERT', V.mode, 'insert'); eq('d3w did not insert a note', (last():find('^ins:') == nil), true)
+reset(); V.mode = 'insert'; V.cur.row = 8; keysin('m'); eq('KEYS m mutes', last(), 'mute:snare')
+keysin('f');  eq('KEYS f → fx field', V.cur.field, 4)
+keysin('f');  eq('KEYS f wraps (1 fx col)', V.cur.field, 4)
+V.cur.field = 1
+keysin('G');  eq('KEYS G → end', V.cur.row > 8, true)
+keysin('g');  eq('KEYS g → start', V.cur.row, 0)
+keysin('s');  eq('INSERT s → :step prompt', V.mode .. '|' .. tostring(V.cmdline), 'cmd|step '); V.key(27)
+eq('Esc from cmd → back to INSERT', V.mode, 'insert')
+keysin(':w'); V.key(13); eq(':w from INSERT stays in INSERT', V.mode, 'insert')
+V.key(27); eq('INSERT Esc → NORMAL', V.mode, 'normal')
+keysin('v');  eq('NORMAL v → VISUAL', V.mode, 'visual'); V.key(27); keysin('V'); eq('NORMAL V → V-LINE', V.mode, 'vline'); V.key(27)
+reset(); V.mode = 'insert'; V.cur.field = 2; keysin('7f'); eq('hex on vol in KEYS', last(), 'vol:kick:127'); V.cur.field = 1
+reset(); keysin('='); eq('= → beatsync kick to beat', last(), 'beatsync:kick:beat')
+keysin('8='); eq('8= → beatsync to 8 rows', last(), 'beatsync:kick:8')
+reset(); keysin('>'); eq('> → loop item to region end', last(), 'loop:item:nil')
+keysin('8>'); eq('8> → loop period 8 rows', last(), 'loop:item:8')
+keysin('<'); eq('< → region to item end', last(), 'loop:region:nil')
+keysin(':loop 4'); V.key(13); eq(':loop 4', last(), 'loop:item:4')
+keysin(':loop region'); V.key(13); eq(':loop region', last(), 'loop:region:nil')
+keysin(':loop off'); V.key(13); eq(':loop off', last(), 'loop:off:nil')
+keysin(':loop'); V.key(13); eq(':loop → item', last(), 'loop:item:nil')
+keysin('i'); keysin('>'); eq('> in INSERT → loop item', last(), 'loop:item:nil'); V.key(27)
+keysin(':beatsync bar'); V.key(13); eq(':beatsync bar', last(), 'beatsync:kick:bar')
+print(('%d checks, %d failed'):format(checks, fails))
+os.exit(fails == 0 and 0 or 1)

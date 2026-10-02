@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jf_tracker — справка</title>
+<style>
+  :root {
+    --bg: #f4f4f2; --panel: #e9e9e5; --text: #1c1c1c; --grey: #666; --line: #c9c9c4;
+    --amber: #b4581a; --cyan: #1d6f7a; --code: #e2e2dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1012; --panel: #16191c; --text: #d8dcdc; --grey: #8a9090; --line: #2c3236;
+      --amber: #e88a3a; --cyan: #5fb8c4; --code: #1e2327;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1012; --panel: #16191c; --text: #d8dcdc; --grey: #8a9090; --line: #2c3236;
+    --amber: #e88a3a; --cyan: #5fb8c4; --code: #1e2327;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; font-weight: 600; }
+  h1 small { color: var(--grey); font-weight: 400; font-size: 15px; margin-left: 10px; }
+  h2 { font-size: 18px; margin: 36px 0 10px; padding-bottom: 4px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  h3 { font-size: 15px; margin: 22px 0 6px; color: var(--amber); font-weight: 600; text-transform: none; }
+  p { margin: 6px 0 10px; }
+  code, kbd { font: 13px/1.4 "JetBrains Mono", Menlo, monospace; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 2px; }
+  kbd { display: inline-block; min-width: 1.6em; text-align: center; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--panel); color: var(--text); }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--grey); font-weight: 500; font-size: 13px; }
+  td:first-child { white-space: nowrap; width: 34%; }
+  .nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 14px 0 6px; font-size: 14px; }
+  .nav a { color: var(--cyan); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 16px; }
+  .box { border: 1px solid var(--line); background: var(--panel); padding: 8px 10px; }
+  .box b { display: block; font-family: "JetBrains Mono", Menlo, monospace; font-size: 13px; font-weight: 500; color: var(--amber); }
+  .box span { font-size: 13px; color: var(--grey); }
+  .rule { border-left: 3px solid var(--amber); padding: 2px 12px; margin: 10px 0; background: var(--panel); }
+  .tracker { font: 12px/1.35 "JetBrains Mono", Menlo, monospace; background: var(--code); padding: 10px 12px; overflow-x: auto; white-space: pre; color: var(--text); }
+  .tracker .c { color: var(--cyan); } .tracker .g { color: var(--grey); } .tracker .a { color: var(--amber); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; }
+  footer { margin-top: 40px; color: var(--grey); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<h1>jf_tracker <small>трекерный вид таймлайна REAPER с Vim-редактированием, секвенсером паттернов и слайсером</small></h1>
+<div class="nav">
+  <a href="#phil">Философия</a> <a href="#arch">Архитектура</a> <a href="#view">Что на экране</a>
+  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a>
+  <a href="#cmd">Команды :</a> <a href="#matrix">Матрица</a> <a href="#pool">Пул и браузер</a> <a href="#slice">Слайсер</a> <a href="#dsp">DSP</a> <a href="#monome">Monome</a> <a href="#alias">Алиасы</a> <a href="#fx">Колонки команд</a> <a href="#env">Огибающие</a>
+</div>
+
+<h2 id="phil">Философия</h2>
+<div class="rule"><b>Зачем.</b> Собрать трек целиком, не глядя в REAPER: сначала несколько паттернов, потом их последовательность — всё с клавиатуры, в одном окне, без прыжков между окнами плагинов и аранжировкой. Сведение потом, уже в самом REAPER, на тех же треках и items.</div>
+<div class="rule"><b>Трекер — вид. REAPER — движок.</b> Всё, что вы видите, — треки, items, takes, MIDI-ноты, fixed lanes, регионы и огибающие проекта. Своего формата хранения нет. Закрыли окно — проект играет и редактируется как обычный проект REAPER.</div>
+<div class="rule"><b>Vim.</b> Строка трекера — строка Vim, событие (item или нота) — слово, подколонка — столбец. Режимы NORMAL / INSERT / VISUAL / V-LINE / <code>:</code>. Счётчики, операторы с движениями (<code>d3j</code>, <code>dw</code>, <code>yy</code>, <code>cG</code>), регистр, <kbd>.</kbd>, макросы <kbd>q</kbd>/<kbd>@</kbd>.</div>
+<div class="rule"><b>Тиклесс.</b> Время непрерывное. Строка = 1/LPB четверти, всё меньше строки — доля <code>xx/256</code> в колонке delay. LPB — только масштаб вида: смена LPB ничего не меняет в проекте.</div>
+<div class="rule"><b>Каждая правка — undo-блок</b> <code>jf_tracker: …</code>. Штатный Ctrl+Z (и <kbd>u</kbd>) откатывает её целиком.</div>
+<div class="rule"><b>Нативная графика и скорость.</b> Окно <code>gfx</code>, докируется, встроенный битмап-шрифт REAPER в масштабе ×2 через кеш строк, цвета из темы с проверкой контраста. Ширины колонок считаются от шрифта, ничего не накладывается. Замер на живом окне: отрисовка кадра ≈ 9 мс при 33 fps и для битмапа, и для TTF — шрифт не узкое место; Nerd-иконки отложены как опция.</div>
+
+<h2 id="arch">Архитектура</h2>
+<div class="flow">
+  <div class="box"><b>jf_tracker.lua</b><span>окно, defer-цикл, фокус модулей, мышь и контекстное меню, hydra, верхняя панель, очередь регионов, один экземпляр (owner)</span></div>
+  <div class="box"><b>jf_tracker_model.lua</b><span>снимок проекта → строки/подколонки, пул трека, огибающие, модуляции FX, регионы и паттерны, пики. Единственный читатель reaper.*</span></div>
+  <div class="box"><b>jf_tracker_vim.lua</b><span>NORMAL/INSERT/VISUAL/:/поиск, движения и операторы, макросы, hydra, fzf-пикер. Без reaper.*</span></div>
+  <div class="box"><b>jf_tracker_edit.lua</b><span>ВСЕ записи в проект, каждая — undo-блок: события, поля, команды, слайсы, огибающие, модуляции, депо</span></div>
+  <div class="box"><b>jf_tracker_draw.lua</b><span>gfx: раскладка (L.flat), ячейки, волны, огибающие в цветах темы, метры, верхняя панель с вкладками, всплывашки, рамка фокуса. Битмап ×N через кеш строк</span></div>
+  <div class="box"><b>jf_tracker_matrix.lua</b><span>секвенсер паттернов: слоты «&lt; NN &gt; имя», сетка, схема/микровид, очередь, зум</span></div>
+  <div class="box"><b>jf_tracker_alias.lua</b><span>паттерн = имя региона: синхронизация копий, повтор, переключение слота, библиотека =LIB, сдвиг времени</span></div>
+  <div class="box"><b>jf_tracker_slicer.lua</b><span>виртуальная нарезка во вкладке sample: ровная / по транзиентам, P_EXT:jf_slices</span></div>
+  <div class="box"><b>jf_tracker_browser.lua</b><span>сайдбар: файлы, базы Media Explorer, проекты jf_pm; превью, авто-превью, drag &amp; drop на треки, добавление в депо (=LIB)</span></div>
+  <div class="box"><b>jf_tracker_preview.lua</b><span>предпрослушивание: CF_Preview через FX трека, слайсы, файлы; MIDI — транспорт</span></div>
+  <div class="box"><b>jf_tracker_keys.lua</b><span>пианино, раскладка ЙЦУКЕН→QWERTY, коды клавиш — файл пользователя</span></div>
+</div>
+<p><b>Поток данных.</b> Кадр: <code>model.snapshot(lpb)</code> пересобирается только при смене <code>GetProjectStateChangeCount</code>, LPB или хеша MIDI (<code>MIDI_GetTrackHash</code>, опрос 4 Гц) → <code>model.regions</code> → <code>draw.layout</code> строит плоский список подколонок <code>L.flat</code> (ноты, подколонки lanes, свёрнутые треки, огибающие) → <code>draw.frame</code> рисует всё и возвращает, что под мышью → клавиша переводится по раскладке и уходит модулю с фокусом (трекер → <code>vim.key</code>, матрица, верхняя вкладка, браузер) → правки идут через <code>edit.*</code> в undo-блоке, хук <code>edit.after</code> синхронизирует одноимённые регионы → модель сбрасывает кеш.</p>
+<p><b>Курсор</b> — тройка <code>(fi, row, field)</code>: индекс в <code>L.flat</code>, абсолютная строка от QN 0, поле (нота · vol · delay · команды; у огибающей одно поле). Движения и операторы работают с прямоугольником <code>[fi0..fi1] × [row0..row1]</code>; что внутри (item, нота, свёрнутый трек, огибающая) — забота модели.</p>
+<p><b>Фокус клавиатуры</b> — один из модулей: трекер, матрица, верхняя вкладка (sample = слайсер, modulation = список модуляций, scope), браузер. Он обведён розовой рамкой <code>#ff00ff</code>; <kbd>Tab</kbd> идёт по кругу, клик по модулю даёт фокус, <kbd>Esc</kbd> возвращает трекеру.</p>
+<p><b>Один экземпляр.</b> При старте скрипт пишет свой id в ExtState <code>jf_tracker/owner</code>; экземпляр, увидевший чужой id, выходит. Любой повторный запуск перехватывает окно.</p>
+<p><b>Соответствие понятий.</b></p>
+<table>
+<tr><th>Трекер</th><th>REAPER</th></tr>
+<tr><td>Строка</td><td>шаг сетки в QN; LPB — масштаб вида, в проекте ничего не меняет</td></tr>
+<tr><td>Колонка трека</td><td>трек; папки — сдвиг и приглушение шапки; депо сэмплов — items трека после маркера <code>=LIB</code> (трек <code>DEPOT</code> — наследие, тоже читается)</td></tr>
+<tr><td>Lane-колонка</td><td>fixed item lane (<code>I_FREEMODE = 2</code>, REAPER 7)</td></tr>
+<tr><td>Подколонка</td><td>первая свободная: полифония MIDI и перекрытие items — один механизм</td></tr>
+<tr><td>Нота (аудио)</td><td>старт item: имя take, <code>D_PITCH</code> или <code>D_PLAYRATE</code> (режим питча трека), vol = <code>D_VOL</code></td></tr>
+<tr><td>Нота (MIDI)</td><td>нота take (<code>MIDI_GetAllEvts</code>), <code>OFF</code> = note-off, delay = дробь строки</td></tr>
+<tr><td>Продолжение <code>|</code> / волна</td><td>тело item (пики <code>PCM_Source_GetPeaks</code>) или ноты</td></tr>
+<tr><td>Колонки команд</td><td>свойства item/take: 9 offset, 8 pan, C vol, I/O fades, L loop, M канал, P питч, S слайс, T beatsync</td></tr>
+<tr><td>Инструмент</td><td>уникальный аудио-источник items трека; items после маркера <code>=LIB</code> — библиотека трека (<code>*</code>); слайсы — тайм-коды в <code>P_EXT:jf_slices</code></td></tr>
+<tr><td>Паттерн / слот</td><td>регион; одноимённые регионы — один паттерн; библиотека — регионы после маркера <code>=LIB</code></td></tr>
+<tr><td>Огибающие</td><td>видимые огибающие трека, вертикально, цветами темы; точки — <code>InsertEnvelopePoint</code>/<code>SetEnvelopePoint</code></td></tr>
+<tr><td>Модуляция</td><td>нативная параметр-модуляция FX (<code>param.N.lfo/acs/plink.active</code>)</td></tr>
+</table>
+
+<h2 id="view">Что на экране</h2>
+<div class="tracker"><span class="g">[контрол: play BPM LPB oct step inst …] [scope | sample | modulation] [инструменты трека]</span>
+<span class="g">schema fill sync │ ptn           │ A drums        M S R │ B lanes      M S R</span>
+<span class="g">      имена ↑   │ 0000 </span><span class="a">D-4 80 ..</span> 9A0 <span class="g">│ Volume ╱ │ C-4 64 .. ...</span>
+<span class="g">&lt;02&gt; intro ▬ ▬ │ 0001 </span>amen         <span class="g">│</span> ... .. .. ...  <span class="g">│  |</span>
+<span class="g">&lt;03&gt; A     ▬ ▬ │ 0002 </span> ~~~         <span class="g">│ C-3 80 .. ... │ OFF</span></div>
+<p><b>Сверху</b> — панель как в Renoise 2: слева контрол (клик переключает, колесо меняет), по центру вкладки <b>scope</b> (пик-метры треков) · <b>sample</b> (редактор сэмпла: волна, слайсы, транзиенты) · <b>modulation</b> (параметры FX с модуляцией: LFO, ACS, LINK), справа инструменты трека под курсором с мини-волнами.</p>
+<p><b>Слева</b> — матрица паттернов: кнопки (схема/микровид, заполнение, sync), имена треков вертикально, строки-слоты <code>&lt; NN &gt; имя</code> со стрелками переключения паттерна, сетка ячеек; схема — линии по четвертям региона, заглушено — красный X; играющий слот — янтарный, в очереди — голубой.</p>
+<p><b>Центр</b> — трекер: номера строк, треки → lanes → подколонки <code>нота vol delay [команды]</code>, затем огибающие трека линиями в цветах темы. Курсор — инверсное поле, его строка подсвечена с янтарной кромкой; edit-курсор REAPER — зелёная кромка; плейхед — янтарная строка. Пик-метры (<code>:meters</code>) растут от низа колонки. Свёрнутый трек (<kbd>za</kbd>) — узкая колонка с точками.</p>
+<p><b>Справа</b> — сайдбар-браузер файлов (<code>:side</code>). <b>Снизу</b> — интерактивный статус-бар: слева режим Vim, набранные клавиши, фокус, очередь и сообщение; дальше — короткое описание того, на что наведена мышь, и что делают клик / двойной клик / правый клик / колесо (LPB, позиция, октава и прочее не дублируются — они в контрол-блоке сверху). Над ним всплывашки: подсказка команд <code>:</code>, hydra <kbd>\</kbd>, fzf-пикер <kbd>A</kbd>. Модуль с фокусом клавиатуры обведён розовой рамкой.</p>
+
+<h2 id="normal">NORMAL — навигация</h2>
+<div class="two">
+<table>
+<tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> / стрелки</td><td>поле влево/вправо (нота → vol → delay → команды → следующая подколонка), строка вниз/вверх</td></tr>
+<tr><td><kbd>H</kbd> <kbd>L</kbd></td><td>трек назад / вперёд</td></tr>
+<tr><td><kbd>0</kbd> <kbd>$</kbd></td><td>первая / последняя колонка</td></tr>
+<tr><td><kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd></td><td>событие вперёд / назад / граница сразу после текущего (кромка курсора = конец item)</td></tr>
+<tr><td><kbd>W</kbd> <kbd>B</kbd></td><td>событие в любой подколонке трека</td></tr>
+<tr><td><kbd>gg</kbd> <kbd>G</kbd> <kbd>10G</kbd></td><td>начало / конец / строка 10</td></tr>
+<tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>такт назад / вперёд</td></tr>
+<tr><td><kbd>^D</kbd> <kbd>^U</kbd> <kbd>^F</kbd> <kbd>^B</kbd></td><td>полстраницы / страница</td></tr>
+<tr><td><kbd>zz</kbd> <kbd>zt</kbd> <kbd>zb</kbd></td><td>прокрутить: курсор в центр / вверх / вниз</td></tr>
+<tr><td><kbd>3j</kbd>, <kbd>2w</kbd> …</td><td>счётчик перед любым движением</td></tr>
+</table>
+<table>
+<tr><td><kbd>za</kbd> <kbd>zc</kbd> <kbd>zo</kbd></td><td>свернуть/развернуть трек в точки (fold)</td></tr>
+<tr><td><kbd>zM</kbd> <kbd>zR</kbd></td><td>свернуть / развернуть все</td></tr>
+<tr><td><kbd>F</kbd></td><td>follow — вид следует за плейхедом</td></tr>
+<tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>edit-курсор REAPER в строку курсора</td></tr>
+<tr><td><kbd>Tab</kbd></td><td><b>фокус клавиатуры</b> по кругу: трекер → матрица → верхняя вкладка → браузер. Модуль с фокусом обведён розовой рамкой <code>#ff00ff</code>; клик по модулю тоже даёт ему фокус. Фокус на вкладке sample сразу включает правку слайсера, на modulation — <kbd>j</kbd> <kbd>k</kbd> строка, <kbd>l</kbd>/<kbd>Enter</kbd> LFO, <kbd>a</kbd> ACS, <kbd>p</kbd> LINK. <kbd>Esc</kbd> возвращает фокус трекеру</td></tr>
+<tr><td><kbd>^H</kbd> <kbd>^J</kbd> <kbd>^K</kbd> <kbd>^L</kbd></td><td>Ctrl: курсор матрицы прямо из трекера (вид и edit-курсор следуют за регионом)</td></tr>
+<tr><td><kbd>⌥H</kbd> <kbd>⌥L</kbd> / <kbd>⌥J</kbd> <kbd>⌥K</kbd></td><td>Option: трек назад / вперёд; событие трека вперёд / назад (любая подколонка)</td></tr>
+<tr><td><kbd>⌘J</kbd> <kbd>⌘L</kbd> / <kbd>⌘K</kbd> <kbd>⌘H</kbd></td><td>Cmd: инструмент трека следующий / предыдущий (⌘H перехватывает macOS — «скрыть приложение»)</td></tr>
+<tr><td>правый клик</td><td>контекстное меню: событие / выделение / заголовок трека / матрица / пул</td></tr>
+<tr><td>клик / двойной клик по событию</td><td>выделить item в REAPER (штатные действия работают с ним) / Item properties (MIDI — редактор)</td></tr>
+<tr><td><kbd>+</kbd> <kbd>-</kbd></td><td>LPB (1 2 3 4 6 8 12 16), позиция во времени сохраняется</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>октава для ввода −/+</td></tr>
+<tr><td><kbd>(</kbd> <kbd>)</kbd></td><td>инструмент депо −/+</td></tr>
+<tr><td><kbd>F1</kbd></td><td>эта справка</td></tr>
+<tr><td><kbd>F11</kbd></td><td>док ↔ плавающее окно на весь экран (<code>:dock</code>)</td></tr>
+<tr><td>русская раскладка</td><td>клавиши переводятся по положению (ЙЦУКЕН → QWERTY): <kbd>р</kbd><kbd>о</kbd><kbd>л</kbd><kbd>д</kbd> = <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd>, <kbd>Ж</kbd> = <kbd>:</kbd>; пианино и hex тоже</td></tr>
+</table>
+</div>
+
+<h3>NORMAL — правки</h3>
+<table>
+<tr><td><kbd>x</kbd>, <kbd>3x</kbd></td><td>удалить событие под курсором (n строк); уходит в регистр</td></tr>
+<tr><td><kbd>dd</kbd>, <kbd>d</kbd>{движение}</td><td>удалить строку / диапазон: <code>d3j</code>, <code>dw</code>, <code>dG</code>, <code>d}</code></td></tr>
+<tr><td><kbd>yy</kbd>, <kbd>y</kbd>{движение}</td><td>скопировать в регистр (item — state chunk без GUID, нота — числами)</td></tr>
+<tr><td><kbd>p</kbd></td><td>вставить регистр от строки курсора в колонку курсора (со смещениями)</td></tr>
+<tr><td><kbd>cc</kbd>, <kbd>c</kbd>{движение}</td><td>удалить и перейти в INSERT</td></tr>
+<tr><td><kbd>s</kbd></td><td>разрезать по строке всё, что её накрывает (<code>SplitMediaItem</code> / две ноты)</td></tr>
+<tr><td><kbd>m</kbd></td><td>mute / unmute события (<code>B_MUTE</code>, muted ноты)</td></tr>
+<tr><td><kbd>^A</kbd> <kbd>^X</kbd>, <kbd>12^A</kbd></td><td>±1 к полю под курсором (со счётчиком — на n): нота — полутон, vol, delay, xx команды</td></tr>
+<tr><td><kbd>r</kbd>{нота} / <kbd>r</kbd>{hex hex} / <kbd>r</kbd>{буква hex hex}</td><td>задать значение поля: высоту, vol/delay, команду</td></tr>
+<tr><td><kbd>u</kbd> <kbd>^R</kbd></td><td>undo / redo — штатные REAPER</td></tr>
+<tr><td><kbd>.</kbd></td><td>повторить последнюю правку (со счётчиком)</td></tr>
+<tr><td><kbd>q</kbd>{a–z} … <kbd>q</kbd></td><td>записать макрос в регистр</td></tr>
+<tr><td><kbd>@</kbd>{a–z}, <kbd>@@</kbd>, <kbd>5@a</kbd></td><td>проиграть макрос / последний / n раз</td></tr>
+<tr><td><kbd>i</kbd> / <kbd>v</kbd> <kbd>V</kbd> / <kbd>:</kbd></td><td>INSERT / VISUAL / V-LINE / командная строка (список команд снизу, <kbd>Tab</kbd> дополняет)</td></tr>
+<tr><td><kbd>a</kbd> / <kbd>A</kbd></td><td>показать-скрыть активные огибающие / fzf по всем параметрам автоматизации трека (огибающие трека и каждый параметр каждого FX); буквы фильтруют, <kbd>^N</kbd> <kbd>^P</kbd> или стрелки — курсор, <kbd>Enter</kbd> создаёт и показывает огибающую</td></tr>
+<tr><td><kbd>/</kbd>текст <kbd>n</kbd> <kbd>N</kbd> <kbd>*</kbd></td><td>поиск по имени сэмпла, ноте (<code>C-4</code>) или команде (<code>9A0</code>); дальше / назад / имя под курсором</td></tr>
+<tr><td><kbd>\</kbd></td><td><b>hydra действий</b> (лидер): <kbd>e</kbd> событие/выделение, <kbd>t</kbd> трек, <kbd>p</kbd> паттерн, <kbd>v</kbd> вид, <kbd>i</kbd> инструмент, <kbd>:</kbd> <kbd>/</kbd>; внутри одна клавиша = действие, <kbd>Backspace</kbd> назад, <kbd>Esc</kbd> закрыть. То же, что контекстное меню правым кликом</td></tr>
+<tr><td><kbd>?</kbd></td><td>шпаргалка клавиш</td></tr>
+<tr><td><kbd>f</kbd></td><td><b>подсказки-прыжки</b> (как Vimium): на видимые цели вешаются двухбуквенные метки — в трекере по одной на такт в каждой колонке трека (прыжок «на этот такт этого трека»), шапки треков, M/S/R, огибающие, ячейки и стрелки матрицы, вкладки, контрол, инструменты, модуляции, DSP-блоки и параметры, строки браузера; набрал метку — фокус и курсор там, без мыши. <kbd>Esc</kbd> отменяет</td></tr>
+</table>
+
+<h2 id="insert">INSERT — Ableton-раскладка (<kbd>i</kbd> из NORMAL, <kbd>Esc</kbd> обратно)</h2>
+<div class="tracker"> 2 3   5 6 7   9 0        <span class="g">← чёрные клавиши</span>
+q w e r t y u i o p        <span class="g">← C D E F G A B C D E  (q = C текущей октавы, как верхний ряд Ableton)</span>
+ a s d f g h j k l          <span class="g">← a step auto · s :step · d удалить · f fx-поле · g начало · h j k l движение</span>
+z x c   b n m , .          <span class="g">← z x октава · c C velocity · b n такт · m mute · , . инструмент</span></div>
+<table>
+<tr><td><kbd>d</kbd> в INSERT</td><td>оператор Vim: <kbd>dd</kbd>, <kbd>d3w</kbd>, <kbd>dG</kbd>… — ждёт счётчик и движение, после удаления снова INSERT</td></tr>
+<tr><td>шапка трека</td><td>имя на всю ширину; ниже <code>R I M S A</code> (как в REAPER: запись, мониторинг, mute, solo, автоматизация); слайдер громкости <code>v</code> (−60…+12 dB) и панорамы <code>p</code>; stereo pan — <code>p</code> + <code>w</code> (ширина), dual pan — <code>L</code> + <code>R</code>; тянуть мышью, колесо — точно, двойной клик — сброс</td></tr>
+<tr><td>Garden (вкладка <code>garden</code>, <code>:garden</code>)</td><td>сетка регион × трек: число = период лупа первого item (шагов), <code>-</code> без лупа, <code>x</code> заглушено, <code>*</code> сюда сажает Orca; цифры+Enter или <kbd>&gt;</kbd> — луп N шагов, <kbd>&lt;</kbd> регион до конца item, <kbd>+</kbd>/<kbd>−</kbd>/колесо — период, <kbd>m</kbd> mute, Enter/Space — очередь, <kbd>o</kbd> — поле Orca, <kbd>O</kbd> — Orca вкл/выкл, <kbd>p</kbd> закрепить, <kbd>x</kbd> снести посаженное. Поле: стрелки, любой символ, <kbd>.</kbd> стереть, <kbd>!</kbd> банг; <code>:</code> трек инстр окт нота vel длина — сажает ноту на строку вперёд, <code>$</code> — слайс, <code>;</code> — регион в очередь, <code>=</code> — параметр FX. Посадка без undo; <code>:garden pin</code> перед рендером</td></tr>
+<tr><td>MIDI во вкладке Sample</td><td>когда вкладка Sample в фокусе, MIDI-вход прослушивает инструмент: нарезанный — C4 = слайс 1, C#4 = слайс 2…; целый — транспонирован от C-4. Это предпросмотр (CF_Preview через FX трека), в проект не пишется. Нативно MIDI идёт в плагин трека (например jf_slixer), если трек слушает вход</td></tr>
+<tr><td>кнопки <code>select</code> / <code>insert</code></td><td>под инструментами: звук при выборе инструмента / звук при вставке ноты</td></tr>
+<tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd><kbd>Tab</kbd></td><td>модули по часовой: трекер → инструменты → браузер → DSP → матрица → верхний док → трекер (Shift — назад)</td></tr>
+<tr><td><kbd>Option</kbd><kbd>Tab</kbd> / <kbd>Option</kbd><kbd>Shift</kbd><kbd>Tab</kbd></td><td>вкладки верхнего дока по кругу: sample → modulation → retro → garden → master → sample (Shift — назад)</td></tr>
+<tr><td>DSP с клавиатуры</td><td><kbd>h</kbd>/<kbd>l</kbd> блок, <kbd>j</kbd>/<kbd>k</kbd> параметр, <kbd>+</kbd>/<kbd>-</kbd> (<kbd>^A</kbd>/<kbd>^X</kbd>) значение, Shift — крупнее, Enter — тоггл / bypass, <kbd>b</kbd> bypass, <kbd>o</kbd> окно FX, <kbd>a</kbd> добавить, <kbd>x</kbd> удалить, <kbd>A</kbd> огибающая параметра</td></tr>
+<tr><td>модификатор ноты</td><td><kbd>Shift</kbd>+нота — только прослушать (ничего не вставляет); <kbd>Option</kbd>+нота — вставить рядом в новую подколонку (даже та же нота); <kbd>Ctrl</kbd>+нота — захват звука канала с модуляцией (в плане F5, пока прослушка)</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>INSERT → NORMAL (канонический Vim; <kbd>v</kbd> / <kbd>V</kbd> в NORMAL — VISUAL / V-LINE)</td></tr>
+<tr><td><kbd>c</kbd> / <kbd>C</kbd>, <code>:vel N</code></td><td>velocity вставляемых нот −8 / +8 (1…127, в INSERT), видно в контроле <code>vel</code></td></tr>
+<tr><td><kbd>&gt;</kbd> <kbd>N&gt;</kbd> <kbd>&lt;</kbd></td><td>луп: item до конца региона / период N шагов (секция источника, MIDI — длина источника) / регион до конца item; <code>:loop N|region|off</code>, hydra <kbd>\</kbd><kbd>l</kbd>; границы периода — тусклые чёрточки в колонке волны</td></tr>
+<tr><td><kbd>⌘1</kbd>…<kbd>⌘9</kbd> <kbd>⌘0</kbd>, <kbd>⌘J</kbd>/<kbd>⌘K</kbd></td><td>слот пула трека — инструмент для вставки (цифры без ⌘ — чёрные клавиши верхнего ряда пианино); выбранный звучит 1 с — тоггл <code>[&gt;] preview</code> под списком инструментов или <code>:poolprev</code></td></tr>
+<tr><td><kbd>`</kbd></td><td>note-off: укоротить событие, накрывающее строку, до неё</td></tr>
+<tr><td>третья строка шапки</td><td>подписи подколонок: <code>wv</code> волна, <code>nt</code> нота, <code>vl</code> громкость/velocity, <code>dl</code> задержка, <code>fx1…</code> команды, <code>env</code> огибающая; наведение — полное описание в статус-баре</td></tr>
+<tr><td>строка имени в ячейке</td><td>номер инструмента (пул), затем имя — только если оно целиком помещается в item; иначе один номер</td></tr>
+<tr><td>инструменты (пул)</td><td>группы по первому треку использования (заголовок — имя трека и линия), внутри по длине, библиотека последней; метки <code>@</code> трек курсора, <code>$</code> нарезан, <code>*</code> библиотека, <code>sN</code> кусок = слайс N родителя (наведение на значки — расшифровка в статус-баре); кнопка <code>sort</code>: track / len / mark — номера не меняются</td></tr>
+<tr><td><kbd>Ctrl</kbd><kbd>+</kbd> / <kbd>Ctrl</kbd><kbd>−</kbd></td><td>масштаб битмапа x1…x4 (целые; дробный пробовали — кривой); в TTF — кегль</td></tr>
+<tr><td>sample: <code>vol</code>, <code>normalize</code></td><td>громкость item в dB (колесо / <kbd>&lt;</kbd> <kbd>&gt;</kbd> = 1 dB, клик = 0 dB) и нормализация пика к 0 dB (<kbd>n</kbd>); виды только <code>peaks</code> / <code>spec</code> (нативные спектральные пики REAPER, цвет как в колонке трека)</td></tr>
+<tr><td>матрица: <kbd>+</kbd> / <code>:add [тактов] [имя]</code></td><td>новый регион после последнего с начала следующего такта, сразу запрос имени; маркер <code>=END</code> переезжает за него</td></tr>
+<tr><td>матрица: имя, длина</td><td>двойной клик по имени / <kbd>n</kbd> → <code>:name текст</code>; клик по длине / <kbd>=</kbd> → <code>:len N</code> (шаги по LPB; <code>5s</code> / <code>2b</code> тоже понимает). Следующие регионы, маркеры и items всех треков едут на разницу, длины сохраняются; отмена — undo</td></tr>
+<tr><td>колонка волны <code>wv</code></td><td>всегда спектральные пики REAPER (цвет = частота) + stretch-маркеры янтарной чёрточкой; <code>:wave</code> / контрол — только вкл/выкл (режимы peaks/rect убраны)</td></tr>
+<tr><td>порядок полей</td><td><code>wv nt vl fx1… dl</code> — команды перед задержкой (стандартные колонки, fx-колонка хотя бы одна); <kbd>h</kbd>/<kbd>l</kbd>/<kbd>$</kbd> ходят в этом порядке</td></tr>
+<tr><td>длина региона в шагах</td><td>в матрице колонка длины — шаги по LPB; над номерами строк квадрат с длиной региона курсора и стрелками <code>&lt; &gt;</code> (клик / колесо = ±1 шаг, следующие регионы и items едут)</td></tr>
+<tr><td>маркеры <code>=END</code> / <code>=LIB</code></td><td>пул инструментов читает items до <code>=END</code> (последовательность) и после <code>=LIB</code> (библиотека, метка <code>*</code>); всё между ними не читается</td></tr>
+<tr><td><code>options</code> в контроле, <code>:options</code></td><td>окно со всеми опциями: j/k строка, Enter/Space/h/l/+/− изменить, Esc закрыть; мышь — клик по строке, колесо</td></tr>
+<tr><td><code>step auto</code></td><td>клик по <code>step</code> в контроле или <code>:step auto</code>: после вставки курсор прыгает за конец вставленного item или слайса</td></tr>
+<tr><td><kbd>−</kbd> <kbd>+</kbd> в строке лейна</td><td>минимум подколонок лейна (при наложениях items раскладка добавит свои)</td></tr>
+<tr><td>сэмпл-модуль: слайс-инструмент</td><td>показывает исходник (родителя по тому же файлу) и чуть светлее подсвечивает зону, которую играет item; слайс-маркеры тянутся мышью</td></tr>
+<tr><td>wave detail (Options)</td><td>пиков на пиксель 1/2/4 — точнее волна в колонке трека и в сэмпл-модуле</td></tr>
+<tr><td>матрица: <code>=START</code> … <code>=END</code></td><td>матрица показывает только этот участок; свободное место между регионами и до <code>=END</code> — строки «bar» по такту; имя такой строки (<kbd>n</kbd> / двойной клик) создаёт регион; items за <code>=END</code> (склад, <code>=LIB</code>) трекер не показывает и за курсором REAPER туда не прыгает; кнопка <code>zoom</code></td></tr>
+<tr><td>нота на занятой строке</td><td>без Shift: нота ровно на шаг курсора, предыдущий item дорожки, тянущийся через шаг (любая подколонка), обрубается по реальной границе; при включённом x-fade вместо обрубания — кроссфейд. <kbd>Shift</kbd>+нота — рядом, ничего не трогая</td></tr>
+<tr><td>клавиша пианино (поле ноты)</td><td>вставить ноту и <b>прослушать</b> (аудио — образец через FX трека, MIDI — транспорт от строки); курсор вниз на <code>step</code></td></tr>
+<tr><td>hex-цифры (поле vol / delay)</td><td>две цифры → значение; набор виден в статусе <code>[7_]</code>, Esc отменяет</td></tr>
+<tr><td>буква + hex hex (поле команды)</td><td>например <code>9 8 0</code> → offset на половину источника, <code>S 1 0</code> → beatsync на 16 строк</td></tr>
+<tr><td><kbd>Backspace</kbd> <kbd>Delete</kbd></td><td>поле ноты — удалить событие; vol/delay — сбросить (80 / 00); команда — снять</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>октава −/+</td></tr>
+<tr><td>стрелки, PgUp/PgDn, Home/End</td><td>навигация без выхода из INSERT</td></tr>
+<tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>в NORMAL; вся вставка — одна правка для <kbd>.</kbd></td></tr>
+</table>
+<p>Куда вставляется: если на строке есть MIDI-item трека (или трек без аудио) — MIDI-нота длиной <code>step</code> строк (item создаётся на такт при отсутствии); иначе — копия item из трека <code>DEPOT</code> (инструмент <code>inst</code>) с <code>D_PITCH</code> = нота − C-4.</p>
+
+<h2 id="visual">VISUAL и V-LINE</h2>
+<table>
+<tr><td><kbd>v</kbd> / <kbd>V</kbd></td><td>блок от якоря до курсора / строки по всем колонкам</td></tr>
+<tr><td>движения</td><td>расширяют выделение</td></tr>
+<tr><td><kbd>o</kbd></td><td>якорь ↔ курсор</td></tr>
+<tr><td><kbd>d</kbd> <kbd>x</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>m</kbd> <kbd>s</kbd> <kbd>^A</kbd> <kbd>^X</kbd> <kbd>r</kbd>{нота}</td><td>оператор на выделении, затем NORMAL</td></tr>
+<tr><td><kbd>p</kbd></td><td>заменить выделение регистром</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>снять выделение</td></tr>
+</table>
+
+<h2 id="cmd">Командная строка <code>:</code></h2>
+<table>
+<tr><td><code>:q</code> <code>:w</code> <code>:wq</code></td><td>закрыть окно / сохранить проект / оба</td></tr>
+<tr><td><code>:lpb 8</code></td><td>строк на четверть (1…64)</td></tr>
+<tr><td><code>:step 2</code></td><td>шаг курсора после ввода и длина MIDI-ноты в строках</td></tr>
+<tr><td><code>:oct 5</code> <code>:inst 2</code></td><td>октава ввода / инструмент депо</td></tr>
+<tr><td><code>:font 0</code> / <code>:font 24</code></td><td>битмап REAPER (по умолчанию) / TTF JetBrainsMono Nerd Font Mono размера N</td></tr>
+<tr><td><code>:scale 2</code></td><td>масштаб битмапа ×1…4 пиксель-в-пиксель (строки кешируются в offscreen-буферах и блитятся)</td></tr>
+<tr><td><code>:space 2</code></td><td>зазор над буквами в строке, px (входит в высоту строки)</td></tr>
+<tr><td><code>:tab scope|sample|modulation</code></td><td>вкладка центра верхней панели: квадраскоп и пик-метры / редактор сэмпла (слайсер) / нативные модуляции параметров FX трека (LFO, ACS, LINK — клик переключает)</td></tr>
+<tr><td><code>:scopes</code></td><td>осциллоскопы: Lua не видит аудио, поэтому на каждый трек ставится крошечный JSFX-мост <code>jf_tracker_scope</code> (пишет децимированный сигнал в gmem), вкладка scope рисует осциллограф по треку; выключение удаляет мост. Один undo-блок</td></tr>
+<tr><td><code>:top</code> <code>:meters</code> <code>:poolprev</code></td><td>верхняя панель (контрол, метры, инструменты) / пик-метры поверх колонок, как в ProTracker (столбик от строки плейхеда вверх, полупрозрачный) / прослушивание слота при выборе</td></tr>
+<tr><td><code>:rec</code> <code>:input</code> <code>:smartin</code></td><td>record arm трека курсора / hydra выбора входа записи (моно, стерео, MIDI) / самый активный вход скриптом jf_smart_set_input; то же в hydra <kbd>\r</kbd></td></tr>
+<tr><td><code>:side</code> <code>:browse ~/samples</code></td><td>сайдбар-браузер файлов / его корень</td></tr>
+<tr><td><code>:fx 2</code></td><td>сколько колонок команд показывать на подколонку (0 — скрыть)</td></tr>
+<tr><td><code>:env</code></td><td>показать / скрыть колонки огибающих</td></tr>
+<tr><td><code>:preview</code></td><td>предпрослушивание при вводе вкл/выкл</td></tr>
+<tr><td><code>:pitchmode shift</code> / <code>resample</code></td><td>режим питча трека под курсором: <code>D_PITCH</code> (длина сохраняется) или <code>D_PLAYRATE</code> без preserve pitch (классика PT2, длина меняется)</td></tr>
+<tr><td><code>:sync</code> <code>:autosync</code></td><td>переписать одноимённые регионы содержимым региона под курсором / делать это после каждой правки (по умолчанию вкл)</td></tr>
+<tr><td><code>:ramp xx [len]</code> <code>:fade in|out [len]</code></td><td>пандус огибающей к xx / фейд события; len — строки или <code>Nb</code> битов, по умолчанию 1 бит</td></tr>
+<tr><td><code>:follow</code> <code>:debug</code></td><td>follow; fps, код последней клавиши, кеш пиков в статусе</td></tr>
+<tr><td><code>:fold</code> <code>:unfold</code></td><td>свернуть / развернуть все треки</td></tr>
+</table>
+
+<h2 id="matrix">Матрица паттернов (живая)</h2>
+<p>Панель слева появляется, когда в проекте есть регионы. Строка — <b>слот последовательности</b> (регион): <code>&lt; NN &gt;</code> номер паттерна и имя; колонка — трек (имя вертикально, полоска цвета). Ячейки обведены сеткой, как в Renoise. Два зума (<kbd>z</kbd>, кнопка <code>schema/detail</code>, <code>:mxzoom</code>): <b>схема</b> — горизонтальные линии по четвертям региона там, где есть события (толще — плотнее); <b>микровид</b> — события штрихами по позициям, голубые — MIDI. Заглушено — красный X. Кнопка <code>fill/grid</code> прячет заполнение, <code>sync</code> синхронизирует одноимённые регионы.</p>
+<p><b>Номера интерактивны</b>: стрелки <code>&lt;</code> <code>&gt;</code> у слота (или <kbd>&lt;</kbd> <kbd>&gt;</kbd> в матрице) переключают паттерн слота — регион меняет длину (всё после сдвигается) и содержимое, как в секвенсере Renoise. Чтобы паттерны не пропадали, единственный экземпляр переезжает в <b>библиотеку</b>: зона после маркера <code>=LIB</code> в конце проекта, в последовательность она не входит. Паттерн = имя региона, номер = наименьший индекс его регионов. <kbd>Tab</kbd> переводит фокус в матрицу. Матрица <b>живая</b>: пока проект стоит, курсор на регионе ведёт за собой edit-курсор REAPER; во время воспроизведения edit-курсор и плейхед живут отдельно — <kbd>Space</kbd> ставит регион в <b>очередь</b> (голубая строка), прыжок происходит на границе текущего региона или такта.</p>
+<table>
+<tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>ячейка; трекер прокручивается к началу региона, курсор — в тот трек</td></tr>
+<tr><td><kbd>g</kbd> <kbd>G</kbd></td><td>первый / последний регион</td></tr>
+<tr><td><kbd>Space</kbd></td><td>играет — поставить регион в очередь (повторно — снять); стоит — play отсюда</td></tr>
+<tr><td><kbd>z</kbd></td><td>зум матрицы: схема ↔ микровид</td></tr>
+<tr><td><kbd>m</kbd> / <kbd>Enter</kbd></td><td>mute всех items ячейки (один undo-блок)</td></tr>
+<tr><td><kbd>y</kbd> / <kbd>p</kbd></td><td>запомнить регион как паттерн / добавить его повтор в конец проекта (алиас)</td></tr>
+<tr><td>клик / правый клик</td><td>выбрать ячейку / mute</td></tr>
+<tr><td><kbd>Tab</kbd> <kbd>Esc</kbd></td><td>назад в трекер</td></tr>
+</table>
+
+<h2 id="pool">Пул трека и браузер</h2>
+<p>Верхняя панель, как в Renoise 2: слева <b>контрол</b> (play, BPM, LPB, октава, шаг, инструмент, follow, loop, режим питча, шрифт, колонки команд, метры — клик переключает, колесо меняет на ±1), по центру <b>пик-метры треков</b> (клик — курсор на трек), справа <b>инструменты</b> трека под курсором: число сэмплов, «N имя» и тонкая волна в цвет item; список меняется при переходе на другой трек. Это уникальные аудио-источники items трека и, со звёздочкой, items трека <code>DEPOT</code>. <kbd>⌘1</kbd>…<kbd>⌘0</kbd> и <kbd>⌘J</kbd>/<kbd>⌘K</kbd> выбирают слот (он звучит секунду через FX трека, если включён тоггл <code>[&gt;] preview</code> под списком), <kbd>(</kbd> <kbd>)</kbd> листают. Выбранный слот — инструмент, копия которого вставляется клавишей пианино.</p>
+<p><b>Сайдбар-браузер</b> (<code>:side</code>, корень <code>:browse путь</code>, по умолчанию <code>~/samples</code>): <kbd>j</kbd> <kbd>k</kbd> — курсор, <kbd>l</kbd>/<kbd>Enter</kbd> — войти в папку или добавить файл в <code>DEPOT</code>, <kbd>h</kbd>/<kbd>Backspace</kbd> — наверх, <kbd>Space</kbd> — прослушать секунду, двойной клик — то же, что Enter.</p>
+
+<h2 id="slice">Виртуальная нарезка (слайсер)</h2>
+<p>Слайсер живёт во вкладке <b>sample</b> верхней панели, прямо под вкладками (scope · sample · modulation). Вкладка всегда показывает выбранный инструмент трека курсора с его слайсами; двойной клик по волне, по сэмплу в панели инструментов, <code>:slice</code> или <kbd>\is</kbd> включают правку (клавиши уходят слайсеру, Esc возвращает). Слайсы — только тайм-коды в <code>P_EXT:jf_slices</code> у item-инструмента, файлов и правок источника нет. Нарезка: <kbd>2</kbd> <kbd>4</kbd> <kbd>8</kbd> <kbd>1</kbd>(16) <kbd>3</kbd>(32) <kbd>6</kbd>(64) — ровная; <kbd>d</kbd> — показать транзиенты (детекция по пикам REAPER, 500 Гц), <kbd>+</kbd> <kbd>-</kbd> — чувствительность, <kbd>t</kbd> — нарезать по ним; <kbd>q</kbd>…<kbd>p</kbd> — послушать слайс; <kbd>Enter</kbd> — применить, <kbd>x</kbd> — снять, <kbd>Esc</kbd>. В панели инструментов нарезанный сэмпл помечен <code>/N</code>.</p>
+<p>Вставка: при выбранном нарезанном инструменте в INSERT верхний ряд <kbd>q</kbd>…<kbd>p</kbd> вставляет слайсы 1…10 (каждый слайс — отдельный item с нужным offset и длиной, <code>P_EXT:jf_slice</code>), нижний ряд по-прежнему ноты. В колонке команд <code>Sxx</code> — слайс xx (без нарезки — offset xx/256 источника, как в Renoise); beatsync переехал на <code>Txx</code>.</p>
+
+<h2 id="dsp">DSP-панель</h2>
+<p><code>:dsp</code> (hydra <kbd>\vD</kbd>) открывает нижнюю панель с FX трека под курсором: каждый эффект — блок с именем и первыми восемью параметрами. Вид однородный, тип виджета REAPER сообщает сам (<code>TrackFX_GetParameterStepSizes</code>): тоггл — квадрат-переключатель, ступенчатый параметр (до 16 ступеней) — сегменты, непрерывный — полоска с форматированным значением. <b>Реестр модулей</b> <code>jf_tracker_dspmods.lua</code> (файл пользователя) задаёт для известных эффектов кураторский вид: какие параметры, в каком порядке, с какой подписью, в сколько колонок — параметры ищутся по подстроке имени. Сейчас описаны слайсер экосистемы <code>jf_slixer</code> (режим и чувствительность нарезки, части, триггер, loop, стретч, арпеджио, glide, квантование, dry/wet, gain) и ReaEQ. Клик или протяжка по слайдеру ставит значение, колесо — ±2 %, двойной клик по имени открывает окно плагина. С клавиатуры (фокус dsp, розовая рамка): <kbd>h</kbd> <kbd>l</kbd> — эффект, <kbd>j</kbd> <kbd>k</kbd> — параметр, <kbd>^A</kbd> <kbd>^X</kbd> или <kbd>+</kbd> <kbd>-</kbd> — ±2 % (с Shift ±10 %), <kbd>b</kbd>/<kbd>Enter</kbd> — bypass, <kbd>o</kbd> — окно, <kbd>x</kbd> — удалить, <kbd>a</kbd> — добавить эффект (fzf по всем установленным), <kbd>A</kbd> — fzf по параметрам этого эффекта → огибающая. Всё на одном экране, без окон плагинов. Автоматизация остаётся вертикально в колонке трека.</p>
+
+<h2 id="monome">Monome</h2>
+<p>Через демон экосистемы jf_grid: модуль <code>daemon_tracker.lua</code> кладёт матрицу паттернов на грид (ряд — слот, колонка — трек; яркость: пусто · события · заглушено · строка плейхеда · очередь · курсор). Нажатие ставит регион в очередь (при воспроизведении) или играет с него. Мод появляется в списке модов демона, когда включены <code>:scopes</code> (JSFX-мост на треках — его метка присутствия).</p>
+
+<h2 id="alias">Алиасы паттернов</h2>
+<p>Повтор паттерна — <b>регион с тем же именем</b>. Содержимое повторов — копии items (как aliases в Renoise): после каждой правки регион под курсором переписывает все одноимённые регионы в том же undo-блоке. В матрице <kbd>y</kbd> запоминает регион, <kbd>p</kbd> ставит его повтор после конца проекта. Переименовали регион в REAPER — он вышел из группы. Копии помечаются <code>P_EXT:jf_pattern</code>.</p>
+
+<h2 id="fx">Колонки команд</h2>
+<p>Два вида. <b>Статические</b> читаются из свойств item/take и правятся на месте. <b>Команды-огибающие и генераторы</b> хранятся у item текстом (<code>P_EXT:jf_cmds</code>) и при каждой правке пересобираются целиком: take-огибающие внутри события очищаются и строятся заново, сгенерированные копии удаляются и создаются снова — всё остаётся нативными точками и items. Ввод одинаков: поле команды, <kbd>i</kbd> + буква + hex hex, <kbd>^A</kbd>/<kbd>^X</kbd>, Backspace снимает. Показываются у головы события, по <code>:fx N</code> штук.</p>
+<table>
+<tr><th>Команда</th><th>Смысл</th><th>В REAPER</th></tr>
+<tr><td><code>9xx</code></td><td>offset в источнике, доля длины</td><td><code>D_STARTOFFS</code></td></tr>
+<tr><td><code>8xx</code></td><td>панорама, 80 = центр</td><td>take <code>D_PAN</code></td></tr>
+<tr><td><code>Ixx</code> / <code>Oxx</code></td><td>fade in / out, длина в строках × 16 (штатные 10 мс не показываются)</td><td><code>D_FADEINLEN</code> / <code>D_FADEOUTLEN</code></td></tr>
+<tr><td><code>L00</code></td><td>loop источника выключен (по умолчанию в REAPER он включён)</td><td><code>B_LOOPSRC</code></td></tr>
+<tr><td><code>M0x</code></td><td>канал: 1 swap, 2 моно, 3 L, 4 R</td><td><code>I_CHANMODE</code></td></tr>
+<tr><td><code>Sxx</code></td><td>слайс xx нарезанного инструмента; без нарезки — offset xx/256</td><td><code>D_STARTOFFS</code> + <code>D_LENGTH</code> по <code>P_EXT:jf_slices</code></td></tr>
+<tr><td><code>Txx</code></td><td>beatsync (stretch) на xx строк</td><td><code>D_PLAYRATE</code> при <code>B_PPITCH = 1</code></td></tr>
+<tr><td><code>Uxx</code> / <code>Dxx</code></td><td>pitch slide вверх/вниз на xx/16 полутона за строку на всю длину события</td><td>take-огибающая Pitch (аудио, диапазон ±3 по умолчанию) / pitchbend ±2 (MIDI)</td></tr>
+<tr><td><code>Gxx</code></td><td>glide: от высоты предыдущего события к своей за xx строк</td><td>take Pitch</td></tr>
+<tr><td><code>4xy</code></td><td>vibrato: период 16/x строк, глубина y/8 полутона</td><td>take Pitch (синус точками)</td></tr>
+<tr><td><code>0xy</code></td><td>arpeggio: 0, x, y полутонов по трети строки</td><td>take Pitch (ступени)</td></tr>
+<tr><td><code>Axy</code></td><td>volume slide: +x/16 за строку вверх, −y/16 вниз</td><td>take Volume</td></tr>
+<tr><td><code>Rxy</code></td><td>retrigger: копии каждые x/16 строки, громкость ×(1 − y/16)</td><td>items с <code>P_EXT:jf_gen</code>, удаляются при пересборке</td></tr>
+<tr><td><code>Pxx</code></td><td>вероятность: событие заглушается с шансом 1 − xx/FF (бросок при каждой правке)</td><td><code>B_MUTE</code></td></tr>
+<tr><td><code>Fxx</code></td><td>темп BPM = xx (hex) с этой строки</td><td>tempo-маркер</td></tr>
+<tr><td><code>Bxx</code></td><td>jump: когда плейхед доходит до строки события — перейти в слот xx последовательности</td><td>исполняет трекер в кадре (SetEditCurPos seekplay), без правки проекта</td></tr>
+<tr><td><code>Cxx</code></td><td>громкость, 80 = 0 dB (то же, что колонка vol)</td><td><code>D_VOL</code></td></tr>
+</table>
+
+<h2 id="env">Огибающие</h2>
+<p>Видимые огибающие трека рисуются справа от его lanes как в аранжировке REAPER и <b>тем же цветом темы</b> (<code>col_env1</code> громкость, <code>col_env2</code> панорама, <code>env_track_mute</code>, …): плавная линия значения (0…1 от диапазона по горизонтали, подточки между строками), точки — квадратики, hex у точки. Включаются <code>:env</code>. Автоматизация остаётся в колонке трека, вертикально.</p>
+<p><b>Редактирование</b> — как в аранжировке: клик или протяжка мышью по колонке огибающей ставит/двигает точку строки (значение от x), правый клик удаляет точку строки, колесо двигает на 1/64. С клавиатуры колонка огибающей — обычная колонка курсора (<kbd>h</kbd> <kbd>l</kbd> заходят в неё): в INSERT две hex-цифры ставят точку (<code>00…FF</code>) и шагают вниз, <kbd>Backspace</kbd> удаляет; в NORMAL <kbd>x</kbd> / <kbd>Backspace</kbd> удаляют точку строки, <kbd>^A</kbd> <kbd>^X</kbd> двигают на 1/64 (со счётчиком). Каждая правка — undo-блок.</p>
+<p><b>DSP-панель (<code>:dsp</code>, hydra <kbd>\</kbd><kbd>d</kbd>).</b> Блоки эффектов трека курсора. В фокусе панели: <kbd>h</kbd> <kbd>l</kbd> — эффект, <kbd>j</kbd> <kbd>k</kbd> — параметр, <kbd>^A</kbd> <kbd>^X</kbd> / <kbd>+</kbd> <kbd>-</kbd> — значение, <kbd>b</kbd> — bypass, <kbd>o</kbd> — окно плагина, <kbd>x</kbd> / <kbd>Backspace</kbd> / <kbd>Delete</kbd> — удалить эффект, <kbd>a</kbd> или <kbd>/</kbd> — fzf по всем установленным эффектам (добавить на трек). Тот же fzf из любого места — hydra <kbd>\</kbd><kbd>f</kbd>. Статус-бар — в самом низу окна, под панелью.</p>
+<p><b>Шапка трека: A M S R.</b> Слева от M/S/R — индикатор автоматизации <code>A</code>: контур, если у трека есть огибающие, заливка — когда колонки огибающих этого трека показаны. Клик по <code>A</code> раскрывает/прячет огибающие <b>только этого трека</b>; клавиша <kbd>a</kbd> — все треки разом (и сбрасывает поканальные переключения). В статусе — список огибающих трека.</p>
+<p><b><kbd>o</kbd> — показать в REAPER.</b> В NORMAL на событии: item выделяется в REAPER, аранжировка зумится на него (<i>View: Toggle zoom to selected items</i>), трек прокручивается в видимую область, окно REAPER выходит на передний план.</p>
+<p><b>Рамка фокуса.</b> Розовая — какому модулю идут клавиши; в INSERT трекера она красная и на пиксель толще: клавиши пишут в проект. Рамки items — 2 px плюс почти прозрачная заливка с отливом цвета item.</p>
+<p><b>Браузер (сайдбар, <code>:side</code>).</b> Шапка: вкладки <code>files</code> (папки и аудио корня <code>:browse</code>), <code>db</code> (базы Media Explorer REAPER из <code>reaper.ini</code>, файлы из <code>MediaDB/*.ReaperFileList</code>, с длительностью) и <code>pm</code> (проекты из индекса jf_pm, свежие сверху; Enter — сабпроект на трек курсора, Space — рендер проекта или <code>jf_preview.wav</code>), кнопки <code>auto</code> — авто-превью строки под курсором (3 с, клавиша <kbd>p</kbd>), <code>&lt;&gt;</code> — узкий/широкий сайдбар и <code>x</code> — спрятать. <b>Drag &amp; drop:</b> строку браузера можно утащить мышью на колонку трека — файл становится item в строке под мышью (lane по фиксированным дорожкам), <code>.rpp</code> — сабпроектом (InsertMedia, как в jf_pm). <b>Депо:</b> Enter на файле кладёт его на трек курсора после маркера <code>=LIB</code> в конце проекта (маркер создаётся, если его нет) — это библиотека инструментов трека, отдельный трек DEPOT больше не нужен. В фокусе браузера: <kbd>j</kbd> <kbd>k</kbd> курсор, <kbd>Enter</kbd> / <kbd>l</kbd> — открыть папку или базу / файл → DEPOT (инструмент), <kbd>-</kbd> / <kbd>h</kbd> / <kbd>Backspace</kbd> — наверх, <kbd>Space</kbd> — прослушать, <kbd>/</kbd> — фильтр по имени (как поиск Media Explorer; Enter/Esc — закончить набор, Esc при пустом — снять), <kbd>t</kbd> — сменить вкладку, <kbd>w</kbd> — ширина, <kbd>q</kbd> — спрятать.</p>
+<h2 id="oct1">Добавлено 1 октября</h2>
+<table>
+<tr><td><kbd>Tab</kbd> / <kbd>Shift-Tab</kbd></td><td>фокус по кругу вперёд / назад из любого места: трекер → матрица → верх → инструменты → браузер → DSP. Клик по модулю тоже переносит рамку.</td></tr>
+<tr><td><kbd>Shift</kbd>+клик, <kbd>Shift</kbd>+протяжка</td><td>блок от якоря (курсор) до клика, протяжка тянет второй угол (VISUAL)</td></tr>
+<tr><td><kbd>Backspace</kbd> / <kbd>Shift+Backspace</kbd></td><td>удалить время строки на треке курсора / на всех треках — items и автоматизация подтягиваются <b>только внутри региона</b>. Счётчик = строк. <code>:deltime [N] [all]</code></td></tr>
+<tr><td><kbd>Insert</kbd> / <kbd>I</kbd> / <kbd>Shift</kbd></td><td>вставить время строки (в рамках региона, хвост обрезается по его границе). <code>:instime [N] [all]</code></td></tr>
+<tr><td><kbd>o</kbd></td><td>показать item в REAPER: выделить, зум, трек в видимую область</td></tr>
+<tr><td>матрица: <code>trim</code> / <kbd>t</kbd> / <code>:trim</code></td><td>жёсткие паттерны: items режутся по границам регионов; при <code>:autosync</code> — после каждой правки</td></tr>
+<tr><td>матрица: <kbd>z</kbd> / <code>zoom</code></td><td>детальный зум по вертикали: ряд в 4 строки, время сверху вниз, блоки цветом item, мини-огибающие, плейхед линией</td></tr>
+<tr><td>контрол <code>wave</code> / <code>:wave</code></td><td>колонка волны слева от ноты на каждой строке item: <code>peaks</code> / <code>rect</code> / <code>spec</code> (спектральная окраска REAPER) / <code>off</code>. Офлайн-медиа пиков не даёт.</td></tr>
+<tr><td>верх: <code>sample</code></td><td>сэмпл-модуль: протяжка — выделение; вынос выделения мышью на колонку трекера — item со смещением; <kbd>Enter</kbd> — вставить в строку курсора; <kbd>D</kbd> — в депо (=LIB), чтобы нарезать; <kbd>a</kbd> всё; <kbd>Space</kbd> — послушать. Файл из браузера: <kbd>v</kbd> или авто при <code>auto</code>.</td></tr>
+<tr><td>верх: <code>retro</code> / <code>:retro [add]</code></td><td>ретро-сэмплер jf_rec (40 с кольцо на треке): волна буфера, протяжка — выделение, <kbd>a</kbd> всё, <kbd>Space</kbd> превью, <kbd>p</kbd> — на трек в строку курсора, <kbd>d</kbd> — в депо трека, <kbd>j</kbd>/<kbd>k</kbd> — другой трек с jf_rec, <kbd>+</kbd> — добавить jf_rec. Экспорт выполняет плагин в своём UI (панель в TCP должна быть видна).</td></tr>
+<tr><td>верх: <code>master</code></td><td>мастер: метры L/R, анализатор (<code>scope</code> / <code>spec</code> / <code>sgram</code> — кнопки, <kbd>m</kbd>, <code>:scopemode</code>), цепь FX. Нужен <code>:scopes</code> (мост ставится и на мастер, слот 31).</td></tr>
+<tr><td>контрол: <code>mono</code></td><td>шина jf_grid: демон жив, grid/arc, владелец; <code>take</code> — поверхность трекеру, <code>grid</code> — вернуть; мини-грид и легенда того, что мод трекера показывает на устройстве</td></tr>
+<tr><td>DSP</td><td>перетаскивание блока за заголовок — порядок FX (слева направо = сверху вниз в REAPER); контейнеры раскрыты: дети и маршрутизация (<code>|</code> за предыдущим, <code>=</code> параллельно, <code>+</code> с суммой); правый клик по параметру — <b>модуляция</b>: LFO, ACS, link (fzf), окно модуляции, огибающая</td></tr>
+<tr><td>браузер: <code>pm</code></td><td>Enter на проекте — внутрь как в папку: <code>tracks</code> (Enter/drag — вставить трек chunk'ом с абсолютными путями), <code>samples</code> (как файлы), <code>regions</code> (Enter/drag — сабпроект, обрезанный по региону), <code>markers</code>; <code>wave</code> — мини-волны у файлов</td></tr>
+<tr><td>ресайз мышью</td><td>левый край браузера — ширина, нижний край верхней панели — высота (двойной клик — авто)</td></tr>
+<tr><td>INSERT: нота</td><td>на строке с названием события — <b>перезапись</b> (старое удаляется); на строке-продолжении — событие обрезается в этой строке, новая нота в ту же подколонку; <kbd>Shift</kbd>+нота — рядом, в свободной подколонке</td></tr>
+<tr><td><kbd>dw</kbd> <kbd>de</kbd> <kbd>cw</kbd> <kbd>yw</kbd> из пустоты</td><td>как в Vim «понимают», что впереди событие: берут событие, на которое встаёт движение</td></tr>
+<tr><td>матрица: блок</td><td><kbd>Shift</kbd>+hjkl или <kbd>v</kbd> — выделение от якоря; <kbd>Ctrl+N</kbd> — mute блока; <kbd>Ctrl+X</kbd> / <kbd>⌘Backspace</kbd> — вырезать; <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd> — копия и вставка от курсора (ячейки-цели заменяются, хвосты режутся по региону); <kbd>Ctrl+hjkl</kbd> — движение из любого модуля</td></tr>
+<tr><td>матрица: <code>&lt; NN &gt;</code></td><td>паттерны по порядку имён, номер = позиция (стрелки идут 1, 2, 3…); справа от имени — длина региона в тактах</td></tr>
+<tr><td>сэмпл-модуль</td><td>волна и виртуальная нарезка видны всегда при выборе инструмента (буквы q…p над слайсами); вид <code>peaks</code> / <code>spec</code> (цвет по частоте) / <code>sgram</code> (спектрограмма) — кнопки справа или <kbd>v</kbd>; нарезка (2/4/8/16/32/64, <kbd>t</kbd> транзиенты, <kbd>+</kbd>/<kbd>-</kbd>) применяется сразу, Enter не нужен; заглушённый инструмент — волна тусклее, <code>(muted)</code></td></tr>
+<tr><td>x-fade: контрол <code>xf</code>, hydra <kbd>\</kbd><kbd>x</kbd>, <code>:xfade</code></td><td>вкл — новая нота на стыке с предыдущей получает кроссфейд (предыдущая удлиняется на длину x-fade, её fade-out и fade-in новой = длина); выкл — внахлёст без кроссфейда (авто-фейды обнуляются). <kbd>\</kbd><kbd>x</kbd><kbd>c</kbd> — скроссфейдить сейчас (VISUAL-выделение или все подколонки трека курсора в регионе), <kbd>d</kbd> — снять, <kbd>1</kbd>…<kbd>5</kbd> — 5/10/20/50/100 мс, <kbd>+</kbd>/<kbd>-</kbd>; колесо по <code>xf</code> — длина</td></tr>
+<tr><td><code>lock</code> (контрол, <code>:lock</code>)</td><td>курсор трекера ≡ edit-курсор и выделенный трек REAPER в обе стороны: щёлкнули в аранжировке или выбрали трек — курсор трекера прыгнул туда; двинули курсор в трекере — edit-курсор и выделение REAPER следом. <code>follow</code> — отдельно: вид за плейхедом при игре</td></tr>
+<tr><td>запись с MIDI-входа</td><td>INSERT + <code>R</code> на треке курсора с MIDI-входом: ноты пишутся в строку курсора с velocity; аккорд — одна строка, соседние подколонки; шаг — после отпускания всех клавиш; <code>step 0</code> — следующий аккорд перезаписывает строку; Shift при первой ноте — рядом, без перезаписи; aftertouch (poly / channel) и CC — в тот же MIDI-item кривой по времени удержания</td></tr>
+<tr><td>запись с аудиовхода</td><td>INSERT + <code>R</code> на треке с <code>jf_rec</code> и аудиовходом: звук выше порога — атака (первый транзиент, с предзаписью 10 мс), тишина 0,25 с — конец фразы; кусок встаёт item'ом в строку курсора с pitch 0 и rate 1 (базовая нота C-4); шаг — после куска, <code>step 0</code> — перезапись, Shift при атаке — рядом. Печатает сам jf_rec (панель должна быть видна); трекер ставит item точно в строку</td></tr>
+<tr><td>ретро в строку</td><td><kbd>p</kbd> / Enter во вкладке <code>retro</code> — кусок встаёт в строку курсора с первого транзиента выделения (атака ровно на строке); <kbd>P</kbd> — как выделено</td></tr>
+<tr><td>верх: <code>modulation</code></td><td>модуляционная матрица — таблица нативной модуляции параметров трека: <code>BASE</code> · <code>L1</code> SHP SPD SYN STR (LFO) · <code>ENV</code> ATT REL E.ST (следящий, ACS) · <code>LNK</code> SRC SCL OFS (связь). <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> — ячейка, Enter/Space — тоггл / форма / выбор источника (fzf), <kbd>+</kbd><kbd>-</kbd> ^A ^X — значение, <kbd>&gt;</kbd><kbd>&lt;</kbd> — ×10, <kbd>a</kbd> — добавить параметр (fzf), <kbd>x</kbd> — снять, <kbd>o</kbd> — окно FX, <kbd>w</kbd> — нативное окно модуляции; мышь: клик, двойной клик, колесо (Shift ×10)</td></tr>
+<tr><td>DSP-строка</td><td>имя · белый виджет (полоска / квадрат / ступени) · значение справа; без подложки; клик и протяжка — только по виджету</td></tr>
+<tr><td><kbd>=</kbd> / <kbd>N=</kbd> / <code>:beatsync [beat|bar|N]</code></td><td>beatsync: конец события (аудио — stretch с сохранением питча, MIDI — длина ноты) дотягивается к ближайшей доле, к N строкам или к такту; в VISUAL — все события выделения</td></tr>
+<tr><td>мышь: items</td><td>край рамки item (±3 px) — trim начала/конца как в аранжировке, тело рамки с <kbd>Option</kbd> — сдвиг; привязка к строкам, <kbd>⌘</kbd> — без привязки; один undo-блок на жест</td></tr>
+<tr><td>браузер: кнопки</td><td>текстом: сверху — куда идти (<code>files db pm proj</code>), снизу — вид (<code>wave auto &lt;&gt; hide</code>); сайдбар во всю высоту окна</td></tr>
+<tr><td>шапка трека в битмапе</td><td>только буквы: <code>A M S I R</code> (<code>I</code> — input monitoring: off → on → auto)</td></tr>
+<tr><td>x-fade: правила</td><td>кроссфейдятся только настоящие последования одной дорожки (нота кончается у старта следующей); аккорды, слои, Shift+нота и удержанные ноты не режутся; MIDI и заглушённые не участвуют; удлинение не дальше конца файла; <kbd>\</kbd><kbd>x</kbd><kbd>d</kbd> возвращает длину и снимает фейды (метка <code>P_EXT:jf_xfade</code>); вставка, paste и drop файла проходят через x-fade</td></tr>
+<tr><td>матрица: двойной клик</td><td>играет — регион в очередь; стоит — открыть это место в трекере на канале ячейки, без запуска</td></tr>
+<tr><td>инструменты</td><td>один общий список проекта для всех треков (как в Renoise 3): уникальные источники всех треков + библиотека после <code>=LIB</code> (<code>*</code>). <code>@</code> перед именем — сэмпл стоит на треке курсора; у выбранного в шапке — <code>@ треки</code>, где он используется. При открытом сайдбаре список стоит над браузером, граница между ними тянется мышью (двойной клик — авто); без сайдбара — справа в верхней панели</td></tr>
+<tr><td>сэмпл-модуль и браузер</td><td>файл, который вы слушаете в браузере (Space, <code>auto</code>) или открываете <kbd>v</kbd>, сразу показывается во вкладке <code>sample</code>; выбор инструмента возвращает модуль к нему</td></tr>
+<tr><td>браузер: <code>proj</code></td><td>все аудио-источники проекта (у Project Bay нет ReaScript API, поэтому берём то, что реально стоит в items, включая библиотеку =LIB): Enter — в депо трека курсора, drag — на трек, <kbd>v</kbd> — в сэмпл-модуль</td></tr>
+<tr><td><code>:font</code> / <code>:nerd</code></td><td>без числа — Nerd Font 24 с иконками ↔ битмап; <code>:font N</code> — размер</td></tr>
+<tr><td><code>:hybrid</code></td><td>битмап-текст REAPER + Nerd-иконки: строка режется на ASCII (битмап) и глифы (Nerd-шрифт размером с битмап); включается сам при <code>:font 0</code> и <code>:icons</code></td></tr>
+<tr><td><code>:fontface [имя]</code></td><td>Nerd-шрифт: в TTF-режиме — для текста, в гибриде — для иконок. Пиксельные из установленных: DepartureMono, BigBlueTerm437, BigBlueTermPlus, GohuFont 14/11, ProggyClean, Terminess, ProFont IIx, 3270; без имени — следующий по кругу</td></tr>
+<tr><td>шапка трека: A M S 🎧 R</td><td>M, S, R — буквами всегда; наушники — мониторинг входа: клик выкл → вкл → авто (tape, только контур)</td></tr>
+<tr><td>Tab при reaper-keys</td><td>reaper-keys держит Tab в главной секции; в его гейте <code>rk.lua</code> мост: если в фокусе окно jf_tracker, Tab / Shift-Tab уходят трекеру (<code>jf_tracker/inject</code>)</td></tr>
+<tr><td><code>:icons</code></td><td>Nerd-иконки на кнопках и вкладках в TTF-режиме (<code>:font 24</code>)</td></tr>
+</table>
+<p><b>Рамки items.</b> Каждый item обведён тонкой каймой по своим строкам (начало и конец — дробные, по положению в такте): аудио — в своей подколонке, MIDI-item — на всю lane, ноты внутри. Цвет — цвет item (или трека), приглушённый; выбранный в REAPER item — ярче, заглушённый — тусклее. Так MIDI-нота и её item не путаются. Новая нота в INSERT, если MIDI-item на строке нет, создаёт item на такт. <b>Automation items</b> в колонках огибающих — полупрозрачная заливка с каймой цветом темы (<code>env_item_vol</code> / <code>pan</code> / <code>mute</code> / <code>pitch</code>), как в аранжировке; выбранный — ярче.</p>
+<p><b>Текстовые макросы автоматизации</b> (этап 10 хандовера): в INSERT на колонке огибающей <kbd>/</kbd> — пандус от текущего значения к максимуму за 1 бит (LPB строк), <kbd>\</kbd> — спад к минимуму за 1 бит; курсор прыгает в конец пандуса, так что <kbd>/</kbd><kbd>\</kbd> подряд дают «горку». Промежуточные точки внутри пандуса убираются, между двумя точками REAPER интерполирует линейно. Произвольный пандус — <code>:ramp xx [len]</code>: к значению <code>xx</code> (hex) за <code>len</code> строк или <code>Nb</code> битов (<code>:ramp 00 2b</code>), а в VISUAL / V-LINE — по выделенным строкам. На поле vol аудио-события <kbd>/</kbd> и <kbd>\</kbd> — фейд-ин / фейд-аут за 1 бит (это команды <code>Ixx</code>/<code>Oxx</code>), <code>:fade in|out [len]</code> — с длиной.</p>
+<p><b>Шапка трека</b>: кнопки <kbd>M</kbd> <kbd>S</kbd> <kbd>R</kbd> (mute, solo, rec arm — клик переключает), вложенные в папку треки сдвинуты и приглушены, папка помечена «+».</p>
+
+<footer>jf_tracker · Scripts/jf_tracker · тесты: <code>lua tests/test_model.lua</code>, <code>lua tests/test_vim.lua</code>, живой прогон <code>tests/smoke_edit.lua</code></footer>
+</main>
+</body>
+</html>

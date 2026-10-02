@@ -1,0 +1,503 @@
+-- jf_tracker_browser.lua — сайдбар-браузер (справа от трекера).
+--
+-- Вкладки: `pm` — проекты из индекса jf_pm (Enter — внутрь проекта как в папку:
+-- tracks (Enter/drag — вставить трек chunk'ом), samples (как файлы), regions
+-- (Enter/drag — сабпроект, обрезанный по региону), markers; drag проекта → сабпроект,
+-- Space — рендер проекта), `auto` — автопревью строки под курсором; строку
+-- можно тащить мышью на колонку трека: файл → item в строке, .rpp → сабпроект.
+-- `files` — папки и аудио-файлы корня (`:browse <путь>`, по
+-- умолчанию ~/samples, ExtState jf_tracker/browse); `db` — базы Media
+-- Explorer REAPER: список из reaper.ini [reaper_sexplorer] (ShortcutN =
+-- NN.ReaperFileList, подпись ShortcutTN), файлы — из MediaDB/NN.ReaperFileList
+-- (строки FILE "путь", DATA l:длина), разбор кешируется по базе. Кнопки в
+-- шапке: files / db, `<>` — узкий/широкий сайдбар, `x` — спрятать (:side).
+-- Фокус — по Tab (трекер → матрица → браузер). j/k — курсор, Enter — войти в
+-- папку / базу или добавить файл в трек DEPOT (он становится инструментом
+-- пула), Backspace или `-` — наверх, Space — прослушать (1 с через трек
+-- курсора), `/` — фильтр по имени (набор, Enter/Esc — закончить, Esc при
+-- пустом фильтре — снять), `t` — сменить вкладку, `w` — ширина, `q` —
+-- спрятать, Tab — назад.
+-- Чтение диска — EnumerateSubdirectories / EnumerateFiles / io.open; это не
+-- reaper.* проекта, модель не трогается.
+
+local B = {}
+local R = reaper
+local ctx
+
+B.root = nil
+B.path = nil
+B.entries = {}      -- показанные строки (после фильтра)
+B.all = {}          -- строки текущего места без фильтра
+B.cur = 1
+B.scroll = 0
+B.focus = false
+B.mode = 'files'    -- 'files' | 'db' | 'pm'
+B.pm = nil          -- карточки jf_pm (ленивое чтение индекса jf_pm_index.json)
+B.auto = false      -- автопревью: курсор на файле → слушаем (кнопка auto)
+B.drag = nil        -- перетаскивание: { e=, x0=, y0=, active= }
+B.db = nil          -- открытая база { file=, title= } или nil (список баз)
+B.dbs = nil         -- базы из reaper.ini (ленивое чтение)
+B.dbcache = {}      -- file → список файлов базы
+B.filter = ''       -- подстрока фильтра (без регистра)
+B.filtering = false -- идёт набор фильтра
+B.pmproj = nil      -- открытый проект pm: { e=, dir=, tracks=, samples=, regions=, markers= }
+B.pmdir = nil       -- подпапка внутри проекта: 'tracks' | 'samples' | 'regions' | 'markers'
+B.wave = false      -- мини-волны у файлов (кнопка wave)
+
+local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true }
+
+function B.init(c, root)
+  ctx = c
+  B.root = root or (os.getenv('HOME') .. '/samples')
+  B.path = B.root
+  B.refresh()
+end
+
+function B.refresh()
+  local out = {}
+  local i = 0
+  while true do
+    local d = R.EnumerateSubdirectories(B.path, i)
+    if not d then break end
+    if d:sub(1, 1) ~= '.' then out[#out + 1] = { name = d, dir = true } end
+    i = i + 1
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  local files = {}
+  i = 0
+  while true do
+    local f = R.EnumerateFiles(B.path, i)
+    if not f then break end
+    local ext = f:match('%.([%w]+)$')
+    if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then files[#files + 1] = { name = f, dir = false } end
+    i = i + 1
+  end
+  table.sort(files, function(a, b) return a.name:lower() < b.name:lower() end)
+  for _, f in ipairs(files) do out[#out + 1] = f end
+  B.set_all(out)
+end
+
+-- применить фильтр к B.all → B.entries
+function B.set_all(list)
+  B.all = list
+  local f = B.filter:lower()
+  if f == '' then B.entries = list
+  else
+    local out = {}
+    for _, e in ipairs(list) do if e.name:lower():find(f, 1, true) then out[#out + 1] = e end end
+    B.entries = out
+  end
+  if B.cur > #B.entries then B.cur = math.max(1, #B.entries) end
+  B.scroll = 0
+end
+
+-- ── базы Media Explorer ───────────────────────────────────────────────────
+local function res_path() return R.GetResourcePath and R.GetResourcePath() or (os.getenv('HOME') .. '/Library/Application Support/REAPER') end
+
+function B.read_dbs()
+  local dbs = {}
+  local fh = io.open(res_path() .. '/reaper.ini', 'r')
+  if fh then
+    local sect = false
+    local files, titles = {}, {}
+    for line in fh:lines() do
+      local h = line:match('^%[(.-)%]')
+      if h then sect = (h == 'reaper_sexplorer')
+      elseif sect then
+        local n, v = line:match('^Shortcut(%d+)=(.+)$')
+        if n and v:match('%.ReaperFileList$') then files[n] = v end
+        local tn, tv = line:match('^ShortcutT(%d+)=(.+)$')
+        if tn then titles[tn] = tv end
+      end
+    end
+    fh:close()
+    local keys = {}
+    for n in pairs(files) do keys[#keys + 1] = n end
+    table.sort(keys, function(a, b) return tonumber(a) < tonumber(b) end)
+    for _, n in ipairs(keys) do
+      dbs[#dbs + 1] = { name = (titles[n] or files[n]):gsub('^DB: ', ''), file = files[n], dir = true, db = true }
+    end
+  end
+  return dbs
+end
+
+-- файлы базы: FILE "путь" … / DATA … l:м:сс.ссс …
+function B.read_db(file)
+  local cached = B.dbcache[file]
+  if cached then return cached end
+  local out = {}
+  local fh = io.open(res_path() .. '/MediaDB/' .. file, 'r')
+  if fh then
+    local last
+    for line in fh:lines() do
+      local path = line:match('^FILE "(.-)"')
+      if path then
+        last = { name = path:match('[^/]+$') or path, path = path, dir = false }
+        out[#out + 1] = last
+      elseif last and line:sub(1, 5) == 'DATA ' then
+        local m, sec = line:match(' l:(%d+):([%d%.]+)')
+        if m then last.len = tonumber(m) * 60 + tonumber(sec) end
+      end
+    end
+    fh:close()
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  B.dbcache[file] = out
+  return out
+end
+
+function B.refresh_db()
+  if B.db then B.set_all(B.read_db(B.db.file))
+  else B.dbs = B.read_dbs(); B.set_all(B.dbs) end
+end
+
+-- ── jf_pm: проекты из индекса менеджера проектов ─────────────────────────
+-- jf_pm_core.lua (Scripts/jf_pm) читает jf_pm_index.json; карточка: name,
+-- path, mtime, duration, render_file, track_names. Сортировка — по mtime (свежие сверху).
+function B.read_pm()
+  if B.pm then return B.pm end
+  local out = {}
+  local dir = res_path() .. '/Scripts/jf_pm'
+  local ok, core = pcall(dofile, dir .. '/jf_pm_core.lua')
+  if ok and type(core) == 'table' and core.load_index then
+    local ok2, idx = pcall(core.load_index)
+    if ok2 and idx and idx.projects then
+      for path, c in pairs(idx.projects) do
+        local ext = (path:match('%.(%w+)$') or ''):lower()
+        local base = path:match('[^/]+$') or ''
+        if ext == 'rpp' and base:sub(1, 1) ~= '.' and not base:find('TemporaryUnsaved', 1, true) then
+          out[#out + 1] = { name = c.name or (path:match('[^/]+$') or path), path = path, pm = true, dir = false,
+                            mtime = tonumber(c.mtime) or 0, len = tonumber(c.duration),
+                            render = c.render_file ~= '' and c.render_file or nil, tracks = c.track_names }
+        end
+      end
+    end
+  end
+  table.sort(out, function(a, b) return a.mtime > b.mtime end)
+  B.pm = out
+  return out
+end
+
+-- файл для прослушивания проекта: рендер из карточки, иначе jf_preview.wav рядом
+function B.pm_preview(e)
+  if e.render and e.render ~= '' then return e.render end
+  local dir = e.path:match('^(.*)/[^/]+$')
+  local f = dir and io.open(dir .. '/jf_preview.wav', 'rb')
+  if f then f:close(); return dir .. '/jf_preview.wav' end
+  return nil
+end
+
+-- ── внутрь проекта: .rpp как папка (tracks / samples / regions / markers) ──
+-- Текст проекта читается напрямую: блоки <TRACK …> верхнего уровня (имя из
+-- NAME, FILE внутри — абсолютизируются относительно папки проекта, сырой
+-- chunk — для вставки трека через SetTrackStateChunk), регионы и маркеры —
+-- строки MARKER (flags&1 = регион: пара строк начало/конец).
+function B.scan_project(path)
+  local fh = io.open(path, 'rb'); if not fh then return nil end
+  local dir = path:match('^(.*)/[^/]+$') or '.'
+  local proj = { tracks = {}, samples = {}, regions = {}, markers = {} }
+  local depth, cur, seen = 0, nil, {}
+  local region_open = {}
+  local function absf(f) if f:sub(1, 1) == '/' then return f end; return dir .. '/' .. f end
+  for line in fh:lines() do
+    local st = line:match('^%s*(.-)%s*$')
+    local first = st:sub(1, 1)
+    if first == '<' then
+      depth = depth + 1
+      if depth == 2 and st:match('^<TRACK') then cur = { name = '', lines = { line }, files = {} } end
+      if cur and depth > 2 then cur.lines[#cur.lines + 1] = line end
+    elseif st == '>' then
+      if cur and depth == 2 then
+        cur.lines[#cur.lines + 1] = line
+        cur.chunk = table.concat(cur.lines, '\n')
+        cur.lines = nil
+        proj.tracks[#proj.tracks + 1] = { name = cur.name ~= '' and cur.name or ('track ' .. (#proj.tracks + 1)), chunk = cur.chunk, nfiles = #cur.files, trk = true, dir = false }
+        cur = nil
+      elseif cur then cur.lines[#cur.lines + 1] = line end
+      depth = depth - 1
+    else
+      if cur then
+        if depth == 2 and cur.name == '' then local nm = st:match('^NAME%s+"(.-)"') or st:match('^NAME%s+(%S+)'); if nm then cur.name = nm end end
+        local f = st:match('^FILE%s+"(.-)"') or st:match('^FILE%s+(%S+)')
+        if f then
+          local af = absf(f)
+          cur.files[#cur.files + 1] = af
+          if not seen[af] then seen[af] = true; proj.samples[#proj.samples + 1] = { name = af:match('[^/]+$') or af, path = af, dir = false } end
+          -- в chunk путь должен быть абсолютным, иначе вставленный трек потеряет медиа
+          if f ~= af then cur.lines[#cur.lines] = line:gsub('FILE%s+"?' .. f:gsub('%p', '%%%0') .. '"?', 'FILE "' .. af .. '"', 1) end
+        else cur.lines[#cur.lines] = line end
+      end
+      if depth == 1 then
+        local id, pos, nm, flags = st:match('^MARKER%s+(%d+)%s+([%d%.%-]+)%s+"(.-)"%s+(%d+)')
+        if not id then id, pos, nm, flags = st:match('^MARKER%s+(%d+)%s+([%d%.%-]+)%s+(%S+)%s+(%d+)') end
+        if id then
+          pos, flags = tonumber(pos), tonumber(flags) or 0
+          if flags & 1 == 1 then
+            if region_open[id] then region_open[id].fin = pos; region_open[id] = nil
+            else local r = { name = nm, pos = pos, fin = pos, rgn = true, dir = false }; region_open[id] = r; proj.regions[#proj.regions + 1] = r end
+          else proj.markers[#proj.markers + 1] = { name = nm, pos = pos, mark = true, dir = false } end
+        end
+      end
+    end
+  end
+  fh:close()
+  for _, r in ipairs(proj.regions) do r.name = ('%s  %.1fs'):format(r.name ~= '' and r.name or 'region', r.fin - r.pos) end
+  for _, m in ipairs(proj.markers) do m.name = ('%s  @%.1fs'):format(m.name ~= '' and m.name or 'marker', m.pos) end
+  return proj
+end
+
+function B.pm_open(e)
+  local proj = B.scan_project(e.path)
+  if not proj then B.filter = ''; return false end
+  proj.e = e
+  B.pmproj, B.pmdir = proj, nil
+  B.cur = 1; B.filter = ''; B.filtering = false
+  B.refresh_pm()
+  return true
+end
+
+function B.refresh_pm()
+  local pr = B.pmproj
+  if not pr then B.set_all(B.read_pm()); return end
+  if not B.pmdir then
+    B.set_all({ { name = ('tracks (%d)'):format(#pr.tracks), dir = true, pmdir = 'tracks' },
+                { name = ('samples (%d)'):format(#pr.samples), dir = true, pmdir = 'samples' },
+                { name = ('regions (%d)'):format(#pr.regions), dir = true, pmdir = 'regions' },
+                { name = ('markers (%d)'):format(#pr.markers), dir = true, pmdir = 'markers' } })
+  else B.set_all(pr[B.pmdir] or {}) end
+end
+
+-- ── proj: все аудио-источники текущего проекта (как Project Bay: у Bay нет
+-- ReaScript API, а то, что реально используется, — это items проекта, в том
+-- числе библиотека после =LIB). Уникальные по файлу; трек и число items.
+function B.read_proj()
+  local seen, out = {}, {}
+  for i = 0, R.CountMediaItems(0) - 1 do
+    local it = R.GetMediaItem(0, i)
+    local tk = R.GetActiveTake(it)
+    if tk and not R.TakeIsMIDI(tk) then
+      local src = R.GetMediaItemTake_Source(tk)
+      local fn = src and R.GetMediaSourceFileName(src, '') or ''
+      if fn ~= '' then
+        local e = seen[fn]
+        if not e then
+          local tr = R.GetMediaItem_Track(it)
+          local _, tn = R.GetTrackName(tr)
+          e = { name = fn:match('[^/]+$') or fn, path = fn, dir = false, proj = true, n = 0, track = tn }
+          seen[fn] = e; out[#out + 1] = e
+        end
+        e.n = e.n + 1
+      end
+    end
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  return out
+end
+
+function B.set_mode(m)
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' then return end
+  B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
+  B.pmproj, B.pmdir = nil, nil
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) else B.set_all(B.read_pm()) end
+end
+
+-- кнопки шапки: files | db | size | hide
+function B.click(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' then B.set_mode(what)
+  elseif what == 'auto' then B.auto = not B.auto
+  elseif what == 'wave' then B.wave = not B.wave
+  elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
+  elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
+end
+
+function B.full(e)
+  if e.path then return e.path end
+  return B.path .. '/' .. e.name
+end
+
+function B.enter()
+  local e = B.entries[B.cur]
+  if not e then return end
+  if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
+  elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
+  elseif e.dir then B.path = B.full(e); B.cur = 1; B.filter = ''; B.refresh()
+  elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
+  elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
+  elseif e.rgn then if ctx.drop_region_at_cursor then ctx.drop_region_at_cursor(B.pmproj.e.path, e) end
+  elseif e.mark then return
+  else ctx.add_to_depot(B.full(e)) end
+end
+
+-- путь для прослушивания строки (nil — нечего слушать)
+function B.preview_path(e)
+  if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
+  if e.pm then return B.pm_preview(e) end
+  return B.full(e)
+end
+
+function B.up()
+  if B.filter ~= '' then B.filter = ''; B.filtering = false; B.set_all(B.all); return end
+  if B.mode == 'db' then
+    if B.db then B.db = nil; B.cur = 1; B.refresh_db() end
+    return
+  end
+  if B.mode == 'pm' then
+    if B.pmdir then B.pmdir = nil; B.cur = 1; B.refresh_pm()
+    elseif B.pmproj then B.pmproj = nil; B.cur = 1; B.set_all(B.read_pm()) end
+    return
+  end
+  if B.path == B.root or #B.path <= #B.root then return end
+  local parent = B.path:match('(.*)/[^/]+$')
+  if parent and #parent >= #B.root then B.path = parent; B.cur = 1; B.refresh() end
+end
+
+-- строка описания для статус-бара
+function B.describe(idx)
+  local e = B.entries[idx]
+  if not e then return '' end
+  if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
+  if e.dir then return ('folder %s - Enter: open'):format(e.name) end
+  if e.pm then
+    local len = e.len and e.len > 0 and (' %d:%02d'):format(math.floor(e.len / 60), math.floor(e.len % 60)) or ''
+    return ('project %s%s - Enter: open as folder (tracks / samples / regions), drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
+  end
+  if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
+  if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
+  if e.rgn then return ('region %s [%.2f - %.2f] - Enter: subproject trimmed to region @cursor, drag: to track/row'):format(e.name, e.pos, e.fin) end
+  if e.mark then return 'marker ' .. e.name end
+  if e.proj then return ('%s - used %d× (first on %s); Enter: to depot of cursor track, drag: to track, v: sample view'):format(e.path, e.n, e.track or '?') end
+  local len = e.len and (' %d:%05.2f'):format(math.floor(e.len / 60), e.len % 60) or ''
+  return ('%s%s - Enter: to depot (instrument), Space: preview, v: view in sample tab, drag: to track'):format(B.full(e), len)
+end
+
+function B.preview()
+  local pth = B.preview_path(B.entries[B.cur])
+  if pth then ctx.preview_file(pth) end
+end
+
+-- клавиши в фокусе браузера; true — съедена
+function B.key(c)
+  local ch = c < 256 and string.char(c) or ''
+  if B.filtering then
+    -- набор фильтра: печатные символы сужают список, BS стирает, Enter/Esc — выход
+    if c == 27 or c == 13 then B.filtering = false
+    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.set_all(B.all)
+    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.set_all(B.all)
+    else return false end
+    return true
+  end
+  if ch == '/' then B.filtering = true
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
+  elseif ch == 'p' then B.click('auto')
+  elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
+  elseif ch == 'w' then B.click('size')
+  elseif ch == 'q' then B.click('hide')
+  elseif c == 27 and B.filter ~= '' then B.filter = ''; B.set_all(B.all)
+  elseif ch == 'j' or c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
+  elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - 1)
+  elseif ch == 'g' then B.cur = 1
+  elseif ch == 'G' then B.cur = #B.entries
+  elseif c == 13 or ch == 'l' then B.enter()
+  elseif c == 8 or ch == '-' or ch == 'h' then B.up()
+  elseif ch == ' ' then B.preview()
+  elseif c == 9 or c == 27 then ctx.toggle_focus()
+  else return false end
+  return true
+end
+
+-- отрисовка в прямоугольнике (x, y, w, h); возвращает hover-индекс
+-- hover: число — строка списка, строка — кнопка шапки ('files','db','size','hide')
+function B.draw(U, L, x, y, w, h)
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  U.set(U.LINE); gfx.rect(x, y, 2, h, 1)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hover
+  -- кнопки текстом: сверху — куда идти (files db pm proj), снизу — вид
+  -- (wave auto <> x). Шапка и подвал по одной строке.
+  local function btn(bx, by, label, what, on)
+    local bw = U.measure(label) + 2 * L.pad
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hover = what end
+    if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
+    return bx + bw + L.pad
+  end
+  do
+    local bx = x + L.pad + 2
+    for _, t in ipairs({ 'files', 'db', 'pm', 'proj' }) do
+      if bx + U.measure(t) + 2 * L.pad > x + w then break end
+      bx = btn(bx, y, t, t, B.mode == t)
+    end
+  end
+  do
+    local by = y + h - L.rh - 2
+    local bx = x + L.pad + 2
+    for _, b in ipairs({ { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
+      if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
+      bx = btn(bx, by, b[1], b[2], b[3])
+    end
+    h = h - L.rh - 4
+  end
+  y = y + L.rh + 2; h = h - L.rh - 2
+  -- путь / база / фильтр
+  local where
+  if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
+  elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
+  elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or ('jf_pm: %d projects'):format(#B.all)
+  else where = B.db and ('db ' .. B.db.name) or 'databases' end
+  if B.filter ~= '' or B.filtering then where = where .. ' /' .. B.filter .. (B.filtering and '_' or '') end
+  U.text(x + L.pad + 2, y + 1, ctx.fit(where, w - 2 * L.pad), (B.filtering and U.AMBER or U.GREY))
+  y = y + L.rh; h = h - L.rh
+  local nvis = math.floor(h / L.rh)
+  if B.cur - 1 < B.scroll then B.scroll = B.cur - 1 end
+  if B.cur - 1 >= B.scroll + nvis then B.scroll = B.cur - nvis end
+  for i = 1, nvis do
+    local idx = B.scroll + i
+    local e = B.entries[idx]
+    if not e then break end
+    local ry = y + (i - 1) * L.rh
+    if idx == B.cur then
+      U.set(B.focus and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 2, L.rh, 1)
+    end
+    local col = (idx == B.cur and B.focus) and U.BG or ((e.dir or e.db) and U.CYAN or ((e.pm or e.trk or e.rgn) and U.AMBER or U.TEXT))
+    local glyph = e.db and '#' or (e.pm and '@' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or (e.dir and '/' or ' ')))))
+    local is_file = not (e.dir or e.db or e.pm or e.trk or e.rgn or e.mark)
+    local tw = w - 2 * L.pad
+    if B.wave and is_file then tw = math.floor(tw * 0.55) end
+    U.text(x + L.pad, ry + 1, ctx.fit(glyph .. e.name, tw), col)
+    if B.wave and is_file and ctx.file_peaks then
+      -- мини-волна файла справа от имени (нативные пики REAPER, кеш по пути)
+      local wx, ww = x + L.pad + tw + L.pad, w - 2 * L.pad - tw - L.pad
+      local pk = ww > 8 and ctx.file_peaks(B.full(e), ww)
+      local cy, hh = ry + L.rh / 2, L.rh / 2 - 1
+      U.set((idx == B.cur and B.focus) and U.BG or U.readable(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 4.0))
+      if pk and pk.n > 0 then
+        for px = 0, ww - 1 do
+          local i = math.floor(px / ww * pk.n) + 1
+          local a, b = pk.min[i] or 0, pk.max[i] or 0
+          if b - a < 0.03 then a, b = -0.015, 0.015 end
+          gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
+        end
+      else gfx.line(wx, cy, wx + ww, cy) end
+    end
+    if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then hover = idx end
+    if ctx.hint then ctx.hint('browser', x + 2, ry, w - 4, L.rh, idx) end
+  end
+  return hover
+end
+
+-- «призрак» перетаскиваемой строки у курсора мыши (рисуется поверх всего)
+function B.draw_drag(U, L)
+  local d = B.drag
+  if not d or not d.active then return end
+  local label = (d.e.pm and '@' or ' ') .. d.e.name
+  local bw = U.measure(label) + 2 * L.pad
+  local x, y = gfx.mouse_x + 12, gfx.mouse_y - L.rh // 2
+  U.set(U.AMBER); gfx.rect(x, y, bw, L.rh, 1)
+  U.set(U.BG); gfx.rect(x, y, bw, L.rh, 0)
+  U.text(x + L.pad, y + 1, label, U.BG, U.AMBER)
+end
+
+return B
