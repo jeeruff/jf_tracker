@@ -69,5 +69,24 @@ FB.key(27); eq(FB.query, '', 'fx esc clears'); eq(FB.key(27), 'leave', 'fx esc l
 for ch in ('del !apple'):gmatch('.') do FB.key(ch:byte()) end
 eq(#FB.results(), 0, 'fx negation')
 FB.query = ''; FB.cur = 1; FB.key(1685026670); eq(FB.cur, 2, 'fx down'); eq(FB.key(13), 'add', 'fx enter adds')
+-- DSP-грамматика (2 окт)
+local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')
+local dcalls = {}
+local dctx = setmetatable({ msg = function() end }, { __index = function(t, k) local f = function(...) local a = { ... }; dcalls[#dcalls + 1] = k .. ':' .. table.concat((function() local o = {}; for i = 1, #a do o[i] = tostring(a[i]) end; return o end)(), ':') end; rawset(t, k, f); return f end })
+DK.init(dctx)
+local function dk(str, sel) dcalls = {}; for ch in str:gmatch('.') do DK.key(ch:byte(), sel, 4, 8, {}) end; return table.concat(dcalls, ' ') end
+local sel = { fx = 2, param = 1 }
+eq(dk('dd', sel), 'dsp_delete:2:2', 'dsp dd')
+eq(DK.pending_hint(), nil, 'dsp hint cleared')
+DK.key(('d'):byte(), sel, 4, 8, {}); eq((DK.pending_hint() or ''):match('^d: d delete fx') ~= nil, true, 'dsp d hint'); DK.key(27, sel, 4, 8, {})
+eq(dk('dc', sel), 'dsp_unpack:2', 'dsp dc')
+eq(dk('yy', sel), 'dsp_yank:2', 'dsp yy')
+eq(dk('p', sel), 'dsp_paste:2:true', 'dsp p')
+eq(dk('cc', sel), 'dsp_pack:2:2', 'dsp cc')
+eq(dk('aa', sel), 'dsp_automate:2:1', 'dsp aa')
+eq(dk('ap', sel), 'dsp_pick_param:2', 'dsp ap')
+eq(dk('vlc', sel), 'dsp_pack:2:3', 'dsp v l c = pack range'); eq(sel.fx, 3, 'dsp l moved')
+eq(dk('vhd', sel), 'dsp_delete:2:3', 'dsp v h d = delete range')
+eq(DK.key(27, sel, 4, 8, {}), 'leave', 'dsp esc leaves')
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

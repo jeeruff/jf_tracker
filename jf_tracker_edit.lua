@@ -985,6 +985,60 @@ function E.fx_move(track, src, dst)
   run('fx move', function() R.TrackFX_CopyToTrack(track, src, track, dst, true) end)
   if model then model.invalidate() end
 end
+-- ── контейнеры (2 окт): упаковать / распаковать, копия эффекта ───────────
+-- Адрес ребёнка контейнера c (верхний уровень, с 0) на позиции k (с 0):
+-- 0x2000000 + (k + 1) * (TrackFX_GetCount + 1) + (c + 1) — схема REAPER 7.
+local function child_addr(track, c, k)
+  return 0x2000000 + (k + 1) * (R.TrackFX_GetCount(track) + 1) + (c + 1)
+end
+-- эффекты верхнего уровня i0..i1 (индексы REAPER) → в новый контейнер на месте i0
+function E.fx_pack(track, i0, i1)
+  local n = i1 - i0 + 1
+  if n < 1 then return false end
+  local ok = false
+  run('fx pack into container', function()
+    local c = R.TrackFX_AddByName(track, 'Container', false, -1000 - i0)
+    if not c or c < 0 then return end
+    for k = 0, n - 1 do
+      -- после каждого переноса следующий эффект встаёт сразу за контейнером
+      R.TrackFX_CopyToTrack(track, c + 1, track, child_addr(track, c, k), true)
+    end
+    ok = true
+  end)
+  if model then model.invalidate() end
+  return ok
+end
+-- контейнер c (верхний уровень) → его дети в цепочку сразу за ним, контейнер долой
+function E.fx_unpack(track, c)
+  local ok = false
+  run('fx unpack container', function()
+    local okc, cnt = R.TrackFX_GetNamedConfigParm(track, c, 'container_count')
+    cnt = okc and tonumber(cnt) or nil
+    if not cnt then return end
+    for j = 0, cnt - 1 do
+      local ok2, id = R.TrackFX_GetNamedConfigParm(track, c, 'container_item.0')
+      id = ok2 and tonumber(id)
+      if not id then break end
+      R.TrackFX_CopyToTrack(track, id, track, c + 1 + j, true)
+    end
+    R.TrackFX_Delete(track, c)
+    ok = true
+  end)
+  if model then model.invalidate() end
+  return ok
+end
+-- копия эффекта (с трека src, индекс si) на трек dst в позицию di
+function E.fx_copy(src, si, dst, di)
+  run('fx copy', function() R.TrackFX_CopyToTrack(src, si, dst, di, false) end)
+  if model then model.invalidate() end
+end
+-- огибающая параметра (автоматизация): создать и показать
+function E.fx_envelope(track, fx, param)
+  local env
+  run('show fx envelope', function() env = R.GetFXEnvelope(track, fx, param, true) end)
+  if model then model.invalidate() end
+  return env
+end
 function E.fx_bypass(track, fx)
   run('fx bypass', function() R.TrackFX_SetEnabled(track, fx, not R.TrackFX_GetEnabled(track, fx)) end)
 end

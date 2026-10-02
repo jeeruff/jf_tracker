@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.15'
+V.VERSION = '0.5.16'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.16', d = '2026-10-02', items = {
+    'chords: extra notes get narrow note + velocity subcolumns, not full lanes; a lane is only a REAPER fixed lane',
+    'hints option (button in the control block, on by default): one line of the main keys under every module',
+    'DSP has its own keys: dd delete fx, dc unpack container, yy p P copy, cc pack into container, aa automate, ap pick parameter, af / add, v range; hints in the status bar',
+  } },
   { v = '0.5.15', d = '2026-10-02', items = {
     'status bar: pending operator shows what can follow (d: d rows | w event | W whole item | t track ...)',
     'dW deletes the whole item under the cursor, dt clears the cursor track in its region',

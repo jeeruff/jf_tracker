@@ -40,7 +40,8 @@ local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
-local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')     -- контекстная справка ? (2 окт)
+local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
+local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
 
@@ -105,7 +106,8 @@ local state = {
   mxruler = flag('mxruler', true),
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
-  fxb = flag('fxb', true),                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
+  fxb = flag('fxb', true),
+  hints = flag('hints', true),                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
@@ -226,7 +228,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -414,6 +416,80 @@ ctx = {
     vim.msg = 'new folder in ' .. B.path
   end,
   browser_mkdir = function(name) B.mkdir(name) end,
+  -- ── DSP: действия грамматики эффектов (jf_tracker_dspkeys.lua) ─────────
+  dsp_fx = function(k) local col = cur_col(); return col, col and col.fx and col.fx[k] end,
+  dsp_delete = function(k0, k1)
+    local col = cur_col(); local fxs = col and col.fx or {}
+    if not fxs[k0] then vim.msg = 'dsp: no fx'; return end
+    local names = {}
+    edit.run('fx delete', function()
+      for k = math.min(k1, #fxs), k0, -1 do names[#names + 1] = fxs[k].name; reaper.TrackFX_Delete(col.track, fxs[k].i) end
+    end)
+    model.invalidate()
+    dsp_sel.fx = math.max(1, k0 - 1); dsp_sel.param = 1
+    vim.msg = 'fx deleted: ' .. table.concat(names, ', ') .. ' (u / Cmd+Z undo)'
+  end,
+  dsp_yank = function(k)
+    local col, f = ctx.dsp_fx(k)
+    if not f then vim.msg = 'dsp: no fx'; return end
+    state.fx_reg = { track = col.track, guid = reaper.TrackFX_GetFXGUID(col.track, f.i), name = f.name }
+    vim.msg = 'yank fx ' .. f.name .. ' - p after, P before (any track)'
+  end,
+  dsp_paste = function(k, after)
+    local reg = state.fx_reg
+    local col, f = ctx.dsp_fx(k)
+    if not (reg and col) then vim.msg = 'fx register empty (yy)'; return end
+    if not reaper.ValidatePtr(reg.track, 'MediaTrack*') then vim.msg = 'yanked fx track is gone'; return end
+    local si
+    for i = 0, reaper.TrackFX_GetCount(reg.track) - 1 do if reaper.TrackFX_GetFXGUID(reg.track, i) == reg.guid then si = i end end
+    if not si then vim.msg = 'yanked fx is gone'; return end
+    local di = f and (after and f.i + 1 or f.i) or reaper.TrackFX_GetCount(col.track)
+    edit.fx_copy(reg.track, si, col.track, di)
+    dsp_sel.fx = f and (after and k + 1 or k) or 1
+    vim.msg = 'fx copy: ' .. reg.name
+  end,
+  dsp_pack = function(k0, k1)
+    local col = cur_col(); local fxs = col and col.fx or {}
+    if not (fxs[k0] and fxs[k1]) then vim.msg = 'dsp: no fx'; return end
+    if edit.fx_pack(col.track, fxs[k0].i, fxs[k1].i) then dsp_sel.fx = k0; vim.msg = ('packed %d fx into a container'):format(k1 - k0 + 1)
+    else vim.msg = 'pack failed (REAPER 7 containers)' end
+  end,
+  dsp_unpack = function(k)
+    local col, f = ctx.dsp_fx(k)
+    if not (f and f.container) then vim.msg = 'dc: not a container'; return end
+    if edit.fx_unpack(col.track, f.i) then vim.msg = 'container unpacked: ' .. f.name end
+  end,
+  dsp_automate = function(k, pi)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then vim.msg = 'aa: no parameter'; return end
+    if edit.fx_envelope(col.track, p.fx or f.i, p.i) then state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. p.name .. ' (envelope column shown)' end
+  end,
+  dsp_pick_param = function(k)
+    local col, f = ctx.dsp_fx(k)
+    if not f then vim.msg = 'dsp: no fx'; return end
+    vim.open_picker('automate ' .. f.name, (function()
+      local items = {}
+      for pi = 0, f.np - 1 do local _, pn = reaper.TrackFX_GetParamName(col.track, f.i, pi, ''); items[#items + 1] = { label = pn or ('p' .. pi), data = pi } end
+      return items end)(), function(it) if edit.fx_envelope(col.track, f.i, it.data) then state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. it.label end end)
+  end,
+  dsp_value = function(k, pi, d, coarse)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then return end
+    local id = p.fx or f.i
+    local v = reaper.TrackFX_GetParamNormalized(col.track, id, p.i)
+    if p.kind == 'toggle' then edit.fx_param(col.track, id, p.i, v >= 0.5 and 0 or 1)
+    elseif p.kind == 'steps' and p.nsteps then edit.fx_param(col.track, id, p.i, v + d / (p.nsteps - 1))
+    else edit.fx_param(col.track, id, p.i, v + d * (coarse and 0.1 or 0.02)) end
+  end,
+  dsp_enter = function(k, pi)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if p and p.kind == 'toggle' then ctx.dsp_value(k, pi, 1) elseif f then edit.fx_bypass(col.track, f.i) end
+  end,
+  dsp_bypass = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_bypass(col.track, f.i) end end,
+  dsp_show = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_show(col.track, f.i) end end,
   -- браузер эффектов: добавить выбранный FX на трек курсора (pos — место в цепочке)
   fxb_add = function(it, pos)
     it = it or FB.selected()
@@ -1126,6 +1202,7 @@ ctx = {
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('icons', 'nerd icons', 'icons on buttons (TTF font only)'),
+      flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = 4, desc = 'x1..x4 (Ctrl +/-)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
       { key = 'font', label = 'ttf font size', kind = 'num', min = 0, max = 40, desc = '0 = bitmap font; N = Nerd font size', get = function() return state.font or 0 end, set = function(v) ctx.set_font(math.floor(v)) end },
@@ -1695,6 +1772,7 @@ ctx.ic = function(name, text) return draw.ic(name, text) end
 ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font or 0) > 0 end
 vim.init(ctx)
 MX.init(U, ctx)
+DK.init(ctx)
 MX.ruler = state.mxruler
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
@@ -2391,6 +2469,7 @@ local function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
+  elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
   elseif name == 'play' then if delta == 0 then edit.play_stop() end
   elseif name == 'bpm' then
     if delta ~= 0 then
@@ -2809,7 +2888,8 @@ local function frame()
   local hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = left,
-    status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus ~= 'matrix' and vim.pending_hint()) or state.status,
+    status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint())
+      or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     timesel = (function()
@@ -2836,6 +2916,7 @@ local function frame()
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
     retro = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad))) or nil,
     dsp_sel = state.focus == 'dsp' and dsp_sel or nil,
+    dsp_range = (state.focus == 'dsp' and DK.anchor) and { DK.range(dsp_sel) } or nil,
     fx_values = function(f) local col = cur_col(); if not col then return {} end
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
     ctrl = {
@@ -2844,12 +2925,14 @@ local function frame()
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
-      xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp,
+      xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints,
     },
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
     inspreview = state.preview,
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
+    hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
+    top_page = (state.toptab == 'garden' and (GD.page == 'orca' and 'orca' or 'garden')) or (state.toptab == 'scope' and 'master') or state.toptab,
     fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list() end
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
@@ -2984,6 +3067,7 @@ local function frame()
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
   elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
+  elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
@@ -3727,36 +3811,15 @@ local function frame()
         if r == 'add' then ctx.fxb_add()
         elseif r == 'leave' then ctx.toggle_focus() end
       elseif state.focus == 'dsp' and state.dsp and not state.khelp then
+        -- DSP — своя грамматика по эффектам (jf_tracker_dspkeys.lua, 2 окт);
+        -- в vim уходят только командная строка и поиск (: /)
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
+        if not DK.pending and (ch == ':' ) then return vim.key(c) end
         local col = cur_col(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
-        if c == 9 then ctx.toggle_focus()
-        elseif c == 27 then ctx.set_focus('tracker')
-        elseif ch == 'h' or c == keys.left then dsp_sel.fx = math.max(1, dsp_sel.fx - 1); dsp_sel.param = 1
-        elseif ch == 'l' or c == keys.right then dsp_sel.fx = math.min(math.max(1, #fxs), dsp_sel.fx + 1); dsp_sel.param = 1
-        elseif ch == 'j' or c == keys.down then dsp_sel.param = math.min(f and #f.params or 1, dsp_sel.param + 1)
-        elseif ch == 'k' or c == keys.up then dsp_sel.param = math.max(1, dsp_sel.param - 1)
-        elseif (c == 1 or c == 24 or ch == '+' or ch == '-' or ch == '=' or c == 13 and f and f.params[dsp_sel.param] and f.params[dsp_sel.param].kind == 'toggle') and f then
-          local p = f.params[dsp_sel.param]
-          if p then
-            local id = p.fx or f.i
-            local v = reaper.TrackFX_GetParamNormalized(col.track, id, p.i)
-            local d = (c == 1 or ch == '+' or ch == '=') and 1 or -1
-            if p.kind == 'toggle' then edit.fx_param(col.track, id, p.i, v >= 0.5 and 0 or 1)
-            elseif p.kind == 'steps' and p.nsteps then edit.fx_param(col.track, id, p.i, v + d / (p.nsteps - 1))
-            else edit.fx_param(col.track, id, p.i, v + d * (gfx.mouse_cap & 8 == 8 and 0.1 or 0.02)) end
-          end
-        elseif (ch == 'b' or c == 13) and f then edit.fx_bypass(col.track, f.i)
-        elseif ch == 'o' and f then edit.fx_show(col.track, f.i)
-        elseif (ch == 'x' or c == 8 or c == keys.delete) and f then edit.fx_remove(col.track, f.i); dsp_sel.fx = math.max(1, dsp_sel.fx - 1)
-        elseif (ch == 'a' or ch == '/') and col then ctx.fx_picker()
-        elseif ch == 'A' and f then
-          vim.open_picker('automate ' .. f.name, (function()
-            local items = {}
-            for pi = 0, f.np - 1 do local _, pn = reaper.TrackFX_GetParamName(col.track, f.i, pi, ''); items[#items + 1] = { label = pn or ('p' .. pi), data = pi } end
-            return items end)(), function(it) edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, f.i, it.data, true) end); state.envs = true; model.invalidate() end)
-        elseif ch == ' ' then edit.play_stop()
-        else return vim.key(c) end
+        local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
+        if r == 'leave' then ctx.set_focus('tracker') end
       elseif state.focus == 'top' and state.top and (vim.mode == 'cmd' or vim.mode == 'search') then
         -- набор команды / поиска: клавиши только в vim, вкладка их не видит (2 окт)
         return vim.key(c)

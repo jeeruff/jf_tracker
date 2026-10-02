@@ -109,6 +109,7 @@ V.parse_len = parse_len
 local function nfields(fi)
   local f = flat()[fi or V.cur.fi]
   if not f or f.folded then return 1 end
+  if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
   return 3 + (ctx.state.fxcols or 0)
 end
 
@@ -598,7 +599,7 @@ local function keys_control(c)
     V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true; V.hexbuf = nil; return true
   elseif ch == 'm' then local hs = heads(); if #hs > 0 then ctx.edit.mute(hs, lpb()); finish_edit() end; return true
   elseif ch == 'f' then
-    local nf = 3 + (ctx.state.fxcols or 0)
+    local nf = nfields()
     local fld = V.cur.field or 1
     if nf < 4 then V.cur.field = 1 elseif fld < 4 or fld >= nf then V.cur.field = 4 else V.cur.field = fld + 1 end
     V.hexbuf = nil; return true

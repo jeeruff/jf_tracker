@@ -247,5 +247,15 @@ do
   end end
   eq('items recorded', nit > 0, true); eq('midi items recorded', nmidi > 0, true)
 end
+-- узкие подколонки (2 окт): аккорд MIDI — подколонки без аудио
+do
+  local lane = { subs = { {} } }
+  M._place(lane, 0, 3, { kind = 'midi' })
+  M._place(lane, 0, 3, { kind = 'midi' })
+  M._place(lane, 0, 3, { kind = 'audio' })
+  eq('chord: 3 subs', #lane.subs, 3)
+  eq('midi sub 2 is not audio', lane.audio_sub and lane.audio_sub[2] or false, false)
+  eq('audio sub 3 flagged', lane.audio_sub and lane.audio_sub[3], true)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

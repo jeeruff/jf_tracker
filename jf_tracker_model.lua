@@ -125,7 +125,14 @@ local function place(lane, r0, r1, head, cont, tail)
   if r1 > r0 then sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0 } end
   head.rows = r1 - r0 + 1
   if lane.last_row == nil or r1 > lane.last_row then lane.last_row = r1 end
-  for i, s in ipairs(lane.subs) do if s == sub then return sub, i end end
+  for i, s in ipairs(lane.subs) do
+    if s == sub then
+      -- подколонка с аудио — полной ширины; только MIDI-ноты — узкая
+      -- «нота + velocity» (2 окт: аккорд не раздувается в лейны)
+      if head.kind == 'audio' then lane.audio_sub = lane.audio_sub or {}; lane.audio_sub[i] = true end
+      return sub, i
+    end
+  end
   return sub
 end
 M._place = place

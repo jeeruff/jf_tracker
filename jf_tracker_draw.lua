@@ -202,6 +202,11 @@ function D.layout(snap, state, nregions)
   L.x_del = x
   x = L.x_del + L.w_del + L.pad
   L.sub_w = x
+  -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
+  -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
+  L.sub_w_narrow = L.pad + L.w_note + L.pad + L.w_vol + L.pad
+  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad,
+    x_vol = L.pad + L.w_note + L.pad, x_fx = {}, x_del = L.pad + L.w_note + L.pad, sub_w = L.sub_w_narrow }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
   L.env_hex_w = ms('FF')
   L.env_bar_w = ms('WWWW')
@@ -239,7 +244,9 @@ function D.layout(snap, state, nregions)
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
   L.body_y = L.header_y + L.header_h
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.dsp_h)
+  -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
+  L.hint_h = state.hints and (L.rh + 1) or 0
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.dsp_h - L.hint_h)
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   local cx = L.matrix_w + L.label_w
@@ -261,11 +268,17 @@ function D.layout(snap, state, nregions)
       for li, lane in ipairs(col.lanes) do
         -- минимум подколонок задаёт пользователь кнопками -/+ над лейном (1 окт)
         local nsub = math.max(1, #lane.subs, (state.subs_min or {})[col.guid .. ':' .. tostring(lane.idx)] or 0)
-        local ln = { lane = lane, x = lx, w = nsub * L.sub_w, nsub = nsub, f0 = #L.flat + 1 }
+        local ln = { lane = lane, x = lx, nsub = nsub, f0 = #L.flat + 1, sx = {} }
+        local off = 0
         for si = 1, nsub do
+          local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
+          local sw = narrow and L.sub_w_narrow or L.sub_w
+          ln.sx[si] = off
           L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
-                                  x = vis and (lx + (si - 1) * L.sub_w) or nil, w = L.sub_w }
+                                  x = vis and (lx + off) or nil, w = sw, narrow = narrow or nil, G = narrow and L.GN or nil }
+          off = off + sw
         end
+        ln.w = off
         c.lanes[#c.lanes + 1] = ln
         lx = lx + ln.w + 1
       end
@@ -336,6 +349,23 @@ local function fit(s, w)
   return s:sub(1, n)
 end
 D.fit = fit
+
+-- строка подсказок модуля: «клавиша действие» парами, клавиши янтарём; пара,
+-- которая не влезает целиком, не рисуется (без наложений); модуль в фокусе ярче
+function D.hint_bar(L, x, y, w, items, active)
+  if not L.hint_h or L.hint_h <= 0 or not items or w <= 0 then return end
+  set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
+  set(U.LINE); gfx.rect(x, y, w, 1, 1)
+  local sp = math.max(L.pad, ms(' '))        -- в битмапе ширина пробела 0
+  local cx = x + L.pad
+  for _, it in ipairs(items) do
+    local kw, dw = ms(it[1]), ms(it[2])
+    if cx + kw + sp + dw > x + w - L.pad then break end
+    text(cx, y + 1, it[1], active and U.AMBER or U.GREY)
+    text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.mix(U.GREY, U.PANEL, 0.25))
+    cx = cx + kw + sp + dw + 2 * sp
+  end
+end
 
 -- вертикальный текст (имена треков в матрице). gfx.blit с поворотом режет
 -- результат прямоугольником назначения, поэтому поворачиваем честно:
@@ -505,7 +535,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local function text(tx, tyy, str, col)
     if inv and col == U.BG then text_(tx, tyy, str, col, D.inv_bg or U.TEXT) else text_(tx, tyy, str, col) end
   end
-  local nf = 3 + L.nfx
+  local nf = L.narrow and 2 or (3 + L.nfx)
   if not cell then
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
@@ -527,7 +557,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
     local muted = cell.muted
     text(x + L.x_note, ty, cell.note, c(1, muted and U.GREY or U.TEXT))
     text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or U.CYAN))
-    if cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, U.TEXT))
+    if L.narrow then
+    elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, U.TEXT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     local fx = cell.fx or {}
     for i = 1, L.nfx do
@@ -537,7 +568,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
   elseif k == 'off' then
     text(x + L.x_note, ty, 'OFF', c(1, D.CONT))
     text(x + L.x_vol, ty, '..', c(2, D.EMPTY))
-    if cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
+    if L.narrow then
+    elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     for i = 1, L.nfx do text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
   elseif k == 'cont' then
@@ -748,7 +780,7 @@ local function draw_topbar(L, info)
     { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
     { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
     { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
-    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY },
+    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
     { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
     { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
     { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
@@ -874,6 +906,8 @@ local function draw_topbar(L, info)
   end
   local cy0 = 1 + L.rh + 3           -- верх содержимого вкладки
   L.top_rect = { sx0 - L.pad, 0, sx1 - sx0 + 2 * L.pad, H - 2 }
+  local HT = H
+  H = H - (L.hint_h or 0)        -- место под строку подсказок вкладки
   local cols = info.cols or {}
   if tab == 'sample' and info.sample_draw then
     -- редактор сэмпла (слайсер) прямо под вкладкой
@@ -1037,7 +1071,12 @@ local function draw_topbar(L, info)
   end
 
   -- инструменты: в верхней панели, только если сайдбар скрыт
+  if (L.hint_h or 0) > 0 then
+    D.hint_bar(L, sx0 - L.pad, H - 2, sx1 - sx0 + 2 * L.pad, (info.hint_bars or function() end)(info.top_page or tab), info.focus == 'top')
+    if L.inst_w > 0 then D.hint_bar(L, gfx.w - L.inst_w, H - 2, L.inst_w, (info.hint_bars or function() end)('inst'), info.focus == 'inst') end
+  end
   if L.inst_w > 0 then D.draw_instruments(L, info, gfx.w - L.inst_w, 0, L.inst_w, H, hover) end
+  H = HT
   return hover
 end
 
@@ -1358,12 +1397,15 @@ function D.frame(L, snap, rows, state, info)
       end
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
-          local sx = ln.x + (si - 1) * L.sub_w
-          if L.w_wave > 0 then cap(sx + L.x_wave, L.w_wave, L.wave == 'spec' and 'wav' or 'wv', 'wave') end
-          cap(sx + L.x_note, L.w_note, 'nt', 'note')
-          cap(sx + L.x_vol, L.w_vol, 'vl', 'vol')
-          for k = 1, L.nfx do cap(sx + L.x_fx[k], L.w_fx, 'fx' .. k, 'fx') end
-          cap(sx + L.x_del, L.w_del, 'dl', 'delay')
+          local sx = ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w)
+          local G = (L.flat[ln.f0 + si - 1] or {}).G or L
+          if G.w_wave > 0 then cap(sx + G.x_wave, G.w_wave, L.wave == 'spec' and 'wav' or 'wv', 'wave') end
+          cap(sx + G.x_note, L.w_note, 'nt', 'note')
+          cap(sx + G.x_vol, L.w_vol, 'vl', 'vol')
+          if not G.narrow then
+            for k = 1, L.nfx do cap(sx + L.x_fx[k], L.w_fx, 'fx' .. k, 'fx') end
+            cap(sx + L.x_del, L.w_del, 'dl', 'delay')
+          end
         end
       end
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
@@ -1463,16 +1505,16 @@ function D.frame(L, snap, rows, state, info)
               D.inv_bg = info.focus == 'tracker' and U.TEXT or U.LINE
               set(D.inv_bg)
               if c.folded then gfx.rect(x, y, f.w, L.rh, 1)
-              else local fx, fw = D.field_rect(L, inv); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
+              else local fx, fw = D.field_rect(f.G or L, inv); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
             end
             local cell
             if r.row < 0 then
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
-            else cell = f.sub[r.row]; draw_cell(L, cell, x, y, ty, inv) end
+            else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
-              for fld = 1, 3 + L.nfx do
-                local fx, fw = D.field_rect(L, fld)
+              for fld = 1, f.narrow and 2 or (3 + L.nfx) do
+                local fx, fw = D.field_rect(f.G or L, fld)
                 if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
               end
             end
@@ -1584,7 +1626,7 @@ function D.frame(L, snap, rows, state, info)
     set(U.LINE); gfx.rect(c.x, L.body_y, 1, L.body_h, 1)
     for li, ln in ipairs(c.lanes) do
       if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, L.body_y, 1, L.body_h, 1) end
-      for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (si - 1) * L.sub_w, L.body_y, 1, L.body_h, 1) end
+      for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), L.body_y, 1, L.body_h, 1) end
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
   end
@@ -1689,20 +1731,31 @@ function D.frame(L, snap, rows, state, info)
     local ih = math.max(4 * L.rh, math.min(total - 6 * L.rh, state.inst_px or math.floor(total * 0.40)))
     L.inst_side_h = ih
     L.side_y0 = sy0
-    D.draw_instruments(L, info, W, sy0, L.side_w, ih, hover)
-    hover.browser = info.browser_draw(L, W, sy0 + ih + 2, L.side_w, total - ih - 2)
+    local hh = L.hint_h or 0
+    D.draw_instruments(L, info, W, sy0, L.side_w, ih - hh, hover)
+    hover.browser = info.browser_draw(L, W, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
+    if hh > 0 then
+      D.hint_bar(L, W, sy0 + ih - hh, L.side_w, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
+      D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)('browser'), info.focus == 'browser')
+    end
   end
 
   -- нижняя DSP-панель: FX трека курсора блоками, параметры мини-слайдерами
+  -- строки подсказок трекера и матрицы — в резерве под телом (опция hints)
+  if (L.hint_h or 0) > 0 then
+    local hy2 = L.body_y + L.body_h
+    if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
+    D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
+  end
   -- режим справки (?): то же место внизу занимает контекстная справка
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
-    local dy = L.body_y + L.body_h
+    local dy = L.body_y + L.body_h + (L.hint_h or 0)     -- под строкой подсказок тела
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     hover.khelp = info.khelp_draw(L, 0, dy, L.win_w, L.dsp_h) or true
     L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
   elseif L.dsp_h > 0 then
-    local dy = L.body_y + L.body_h
+    local dy = L.body_y + L.body_h + (L.hint_h or 0)     -- под строкой подсказок тела
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     local col = info.pool_col
@@ -1711,7 +1764,7 @@ function D.frame(L, snap, rows, state, info)
     local fbw = 0
     if info.fxb_draw then
       fbw = (L.matrix_w and L.matrix_w > 0) and L.matrix_w or math.min(L.cw * 26, math.floor(L.win_w / 4))
-      hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2)
+      hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
     text(fbw + L.pad, dy + 3, fit('dsp ' .. (col and col.name or '') .. (#fxs == 0 and '  (no fx; a - add, or drag from the fx list)' or ''), gfx.w - fbw - 2 * L.pad), U.GREY)
@@ -1726,10 +1779,11 @@ function D.frame(L, snap, rows, state, info)
       local bw = bw1 * ncol
       if bx + bw > L.win_w then break end
       local by = dy + 3 + L.rh
-      local bh = L.dsp_h - L.rh - 6
+      local bh = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k }
-      set(is_sel and U.tint(U.AMBER, 0.18) or U.BG); gfx.rect(bx, by, bw, bh, 1)
+      local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
+      set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, by, bw, bh, 0)
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), bw - 2 * L.pad), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
       if not drag and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
@@ -1801,7 +1855,7 @@ function D.frame(L, snap, rows, state, info)
       for _, b in ipairs(blocks) do
         if mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
       end
-      local gy, gh = dy + 3 + L.rh, L.dsp_h - L.rh - 6
+      local gy, gh = dy + 3 + L.rh, L.dsp_h - L.rh - 6 - (L.hint_h or 0)
       set(U.AMBER); gfx.rect(gx - 1, gy, 3, gh, 1)
       gfx.rect(gx - 4, gy, 9, 2, 1); gfx.rect(gx - 4, gy + gh - 2, 9, 2, 1)
       hover.dsp_gap = gap
@@ -1810,6 +1864,11 @@ function D.frame(L, snap, rows, state, info)
       for _, b in ipairs(blocks) do
         if b.k == drag.k then set(U.BG); gfx.a = 0.5; gfx.rect(b.x, b.y, b.w, b.h, 1); gfx.a = 1 end
       end
+    end
+    if (L.hint_h or 0) > 0 then
+      local hy3 = dy + L.dsp_h - L.hint_h
+      if fbw > 0 then D.hint_bar(L, 0, hy3, fbw - 1, (info.hint_bars or function() end)('fxb'), info.focus == 'fxb') end
+      D.hint_bar(L, fbw, hy3, L.win_w - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
     end
     L.dsp_rect = { fbw, dy, L.win_w - fbw, L.dsp_h }
   end
