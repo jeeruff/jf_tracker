@@ -60,7 +60,10 @@ end
 -- D.SPACE — зазор над буквами в строке (`:space`), входит в высоту строки.
 D.SCALE, D.SPACE = 1, 2
 local tcache, next_img = {}, 100
-local IMG_FIRST, IMG_LAST = 100, 999
+-- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
+-- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
+-- вертикальный текст, 960..1019 спектрограммы анализатора, 1023 черновик поворота
+local IMG_FIRST, IMG_LAST = 100, 799
 
 function D.set_font(state)
   local n = tonumber(state.font) or 0
@@ -233,7 +236,8 @@ function D.layout(snap, state, nregions)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.rh + 4
-  L.dsp_h = state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0
+  L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
+    or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
   L.body_y = L.header_y + L.header_h
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.dsp_h)
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
@@ -337,9 +341,9 @@ D.fit = fit
 -- результат прямоугольником назначения, поэтому поворачиваем честно:
 -- текст → картинка A (w×h) → попиксельно в картинку B (h×w), B блитится с
 -- масштабом. Кеш по строке+цвету, картинки 1000..1022 (сброс по кругу).
--- вертикальный текст: картинки 1200..1399 (200 подписей: имена в матрице,
+-- вертикальный текст: картинки 800..959 (160 подписей: имена в матрице,
 -- регионы и маркеры линейки), 1023 — черновик поворота
-local VFIRST, VLAST = 1200, 1399
+local VFIRST, VLAST = 800, 959
 local vcache, vnext = {}, VFIRST
 D.reset_vcache = function() vcache, vnext = {}, VFIRST end
 function D.vtext(x, y, h_avail, str, col, bg)
@@ -656,6 +660,7 @@ local function heat(v)
   elseif v < 0.75 then return U.mix(U.GREEN, U.AMBER, (v - 0.4) / 0.35)
   else return U.mix(U.AMBER, U.RED, (v - 0.75) / 0.25) end
 end
+local SG_IMG = 960                 -- спектрограммы: 960..1019 (60 слотов)
 local function draw_analyzer(x, y, w, h, slot, mode, info)
   if not slot or w < 8 or h < 4 then return end
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
@@ -672,15 +677,15 @@ local function draw_analyzer(x, y, w, h, slot, mode, info)
         gfx.rect(x + math.floor((b - 1) * bw), y + h - 1 - bh, math.max(1, math.floor(bw) - 1), bh, 1)
       end
     end
-  elseif mode == 'sgram' and info.spec then
+  elseif mode == 'sgram' and info.spec and slot < 60 then
     local st = sg[slot]
-    if not st then st = { col = 0, frame = -1 }; sg[slot] = st; gfx.setimgdim(1024 + slot, SG_COLS, SG_ROWS) end
+    if not st then st = { col = 0, frame = -1 }; sg[slot] = st; gfx.setimgdim(SG_IMG + slot, SG_COLS, SG_ROWS) end
     local fr = info.spec_frame and info.spec_frame(slot) or 0
     if fr ~= st.frame then
       st.frame = fr
       local bands = info.spec(slot)
       if bands then
-        local dest = gfx.dest; gfx.dest = 1024 + slot
+        local dest = gfx.dest; gfx.dest = SG_IMG + slot
         local mode0 = gfx.mode; gfx.mode = 0; gfx.a = 1
         for b = 1, SG_ROWS do
           set(heat(bands[math.floor((b - 1) / SG_ROWS * #bands) + 1] or 0))
@@ -693,8 +698,8 @@ local function draw_analyzer(x, y, w, h, slot, mode, info)
     local mode0 = gfx.mode; gfx.mode = 0; gfx.a = 1
     local n1 = SG_COLS - st.col            -- старые столбцы: col..end → слева
     local w1 = math.floor(w * n1 / SG_COLS)
-    if n1 > 0 then gfx.blit(1024 + slot, 1, 0, st.col, 0, n1, SG_ROWS, x, y, w1, h) end
-    if st.col > 0 then gfx.blit(1024 + slot, 1, 0, 0, 0, st.col, SG_ROWS, x + w1, y, w - w1, h) end
+    if n1 > 0 then gfx.blit(SG_IMG + slot, 1, 0, st.col, 0, n1, SG_ROWS, x, y, w1, h) end
+    if st.col > 0 then gfx.blit(SG_IMG + slot, 1, 0, 0, 0, st.col, SG_ROWS, x + w1, y, w - w1, h) end
     gfx.mode = mode0
   elseif info.scope then
     local sc = info.scope(slot)
@@ -743,7 +748,7 @@ local function draw_topbar(L, info)
     { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
     { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
     { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
-    { 'options', 'options', U.AMBER },
+    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY },
     { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
     { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
     { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
@@ -1376,9 +1381,29 @@ function D.frame(L, snap, rows, state, info)
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, hy + 1, bw, L.rh, 1)
       set(c); gfx.rect(bx, hy + 1, 3, L.rh, 1)
-      text(bx + 5, hy + 1, fit(rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), bw - 7), U.TEXT)
+      -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»
+      text(bx + 5, hy + 1, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
     else
       text(bx + 5, hy + 1, fit('no region', bw - 7), U.DIM)
+    end
+    -- кнопки под именем (2 окт): /2 x2 dup; не влезают в ряд — dup ниже
+    if rg then
+      local BT = { { 'half', '/2' }, { 'double', 'x2' }, { 'dup', 'dup' } }
+      -- ряды кнопок вплотную: второй ряд кончается ровно над числом длины
+      local x, y = bx, hy + 1 + L.rh
+      for _, b in ipairs(BT) do
+        local w1 = ms(b[2]) + 2 * L.pad
+        if x + w1 > bx + bw then x, y = bx, y + L.rh end
+        if y + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+          local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
+          set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w1, L.rh, 1)
+          set(hot and U.AMBER or U.LINE); gfx.rect(x, y, w1, L.rh, 0)
+          text(x + L.pad, y, b[2], hot and U.AMBER or U.TEXT)
+          if hot then hover.rgbtn = b[1] end
+          hint('rgbtn', x, y, w1, L.rh, b[1])
+        end
+        x = x + w1 + 2
+      end
     end
   end
   -- длина региона курсора в шагах — квадрат над номерами строк: число на
@@ -1563,20 +1588,6 @@ function D.frame(L, snap, rows, state, info)
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
   end
-  -- time selection REAPER (2 окт): бледная подсветка строк и голубая скобка
-  -- у правого края линейки
-  if info.timesel and #rows > 0 then
-    local row0, nr = rows[1].row, #rows
-    local a, b = math.max(info.timesel[1], row0), math.min(info.timesel[2], row0 + nr)
-    if b > a then
-      local y0, y1 = L.body_y + (a - row0) * L.rh, L.body_y + (b - row0) * L.rh
-      set(U.CYAN); gfx.a = 0.07; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1); gfx.a = 1
-      local bx = tx0 + L.ruler_w - 3
-      gfx.rect(bx, y0, 2, y1 - y0, 1)
-      if info.timesel[1] >= row0 then gfx.rect(bx - 4, y0, 6, 1, 1) end
-      if info.timesel[2] <= row0 + nr then gfx.rect(bx - 4, y1 - 1, 6, 1, 1) end
-    end
-  end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
   if L.ruler_w > 0 and info.ruler and #rows > 0 then
     local row0, nr = rows[1].row, #rows
@@ -1610,12 +1621,41 @@ function D.frame(L, snap, rows, state, info)
     end
     if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
+  -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
+  -- уголке с именем, на линейке и в матрице
+  if L.ruler_w > 0 and info.ruler and #rows > 0 then
+    local row0, nr = rows[1].row, #rows
+    for _, rg in ipairs(info.ruler.regions) do
+      local a, b = math.max(rg.r0, row0), math.min(rg.r1, row0 + nr)
+      if b > a and rg.rgb then
+        set(rg.rgb); gfx.rect(tx0 + L.ruler_w, L.body_y + (a - row0) * L.rh, 2, (b - a) * L.rh, 1)
+      end
+    end
+  end
+  -- time selection REAPER (2 окт, правка): фон номеров шагов ярко-серый,
+  -- бледная полоса по паттерну и скобка «]» у правого края линейки
+  if info.timesel and #rows > 0 then
+    local row0, nr = rows[1].row, #rows
+    local a, b = math.max(info.timesel[1], row0), math.min(info.timesel[2], row0 + nr)
+    if b > a then
+      local y0, y1 = L.body_y + (a - row0) * L.rh, L.body_y + (b - row0) * L.rh
+      local grey = { 0.80, 0.80, 0.80 }
+      set(grey)
+      gfx.a = 0.16; gfx.rect(tx0 + L.ruler_w + 2, y0, L.label_w - L.ruler_w - 3, y1 - y0, 1)
+      gfx.a = 0.05; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1)
+      gfx.a = 1
+      local sx = tx0 + L.ruler_w - 3                 -- спина скобки; усы — влево: «]»
+      gfx.rect(sx, y0, 2, y1 - y0, 1)
+      if info.timesel[1] >= row0 then gfx.rect(sx - 5, y0, 7, 2, 1) end
+      if info.timesel[2] <= row0 + nr then gfx.rect(sx - 5, y1 - 2, 7, 2, 1) end
+    end
+  end
   set(D.SEP); gfx.rect(tx0 + L.label_w - 1, L.body_y, 2, L.body_h, 1)
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 1, hy, 2, L.body_y + L.body_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   if MX and L.matrix_w > 0 and not state.mx_hidden then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
   end
   -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,
@@ -1654,7 +1694,14 @@ function D.frame(L, snap, rows, state, info)
   end
 
   -- нижняя DSP-панель: FX трека курсора блоками, параметры мини-слайдерами
-  if L.dsp_h > 0 then
+  -- режим справки (?): то же место внизу занимает контекстная справка
+  if L.dsp_h > 0 and info.khelp and info.khelp_draw then
+    local dy = L.body_y + L.body_h
+    set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
+    set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
+    hover.khelp = info.khelp_draw(L, 0, dy, L.win_w, L.dsp_h) or true
+    L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
+  elseif L.dsp_h > 0 then
     local dy = L.body_y + L.body_h
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
@@ -1759,8 +1806,11 @@ function D.frame(L, snap, rows, state, info)
       if hot then hover.sidectl = what end
       hint('sidectl', bx, y, bw, L.rh, what)
     end
-    knob(bot - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
-    if state.side then knob(bot - 2 * L.rh - 4, '=', 'grip') end
+    -- панель открыта: кнопки в трекере у низа его тела, над нижней панелью
+    -- (DSP / справка), иначе они ложились на текст справки (2 окт)
+    local kb = state.side and (L.body_y + L.body_h) or bot
+    knob(kb - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
+    if state.side then knob(kb - 2 * L.rh - 4, '=', 'grip') end
   end
 
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши

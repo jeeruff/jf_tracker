@@ -41,7 +41,8 @@ function MX.init(u, c) U, ctx = u, c end
 local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
-local BTNS = { { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'add', '+' } }
+local BTNS = { { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'add', '+' } }
+MX.ruler = true          -- вертикальная линейка тактов слева (кнопка ruler, R)
 MX.ENV_PTS = 12          -- отсчётов огибающей на ячейку в детальном зуме
 
 function MX.grid(snap, regions)
@@ -105,7 +106,9 @@ MX.DETAIL_ROWS = 4
 function MX.width(L, nregions, ncols)
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
   L.mx_arrow_w = U.measure('<')
-  L.mx_idx_w = L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
+  -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
+  L.mx_ruler_w = MX.ruler and (U.measure('999.9') + 2 * L.pad + 4) or 0
+  L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
   L.mx_dur_w = U.measure('9999') + L.pad                  -- колонка длины региона в шагах
   L.mx_label_w = L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_dur_w
   L.mx_cell_w = (MX.zoom == 'detail' and L.cw * 3 or L.cw * 2) + 2 * L.pad
@@ -151,7 +154,7 @@ function MX.draw(L, snap, regions, info)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or U.TEXT)
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or ((b[1] == 'ruler' and MX.ruler) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -168,7 +171,23 @@ function MX.draw(L, snap, regions, info)
   end
   local top = hy + L.mx_head_h
   local rh = L.mx_row_h or L.rh
-  local nvis = math.max(1, math.floor((L.body_y + L.body_h - top) / rh))
+  local RW = L.mx_ruler_w or 0
+  local marks = info.marks or {}
+  -- маркер =START строкой до первого слота, =END — после последнего (2 окт)
+  local function mark_row(mk, y)
+    local c = mk.rgb or U.CYAN
+    U.set(c); gfx.rect(0, y + math.floor(L.rh / 2), W - 4, 1, 1)
+    if RW > 0 then
+      U.set(U.PANEL); gfx.rect(L.pad, y, U.measure(mk.bar) + 2, L.rh, 1)
+      U.text(L.pad + 1, y + 1, mk.bar, c)
+    end
+    local lx = RW + L.pad
+    U.set(U.PANEL); gfx.rect(lx - 2, y, U.measure(mk.name) + 4, L.rh, 1)
+    U.text(lx, y + 1, mk.name, c)
+  end
+  if marks.start then mark_row(marks.start, top); top = top + L.rh end
+  local bottom = L.body_y + L.body_h - (marks.stop and L.rh or 0)
+  local nvis = math.max(1, math.floor((bottom - top) / rh))
   MX.scroll = MX.scroll or 0
   if MX.cur.ri - 1 < MX.scroll then MX.scroll = MX.cur.ri - 1 end
   if MX.cur.ri - 1 >= MX.scroll + nvis then MX.scroll = MX.cur.ri - nvis end
@@ -188,9 +207,31 @@ function MX.draw(L, snap, regions, info)
       U.set(U.AMBER); gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 1, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
+    -- цвет региона (2 окт): полоска у края и подкраска под номером и именем —
+    -- тот же цвет, что на таймлайне REAPER, в уголке трекера и у номеров шагов
+    if not rg.gap and info.region_rgb then
+      local c = info.region_rgb(rg.color)
+      if c then
+        U.set(U.tint(c, 0.22)); gfx.rect(RW + 3, y + 1, L.mx_label_w - L.mx_dur_w - 3 - RW, L.rh - 1, 1)
+        U.set(c); gfx.rect(RW + 1, y + 1, 2, rh - 1, 1)
+      end
+    end
+    -- линейка: черта начала слота, «такт.доля», риски тактов (длинные) и долей
+    if RW > 0 then
+      U.set(U.LINE); gfx.rect(0, y, RW - 2, 1, 1)
+      if info.bar_label then U.text(L.pad, y + 1, info.bar_label(rg.pos), U.GREY) end
+      if info.ticks then
+        for _, tk in ipairs(info.ticks(rg)) do
+          local ty = y + math.floor(tk.f * rh)
+          if tk.bar then U.set(U.TEXT); gfx.rect(RW - 8, ty, 6, 1, 1)
+          elseif rh > L.rh then U.set(U.DIM); gfx.rect(RW - 5, ty, 3, 1, 1) end
+        end
+      end
+      U.set(U.DIM); gfx.rect(RW - 2, y, 1, rh, 1)
+    end
     -- «< NN >»: стрелки переключают паттерн слота
     local lc = playing and U.AMBER or (queued and U.CYAN or U.TEXT)
-    local xa = L.pad                                   -- '<'
+    local xa = RW + L.pad                              -- '<'
     local xn = xa + aw + 3                             -- номер
     local xb = xn + U.measure('00') + 3                -- '>'
     local hot_prev = hover.ri == ri and mx >= xa and mx < xn
@@ -207,7 +248,7 @@ function MX.draw(L, snap, regions, info)
     end
     -- имя и длина — интерактивные (1 окт): dblclick имени → :name, клик по
     -- длине → :len; hover.name / hover.dur = ri
-    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - 2 - L.pad
+    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - 2 - L.pad   -- mx_idx_w уже с линейкой
     local hot_name = hover.ri == ri and mx >= nx and mx < nx + nw
     U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
@@ -291,6 +332,11 @@ function MX.draw(L, snap, regions, info)
       if ctx.hint then ctx.hint('mx', x, y, L.mx_cell_w, rh, { ri = ri, ci = ci }) end
     end
   end
+  if marks.stop then
+    local last = math.min(#regions, MX.scroll + nvis)
+    local ye = top + (last - MX.scroll) * rh
+    if last == #regions and ye + L.rh <= L.body_y + L.body_h then mark_row(marks.stop, ye) end
+  end
   return hover
 end
 
@@ -324,11 +370,32 @@ function MX.toggle_mute(regions, snap)
   if rg and col then ctx.edit.mute_span(col.track, rg.pos, rg.rgnend, nil) end
 end
 
--- клавиши в фокусе матрицы; возвращает true, если съедена
+-- клавиши в фокусе матрицы; возвращает true, если съедена.
+-- Vim-раскладка слотов (2 окт): слот = строка матрицы (регион или свободный такт).
+--   o O       новый пустой такт после / перед      dd   удалить слот (в регистр)
+--   yy Y      взять слот в регистр                  p P  вставить после / перед
+--   D ^D      дублировать слот (новое имя)          x    вырезать ячейку / блок
+--   n cc cw r i  имя    =  длина    [ ] ± такт   { } ± шаг    < > паттерн слота
+--   m Enter mute   Space очередь / play   + регион в конце   u ^R undo / redo
+-- В блоке (v / Shift+hjkl): y копия, d x вырезать, m (Ctrl+N) mute.
+MX.pending = nil
+local OPS = { d = true, y = true, c = true, g = true }
+
 function MX.key(c, regions, snap)
   local ch = c < 256 and string.char(c) or ''
-  local n = 1
   local mods = ctx.mods and ctx.mods() or {}
+  -- оператор ждёт второй клавиши: dd yy cc cw gg
+  if MX.pending then
+    local op = MX.pending
+    MX.pending = nil
+    if c == 27 then return true end
+    if op == 'd' and ch == 'd' then ctx.slot_delete()
+    elseif op == 'y' and ch == 'y' then ctx.slot_yank()
+    elseif op == 'c' and (ch == 'c' or ch == 'w') then ctx.mx_name_prompt()
+    elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
+    else ctx.msg(op .. ch .. ': not a matrix command (? - help)') end
+    return true
+  end
   -- блок: Shift+hjkl (H J K L) тянет от якоря, v — якорь/снять, Esc — снять
   if ch == 'H' or ch == 'J' or ch == 'K' or ch == 'L' then
     if not MX.anchor then MX.anchor = { ri = MX.cur.ri, ci = MX.cur.ci } end
@@ -338,34 +405,51 @@ function MX.key(c, regions, snap)
   end
   if ch == 'v' then if MX.anchor then MX.anchor = nil else MX.anchor = { ri = MX.cur.ri, ci = MX.cur.ci } end; return true end
   if c == 27 and MX.anchor then MX.anchor = nil; return true end
-  -- Ctrl+N mute блока, Ctrl+X / Cmd+Backspace вырезать, Ctrl+C копия, Ctrl+V вставка
+  -- в блоке y / d / x действуют на ячейки блока
+  if MX.anchor and ch == 'y' then ctx.mx_block('copy'); return true end
+  if MX.anchor and (ch == 'd' or ch == 'x') then ctx.mx_block('cut'); return true end
+  if MX.anchor and ch == 'm' then ctx.mx_block('mute'); return true end
+  -- Ctrl+N mute блока, Ctrl+X / Cmd+Backspace вырезать, Ctrl+C копия, Ctrl+V вставка, Ctrl+D дубль
   if c == 14 then ctx.mx_block('mute'); return true end
   if c == 24 or (c == 8 and mods.cmd) then ctx.mx_block('cut'); return true end
   if c == 3 then ctx.mx_block('copy'); return true end
   if c == 22 then ctx.mx_block('paste'); return true end
+  if c == 4 then ctx.slot_new('dup'); return true end
+  if c == 18 then ctx.edit.redo(); ctx.mx_refresh(); return true end
   -- Ctrl+hjkl приходят кодами 8/10/11/12 — те же движения
   if mods.ctrl and (c == 8 or c == 10 or c == 11 or c == 12) then
     local dx, dy = 0, 0
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
-  if ch == 'j' or c == 1685026670 then MX.goto_cell(regions, snap, MX.cur.ri + n, MX.cur.ci)
-  elseif ch == 'k' or c == 30064 then MX.goto_cell(regions, snap, MX.cur.ri - n, MX.cur.ci)
+  if OPS[ch] then MX.pending = ch; ctx.msg(ch .. '...'); return true end
+  if ch == 'j' or c == 1685026670 then MX.goto_cell(regions, snap, MX.cur.ri + 1, MX.cur.ci)
+  elseif ch == 'k' or c == 30064 then MX.goto_cell(regions, snap, MX.cur.ri - 1, MX.cur.ci)
   elseif ch == 'h' or c == 1818584692 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci - 1)
   elseif ch == 'l' or c == 1919379572 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci + 1)
-  elseif ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
   elseif ch == 'G' then MX.goto_cell(regions, snap, #regions, MX.cur.ci)
   elseif ch == 'm' or c == 13 then MX.toggle_mute(regions, snap)
   elseif ch == 'z' then MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail'
   elseif ch == 'f' then MX.fill = not MX.fill
+  elseif ch == 'R' then ctx.mx_ruler_toggle()
   elseif ch == 't' then if ctx.mx_trim then ctx.mx_trim() end
   elseif ch == '+' then ctx.mx_add()
-  elseif ch == 'n' then ctx.mx_name_prompt()
+  elseif ch == 'o' then ctx.slot_new('empty', false)
+  elseif ch == 'O' then ctx.slot_new('empty', true)
+  elseif ch == 'p' then ctx.slot_new('put', false)
+  elseif ch == 'P' then ctx.slot_new('put', true)
+  elseif ch == 'D' then ctx.slot_new('dup')
+  elseif ch == 'Y' then ctx.slot_yank()
+  elseif ch == 'x' then ctx.mx_block('cut')
+  elseif ch == 'n' or ch == 'r' or ch == 'i' then ctx.mx_name_prompt()
   elseif ch == '=' then ctx.mx_len_prompt()
+  elseif ch == ']' then ctx.slot_len_step('bar', 1)
+  elseif ch == '[' then ctx.slot_len_step('bar', -1)
+  elseif ch == '}' then ctx.slot_len_step('step', 1)
+  elseif ch == '{' then ctx.slot_len_step('step', -1)
   elseif ch == '<' or ch == ',' then ctx.slot_cycle(MX.cur.ri, -1)
   elseif ch == '>' or ch == '.' then ctx.slot_cycle(MX.cur.ri, 1)
-  elseif ch == 'y' then local rg = regions[MX.cur.ri]; if rg then ctx.alias_yank(rg) end
-  elseif ch == 'p' then ctx.alias_paste()
+  elseif ch == 'u' then ctx.edit.undo(); ctx.mx_refresh()
   elseif c == 9 or c == 27 then ctx.toggle_focus()
   elseif ch == ' ' then MX.space(regions)
   else return false end

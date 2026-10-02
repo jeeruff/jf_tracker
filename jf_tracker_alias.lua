@@ -275,14 +275,17 @@ end
 
 -- только маркеры/регионы от t: items двигает E.time_insert/time_delete
 -- (с огибающими и разрезом на границе) — иначе items ехали дважды (ревью 1 окт)
-function A.shift_markers(t, delta)
+-- keep: маркеры (не регионы) с этими именами, стоящие ровно в t, не едут —
+-- вставка слота перед первым регионом не должна утащить =START (2 окт)
+function A.shift_markers(t, delta, keep)
   if math.abs(delta) < 1e-9 then return end
   local list = {}
   local i = 0
   while true do
     local ret, isrgn, pos, rgnend, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
-    if pos >= t - EPS then list[#list + 1] = { i = i, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
+    local kept = keep and not isrgn and keep[name] and math.abs(pos - t) < EPS
+    if pos >= t - EPS and not kept then list[#list + 1] = { i = i, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
     i = i + 1
   end
   table.sort(list, function(a, b) if delta > 0 then return a.pos > b.pos end return a.pos < b.pos end)
@@ -390,6 +393,75 @@ function A.set_slot(regions, slot, pat)
     for _, tr in ipairs(tracks()) do copy_span(tr, src, dst, pat.name) end
   end)
   return true
+end
+
+-- ── слоты матрицы как строки Vim (2 окт): o O dd yy p P D ────────────────
+-- Снимок слота: имя, цвет, длина и items всех колонок (chunks без GUID,
+-- позиция от начала слота). Огибающие не копируются — только items.
+function A.slot_snapshot(regions, snap, ri)
+  local rg = regions[ri]
+  if not rg then return nil end
+  local clip = A.cells_copy(regions, snap, ri, ri, 1, math.max(1, #snap.cols))
+  local n = 0
+  for _, list in pairs(clip.cells[1] or {}) do n = n + #list end
+  return { name = rg.gap and '' or rg.name, color = rg.color or 0, len = rg.rgnend - rg.pos,
+           gap = rg.gap, clip = clip, nitems = n }
+end
+
+-- вставить пустое время [t, t+len) во все треки, регионы и маркеры после t
+-- едут; =START в точке t остаётся. Без своего undo — внутри edit.run.
+function A.open_time(t, len)
+  local trs = {}
+  for ti = 0, R.CountTracks(0) - 1 do trs[#trs + 1] = R.GetTrack(0, ti) end
+  A.shift_markers(t, len, { [model.START_MARKER or '=START'] = true })
+  edit.time_insert(trs, t, len, math.huge)
+end
+
+-- новый слот в t длиной len: регион (если не пустой такт) + items снимка
+function A.put_slot(snap, t, sl)
+  A.open_time(t, sl.len)
+  if not sl.gap then R.AddProjectMarker2(0, true, t, t + sl.len, sl.name or '', -1, sl.color or 0) end
+  if sl.clip then return A.cells_paste({ { pos = t, rgnend = t + sl.len } }, snap, 1, 1, sl.clip) end
+  return 0
+end
+
+-- удалить слот: регион, время слота во всех треках, простые маркеры внутри;
+-- всё после конца слота едет назад
+function A.delete_slot(rg)
+  local len = rg.rgnend - rg.pos
+  if not rg.gap then
+    local i = marker_i(rg.idx)
+    if i then R.DeleteProjectMarkerByIndex(0, i) end
+  end
+  local i = 0
+  while true do
+    local ret, isrgn, pos, _, name, idx = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if not isrgn and pos > rg.pos + EPS and pos < rg.rgnend - EPS and not name:match('^=') then
+      R.DeleteProjectMarkerByIndex(0, i)
+    else i = i + 1 end
+  end
+  local trs = {}
+  for ti = 0, R.CountTracks(0) - 1 do trs[#trs + 1] = R.GetTrack(0, ti) end
+  edit.time_delete(trs, rg.pos, rg.rgnend, math.huge)
+  A.shift_markers(rg.rgnend, -len)
+end
+
+-- свободное имя для дубля: «name 2», «name 3» … (числовое имя — следующее число)
+function A.free_name(regions, name)
+  local used = {}
+  for _, r in ipairs(regions) do used[r.name] = true end
+  if name == '' then return '' end
+  local num = tonumber(name)
+  if num then
+    local k = num + 1
+    while used[('%0' .. #name .. 'd'):format(k)] do k = k + 1 end
+    return ('%0' .. #name .. 'd'):format(k)
+  end
+  local base = name:gsub('%s+%d+$', '')
+  local k = 2
+  while used[base .. ' ' .. k] do k = k + 1 end
+  return base .. ' ' .. k
 end
 
 return A

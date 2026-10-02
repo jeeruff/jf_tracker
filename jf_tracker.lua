@@ -39,6 +39,7 @@ local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garde
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
+local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
 
@@ -92,7 +93,9 @@ local state = {
   mx_px = tonumber(reaper.GetExtState(EXT, 'mx_px')),       -- ширина матрицы мышью (nil = авто)
   mx_hidden = reaper.GetExtState(EXT, 'mx_hidden') == '1',  -- матрица свёрнута в полосу
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
-  dsp = flag('dsp', false),                     -- нижняя DSP-панель (FX трека)
+  dsp = flag('dsp', false),
+  khelp = flag('khelp', false),
+  mxruler = flag('mxruler', true),               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
@@ -212,7 +215,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -392,6 +395,27 @@ ctx = {
   toggle_dock = toggle_dock,
   ctrl_held = function() return gfx.mouse_cap & 32 == 32 end,
   -- macOS: бит 4 = Cmd, 32 = Ctrl, 16 = Option
+  msg = function(m) vim.msg = m end,
+  -- страница справки для модуля в фокусе
+  help_page = function()
+    local f = state.focus
+    if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' then return f
+    elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
+    elseif f == 'top' then
+      local t = state.toptab
+      if t == 'garden' then return GD.page == 'orca' and 'orca' or 'garden' end
+      if t == 'scope' then return 'master' end
+      return KH.PAGES[t] and t or 'tracker'
+    end
+    return 'tracker'
+  end,
+  toggle_help = function()
+    state.khelp = not state.khelp
+    if not state.khelp and state.focus == 'dsp' and not state.dsp then ctx.set_focus('tracker') end
+    KH.pinned = false
+    vim.msg = state.khelp and 'help: keys of the focused module below; Tab to it for search' or 'help off'
+  end,
   mods = function()
     local cap = inject_cap or gfx.mouse_cap
     return { cmd = cap & 4 == 4, ctrl = cap & 32 == 32, alt = cap & 16 == 16, shift = cap & 8 == 8 }
@@ -561,9 +585,11 @@ ctx = {
     local r0, r1, c0, c1 = MX.block()
     if what == 'copy' then
       state.mx_clip = alias.cells_copy(seq, snap, r0, r1, c0, c1)
+      state.mx_reg = { kind = 'cells' }
       vim.msg = ('matrix: copied %dx%d block'):format(r1 - r0 + 1, c1 - c0 + 1)
     elseif what == 'cut' then
       state.mx_clip = alias.cells_copy(seq, snap, r0, r1, c0, c1)
+      state.mx_reg = { kind = 'cells' }
       local n
       edit.run('matrix cut', function() n = alias.cells_delete(seq, snap, r0, r1, c0, c1) end)
       vim.msg = ('matrix: cut %d item(s)'):format(n or 0)
@@ -783,6 +809,85 @@ ctx = {
     ctx.set_focus('matrix')
     vim.msg = ('region %d "%s" added - name it'):format(#seq, name)
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. name
+  end,
+  -- ── слоты матрицы как строки Vim (2 окт) ────────────────────────────
+  -- Регистр матрицы state.mx_reg: { kind = 'slot', sl = снимок } после yy / dd,
+  -- { kind = 'cells' } после Ctrl+C / x / y в блоке. p — после курсора, P — перед.
+  -- Каждая операция — один undo-шаг; хук edit.after выключен на время правки
+  -- (как в set_region_len), иначе автосинк работал бы по старым регионам.
+  slot_op = function(desc, fn)
+    local hook = edit.after
+    edit.after = nil
+    local ok, r = pcall(edit.run, desc, fn)
+    edit.after = hook
+    ctx.mx_refresh()
+    if not ok then error(r) end
+  end,
+  slot_yank = function(ri)
+    local sl = alias.slot_snapshot(seq, snap, ri or MX.cur.ri)
+    if not sl then vim.msg = 'no slot'; return end
+    state.mx_reg = { kind = 'slot', sl = sl }
+    vim.msg = ('yank slot %s: %d item(s), %d steps - p / P puts it'):format(sl.gap and 'bar' or (sl.name ~= '' and sl.name or '#'), sl.nitems, math.floor((seq[ri or MX.cur.ri].r1 - seq[ri or MX.cur.ri].r0) + 0.5))
+  end,
+  -- новый слот: kind = 'empty' (такт) | 'put' (регистр) | 'dup' (копия курсора, новое имя)
+  slot_new = function(kind, before)
+    if #seq == 0 then ctx.mx_add(); return end
+    local ri = MX.cur.ri
+    local rg = seq[ri]
+    if not rg then return end
+    local sl
+    if kind == 'put' then
+      local reg = state.mx_reg
+      if not reg then vim.msg = 'matrix register empty (yy / dd / Ctrl+C)'; return end
+      if reg.kind == 'cells' then ctx.mx_block('paste'); return end
+      sl = reg.sl
+    elseif kind == 'dup' then
+      sl = alias.slot_snapshot(seq, snap, ri)
+      if not sl then return end
+      sl.name = alias.free_name(regions, sl.name)
+    else
+      local t = before and rg.pos or rg.rgnend
+      local qn = reaper.TimeMap2_timeToQN(0, t)
+      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
+      local blen = (qme and qms) and (qme - qms) or 4
+      sl = { name = '', len = reaper.TimeMap2_QNToTime(0, qn + blen) - t, color = 0 }
+    end
+    local t = before and rg.pos or rg.rgnend
+    local n = 0
+    ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', dup = 'matrix duplicate slot' })[kind],
+      function() n = alias.put_slot(snap, t, sl) end)
+    local target = before and ri or ri + 1
+    MX.goto_cell(seq, snap, target, MX.cur.ci)
+    if kind == 'empty' then
+      vim.msg = 'new 1-bar slot - n: name, = / [ ]: length'
+    else
+      vim.msg = ('%s slot "%s": %d item(s)'):format(kind == 'dup' and 'duplicated' or 'put', sl.name, n)
+    end
+  end,
+  slot_delete = function()
+    local rg = seq[MX.cur.ri]
+    if not rg then return end
+    local sl = alias.slot_snapshot(seq, snap, MX.cur.ri)
+    state.mx_reg = { kind = 'slot', sl = sl }
+    ctx.slot_op('matrix delete slot', function() alias.delete_slot(rg) end)
+    if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
+    if #seq > 0 then MX.goto_cell(seq, snap, MX.cur.ri, MX.cur.ci) else ctx.set_focus('tracker') end
+    vim.msg = ('deleted slot %s (%d item(s)) - p puts it back, u undo'):format(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. rg.idx)), sl and sl.nitems or 0)
+  end,
+  -- длина слота: ±1 такт / ±1 шаг (ripple, как :len)
+  slot_len_step = function(unit, d)
+    local rg = seq[MX.cur.ri]
+    if not rg or rg.gap then vim.msg = 'free bar: name it first (n)'; return end
+    local t1
+    if unit == 'bar' then
+      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, rg.qn1 - 1e-6)
+      local blen = (qme and qms) and (qme - qms) or 4
+      t1 = reaper.TimeMap2_QNToTime(0, rg.qn1 + d * blen)
+    else
+      t1 = edit.row_time(rg.r1 + d, state.lpb, 0)
+    end
+    if t1 <= rg.pos + 1e-6 then vim.msg = 'min length'; return end
+    ctx.set_region_len(rg, t1)
   end,
   mx_name_prompt = function(ri)
     if ri then MX.goto_cell(seq, snap, ri, MX.cur.ci) end
@@ -1083,6 +1188,23 @@ ctx = {
     if steps < 1 then vim.msg = 'min 1 step'; return end
     ctx.set_region_len(rg, edit.row_time(rg.r0 + steps, state.lpb, 0))
   end,
+  -- кнопки под именем региона (2 окт): /2 x2 — длина вдвое (ripple, как :len),
+  -- dup — копия региона справа как новый паттерн (как D в матрице)
+  region_btn = function(what)
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if not rg then vim.msg = 'cursor is not inside a region'; return end
+    if what == 'dup' then
+      for i, r in ipairs(seq) do
+        if not r.gap and r.idx == rg.idx then MX.cur.ri = i; ctx.slot_new('dup'); return end
+      end
+      vim.msg = 'region is not in the sequence (=START..=END)'
+      return
+    end
+    local f = what == 'double' and 2 or 0.5
+    local qlen = (rg.qn1 - rg.qn0) * f
+    if qlen * state.lpb < 1 - 1e-6 then vim.msg = 'min 1 step'; return end
+    ctx.set_region_len(rg, reaper.TimeMap2_QNToTime(0, rg.qn0 + qlen))
+  end,
   -- запись: arm трека курсора, выбор входа, умный выбор входа (jf_smart_set_input)
   rec_arm = function()
     local col = cur_col(); if not col then return end
@@ -1284,9 +1406,10 @@ ctx = {
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
-    if f == 'dsp' and not state.dsp then f = 'tracker' end
+    if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
     if f == 'inst' and not state.top then f = 'tracker' end
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
+    if f == 'dsp' and state.focus ~= 'dsp' then KH.from = state.focus end
     state.focus = f
     MX.focus = f == 'matrix'; B.focus = f == 'browser'
     if f == 'top' and state.toptab == 'sample' and not SL.active then ctx.open_slicer() end
@@ -1298,7 +1421,7 @@ ctx = {
     local order = { 'tracker' }
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
-    if state.dsp then order[#order + 1] = 'dsp' end
+    if state.dsp or state.khelp then order[#order + 1] = 'dsp' end
     if not state.mx_hidden then order[#order + 1] = 'matrix' end
     if state.top then order[#order + 1] = 'top' end
     local i = 1
@@ -1508,6 +1631,7 @@ ctx.ic = function(name, text) return draw.ic(name, text) end
 ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font or 0) > 0 end
 vim.init(ctx)
 MX.init(U, ctx)
+MX.ruler = state.mxruler
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 MMX.init(U, ctx)
@@ -1535,10 +1659,11 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'zoom' then ctx.mx_zoom() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() end
+    if d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
+  elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
@@ -2201,6 +2326,7 @@ end
 local function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
+  elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'play' then if delta == 0 then edit.play_stop() end
   elseif name == 'bpm' then
     if delta ~= 0 then
@@ -2309,6 +2435,65 @@ local jump_row_done = nil
 -- (без undo, тег = регион строки-цели); при входе плейхеда в регион прежний
 -- урожай этого региона сносится (кроме посаженного на текущую строку).
 local orca_row_done, orca_pass = nil, nil
+-- линейка матрицы (2 окт): подпись «такт.доля» начала слота и риски тактов /
+-- долей внутри слота; маркеры =START / =END строками до и после слотов.
+-- Кэш сбрасывается вместе с таблицей последовательности (темп, маркеры).
+local mxr = { seq = nil, lbl = {}, ticks = {}, marks = nil }
+local function mxr_check() if mxr.seq ~= seq then mxr.seq = seq; mxr.lbl = {}; mxr.ticks = {}; mxr.marks = nil end end
+local function mx_bar_label(t)
+  mxr_check()
+  local v = mxr.lbl[t]
+  if v then return v end
+  local qn = reaper.TimeMap2_timeToQN(0, t)
+  local m, qms = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
+  local beat = math.floor(qn - (qms or qn) + 1e-6) + 1
+  v = ('%d.%d'):format((m or 0) + 1, beat)
+  mxr.lbl[t] = v
+  return v
+end
+local function mx_ticks(rg)
+  mxr_check()
+  local v = mxr.ticks[rg]
+  if v then return v end
+  v = {}
+  local span = rg.qn1 - rg.qn0
+  if span > 0 then
+    local q = math.floor(rg.qn0 + 1 - 1e-6)
+    local n = 0
+    while q < rg.qn1 - 1e-6 and n < 256 do
+      if q > rg.qn0 + 1e-6 then
+        local _, qms = reaper.TimeMap_QNToMeasures(0, q + 1e-9)
+        v[#v + 1] = { f = (q - rg.qn0) / span, bar = qms and math.abs(qms - q) < 1e-6 }
+      end
+      q = q + 1; n = n + 1
+    end
+  end
+  mxr.ticks[rg] = v
+  return v
+end
+local function mx_marks()
+  mxr_check()
+  if mxr.marks then return mxr.marks end
+  local out = {}
+  for _, mk in ipairs((regions and regions.markers) or {}) do
+    local key = (mk.name == model.START_MARKER and 'start') or (mk.name == model.END_MARKER and 'stop') or nil
+    if key and not out[key] then
+      local rgb
+      if mk.color and mk.color ~= 0 then local r, g, b = reaper.ColorFromNative(mk.color & 0xFFFFFF); rgb = { r / 255, g / 255, b / 255 } end
+      if not rgb and reaper.GetThemeColor then
+        local tc = reaper.GetThemeColor('marker', 0)
+        if tc and tc >= 0 then local r, g, b = reaper.ColorFromNative(tc); rgb = { r / 255, g / 255, b / 255 } end
+      end
+      out[key] = { name = mk.name, bar = mx_bar_label(mk.pos), rgb = rgb }
+    end
+  end
+  mxr.marks = out
+  return out
+end
+ctx.mx_ruler_toggle = function()
+  state.mxruler = not state.mxruler; MX.ruler = state.mxruler
+  vim.msg = 'matrix ruler ' .. (state.mxruler and 'on' or 'off')
+end
 -- линейка трекера: регионы и маркеры REAPER с цветами (кэш по таблице регионов)
 local ruler_cache = {}
 local ruler_info
@@ -2317,10 +2502,22 @@ local function native_rgb(c)
   local r, g, b = reaper.ColorFromNative(c & 0xFFFFFF)
   return { r / 255, g / 255, b / 255 }
 end
+-- цвет региона: свой, иначе цвет регионов из темы REAPER (как на таймлайне, 2 окт)
+local theme_region_rgb
+local function region_rgb(c)
+  local own = native_rgb(c)
+  if own then return own end
+  if theme_region_rgb == nil then
+    local tc = reaper.GetThemeColor and reaper.GetThemeColor('region', 0) or -1
+    theme_region_rgb = (tc and tc >= 0) and native_rgb(tc | 0x1000000) or false
+  end
+  return theme_region_rgb or nil
+end
+ctx.region_rgb = region_rgb
 ruler_info = function()
   if ruler_cache.src == regions then return ruler_cache.v end
   local v = { regions = {}, markers = {} }
-  for _, rg in ipairs(regions or {}) do v.regions[#v.regions + 1] = { r0 = rg.r0, r1 = rg.r1, name = rg.name, idx = rg.idx, rgb = native_rgb(rg.color) } end
+  for _, rg in ipairs(regions or {}) do v.regions[#v.regions + 1] = { r0 = rg.r0, r1 = rg.r1, name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) } end
   for _, mk in ipairs((regions and regions.markers) or {}) do v.markers[#v.markers + 1] = { row_f = mk.row_f, name = mk.name, idx = mk.idx, rgb = native_rgb(mk.color) } end
   ruler_cache.src, ruler_cache.v = regions, v
   return v
@@ -2439,6 +2636,8 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  -- справка следит за модулем в фокусе (пока её не листают стрелками)
+  if state.khelp and state.focus ~= 'dsp' then KH.pinned = false; KH.page = ctx.help_page() end
   local t_0 = reaper.time_precise()
   U.begin_frame()
   PV.tick()
@@ -2550,11 +2749,10 @@ local function frame()
     cur_region_full = (function()
       local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
       if not rg then return nil end
-      local rgb
-      if rg.color and rg.color ~= 0 then local r, g, b = reaper.ColorFromNative(rg.color & 0xFFFFFF); rgb = { r / 255, g / 255, b / 255 } end
-      return { name = rg.name, idx = rg.idx, rgb = rgb }
+      return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) }
     end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
+    region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = snap.cols, peaks = track_peaks, poolsort = state.poolsort,
@@ -2575,11 +2773,15 @@ local function frame()
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
-      xfade = state.xfade, xfade_ms = state.xfade_ms,
+      xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp,
     },
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
     inspreview = state.preview,
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
+    khelp = state.khelp,
+    khelp_draw = function(Lx, x, y, w, h)
+      return KH.draw(U, Lx, x, y, w, h, reaper.time_precise(), state.focus == 'dsp', ctx.fit)
+    end,
     garden_draw = function(Lx, x, y, w, h)
       return GD.draw(Lx, x, y, w, h, snap, seq, { play_row = ph_row, queued = MX.queued, garden_on = garden.f and garden.f.on },
                      state.focus == 'top' and state.toptab == 'garden')
@@ -2675,6 +2877,7 @@ local function frame()
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters, analyzer, fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
@@ -2702,6 +2905,8 @@ local function frame()
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
+  elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
+  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
@@ -2888,6 +3093,7 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
+    elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
@@ -2936,6 +3142,7 @@ local function frame()
       elseif hover.matrix.btn == 'fill' then MX.fill = not MX.fill
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
+      elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
       elseif hover.matrix.btn == 'add' then ctx.mx_add() end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
@@ -3280,6 +3487,15 @@ local function frame()
       state.top = true; state.toptab = FTAB[c]; ctx.set_focus('top'); vim.msg = 'tab: ' .. FTAB[c]; c = 0
     end
   end
+  -- Cmd+Z — undo, Cmd+Shift+Z — redo: везде в трекере, в любом модуле (2 окт)
+  do
+    local m = ctx.mods()
+    if m.cmd and not m.ctrl and (c == 26 or c == 122 or c == 90) then
+      if m.shift or c == 90 then edit.redo(); vim.msg = 'redo' else edit.undo(); vim.msg = 'undo' end
+      ctx.mx_refresh()
+      c = 0
+    end
+  end
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
@@ -3344,6 +3560,23 @@ local function frame()
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
   end
+  -- справка (2 окт): ? включает / выключает; фокус на справке — поиск и
+  -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
+  if c > 0 then
+    local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca')
+    if state.khelp and state.focus == 'dsp' and not typing then
+      if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0
+      else
+        local r = KH.key(c)
+        if r == 'leave' then ctx.set_focus(KH.from or 'tracker'); c = 0 elseif r then c = 0 end
+      end
+    elseif c == 63 and not typing then
+      ctx.toggle_help(); c = 0
+    elseif state.khelp and not typing then
+      KH.press(ctx.help_page(), c, reaper.time_precise())
+    end
+  end
   if c > 0 then
     state.last_key = c
     vim.msg = ''
@@ -3370,7 +3603,7 @@ local function frame()
         elseif ch == 'h' or c == keys.left then vim.key(('H'):byte())
         elseif ch == 'l' or c == keys.right then vim.key(('L'):byte())
         else return vim.key(c) end
-      elseif state.focus == 'dsp' and state.dsp then
+      elseif state.focus == 'dsp' and state.dsp and not state.khelp then
         local ch = c < 256 and string.char(c) or ''
         local col = cur_col(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]

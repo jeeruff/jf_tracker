@@ -1,9 +1,20 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.13'
+V.VERSION = '0.5.14'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.14', d = '2026-10-02', items = {
+    'matrix: Vim editing of slots - o O new bar, dd delete, yy Y yank, p P put, D ^D duplicate as new pattern, x cut cell, n cc cw rename, [ ] +-bar, { } +-step',
+    'context help (? or the help button): keys of the focused module at the bottom, pressed keys light up with a burst of dots, fzf search over all pages',
+    'Cmd+Z undo / Cmd+Shift+Z redo everywhere in the tracker',
+    'region corner: REAPER number before the name, theme region colour; buttons /2 x2 dup under the name',
+    'region colour as a thin strip beside the step numbers and in the matrix',
+    'time selection: bright grey, step-number background lit, bracket faces right',
+    'matrix: =START / =END rows, bar ruler on the left (button ruler, R)',
+    'fix: vertical track names in the matrix and ruler labels were invisible (gfx image ids above 1023); spectrogram ids moved too',
+    'fix: side panel knobs no longer cover the bottom panel',
+  } },
   { v = '0.5.13', d = '2026-10-02', items = {
     'fix: an =LIB marker before =END hid sequence regions from the matrix; library is now only after =LIB and =END, and =LIB is never created before =END',
     'time selection shown in the tracker: faint row tint and a bracket at the ruler edge',
