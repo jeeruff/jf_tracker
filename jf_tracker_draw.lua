@@ -2090,6 +2090,38 @@ function D.frame(L, snap, rows, state, info)
           ky = ky + L.rh
         end
       end
+      if f.view == 'grain' then
+        -- гранулятор: облако — 16 колонок волны, точки зёрен (свежее выше),
+        -- окно зума, позиция головки зёрен, голова записи (красная)
+        pcol0 = 1
+        local wx, wy, ww, wh = bx + L.pad, by + L.rh + 1, pw, bh - L.rh - 4
+        local g = info.dsp_view and info.dsp_view('grain')
+        set(U.PANEL); gfx.rect(wx, wy, ww, wh, 1)
+        set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
+        if g and g.alive then
+          if g.z1 > g.z0 then set(U.tint(U.CYAN, 0.12)); gfx.rect(wx + math.floor(g.z0 * ww), wy + 1, math.max(1, math.floor((g.z1 - g.z0) * ww)), wh - 2, 1) end
+          local cw = ww / 16
+          local cy, hh = wy + math.floor(wh / 2), math.floor(wh / 2) - 2
+          for i = 1, 16 do
+            local v = g.wave[i] or 0
+            local x0 = wx + math.floor((i - 1) * cw) + 1
+            local bw2 = math.max(1, math.floor(cw) - 1)
+            set(U.mix(U.DIM, U.TEXT, 0.6)); gfx.rect(x0, cy - math.floor(v * hh), bw2, math.max(1, math.floor(v * hh * 2)), 1)
+            local row = g.grow[i] or -1
+            if row >= 0 then
+              set(U.AMBER)
+              gfx.circle(x0 + math.floor(bw2 / 2), wy + 3 + math.floor(row / 7 * (wh - 8)), math.max(2, math.floor(L.rh / 5)), 1, 1)
+            end
+          end
+          set(U.AMBER); gfx.rect(wx + math.floor(g.pos * (ww - 1)), wy, 1, wh, 1)
+          if g.rec then set(U.RED); gfx.rect(wx + math.floor(g.head * (ww - 1)), wy, 2, wh, 1) end
+        else
+          text(wx + 2, wy + 1, fit('no grain data (drop a sound in jf_grgrain)', ww - 4), U.DIM)
+        end
+        if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
+          hover.dspview = { fx = k, f = f, x = wx, w = ww }
+        end
+      end
       if f.xy then
         -- XY-пэд (TG33 vector): квадрат в первой колонке, точка — X / Y, Y вверх
         pcol0 = 1

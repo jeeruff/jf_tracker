@@ -166,6 +166,8 @@ local loop_cache = {}         -- GD.cells по (snap, seq): слой лупов 
 local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- размер / доли для контрола
 local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
 local dspxy_drag = nil        -- XY-пэд модуля DSP (TG33 vector, 2 окт)
+local dspview_drag = nil      -- протяжка по живому виду модуля (гранулятор)
+local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
@@ -3720,7 +3722,7 @@ local function frame()
   local t_0 = reaper.time_precise()
   U.begin_frame()
   PV.tick()
-  env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}
+  env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
   local is_playing = playing()
   local playpos = is_playing and reaper.GetPlayPosition() or nil
   local curpos = reaper.GetCursorPosition()
@@ -3866,6 +3868,24 @@ local function frame()
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
+    -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
+    dsp_view = function(kind)
+      if kind ~= 'grain' then return nil end
+      if view_cache.grain ~= nil then return view_cache.grain or nil end
+      local g = with_ns('jf_grgrain', function()
+        local GB = 20000
+        local t = { wave = {}, grow = {} }
+        for i = 0, 15 do t.wave[i + 1] = reaper.gmem_read(GB + 1600 + i) or 0; t.grow[i + 1] = reaper.gmem_read(GB + 1760 + i) or -1 end
+        t.pos, t.z0, t.z1 = reaper.gmem_read(GB + 1640) or 0, reaper.gmem_read(GB + 1641) or 0, reaper.gmem_read(GB + 1642) or 0
+        t.rec, t.head = (reaper.gmem_read(GB + 1643) or 0) > 0.5, reaper.gmem_read(GB + 1644) or 0
+        local any = 0
+        for i = 1, 16 do any = any + t.wave[i] end
+        t.alive = any > 0 or t.pos > 0
+        return t
+      end)
+      view_cache.grain = g or false
+      return g
+    end,
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
@@ -4037,6 +4057,7 @@ local function frame()
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
+  elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
@@ -4454,6 +4475,11 @@ local function frame()
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
       click = { t = now2, zone = 'dsptarget' }
+    elseif hover.dspview then
+      -- живой вид модуля (гранулятор): клик / протяжка = нативный параметр вида
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
+      dspview_drag = { f = hover.dspview.f, x = hover.dspview.x, w = hover.dspview.w }
+      click = { t = now2, zone = 'dspview' }
     elseif hover.dspxy then
       -- XY-пэд (TG33 vector): точка едет за мышью, X и Y одним жестом
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspxy.fx
@@ -4826,6 +4852,19 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if hover.row and hover.fi and vim.mode == 'visual' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
     else body_drag = nil end
+  end
+  -- протяжка по живому виду модуля DSP (гранулятор: Position)
+  if dspview_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d = dspview_drag
+      local col = dsp_target()
+      local p = d.f.params[d.f.view_p or 0]
+      if col and p then
+        local fr = math.max(0, math.min(1, (gfx.mouse_x - d.x) / math.max(1, d.w - 1)))
+        edit.fx_param(col.track, d.f.i, p.i, fr)
+        state.status = ('%s: %s %.1f%%'):format(d.f.name, p.name, fr * 100)
+      end
+    else dspview_drag = nil end
   end
   -- XY-пэд модуля DSP
   if dspxy_drag then

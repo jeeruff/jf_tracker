@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.37'
+V.VERSION = '0.5.38'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.38', d = '2026-10-02', items = {
+    'DSP: granulator module (jf_grgrain) - live cloud from its gmem (16 wave columns, grain dots, zoom window, grain position, record head); click / drag on it sets the native Position parameter; size, density, spray, pitch, jitters, reverse, shape, drift, spread, freeze, feedback, filter, zoom, record, mix',
+    'DSP: slixer module in three columns with arp gate, pre-roll, playthrough, timeline lock, bend range, Q by transients, pitch sensitivity, capture length',
+  } },
   { v = '0.5.37', d = '2026-10-02', items = {
     'retro looper: while playing, L (or the loop button) takes the last N bars just played from the jf_rec ring (ending at the last bar line) and loops them from the next bar - to the region end, else 4 times; 1 2 4 8 set N',
     'fix: names used before their definition were nil globals - retro a / j k / h l and its hint labels, the \\ menu submenus (event / track / pattern / view), monome take / grid buttons, hint labels on the control cells, browser preview with the top panel open, and committing a dragged slice marker in the slicer',
