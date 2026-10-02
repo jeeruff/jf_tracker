@@ -224,7 +224,7 @@ KH.PAGES = {
     { k = 'Esc', d = 'back to tracker' },
   } },
   modulation = { title = 'modulation matrix + LFO generator', e = {
-    { k = 'L', d = 'LFO generator panel on the right / back to the matrix' },
+    { k = 'L', d = 'curves (generator) / matrix - side by side when wide, pages [matrix] [curves] when narrow' },
     { k = 'LFO j k h l', d = 'field / value: shape (sin tri saw+ saw- sqr rnd), period in rows, depth, center, phase, points per period' },
     { k = 'type', d = 'lfo | podkat (Anticipate: lead curve before every hit of a source track - its events or audio transients, hold, release, duck / swell) | follow (curve from another envelope or the audio level of a track: attack, release, shift = lookahead, invert)' },
     { k = 'LFO g p', d = 'g: new automation item with the curve, p: write points into the envelope - envelope at the tracker cursor (or selected in REAPER); time selection, else cursor region, else one bar' },
@@ -304,7 +304,7 @@ KH.BARS = {
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   sample = { { 'Enter', 'apply' }, { '2 4 8 1 3 6', 'slices' }, { 's', 'transients' }, { 'Q', 'quantize' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'JK HL', 'props' }, { '?', 'help' } },
-  modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
+  modulation = { { 'L', 'curves' }, { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
   retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'depot' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },

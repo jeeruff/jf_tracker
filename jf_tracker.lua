@@ -3943,21 +3943,45 @@ local function frame()
       local hv = MM.draw(U, Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'midi', ctx.fit)
       return hv
     end,
+    -- вкладка modulate (2 окт): нативная матрица модуляции + генератор кривых
+    -- (lfo / podkat = Anticipate / follow). Широко — рядом, узко — страницы
+    -- [matrix] [curves] (L переключает)
     mm_draw = function(Lx, x, y, w, h)
       local col = cur_col()
-      -- справа — генератор LFO (2 окт), если влезает рядом с матрицей
-      local lw = (w >= Lx.cw * 70) and math.min(Lx.cw * 30, math.floor(w * 0.34)) or 0
+      local wide = w >= Lx.cw * 70
+      local lw = wide and math.min(Lx.cw * 30, math.floor(w * 0.34)) or 0
       lfo_hover = nil
-      if lw > 0 then
-        local tgt = ctx.lfo_target()
-        local names = {}
-        for i, c in ipairs(snap and snap.cols or {}) do names[i] = c.name end
-        LG.src_names = names
-        if LG.src_i > #names then LG.src_i = math.max(1, #names) end
-        lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, state.focus == 'top' and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
-        U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      elseif mod_pane == 'lfo' then mod_pane = 'matrix' end
-      return MMX.draw(Lx, x, y, w - (lw > 0 and lw + 2 * Lx.pad or 0), h, col and col.mods or {}, state.focus == 'top' and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
+      local names = {}
+      for i, c in ipairs(snap and snap.cols or {}) do names[i] = c.name end
+      LG.src_names = names
+      if LG.src_i > #names then LG.src_i = math.max(1, #names) end
+      local focused = state.focus == 'top'
+      if not wide then
+        -- узко: переключатель страниц сверху, ниже — одна страница во всю ширину
+        local bx = x
+        for _, b in ipairs({ { 'matrix', 'matrix' }, { 'curves', 'lfo' } }) do
+          local bw = U.measure(b[1]) + 2 * Lx.pad
+          local on = mod_pane == b[2]
+          local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y and gfx.mouse_y < y + Lx.rh
+          U.set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.TEXT, 0.08) or U.BG)); gfx.rect(bx, y, bw, Lx.rh, 1)
+          U.set(on and U.AMBER or U.LINE); gfx.rect(bx, y, bw, Lx.rh, 0)
+          U.text(bx + Lx.pad, y + 1, b[1], on and U.AMBER or U.GREY)
+          if hot then lfo_hover = { pane = b[2] } end
+          bx = bx + bw + 2
+        end
+        y, h = y + Lx.rh + 2, h - Lx.rh - 2
+        if mod_pane == 'lfo' then
+          local tgt = ctx.lfo_target()
+          local hv = LG.draw(U, Lx, x, y, w, h, focused, ctx.fit, tgt and tgt.label or nil)
+          lfo_hover = lfo_hover or hv
+          return nil
+        end
+        return MMX.draw(Lx, x, y, w, h, col and col.mods or {}, focused, col and (col.name .. ' modulation') or 'modulation')
+      end
+      local tgt = ctx.lfo_target()
+      lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
+      U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
+      return MMX.draw(Lx, x, y, w - lw - 2 * Lx.pad, h, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
     end,
     sample_draw = function(x, y, w, h)
       local col = cur_col()
@@ -4079,7 +4103,7 @@ local function frame()
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
-  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
@@ -4272,7 +4296,7 @@ local function frame()
       else MM.cur = i end
       click = { t = now2, zone = 'midimap' }
     elseif lfo_hover and state.top and state.toptab == 'modulation' then
-      ctx.set_focus('top'); mod_pane = 'lfo'
+      ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.field then
         LG.sel = lfo_hover.field
         local f = LG.FIELDS[lfo_hover.field]

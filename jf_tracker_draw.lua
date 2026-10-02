@@ -971,7 +971,7 @@ local function draw_topbar(L, info)
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
   for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
-    local lbl = D.ic(t, t == 'garden' and 'orca' or t)
+    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'modulate') or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
     local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
