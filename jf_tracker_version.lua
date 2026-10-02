@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.22'
+V.VERSION = '0.5.23'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.23', d = '2026-10-02', items = {
+    'notes: button in the control block opens an editor left of the DSP panel - project notes or the notes of the item under the cursor (track notes with SWS), saved on leave and a second after typing',
+    'browser: *.* shows all file types, .* hidden files; Enter on MIDI / video / images inserts them at the cursor, other files open in their app',
+  } },
   { v = '0.5.22', d = '2026-10-02', items = {
     'mouse: drag in the body selects a block (NORMAL and INSERT), Option+drag moves events; drag on the step numbers sets the REAPER time selection',
     'instruments: empty slots .. after the instruments - retro p / Enter puts the capture there, drop a retro / sample selection or a browser file onto them; retro selection can be dragged out',

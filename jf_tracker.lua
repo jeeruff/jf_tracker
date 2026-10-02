@@ -41,7 +41,8 @@ local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
-local IMP = dofile(DIR .. '/jf_tracker_import.lua')      -- импорт REX / XRNI (2 окт)
+local IMP = dofile(DIR .. '/jf_tracker_import.lua')
+local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
@@ -109,6 +110,7 @@ local state = {
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
   hints = flag('hints', true),
+  notes_open = flag('notes', false),            -- редактор заметок на месте списка эффектов
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
@@ -244,6 +246,7 @@ local function save_win()
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
+  S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
@@ -445,6 +448,45 @@ ctx = {
   ctrl_held = function() return gfx.mouse_cap & 32 == 32 end,
   -- macOS: бит 4 = Cmd, 32 = Ctrl, 16 = Option
   msg = function(m) vim.msg = m end,
+  -- ── заметки (2 окт): project — заметки проекта; context — item под курсором,
+  -- без item — трек (заметки трека SWS) ──────────────────────────────────────
+  notes_owner = function()
+    if NT.target == 'project' then return 'project', nil, 'project notes' end
+    local item = ctx.item_at_cursor()
+    if item then
+      local tk = reaper.GetActiveTake(item)
+      return 'item', item, 'item: ' .. (tk and reaper.GetTakeName(tk) or '?')
+    end
+    local col = cur_col()
+    if col and reaper.NF_GetSWSTrackNotes then return 'track', col.track, 'track: ' .. col.name end
+    return 'none', nil, 'no item under the cursor (track notes need SWS)'
+  end,
+  notes_load = function()
+    local kind, obj, title = ctx.notes_owner()
+    local text = ''
+    if kind == 'project' then text = reaper.GetSetProjectNotes(0, false, '')
+    elseif kind == 'item' then local _, t = reaper.GetSetMediaItemInfo_String(obj, 'P_NOTES', '', false); text = t or ''
+    elseif kind == 'track' then text = reaper.NF_GetSWSTrackNotes(obj) or '' end
+    NT.set(text); NT.owner = obj; NT.kind = kind; NT.title = title
+  end,
+  notes_save = function()
+    if not NT.dirty then return end
+    local text = NT.text()
+    if NT.kind == 'project' then reaper.GetSetProjectNotes(0, true, text)
+    elseif NT.kind == 'item' and NT.owner and reaper.ValidatePtr(NT.owner, 'MediaItem*') then
+      edit.run('item notes', function() reaper.GetSetMediaItemInfo_String(NT.owner, 'P_NOTES', text, true) end)
+    elseif NT.kind == 'track' and NT.owner and reaper.NF_SetSWSTrackNotes then reaper.NF_SetSWSTrackNotes(NT.owner, text) end
+    NT.dirty = false; NT.saved_t = reaper.time_precise()
+  end,
+  notes_toggle = function()
+    state.notes_open = not state.notes_open
+    if state.notes_open then state.dsp = true; ctx.notes_load(); ctx.set_focus('notes')
+    else ctx.notes_save(); if state.focus == 'notes' then ctx.set_focus('tracker') end end
+    vim.msg = state.notes_open and ('notes: ' .. (NT.title or '')) or 'notes closed'
+  end,
+  notes_target = function(t)
+    ctx.notes_save(); NT.target = t; ctx.notes_load(); ctx.set_focus('notes')
+  end,
   view_reg = function(on)
     if on == nil then on = not state.view_reg end
     state.view_reg = on
@@ -664,7 +706,7 @@ ctx = {
   help_page = function()
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -1349,7 +1391,7 @@ ctx = {
     local f
     if inr(L.inst_rect) then f = 'inst'
     elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
-    elseif inr(L.fxb_rect) then f = 'fxb'
+    elseif inr(L.fxb_rect) then f = state.notes_open and 'notes' or 'fxb'
     elseif inr(L.dsp_rect) then f = 'dsp'
     elseif inr(L.top_rect) then f = 'top'
     elseif not state.mx_hidden and x < L.matrix_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'matrix'
@@ -1568,6 +1610,17 @@ ctx = {
     local c = cur_col()
     local it = edit.depot_add(path, c and c.track)
     vim.msg = it and ('→ lib ' .. (c and c.name or 'DEPOT') .. ': ' .. path:match('[^/]+$')) or 'depot add failed'
+  end,
+  -- браузер *.* (2 окт): не звук — MIDI / видео / картинка в строку курсора (REAPER
+  -- сам делает источник), остальное — программой macOS по умолчанию
+  open_file = function(path)
+    local ext = (path:match('%.([%w]+)$') or ''):lower()
+    local MEDIA = { mid = true, midi = true, mp4 = true, mov = true, m4v = true, mkv = true, avi = true, webm = true, wmv = true,
+                    gif = true, png = true, jpg = true, jpeg = true }
+    if MEDIA[ext] then ctx.drop_at_cursor(path); return end
+    if reaper.CF_ShellExecute then reaper.CF_ShellExecute(path)
+    else reaper.ExecProcess("/usr/bin/open '" .. path:gsub("'", "'\\''") .. "'", -1) end
+    vim.msg = 'opened with the default app: ' .. (path:match('[^/]+$') or path)
   end,
   -- импорт нарезанного инструмента (2 окт): REX/RX2 — звук декодирует REAPER,
   -- позиции слайсов из файла; XRNI (Renoise / Redux) — распаковка в папку
@@ -1795,6 +1848,8 @@ ctx = {
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
     if f == 'fxb' and not (state.dsp and state.fxb and not state.khelp) then f = 'tracker' end
+    if f == 'notes' and not (state.dsp and state.notes_open and not state.khelp) then f = 'tracker' end
+    if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not state.top then f = 'tracker' end
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
     if f == 'dsp' and state.focus ~= 'dsp' then KH.from = state.focus end
@@ -1810,7 +1865,8 @@ ctx = {
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
     if state.dsp or state.khelp then order[#order + 1] = 'dsp' end
-    if state.dsp and state.fxb and not state.khelp then order[#order + 1] = 'fxb' end
+    if state.dsp and state.notes_open and not state.khelp then order[#order + 1] = 'notes'
+    elseif state.dsp and state.fxb and not state.khelp then order[#order + 1] = 'fxb' end
     if not state.mx_hidden then order[#order + 1] = 'matrix' end
     if state.top then order[#order + 1] = 'top' end
     local i = 1
@@ -2728,6 +2784,7 @@ local function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
+  elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
   elseif name == 'play' then if delta == 0 then edit.play_stop() end
   elseif name == 'bpm' then
@@ -3038,6 +3095,15 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  -- заметки: автозапись через секунду после правки; context следует за item под курсором
+  if state.notes_open then
+    NT.edit_t = NT.dirty and (NT.edit_t or reaper.time_precise()) or nil
+    if NT.dirty and NT.edit_t and reaper.time_precise() - NT.edit_t > 1 then ctx.notes_save(); NT.edit_t = nil end
+    if NT.target == 'context' and L then
+      local _, obj = ctx.notes_owner()
+      if obj ~= NT.owner then ctx.notes_save(); ctx.notes_load() end
+    end
+  end
   if reselect_item and snap and snap.inst_of and snap.inst_of[reselect_item] then
     vim.inst = snap.inst_of[reselect_item]; reselect_item = nil
   end
@@ -3220,7 +3286,7 @@ local function frame()
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
-      xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints,
+      xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
     },
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
     inspreview = state.preview,
@@ -3228,6 +3294,9 @@ local function frame()
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
     top_page = (state.toptab == 'garden' and (GD.page == 'orca' and 'orca' or 'garden')) or (state.toptab == 'scope' and 'master') or state.toptab,
+    notes_draw = (state.dsp and state.notes_open and not state.khelp) and function(Lx, x, y, w, h)
+      return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
+    end or nil,
     fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list() end
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
@@ -3389,6 +3458,8 @@ local function frame()
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
   elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
+  elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor, editor left of the DSP panel'
+  elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type; Esc / Tab: leave (saved)' or ('show ' .. hover.notes .. ' notes')
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
@@ -3698,6 +3769,10 @@ local function frame()
       click = { t = now2, zone = 'browser', row = hover.browser }
       local e = B.entries[hover.browser]
       if e and not e.dir and not e.db and not e.pmdir and not e.mark then B.drag = { e = e, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
+    elseif hover.notes then
+      ctx.set_focus('notes')
+      if hover.notes == 'project' or hover.notes == 'context' then ctx.notes_target(hover.notes) end
+      click = { t = now2, zone = 'notes' }
     elseif hover.fxb then
       ctx.set_focus('fxb')
       if type(hover.fxb) == 'table' then
@@ -4422,7 +4497,7 @@ local function frame()
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end end
     c = 0
-  elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' then
+  elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
   end
@@ -4430,7 +4505,7 @@ local function frame()
   -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb'
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
     if state.khelp and state.focus == 'dsp' and not typing then
       if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0
       else
@@ -4469,6 +4544,8 @@ local function frame()
         elseif ch == 'h' or c == keys.left then vim.key(('H'):byte())
         elseif ch == 'l' or c == keys.right then vim.key(('L'):byte())
         else return vim.key(c) end
+      elseif state.focus == 'notes' and state.notes_open then
+        if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local r = FB.key(c, ctx.mods())

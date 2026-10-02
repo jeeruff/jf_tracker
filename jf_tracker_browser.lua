@@ -48,6 +48,9 @@ B.wave = false      -- мини-волны у файлов (кнопка wave)
 -- Shift+клик — перезаписать, Cmd+клик — очистить; клавиши 1..5 / Shift+1..5),
 -- * — новая папка (:mkdir), строка пути под кнопками: клик по папке — туда
 B.back, B.fwd = {}, {}
+-- *.* — все файлы, не только звук; .* — скрытые (имя с точки); 2 окт, сохраняются
+B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or false
+B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 B.marks = {}
 B.crumbs = {}       -- сегменты пути последней отрисовки { label=, path= }
 local MARK_SHIFT = { ['!'] = 1, ['@'] = 2, ['#'] = 3, ['$'] = 4, ['%'] = 5 }
@@ -60,6 +63,11 @@ end
 
 local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true,
                 rx2 = true, rex = true, xrni = true }   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
+local function shown(name) return B.hidden or name:sub(1, 1) ~= '.' end
+local function wanted(name)
+  local ext = name:match('%.([%w]+)$')
+  return B.all_files or (ext ~= nil and AUDIO[ext:lower()] == true)
+end
 
 function B.init(c, root)
   ctx = c
@@ -127,7 +135,7 @@ function B.refresh()
   while true do
     local d = R.EnumerateSubdirectories(B.path, i)
     if not d then break end
-    if d:sub(1, 1) ~= '.' then out[#out + 1] = { name = d, dir = true } end
+    if shown(d) then out[#out + 1] = { name = d, dir = true } end
     i = i + 1
   end
   table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
@@ -137,7 +145,9 @@ function B.refresh()
     local f = R.EnumerateFiles(B.path, i)
     if not f then break end
     local ext = f:match('%.([%w]+)$')
-    if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then files[#files + 1] = { name = f, dir = false } end
+    if shown(f) and wanted(f) then
+      files[#files + 1] = { name = f, dir = false, other = not (ext and AUDIO[ext:lower()]) or nil }
+    end
     i = i + 1
   end
   table.sort(files, function(a, b) return a.name:lower() < b.name:lower() end)
@@ -195,7 +205,7 @@ function B.folder_index(path)
     while true do
       local d = R.EnumerateSubdirectories(dir, i)
       if not d then break end
-      if d:sub(1, 1) ~= '.' then
+      if shown(d) then
         local r = (rel ~= '' and (rel .. '/') or '') .. d
         idx[#idx + 1] = { name = r, label = r, path = dir .. '/' .. d, dir = true }
         scan(dir .. '/' .. d, r, depth + 1)
@@ -207,7 +217,7 @@ function B.folder_index(path)
       local f = R.EnumerateFiles(dir, i)
       if not f then break end
       local ext = f:match('%.([%w]+)$')
-      if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then
+      if shown(f) and wanted(f) then
         local r = (rel ~= '' and (rel .. '/') or '') .. f
         idx[#idx + 1] = { name = r, label = r, path = dir .. '/' .. f, dir = false }
       end
@@ -466,6 +476,15 @@ function B.click(what)
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
   elseif what == 'wave' then B.wave = not B.wave
+  elseif what == 'allfiles' or what == 'hidden' then
+    if what == 'allfiles' then B.all_files = not B.all_files else B.hidden = not B.hidden end
+    if R.SetExtState then
+      R.SetExtState('jf_tracker', 'brall', B.all_files and '1' or '0', true)
+      R.SetExtState('jf_tracker', 'brhid', B.hidden and '1' or '0', true)
+    end
+    B.findidx = {}
+    if B.mode == 'files' then B.refresh() end
+    if ctx.msg then ctx.msg(('browser: %s, hidden files %s'):format(B.all_files and 'all files' or 'audio only', B.hidden and 'shown' or 'hidden')) end
   elseif what == 'back' then B.history(-1)
   elseif what == 'fwd' then B.history(1)
   elseif what == 'mkdir' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
@@ -494,6 +513,8 @@ function B.enter()
   elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
   elseif e.rgn then if ctx.drop_region_at_cursor then ctx.drop_region_at_cursor(B.pmproj.e.path, e) end
   elseif e.mark then return
+  elseif e.other and not (e.name or ''):lower():match('%.xrni$') and not (e.name or ''):lower():match('%.rx2$') and not (e.name or ''):lower():match('%.rex$') then
+    if ctx.open_file then ctx.open_file(B.full(e)) end                -- не звук (*.*): MIDI / видео / прочее
   else ctx.add_to_depot(B.full(e)) end
 end
 
@@ -501,6 +522,7 @@ end
 function B.preview_path(e)
   if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
   if (e.name or ''):lower():match('%.xrni$') then return nil end       -- архив инструмента, не звук
+  if e.other then return nil end                                      -- не звук (*.*): не слушаем
   if e.pm then return B.pm_preview(e) end
   return B.full(e)
 end
@@ -628,7 +650,8 @@ function B.draw(U, L, x, y, w, h)
   do
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
-    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
+    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto },
+                         { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

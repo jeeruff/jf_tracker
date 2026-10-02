@@ -51,4 +51,14 @@ local parts = B.path_parts('/r/Drums/Kicks')
 eq('path parts', #parts, 4); eq('crumb path', parts[3].path, '/r/Drums')
 B.go('/r'); eq('mkdir', B.mkdir('New Kit'), true); eq('mkdir selects', B.entries[B.cur].name, 'New Kit')
 B.key(('H'):byte()); eq('H back', B.path ~= '/r', true)
+-- *.* и .* (2 окт)
+tree['/r'].files[#tree['/r'].files + 1] = 'notes.txt'
+tree['/r'].files[#tree['/r'].files + 1] = '.hidden.wav'
+B.go('/r'); B.all_files = false; B.hidden = false; B.refresh()
+local has = function(nm) for _, e in ipairs(B.entries) do if e.name == nm then return e end end end
+eq('txt hidden by default', has('notes.txt'), nil); eq('dot file hidden', has('.hidden.wav'), nil)
+B.click('allfiles'); eq('*.* shows txt', has('notes.txt') ~= nil, true); eq('txt is other', has('notes.txt').other, true)
+B.click('hidden'); eq('.* shows dot file', has('.hidden.wav') ~= nil, true)
+eq('other not previewed', B.preview_path(has('notes.txt')), nil)
+B.click('allfiles'); B.click('hidden')
 print(('%d checks, %d failed'):format(n, bad))

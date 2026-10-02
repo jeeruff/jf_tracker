@@ -818,7 +818,7 @@ local function draw_topbar(L, info)
     { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
     { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
     { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
-    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
+    { 'options', 'options', U.AMBER }, { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
     { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
     { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
     { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
@@ -1925,11 +1925,12 @@ function D.frame(L, snap, rows, state, info)
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
-    if info.fxb_draw then
+    if info.notes_draw or info.fxb_draw then
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
       local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
       fbw = (L.matrix_w and L.matrix_w > 0 and not state.mx_hidden) and math.max(L.matrix_w, math.floor(own * 0.6)) or own
-      hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
+      if info.notes_draw then hover.notes = info.notes_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
+      else hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
     -- шапка: [track] [take] — чья цепочка показана (t переключает), затем имя
@@ -2063,7 +2064,7 @@ function D.frame(L, snap, rows, state, info)
     end
     if (L.hint_h or 0) > 0 then
       local hy3 = dy + L.dsp_h - L.hint_h
-      if fbw > 0 then D.hint_bar(L, 0, hy3, fbw - 1, (info.hint_bars or function() end)('fxb'), info.focus == 'fxb') end
+      if fbw > 0 then D.hint_bar(L, 0, hy3, fbw - 1, (info.hint_bars or function() end)(info.notes_draw and 'notes' or 'fxb'), info.focus == 'fxb' or info.focus == 'notes') end
       D.hint_bar(L, fbw, hy3, L.win_w - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
     end
     L.dsp_rect = { fbw, dy, L.win_w - fbw, L.dsp_h }
@@ -2105,7 +2106,7 @@ function D.frame(L, snap, rows, state, info)
     elseif f == 'top' and L.top_rect then r = L.top_rect
     elseif f == 'inst' and L.inst_rect then r = L.inst_rect
     elseif f == 'dsp' and L.dsp_rect then r = L.dsp_rect
-    elseif f == 'fxb' and L.fxb_rect then r = L.fxb_rect end
+    elseif (f == 'fxb' or f == 'notes') and L.fxb_rect then r = L.fxb_rect end
     if r then
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'

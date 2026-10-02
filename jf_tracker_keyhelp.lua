@@ -127,6 +127,7 @@ KH.PAGES = {
     { k = 'h - BS', d = 'folder up' },
     { k = 'Cmd+Enter', d = 'replace sample of the selected instrument everywhere' },
     { k = 'Enter .rx2 .xrni', d = 'import REX / Renoise-Redux instrument with its slices' },
+    { k = '*.* .*', d = 'buttons: all file types / hidden files; Enter on MIDI / video inserts it, others open in their app' },
     { k = 'Space', d = 'preview (mini player below)' },
     { k = '/ f', d = 'fzf find: ^start end$ \'exact !not' },
     { k = 't', d = 'mode: files / db / projects' },
@@ -138,6 +139,11 @@ KH.PAGES = {
     { k = 'H L', d = 'folder history back / forward (< > buttons)' },
     { k = '*', d = 'new folder here (:mkdir name)' },
     { k = 'Esc Tab', d = 'clear filter / next module' },
+  } },
+  notes = { title = 'notes (left of DSP)', e = {
+    { k = 'type', d = 'write; Enter new line, BS Del erase, arrows Home End move' },
+    { k = 'project context', d = 'buttons: project notes / notes of the item under the cursor (track with SWS)' },
+    { k = 'Esc Tab', d = 'leave (saved); also saved a second after typing' },
   } },
   fxb = { title = 'fx list (left of DSP)', e = {
     { k = 'type', d = "fzf search: words, ^start, end$, 'exact, !not" },
@@ -261,6 +267,7 @@ KH.BARS = {
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
           { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'add' }, { '?', 'help' } },
+  notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   sample = { { 'Enter', 'apply' }, { '2 4 8 1 3 6', 'slices' }, { 's', 'transients' }, { 'Q', 'quantize' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'JK HL', 'props' }, { '?', 'help' } },
@@ -272,7 +279,7 @@ KH.BARS = {
   master = { { 'm', 'scope mode' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'sample', 'modulation', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
