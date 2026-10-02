@@ -156,6 +156,7 @@ end
 -- (огибающая идёт по источнику с rate, пересчитываем).
 function S.detect()
   S.trans = {}
+  S.trans_amp = {}
   local env = S.env
   if not env then return end
   local thr = 0.04 + (1 - S.sens) * 0.30
@@ -172,6 +173,11 @@ function S.detect()
       if v > bg * ratio then
         local t_src = (i - 1) / env.rate
         S.trans[#S.trans + 1] = t_src / (S.entry.rate or 1)
+        -- громкость атаки (~30 мс после начала) — для smart quantize: сильный / слабый
+        local a = 0
+        for j = i, math.min(env.n, i + math.floor(env.rate * 0.03)) do if env.v[j] > a then a = env.v[j] end end
+        S.trans_amp = S.trans_amp or {}
+        S.trans_amp[#S.trans] = a
         last = i
       end
     end
@@ -243,6 +249,7 @@ function S.key(c)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
+  elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
   elseif ch == 't' or ch == 's' then S.use_transients()                -- s: нарезать по транзиентам (2 окт)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
@@ -304,7 +311,21 @@ function S.button(id)
   elseif id == 'sens-' or id == 'sens+' then
     S.sens = math.max(0, math.min(1, S.sens + (id == 'sens+' and 0.05 or -0.05)))
     S.use_transients()
-  elseif id == 'clear' then S.clear() end
+  elseif id == 'clear' then S.clear()
+  elseif id == 'quant' then S.smart_quantize() end
+end
+
+-- smart quantize (2 окт): транзиенты сэмпла → stretch-маркеры, сильные к
+-- ближайшим долям, слабые к шестнадцатым; длина — до целых тактов / долей
+function S.smart_quantize()
+  local e = S.entry
+  if not e or e.file or not e.item then S.msg = 'quantize: open an instrument (not a browser file)'; return end
+  S.detect()
+  if #S.trans == 0 then S.msg = 'quantize: no transients (sens+ for more)'; return end
+  local hits = {}
+  for k, t in ipairs(S.trans) do hits[#hits + 1] = { t = t, amp = (S.trans_amp or {})[k] or 0 } end
+  local n, kept, newlen = ctx.edit.smart_quantize(e.item, hits)
+  S.msg = n and ('quantized: %d of %d transients, length %.3fs'):format(kept or 0, #hits, newlen or 0) or 'quantize failed'
 end
 
 function S.cycle_view()
@@ -375,7 +396,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if not e.file and e.item then
     local bx = x
     local BTN = { { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' } }
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' } }
     U.text(bx, y + rh, 'slice', U.GREY); bx = bx + U.measure('slice') + L.pad
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad

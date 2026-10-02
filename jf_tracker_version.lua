@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.11'
+V.VERSION = '0.5.12'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.12', d = '2026-10-02', items = {
+    'smart quantize (button quantize, Q, :quantize): loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo',
+    'ruler: region and marker names as vertical text along their rows',
+    'BPM: click - tempo list (take from selected item: metadata / file name / length), dblclick - type the number [..._], wheel +-1',
+  } },
   { v = '0.5.11', d = '2026-10-02', items = {
     'rename: dblclick on a track name (:tname), click on the instrument name in sample properties (:iname, all its items)',
     'track header: volume on its own full-width row, pan on its own row; column captions row is optional (Options, off by default)',

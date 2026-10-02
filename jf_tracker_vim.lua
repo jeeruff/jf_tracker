@@ -432,6 +432,7 @@ V.COMMANDS = {
   { 'fold', '', 'fold all tracks' }, { 'unfold', '', 'unfold all' },
   { 'trim', '', 'trim items to region bounds (strict patterns)' },
   { 'beatsync', '[beat|bar|N]', 'stretch event end to the nearest beat / bar / N rows (= key, N=)' },
+  { 'quantize', '', 'smart quantize the instrument: loud transients to beats, soft to 16ths, length to whole bars / beats (stretch markers)' },
   { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'garden', '[on|off|clear|pin|reset|size WxH|load]', 'Garden tab: loops grid + Orca field (plants notes into the timeline while playing)' },
@@ -528,6 +529,7 @@ local function run_cmd(line)
   elseif cmd == 'icons' then st.icons = not st.icons; V.msg = 'nerd icons ' .. (st.icons and 'on' or 'off') .. ((st.font or 0) > 0 and '' or ' (TTF only: :font 24)')
   elseif cmd == 'mxzoom' then ctx.mx_zoom()
   elseif cmd == 'trim' then if ctx.mx_trim then ctx.mx_trim() end
+  elseif cmd == 'quantize' or cmd == 'squant' then ctx.smart_quantize()
   elseif cmd == 'tname' then ctx.rename_track(arg)
   elseif cmd == 'iname' then ctx.rename_inst(arg)
   elseif cmd == 'garden' then ctx.garden_cmd(arg ~= '' and arg or 'show')

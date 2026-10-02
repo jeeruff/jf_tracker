@@ -1425,6 +1425,80 @@ function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R
 function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 
+-- ── smart quantize (2 окт; принципы jf_transient_stretch_quantize и
+-- jf_QuantumCut) ──────────────────────────────────────────────────────────
+-- hits = { {t = время от начала item, amp = громкость атаки} } по времени.
+-- Сильные (amp ≥ 0.6·max) → ближайшая доля (целый QN), слабые → ближайшая
+-- шестнадцатая. Два хита в одну точку — остаётся громкий. Stretch-маркер
+-- ставится на исходное место (srcpos считает REAPER), потом двигается только
+-- позиция воспроизведения — так растягивается звук. Длина — до целых тактов
+-- (сэмпл ≥ ¾ такта) или долей; концевой маркер едет вместе с концом.
+-- Возвращает число поставленных маркеров хитов, число оставленных хитов, новую длину.
+function E.smart_quantize(item, hits)
+  local take = R.GetActiveTake(item)
+  if not take or R.TakeIsMIDI(take) then return nil end
+  local pos = R.GetMediaItemInfo_Value(item, 'D_POSITION')
+  local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
+  local qn0 = R.TimeMap2_timeToQN(0, pos)
+  local maxa = 0
+  for _, h in ipairs(hits) do if h.amp > maxa then maxa = h.amp end end
+  -- цели в QN, монотонно; коллизия — громкий остаётся
+  local kept = {}
+  for _, h in ipairs(hits) do
+    if h.t > 0.005 and h.t < len - 0.005 then
+      local q = R.TimeMap2_timeToQN(0, pos + h.t)
+      local strong = maxa > 0 and h.amp >= 0.6 * maxa
+      local step = strong and 1 or 0.25
+      local tq = math.floor(q / step + 0.5) * step
+      if tq <= qn0 + 1e-6 then tq = nil end                  -- на начало item не тянем
+      if tq then
+        local prev = kept[#kept]
+        if prev and tq <= prev.tq + 1e-6 then
+          if h.amp > prev.amp then kept[#kept] = { t = h.t, tq = tq, amp = h.amp } end
+        else kept[#kept + 1] = { t = h.t, tq = tq, amp = h.amp } end
+      end
+    end
+  end
+  -- длина: до целых тактов (если ≥ ¾ такта), иначе до целых долей
+  local qe = R.TimeMap2_timeToQN(0, pos + len)
+  local _, qms, qme = R.TimeMap_QNToMeasures(0, qn0 + 1e-9)
+  local bar = (qms and qme) and (qme - qms) or 4
+  local beats = qe - qn0
+  local nb = beats >= 0.75 * bar and math.max(bar, math.floor(beats / bar + 0.5) * bar) or math.max(1, math.floor(beats + 0.5))
+  local last_tq = kept[#kept] and kept[#kept].tq or qn0
+  if qn0 + nb <= last_tq + 1e-6 then nb = math.ceil((last_tq - qn0) + 0.25) end
+  local newlen = R.TimeMap2_QNToTime(0, qn0 + nb) - pos
+  local placed = 0
+  run('smart quantize', function()
+    local nm = R.GetTakeNumStretchMarkers(take)
+    if nm > 0 then R.DeleteTakeStretchMarkers(take, 0, nm) end
+    R.SetMediaItemTakeInfo_Value(take, 'B_PPITCH', 1)          -- растяжение без смены высоты
+    R.SetMediaItemInfo_Value(item, 'D_LENGTH', math.max(len, newlen))
+    -- маркеры на исходных местах: начало, хиты, конец (srcpos — сам REAPER)
+    local want = { { o = 0, n = 0 } }
+    R.SetTakeStretchMarker(take, -1, 0)
+    for _, k in ipairs(kept) do
+      R.SetTakeStretchMarker(take, -1, k.t)
+      want[#want + 1] = { o = k.t, n = R.TimeMap2_QNToTime(0, k.tq) - pos }
+    end
+    R.SetTakeStretchMarker(take, -1, len)
+    want[#want + 1] = { o = len, n = newlen }
+    -- двигаем только позицию воспроизведения; несколько проходов, потому что
+    -- REAPER ограничивает маркер соседями
+    for _ = 1, 4 do
+      for i = 0, R.GetTakeNumStretchMarkers(take) - 1 do
+        local _, p = R.GetTakeStretchMarker(take, i)
+        local w = want[i + 1]
+        if w and math.abs(p - w.n) > 1e-6 then R.SetTakeStretchMarker(take, i, w.n) end
+      end
+    end
+    R.SetMediaItemInfo_Value(item, 'D_LENGTH', newlen)
+    R.UpdateItemInProject(item)
+    placed = #kept
+  end)
+  return placed, #kept, newlen
+end
+
 -- ── переименование (2 окт) ───────────────────────────────────────────────
 function E.track_name(tr, name) run('rename track', function() R.GetSetMediaTrackInfo_String(tr, 'P_NAME', name, true) end) end
 function E.take_names(items, name)

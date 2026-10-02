@@ -215,7 +215,8 @@ function D.layout(snap, state, nregions)
   elseif state.mx_px and MX then L.matrix_w = math.max((MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
-  L.ruler_w = (state.ruler == false) and 0 or (L.cw * 9 + L.pad)
+  -- две узкие дорожки с вертикальным текстом: регионы (полоса цвета) и маркеры
+  L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad)
   L.label_w = L.ruler_w + ms('0000') + 2 * L.pad
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
@@ -336,8 +337,11 @@ D.fit = fit
 -- результат прямоугольником назначения, поэтому поворачиваем честно:
 -- текст → картинка A (w×h) → попиксельно в картинку B (h×w), B блитится с
 -- масштабом. Кеш по строке+цвету, картинки 1000..1022 (сброс по кругу).
-local vcache, vnext = {}, 1000
-D.reset_vcache = function() vcache, vnext = {}, 1000 end
+-- вертикальный текст: картинки 1200..1399 (200 подписей: имена в матрице,
+-- регионы и маркеры линейки), 1023 — черновик поворота
+local VFIRST, VLAST = 1200, 1399
+local vcache, vnext = {}, VFIRST
+D.reset_vcache = function() vcache, vnext = {}, VFIRST end
 function D.vtext(x, y, h_avail, str, col, bg)
   bg = bg or U.PANEL
   local maxchars = math.max(1, math.floor(h_avail / math.max(1, ms('W'))))
@@ -345,7 +349,7 @@ function D.vtext(x, y, h_avail, str, col, bg)
   local key = str .. '|' .. math.floor(col[1] * 255) .. ',' .. math.floor(col[2] * 255) .. ',' .. math.floor(col[3] * 255)
   local e = vcache[key]
   if not e then
-    if vnext > 1022 then vcache, vnext = {}, 1000 end
+    if vnext > VLAST then vcache, vnext = {}, VFIRST end
     local w, h = gfx.measurestr(str), gfx.texth
     if w < 1 then return end
     local A, B = 1023, vnext; vnext = vnext + 1
@@ -730,7 +734,7 @@ local function draw_topbar(L, info)
   -- контрол: сетка 3 колонки × 4 строки
   local items = {
     { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
-    { 'bpm', ('BPM %.1f'):format(c.bpm or 0) }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
+    { 'bpm', c.bpm_edit and ('BPM [%s_]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
     { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
     { 'vel', ('vel %d'):format(c.vel or 100) },
     { 'follow', D.ic('follow', 'follow ' .. (c.follow and 'on' or 'off')), c.follow and U.CYAN or U.GREY },
@@ -752,6 +756,8 @@ local function draw_topbar(L, info)
     local x, y = L.pad + ci * colw, 2 + ri * L.rh
     local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
     if hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1); hover.ctrl = it[1] end
+    D.ctrl_rect = D.ctrl_rect or {}
+    D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
     text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
     hint('ctrl', x, y, colw, L.rh, it[1])
   end
@@ -1399,30 +1405,6 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(D.CURTOP); gfx.rect(tx0, y, W - tx0, 1, 1) end
     if r.row == cur then set(D.EDITTOP); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.rect(tx0, y, 3, L.rh, 1) end
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
-    -- линейка: регион (полоса цвета, имя на первой строке), маркеры (имя + черта)
-    if L.ruler_w > 0 and info.ruler then
-      local rx, rw = tx0 + 1, L.ruler_w - 3
-      local label, lcol
-      for _, rg in ipairs(info.ruler.regions) do
-        if r.row >= rg.r0 and r.row < rg.r1 then
-          local c = rg.rgb or U.LINE
-          set(c); gfx.rect(rx, y, 3, L.rh, 1)
-          if r.row == rg.r0 then
-            set(U.tint(c, 0.35)); gfx.rect(rx + 3, y, rw - 3, L.rh, 1)
-            label, lcol = rg.name ~= '' and rg.name or '#' .. rg.idx, U.TEXT
-          end
-        end
-      end
-      for _, mk in ipairs(info.ruler.markers) do
-        if math.floor(mk.row_f + 1e-6) == r.row then
-          local c = mk.rgb or U.AMBER
-          set(c); gfx.rect(rx, y, rw, 1, 1); gfx.rect(rx, y, 2, L.rh, 1)
-          label, lcol = mk.name ~= '' and mk.name or tostring(mk.idx), c
-        end
-      end
-      if label then text(rx + 5, ty, fit(label, rw - 6), lcol) end
-      if mx >= tx0 and mx < tx0 + L.ruler_w and my >= y and my < y + L.rh then hover.ruler = r.row end
-    end
     local in_body = my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     for _, c in ipairs(L.cols) do
@@ -1566,6 +1548,39 @@ function D.frame(L, snap, rows, state, info)
       for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (si - 1) * L.sub_w, L.body_y, 1, L.body_h, 1) end
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
+  end
+  -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
+  if L.ruler_w > 0 and info.ruler and #rows > 0 then
+    local row0, nr = rows[1].row, #rows
+    local function ry(row) return L.body_y + (row - row0) * L.rh end
+    local bot = L.body_y + nr * L.rh
+    local laneR, laneM = tx0 + 1, tx0 + 1 + L.th + 6
+    for _, rg in ipairs(info.ruler.regions) do
+      local a, b = math.max(rg.r0, row0), math.min(rg.r1, row0 + nr)
+      if b > a then
+        local y0, y1 = ry(a), ry(b)
+        local c = rg.rgb or U.LINE
+        local bgc = U.tint(c, 0.25)
+        set(c); gfx.rect(laneR, y0, 3, y1 - y0, 1)
+        set(bgc); gfx.rect(laneR + 3, y0, L.th + 2, y1 - y0, 1)
+        if rg.r0 >= row0 then set(c); gfx.rect(laneR, y0, L.th + 5, 1, 1) end
+        if y1 - y0 > L.th then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc) end
+      end
+    end
+    local mks = {}
+    for _, mk in ipairs(info.ruler.markers) do
+      local row = math.floor(mk.row_f + 1e-6)
+      if row >= row0 and row < row0 + nr then mks[#mks + 1] = { row = row, mk = mk } end
+    end
+    table.sort(mks, function(p, q) return p.row < q.row end)
+    for k, m in ipairs(mks) do
+      local y = ry(m.row)
+      local ynext = mks[k + 1] and ry(mks[k + 1].row) or bot
+      local c = m.mk.rgb or U.AMBER
+      set(c); gfx.rect(laneR, y, L.ruler_w - 3, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
+      if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG) end
+    end
+    if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   set(D.SEP); gfx.rect(tx0 + L.label_w - 1, L.body_y, 2, L.body_h, 1)
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 1, hy, 2, L.body_y + L.body_h - hy, 1) end

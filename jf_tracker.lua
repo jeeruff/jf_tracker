@@ -128,6 +128,53 @@ local resize_drag = nil                                     -- ресайз: 'si
 local lock_sync = {}                                        -- lock: последнее синхронное состояние
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
+-- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
+local bpm_menu = nil                                        -- { sel = n, hover = n }
+local BPM_LIST = {
+  { 'take from selected item', 'item' },
+  { '60   slow / ambient', 60 }, { '70   hip hop slow', 70 }, { '75', 75 }, { '80   lo-fi', 80 }, { '85', 85 },
+  { '87.5 half of 175', 87.5 }, { '90   boom bap', 90 }, { '93', 93 }, { '95', 95 }, { '100', 100 },
+  { '105', 105 }, { '110', 110 }, { '115', 115 }, { '120  pop / house', 120 }, { '122  deep house', 122 },
+  { '124  tech house', 124 }, { '125', 125 }, { '126', 126 }, { '128  house / edm', 128 }, { '130  techno', 130 },
+  { '132', 132 }, { '135  trance', 135 }, { '138', 138 }, { '140  dubstep / grime', 140 }, { '145', 145 },
+  { '150  footwork 160', 150 }, { '160  footwork', 160 }, { '165', 165 }, { '170  jungle', 170 },
+  { '172', 172 }, { '174  drum & bass', 174 }, { '175', 175 }, { '180  breakcore', 180 }, { '200', 200 },
+}
+-- BPM из выделенного item: метаданные файла → число в имени → длина (целые такты 4/4)
+local function bpm_from_item()
+  local it = reaper.GetSelectedMediaItem(0, 0)
+  if not it then
+    local f = L and L.flat[vim.cur.fi]; local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    it = cell and cell.item
+  end
+  local take = it and reaper.GetActiveTake(it)
+  if not take or reaper.TakeIsMIDI(take) then return nil, 'select an audio item' end
+  local src = reaper.GetMediaItemTake_Source(take)
+  local function meta(k) if not reaper.GetMediaFileMetadata then return nil end; local ok, v = reaper.GetMediaFileMetadata(src, k); return ok and tonumber((v or ''):match('[%d%.]+')) or nil end
+  local b = meta('ID3:TBPM') or meta('XMP:dm/tempo') or meta('ACID:tempo') or meta('Generic:BPM')
+  if b and b > 30 and b < 400 then return b, 'metadata' end
+  local fn = reaper.GetMediaSourceFileName(src, '') or ''
+  local base = fn:match('[^/]+$') or fn
+  local n = tonumber(base:match('(%d+%.?%d*)%s*[bB][pP][mM]') or '')
+  if not n then for d in base:gmatch('[_%s%-](%d%d%d?)[_%s%-%.]') do local v = tonumber(d); if v and v >= 60 and v <= 200 then n = v; break end end end
+  if n and n >= 40 and n <= 400 then return n, 'file name' end
+  local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  if len > 0.2 then
+    local best
+    for _, beats in ipairs({ 4, 8, 16, 32, 2, 64 }) do
+      local v = 60 * beats / len
+      if v >= 80 and v <= 180 then best = v; break end
+    end
+    if best then return math.floor(best * 100 + 0.5) / 100, 'length (whole bars)' end
+  end
+  return nil, 'no tempo found'
+end
+local function set_bpm(v, why)
+  v = math.max(20, math.min(400, v))
+  edit.run('tempo', function() reaper.SetCurrentBPM(0, v, false) end)
+  vim.msg = ('BPM %.2f%s'):format(v, why and ('  (' .. why .. ')') or '')
+end
 -- слайдер шапки: доля 0..1 → значение и ключ трека
 local TRS_KEY = { vol = 'D_VOL', pan = 'D_PAN', width = 'D_WIDTH', panl = 'D_DUALPANL', panr = 'D_DUALPANR' }
 local function trs_value(what, frac)
@@ -1117,6 +1164,13 @@ ctx = {
     state.top = true; state.toptab = 'sample'
     local c = cur_col()
     if SL.open_file(path, c and c.track) then vim.msg = 'sample: ' .. (path:match('[^/]+$') or path) end
+  end,
+  -- smart quantize выбранного инструмента (кнопка quantize, Q во вкладке Sample, :quantize)
+  smart_quantize = function()
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if not e then vim.msg = 'no instrument'; return end
+    if not (SL.active and SL.entry and SL.entry.item == e.item) then SL.open(e, col.track) end
+    SL.smart_quantize(); vim.msg = SL.msg; model.invalidate()
   end,
   -- ── переименование трека и инструмента (2 окт) ─────────────────────
   rename_track_prompt = function(col)
@@ -2504,7 +2558,7 @@ local function frame()
     fx_values = function(f) local col = cur_col(); if not col then return {} end
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
     ctrl = {
-      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(),
+      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
       lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_auto and 'auto' or vim.step, inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
@@ -2557,6 +2611,31 @@ local function frame()
   SL.draw_drag(U, L)
   draw.popup(L, vim.popup())
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
+  if bpm_menu then
+    local r = draw.ctrl_rect and draw.ctrl_rect.bpm
+    if r then
+      local w = L.cw * 24 + 2 * L.pad
+      local x, y = r[1], r[2] + L.rh + 1
+      local nv = math.max(3, math.min(#BPM_LIST, math.floor((gfx.h - y - L.status_h - 4) / L.rh)))
+      bpm_menu.scroll = bpm_menu.scroll or 0
+      if bpm_menu.sel - 1 < bpm_menu.scroll then bpm_menu.scroll = bpm_menu.sel - 1 end
+      if bpm_menu.sel > bpm_menu.scroll + nv then bpm_menu.scroll = bpm_menu.sel - nv end
+      U.set(U.BG); gfx.rect(x, y, w, nv * L.rh + 4, 1)
+      U.set(U.TEXT); gfx.rect(x, y, w, nv * L.rh + 4, 0)
+      bpm_menu.hover = nil
+      local cur = reaper.Master_GetTempo()
+      for k = 1, nv do
+        local i = bpm_menu.scroll + k
+        local it = BPM_LIST[i]; if not it then break end
+        local yy = y + 2 + (k - 1) * L.rh
+        local hot = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= yy and gfx.mouse_y < yy + L.rh
+        if hot then bpm_menu.hover = i end
+        if hot or i == bpm_menu.sel then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(x + 1, yy, w - 2, L.rh, 1) end
+        local is_cur = type(it[2]) == 'number' and math.abs(it[2] - cur) < 0.01
+        U.text(x + L.pad, yy, it[1], it[2] == 'item' and U.CYAN or (is_cur and U.AMBER or U.TEXT))
+      end
+    end
+  end
 
   -- наведение
   local cell = hover.cell
@@ -2610,6 +2689,7 @@ local function frame()
   elseif hover.ctrl == 'xfade' then state.status = 'x-fade of inserted notes: click on/off, wheel: length (ms); off = overlaps without crossfade; \\x: menu'
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
+  elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
@@ -2654,7 +2734,7 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
-  elseif hover.sample and hover.sample.sbtn then state.status = ({ eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
+  elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move'):format(hover.sample.slice)
@@ -2706,6 +2786,14 @@ local function frame()
     end
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.click and bpm_menu then
+    if bpm_menu.hover then
+      local it = BPM_LIST[bpm_menu.hover]
+      if it[2] == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end
+      else set_bpm(it[2]) end
+      bpm_menu = nil; U.click = false
+    elseif not (hover.ctrl == 'bpm') then bpm_menu = nil; U.click = false end
+  end
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()
@@ -2891,6 +2979,10 @@ local function frame()
         edit.fx_show(col.track, hover.dsp.f.i)
       end
       click = { t = now2, zone = 'dsp' }
+    elseif hover.ctrl == 'bpm' then
+      if dbl and click.zone == 'bpm' then bpm_menu = nil; state.bpm_edit = ''
+      else bpm_menu = bpm_menu and nil or { sel = 1 } end
+      click = { t = now2, zone = 'bpm' }
     elseif hover.ctrl then
       ctrl_action(hover.ctrl, 0)
       click = { t = now2, zone = 'ctrl' }
@@ -3179,6 +3271,27 @@ local function frame()
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
+  if state.bpm_edit and c ~= 0 then
+    local ch = c < 256 and string.char(c) or ''
+    if c == 27 then state.bpm_edit = nil
+    elseif c == 13 then local v = tonumber(state.bpm_edit); state.bpm_edit = nil; if v then set_bpm(v) end
+    elseif c == 8 then state.bpm_edit = state.bpm_edit:sub(1, -2)
+    elseif ch:match('[%d%.]') and #state.bpm_edit < 7 then state.bpm_edit = state.bpm_edit .. ch end
+    c = 0
+  end
+  if bpm_menu and c ~= 0 then
+    local ch = c < 256 and string.char(c) or ''
+    if c == 27 then bpm_menu = nil
+    elseif ch == 'j' or c == keys.down then bpm_menu.sel = math.min(#BPM_LIST, bpm_menu.sel + 1)
+    elseif ch == 'k' or c == keys.up then bpm_menu.sel = math.max(1, bpm_menu.sel - 1)
+    elseif c == 13 then
+      local it = BPM_LIST[bpm_menu.sel]
+      if it[2] == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end else set_bpm(it[2]) end
+      bpm_menu = nil
+    elseif ch:match('%d') then bpm_menu = nil; state.bpm_edit = ch      -- цифра — сразу ввод числа
+    end
+    c = 0
+  end
   -- Tab / Shift-Tab — переход между модулями из ЛЮБОГО места (в INSERT,
   -- в слайсере, в браузере…); исключения: набор команды/поиска (там Tab —
   -- дополнение) и открытые fzf-пикер / hydra
