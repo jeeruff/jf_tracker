@@ -1319,6 +1319,37 @@ edit.pitch_mode = function(head)
   return (g and state.pitchmodes[g]) or 'shift'
 end
 edit.after = function(desc)
+  -- новый паттерн (2 окт): вставка на строку, которую не покрывает ни один
+  -- регион (новый проект, свободный такт матрицы) → регион на весь такт этой
+  -- строки; имя пустое, как у нового региона REAPER. В том же шаге undo.
+  if desc:match('^insert') or desc:match('^paste') or desc:match('^rec ') or desc:match('^drop') then
+    local t = edit.row_time(vim.cur.row, state.lpb, 0)
+    local s0 = model.marker_pos(model.START_MARKER)
+    local s1 = model.marker_pos(model.END_MARKER)
+    local lib = regions and regions.lib_pos
+    local covered = false
+    local next_pos
+    for _, rg in ipairs(regions or {}) do
+      if not rg.lib then
+        if t >= rg.pos - 1e-6 and t < rg.rgnend - 1e-6 then covered = true end
+        if rg.pos > t + 1e-6 and (not next_pos or rg.pos < next_pos) then next_pos = rg.pos end
+      end
+    end
+    if not covered and (not s0 or t >= s0 - 1e-6) and (not s1 or t < s1 - 1e-6) and (not lib or t < lib - 1e-6) then
+      local qn = reaper.TimeMap2_timeToQN(0, t)
+      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
+      local t0 = reaper.TimeMap2_QNToTime(0, qms or qn)
+      local t1 = reaper.TimeMap2_QNToTime(0, qme or (qn + 4))
+      if s0 and t0 < s0 then t0 = s0 end
+      if next_pos and t1 > next_pos then t1 = next_pos end
+      if s1 and t1 > s1 then t1 = s1 end
+      if t1 > t0 + 1e-4 then
+        reaper.AddProjectMarker2(0, true, t0, t1, '', -1, 0)
+        vim.msg = 'new pattern: region created for this bar'
+        model.invalidate()
+      end
+    end
+  end
   if not state.autosync or not regions or #regions == 0 then return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
   local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))

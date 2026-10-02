@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.7'
+V.VERSION = '0.5.8'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.8', d = '2026-10-02', items = {
+    'new pattern: entering a note / paste / drop on a row with no region creates a region for that bar (empty name like a new REAPER region), in the same undo step',
+    'regions without a name show as #N in the matrix and Garden',
+  } },
   { v = '0.5.7', d = '2026-10-02', items = {
     'fix: instruments were treated as browser files in the sample tab (no slicing keys, file hint, no properties panel)',
     'slicing buttons in the sample tab: 2 4 8 16 32 64, transients, sens- sens+, clear; s = slice at transients',

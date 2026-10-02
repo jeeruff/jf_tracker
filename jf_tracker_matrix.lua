@@ -209,7 +209,7 @@ function MX.draw(L, snap, regions, info)
     -- длине → :len; hover.name / hover.dur = ri
     local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - 2 - L.pad
     local hot_name = hover.ri == ri and mx >= nx and mx < nx + nw
-    U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or '-'), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
+    U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5

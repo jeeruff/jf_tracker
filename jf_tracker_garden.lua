@@ -81,7 +81,7 @@ function GD.draw(L, x, y, w, h, snap, seq, info, focused)
     local yy = ry0 + (r - 1) * L.rh
     local playing = info.play_row and info.play_row >= rg.r0 and info.play_row < rg.r1
     local queued = info.queued and info.queued.pos == rg.pos
-    local lbl = ('%02d %s'):format(ri % 100, rg.gap and 'bar' or (rg.name ~= '' and rg.name or '-'))
+    local lbl = ('%02d %s'):format(ri % 100, rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))
     U.text(x, yy, ctx.fit(lbl, label_w - L.pad), playing and U.AMBER or (queued and U.CYAN or (rg.gap and U.DIM or U.TEXT)))
     for ci = 1, math.min(#snap.cols, ncols) do
       local g = grid[ri] and grid[ri][ci]
