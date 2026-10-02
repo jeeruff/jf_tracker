@@ -1410,7 +1410,21 @@ end
 -- маркер =LIB: есть — его позиция; нет — ставим на такт после конца проекта
 function E.ensure_lib()
   local pos = model.lib_pos()
-  if pos then return pos end
+  local endp = model.marker_pos(model.END_MARKER)
+  if pos and not (endp and pos < endp - 1e-6) then return pos end
+  if pos then
+    -- =LIB раньше =END (2 окт) — не библиотека: перенести маркер за =END
+    local qn = R.TimeMap2_timeToQN(0, endp)
+    local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
+    local nt = (qms and math.abs(qn - qms) < 1e-6) and endp or R.TimeMap2_QNToTime(0, qme or (qn + 4))
+    local i = 0
+    while true do
+      local ret, isrgn, _, _, nm, _, color = R.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and nm == model.LIB_MARKER then R.SetProjectMarkerByIndex(0, i, false, nt, 0, -1, nm, color or 0); return nt end
+      i = i + 1
+    end
+  end
   local len = R.GetProjectLength(0)
   local qn = R.TimeMap2_timeToQN(0, len)
   local _, _, qme = R.TimeMap_QNToMeasures(0, qn)

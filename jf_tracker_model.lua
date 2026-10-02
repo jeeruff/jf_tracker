@@ -402,6 +402,7 @@ function M.build(lpb)
           -- своей подколонке (si), MIDI — на всю lane (ноты внутри)
           lane.items[#lane.items + 1] = {
             item = it, r0 = qn0 * lpb, r1 = qn1 * lpb, midi = midi, si = si, loop_rows = loop_rows,
+            loop_first = (not midi) and ahead and ahead.loop_first or nil,      -- первый стык от начала item (строки)
             rgb = M.item_rgb(it),
             sel = R.IsMediaItemSelected and R.IsMediaItemSelected(it) or false,
             muted = R.GetMediaItemInfo_Value(it, 'B_MUTE_ACTUAL') == 1,

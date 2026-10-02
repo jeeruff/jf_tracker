@@ -1639,6 +1639,20 @@ function D.frame(L, snap, rows, state, info)
               gfx.rect(x0 + 1, cy0 + 1, math.max(0, w0 - 2), math.max(0, cy1 - cy0 - 2), 0)
               if y0 < by0 then set(U.BG); gfx.rect(x0, by0, w0, 2, 1) end   -- срез сверху: без верхней кромки
               if y1 > by1 then set(U.BG); gfx.rect(x0, by1 - 2, w0, 2, 1) end
+              -- стыки лупа item (2 окт): косые срезы поперёк, как у automation items
+              if it.loop_rows and it.loop_rows > 1e-6 then
+                set(col)
+                local rr = it.r0 + (it.loop_first or it.loop_rows)
+                local guard = 0
+                while rr < it.r1 - 1e-6 and guard < 512 do
+                  local ly = yr(rr)
+                  if ly > cy0 and ly < cy1 then
+                    gfx.a = 0.8; gfx.rect(x0 + 2, ly, w0 - 4, 1, 1)
+                    gfx.line(x0 + 2, ly - 2, x0 + 5, ly + 1); gfx.a = 1
+                  end
+                  rr = rr + it.loop_rows; guard = guard + 1
+                end
+              end
             end
           end
         end

@@ -238,7 +238,22 @@ local function bar_ceil(t)
 end
 
 function A.ensure_lib(regions)
-  if regions.lib_pos then return regions.lib_pos end
+  local endp = model.marker_pos and model.marker_pos(model.END_MARKER)
+  if regions.lib_pos and not (endp and regions.lib_pos < endp - EPS) then return regions.lib_pos end
+  if regions.lib_pos then
+    -- =LIB раньше =END — переставить за =END (маркер трекера, не пользователя)
+    local i = 0
+    while true do
+      local ret, isrgn, pos, _, nm, _, color = R.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and nm == model.LIB_MARKER then
+        local nt = bar_ceil(endp)
+        R.SetProjectMarkerByIndex(0, i, false, nt, 0, -1, nm, color or 0)
+        return nt
+      end
+      i = i + 1
+    end
+  end
   local t = R.GetProjectLength(0)
   for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
   t = bar_ceil(t) + R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, 0) + 4) -- +такт
@@ -316,7 +331,12 @@ function A.add_region(regions, name, bars)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
   local blen = (qme and qms) and (qme - qms) or 4
   local t1 = R.TimeMap2_QNToTime(0, qn + blen * math.max(1, bars or 1))
-  if regions.lib_pos and t1 > regions.lib_pos + EPS then A.shift_after(regions.lib_pos, bar_ceil(t1) - regions.lib_pos) end
+  -- библиотека — только =LIB ПОСЛЕ =END (2 окт: =LIB раньше =END — не библиотека;
+  -- раньше сдвигалось всё после такого =LIB, вся песня уезжала на каждое «+»)
+  local endp0 = model.marker_pos and model.marker_pos(model.END_MARKER)
+  local lib = regions.lib_pos
+  if lib and endp0 and lib < endp0 - EPS then lib = nil end
+  if lib and t1 > lib + EPS then A.shift_after(lib, bar_ceil(t1) - lib) end
   local i = 0
   while true do
     local ret, isrgn, pos, _, nm, _, color = R.EnumProjectMarkers3(0, i)

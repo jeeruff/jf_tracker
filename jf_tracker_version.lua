@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.20'
+V.VERSION = '0.5.21'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.21', d = '2026-10-02', items = {
+    'fix: matrix + shifted the whole song when =LIB stood before =END (every press moved everything after =LIB); the library now counts only after =END, a misplaced =LIB is moved behind =END when the library is needed',
+    'looped items show their loop seams as cuts across the item, like automation items',
+  } },
   { v = '0.5.20', d = '2026-10-02', items = {
     'envelope line is continuous and 1 px like REAPER; the segment shape shows under the point value, only when not lin',
     'automation items: colour of their curve, thicker left strip to move them, top / bottom edges = start / length, loop seams drawn as cuts',
