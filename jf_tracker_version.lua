@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.16'
+V.VERSION = '0.5.17'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.17', d = '2026-10-02', items = {
+    'hydra \\P project: s save (same as :w), S save as',
+  } },
   { v = '0.5.16', d = '2026-10-02', items = {
     'chords: extra notes get narrow note + velocity subcolumns, not full lanes; a lane is only a REAPER fixed lane',
     'hints option (button in the control block, on by default): one line of the main keys under every module',

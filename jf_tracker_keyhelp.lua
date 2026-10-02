@@ -49,6 +49,7 @@ KH.PAGES = {
     { k = '/ n N *', d = 'search, next, previous, word under cursor' },
     { k = ':', d = 'command line (Tab completes)' },
     { k = '\\', d = 'hydra menu of all actions' },
+    { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = 'Space Enter', d = 'play / stop, move edit cursor here' },
     { k = 'F', d = 'follow playhead on / off' },

@@ -1664,6 +1664,11 @@ ctx = {
           { key = '-', label = 'length -1 ms', fn = function() ctx.xfade_len(-1) end },
         } } end },
       { key = 'd', label = (state.dsp and 'hide' or 'show') .. ' DSP panel (:dsp)', fn = ctx.toggle_dsp },
+      -- \P — проект (2 окт): s сохранить (как :w), S сохранить как…
+      { key = 'P', label = 'project …', sub = function() return { title = 'project', items = {
+          { key = 's', label = 'save project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
+          { key = 'S', label = 'save project as …', fn = function() reaper.Main_OnCommand(40022, 0) end },
+        } } end },
       { key = ':', label = 'command line', fn = function() vim.mode = 'cmd'; vim.cmdline = '' end },
       { key = '/', label = 'search', fn = function() vim.mode = 'search'; vim.searchline = '' end },
       { key = '?', label = 'keys cheat sheet', sub = function() return ctx.hydra_keys() end },
