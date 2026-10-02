@@ -2529,6 +2529,7 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
+  elseif hover.sample and hover.sample.sbtn then state.status = ({ eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move'):format(hover.sample.slice)
@@ -2633,6 +2634,12 @@ local function frame()
       state.toptab = hover.tab
       ctx.set_focus('top')
       click = { t = now2, zone = 'tab' }
+    elseif hover.sample and hover.sample.sbtn then
+      ctx.set_focus('top')
+      local e = hover.sample.e
+      if e and e.item and not (SL.active and SL.entry and SL.entry.item == e.item) then SL.open(e, cur_col() and cur_col().track) end
+      SL.button(hover.sample.sbtn)
+      click = { t = now2, zone = 'slicebtn' }
     elseif hover.sample and hover.sample.norm then
       ctx.set_focus('top'); if hover.sample.e.item then edit.normalize(hover.sample.e.item); vim.msg = 'normalized (peak 0 dB)' end
     elseif hover.sample and hover.sample.vol then

@@ -437,7 +437,7 @@ function M.build(lpb)
     local best, blen
     local e0, e1 = e.offs, e.offs + e.len * e.rate
     for _, p in ipairs(all) do
-      if p ~= e and p.file ~= '' and p.file == e.file then
+      if p ~= e and p.fpath ~= '' and p.fpath == e.fpath then
         local p0, p1 = p.offs, p.offs + p.len * p.rate
         if p0 <= e0 + 1e-4 and p1 >= e1 - 1e-4 and (p1 - p0) > (e1 - e0) + 1e-3 then
           local better = not best or ((p.slices ~= nil) and (best.slices == nil)) or (((p.slices ~= nil) == (best.slices ~= nil)) and (p1 - p0) > blen)
@@ -597,7 +597,9 @@ local function pool_add(pool, seen, it, from_depot)
       for k = 0, (R.TakeFX_GetCount and R.TakeFX_GetCount(take) or 0) - 1 do local _, nm = R.TakeFX_GetFXName(take, k, ''); t[#t + 1] = (nm or ''):gsub('^%w+: ', '') end
       return t
     end)(),
-    file = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
+    -- путь файла источника (для поиска исходника слайса). НЕ `file`: это поле
+    -- у редактора сэмпла значит «файл из браузера» (2 окт: ломало нарезку)
+    fpath = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }
   -- виртуальная нарезка (jf_tracker_slicer): тайм-коды в P_EXT

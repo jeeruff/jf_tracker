@@ -243,7 +243,7 @@ function S.key(c)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
-  elseif ch == 't' then S.use_transients()
+  elseif ch == 't' or ch == 's' then S.use_transients()                -- s: нарезать по транзиентам (2 окт)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
   elseif ch == 'n' and S.entry and S.entry.item then ctx.edit.normalize(S.entry.item); S.msg = 'normalized (peak 0 dB)'
@@ -295,6 +295,18 @@ function S.vol_step(d)
   S.msg = ('vol %+.1f dB'):format(db)
 end
 
+-- кнопка нарезки (2 окт): равные части / транзиенты / чувствительность / сброс
+function S.button(id)
+  if not S.entry or S.entry.file then return end
+  local n = id:match('^eq(%d+)$')
+  if n then S.equal(tonumber(n))
+  elseif id == 'trans' then S.use_transients()
+  elseif id == 'sens-' or id == 'sens+' then
+    S.sens = math.max(0, math.min(1, S.sens + (id == 'sens+' and 0.05 or -0.05)))
+    S.use_transients()
+  elseif id == 'clear' then S.clear() end
+end
+
 function S.cycle_view()
   S.view = S.view == 'peaks' and 'spec' or 'peaks'
   return S.view
@@ -307,7 +319,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local editing = S.active and S.entry and S.entry.item == e.item
   local rh = L.rh
   local title = editing
-    and ('slice: %s  (%.3fs)  %s'):format(e.name, e.len, S.mode)
+    and ('%s  (%.3fs)  %d slices%s'):format(e.name, e.len, #S.slices, S.mode ~= '' and ('  - ' .. S.mode) or '')
     or ('%s  offs %.3f  len %.3f  rate %.2f%s'):format(e.name, e.offs or 0, e.len or 0, e.rate or 1,
         e.slices and ('  slices ' .. #e.slices) or '')
   if zone then title = title .. ('  [inst %02d plays %.3f-%.3fs]'):format(zone[3] or 0, zone[1], zone[2]) end
@@ -357,7 +369,29 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if ctx.hint then ctx.hint('samplevol', vx, y + rh, vw, rh, true) end
     hint_w = vx - x - L.pad
   end
-  U.text(x, y + rh, ctx.fit(hint, hint_w), U.GREY)
+  -- кнопки нарезки (2 окт): вместо строки-подсказки у инструмента (не у файла
+  -- браузера). Клик по кнопке открывает правку этого сэмпла, если она не открыта.
+  local hover_sbtn
+  if not e.file and e.item then
+    local bx = x
+    local BTN = { { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' } }
+    U.text(bx, y + rh, 'slice', U.GREY); bx = bx + U.measure('slice') + L.pad
+    for _, b in ipairs(BTN) do
+      local bw = U.measure(b[1]) + 2 * L.pad
+      if bx + bw > x + hint_w then break end
+      local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y + rh, bw, rh, 1)
+      U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y + rh, bw, rh, 0)
+      U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or U.TEXT)
+      if hot then hover_sbtn = b[2] end
+      if ctx.hint then ctx.hint('slicebtn', bx, y + rh, bw, rh, b[2]) end
+      bx = bx + bw + 2
+    end
+    if editing and #S.trans > 0 then U.text(bx + L.pad, y + rh + 1, ctx.fit(('sens %.2f'):format(S.sens), x + hint_w - bx - L.pad), U.GREY) end
+  else
+    U.text(x, y + rh, ctx.fit(hint, hint_w), U.GREY)
+  end
   -- волна: peaks / spec — нативные спектральные пики REAPER, цвет той же
   -- функцией, что колонка волны трека (ctx.spec_colour); спектрограмма
   -- убрана 1 окт
@@ -442,6 +476,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: depot  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
+  if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end
   if hover_norm then return { e = e, norm = true } end
   if gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh then

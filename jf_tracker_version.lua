@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.6'
+V.VERSION = '0.5.7'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.7', d = '2026-10-02', items = {
+    'fix: instruments were treated as browser files in the sample tab (no slicing keys, file hint, no properties panel)',
+    'slicing buttons in the sample tab: 2 4 8 16 32 64, transients, sens- sens+, clear; s = slice at transients',
+    'sample title shows name, length and slice count (no "slice:" prefix for a whole sample)',
+  } },
   { v = '0.5.6', d = '2026-10-02', items = {
     'ruler left of the row numbers: region names and colours, marker names on their rows (vertical REAPER ruler); click: go to the row',
     'track header: volume and pan on one line (header is 5 rows)',
