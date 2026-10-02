@@ -227,7 +227,9 @@ function D.layout(snap, state, nregions)
   L.header_y = L.top_h
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
-  L.header_h = 5 * L.rh + 3      -- имя | R I M S A | громкость + панорама | лейн / огибающие | подписи
+  -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
+  L.header_rows = 5 + (state.captions and 1 or 0)
+  L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.rh + 4
   L.dsp_h = state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0
@@ -1287,16 +1289,15 @@ function D.frame(L, snap, rows, state, info)
       end
       local function db_of(v) return v > 1e-6 and 20 * math.log(v, 10) or -150 end
       local function pan_txt(p) if math.abs(p) < 0.005 then return 'C' end; return (p < 0 and 'L' or 'R') .. math.floor(math.abs(p) * 100 + 0.5) end
-      -- одна строка (2 окт): громкость слева, панорама справа (stereo pan — p + w, dual — L + R)
+      -- громкость — своя строка на всю ширину; панорама — своя строка ниже
+      -- (stereo pan — p + w, dual — L + R), 2 окт
       local sx, sw = c.x + L.pad + indent, c.w - 2 * L.pad - indent
-      local py = hy + 2 * L.rh + 1
       local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
       local db = db_of(vol)
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
-      local two = col.panmode == 5 or col.panmode == 6
-      local vw = math.floor(sw * (two and 0.42 or 0.55))
-      slider(sx, py, vw - L.pad, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
-      local px, pw = sx + vw, sw - vw
+      slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
+      local py = hy + 3 * L.rh + 1
+      local px, pw = sx, sw
       if col.panmode == 5 then
         local half = math.floor(pw / 2)
         slider(px, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
@@ -1314,10 +1315,10 @@ function D.frame(L, snap, rows, state, info)
       local bw2 = c.folded and 0 or (2 * L.btn_w + 2)
       if col.fixed and not c.folded then
         local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
-        text(ln.x + L.pad, hy + 3 * L.rh + 2, fit(lname, ln.w - 2 * L.pad - bw2), U.GREY)
+        text(ln.x + L.pad, hy + 4 * L.rh + 2, fit(lname, ln.w - 2 * L.pad - bw2), U.GREY)
       end
       if not c.folded then
-        local by = hy + 3 * L.rh + 1
+        local by = hy + 4 * L.rh + 1
         for k, b in ipairs({ { '-', -1 }, { '+', 1 } }) do
           local bx = ln.x + ln.w - bw2 + (k - 1) * (L.btn_w + 2)
           local hot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
@@ -1328,18 +1329,18 @@ function D.frame(L, snap, rows, state, info)
           hint('lanebtn', bx, by, L.btn_w, L.rh, { col = col, lane = ln.lane, d = b[2], n = ln.nsub })
         end
       end
-      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 3 * L.rh + 1, 1, L.rh, 1) end
+      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1) end
     end
     for _, ev in ipairs(c.envs) do
-      text(ev.x + L.pad, hy + 3 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
-      hint('env', ev.x, hy + 3 * L.rh, ev.w, L.rh, ev.fi)
-      set(U.DIM); gfx.rect(ev.x - 1, hy + 3 * L.rh + 1, 1, L.rh, 1)
+      text(ev.x + L.pad, hy + 4 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
+      hint('env', ev.x, hy + 4 * L.rh, ev.w, L.rh, ev.fi)
+      set(U.DIM); gfx.rect(ev.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1)
     end
     -- третья строка: что делает каждая подколонка (просьба 1 окт). Подписи
     -- короче ширины поля на символ, чтобы соседние не слипались; полное
     -- описание — в статус-баре при наведении (hover.caption)
-    if not c.folded then
-      local cy3 = hy + 4 * L.rh + 2
+    if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
+      local cy3 = hy + 5 * L.rh + 2
       local function cap(x, w, txt, kind)
         text(x, cy3, fit(txt, w), U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
@@ -1366,7 +1367,7 @@ function D.frame(L, snap, rows, state, info)
     local rg = info.cur_region
     local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
     local bx, bw = tx0 + 1, L.label_w - 2
-    local y2, y3 = hy + 3 * L.rh + 2, hy + 4 * L.rh + 2
+    local y2, y3 = hy + (L.header_rows - 2) * L.rh + 2, hy + (L.header_rows - 1) * L.rh + 2
     set(U.LINE); gfx.rect(bx, y2 - 1, bw, 2 * L.rh + 1, 0)
     text(bx + math.max(1, math.floor((bw - ms(s)) / 2)), y2, fit(s, bw - 2), U.TEXT)
     local hl = mx >= bx and mx < bx + bw / 2 and my >= y3 and my < y3 + L.rh

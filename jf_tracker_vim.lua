@@ -432,6 +432,8 @@ V.COMMANDS = {
   { 'fold', '', 'fold all tracks' }, { 'unfold', '', 'unfold all' },
   { 'trim', '', 'trim items to region bounds (strict patterns)' },
   { 'beatsync', '[beat|bar|N]', 'stretch event end to the nearest beat / bar / N rows (= key, N=)' },
+  { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
+  { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'garden', '[on|off|clear|pin|reset|size WxH|load]', 'Garden tab: loops grid + Orca field (plants notes into the timeline while playing)' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
@@ -526,6 +528,8 @@ local function run_cmd(line)
   elseif cmd == 'icons' then st.icons = not st.icons; V.msg = 'nerd icons ' .. (st.icons and 'on' or 'off') .. ((st.font or 0) > 0 and '' or ' (TTF only: :font 24)')
   elseif cmd == 'mxzoom' then ctx.mx_zoom()
   elseif cmd == 'trim' then if ctx.mx_trim then ctx.mx_trim() end
+  elseif cmd == 'tname' then ctx.rename_track(arg)
+  elseif cmd == 'iname' then ctx.rename_inst(arg)
   elseif cmd == 'garden' then ctx.garden_cmd(arg ~= '' and arg or 'show')
   elseif cmd == 'vel' and n then V.vel = math.max(1, math.min(127, math.floor(n))); V.msg = 'velocity ' .. V.vel
   elseif cmd == 'loop' then

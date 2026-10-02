@@ -102,6 +102,7 @@ if tostring(ext('font_v', '')) ~= '3' then state.font = 0; state.fontscale = 2 e
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
+state.captions = tostring(ext('captions', '0')) == '1'     -- строка подписей колонок (по умолчанию выкл, 2 окт)
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
 PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
@@ -164,7 +165,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -911,6 +912,7 @@ ctx = {
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('icons', 'nerd icons', 'icons on buttons (TTF font only)'),
+      flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = 4, desc = 'x1..x4 (Ctrl +/-)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
       { key = 'font', label = 'ttf font size', kind = 'num', min = 0, max = 40, desc = '0 = bitmap font; N = Nerd font size', get = function() return state.font or 0 end, set = function(v) ctx.set_font(math.floor(v)) end },
       { sep = true },
@@ -1115,6 +1117,40 @@ ctx = {
     state.top = true; state.toptab = 'sample'
     local c = cur_col()
     if SL.open_file(path, c and c.track) then vim.msg = 'sample: ' .. (path:match('[^/]+$') or path) end
+  end,
+  -- ── переименование трека и инструмента (2 окт) ─────────────────────
+  rename_track_prompt = function(col)
+    col = col or cur_col(); if not col then return end
+    state.rename_guid = col.guid
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'tname ' .. (col.name or '')
+  end,
+  rename_track = function(text)
+    text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local col
+    for _, c in ipairs((snap and snap.cols) or {}) do if c.guid == state.rename_guid then col = c end end
+    col = col or cur_col()
+    state.rename_guid = nil
+    if not col then vim.msg = 'no track'; return end
+    edit.track_name(col.track, text)
+    model.invalidate()
+    vim.msg = 'track: ' .. (text ~= '' and text or '(no name)')
+  end,
+  rename_inst_prompt = function()
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if not e then vim.msg = 'no instrument'; return end
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'iname ' .. (e.name or '')
+  end,
+  rename_inst = function(text)
+    text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if not e then vim.msg = 'no instrument'; return end
+    if text == '' then vim.msg = 'name: empty'; return end
+    local items = {}
+    for it, i in pairs((snap and snap.inst_of) or {}) do if i == vim.inst then items[#items + 1] = it end end
+    if #items == 0 and e.item then items[1] = e.item end
+    local n = edit.take_names(items, text)
+    model.invalidate()
+    vim.msg = ('instrument %02d: %s (%d item%s)'):format(vim.inst, text, n, n == 1 and '' or 's')
   end,
   -- Cmd+Enter в браузере: выделенный файл заменяет сэмпл выбранного инструмента
   browser_replace = function()
@@ -2586,7 +2622,7 @@ local function frame()
     state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
-  elseif SPROP.hover and state.top and state.toptab == 'sample' then
+  elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.trs then
     local names = { vol = 'volume', pan = 'pan', width = 'width (stereo pan)', panl = 'left pan (dual pan)', panr = 'right pan (dual pan)' }
@@ -2629,9 +2665,10 @@ local function frame()
   elseif type(hover.browser) == 'string' then
     state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
+  elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
     local c = hover.header_col or hover.col
-    state.status = c.name .. (c.muted and ' [muted]' or '') .. (c.solo and ' [solo]' or '') .. (c.armed and ' [rec]' or '') .. ' - click: select track in REAPER, rclick: track menu'
+    state.status = c.name .. (c.muted and ' [muted]' or '') .. (c.solo and ' [solo]' or '') .. (c.armed and ' [rec]' or '') .. ' - click: select track in REAPER, dblclick name: rename (:tname), rclick: track menu'
   else state.status = '' end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
     local ks = {}; for k in pairs(hover) do ks[#ks + 1] = k end; table.sort(ks)
@@ -2774,11 +2811,13 @@ local function frame()
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
+      if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
       local same = click.zone == 'sprop' and click.row == SPROP.hover.row
       SPROP.sel = SPROP.hover.row
       if e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
+      ::sprop_done::
     elseif hover.trs then
       local t = hover.trs
       if dbl and click.zone == 'trs' and click.row == t.what then
@@ -2877,7 +2916,11 @@ local function frame()
       click = { t = now2, zone = 'btn' }
     elseif hover.header_col then
       reaper.SetOnlyTrackSelected(hover.header_col.track)
-      click = { t = now2, zone = 'header' }
+      -- двойной клик по имени трека — переименовать (строка :tname с текущим именем)
+      if dbl and click.zone == 'header' and click.guid == hover.header_col.guid and gfx.mouse_y < L.header_y + L.rh then
+        ctx.rename_track_prompt(hover.header_col)
+      end
+      click = { t = now2, zone = 'header', guid = hover.header_col.guid }
     elseif hover.itemedge and hover.itemedge.edge ~= 'move' and gfx.mouse_cap & 8 ~= 8 then
       -- край рамки item: trim как в аранжировке
       ctx.set_focus('tracker')
@@ -3126,6 +3169,13 @@ local function frame()
   local quit = false
   if c == keys.f1 then open_help(); c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end
+  -- F2..F6 — вкладки верхнего дока (2 окт): sample, modulation, retro, garden, master
+  do
+    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'retro', [26165] = 'garden', [26166] = 'master' }
+    if FTAB[c] and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      state.top = true; state.toptab = FTAB[c]; ctx.set_focus('top'); vim.msg = 'tab: ' .. FTAB[c]; c = 0
+    end
+  end
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end

@@ -55,6 +55,9 @@ function SP.draw(L, x, y, w, h, e, focused)
   local title = (e.depth or 0) > 0 and e.parent
     and (((e.slice_k and e.slice_k > 0) and ('s' .. e.slice_k) or 'cut') .. ' of ' .. e.parent.name)
     or e.name
+  local tmx, tmy = gfx.mouse_x, gfx.mouse_y
+  local thot = tmx >= x and tmx < x + w and tmy >= y and tmy < y + L.rh
+  if thot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x, y, w, L.rh, 1); SP.hover = { title = true, row = 0 } end
   U.text(x + L.pad, y, ctx.fit(title, w - L.pad), U.AMBER)
   local lw = math.floor(w * 0.45)
   local n = math.min(#SP.ROWS, math.floor((h - L.rh) / L.rh))

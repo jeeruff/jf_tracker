@@ -1425,6 +1425,19 @@ function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R
 function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 
+-- ── переименование (2 окт) ───────────────────────────────────────────────
+function E.track_name(tr, name) run('rename track', function() R.GetSetMediaTrackInfo_String(tr, 'P_NAME', name, true) end) end
+function E.take_names(items, name)
+  local n = 0
+  run('rename instrument', function()
+    for _, it in ipairs(items) do
+      local tk = R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
+      if tk then R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', name, true); n = n + 1 end
+    end
+  end)
+  return n
+end
+
 -- ── замена сэмпла инструмента файлом из браузера (Cmd+Enter, 2 окт) ──────
 -- Все items инструмента получают новый источник; позиция и длина нот те же,
 -- offset в начало файла, имя take = имя файла, старая нарезка снимается.

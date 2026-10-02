@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.10'
+V.VERSION = '0.5.11'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.11', d = '2026-10-02', items = {
+    'rename: dblclick on a track name (:tname), click on the instrument name in sample properties (:iname, all its items)',
+    'track header: volume on its own full-width row, pan on its own row; column captions row is optional (Options, off by default)',
+    'F2 sample, F3 modulation, F4 retro, F5 garden, F6 master',
+  } },
   { v = '0.5.10', d = '2026-10-02', items = {
     'Cmd+Enter in the browser replaces the sample of the selected instrument in all its items (length kept, offset 0, take named after the file, old slices removed; one undo step)',
   } },
