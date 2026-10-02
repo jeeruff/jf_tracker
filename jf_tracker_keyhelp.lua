@@ -33,6 +33,7 @@ KH.PAGES = {
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
     { k = 'dd', d = 'delete rows; d + motion: d3w dG', t = { 'dd', 'd' } },
+    { k = 'dW dt', d = 'delete whole item under cursor / clear track in region', t = { 'dW', 'dt' } },
     { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s m', d = 'replace / split / mute event' },
     { k = '^A ^X', d = 'field value +1 / -1' },
@@ -124,7 +125,20 @@ KH.PAGES = {
     { k = 'p', d = 'auto preview on / off' },
     { k = 'v', d = 'show file in sample tab' },
     { k = 'w q', d = 'panel width / hide' },
+    { k = '1 2 3 4 5', d = 'bookmark: go (empty: remember this folder)' },
+    { k = '! @ # $ %', d = 'Shift+1..5: set bookmark to this folder', t = { '!', '@', '#', '$', '%' } },
+    { k = 'H L', d = 'folder history back / forward (< > buttons)' },
+    { k = '*', d = 'new folder here (:mkdir name)' },
     { k = 'Esc Tab', d = 'clear filter / next module' },
+  } },
+  fxb = { title = 'fx list (left of DSP)', e = {
+    { k = 'type', d = "fzf search: words, ^start, end$, 'exact, !not" },
+    { k = 'Up Down ^J ^K', d = 'move', t = { 'Up', 'Down', '^J', '^K' } },
+    { k = 'Enter', d = 'add fx to the end of the cursor track chain' },
+    { k = 'dblclick', d = 'add fx' },
+    { k = 'drag', d = 'onto the DSP panel: insert at the amber line' },
+    { k = 'BS', d = 'erase search' },
+    { k = 'Esc Tab', d = 'clear search / next module' },
   } },
   dsp = { title = 'DSP (track fx)', e = {
     { k = 'h l', d = 'fx left / right' },
@@ -136,6 +150,7 @@ KH.PAGES = {
     { k = 'a /', d = 'add fx (fzf)' },
     { k = 'A', d = 'automate a parameter (fzf)' },
     { k = 'Space', d = 'play / stop' },
+    { k = 'drag title', d = 'move fx: the amber line shows where it lands' },
   } },
   sample = { title = 'sample tab (slicer + properties)', e = {
     { k = 'Enter', d = 'apply slicing / insert selection at cursor' },
@@ -213,7 +228,7 @@ KH.PAGES = {
     { k = '?', d = 'help off' },
   } },
 }
-KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'sample', 'modulation', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'sample', 'modulation', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

@@ -8,6 +8,10 @@ reaper = {
   EnumerateSubdirectories = function(p, i) local t = tree[p]; return t and t.dirs[i + 1] end,
   EnumerateFiles = function(p, i) local t = tree[p]; return t and t.files[i + 1] end,
   GetResourcePath = function() return '/tmp' end,
+  GetExtState = function(sec, k) return (EXT or {})[k] or '' end,
+  SetExtState = function(sec, k, v) EXT = EXT or {}; EXT[k] = v end,
+  DeleteExtState = function(sec, k) if EXT then EXT[k] = nil end end,
+  RecursiveCreateDirectory = function(p) local par, nm = p:match('^(.*)/([^/]+)$'); tree[p] = { dirs = {}, files = {} }; local t = tree[par]; if t then t.dirs[#t.dirs + 1] = nm end; return 1 end,
 }
 local B = dofile('/Users/jeeruff/Library/Application Support/REAPER/Scripts/jf_tracker/jf_tracker_browser.lua')
 B.init({}, '/r')
@@ -31,4 +35,20 @@ eq('folder scope: no bass in Drums', #B.entries, 0)
 B.key(27); B.start_find(); for c in ('^kick'):gmatch('.') do B.key(c:byte()) end
 eq('^ prefix on basename (folder Kicks + 2 files)', #B.entries, 3)
 B.key(13); eq('Enter keeps results', #B.entries, 3); eq('typing stopped', B.filtering, false)
+-- навигация 2 окт: история, закладки, путь, mkdir
+B.filter = ''; B.filtering = false; B.mode = 'files'
+B.path = '/r'; B.back, B.fwd = {}, {}; B.refresh()
+B.cur = 2; B.enter(); eq('enter Drums', B.path, '/r/Drums')
+B.up(); eq('up', B.path, '/r')
+B.history(-1); eq('back → Drums', B.path, '/r/Drums')
+B.history(1); eq('forward → /r', B.path, '/r')
+B.up(); eq('up above root allowed', B.path, '/')
+B.go('/r/Bass'); B.mark(1); eq('empty mark assigns', B.marks[1], '/r/Bass')
+B.go('/r'); B.mark(1); eq('mark jumps', B.path, '/r/Bass')
+B.go('/r'); B.key(('!'):byte()); eq('Shift+1 reassigns', B.marks[1], '/r')
+B.key(('2'):byte()); eq('2 on empty assigns', B.marks[2], '/r')
+local parts = B.path_parts('/r/Drums/Kicks')
+eq('path parts', #parts, 4); eq('crumb path', parts[3].path, '/r/Drums')
+B.go('/r'); eq('mkdir', B.mkdir('New Kit'), true); eq('mkdir selects', B.entries[B.cur].name, 'New Kit')
+B.key(('H'):byte()); eq('H back', B.path ~= '/r', true)
 print(('%d checks, %d failed'):format(n, bad))

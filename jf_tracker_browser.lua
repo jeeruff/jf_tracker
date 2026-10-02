@@ -43,6 +43,20 @@ B.filtering = false -- идёт набор фильтра
 B.pmproj = nil      -- открытый проект pm: { e=, dir=, tracks=, samples=, regions=, markers= }
 B.pmdir = nil       -- подпапка внутри проекта: 'tracks' | 'samples' | 'regions' | 'markers'
 B.wave = false      -- мини-волны у файлов (кнопка wave)
+-- навигация по папкам (2 окт): история назад / вперёд (< > и H L), закладки
+-- 1..5 (клик по пустой — запомнить текущую папку, по занятой — перейти;
+-- Shift+клик — перезаписать, Cmd+клик — очистить; клавиши 1..5 / Shift+1..5),
+-- * — новая папка (:mkdir), строка пути под кнопками: клик по папке — туда
+B.back, B.fwd = {}, {}
+B.marks = {}
+B.crumbs = {}       -- сегменты пути последней отрисовки { label=, path= }
+local MARK_SHIFT = { ['!'] = 1, ['@'] = 2, ['#'] = 3, ['$'] = 4, ['%'] = 5 }
+local function load_marks()
+  for i = 1, 5 do
+    local v = R.GetExtState and R.GetExtState('jf_tracker', 'bmark' .. i) or ''
+    B.marks[i] = (v ~= '' and v) or nil
+  end
+end
 
 local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true }
 
@@ -50,7 +64,60 @@ function B.init(c, root)
   ctx = c
   B.root = root or (os.getenv('HOME') .. '/samples')
   B.path = B.root
+  load_marks()
   B.refresh()
+end
+
+-- перейти в папку (с записью в историю)
+function B.go(path, no_hist)
+  if not path or path == '' or path == B.path then return end
+  if not no_hist then
+    B.back[#B.back + 1] = B.path
+    if #B.back > 100 then table.remove(B.back, 1) end
+    B.fwd = {}
+  end
+  if B.mode ~= 'files' then B.mode = 'files'; B.pmproj, B.pmdir, B.db = nil, nil, nil end
+  B.path = path; B.cur = 1; B.filter = ''; B.filtering = false
+  B.refresh()
+end
+function B.history(d)
+  local from, to = d < 0 and B.back or B.fwd, d < 0 and B.fwd or B.back
+  local p = table.remove(from)
+  if not p then if ctx.msg then ctx.msg(d < 0 and 'no folder back' or 'no folder forward') end; return end
+  to[#to + 1] = B.path
+  B.go(p, true)
+end
+function B.mark(i, how)
+  if how == 'set' or (how == nil and not B.marks[i]) then
+    B.marks[i] = B.path
+    if R.SetExtState then R.SetExtState('jf_tracker', 'bmark' .. i, B.path, true) end
+    if ctx.msg then ctx.msg(('bookmark %d = %s'):format(i, B.path)) end
+  elseif how == 'clear' then
+    B.marks[i] = nil
+    if R.DeleteExtState then R.DeleteExtState('jf_tracker', 'bmark' .. i, true) end
+    if ctx.msg then ctx.msg(('bookmark %d cleared'):format(i)) end
+  else B.go(B.marks[i]) end
+end
+-- новая папка в текущей (имя из :mkdir)
+function B.mkdir(name)
+  name = (name or ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('/', '-')
+  if name == '' then if ctx.msg then ctx.msg('mkdir: give a name') end; return false end
+  local p = B.path .. '/' .. name
+  R.RecursiveCreateDirectory(p, 0)
+  B.refresh()
+  for i, e in ipairs(B.entries) do if e.dir and e.name == name then B.cur = i end end
+  if ctx.msg then ctx.msg('folder created: ' .. p) end
+  return true
+end
+-- сегменты полного пути: «/», «Users», … (клик — перейти)
+function B.path_parts(path)
+  local out = { { label = '/', path = '/' } }
+  local acc = ''
+  for seg in path:gmatch('[^/]+') do
+    acc = acc .. '/' .. seg
+    out[#out + 1] = { label = seg, path = acc }
+  end
+  return out
 end
 
 function B.refresh()
@@ -398,6 +465,15 @@ function B.click(what)
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
   elseif what == 'wave' then B.wave = not B.wave
+  elseif what == 'back' then B.history(-1)
+  elseif what == 'fwd' then B.history(1)
+  elseif what == 'mkdir' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
+  elseif what:match('^bm%d$') then
+    local m = ctx.mods and ctx.mods() or {}
+    B.mark(tonumber(what:sub(3)), m.cmd and 'clear' or (m.shift and 'set' or nil))
+  elseif what:match('^crumb%d+$') then
+    local c = B.crumbs[tonumber(what:match('%d+'))]
+    if c then B.go(c.path) end
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
   elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
 end
@@ -412,7 +488,7 @@ function B.enter()
   if not e then return end
   if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
-  elseif e.dir then B.path = B.full(e); B.cur = 1; B.filter = ''; B.refresh()
+  elseif e.dir then B.go(B.full(e))
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
   elseif e.rgn then if ctx.drop_region_at_cursor then ctx.drop_region_at_cursor(B.pmproj.e.path, e) end
@@ -438,9 +514,10 @@ function B.up()
     elseif B.pmproj then B.pmproj = nil; B.cur = 1; B.set_all(B.read_pm()) end
     return
   end
-  if B.path == B.root or #B.path <= #B.root then return end
+  -- выше корня :browse тоже можно (полный путь в строке пути, 2 окт)
+  if B.path == '/' then return end
   local parent = B.path:match('(.*)/[^/]+$')
-  if parent and #parent >= #B.root then B.path = parent; B.cur = 1; B.refresh() end
+  if parent then B.go(parent ~= '' and parent or '/') end
 end
 
 -- строка описания для статус-бара
@@ -482,7 +559,12 @@ function B.key(c)
     else return false end
     return true
   end
-  if ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
+  if ch:match('^[1-5]$') then B.mark(tonumber(ch))
+  elseif MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
+  elseif ch == 'H' then B.history(-1)
+  elseif ch == 'L' then B.history(1)
+  elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
+  elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
   elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
@@ -504,6 +586,15 @@ end
 
 -- отрисовка в прямоугольнике (x, y, w, h); возвращает hover-индекс
 -- hover: число — строка списка, строка — кнопка шапки ('files','db','size','hide')
+-- кнопки закладок 1..5: занятая — циан, текущая папка — янтарь, пустая — тускло
+function B.draw_marks(btn, bx, by, U)
+  for i = 1, 5 do
+    local p = B.marks[i]
+    bx = btn(bx, by, tostring(i), 'bm' .. i, p ~= nil and p == B.path, p and U.CYAN or U.DIM)
+  end
+  return bx
+end
+
 function B.draw(U, L, x, y, w, h)
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.LINE); gfx.rect(x, y, 2, h, 1)
@@ -511,22 +602,26 @@ function B.draw(U, L, x, y, w, h)
   local hover
   -- кнопки текстом: сверху — куда идти (files db pm proj), снизу — вид
   -- (wave auto <> x). Шапка и подвал по одной строке.
-  local function btn(bx, by, label, what, on)
+  local function btn(bx, by, label, what, on, tc)
     local bw = U.measure(label) + 2 * L.pad
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
     U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
-    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or (tc or U.GREY)))
     if hot then hover = what end
     if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
     return bx + bw + L.pad
   end
+  local wrap_marks = false
   do
     local bx = x + L.pad + 2
     for _, t in ipairs({ 'files', 'db', 'pm', 'proj' }) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
+    -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
+    local mw = 5 * (U.measure('5') + 3 * L.pad)
+    if bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
   end
   do
     local by = y + h - L.rh - 2
@@ -589,7 +684,51 @@ function B.draw(U, L, x, y, w, h)
     h = h - wh - L.rh - 6
   end
   y = y + L.rh + 2; h = h - L.rh - 2
-  -- путь / база / фильтр
+  -- управляющая строка (2 окт): < > * [1..5] и полный путь, клик по папке — туда
+  do
+    local bx = x + L.pad + 2
+    if B.mode == 'files' then
+      bx = btn(bx, y, '<', 'back', false)
+      bx = btn(bx, y, '>', 'fwd', false)
+      bx = btn(bx, y, '*', 'mkdir', false)
+      if wrap_marks then bx = B.draw_marks(btn, bx, y, U) end
+      if B.filter == '' and not B.filtering then
+        local parts = B.path_parts(B.path)
+        -- влезают последние сегменты; срезанное начало — «..»
+        local avail = x + w - L.pad - bx
+        local sep = U.measure('/')
+        local first, used = #parts + 1, 0
+        for i = #parts, 1, -1 do
+          local wi = U.measure(parts[i].label) + (i > 2 and sep or 0)
+          if used + wi > avail - U.measure('..') then break end
+          used = used + wi; first = i
+        end
+        B.crumbs = {}
+        local cx = bx
+        if first > 1 then U.text(cx, y + 1, '..', U.DIM); cx = cx + U.measure('..') end
+        for i = first, #parts do
+          local pt = parts[i]
+          if i > 2 and i > first then U.text(cx, y + 1, '/', U.DIM); cx = cx + sep end   -- после корня «/» свой слэш не нужен
+          local wi = U.measure(pt.label)
+          local hot = mx >= cx and mx < cx + wi and my >= y and my < y + L.rh
+          local last = i == #parts
+          U.text(cx, y + 1, pt.label, hot and U.AMBER or (last and U.TEXT or U.CYAN))
+          B.crumbs[i] = pt
+          if hot then hover = 'crumb' .. i end
+          if ctx.hint then ctx.hint('browserbtn', cx, y, wi, L.rh, 'crumb' .. i) end
+          cx = cx + wi
+        end
+        y = y + L.rh + 2; h = h - L.rh - 2
+      end
+    end
+    if bx > x + L.pad + 2 and (B.filter ~= '' or B.filtering) then
+      -- поиск: та же строка, после кнопок
+      local scope = 'in folder'
+      U.text(bx, y + 1, ctx.fit('/' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries), x + w - L.pad - bx), U.AMBER)
+      y = y + L.rh + 2; h = h - L.rh - 2
+    end
+  end
+  -- путь / база / фильтр (не files: прежняя строка «где я»)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
@@ -599,8 +738,10 @@ function B.draw(U, L, x, y, w, h)
     local scope = B.mode == 'files' and 'in folder' or (B.mode == 'db' and B.db and 'in db' or 'in list')
     where = where .. ' /' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries)
   end
-  U.text(x + L.pad + 2, y + 1, ctx.fit(where, w - 2 * L.pad), (B.filtering and U.AMBER or U.GREY))
-  y = y + L.rh; h = h - L.rh
+  if B.mode ~= 'files' then
+    U.text(x + L.pad + 2, y + 1, ctx.fit(where, w - 2 * L.pad), (B.filtering and U.AMBER or U.GREY))
+    y = y + L.rh; h = h - L.rh
+  end
   local nvis = math.floor(h / L.rh)
   if B.cur - 1 < B.scroll then B.scroll = B.cur - 1 end
   if B.cur - 1 >= B.scroll + nvis then B.scroll = B.cur - nvis end

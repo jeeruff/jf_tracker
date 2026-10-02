@@ -562,6 +562,7 @@ local function run_cmd(line)
   elseif cmd == 'poolprev' then st.poolprev = not st.poolprev; V.msg = 'pool preview ' .. (st.poolprev and 'on' or 'off')
   elseif cmd == 'side' then st.side = not st.side
   elseif cmd == 'dock' then ctx.toggle_dock()
+  elseif cmd == 'mkdir' then if ctx.browser_mkdir then ctx.browser_mkdir(arg) end
   elseif cmd == 'browse' then ctx.browse(arg ~= '' and arg or nil); st.side = true
   elseif cmd == 'sync' then V.msg = 'synced ' .. tostring(ctx.sync_here())
   elseif cmd == 'autosync' then st.autosync = not st.autosync; V.msg = 'autosync ' .. (st.autosync and 'on' or 'off')
@@ -911,6 +912,16 @@ function V.key_impl(c)
         V.count = (V.count or 0) * 10 + (c - 48); V.pending = p; return
       end
       if c == ('g'):byte() then V.op = p; V.pending = 'g'; return end
+      -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
+      -- курсора в регионе (вне региона — до =END). Просьба 2 окт.
+      if p == 'd' and c == ('W'):byte() then
+        if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
+      if p == 'd' and c == ('t'):byte() then
+        if ctx.clear_track() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
       local t = motion(c, n)
       if t then
         local f0, f1, r0, r1 = range_or_event(p, t)
@@ -1193,6 +1204,26 @@ function V.visual_range()
   local f0, f1 = math.min(a.fi, b.fi), math.max(a.fi, b.fi)
   if V.mode == 'vline' then f0, f1 = 1, nflat() end
   return f0, f1, math.min(a.row, b.row), math.max(a.row, b.row)
+end
+
+-- подсказка продолжений ожидающего оператора — справа в строке статуса
+-- (просьба 2 окт: нажал d — видно, что можно дальше)
+local PENDING_HINT = {
+  d = 'd: d rows | w event | W whole item | t track in region | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
+  c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
+  g = 'g: g first row | Esc',
+  z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom',
+  r = 'r: note key sets pitch | hex digits set field | Esc',
+  q = 'q: a..z record macro into register',
+  ['@'] = '@: a..z play macro | @ repeat last',
+}
+function V.pending_hint()
+  if not V.pending then return nil end
+  local p = V.op and V.pending == 'g' and V.op or V.pending
+  local h = PENDING_HINT[p]
+  if not h then return nil end
+  return (V.count and (tostring(V.count) .. ' ') or '') .. h
 end
 
 function V.status()

@@ -39,6 +39,7 @@ local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garde
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
+local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
@@ -49,7 +50,13 @@ local function ext(k, d)
   if v == '' then return d end
   return tonumber(v) or v
 end
-local function flag(k, d) return ext(k, d and '1' or '0') ~= '0' end
+-- флаг: сохранённое '0' — выкл. (раньше ext() превращал '0' в число 0, а
+-- 0 ~= '0' в Lua истинно: любой выключенный флаг после рестарта включался — 2 окт)
+local function flag(k, d)
+  local v = reaper.GetExtState(EXT, k)
+  if v == '' then return d and true or false end
+  return v ~= '0'
+end
 
 local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16 }
 local state = {
@@ -95,7 +102,10 @@ local state = {
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
-  mxruler = flag('mxruler', true),               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
+  mxruler = flag('mxruler', true),
+  keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
+  copymedia = flag('copymedia', true),
+  fxb = flag('fxb', true),                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
@@ -127,6 +137,7 @@ local inject_last = reaper.GetExtState(EXT, 'inject')       -- стартово�
 local body_drag = nil                                       -- Shift+протяжка блока в теле
 local cmd_text_cache                                        -- ctx.cmd_by_text
 local dsp_drag = nil                                        -- перетаскивание DSP-блока
+local fxb_drag = nil                                        -- перетаскивание FX из браузера эффектов
 local resize_drag = nil                                     -- ресайз: 'side' | 'top'
 local lock_sync = {}                                        -- lock: последнее синхронное состояние
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
@@ -215,7 +226,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -396,11 +407,59 @@ ctx = {
   ctrl_held = function() return gfx.mouse_cap & 32 == 32 end,
   -- macOS: бит 4 = Cmd, 32 = Ctrl, 16 = Option
   msg = function(m) vim.msg = m end,
+  -- браузер: * / :mkdir — новая папка в текущей
+  browser_mkdir_prompt = function()
+    if B.mode ~= 'files' then vim.msg = 'mkdir: only in files'; return end
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'mkdir '
+    vim.msg = 'new folder in ' .. B.path
+  end,
+  browser_mkdir = function(name) B.mkdir(name) end,
+  -- браузер эффектов: добавить выбранный FX на трек курсора (pos — место в цепочке)
+  fxb_add = function(it, pos)
+    it = it or FB.selected()
+    local col = cur_col()
+    if not (it and col) then vim.msg = 'fx: nothing selected'; return end
+    edit.fx_add(col.track, it.data, pos)
+    state.dsp = true
+    vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. col.name .. (pos and (' @' .. (pos + 1)) or '')
+  end,
+  -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
+  delete_item_at_cursor = function()
+    local f = L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
+    local item = cell and cell.item
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'dW: no item under cursor'; return false end
+    local tr = reaper.GetMediaItemTrack(item)
+    edit.run('delete item', function() reaper.DeleteTrackMediaItem(tr, item) end)
+    vim.msg = 'dW: item deleted'
+    return true
+  end,
+  -- dt: очистить трек курсора в его регионе; вне региона — от =START до =END
+  -- (библиотека за =LIB не трогается)
+  clear_track = function()
+    local f = L.flat[vim.cur.fi]
+    if not (f and f.col) then return false end
+    local tr = f.col.track
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local t0 = rg and rg.pos or (model.marker_pos(model.START_MARKER) or 0)
+    local t1 = rg and rg.rgnend or model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
+    local n = 0
+    edit.run('clear track', function()
+      for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+        local it = reaper.GetTrackMediaItem(tr, i)
+        local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        if pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
+      end
+    end)
+    vim.msg = ('dt: %d item(s) of %s cleared in %s'):format(n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (=START..=END)')
+    return n > 0
+  end,
   -- страница справки для модуля в фокусе
   help_page = function()
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -1032,6 +1091,7 @@ ctx = {
     local f
     if inr(L.inst_rect) then f = 'inst'
     elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
+    elseif inr(L.fxb_rect) then f = 'fxb'
     elseif inr(L.dsp_rect) then f = 'dsp'
     elseif inr(L.top_rect) then f = 'top'
     elseif not state.mx_hidden and x < L.matrix_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'matrix'
@@ -1057,6 +1117,8 @@ ctx = {
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
+      flag('keepsamples', 'keep deleted samples', 'last item of a file deleted: the sample goes to the track library (=LIB)'),
+      flag('copymedia', 'copy files to project', 'files from the browser are copied into the project media folder (saved projects)'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'len', 'mark' }, desc = 'track groups / by length / by marks @ $ *', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       { sep = true },
       flag('meters', 'peak meters', 'meters over the columns'),
@@ -1407,6 +1469,7 @@ ctx = {
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
+    if f == 'fxb' and not (state.dsp and state.fxb and not state.khelp) then f = 'tracker' end
     if f == 'inst' and not state.top then f = 'tracker' end
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
     if f == 'dsp' and state.focus ~= 'dsp' then KH.from = state.focus end
@@ -1422,6 +1485,7 @@ ctx = {
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
     if state.dsp or state.khelp then order[#order + 1] = 'dsp' end
+    if state.dsp and state.fxb and not state.khelp then order[#order + 1] = 'fxb' end
     if not state.mx_hidden then order[#order + 1] = 'matrix' end
     if state.top then order[#order + 1] = 'top' end
     local i = 1
@@ -2636,6 +2700,12 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
+  -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
+  if edit.rescued then
+    vim.msg = 'last item of ' .. table.concat(edit.rescued, ', ') .. ' deleted - sample kept in track library (=LIB)'
+    edit.rescued = nil
+  end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.khelp and state.focus ~= 'dsp' then KH.pinned = false; KH.page = ctx.help_page() end
   local t_0 = reaper.time_precise()
@@ -2738,7 +2808,8 @@ local function frame()
   draw.hybrid = state.icons and (state.font or 0) == 0   -- битмап-текст + Nerd-глифы
   local hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
-    status_left = left, status_right = state.status,
+    status_left = left,
+    status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus ~= 'matrix' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     timesel = (function()
@@ -2779,6 +2850,11 @@ local function frame()
     inspreview = state.preview,
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
+    fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
+      if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list() end
+      return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
+    end or nil,
+    dsp_drag = (dsp_drag and dsp_drag.active and { k = dsp_drag.fx }) or (fxb_drag and fxb_drag.active and { new = true }) or nil,
     khelp_draw = function(Lx, x, y, w, h)
       return KH.draw(U, Lx, x, y, w, h, reaper.time_precise(), state.focus == 'dsp', ctx.fit)
     end,
@@ -2822,6 +2898,7 @@ local function frame()
   HN.draw(U, L)
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
+  if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   SL.draw_drag(U, L)
   draw.popup(L, vim.popup())
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
@@ -2905,6 +2982,7 @@ local function frame()
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
+  elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
@@ -2959,8 +3037,15 @@ local function frame()
     local e = hover.sample.e or hover.sample
     state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to depot; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
+  elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d$') then
+    local i = tonumber(hover.browser:sub(3))
+    state.status = B.marks[i] and ('bookmark %d: %s - click: go, Shift+click: set to this folder, Cmd+click: clear (keys %d / Shift+%d)'):format(i, B.marks[i], i, i)
+      or ('bookmark %d empty - click: remember this folder (Shift+%d)'):format(i, i)
+  elseif type(hover.browser) == 'string' and hover.browser:match('^crumb%d+$') then
+    local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
+    state.status = 'go to ' .. (c and c.path or '?')
   elseif type(hover.browser) == 'string' then
-    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
+    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
@@ -3184,6 +3269,15 @@ local function frame()
       click = { t = now2, zone = 'browser', row = hover.browser }
       local e = B.entries[hover.browser]
       if e and not e.dir and not e.db and not e.pmdir and not e.mark then B.drag = { e = e, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
+    elseif hover.fxb then
+      ctx.set_focus('fxb')
+      if type(hover.fxb) == 'table' then
+        local same = FB.cur == hover.fxb.row
+        FB.cur = hover.fxb.row
+        if dbl and same and click.zone == 'fxb' then ctx.fxb_add()
+        else local it = FB.selected(); if it then fxb_drag = { it = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end end
+      end
+      click = { t = now2, zone = 'fxb' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end
@@ -3298,7 +3392,7 @@ local function frame()
     else body_drag = nil end
   end
   -- протяжка по слайдеру DSP
-  if hover.dsp and hover.dsp.param and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' then
+  if hover.dsp and hover.dsp.param and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
     local col = cur_col()
     local p = col and hover.dsp.f.params[hover.dsp.param]
     if p and p.kind ~= 'toggle' and hover.dsp.sv then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
@@ -3372,14 +3466,34 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if not dsp_drag.active and (math.abs(gfx.mouse_x - dsp_drag.x0) > 6 or math.abs(gfx.mouse_y - dsp_drag.y0) > 6) then dsp_drag.active = true end
       if dsp_drag.active then
-        state.status = hover.dsp and hover.dsp.fx ~= dsp_drag.fx and ('move ' .. dsp_drag.f.name .. ' → position of ' .. hover.dsp.f.name) or ('move ' .. dsp_drag.f.name .. ' - drop on another block')
+        local g = hover.dsp_gap
+        state.status = g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)') or ('move ' .. dsp_drag.f.name .. ' - drop between blocks')
       end
     else
-      if dsp_drag.active and hover.dsp and hover.dsp.fx ~= dsp_drag.fx then
+      local g, s = hover.dsp_gap, dsp_drag.fx
+      if dsp_drag.active and g and g ~= s and g ~= s - 1 then
         local col = cur_col()
-        if col then edit.fx_move(col.track, dsp_drag.f.i, hover.dsp.f.i); dsp_sel.fx = hover.dsp.fx; vim.msg = 'fx moved: ' .. dsp_drag.f.name end
+        local fxs = col and col.fx or {}
+        local dst = (g < s - 1) and fxs[g + 1] or fxs[g]
+        if col and dst then
+          edit.fx_move(col.track, dsp_drag.f.i, dst.i)
+          dsp_sel.fx = (g < s - 1) and (g + 1) or g
+          vim.msg = 'fx moved: ' .. dsp_drag.f.name
+        end
       end
       dsp_drag = nil
+    end
+  end
+  -- FX из браузера эффектов → на DSP-панель (место — янтарная черта)
+  if fxb_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not fxb_drag.active and (math.abs(gfx.mouse_x - fxb_drag.x0) > 6 or math.abs(gfx.mouse_y - fxb_drag.y0) > 6) then fxb_drag.active = true end
+      if fxb_drag.active then
+        state.status = hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1)) or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel')
+      end
+    else
+      if fxb_drag.active and hover.dsp_gap then ctx.fxb_add(fxb_drag.it, hover.dsp_gap) end
+      fxb_drag = nil
     end
   end
   -- ретро: протяжка выделения по волне
@@ -3405,6 +3519,10 @@ local function frame()
     local e = cur_col() and (cur_col().pool or {})[vim.inst]
     SPROP.sel = SPROP.hover.row
     if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
+    gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover.fxb then
+    FB.cur = math.max(1, math.min(#FB.results(), FB.cur + (gfx.mouse_wheel > 0 and -3 or 3)))
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.browser == 'pvvol' then
@@ -3556,7 +3674,7 @@ local function frame()
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end end
     c = 0
-  elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' then
+  elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
   end
@@ -3564,7 +3682,7 @@ local function frame()
   -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca')
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb'
     if state.khelp and state.focus == 'dsp' and not typing then
       if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0
       else
@@ -3603,6 +3721,11 @@ local function frame()
         elseif ch == 'h' or c == keys.left then vim.key(('H'):byte())
         elseif ch == 'l' or c == keys.right then vim.key(('L'):byte())
         else return vim.key(c) end
+      elseif state.focus == 'fxb' and state.dsp and state.fxb then
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local r = FB.key(c, ctx.mods())
+        if r == 'add' then ctx.fxb_add()
+        elseif r == 'leave' then ctx.toggle_focus() end
       elseif state.focus == 'dsp' and state.dsp and not state.khelp then
         local ch = c < 256 and string.char(c) or ''
         local col = cur_col(); local fxs = col and col.fx or {}

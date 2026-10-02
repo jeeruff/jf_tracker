@@ -1707,8 +1707,17 @@ function D.frame(L, snap, rows, state, info)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     local col = info.pool_col
     local fxs = col and col.fx or {}
-    text(L.pad, dy + 3, fit('dsp ' .. (col and col.name or '') .. (#fxs == 0 and '  (no fx; a - add)' or ''), gfx.w - 2 * L.pad), U.GREY)
-    local bx = L.pad
+    -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
+    local fbw = 0
+    if info.fxb_draw then
+      fbw = (L.matrix_w and L.matrix_w > 0) and L.matrix_w or math.min(L.cw * 26, math.floor(L.win_w / 4))
+      hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2)
+      L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
+    else L.fxb_rect = nil end
+    text(fbw + L.pad, dy + 3, fit('dsp ' .. (col and col.name or '') .. (#fxs == 0 and '  (no fx; a - add, or drag from the fx list)' or ''), gfx.w - fbw - 2 * L.pad), U.GREY)
+    local bx = fbw + L.pad
+    local drag = info.dsp_drag                 -- { k = блок } | { new = true } — идёт перетаскивание
+    local blocks = {}
     local bw = L.cw * 22
     local sel = info.dsp_sel or {}
     for k, f in ipairs(fxs) do
@@ -1719,10 +1728,11 @@ function D.frame(L, snap, rows, state, info)
       local by = dy + 3 + L.rh
       local bh = L.dsp_h - L.rh - 6
       local is_sel = sel.fx == k
+      blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k }
       set(is_sel and U.tint(U.AMBER, 0.18) or U.BG); gfx.rect(bx, by, bw, bh, 1)
       set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, by, bw, bh, 0)
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), bw - 2 * L.pad), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
-      if mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
+      if not drag and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
       local pw = bw1 - 2 * L.pad
@@ -1776,7 +1786,7 @@ function D.frame(L, snap, rows, state, info)
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
         if vw > 4 then text(vx, py, fit(v.s, vw), U.GREY) end
-        if mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
+        if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
         end
@@ -1784,7 +1794,24 @@ function D.frame(L, snap, rows, state, info)
       end
       bx = bx + bw + L.pad
     end
-    L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
+    -- перетаскивание (блок или FX из списка): куда встанет — янтарная черта
+    -- между блоками; половина блока под мышью решает «до» или «после»
+    if drag and my >= dy and my < dy + L.dsp_h and mx >= fbw then
+      local gap, gx = #blocks, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
+      for _, b in ipairs(blocks) do
+        if mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
+      end
+      local gy, gh = dy + 3 + L.rh, L.dsp_h - L.rh - 6
+      set(U.AMBER); gfx.rect(gx - 1, gy, 3, gh, 1)
+      gfx.rect(gx - 4, gy, 9, 2, 1); gfx.rect(gx - 4, gy + gh - 2, 9, 2, 1)
+      hover.dsp_gap = gap
+    end
+    if drag and drag.k then
+      for _, b in ipairs(blocks) do
+        if b.k == drag.k then set(U.BG); gfx.a = 0.5; gfx.rect(b.x, b.y, b.w, b.h, 1); gfx.a = 1 end
+      end
+    end
+    L.dsp_rect = { fbw, dy, L.win_w - fbw, L.dsp_h }
   end
 
   -- кнопки у линии раздела трекер | правая панель (2 окт): > свернуть, < развернуть,
@@ -1822,7 +1849,8 @@ function D.frame(L, snap, rows, state, info)
     elseif f == 'browser' and L.side_w > 0 then r = { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }
     elseif f == 'top' and L.top_rect then r = L.top_rect
     elseif f == 'inst' and L.inst_rect then r = L.inst_rect
-    elseif f == 'dsp' and L.dsp_rect then r = L.dsp_rect end
+    elseif f == 'dsp' and L.dsp_rect then r = L.dsp_rect
+    elseif f == 'fxb' and L.fxb_rect then r = L.fxb_rect end
     if r then
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'

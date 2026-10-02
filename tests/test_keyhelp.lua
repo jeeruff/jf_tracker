@@ -57,5 +57,17 @@ eq(keys('x'), 'mx_block:cut', 'x')
 MX.cur = { ri = 2, ci = 1 }; keys('gg'); eq(MX.cur.ri, 1, 'gg')
 keys('G'); eq(MX.cur.ri, 2, 'G')
 eq(keys('vy'), 'mx_block:copy', 'v y = block copy'); MX.anchor = nil
+-- браузер эффектов (2 окт)
+local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')
+eq(FB.short('VST3: Pro-Q 3 (FabFilter)'), 'Pro-Q 3 (FabFilter)', 'fx short name')
+FB.list = { { label = 'VST: ReaEQ (Cockos)', data = 'ReaEQ' }, { label = 'JS: jf_tracker_scope', data = 'js1' },
+  { label = 'VST3: Pro-Q 3 (FabFilter)', data = 'pq' }, { label = 'AU: AUDelay (Apple)', data = 'aud' } }
+FB.query = ''; eq(#FB.results(), 4, 'fx all')
+for ch in ('eq'):gmatch('.') do FB.key(ch:byte()) end
+eq(FB.results()[1] and FB.results()[1].it.data, 'ReaEQ', 'fx eq: ReaEQ first (word start)')
+FB.key(27); eq(FB.query, '', 'fx esc clears'); eq(FB.key(27), 'leave', 'fx esc leaves')
+for ch in ('del !apple'):gmatch('.') do FB.key(ch:byte()) end
+eq(#FB.results(), 0, 'fx negation')
+FB.query = ''; FB.cur = 1; FB.key(1685026670); eq(FB.cur, 2, 'fx down'); eq(FB.key(13), 'add', 'fx enter adds')
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

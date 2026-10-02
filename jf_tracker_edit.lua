@@ -23,7 +23,74 @@ function E.init(m) model = m end
 -- E.after — хук после каждой правки, ВНУТРИ того же undo-блока (синхронизация
 -- алиасов паттернов, jf_tracker_alias.lua). Защита от рекурсии — E.in_after.
 E.after = nil
+
+-- ── страховка сэмплов (2 окт) ─────────────────────────────────────────────
+-- Инструменты трека живут в его items: удалил последний item с файлом —
+-- сэмпл пропал из пула. Внешний run() переписывает аудиофайлы каждого трека
+-- до и после правки; файл, который был в последовательности (до =END /
+-- вне библиотеки) и исчез с трека совсем, кладётся в библиотеку трека
+-- (за =LIB, E.depot_add) в том же undo-шаге. Библиотечный item, удалённый
+-- нарочно, не возвращается. E.no_rescue — правка, где файл уходит намеренно
+-- (замена сэмпла). E.rescued — список спасённых имён для сообщения.
+E.keep_samples = true
+E.rescued = nil
+local depth = 0
+local function root_file(src)
+  local p = src and R.GetMediaSourceParent and R.GetMediaSourceParent(src)
+  local n = 0
+  while p and n < 8 do src = p; p = R.GetMediaSourceParent(src); n = n + 1 end
+  return src and R.GetMediaSourceFileName(src, '') or ''
+end
+local function census()
+  local out = {}
+  local lib = model and model.lib_pos and model.lib_pos()
+  local endp = model and model.marker_pos and model.marker_pos(model.END_MARKER)
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    local _, name = R.GetTrackName(tr)
+    if not model or name ~= model.DEPOT then
+      local set
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, i)
+        local tk = R.GetActiveTake(it)
+        if tk and not R.TakeIsMIDI(tk) then
+          local fn = root_file(R.GetMediaItemTake_Source(tk))
+          if fn ~= '' then
+            local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+            local in_lib = lib ~= nil and pos >= lib - 1e-6 and (endp == nil or pos >= endp - 1e-6)
+            set = set or {}
+            set[fn] = set[fn] or false
+            if not in_lib then set[fn] = true end
+          end
+        end
+      end
+      if set then out[tr] = set end
+    end
+  end
+  return out
+end
+local function rescue(pre)
+  local post = census()
+  local saved = {}
+  for tr, set in pairs(pre) do
+    if R.ValidatePtr(tr, 'MediaTrack*') then
+      for fn, in_seq in pairs(set) do
+        if in_seq and not (post[tr] and post[tr][fn] ~= nil) then
+          if E.depot_add(fn, tr) then saved[#saved + 1] = fn:match('[^/]+$') or fn end
+        end
+      end
+    end
+  end
+  if #saved > 0 then E.rescued = saved end
+end
+
 local function run(desc, fn)
+  depth = depth + 1
+  local pre
+  if depth == 1 then
+    E.rescued = nil
+    if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
+  end
   R.Undo_BeginBlock2(0)
   R.PreventUIRefresh(1)
   local ok, err = pcall(fn)
@@ -33,6 +100,9 @@ local function run(desc, fn)
     E.in_after = false
     if not ok2 then err = err2; ok = false end
   end
+  if ok and pre then pcall(rescue, pre) end
+  depth = depth - 1
+  if depth == 0 then E.no_rescue = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()
@@ -696,7 +766,7 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
       end
     elseif entry.path then
-      local src = R.PCM_Source_CreateFromFile(entry.path)
+      local src = R.PCM_Source_CreateFromFile(E.media_copy(entry.path))
       if not src then return end
       it = R.AddMediaItemToTrack(track)
       local tk = R.AddTakeToMediaItem(it)
@@ -919,8 +989,10 @@ function E.fx_bypass(track, fx)
   run('fx bypass', function() R.TrackFX_SetEnabled(track, fx, not R.TrackFX_GetEnabled(track, fx)) end)
 end
 function E.fx_show(track, fx) R.TrackFX_Show(track, fx, 3) end
-function E.fx_add(track, name)
-  run('fx add', function() R.TrackFX_AddByName(track, name, false, -1) end)
+-- pos — место в цепочке (0 = первым), nil — в конец
+function E.fx_add(track, name, pos)
+  run('fx add', function() R.TrackFX_AddByName(track, name, false, pos and (-1000 - pos) or -1) end)
+  if model then model.invalidate() end
 end
 function E.fx_remove(track, fx)
   run('fx remove', function() R.TrackFX_Delete(track, fx) end)
@@ -1187,6 +1259,7 @@ end
 -- трек не задан — наследие: трек DEPOT (создаётся)
 function E.depot_add(path, track)
   local item
+  path = E.media_copy(path)
   run('depot add', function()
     local tr = track
     local pos = 0
@@ -1228,10 +1301,49 @@ function E.depot_add(path, track)
   return item
 end
 
+-- ── копия файла в папку проекта (2 окт) ───────────────────────────────────
+-- Файл из браузера (drop, вставка, замена, депо) копируется в папку медиа
+-- проекта (GetProjectPath), если проект сохранён и опция E.copy_media
+-- включена; иначе — путь как есть. Уже лежащий в проекте файл не копируется;
+-- одноимённый другого размера получает суффикс « 2».
+E.copy_media = true
+local function fsize(p) local f = io.open(p, 'rb'); if not f then return nil end; local n = f:seek('end'); f:close(); return n end
+function E.media_copy(path)
+  if not (E.copy_media and path and path ~= '') then return path end
+  if path:lower():match('%.rpp$') then return path end
+  local _, proj = R.EnumProjects(-1, '')
+  if not proj or proj == '' then return path end           -- несохранённый проект: папки нет
+  local dir = R.GetProjectPath('')
+  if not dir or dir == '' then return path end
+  if path:sub(1, #dir + 1) == dir .. '/' then return path end
+  local projdir = proj:match('^(.*)/[^/]+$')
+  if projdir and path:sub(1, #projdir + 1) == projdir .. '/' then return path end
+  local name = path:match('[^/]+$')
+  local size = fsize(path)
+  if not size then return path end
+  R.RecursiveCreateDirectory(dir, 0)
+  local base, ext = name:match('^(.*)(%.[^.]+)$')
+  base, ext = base or name, ext or ''
+  local dst, k = dir .. '/' .. name, 2
+  while true do
+    local ds = fsize(dst)
+    if not ds then break end
+    if ds == size then return dst end                          -- уже скопирован
+    dst = ('%s/%s %d%s'):format(dir, base, k, ext); k = k + 1
+  end
+  local fi = io.open(path, 'rb'); if not fi then return path end
+  local fo = io.open(dst, 'wb'); if not fo then fi:close(); return path end
+  while true do local chunk = fi:read(1048576); if not chunk then break end; fo:write(chunk) end
+  fi:close(); fo:close()
+  E.copied = dst
+  return dst
+end
+
 -- drag & drop из браузера: файл → item на треке в строке row (lane по
 -- фиксированным дорожкам); .rpp → сабпроект (InsertMedia, как jf_pm)
 function E.drop(track, lane_idx, lpb, row, path)
   local t = row_time(row, lpb, 0)
+  path = E.media_copy(path)
   local item
   run('drop ' .. (path:match('[^/]+$') or path), function()
     if path:lower():match('%.rpp$') then
@@ -1520,6 +1632,8 @@ end
 function E.replace_source(items, path)
   local n = 0
   local name = path:match('([^/]+)%.[^.]+$') or path:match('[^/]+$') or path
+  path = E.media_copy(path)
+  E.no_rescue = true                      -- прежний сэмпл уходит намеренно
   run('replace sample: ' .. name, function()
     for _, it in ipairs(items) do
       local take = R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)

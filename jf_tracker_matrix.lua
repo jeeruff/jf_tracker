@@ -379,6 +379,13 @@ end
 --   m Enter mute   Space очередь / play   + регион в конце   u ^R undo / redo
 -- В блоке (v / Shift+hjkl): y копия, d x вырезать, m (Ctrl+N) mute.
 MX.pending = nil
+local MX_HINT = {
+  d = 'd: d delete slot (to register) | Esc',
+  y = 'y: y yank slot | Esc',
+  c = 'c: c / w rename region | Esc',
+  g = 'g: g first slot | Esc',
+}
+function MX.pending_hint() return MX.pending and MX_HINT[MX.pending] or nil end
 local OPS = { d = true, y = true, c = true, g = true }
 
 function MX.key(c, regions, snap)

@@ -122,6 +122,8 @@ local function reset()
       V.open_picker('auto', { { label = 'track: volume' }, { label = 'ReaEQ / Gain' }, { label = 'ReaComp / Threshold' } },
         function(it) calls[#calls + 1] = 'pick:' .. it.label end)
     end,
+    delete_item_at_cursor = function() calls[#calls + 1] = 'delitem'; return true end,
+    clear_track = function() calls[#calls + 1] = 'cleartrack'; return true end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_set = function(e, row, v) calls[#calls + 1] = ('envset:%s@%d:%.3f'):format(e.name, row, v) end,
     env_del = function(e, row) calls[#calls + 1] = ('envdel:%s@%d'):format(e.name, row) end,
@@ -425,5 +427,14 @@ keysin(':loop off'); V.key(13); eq(':loop off', last(), 'loop:off:nil')
 keysin(':loop'); V.key(13); eq(':loop → item', last(), 'loop:item:nil')
 keysin('i'); keysin('>'); eq('> in INSERT → loop item', last(), 'loop:item:nil'); V.key(27)
 keysin(':beatsync bar'); V.key(13); eq(':beatsync bar', last(), 'beatsync:kick:bar')
+-- dW / dt и подсказка продолжений (2 окт)
+reset(); keysin('d'); eq('d pending hint', (V.pending_hint() or ''):match('W whole item') ~= nil, true)
+keysin('W'); eq('dW → delete item', last(), 'delitem'); eq('hint gone', V.pending_hint(), nil)
+reset(); keysin('dt'); eq('dt → clear track', last(), 'cleartrack')
+reset(); keysin('3d'); eq('count in hint', (V.pending_hint() or ''):sub(1, 2), '3 ')
+V.key(27)
+reset(); keysin('z'); eq('z hint', (V.pending_hint() or ''):match('^z:') ~= nil, true); V.key(27)
+reset(); keysin('i'); keysin('d'); eq('d from INSERT shows hint', (V.pending_hint() or ''):match('^d:') ~= nil, true)
+keysin('W'); eq('dW from INSERT', last(), 'delitem'); eq('back to INSERT', V.mode, 'insert'); V.key(27)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

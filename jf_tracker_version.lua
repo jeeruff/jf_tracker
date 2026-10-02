@@ -1,9 +1,19 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.14'
+V.VERSION = '0.5.15'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.15', d = '2026-10-02', items = {
+    'status bar: pending operator shows what can follow (d: d rows | w event | W whole item | t track ...)',
+    'dW deletes the whole item under the cursor, dt clears the cursor track in its region',
+    'samples are kept: the last item of a file deleted - the file goes to the track library (=LIB); option',
+    'files from the browser are copied into the project media folder (saved projects); option',
+    'browser: bookmarks 1-5, folder history < > (H L), * new folder (:mkdir), clickable full path row',
+    'DSP: fx list with fzf search on the left; drag an fx onto the chain; amber line shows where a moved / new fx lands',
+    'fix: sliders no longer react while a DSP block is dragged; drop works anywhere on the panel',
+    'fix: options switched off came back on after a restart (saved 0 was read as on)',
+  } },
   { v = '0.5.14', d = '2026-10-02', items = {
     'matrix: Vim editing of slots - o O new bar, dd delete, yy Y yank, p P put, D ^D duplicate as new pattern, x cut cell, n cc cw rename, [ ] +-bar, { } +-step',
     'context help (? or the help button): keys of the focused module at the bottom, pressed keys light up with a burst of dots, fzf search over all pages',
