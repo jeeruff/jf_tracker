@@ -1,9 +1,18 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.21'
+V.VERSION = '0.5.22'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.22', d = '2026-10-02', items = {
+    'mouse: drag in the body selects a block (NORMAL and INSERT), Option+drag moves events; drag on the step numbers sets the REAPER time selection',
+    'instruments: empty slots .. after the instruments - retro p / Enter puts the capture there, drop a retro / sample selection or a browser file onto them; retro selection can be dragged out',
+    'envelopes use the original theme colours (as the arrange draws them, not tinted by the Theme Adjuster)',
+    'automation items: thick left strip with the vertical name, bigger loop seams; Option on the end edge stretches',
+    'loop seams of items and automation items are draggable: loop length, Option = stretch (playrate)',
+    'fix: the wave of looped items repeats the source period instead of reading past its end',
+    'the instrument finder opens next to the instruments panel',
+  } },
   { v = '0.5.21', d = '2026-10-02', items = {
     'fix: matrix + shifted the whole song when =LIB stood before =END (every press moved everything after =LIB); the library now counts only after =END, a misplaced =LIB is moved behind =END when the library is needed',
     'looped items show their loop seams as cuts across the item, like automation items',

@@ -118,6 +118,7 @@ KH.PAGES = {
     { k = 'Space', d = 'preview' },
     { k = 'p', d = 'preview on select on / off' },
     { k = '/', d = 'fzf find instrument' },
+    { k = '..', d = 'empty slot: retro p / Enter puts the capture here; drop a retro / sample selection or a file' },
     { k = 'Esc', d = 'back to tracker' },
   } },
   browser = { title = 'browser', e = {

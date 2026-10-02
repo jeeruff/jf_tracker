@@ -1643,6 +1643,35 @@ end
 -- Источник активного take → SECTION [start, start+len) исходного файла.
 -- Уже секцию разворачиваем (STARTPOS складывается), вложенности нет.
 -- Без своего undo — зовётся внутри run(). Multi-take не поддерживаем.
+-- стык лупа item тянется (2 окт): mode 'len' — длина периода источника
+-- (аудио — SECTION, MIDI — длина источника, длина item та же), 'rate' —
+-- растяжение (playrate). v — новая длина в секундах / новый playrate.
+function E.loop_period(item, mode, v)
+  local tk = R.GetActiveTake(item)
+  if not tk then return false end
+  local ok = true
+  run(mode == 'rate' and 'loop stretch' or 'loop length', function()
+    if mode == 'rate' then
+      R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', math.max(0.05, math.min(20, v)))
+    elseif R.TakeIsMIDI(tk) then
+      local pos = R.GetMediaItemInfo_Value(item, 'D_POSITION')
+      local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
+      local q0 = R.TimeMap2_timeToQN(0, pos)
+      R.MIDI_SetItemExtents(item, q0, R.TimeMap2_timeToQN(0, pos + math.max(0.01, v)))
+      R.SetMediaItemInfo_Value(item, 'D_POSITION', pos)
+      R.SetMediaItemInfo_Value(item, 'D_LENGTH', len)
+      R.SetMediaItemInfo_Value(item, 'B_LOOPSRC', 1)
+    else
+      local okk, why = E.set_section(item, 0, math.max(0.01, v))
+      ok = okk ~= false
+      if not ok then E.loop_err = why end
+    end
+    R.UpdateItemInProject(item)
+  end)
+  if model then model.invalidate() end
+  return ok
+end
+
 function E.set_section(item, start, len)
   if R.CountTakes(item) > 1 then return false, 'multi-take item' end
   local ok, chunk = R.GetItemStateChunk(item, '', false)

@@ -145,6 +145,9 @@ local inject_last = reaper.GetExtState(EXT, 'inject')       -- стартово�
 local body_drag = nil                                       -- Shift+протяжка блока в теле
 local pt_drag = nil                                         -- протяжка точки огибающей (время + значение)
 local ai_drag = nil                                         -- протяжка automation item (сдвиг / начало / длина)
+local seam_drag = nil                                       -- протяжка стыка лупа (item / automation item)
+local ts_drag = nil                                         -- протяжка по номерам шагов — time selection
+local sel_drag = nil                                        -- протяжка мышью — выделение блока
 local ev_drag = nil                                         -- протяжка события / блока мышью (перенос)
 local cmd_text_cache                                        -- ctx.cmd_by_text
 local dsp_drag = nil                                        -- перетаскивание DSP-блока
@@ -315,9 +318,13 @@ end
 local function pool_select(n)
   local col = cur_col()
   local pool = col and col.pool or {}
-  if #pool == 0 then vim.msg = 'pool empty'; return end
-  n = math.max(1, math.min(#pool, n))
+  n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
   vim.inst = n
+  if n > #pool then
+    -- пустой слот (2 окт): цель для ретро-захвата и бросков
+    vim.msg = ('empty slot %02d: retro p / Enter puts the capture here, or drop a retro / sample selection or a file'):format(n)
+    return
+  end
   local e = pool[n]
   -- выбор инструмента возвращает сэмпл-модуль к нему (если там был файл браузера)
   if SL.entry and SL.entry.file then SL.close(); SL.entry = nil end
@@ -1333,6 +1340,7 @@ ctx = {
         or e.name
       items[#items + 1] = { label = ('%02d %s  [%s]'):format(i, nm, e.home or ''), data = i }
     end
+    state.popup_at = { kind = 'inst' }                -- окно поиска — у панели инструментов
     vim.open_picker('find instrument', items, function(it) ctx.set_focus('inst'); pool_select(it.data) end)
   end,
   -- клик по модулю переносит в него фокус (по прямоугольникам модулей)
@@ -3184,6 +3192,8 @@ local function frame()
       return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) }
     end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
+    seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
+    dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
@@ -3273,7 +3283,7 @@ local function frame()
   SL.draw_drag(U, L)
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
-  if vim.mode ~= 'cmd' then state.popup_at = nil end
+  if vim.mode ~= 'cmd' and not vim.picker then state.popup_at = nil end
   local anchor
   do
     local pa = state.popup_at
@@ -3543,7 +3553,13 @@ local function frame()
       click = { t = now2, zone = 'retrobtn' }
     elseif hover.retro then
       ctx.set_focus('top')
-      retro.sel.a = hover.retro; retro.sel.b = hover.retro; retro.drag = true
+      local a, b = math.min(retro.sel.a, retro.sel.b), math.max(retro.sel.a, retro.sel.b)
+      if b - a > 0.002 and hover.retro > a and hover.retro < b then
+        -- нажатие внутри выделения — вынос: бросить на слот инструментов или колонку трека
+        retro.out = { x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, at = hover.retro }
+      else
+        retro.sel.a = hover.retro; retro.sel.b = hover.retro; retro.drag = true
+      end
       click = { t = now2, zone = 'retro' }
     elseif hover.tab then
       state.toptab = hover.tab
@@ -3754,6 +3770,36 @@ local function frame()
         ctx.rename_track_prompt(hover.header_col)
       end
       click = { t = now2, zone = 'header', guid = hover.header_col.guid }
+    elseif hover.seam then
+      -- стык лупа: длина периода, Option — растяжение (playrate)
+      local s = hover.seam
+      local d = { kind = s.kind, k = s.k, opt = gfx.mouse_cap & 16 == 16, y0 = gfx.mouse_y, active = false, x0 = s.x0, w = s.w }
+      if s.kind == 'item' then
+        local it = s.item
+        local tk = reaper.GetActiveTake(it)
+        if tk then
+          d.item = it; d.pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          d.rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); d.offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+          local src = reaper.GetMediaItemTake_Source(tk)
+          if reaper.TakeIsMIDI(tk) then
+            local slen, is_qn = reaper.GetMediaSourceLength(src)
+            local q0 = reaper.TimeMap2_timeToQN(0, d.pos)
+            d.slen = is_qn and (reaper.TimeMap2_QNToTime(0, q0 + slen) - d.pos) or slen
+          else d.slen = model.src_period(src) end
+          seam_drag = d
+        end
+      else
+        d.env, d.idx, d.r0, d.per, d.first = s.env, s.idx, s.r0, s.per, s.first
+        d.pq = reaper.GetSetAutomationItemInfo(s.env, s.idx, 'D_POOL_QNLEN', 0, false)
+        d.rate = reaper.GetSetAutomationItemInfo(s.env, s.idx, 'D_PLAYRATE', 0, false)
+        d.o = (d.per - (d.first % d.per)) % d.per
+        seam_drag = d
+      end
+      click = { t = now2, zone = 'seam' }
+    elseif hover.rownum then
+      -- номера шагов: протяжка — time selection, клик без протяжки — снять её
+      ts_drag = { row = hover.rownum, active = false, y0 = gfx.mouse_y }
+      click = { t = now2, zone = 'rownum' }
     elseif hover.envpt then
       -- точка огибающей: тянуть в любом режиме (по строкам и по значению), один undo
       local e, row = hover.envpt.e, hover.envpt.row
@@ -3773,6 +3819,7 @@ local function frame()
       local grab = 0
       if a.edge == 'move' and hover.row then grab = edit.row_time(hover.row.row, state.lpb, 0) - a.pos end
       ai_drag = { env = a.e.env, idx = a.idx, edge = a.edge, pos0 = a.pos, len0 = a.len, grab = grab, y0 = gfx.mouse_y, active = false, name = a.e.name }
+      if gfx.mouse_cap & 16 == 16 and a.edge ~= 'move' then ai_drag.rate0 = reaper.GetSetAutomationItemInfo(a.e.env, a.idx, 'D_PLAYRATE', 0, false) end
       click = { t = now2, zone = 'aiedge' }
     elseif hover.itemedge and hover.itemedge.edge ~= 'move' and gfx.mouse_cap & 8 ~= 8 then
       -- край рамки item: trim как в аранжировке
@@ -3786,8 +3833,8 @@ local function frame()
       click = { t = now2, zone = 'itemedge' }
     elseif hover.row and hover.fi then
       ctx.set_focus('tracker')
-      if hover.itemedge and hover.itemedge.edge == 'move' and gfx.mouse_cap & 16 == 16 then
-        -- Option+протяжка по телу item — сдвиг (клик без Option — курсор, как раньше)
+      if false then
+        -- (2 окт: Option+протяжка теперь переносит событие / блок — ниже, ev_drag)
         local pos = reaper.GetMediaItemInfo_Value(hover.itemedge.item, 'D_POSITION')
         item_drag = { item = hover.itemedge.item, edge = 'move', col = hover.itemedge.col, y0 = gfx.mouse_y, active = false, grab = edit.row_time(hover.row.row, state.lpb, 0) - pos }
         click = { t = now2, zone = 'itemmove' }
@@ -3804,16 +3851,23 @@ local function frame()
         -- протяжка события (2 окт): в любом режиме; внутри VISUAL-блока — весь блок.
         -- Блок запоминается ДО того, как клик сдвинет курсор (угол блока)
         local vis_heads, vis_o
-        if vim.mode == 'visual' or vim.mode == 'vline' then
+        if (vim.mode == 'visual' or vim.mode == 'vline') and gfx.mouse_cap & 16 == 16 then
           local f0, f1, r0, r1 = vim.visual_range()
           if hover.fi >= f0 and hover.fi <= f1 and hover.row.row >= r0 and hover.row.row <= r1 then
             vis_heads = vim.heads_in(f0, f1, r0, r1); vis_o = { fi = f0, row = r0, f1 = f1, r1 = r1, anchor = vim.anchor and { fi = vim.anchor.fi, row = vim.anchor.row }, cur = { fi = vim.cur.fi, row = vim.cur.row } }
           end
         end
-        if not vis_heads then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
+        if not vis_heads then
+          -- обычный клик выходит из VISUAL (как в Vim); протяжка начнёт новый блок
+          if (vim.mode == 'visual' or vim.mode == 'vline') and gfx.mouse_cap & 16 ~= 16 then vim.mode = 'normal' end
+          vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
+        end
         if hover.field then vim.cur.field = hover.field end
         local head = cell
-        if head and not dbl then
+        local opt = gfx.mouse_cap & 16 == 16
+        -- протяжка без модификатора — выделение блока (NORMAL и INSERT), 2 окт
+        if not opt and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
+        if head and not dbl and opt then
           local hr = head.row0 or hover.row.row
           local heads = (vis_heads and #vis_heads > 0) and vis_heads or vim.heads_in(hover.fi, hover.fi, hr, hr)
           if #heads > 0 then
@@ -3853,7 +3907,7 @@ local function frame()
       item_drag = nil
     end
   elseif hover.itemedge and hover.itemedge.edge ~= 'move' then
-    state.status = ('item %s %s: drag = trim, Option+drag = stretch (playrate), Cmd = no snap; inside: drag = move event, Option = move item'):format(hover.itemedge.col.name, hover.itemedge.edge)
+    state.status = ('item %s %s: drag = trim, Option+drag = stretch (playrate), Cmd = no snap; inside: drag = select, Option+drag = move'):format(hover.itemedge.col.name, hover.itemedge.edge)
   end
   -- точка огибающей мышью: строка (Cmd — свободно) и значение от x
   if pt_drag then
@@ -3893,7 +3947,9 @@ local function frame()
         if ai_drag.edge == 'move' then
           reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', math.max(0, t - ai_drag.grab), true)
         elseif ai_drag.edge == 'end' then
-          reaper.GetSetAutomationItemInfo(env, k, 'D_LENGTH', math.max(minlen, t - ai_drag.pos0), true)
+          local nl = math.max(minlen, t - ai_drag.pos0)
+          reaper.GetSetAutomationItemInfo(env, k, 'D_LENGTH', nl, true)
+          if ai_drag.rate0 then reaper.GetSetAutomationItemInfo(env, k, 'D_PLAYRATE', ai_drag.rate0 * ai_drag.len0 / nl, true) end   -- Option: растяжение
         else
           local fin = ai_drag.pos0 + ai_drag.len0
           t = math.max(0, math.min(t, fin - minlen))
@@ -3914,7 +3970,73 @@ local function frame()
   elseif hover.aiedge then
     state.status = ('automation item %s: %s'):format(hover.aiedge.e.name or '', ({ move = 'drag the left strip to move it', start = 'drag the top edge: start (trim)', ['end'] = 'drag the bottom edge: length (loops repeat)' })[hover.aiedge.edge])
   end
-  -- перенос события / блока мышью: на отпускании — один undo (взять, удалить, вставить)
+  -- стык лупа мышью: item — на отпускании (правка секции через чанк), automation item — сразу
+  if seam_drag then
+    local d = seam_drag
+    if gfx.mouse_cap & 1 == 1 then
+      if not d.active and math.abs(gfx.mouse_y - d.y0) > 2 then
+        d.active = true
+        if d.kind == 'ai' then edit.item_drag_begin('automation item loop') end
+      end
+      if d.active and rows[1] then
+        local rowf = rows[1].row + (gfx.mouse_y - L.body_y) / L.rh
+        if gfx.mouse_cap & 4 ~= 4 then rowf = math.floor(rowf + 0.5) end
+        d.rowf = rowf
+        d.guide = { x = d.x0, w = d.w, y = L.body_y + math.floor((rowf - rows[1].row) * L.rh) }
+        if d.kind == 'ai' then
+          local T = math.max(0.25, rowf - d.r0)
+          local per_new = (T + d.o) / d.k
+          if d.opt then
+            reaper.GetSetAutomationItemInfo(d.env, d.idx, 'D_PLAYRATE', math.max(0.05, math.min(20, d.pq * state.lpb / per_new)), true)
+          else
+            reaper.GetSetAutomationItemInfo(d.env, d.idx, 'D_POOL_QNLEN', math.max(1 / state.lpb, per_new / state.lpb * d.rate), true)
+          end
+          model.invalidate()
+        end
+        state.status = ('loop %s: seam %d → row %.2f (%s; Cmd: free)'):format(d.kind == 'ai' and 'automation item' or 'item', d.k, rowf, d.opt and 'stretch' or 'length')
+      end
+    else
+      if d.active and d.kind == 'ai' then edit.item_drag_end() end
+      if d.active and d.kind == 'item' and d.rowf then
+        local T = math.max(0.01, edit.row_time(0, state.lpb, 0) + reaper.TimeMap2_QNToTime(0, d.rowf / state.lpb) - d.pos)
+        local ok
+        if d.opt then ok = edit.loop_period(d.item, 'rate', (d.k * d.slen - d.offs) / T)
+        else ok = edit.loop_period(d.item, 'len', (T * d.rate + d.offs) / d.k) end
+        vim.msg = ok and (d.opt and 'loop stretched' or 'loop length changed') or ('loop: ' .. tostring(edit.loop_err or 'failed'))
+      end
+      seam_drag = nil
+    end
+  elseif hover.seam then
+    state.status = 'loop seam: drag = loop length, Option+drag = stretch (playrate), Cmd = no snap'
+  end
+  -- time selection по номерам шагов (строки целиком, как выделение в REAPER)
+  if ts_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not ts_drag.active and math.abs(gfx.mouse_y - ts_drag.y0) > 2 then ts_drag.active = true end
+      if ts_drag.active and rows[1] then
+        local r = math.floor(rows[1].row + (gfx.mouse_y - L.body_y) / L.rh)
+        local a, b = math.min(ts_drag.row, r), math.max(ts_drag.row, r) + 1
+        reaper.GetSet_LoopTimeRange(true, false, edit.row_time(math.max(0, a), state.lpb, 0), edit.row_time(math.max(1, b), state.lpb, 0), false)
+        state.status = ('time selection: rows %04d - %04d (%d)'):format(a, b - 1, b - a)
+      end
+    else
+      if not ts_drag.active then reaper.GetSet_LoopTimeRange(true, false, 0, 0, false); vim.msg = 'time selection cleared' end
+      ts_drag = nil
+    end
+  elseif hover.rownum then
+    state.status = 'step numbers: drag = REAPER time selection, click = clear it'
+  end
+  -- протяжка без модификатора: VISUAL-блок от точки нажатия до мыши
+  if sel_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not sel_drag.active and (math.abs(gfx.mouse_y - sel_drag.y0) > 3 or math.abs(gfx.mouse_x - sel_drag.x0) > 3) then
+        sel_drag.active = true
+        vim.anchor = { fi = sel_drag.fi, row = sel_drag.row }; vim.mode = 'visual'
+      end
+      if sel_drag.active and hover.row and hover.fi and not hover.row.clip then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
+    else sel_drag = nil end
+  end
+  -- перенос события / блока мышью (Option): на отпускании — один undo (взять, удалить, вставить)
   if ev_drag then
     if gfx.mouse_cap & 1 == 1 then
       if not ev_drag.active and (math.abs(gfx.mouse_y - ev_drag.y0) > 3 or math.abs(gfx.mouse_x - ev_drag.x0) > 3) then ev_drag.active = true end
@@ -4004,7 +4126,9 @@ local function frame()
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column' end
       end
     else
-      if B.drag.active and hover.fi and hover.row then
+      if B.drag.active and hover.pool and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark then
+        ctx.add_to_depot(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))       -- бросок на инструменты — в библиотеку трека
+      elseif B.drag.active and hover.fi and hover.row then
         local e = B.drag.e
         if e.trk then ctx.drop_track(e, B.pmproj and B.pmproj.e)
         elseif e.rgn and B.pmproj then ctx.drop_region_to(hover.fi, hover.row.row, B.pmproj.e.path, e)
@@ -4045,7 +4169,10 @@ local function frame()
       end
     else
       local d = SL.mouse_up()
-      if d and d.kind == 'out' and d.active and hover.fi and hover.row then
+      if d and d.kind == 'out' and d.active and hover.pool then
+        local a, b = SL.span()
+        if a then ctx.depot_span(SL.entry, a, b) end                    -- на инструменты — новый инструмент в библиотеке
+      elseif d and d.kind == 'out' and d.active and hover.fi and hover.row then
         local a, b = SL.span()
         if a then ctx.drop_span(hover.fi, hover.row.row, SL.entry, a, b) end
       end
@@ -4096,6 +4223,25 @@ local function frame()
     else
       if fxb_drag.active and hover.dsp_gap then ctx.fxb_add(fxb_drag.it, hover.dsp_gap) end
       fxb_drag = nil
+    end
+  end
+  -- ретро: вынос выделения — слот инструментов (библиотека) или строка колонки трека
+  if retro.out then
+    if gfx.mouse_cap & 1 == 1 then
+      if not retro.out.active and (math.abs(gfx.mouse_x - retro.out.x0) > 6 or math.abs(gfx.mouse_y - retro.out.y0) > 6) then retro.out.active = true end
+      if retro.out.active then
+        state.status = hover.pool and 'drop: capture into the track library (instrument slot)'
+          or ((hover.fi and hover.row) and ('drop: capture at row %04d'):format(hover.row.row) or 'drag the retro selection onto an instrument slot or a track row')
+      end
+    else
+      if retro.out.active then
+        if hover.pool then retro_put('depot')
+        elseif hover.fi and hover.row then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row; retro_put('cursor', true) end
+      elseif retro.out.at then
+        -- клик внутри выделения без протяжки — новое начало, как раньше
+        retro.sel.a = retro.out.at; retro.sel.b = math.min(1, retro.out.at + 0.05)
+      end
+      retro.out = nil
     end
   end
   -- ретро: протяжка выделения по волне
@@ -4355,7 +4501,10 @@ local function frame()
           elseif ch == 'a' then ctx.retro_all()
           elseif ch == ' ' then if retro.cur and retro.cur.playing then retro_preview(false) else retro_preview(true) end
           elseif ch == 's' then retro_preview(false)
-          elseif ch == 'p' or c == 13 then retro_put('cursor')
+          elseif ch == 'p' or c == 13 then
+            -- выбран пустой слот инструментов — захват в библиотеку трека (новый инструмент)
+            local col = cur_col()
+            if col and vim.inst > #(col.pool or {}) then retro_put('depot') else retro_put('cursor') end
           elseif ch == 'P' then retro_put('cursor', true)
           elseif ch == 'd' then retro_put('depot')
           elseif ch == '+' or ch == '=' then ctx.retro_add()

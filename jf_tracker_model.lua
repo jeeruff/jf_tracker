@@ -226,6 +226,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
       local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
       head.loop_rows = (R.TimeMap2_timeToQN(0, pos + per) - qn0) * lpb
       head.loop_first = (R.TimeMap2_timeToQN(0, pos + math.max(0, slen - head.offs) / r) - qn0) * lpb
+      head.loop_src = slen                     -- период в секундах источника (волна лупа — по модулю)
     end
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
@@ -872,6 +873,10 @@ function M.track_envs(tr, lpb)
           local len = R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false)
           local ai = { r0 = R.TimeMap2_timeToQN(0, pos) * lpb, r1 = R.TimeMap2_timeToQN(0, pos + len) * lpb,
                        sel = R.GetSetAutomationItemInfo(env, k, 'D_UISEL', 0, false) ~= 0, idx = k, pos = pos, len = len }
+          -- подпись как в аранжировке: «пул: имя огибающей» (или имя пула)
+          local pid = math.floor((R.GetSetAutomationItemInfo(env, k, 'D_POOL_ID', 0, false) or 0) + 0.5)
+          local pname = R.GetSetAutomationItemInfo_String and select(2, R.GetSetAutomationItemInfo_String(env, k, 'P_POOL_NAME', '', false)) or ''
+          ai.label = (pname and pname ~= '') and pname or ('%d: %s'):format(pid + 1, name or '')
           -- луп (2 окт): стыки повторов пула — срезами, как в аранжировке
           if R.GetSetAutomationItemInfo(env, k, 'D_LOOPSRC', 0, false) ~= 0 then
             local pq = R.GetSetAutomationItemInfo(env, k, 'D_POOL_QNLEN', 0, false) or 0
@@ -1081,6 +1086,42 @@ M.OVERSAMPLE = 1   -- 1/2/4: пиков на пиксель (Options → wave de
 function M.peaks(head, npix, want_spec)
   if not head.src or npix < 2 then return nil end
   npix = math.floor(npix)
+  -- луп (2 окт): пики одного периода источника, разложенные по item по модулю
+  -- периода (раньше читался «источник» за его концом — волна сбивалась)
+  if head.loop_src and not head._lin and not head.smap then
+    local per = head.loop_src
+    local rate = (head.rate and head.rate > 0) and head.rate or 1
+    local key = ('%s|loop|%.4f|%.4f|%.4f|%d%s|%d'):format(head.guid, per, head.offs or 0, head.len, npix, want_spec and 's' or '', M.OVERSAMPLE or 1)
+    local p = peaks[key]
+    if p then return p end
+    local nlin = math.max(2, math.min(16384, math.floor(npix * per * rate / math.max(1e-6, head.len)) * 2 + 2))
+    local lin = M.peaks({ src = head.src, guid = head.guid .. '|loopsrc', offs = 0, len = per, rate = 1, _lin = true }, nlin, want_spec)
+    if not lin then return nil end
+    local out = { n = npix, max = {}, min = {}, spec = lin.spec and {} or nil }
+    local function pick(a, b, acc)          -- a..b — секунды источника внутри [0, per)
+      local ja = math.max(1, math.min(lin.n, math.floor(a / per * lin.n) + 1))
+      local jb = math.max(ja, math.min(lin.n, math.floor(b / per * lin.n)))
+      for j = ja, jb do
+        if lin.max[j] > acc[1] then acc[1] = lin.max[j] end
+        if lin.min[j] < acc[2] then acc[2] = lin.min[j] end
+      end
+      return ja
+    end
+    for i = 1, npix do
+      local s0 = (head.offs or 0) + (i - 1) / npix * head.len * rate
+      local s1 = (head.offs or 0) + i / npix * head.len * rate
+      local a, b = s0 % per, s1 % per
+      local acc = { -2, 2 }
+      local ja
+      if s1 - s0 >= per then ja = pick(0, per, acc)
+      elseif b >= a then ja = pick(a, b, acc)
+      else ja = pick(a, per, acc); pick(0, b, acc) end
+      out.max[i], out.min[i] = acc[1] > -2 and acc[1] or 0, acc[2] < 2 and acc[2] or 0
+      if out.spec then out.spec[i] = lin.spec[ja] end
+    end
+    peaks[key] = out
+    return out
+  end
   -- stretch-маркеры (2 окт): пики источника читаются линейно, потом
   -- раскладываются по карте «время item → время источника», как в REAPER
   if head.smap and not head._lin then

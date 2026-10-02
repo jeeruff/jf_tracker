@@ -656,9 +656,18 @@ end
 -- квадратики, hex только у точек
 local env_col_cache = {}
 local ai_col_cache = {}
+-- цвет огибающих — исходный цвет темы (флаг 1), без обработки Theme Adjuster:
+-- так их рисует аранжировка (2 окт: громкость зелёная, а не жёлтая после Tint)
+local function theme_orig(key, fb)
+  local ok, v = pcall(reaper.GetThemeColor, key, 1)
+  if not ok or not v or v < 0 then return U.theme(key, fb) end
+  local r, g, b = reaper.ColorFromNative(v)
+  if r + g + b == 0 then return fb end
+  return { r / 255, g / 255, b / 255 }
+end
 local function ai_colour(key)
   local c = ai_col_cache[key]
-  if not c then c = U.theme(key, { 0.4, 0.7, 1.0 }); ai_col_cache[key] = c end
+  if not c then c = theme_orig(key, { 0.4, 0.7, 1.0 }); ai_col_cache[key] = c end
   return c
 end
 
@@ -666,7 +675,7 @@ local function env_colour(e)
   if not e.key then return U.GREEN end
   local c = env_col_cache[e.key]
   if not c then
-    c = U.readable(U.theme(e.key, { 0.3, 0.8, 0.3 }), U.BG, 3.0)
+    c = U.readable(theme_orig(e.key, { 0.3, 0.8, 0.3 }), U.BG, 3.0)
     env_col_cache[e.key] = c
   end
   return c
@@ -1117,6 +1126,13 @@ end
 --           по длине; библиотека (*) — последней группой
 --   len   — плоско по длине;  mark — плоско: @ (трек курсора), $, *, прочие
 -- Возвращает список строк { hdr = имя } | { i = индекс пула }
+-- пустые слоты после инструментов (2 окт): «..» — встать, засэмплить ретро,
+-- бросить фрагмент / файл; минимум 2, до 8 слотов всего
+function D.empty_slots(n) return math.max(2, 8 - (n or 0)) end
+local function add_empty(rows, pool)
+  for k = 1, D.empty_slots(#pool) do rows[#rows + 1] = { empty = #pool + k } end
+  return rows
+end
 function D.pool_rows(pool, sort, col, cols)
   local rows = {}
   if sort == 'len' or sort == 'mark' then
@@ -1133,7 +1149,7 @@ function D.pool_rows(pool, sort, col, cols)
       return a < b
     end)
     for _, i in ipairs(idx) do rows[#rows + 1] = { i = i } end
-    return rows
+    return add_empty(rows, pool)
   end
   -- дерево (2 окт): пул уже упорядочен моделью — трек (где лежит исходник),
   -- исходный сэмпл, под ним его слайсы; заголовок при смене трека корня
@@ -1145,7 +1161,7 @@ function D.pool_rows(pool, sort, col, cols)
     end
     rows[#rows + 1] = { i = i }
   end
-  return rows
+  return add_empty(rows, pool)
 end
 
 D.pool_scroll = 0
@@ -1211,7 +1227,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local nvis = math.max(1, math.floor((H - 2 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
-  for r, row in ipairs(rows) do if row.i == inst then sel_r = r end end
+  for r, row in ipairs(rows) do if row.i == inst or row.empty == inst then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   if sel_r > D.pool_scroll + nvis then D.pool_scroll = sel_r - nvis end
@@ -1233,6 +1249,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(row.hdr, w - 12), U.TEXT)
       -- разделитель: длинная линия после имени
       set(U.LINE); gfx.rect(ix + 6 + tw + L.pad, y + math.floor(L.rh / 2), w - 8 - tw - 2 * L.pad, 1, 1)
+    elseif row.empty then
+      -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека
+      local sel = row.empty == inst
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      elseif hot and info.dragging then set(U.tint(U.CYAN, 0.25)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      text(ix + 6, y + 1, ('%02d    ..'):format(row.empty), sel and U.AMBER or U.DIM)
+      if hot then hover.pool = { ci = info.pool_ci, i = row.empty, empty = true } end
     else
       local i = row.i
       local e = pool[i]
@@ -1537,6 +1561,8 @@ function D.frame(L, snap, rows, state, info)
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
     local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
+    -- номера шагов (2 окт): протяжка = time selection REAPER
+    if in_body and mx >= tx0 + L.ruler_w and mx < tx0 + L.label_w then hover.rownum = r.row end
     for _, c in ipairs(L.cols) do
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       if r.bar and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
@@ -1647,8 +1673,13 @@ function D.frame(L, snap, rows, state, info)
                 while rr < it.r1 - 1e-6 and guard < 512 do
                   local ly = yr(rr)
                   if ly > cy0 and ly < cy1 then
-                    gfx.a = 0.8; gfx.rect(x0 + 2, ly, w0 - 4, 1, 1)
-                    gfx.line(x0 + 2, ly - 2, x0 + 5, ly + 1); gfx.a = 1
+                    gfx.a = 0.9; gfx.rect(x0 + 2, ly, w0 - 4, 1, 1)
+                    for k = 0, 1 do gfx.line(x0 + 2 + k, ly - 5, x0 + 10 + k, ly + 3) end
+                    gfx.a = 1
+                    -- стык тянется: длина периода (Option — растяжение)
+                    if mx >= x0 and mx < x0 + w0 and math.abs(my - ly) <= 3 then
+                      hover.seam = { kind = 'item', item = it.item, k = guard + 1, midi = it.midi, x0 = x0, w = w0 }
+                    end
                   end
                   rr = rr + it.loop_rows; guard = guard + 1
                 end
@@ -1673,7 +1704,12 @@ function D.frame(L, snap, rows, state, info)
               gfx.a = 1
               set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
               local hot = hover.aiedge and hover.aiedge.e == ev.e and hover.aiedge.idx == ai.idx
-              gfx.rect(ev.x, cy0, (hot and hover.aiedge.edge == 'move') and 5 or 3, cy1 - cy0, 1)
+              -- ручка слева — полоса в строку текста шириной, в ней имя вертикально (2 окт)
+              local sw = L.th + 4
+              set(col); gfx.a = (hot and hover.aiedge.edge == 'move') and 0.85 or 0.55
+              gfx.rect(ev.x, cy0, sw, cy1 - cy0, 1); gfx.a = 1
+              if cy1 - cy0 > L.th * 2 and ai.label then D.vtext(ev.x + 2, cy0 + 2, cy1 - cy0 - 4, ai.label, U.BG, U.mix(col, U.BG, 0.45), true) end
+              set(col)
               if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, (hot and hover.aiedge.edge == 'start') and 3 or 2, 1) end
               if hot and hover.aiedge.edge == 'end' and y1 <= by1 then gfx.rect(ev.x, y1 - 2, ev.w, 3, 1) end
               if ai.loop_rows and ai.loop_rows > 0 then
@@ -1682,8 +1718,14 @@ function D.frame(L, snap, rows, state, info)
                 while rr < ai.r1 - 1e-6 and guard < 512 do
                   local ly = yr(rr)
                   if ly > cy0 and ly < cy1 then
-                    gfx.a = 0.8; gfx.rect(ev.x + 3, ly, ev.w - 3, 1, 1)
-                    gfx.line(ev.x + 3, ly - 2, ev.x + 6, ly + 1); gfx.a = 1    -- косой срез, как стык лупа
+                    -- стык лупа: линия поперёк и крупная косая насечка (видно издалека)
+                    gfx.a = 0.9; gfx.rect(ev.x + L.th + 4, ly, ev.w - L.th - 4, 1, 1)
+                    for k = 0, 1 do gfx.line(ev.x + L.th + 4 + k, ly - 5, ev.x + L.th + 12 + k, ly + 3) end
+                    gfx.a = 1
+                    if mx >= ev.x and mx < ev.x + ev.w and math.abs(my - ly) <= 3 then
+                      hover.seam = { kind = 'ai', env = ev.e.env, idx = ai.idx, k = guard + 1, r0 = ai.r0, per = ai.loop_rows,
+                                     first = (ai.loop_first or (ai.r0 + ai.loop_rows)) - ai.r0, x0 = ev.x, w = ev.w, name = ev.e.name }
+                    end
                   end
                   rr = rr + ai.loop_rows; guard = guard + 1
                 end
@@ -1692,7 +1734,7 @@ function D.frame(L, snap, rows, state, info)
               if mx >= ev.x and mx < ev.x + ev.w and my >= y0 - 3 and my <= y1 + 3 then
                 local edge
                 if math.abs(my - y0) <= 3 then edge = 'start' elseif math.abs(my - y1) <= 3 then edge = 'end'
-                elseif mx < ev.x + 6 then edge = 'move' end
+                elseif mx < ev.x + L.th + 4 then edge = 'move' end
                 if edge then hover.aiedge = { e = ev.e, idx = ai.idx, edge = edge, pos = ai.pos, len = ai.len, col = c.col } end
               end
             end
@@ -1702,6 +1744,11 @@ function D.frame(L, snap, rows, state, info)
     end
   end
 
+  -- направляющая тянущегося стыка лупа
+  if info.seam_guide then
+    local g = info.seam_guide
+    set(U.CYAN); gfx.rect(g.x, g.y, g.w, 2, 1)
+  end
   -- пик-метры ПОВЕРХ колонок, как в ProTracker: столбик от самого низа
   -- колонки вверх, высота = уровень × высота тела, полупрозрачный — текст
   -- под ним читается
