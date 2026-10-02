@@ -2,3 +2,4 @@
 *.bak
 *.bak.*
 *.swp
+tests/shots/

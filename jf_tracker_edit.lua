@@ -908,6 +908,51 @@ function E.env_ramp(e, t0, t1, v0, v1, tol)
   end)
 end
 
+-- точки огибающей в [t0, t1): { {t, v (сырое), shape, tension} … } (2 окт:
+-- операторы Vim на колонке огибающей — d y c p)
+function E.env_points(e, t0, t1)
+  local out = {}
+  for i = 0, R.CountEnvelopePoints(e.env) - 1 do
+    local ok, t, v, shp, ten = R.GetEnvelopePoint(e.env, i)
+    if ok and t >= t0 - 1e-9 and t < t1 - 1e-9 then out[#out + 1] = { t = t, v = v, shape = shp, tension = ten } end
+  end
+  return out
+end
+function E.env_del_range(e, t0, t1)
+  local n = #E.env_points(e, t0, t1)
+  if n == 0 then return 0 end
+  run('envelope delete points', function() R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9) end)
+  return n
+end
+-- вставка точек (замена в своём диапазоне): pts уже со временами цели
+function E.env_put_points(e, t0, t1, pts)
+  run('envelope paste points', function()
+    R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9)
+    for _, p in ipairs(pts) do R.InsertEnvelopePoint(e.env, p.t, p.v, p.shape or 0, p.tension or 0, false, true) end
+    R.Envelope_SortPoints(e.env)
+  end)
+end
+
+-- удалить огибающую целиком (родное «Envelope: Clear or remove envelope», 40065)
+function E.env_remove(env)
+  run('remove envelope', function()
+    R.SetCursorContext(2, env)
+    R.Main_OnCommand(40065, 0)
+  end)
+  if model then model.invalidate() end
+end
+function E.env_clear(env)
+  run('clear envelope points', function() R.DeleteEnvelopePointRange(env, -1e9, 1e9) end)
+  if model then model.invalidate() end
+end
+-- automation item на огибающей в [pos, pos + len) (только огибающие трека)
+function E.auto_item(env, pos, len)
+  local idx
+  run('insert automation item', function() idx = R.InsertAutomationItem(env, -1, pos, len) end)
+  if model then model.invalidate() end
+  return idx
+end
+
 function E.env_del(e, t, tol)
   local idx = env_point_at(e.env, t, tol or 0.001)
   if not idx then return false end
@@ -916,6 +961,29 @@ function E.env_del(e, t, tol)
 end
 
 -- сдвинуть точку у t на delta (0..1); нет точки — вставить со значением огибающей
+-- форма сегмента точки в t (±tol): 0 lin 1 sqr 2 slo 3 fas 4 fae 5 bez (2 окт)
+-- точка строки — по тому же правилу, что показывает модель (env_values):
+-- последняя точка до начала следующей строки, если она не раньше начала этой
+local function row_point(e, t0, t1)
+  local idx = R.GetEnvelopePointByTime(e.env, t1 - 1e-6)
+  if not idx or idx < 0 then return nil end
+  local ok, pt, _, shp = R.GetEnvelopePoint(e.env, idx)
+  if not ok or pt < t0 - 1e-6 then return nil end
+  return idx, shp
+end
+function E.env_shape(e, t0, t1, shape)
+  local idx = row_point(e, t0, t1)
+  if not idx then return false end
+  run('envelope shape', function()
+    R.SetEnvelopePoint(e.env, idx, nil, nil, shape, nil, nil, true)
+    R.Envelope_SortPoints(e.env)
+  end)
+  return true
+end
+function E.env_get_shape(e, t0, t1)
+  local _, shp = row_point(e, t0, t1)
+  return shp
+end
 function E.env_nudge(e, t, delta, tol)
   local idx = env_point_at(e.env, t, tol or 0.001)
   local raw
@@ -1279,10 +1347,22 @@ function E.item_drag_end()
 end
 -- edge: 'end' — конец в t; 'start' — начало в t (offset источника едет
 -- следом, как trim в REAPER); 'move' — сдвиг начала в t с той же длиной
-function E.item_drag_to(item, edge, t, min_len)
+-- stretch = { len0 =, rate0 = } — Option на краю: растяжение (playrate), как
+-- Alt+край в REAPER; высота — по настройке take (preserve pitch), 2 окт
+function E.item_drag_to(item, edge, t, min_len, stretch)
   local pos = R.GetMediaItemInfo_Value(item, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
   min_len = min_len or 0.01
+  local tk = stretch and R.GetActiveTake(item)
+  if tk and (edge == 'end' or edge == 'start') then
+    local fin = pos + len
+    local nlen = edge == 'end' and math.max(min_len, t - pos) or math.max(min_len, fin - math.max(0, t))
+    R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', math.max(0.01, stretch.rate0 * stretch.len0 / nlen))
+    if edge == 'start' then R.SetMediaItemInfo_Value(item, 'D_POSITION', fin - nlen) end
+    R.SetMediaItemInfo_Value(item, 'D_LENGTH', nlen)
+    R.UpdateItemInProject(item)
+    return
+  end
   if edge == 'end' then
     R.SetMediaItemInfo_Value(item, 'D_LENGTH', math.max(min_len, t - pos))
   elseif edge == 'start' then

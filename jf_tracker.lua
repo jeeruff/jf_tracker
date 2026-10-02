@@ -108,7 +108,8 @@ local state = {
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
-  hints = flag('hints', true),                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
+  hints = flag('hints', true),
+  view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
@@ -125,7 +126,11 @@ vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
 model.OVERSAMPLE = state.wave_os
 vim.step_auto = tostring(ext('step_auto', '0')) == '1'
 reaper.SetExtState(EXT, 'font_v', '3', true)
-for g in tostring(ext('folds', '')):gmatch('[^,]+') do state.folds[g] = true end
+-- fold: «guid» — компактный, «guid=m» — полоска (zC), ревью 2 окт
+for g in tostring(ext('folds', '')):gmatch('[^,]+') do
+  local id, m = g:match('^([^=]+)=?(%a*)$')
+  if id then state.folds[id] = (m == 'm') and 'mini' or true end
+end
 for g in tostring(ext('fcollapse', '')):gmatch('[^,]+') do state.fcollapse[g] = true end
 for g, m in tostring(ext('pitchmodes', '')):gmatch('([^,=]+)=([^,]+)') do state.pitchmodes[g] = m end
 
@@ -138,6 +143,7 @@ local click = { t = 0, fi = nil, row = nil, zone = nil }   -- для двойн�
 local browse_last = nil                                     -- строка браузера, которую уже слушали (auto)
 local inject_last = reaper.GetExtState(EXT, 'inject')       -- стартовое значение не исполняем
 local body_drag = nil                                       -- Shift+протяжка блока в теле
+local ev_drag = nil                                         -- протяжка события / блока мышью (перенос)
 local cmd_text_cache                                        -- ctx.cmd_by_text
 local dsp_drag = nil                                        -- перетаскивание DSP-блока
 local fxb_drag = nil                                        -- перетаскивание FX из браузера эффектов
@@ -215,6 +221,7 @@ local item_drag = nil                                       -- протяжка 
 local inject_cap = nil                                      -- модификаторы инъецированной клавиши
 local env_drag = { key = nil }                             -- протяжка по огибающей
 local modsel = 1                                          -- строка во вкладке modulation (фокус top)
+local env_rows_cache = nil                                  -- строки с точками огибающих (Vim-движения)
 local reselect_item = nil                                   -- после правки слайса: выбрать инструмент этого item
 local sp_on_fx = false                                      -- строка take fx свойств выбрана (прошлый кадр)
 local dsp_sel = { fx = 1, param = 1 }                     -- выбор в DSP-панели (фокус dsp)
@@ -231,6 +238,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
+  S('viewreg', state.view_reg and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'scopes', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
@@ -245,7 +253,7 @@ local function save_win()
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
   S('pitchmodes', table.concat(pm, ','))
   local fl = {}
-  for g, v in pairs(state.folds) do if v then fl[#fl + 1] = g end end
+  for g, v in pairs(state.folds) do if v then fl[#fl + 1] = g .. (v == 'mini' and '=m' or '') end end
   S('folds', table.concat(fl, ','))
   local fc = {}
   for g, v in pairs(state.fcollapse) do if v then fc[#fc + 1] = g end end
@@ -428,6 +436,11 @@ ctx = {
   ctrl_held = function() return gfx.mouse_cap & 32 == 32 end,
   -- macOS: бит 4 = Cmd, 32 = Ctrl, 16 = Option
   msg = function(m) vim.msg = m end,
+  view_reg = function(on)
+    if on == nil then on = not state.view_reg end
+    state.view_reg = on
+    vim.msg = on and 'view: region of the cursor only' or 'view: whole track'
+  end,
   -- браузер: * / :mkdir — новая папка в текущей
   browser_mkdir_prompt = function()
     if B.mode ~= 'files' then vim.msg = 'mkdir: only in files'; return end
@@ -531,6 +544,36 @@ ctx = {
       else state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. p.name .. ' (envelope column shown)' end
     end
   end,
+  -- ad — удалить автоматизацию параметра; ai — automation item по item под курсором трекера
+  dsp_param_env = function(k, pi, create)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then return nil end
+    local id = p.fx or f.i
+    local env
+    if col.take then env = reaper.TakeFX_GetEnvelope(col.track, id, p.i, create)
+    else env = reaper.GetFXEnvelope(col.track, id, p.i, create) end
+    return env, col, f, p
+  end,
+  dsp_unautomate = function(k, pi)
+    local env, _, f, p = ctx.dsp_param_env(k, pi, false)
+    if not env then vim.msg = 'ad: this parameter has no automation'; return end
+    edit.env_remove(env)
+    vim.msg = 'automation removed: ' .. f.name .. ' / ' .. p.name
+  end,
+  dsp_autoitem = function(k, pi)
+    local t = dsp_target()
+    if t and t.take then vim.msg = 'ai: automation items exist only on track envelopes (switch DSP to track: t)'; return end
+    local item = ctx.item_at_cursor()
+    if not item then vim.msg = 'ai: put the tracker cursor on an item'; return end
+    local env, _, f, p = ctx.dsp_param_env(k, pi, true)
+    if not env then vim.msg = 'ai: no parameter'; return end
+    local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
+    local len = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    edit.auto_item(env, pos, len)
+    state.envs = true
+    vim.msg = ('automation item: %s / %s, %.3fs at %.3fs'):format(f.name, p.name, len, pos)
+  end,
   dsp_pick_param = function(k)
     local col, f = ctx.dsp_fx(k)
     if not f then vim.msg = 'dsp: no fx'; return end
@@ -569,6 +612,14 @@ ctx = {
     vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
   end,
   -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
+  item_at_cursor = function()
+    local f = L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
+    local item = cell and cell.item
+    if item and reaper.ValidatePtr(item, 'MediaItem*') then return item end
+    return nil
+  end,
   delete_item_at_cursor = function()
     local f = L.flat[vim.cur.fi]
     local cell = f and f.sub and f.sub[vim.cur.row]
@@ -927,6 +978,56 @@ ctx = {
     local t = edit.row_time(row, state.lpb, 0)
     if not edit.env_del(e, t, (edit.row_time(row + 1, state.lpb, 0) - t) / 2) then vim.msg = 'no point here' end
   end,
+  -- точки огибающей для Vim (2 окт): строки с точками (кэш на снимок), чтение,
+  -- удаление и вставка диапазона строк. Время → строка тем же правилом, что
+  -- у модели: точка в строке r, если row_time(r) <= t < row_time(r + 1).
+  env_point_rows = function(e)
+    env_rows_cache = env_rows_cache or {}
+    local c = env_rows_cache[e.env]
+    if c and c.snap == snap and c.lpb == state.lpb then return c.rows end
+    local rows_, seen = {}, {}
+    for i = 0, reaper.CountEnvelopePoints(e.env) - 1 do
+      local ok, t = reaper.GetEnvelopePoint(e.env, i)
+      if ok then
+        local r = math.floor(model.row_of_time(t, state.lpb) + 1e-6)
+        if not seen[r] then seen[r] = true; rows_[#rows_ + 1] = r end
+      end
+    end
+    table.sort(rows_)
+    env_rows_cache[e.env] = { snap = snap, lpb = state.lpb, rows = rows_ }
+    return rows_
+  end,
+  env_points = function(e, r0, r1)
+    local t0 = edit.row_time(r0, state.lpb, 0)
+    local pts = edit.env_points(e, t0, edit.row_time(r1 + 1, state.lpb, 0))
+    -- в регистре — сдвиг в QN от начала диапазона (темп цели может быть другим)
+    local q0 = reaper.TimeMap2_timeToQN(0, t0)
+    for _, p in ipairs(pts) do p.dq = reaper.TimeMap2_timeToQN(0, p.t) - q0; p.t = nil end
+    return pts
+  end,
+  env_del_range = function(e, r0, r1)
+    local n = edit.env_del_range(e, edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0))
+    vim.msg = ('%s: %d point(s) deleted'):format(e.name or 'envelope', n)
+  end,
+  env_paste = function(e, row, reg)
+    local t0 = edit.row_time(row, state.lpb, 0)
+    local q0 = reaper.TimeMap2_timeToQN(0, t0)
+    local pts = {}
+    for _, p in ipairs(reg.pts or {}) do pts[#pts + 1] = { t = reaper.TimeMap2_QNToTime(0, q0 + p.dq), v = p.v, shape = p.shape, tension = p.tension } end
+    edit.env_put_points(e, t0, edit.row_time(row + (reg.rows or 1), state.lpb, 0), pts)
+    vim.msg = ('%s: %d point(s) pasted'):format(e.name or 'envelope', #pts)
+  end,
+  -- форма сегмента точки строки (2 окт): lin sqr slo fas fae bez
+  env_shape = function(e, row, shape)
+    local ok = edit.env_shape(e, edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0), shape)
+    if ok then vim.msg = 'shape ' .. (vim.SHAPES[shape + 1] or shape) else vim.msg = 'no point in this row' end
+    return ok
+  end,
+  env_shape_step = function(e, row, d)
+    local cur = edit.env_get_shape(e, edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0))
+    if not cur then vim.msg = 'no point in this row'; return end
+    ctx.env_shape(e, row, (cur + d) % 6)
+  end,
   env_nudge = function(e, row, d)
     local t = edit.row_time(row, state.lpb, 0)
     edit.env_nudge(e, t, d, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
@@ -1098,6 +1199,7 @@ ctx = {
     local rg = seq[MX.cur.ri]
     if not rg then vim.msg = 'no region'; return end
     ctx.set_focus('matrix')
+    state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. rg.name
   end,
   mx_len_prompt = function(ri)
@@ -1105,6 +1207,7 @@ ctx = {
     local rg = seq[MX.cur.ri]
     if not rg then vim.msg = 'no region'; return end
     ctx.set_focus('matrix')
+    state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'len '
     vim.msg = ('len: N steps (lpb %d) | Ns seconds | Nb bars; now %d steps = %.3fs'):format(state.lpb, rg.r1 - rg.r0, rg.rgnend - rg.pos)
   end,
@@ -1570,6 +1673,7 @@ ctx = {
   rename_track_prompt = function(col)
     col = col or cur_col(); if not col then return end
     state.rename_guid = col.guid
+    state.popup_at = { kind = 'track', guid = col.guid }
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'tname ' .. (col.name or '')
   end,
   rename_track = function(text)
@@ -1586,6 +1690,7 @@ ctx = {
   rename_inst_prompt = function()
     local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
     if not e then vim.msg = 'no instrument'; return end
+    state.popup_at = { kind = 'inst' }
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'iname ' .. (e.name or '')
   end,
   rename_inst = function(text)
@@ -1944,6 +2049,7 @@ local function hint_go(t)
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
+  elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
@@ -2096,6 +2202,10 @@ local function context_menu(hover)
     add('Slice … (virtual)', function() ctx.open_slicer(hover.pool.i) end)
     add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end)
     add('Hide top bar (:top)', function() state.top = false end)
+  elseif hover.header_env then
+    local e = hover.header_env.e
+    add('Delete envelope ' .. (e.name or '') .. ' (whole curve)', function() edit.env_remove(e.env); vim.msg = 'envelope removed: ' .. (e.name or '') end, 'd')
+    add('Clear all points', function() edit.env_clear(e.env); vim.msg = 'envelope cleared: ' .. (e.name or '') end, 'c')
   elseif hover.header_col then
     for _, a in ipairs(track_actions(hover.header_col)) do add(a[1], a.fn, a.key) end
   elseif hover.dsp then
@@ -3002,7 +3112,26 @@ local function frame()
       state.row0 = math.max(0, r - math.floor(L.nrows / 3))
     end
   end
+  -- вид reg (2 окт): только строки региона курсора (при игре с follow — плейхеда),
+  -- прокрутка в его пределах, строки вне региона пустые
+  local view_clip
+  if state.view_reg then
+    local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
+    local rg = alias.region_at(regions, edit.row_time(ref, state.lpb, 0))
+    if rg then
+      -- границы как у region_at (по времени): строка внутри региона не гасится
+      local r0, r1 = math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6)
+      if not state.fixed then state.row0 = math.max(r0, math.min(state.row0, math.max(r0, r1 - L.nrows))) end
+      view_clip = { r0, r1 }
+    end
+  end
   rows = model.rows(state.row0, L.nrows, state.lpb)
+  if view_clip then
+    for _, r in ipairs(rows) do
+      -- номер строки настоящий (рамки, линейка, клики считают от него), флаг clip гасит строку
+      if r.row < view_clip[1] or r.row >= view_clip[2] then r.clip = true; r.label = ''; r.bar = false; r.beat = false end
+    end
+  end
 
   fps.n = fps.n + 1
   local now = reaper.time_precise()
@@ -3053,7 +3182,7 @@ local function frame()
       return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) }
     end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
-    region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = snap.cols, peaks = track_peaks, poolsort = state.poolsort,
@@ -3138,8 +3267,29 @@ local function frame()
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
   if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
+  if ev_drag and ev_drag.active then draw.ghost(('%d event(s) %+d'):format(#ev_drag.heads, ev_drag.drow or 0)) end
   SL.draw_drag(U, L)
-  draw.popup(L, vim.popup())
+  -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
+  -- инструменты; иначе — ячейка курсора трекера
+  if vim.mode ~= 'cmd' then state.popup_at = nil end
+  local anchor
+  do
+    local pa = state.popup_at
+    if pa and pa.kind == 'track' then
+      for _, c in ipairs(L.cols or {}) do if c.col.guid == pa.guid and c.x then anchor = { x = c.x, y = L.header_y + L.rh } end end
+    elseif pa and pa.kind == 'mxrow' then
+      local y = MX.row_y and MX.row_y[pa.ri]
+      if y then anchor = { x = 2, y = y + L.rh } end
+    elseif pa and pa.kind == 'inst' then
+      anchor = { x = L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
+    end
+    if not anchor and (state.focus == 'tracker') then
+      local f = L.flat[vim.cur.fi]
+      local r = vim.cur.row - (rows[1] and rows[1].row or 0)
+      if f and f.x and r >= 0 and r < L.nrows then anchor = { x = f.x, y = L.body_y + (r + 1) * L.rh } end
+    end
+  end
+  draw.popup(L, vim.popup(), anchor)
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
   if bpm_menu then
     local r = draw.ctrl_rect and draw.ctrl_rect.bpm
@@ -3175,7 +3325,8 @@ local function frame()
       cell.name, cell.note, cell.vol, cell.offs, cell.len, cell.rate, table.concat(cell.fx or {}, ' '))
   elseif cell and cell.kind == 'midi' then
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
-  elseif hover.env then state.status = ('%s %s  %.0f%%'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
+  elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
+  elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
@@ -3195,6 +3346,7 @@ local function frame()
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters, analyzer, fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
@@ -3271,7 +3423,8 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
-  elseif hover.sample and SL.zone_hot then state.status = ('slice %s - drag the handle at the bottom of the wave: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
+  elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
+      or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
   elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
@@ -3414,7 +3567,9 @@ local function frame()
       if e and e.parent and e.item then
         local p = e.parent; local pr = (p.rate and p.rate ~= 0) and p.rate or 1
         local a0, b0 = (e.offs - p.offs) / pr, (e.offs - p.offs + e.len * (e.rate or 1)) / pr
-        SL.zone_drag = { edge = SL.zone_hot, e = e, p = p, a = a0, b = b0, a0 = a0, b0 = b0, inst = vim.inst }
+        local wv = SL.wave
+        local grab = (wv and wv.w > 0) and ((gfx.mouse_x - wv.x) / wv.w * wv.len) or a0
+        SL.zone_drag = { edge = SL.zone_hot, e = e, p = p, a = a0, b = b0, a0 = a0, b0 = b0, inst = vim.inst, grab = grab }
       end
       click = { t = now2, zone = 'slicezone' }
     elseif hover.sample then
@@ -3432,6 +3587,7 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
+    elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
@@ -3585,6 +3741,10 @@ local function frame()
         else reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 and 0 or 1) end
       end)
       click = { t = now2, zone = 'btn' }
+    elseif hover.header_env then
+      local ok, e = pcall(context_menu, hover)
+      if not ok then vim.msg = tostring(e):match('[^\n]*$') end
+      click = { t = now2, zone = 'envhead' }
     elseif hover.header_col then
       reaper.SetOnlyTrackSelected(hover.header_col.track)
       -- двойной клик по имени трека — переименовать (строка :tname с текущим именем)
@@ -3596,6 +3756,11 @@ local function frame()
       -- край рамки item: trim как в аранжировке
       ctx.set_focus('tracker')
       item_drag = { item = hover.itemedge.item, edge = hover.itemedge.edge, col = hover.itemedge.col, y0 = gfx.mouse_y, active = false, name = hover.itemedge.col.name }
+      if gfx.mouse_cap & 16 == 16 then
+        -- Option на краю — растяжение (playrate), обычная протяжка — trim
+        local tk = reaper.GetActiveTake(hover.itemedge.item)
+        if tk then item_drag.stretch = { len0 = reaper.GetMediaItemInfo_Value(hover.itemedge.item, 'D_LENGTH'), rate0 = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') } end
+      end
       click = { t = now2, zone = 'itemedge' }
     elseif hover.row and hover.fi then
       ctx.set_focus('tracker')
@@ -3614,9 +3779,26 @@ local function frame()
         body_drag = true
         click = { t = now2, zone = 'bodysel', fi = hover.fi, row = hover.row.row }
       else
-        vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
+        -- протяжка события (2 окт): в любом режиме; внутри VISUAL-блока — весь блок.
+        -- Блок запоминается ДО того, как клик сдвинет курсор (угол блока)
+        local vis_heads, vis_o
+        if vim.mode == 'visual' or vim.mode == 'vline' then
+          local f0, f1, r0, r1 = vim.visual_range()
+          if hover.fi >= f0 and hover.fi <= f1 and hover.row.row >= r0 and hover.row.row <= r1 then
+            vis_heads = vim.heads_in(f0, f1, r0, r1); vis_o = { fi = f0, row = r0, f1 = f1, r1 = r1, anchor = vim.anchor and { fi = vim.anchor.fi, row = vim.anchor.row }, cur = { fi = vim.cur.fi, row = vim.cur.row } }
+          end
+        end
+        if not vis_heads then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
         if hover.field then vim.cur.field = hover.field end
         local head = cell
+        if head and not dbl then
+          local hr = head.row0 or hover.row.row
+          local heads = (vis_heads and #vis_heads > 0) and vis_heads or vim.heads_in(hover.fi, hover.fi, hr, hr)
+          if #heads > 0 then
+            ev_drag = { heads = heads, fi0 = hover.fi, row0 = hover.row.row, ofi = vis_o and vis_o.fi or hover.fi, orow = vis_o and vis_o.row or hr,
+                        vis = vis_o, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false }
+          end
+        end
         -- клик по событию выделяет item в REAPER (штатные действия и
         -- mouse modifiers работают с ним); двойной — свойства item / MIDI-редактор
         if head and head.item then
@@ -3640,8 +3822,8 @@ local function frame()
         rowf = math.max(0, rowf)
         local t = reaper.TimeMap2_QNToTime(0, rowf / state.lpb)
         if item_drag.edge == 'move' then t = t - (item_drag.grab or 0) end
-        edit.item_drag_to(item_drag.item, item_drag.edge, t, edit.row_time(1, state.lpb, 0) / 4)
-        state.status = ('%s %s → row %.2f (Cmd: free)'):format(item_drag.edge, item_drag.col.name, rowf)
+        edit.item_drag_to(item_drag.item, item_drag.edge, t, edit.row_time(1, state.lpb, 0) / 4, item_drag.stretch)
+        state.status = ('%s %s %s → row %.2f (Cmd: free)'):format(item_drag.stretch and 'stretch' or 'trim', item_drag.edge, item_drag.col.name, rowf)
         model.invalidate()
       end
     else
@@ -3649,7 +3831,46 @@ local function frame()
       item_drag = nil
     end
   elseif hover.itemedge and hover.itemedge.edge ~= 'move' then
-    state.status = ('item %s: drag to trim %s (snap to rows, Cmd: free); Option+drag inside: move'):format(hover.itemedge.col.name, hover.itemedge.edge)
+    state.status = ('item %s %s: drag = trim, Option+drag = stretch (playrate), Cmd = no snap; inside: drag = move event, Option = move item'):format(hover.itemedge.col.name, hover.itemedge.edge)
+  end
+  -- перенос события / блока мышью: на отпускании — один undo (взять, удалить, вставить)
+  if ev_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not ev_drag.active and (math.abs(gfx.mouse_y - ev_drag.y0) > 3 or math.abs(gfx.mouse_x - ev_drag.x0) > 3) then ev_drag.active = true end
+      if ev_drag.active and hover.row and hover.fi then
+        ev_drag.drow = hover.row.row - ev_drag.row0
+        ev_drag.dfi = hover.fi - ev_drag.fi0
+        local f = L.flat[ev_drag.ofi + ev_drag.dfi]
+        state.status = ('move %d event(s) → row %04d, %s (release to drop)'):format(#ev_drag.heads, math.max(0, ev_drag.orow + ev_drag.drow), f and f.col and f.col.name or '?')
+      end
+    else
+      local d = ev_drag
+      ev_drag = nil
+      if d.active and ((d.drow or 0) ~= 0 or (d.dfi or 0) ~= 0) then
+        local drow, dfi = d.drow or 0, d.dfi or 0
+        if d.orow + drow < 0 then drow = -d.orow end
+        local function targets(k)
+          local f = L.flat[d.ofi + dfi + k]
+          if not f or not f.col or f.env or f.folded then return nil end
+          local lane = f.lane or f.col.lanes[1]
+          return { track = f.col.track, lane_idx = f.col.fixed and lane and lane.idx or nil }
+        end
+        local ok, err = pcall(edit.run, 'move events', function()
+          local reg = edit.yank(d.heads, state.lpb, d.orow, d.ofi)
+          edit.delete(d.heads, state.lpb)
+          edit.paste(reg, state.lpb, d.orow + drow, targets)
+        end)
+        if not ok then vim.msg = 'move failed: ' .. tostring(err):match('[^\n]*$')
+        else
+          vim.msg = ('moved %d event(s) %+d rows, %+d columns (Cmd+Z undo)'):format(#d.heads, drow, dfi)
+          if d.vis then
+            if d.vis.anchor then vim.anchor = { fi = d.vis.anchor.fi + dfi, row = d.vis.anchor.row + drow } end
+            vim.cur.fi, vim.cur.row = d.vis.cur.fi + dfi, d.vis.cur.row + drow
+          else vim.cur.fi, vim.cur.row = d.fi0 + dfi, d.row0 + drow end
+        end
+        model.invalidate()
+      end
+    end
   end
   -- Shift+протяжка: второй угол блока следует за мышью
   if body_drag then
@@ -3668,11 +3889,22 @@ local function frame()
   if hover.env and hover.row then
     local down = gfx.mouse_cap & 1 == 1
     if down then
-      local key = tostring(hover.env.env) .. ':' .. hover.row.row .. ':' .. math.floor(hover.envx * 255)
-      if env_drag.key ~= key then
-        env_drag.key = key
-        ctx.env_set(hover.env, hover.row.row, hover.envx)
-        if hover.fi then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
+      -- клик по автоматизации открывает вкладку modulation (фокус остаётся тут) — 2 окт
+      if not env_drag.key then state.top = true; state.toptab = 'modulation' end
+      if hover.field == 2 then
+        -- поле формы: только курсор туда (правка — буквами в INSERT, ^A ^X)
+        if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 2 end
+      elseif vim.mode ~= 'insert' then
+        -- NORMAL / VISUAL: клик только ставит курсор на строку огибающей (2 окт);
+        -- точку от мыши пишет только INSERT
+        if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
+      else
+        local key = tostring(hover.env.env) .. ':' .. hover.row.row .. ':' .. math.floor(hover.envx * 255)
+        if env_drag.key ~= key then
+          env_drag.key = key
+          ctx.env_set(hover.env, hover.row.row, hover.envx)
+          if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
+        end
       end
     else env_drag.key = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
@@ -3706,8 +3938,16 @@ local function frame()
     local zd, wv = SL.zone_drag, SL.wave
     if gfx.mouse_cap & 1 == 1 then
       if wv and wv.w > 0 then
-        local t = SL.snap_t(math.max(0, math.min(wv.len, (gfx.mouse_x - wv.x) / wv.w * wv.len)))
-        if zd.edge == 'a' then zd.a = math.min(t, zd.b - 0.005) else zd.b = math.max(t, zd.a + 0.005) end
+        local raw = math.max(0, math.min(wv.len, (gfx.mouse_x - wv.x) / wv.w * wv.len))
+        if zd.edge == 'move' then
+          -- полоса внизу: вся зона едет, длина та же; начало липнет (snap)
+          local w = zd.b0 - zd.a0
+          local na = SL.snap_t(math.max(0, math.min(wv.len - w, zd.a0 + (raw - zd.grab))))
+          zd.a, zd.b = na, na + w
+        else
+          local t = SL.snap_t(raw)
+          if zd.edge == 'a' then zd.a = math.min(t, zd.b - 0.005) else zd.b = math.max(t, zd.a + 0.005) end
+        end
         state.status = ('slice: %.3f - %.3fs of %s (%.3fs) - release to apply'):format(zd.a, zd.b, zd.p.name or 'sample', zd.b - zd.a)
       end
     else
@@ -3848,7 +4088,7 @@ local function frame()
     if hover.dsp and hover.dsp.param then
       local col = dsp_target(); local p = col and hover.dsp.f.params[hover.dsp.param]
       if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
-    elseif hover.env and hover.row then ctx.env_nudge(hover.env, hover.row.row, (step > 0 and -1 or 1) / 64)
+    -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
     elseif gfx.mouse_cap & 8 == 8 then

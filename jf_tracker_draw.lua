@@ -207,10 +207,21 @@ function D.layout(snap, state, nregions)
   L.sub_w_narrow = L.pad + L.w_note + L.pad + L.w_vol + L.pad
   L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad,
     x_vol = L.pad + L.w_note + L.pad, x_fx = {}, x_del = L.pad + L.w_note + L.pad, sub_w = L.sub_w_narrow }, { __index = L })
+  -- свёрнутый трек (fold, 2 окт): только волна и нота; ноты аккорда — только нота;
+  -- огибающие — узкая схема: линия в символ шириной + hex значения точек
+  L.sub_w_compact = L.x_note + L.w_note + L.pad
+  L.GC = setmetatable({ notes_only = true, nfx = 0, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
+  L.sub_w_compact_n = L.pad + L.w_note + L.pad
+  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_fx = {},
+    x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
   L.env_hex_w = ms('FF')
   L.env_bar_w = ms('WWWW')
-  L.env_w = L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad
+  -- поле формы сегмента (2 окт): lin sqr slo fas fae bez — справа от значения
+  L.env_shape_w = ms('bez')
+  L.env_w = L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad + L.env_shape_w + L.pad
+  L.env_cw = L.pad + L.cw + L.pad + L.env_hex_w + L.pad
+  L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
@@ -258,7 +269,9 @@ function D.layout(snap, state, nregions)
     local hidden = hide_below ~= nil and depth > hide_below
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.win_w
-    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = state.folds[col.guid] == true, hidden = hidden }
+    -- fold: true — компактный вид (волна + нота), 'mini' — полоска в символ (прежний fold)
+    local fs = state.folds[col.guid]
+    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini', compact = fs == true, hidden = hidden }
     local lx = (c.x or 0) + 1
     if c.folded then
       L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, x = vis and lx or nil, w = L.fold_w }
@@ -272,10 +285,12 @@ function D.layout(snap, state, nregions)
         local off = 0
         for si = 1, nsub do
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
-          local sw = narrow and L.sub_w_narrow or L.sub_w
+          local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
+          local sw = G and G.sub_w or L.sub_w
           ln.sx[si] = off
           L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
-                                  x = vis and (lx + off) or nil, w = sw, narrow = narrow or nil, G = narrow and L.GN or nil }
+                                  x = vis and (lx + off) or nil, w = sw, narrow = narrow or nil, G = G,
+                                  compact = c.compact or nil }
           off = off + sw
         end
         ln.w = off
@@ -284,12 +299,14 @@ function D.layout(snap, state, nregions)
       end
       local show_env = state.trackenvs and state.trackenvs[col.guid]
       if show_env == nil then show_env = state.envs end
+      if c.compact then show_env = true end         -- свёрнутый: автоматизация видна всегда, схемой
       if show_env and col.envs then
+        local ew = c.compact and L.env_cw or L.env_w
         for _, e in ipairs(col.envs) do
           -- огибающая — тоже элемент L.flat (курсор заходит, INSERT правит точки)
-          L.flat[#L.flat + 1] = { ci = ci, col = col, env = e, sub = {}, x = vis and lx or nil, w = L.env_w }
-          c.envs[#c.envs + 1] = { e = e, x = lx, w = L.env_w, fi = #L.flat }
-          lx = lx + L.env_w + 1
+          L.flat[#L.flat + 1] = { ci = ci, col = col, env = e, sub = {}, x = vis and lx or nil, w = ew, compact = c.compact or nil }
+          c.envs[#c.envs + 1] = { e = e, x = lx, w = ew, fi = #L.flat, G = c.compact and L.GE or nil }
+          lx = lx + ew + 1
         end
       end
     end
@@ -376,7 +393,9 @@ end
 local VFIRST, VLAST = 800, 959
 local vcache, vnext = {}, VFIRST
 D.reset_vcache = function() vcache, vnext = {}, VFIRST end
-function D.vtext(x, y, h_avail, str, col, bg)
+-- top = true — прижать к верху отведённой высоты (имена на линейке, 2 окт),
+-- иначе к низу (имена треков в матрице растут снизу, как в Renoise)
+function D.vtext(x, y, h_avail, str, col, bg, top)
   bg = bg or U.PANEL
   local maxchars = math.max(1, math.floor(h_avail / math.max(1, ms('W'))))
   if #str > maxchars then str = str:sub(1, maxchars) end
@@ -409,7 +428,7 @@ function D.vtext(x, y, h_avail, str, col, bg)
   local mode = gfx.mode; gfx.mode = 0; gfx.a = 1
   -- прижать к низу отведённой высоты (как в Renoise: имя растёт снизу)
   local dh = e.h * D.SCALE
-  local dy = y + math.max(0, h_avail - dh)
+  local dy = top and y or (y + math.max(0, h_avail - dh))
   gfx.blit(e.id, 1, 0, 0, 0, e.w, e.h, math.floor(x), math.floor(dy), e.w * D.SCALE, dh)
   gfx.mode = mode
 end
@@ -535,7 +554,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local function text(tx, tyy, str, col)
     if inv and col == U.BG then text_(tx, tyy, str, col, D.inv_bg or U.TEXT) else text_(tx, tyy, str, col) end
   end
-  local nf = L.narrow and 2 or (3 + L.nfx)
+  local nf = L.notes_only and 1 or (L.narrow and 2 or (3 + L.nfx))
   if not cell then
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
@@ -556,8 +575,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     text(x + L.x_note, ty, cell.note, c(1, muted and U.GREY or U.TEXT))
-    text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or U.CYAN))
-    if L.narrow then
+    if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or U.CYAN)) end
+    if L.narrow or L.notes_only then
     elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, U.TEXT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     local fx = cell.fx or {}
@@ -567,8 +586,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
     end
   elseif k == 'off' then
     text(x + L.x_note, ty, 'OFF', c(1, D.CONT))
-    text(x + L.x_vol, ty, '..', c(2, D.EMPTY))
-    if L.narrow then
+    if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
+    if L.narrow or L.notes_only then
     elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     for i = 1, L.nfx do text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
@@ -653,6 +672,8 @@ end
 
 D.env_colour = function(e) return env_colour(e) end   -- для матрицы (мини-огибающие)
 
+-- формы сегмента REAPER 0..5 → сокращения (как меню Set segment shape)
+D.ENV_SHAPES = { [0] = 'lin', [1] = 'sqr', [2] = 'slo', [3] = 'fas', [4] = 'fae', [5] = 'bez' }
 local function draw_env_cell(L, ev, prev, x, y, ty, e)
   if not ev then return end
   -- ломаная по подточкам строки (M.ENV_SUB) — без изломов на границах строк;
@@ -666,8 +687,12 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e)
   for k = 2, #pts do gfx.line(pts[k - 1][1], pts[k - 1][2], pts[k][1], pts[k][2]) end
   local ex, cy = pts[1][1], y + 1
   if ev.pt then
-    gfx.rect(ex - 2, cy - 2, 5, 5, 1)
+    gfx.rect(ex - 2, cy - 2, L.env_compact and 3 or 5, L.env_compact and 3 or 5, 1)
     text(x + L.pad + L.env_bar_w + L.pad, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
+    -- форма сегмента от этой точки (полная колонка)
+    if not L.env_compact and ev.shape then
+      text(x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad, ty, D.ENV_SHAPES[ev.shape] or '?', ev.shape == 0 and U.DIM or U.CYAN)
+    end
   end
 end
 
@@ -1324,6 +1349,9 @@ function D.frame(L, snap, rows, state, info)
       local function slider(sx, sy, sw, frac, centered, label, val, what)
         local vw = ms(val) + L.pad
         local lw = ms(label) + L.pad
+        -- узкий трек (свёрнутый): значение не влезает — без него, не в соседа (ревью 2 окт)
+        local show_val = sw >= lw + vw + L.pad + 12
+        if not show_val then vw = 0 end
         local wx0, ww = sx + lw, math.max(4, sw - lw - vw - L.pad)
         local cy = sy + math.floor(L.rh / 2)
         local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
@@ -1339,7 +1367,7 @@ function D.frame(L, snap, rows, state, info)
         else
           set(acc); gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1)
         end
-        text(wx0 + ww + L.pad, sy, val, U.GREY)
+        if show_val then text(wx0 + ww + L.pad, sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
       end
@@ -1389,6 +1417,8 @@ function D.frame(L, snap, rows, state, info)
     end
     for _, ev in ipairs(c.envs) do
       text(ev.x + L.pad, hy + 4 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
+      -- имя огибающей — своё меню (клик: удалить кривую / очистить точки), 2 окт
+      if mx >= ev.x and mx < ev.x + ev.w and my >= hy + 4 * L.rh and my < hy + 5 * L.rh then hover.header_env = { e = ev.e, col = c.col } end
       hint('env', ev.x, hy + 4 * L.rh, ev.w, L.rh, ev.fi)
       set(U.DIM); gfx.rect(ev.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1)
     end
@@ -1407,8 +1437,8 @@ function D.frame(L, snap, rows, state, info)
           local G = (L.flat[ln.f0 + si - 1] or {}).G or L
           if G.w_wave > 0 then cap(sx + G.x_wave, G.w_wave, L.wave == 'spec' and 'wav' or 'wv', 'wave') end
           cap(sx + G.x_note, L.w_note, 'nt', 'note')
-          cap(sx + G.x_vol, L.w_vol, 'vl', 'vol')
-          if not G.narrow then
+          if not G.notes_only then cap(sx + G.x_vol, L.w_vol, 'vl', 'vol') end
+          if not (G.narrow or G.notes_only) then
             for k = 1, L.nfx do cap(sx + L.x_fx[k], L.w_fx, 'fx' .. k, 'fx') end
             cap(sx + L.x_del, L.w_del, 'dl', 'delay')
           end
@@ -1420,37 +1450,46 @@ function D.frame(L, snap, rows, state, info)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 2, 1)
-  -- имя региона курсора — всегда видно на зарезервированном месте над
-  -- номерами строк (2 окт): полоса цвета региона + имя (или #N)
+  -- уголок над номерами строк (2 окт): ряд 0 — вид all | reg (весь трек /
+  -- только регион курсора), ряд 1 — номер и имя региона в его цвете, ряд 2 —
+  -- /2 x2 dup одной строкой (узкие кнопки: влезают на x1..x4, проверено расчётом)
   do
     local rg = info.cur_region_full
     local bx, bw = tx0 + 1, L.label_w - 2
+    local function small(x, y, label, what, on, kind)
+      local w1 = ms(label) + 2
+      local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
+      set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      if hot then hover[kind] = what end
+      hint(kind, x, y, w1, L.rh, what)
+      return x + w1 + 2
+    end
+    -- ряд 0: all | reg
+    local x0 = bx
+    x0 = small(x0, hy + 1, 'all', 'all', not info.view_reg, 'viewbtn')
+    small(x0, hy + 1, 'reg', 'reg', info.view_reg, 'viewbtn')
+    -- ряд 1: номер + имя
+    local ny = hy + 1 + L.rh
     if rg then
       local c = rg.rgb or U.LINE
-      set(U.tint(c, 0.30)); gfx.rect(bx, hy + 1, bw, L.rh, 1)
-      set(c); gfx.rect(bx, hy + 1, 3, L.rh, 1)
+      set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
+      set(c); gfx.rect(bx, ny, 3, L.rh, 1)
       -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»
-      text(bx + 5, hy + 1, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
+      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
     else
-      text(bx + 5, hy + 1, fit('no region', bw - 7), U.DIM)
+      text(bx + 5, ny, fit('no region', bw - 7), U.DIM)
     end
-    -- кнопки под именем (2 окт): /2 x2 dup; не влезают в ряд — dup ниже
+    -- ряд 2: /2 x2 dup
     if rg then
-      local BT = { { 'half', '/2' }, { 'double', 'x2' }, { 'dup', 'dup' } }
-      -- ряды кнопок вплотную: второй ряд кончается ровно над числом длины
-      local x, y = bx, hy + 1 + L.rh
-      for _, b in ipairs(BT) do
-        local w1 = ms(b[2]) + 2 * L.pad
-        if x + w1 > bx + bw then x, y = bx, y + L.rh end
-        if y + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
-          local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
-          set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w1, L.rh, 1)
-          set(hot and U.AMBER or U.LINE); gfx.rect(x, y, w1, L.rh, 0)
-          text(x + L.pad, y, b[2], hot and U.AMBER or U.TEXT)
-          if hot then hover.rgbtn = b[1] end
-          hint('rgbtn', x, y, w1, L.rh, b[1])
+      local by2 = ny + L.rh
+      if by2 + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+        local x = bx
+        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' }, { 'dup', 'dup' } }) do
+          if x + ms(bt[2]) + 2 > bx + bw then break end
+          x = small(x, by2, bt[2], bt[1], false, 'rgbtn')
         end
-        x = x + w1 + 2
       end
     end
   end
@@ -1492,7 +1531,7 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(D.CURTOP); gfx.rect(tx0, y, W - tx0, 1, 1) end
     if r.row == cur then set(D.EDITTOP); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.rect(tx0, y, 3, L.rh, 1) end
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
-    local in_body = my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
+    local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     for _, c in ipairs(L.cols) do
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
@@ -1514,12 +1553,12 @@ function D.frame(L, snap, rows, state, info)
               else local fx, fw = D.field_rect(f.G or L, inv); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
             end
             local cell
-            if r.row < 0 then
+            if r.row < 0 or r.clip then
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
-              for fld = 1, f.narrow and 2 or (3 + L.nfx) do
+              for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
                 local fx, fw = D.field_rect(f.G or L, fld)
                 if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
               end
@@ -1528,14 +1567,23 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       for _, ev in ipairs(c.envs) do
+        local EG = ev.G or L
+        if r.clip then goto env_next end
         if vc and vc.fi == ev.fi and vc.row == r.row then
-          set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(ev.x, y, ev.w, L.rh, 0)
+          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          if (vc.field or 1) == 2 and not ev.G then
+            local sx = ev.x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad
+            gfx.rect(sx - 1, y, L.env_shape_w + 2, L.rh, 0)
+          else gfx.rect(ev.x, y, ev.w, L.rh, 0) end
         end
-        draw_env_cell(L, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e)
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e)
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
-          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (L.env_bar_w - 1)))
+          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (EG.env_bar_w - 1)))
+          -- поле: 1 — линия и значение, 2 — форма (только полная колонка)
+          hover.field = (not ev.G and mx >= ev.x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad) and 2 or 1
         end
+        ::env_next::
       end
     end
   end
@@ -1546,6 +1594,11 @@ function D.frame(L, snap, rows, state, info)
   do
     local top_row = rows[1] and rows[1].row or 0
     local by0, by1 = L.body_y, L.body_y + L.nrows * L.rh
+    -- вид reg: рамки только в строках региона
+    if info.view_clip then
+      by0 = math.max(by0, L.body_y + (info.view_clip[1] - top_row) * L.rh)
+      by1 = math.min(by1, L.body_y + (info.view_clip[2] - top_row) * L.rh)
+    end
     local function yr(rf) return L.body_y + math.floor((rf - top_row) * L.rh + 0.5) end
     for _, c in ipairs(L.cols) do
       if not c.folded then
@@ -1584,11 +1637,14 @@ function D.frame(L, snap, rows, state, info)
             local y0, y1 = yr(ai.r0), yr(ai.r1)
             if y1 > by0 and y0 < by1 then
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
+              -- как в аранжировке REAPER (2 окт): еле заметная заливка — линия
+              -- огибающей видна, рамка цветом item, полоса-шапка сверху
               local col = ai_colour(ev.e.ai_key or 'env_item_pitch')
-              set(col); gfx.a = ai.sel and 0.45 or 0.28
-              gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 1)
+              set(col); gfx.a = ai.sel and 0.16 or 0.08
+              gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
               gfx.a = 1
-              set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.1)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
+              set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
+              if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, 2, 1) end
             end
           end
         end
@@ -1642,8 +1698,10 @@ function D.frame(L, snap, rows, state, info)
     local function ry(row) return L.body_y + (row - row0) * L.rh end
     local bot = L.body_y + nr * L.rh
     local laneR, laneM = tx0 + 1, tx0 + 1 + L.th + 6
+    local c0 = info.view_clip and info.view_clip[1] or -math.huge
+    local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
-      local a, b = math.max(rg.r0, row0), math.min(rg.r1, row0 + nr)
+      local a, b = math.max(rg.r0, row0, c0), math.min(rg.r1, row0 + nr, c1)
       if b > a then
         local y0, y1 = ry(a), ry(b)
         local c = rg.rgb or U.LINE
@@ -1651,7 +1709,7 @@ function D.frame(L, snap, rows, state, info)
         set(c); gfx.rect(laneR, y0, 3, y1 - y0, 1)
         set(bgc); gfx.rect(laneR + 3, y0, L.th + 2, y1 - y0, 1)
         if rg.r0 >= row0 then set(c); gfx.rect(laneR, y0, L.th + 5, 1, 1) end
-        if y1 - y0 > L.th then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc) end
+        if y1 - y0 > L.th then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
       end
     end
     local mks = {}
@@ -1665,7 +1723,7 @@ function D.frame(L, snap, rows, state, info)
       local ynext = mks[k + 1] and ry(mks[k + 1].row) or bot
       local c = m.mk.rgb or U.AMBER
       set(c); gfx.rect(laneR, y, L.ruler_w - 3, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
-      if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG) end
+      if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
     if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
@@ -1673,8 +1731,10 @@ function D.frame(L, snap, rows, state, info)
   -- уголке с именем, на линейке и в матрице
   if L.ruler_w > 0 and info.ruler and #rows > 0 then
     local row0, nr = rows[1].row, #rows
+    local c0 = info.view_clip and info.view_clip[1] or -math.huge
+    local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
-      local a, b = math.max(rg.r0, row0), math.min(rg.r1, row0 + nr)
+      local a, b = math.max(rg.r0, row0, c0), math.min(rg.r1, row0 + nr, c1)
       if b > a and rg.rgb then
         set(rg.rgb); gfx.rect(tx0 + L.ruler_w, L.body_y + (a - row0) * L.rh, 2, (b - a) * L.rh, 1)
       end
@@ -1684,7 +1744,7 @@ function D.frame(L, snap, rows, state, info)
   -- бледная полоса по паттерну и скобка «]» у правого края линейки
   if info.timesel and #rows > 0 then
     local row0, nr = rows[1].row, #rows
-    local a, b = math.max(info.timesel[1], row0), math.min(info.timesel[2], row0 + nr)
+    local a, b = math.max(info.timesel[1], row0, info.view_clip and info.view_clip[1] or -math.huge), math.min(info.timesel[2], row0 + nr, info.view_clip and info.view_clip[2] or math.huge)
     if b > a then
       local y0, y1 = L.body_y + (a - row0) * L.rh, L.body_y + (b - row0) * L.rh
       local grey = { 0.80, 0.80, 0.80 }
@@ -1769,7 +1829,9 @@ function D.frame(L, snap, rows, state, info)
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
     if info.fxb_draw then
-      fbw = (L.matrix_w and L.matrix_w > 0) and L.matrix_w or math.min(L.cw * 26, math.floor(L.win_w / 4))
+      -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
+      local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
+      fbw = (L.matrix_w and L.matrix_w > 0 and not state.mx_hidden) and math.max(L.matrix_w, math.floor(own * 0.6)) or own
       hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
@@ -1979,7 +2041,8 @@ end
 -- ── всплывашка снизу (which-key / подсказка команд / поиск) ───────────────
 -- Панель над строкой статуса: колонками «клавиша  действие». Ширина — от
 -- содержимого, высота — от числа строк (до половины окна).
-function D.popup(L, p)
+-- anchor = { x, y } — место правки: всплывашка под ним (не влезает — над ним)
+function D.popup(L, p, anchor)
   if not p or not p.lines then return end
   local W = gfx.w
   local sy = L.body_y + L.body_h
@@ -1996,8 +2059,14 @@ function D.popup(L, p)
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2
+  if anchor then
+    x = math.max(L.pad, math.min(W - w - L.pad, anchor.x))
+    local bottom = gfx.h - (L.status_h or 0) - 2
+    if anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
+  end
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  -- рамка поярче (2 окт): видна поверх любого модуля
+  set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
   text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
   for i, ln in ipairs(p.lines) do
     local ci = math.floor((i - 1) / nrow)

@@ -125,6 +125,12 @@ local function reset()
     delete_item_at_cursor = function() calls[#calls + 1] = 'delitem'; return true end,
     clear_track = function() calls[#calls + 1] = 'cleartrack'; return true end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
+    env_point_rows = function(e) return e.prows or {} end,
+    env_points = function(e, r0, r1) calls[#calls + 1] = ('envpts:%s@%d-%d'):format(e.name, r0, r1); return { { dq = 0, v = 0.5 } } end,
+    env_del_range = function(e, r0, r1) calls[#calls + 1] = ('envdelr:%s@%d-%d'):format(e.name, r0, r1) end,
+    env_paste = function(e, row, reg) calls[#calls + 1] = ('envpaste:%s@%d:%d'):format(e.name, row, #reg.pts) end,
+    env_shape = function(e, row, sh) calls[#calls + 1] = ('envshape:%s@%d:%d'):format(e.name, row, sh); return true end,
+    env_shape_step = function(e, row, d) calls[#calls + 1] = ('envshapestep:%s@%d:%+d'):format(e.name, row, d) end,
     env_set = function(e, row, v) calls[#calls + 1] = ('envset:%s@%d:%.3f'):format(e.name, row, v) end,
     env_del = function(e, row) calls[#calls + 1] = ('envdel:%s@%d'):format(e.name, row) end,
     env_nudge = function(e, row, d) calls[#calls + 1] = ('envnudge:%s@%d:%+.4f'):format(e.name, row, d) end,
@@ -157,7 +163,13 @@ keysin('10G'); eq('10G', V.cur.row, 9)
 keysin('}');   eq('} → next bar', V.cur.row, 16)
 keysin('{');   eq('{ → bar start', V.cur.row, 0)
 V.cur.fi = 3; V.cur.row = 0
-keysin('W');   eq('W in track M', V.cur.row, 4)
+keysin('W');   eq('W: nearest event in any column (A sub 2 @2)', V.cur.row, 2); eq('W moves to that column', V.cur.fi, 2)
+V.cur.fi = 1; V.cur.row = 0
+keysin('W');   eq('W 1 → A sub2 @2', V.cur.fi * 100 + V.cur.row, 202)
+keysin('W');   eq('W 2 → M @4', V.cur.fi * 100 + V.cur.row, 304)
+keysin('W');   eq('W 3 → A sub1 @8', V.cur.fi * 100 + V.cur.row, 108)
+keysin('B');   eq('B → M @4', V.cur.fi * 100 + V.cur.row, 304)
+keysin('w');   eq('w stays in its column (M @12)', V.cur.fi * 100 + V.cur.row, 312)
 -- прокрутка держит курсор
 V.cur.fi = 1; V.cur.row = 0; state.row0 = 0
 keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
@@ -436,5 +448,39 @@ V.key(27)
 reset(); keysin('z'); eq('z hint', (V.pending_hint() or ''):match('^z:') ~= nil, true); V.key(27)
 reset(); keysin('i'); keysin('d'); eq('d from INSERT shows hint', (V.pending_hint() or ''):match('^d:') ~= nil, true)
 keysin('W'); eq('dW from INSERT', last(), 'delitem'); eq('back to INSERT', V.mode, 'insert'); V.key(27)
+-- форма сегмента огибающей (2 окт): поле 2 колонки огибающей
+eq('shape b → bez', V.shape_match('b'), 5); eq('shape s ambiguous', V.shape_match('s'), nil)
+eq('shape sq → sqr', V.shape_match('sq'), 1); eq('shape fas', V.shape_match('fas'), 3); eq('shape x none', V.shape_match('x'), false)
+reset()
+L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Volume' }, sub = {} }
+local efi2 = #L.flat
+V.cur = { fi = efi2, row = 4, field = 2 }
+keysin('ib');     eq('INSERT b on shape → bez', last(), 'envshape:Volume@4:5'); eq('shape steps down', V.cur.row, 5)
+keysin('fa');     eq('fa still ambiguous', last(), 'envshape:Volume@4:5'); keysin('s'); eq('fas → fast start', last(), 'envshape:Volume@5:3')
+V.key(27); V.key(27)
+V.cur = { fi = efi2, row = 4, field = 2 }
+V.key(1);         eq('NORMAL ^A on shape cycles', last(), 'envshapestep:Volume@4:+1')
+keysin(':shape slo'); V.key(13); eq(':shape slo', last(), 'envshape:Volume@4:2')
+-- свёрнутый трек: подколонка — одно поле (нота)
+reset()
+L.flat[1].compact = true; V.cur = { fi = 1, row = 0, field = 1 }
+keysin('l'); eq('compact sub has one field: l goes to next column', V.cur.fi, 2)
+-- точки автоматизации как события (2 окт): w b e W, dd dw yy p
+reset()
+L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Vol', prows = { 3, 9, 20 } }, sub = {} }
+local efi3 = #L.flat
+V.cur = { fi = efi3, row = 0, field = 1 }
+keysin('w'); eq('w → env point 3', V.cur.row, 3)
+keysin('w'); eq('w → env point 9', V.cur.row, 9)
+keysin('b'); eq('b → env point 3', V.cur.row, 3)
+keysin('e'); eq('e → next point', V.cur.row, 9)
+keysin('dd'); eq('dd on env → delete points of row', last(), 'envdelr:Vol@9-9')
+V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')
+V.cur.row = 15; keysin('p'); eq('p on env → paste points', last(), 'envpaste:Vol@15:1')
+V.cur = { fi = 1, row = 18, field = 1 }; keysin('p'); eq('env register on note column → message, no paste', last(), 'envpaste:Vol@15:1')
+V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → range to 2nd point (exclusive)', last(), 'envdelr:Vol@0-8')
+V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw from empty env row → next point', last(), 'envdelr:Vol@9-9')
+V.cur = { fi = efi3, row = 5, field = 1 }; keysin('db'); eq('db from empty env row → back to previous point', last(), 'envdelr:Vol@3-5')
+V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W reaches env point in any column', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 20)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

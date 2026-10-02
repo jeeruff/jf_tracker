@@ -1,9 +1,24 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.18'
+V.VERSION = '0.5.19'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.19', d = '2026-10-02', items = {
+    'fold (za, zM): the track keeps only the wave and note columns; envelopes stay visible as a thin line with point values; zC = the old one-letter strip',
+    'envelope column: segment shape of every point (lin sqr slo fas fae bez); INSERT letters on the shape field, ^A ^X cycle, :shape',
+    'region corner: all | reg view switch above the region name (reg = only the rows of the cursor region, :reg); /2 x2 dup in one row',
+    'test_layout.lua: the layout is built on a gfx stub at x1 x2 x4 (catches layout crashes before the live restart)',
+    'slice zone handles: triangles at the top (under the marker labels) move start / end, a strip at the bottom moves the whole slice',
+    'W B jump to the next / previous event in any column (cursor follows); w b stay in their column',
+    'envelope points are events: w b e W B move over them, dd d2w dw db yy p delete / yank / paste points with value and shape',
+    'envelope column: NORMAL click only moves the cursor (INSERT writes a point), the wheel only scrolls',
+    'DSP: ad deletes the automation of a parameter, ai adds an automation item over the item under the cursor; envelope name in the header: menu to delete the curve or clear points',
+    'automation items drawn like REAPER (faint fill, frame, top band); clicking automation opens the modulation tab',
+    'mouse: drag an event (any mode) to move it across rows and columns, a VISUAL block moves as a whole; item edge: drag = trim, Option = stretch, Cmd = no snap',
+    'region / marker names sit at the top of their ruler lanes; folding the matrix keeps the fx list width; popups open next to what is edited, brighter frame',
+    'review fixes: zC persists, field clamps after fold, envelope click fields, one point rule for shapes, :reg off, reg view clipping',
+  } },
   { v = '0.5.18', d = '2026-10-02', items = {
     'DSP shows take fx of the instrument: take fx row in sample props (click / select), t or the track / take buttons switch back',
     'empty take fx: the click jumps to the fx list, Enter adds to the take; dblclick opens the REAPER take fx window',

@@ -508,12 +508,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local mxw, myw = gfx.mouse_x, gfx.mouse_y
     local inw = myw >= wy and myw < wy + wh
     local dragging = S.zone_drag and S.zone_drag.edge
-    -- ручки внизу волны (сверху подписи маркеров слайсов): маркеры исходника
-    -- тянутся за верх, зона — за низ; ближайший край (короткая зона — оба)
-    local HH = 10
-    if not S.drag and inw and myw >= wy + wh - HH then
+    -- ручки (2 окт, правка): треугольники начала и конца — вверху, под строкой
+    -- подписей маркеров (сами подписи не перекрываются); полоса внизу зоны —
+    -- тянет всю зону целиком. Маркеры исходника тянутся вне этих полос.
+    local TY = wy + L.rh                  -- верх треугольников: под подписями маркеров
+    local TH = 8
+    local BY = wy + wh - 6                -- полоса переноса
+    if not S.drag and inw then
       local da, db = math.abs(mxw - px0), math.abs(mxw - px1)
-      if math.min(da, db) <= 5 then S.zone_hot = (da <= db) and 'a' or 'b' end
+      if myw >= TY and myw < TY + TH and math.min(da, db) <= 6 then S.zone_hot = (da <= db) and 'a' or 'b'
+      elseif myw >= BY - 2 and mxw >= px0 and mxw <= px1 then S.zone_hot = 'move' end
     end
     U.set(U.TEXT); gfx.a = 0.10; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
     for _, ed in ipairs({ { 'a', px0 }, { 'b', math.max(px0, px1 - 1) } }) do
@@ -521,10 +525,17 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.set(hot and U.AMBER or U.TEXT); gfx.a = hot and 1 or 0.55
       gfx.rect(hot and ed[2] - 1 or ed[2], wy, hot and 3 or 1, wh, 1)
       gfx.a = 1
-      -- ручка внизу: треугольник-флажок внутрь зоны
+      -- треугольник внутрь зоны
       local d = ed[1] == 'a' and 1 or -1
-      for k = 0, 5 do gfx.rect(ed[2] + (d > 0 and 0 or -k), wy + wh - 1 - k, k + 1, 1, 1) end
+      for k = 0, 6 do
+        local wdt = 7 - k
+        gfx.rect(d > 0 and ed[2] or (ed[2] - wdt + 1), TY + k, wdt, 1, 1)
+      end
     end
+    -- полоса переноса всей зоны
+    local mhot = S.zone_hot == 'move' or dragging == 'move'
+    U.set(mhot and U.AMBER or U.mix(U.AMBER, U.BG, 0.45))
+    gfx.rect(px0, BY, math.max(2, px1 - px0), 5, 1)
   end
   local slices = editing and S.slices or (e.slices or {})
   local hover_slice

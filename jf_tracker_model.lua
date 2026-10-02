@@ -911,13 +911,13 @@ function M.env_values(e, rows)
       local _, rv = R.Envelope_Evaluate(e.env, r.t + (nxt - r.t) * j / M.ENV_SUB, 0, 0)
       sub[j] = norm(rv)
     end
-    local pt = false
+    local pt, shape = false, nil
     local idx = R.GetEnvelopePointByTime(e.env, nxt - 1e-6)
     if idx and idx >= 0 then
-      local ok, pt_t = R.GetEnvelopePoint(e.env, idx)
-      if ok and pt_t >= r.t - 1e-6 then pt = true end
+      local ok, pt_t, _, shp = R.GetEnvelopePoint(e.env, idx)
+      if ok and pt_t >= r.t - 1e-6 then pt = true; shape = shp end
     end
-    out[i] = { v = v, pt = pt, raw = raw, sub = sub }
+    out[i] = { v = v, pt = pt, raw = raw, sub = sub, shape = shape }
   end
   return out
 end

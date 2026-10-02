@@ -197,6 +197,7 @@ function MX.draw(L, snap, regions, info)
     local rg = regions[ri]
     if not rg then break end
     local y = top + (i - 1) * rh
+    MX.row_y = MX.row_y or {}; MX.row_y[ri] = y          -- для всплывашки :name / :len у своей строки
     local playing = info.play_row and info.play_row >= rg.r0 and info.play_row < rg.r1
     local queued = MX.queued and MX.queued.idx == rg.idx and math.abs(MX.queued.pos - rg.pos) < 1e-6
     if playing then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(0, y, W, rh, 1) end

@@ -109,8 +109,21 @@ V.parse_len = parse_len
 local function nfields(fi)
   local f = flat()[fi or V.cur.fi]
   if not f or f.folded then return 1 end
+  if f.env then return f.compact and 1 or 2 end   -- огибающая: значение, форма сегмента (свёрнутый — только значение)
+  if f.compact then return 1 end           -- свёрнутый трек: только нота
   if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
   return 3 + (ctx.state.fxcols or 0)
+end
+
+-- формы сегмента огибающей (REAPER 0..5) и их сокращения; набор букв на поле
+-- формы выбирает, как только префикс однозначен: b → bez, sq → sqr, fas …
+V.SHAPES = { 'lin', 'sqr', 'slo', 'fas', 'fae', 'bez' }
+function V.shape_match(buf)
+  local hit, n = nil, 0
+  for i, a in ipairs(V.SHAPES) do if a:sub(1, #buf) == buf then hit = i - 1; n = n + 1 end end
+  if n == 1 then return hit end
+  if n == 0 then return false end
+  return nil                                 -- ещё неоднозначно
 end
 
 local function clamp_cur()
@@ -226,10 +239,23 @@ function V.covering(fi, row)
 end
 
 -- ── движения ──────────────────────────────────────────────────────────────
+-- строка с точкой огибающей после / до row (dir = 1 / -1) — точки как события
+local function env_next(f, row, dir)
+  local rows = (ctx.env_point_rows and ctx.env_point_rows(f.env)) or {}
+  if dir > 0 then for _, r in ipairs(rows) do if r > row then return r end end
+  else for i = #rows, 1, -1 do if rows[i] < row then return rows[i] end end end
+  return nil
+end
+local function env_has(f, r)
+  for _, x in ipairs((ctx.env_point_rows and ctx.env_point_rows(f.env)) or {}) do if x == r then return true end end
+  return false
+end
+
 local function next_head(fi, row, dir, any_sub)
   local F = flat()
   local f = F[fi]
   if not f then return nil end
+  if f.env then return env_next(f, row, dir) end
   local subs = subs_of(f)
   if any_sub then
     subs = {}
@@ -244,11 +270,36 @@ local function next_head(fi, row, dir, any_sub)
   return nil
 end
 
+-- W / B — следующее / предыдущее событие в ЛЮБОЙ колонке (все треки, подколонки
+-- и лейны; огибающие — нет): ближайшая строка, при равенстве — от колонки
+-- курсора вправо по кругу; курсор переходит в эту колонку (просьба 2 окт)
+local function next_any(fi, row, dir)
+  local F = flat()
+  local nf = #F
+  if nf == 0 then return nil end
+  local last = ctx.snap().last_row or 0
+  local r = row + dir
+  while r >= 0 and r <= last + 1 do
+    for k = 0, nf - 1 do
+      local i = (fi - 1 + k) % nf + 1
+      local f = F[i]
+      if f and f.env then
+        if env_has(f, r) then return i, r end
+      elseif f then
+        for _, sub in ipairs(subs_of(f)) do if is_head(sub[r]) then return i, r end end
+      end
+    end
+    r = r + dir
+  end
+  return nil
+end
+
 -- `e` — на ГРАНИЦУ после события: верхняя кромка строки курсора совпадает с
 -- концом item/ноты (а не последняя строка события)
 local function event_end(fi, row)
   local f = flat()[fi]
   if not f then return row end
+  if f.env then return env_next(f, row, 1) or row end    -- огибающая: конец «события» — следующая точка
   for _, sub in ipairs(subs_of(f)) do
     local h = head_of(sub[row])
     if h then return h.row0 + (h.rows or 1) end
@@ -270,14 +321,21 @@ local function motion(c, n)
     local ci = f.ci + (c == ('H'):byte() and -n or n)
     for i, g in ipairs(F) do if g.ci == ci then return { fi = i, row = cur.row } end end
     return { fi = c == ('H'):byte() and 1 or nflat(), row = cur.row }
-  elseif c == ('w'):byte() or c == ('W'):byte() then
+  elseif c == ('w'):byte() or c == ('b'):byte() then
+    -- w / b — только своя подколонка
     local r = cur.row
-    for _ = 1, n do r = next_head(cur.fi, r, 1, c == ('W'):byte()) or r end
-    return { fi = cur.fi, row = r, exclusive = true, linewise = true }
-  elseif c == ('b'):byte() or c == ('B'):byte() then
-    local r = cur.row
-    for _ = 1, n do r = next_head(cur.fi, r, -1, c == ('B'):byte()) or r end
-    return { fi = cur.fi, row = r, linewise = true }
+    local dir = c == ('w'):byte() and 1 or -1
+    for _ = 1, n do r = next_head(cur.fi, r, dir, false) or r end
+    return { fi = cur.fi, row = r, exclusive = dir > 0 or nil, linewise = true }
+  elseif c == ('W'):byte() or c == ('B'):byte() then
+    local fi, r = cur.fi, cur.row
+    local dir = c == ('W'):byte() and 1 or -1
+    for _ = 1, n do
+      local nfi, nr = next_any(fi, r, dir)
+      if not nfi then break end
+      fi, r = nfi, nr
+    end
+    return { fi = fi, row = r, field = 1, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('e'):byte() then
     return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true }
   elseif c == ('G'):byte() then return { fi = cur.fi, row = V.count and (n - 1) or last, linewise = true }
@@ -317,6 +375,15 @@ end
 -- движения (решение пользователя 1 окт)
 local function range_or_event(op, t)
   local f0, f1, r0, r1 = range_from(t)
+  -- огибающая: в диапазоне нет точек (курсор на пустой строке) — оператор
+  -- берёт точку цели движения: dw — следующую, db — предыдущую (2 окт)
+  local ft = flat()[t.fi]
+  if (op == 'd' or op == 'c' or op == 'y') and ft and ft.env and f0 == f1 then
+    local any = false
+    for r = r0, r1 do if env_has(ft, r) then any = true; break end end
+    if not any and env_has(ft, t.row) then return t.fi, t.fi, t.row, t.row end
+    return f0, f1, r0, r1
+  end
   if (op == 'd' or op == 'c' or op == 'y') and #V.heads_in(f0, f1, r0, r1) == 0 then
     if #V.heads_in(t.fi, t.fi, t.row, t.row) > 0 then return t.fi, t.fi, t.row, t.row end
   end
@@ -335,6 +402,15 @@ end
 -- применить оператор к прямоугольнику
 local function apply(op, f0, f1, r0, r1)
   local E = ctx.edit
+  -- колонка огибающей: операторы над точками строк (2 окт)
+  local fenv = f0 == f1 and env_of(f0)
+  if fenv and (op == 'd' or op == 'x' or op == 'c' or op == 'y') then
+    V.regs['"'] = { kind = 'env', pts = ctx.env_points(fenv, r0, r1), rows = r1 - r0 + 1 }
+    if op == 'y' then V.msg = ('yank %d point(s)'):format(#V.regs['"'].pts); return false end
+    ctx.env_del_range(fenv, r0, r1)
+    if op == 'c' then V.mode = 'insert' end
+    return true
+  end
   local heads = V.heads_in(f0, f1, r0, r1)
   local edited = true
   if op == 'd' or op == 'x' or op == 'c' then
@@ -563,6 +639,23 @@ local function run_cmd(line)
   elseif cmd == 'poolprev' then st.poolprev = not st.poolprev; V.msg = 'pool preview ' .. (st.poolprev and 'on' or 'off')
   elseif cmd == 'side' then st.side = not st.side
   elseif cmd == 'dock' then ctx.toggle_dock()
+  elseif cmd == 'reg' then
+    local v
+    if arg == 'on' then v = true elseif arg == 'off' then v = false end   -- без аргумента — переключить
+    ctx.view_reg(v)
+  elseif cmd == 'shape' then
+    -- :shape fas — форма точек огибающей в строке курсора (VISUAL — в диапазоне строк)
+    local env = env_of(V.cur.fi)
+    local m = arg ~= '' and V.shape_match(arg:lower())
+    if not env then V.msg = ':shape - cursor on an envelope column'
+    elseif not m then V.msg = 'shape: lin sqr slo fas fae bez'
+    else
+      local r0, r1 = V.cur.row, V.cur.row
+      if V.cmd_from == 'visual' or V.cmd_from == 'vline' then local _, _, a, b = V.visual_range(); r0, r1 = a, b end
+      local n = 0
+      for r = r0, r1 do if ctx.env_shape(env, r, m) then n = n + 1 end end
+      V.msg = ('shape %s: %d point(s)'):format(V.SHAPES[m + 1], n)
+    end
   elseif cmd == 'mkdir' then if ctx.browser_mkdir then ctx.browser_mkdir(arg) end
   elseif cmd == 'browse' then ctx.browse(arg ~= '' and arg or nil); st.side = true
   elseif cmd == 'sync' then V.msg = 'synced ' .. tostring(ctx.sync_here())
@@ -712,6 +805,7 @@ function V.key_impl(c)
   -- INSERT
   if V.mode == 'insert' then
     if c == ESC then
+      if V.shapebuf then V.shapebuf = nil; return end
       if V.hexbuf then V.hexbuf = nil; return end
       V.mode = 'normal'; finish_edit(); return
     end
@@ -729,6 +823,19 @@ function V.key_impl(c)
     local fld = V.cur.field or 1
     local env = env_of(V.cur.fi)
     if (c == 62 or c == 60) and fld == 1 and not env then ctx.loop(c == 62 and 'item' or 'region'); return end
+    if env and fld == 2 and nfields() >= 2 then
+      -- поле формы: буквы сокращения (lin sqr slo fas fae bez) → форма точки строки
+      local lc = (c < 256) and string.char(c):lower() or ''
+      if c == ESC then V.shapebuf = nil
+      elseif lc:match('^[a-z]$') then
+        local buf = (V.shapebuf or '') .. lc
+        local m = V.shape_match(buf)
+        if m == false then V.shapebuf = nil; V.msg = 'shape: lin sqr slo fas fae bez'
+        elseif m == nil then V.shapebuf = buf; V.msg = 'shape ' .. buf .. '…'
+        else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + V.step; ensure_visible() end
+      end
+      return
+    end
     if env then
       -- колонка огибающей: две hex-цифры — точка; BS — удалить; / и \ —
       -- текстовые макросы: пандус к max / min за 1 бит (этап 10)
@@ -864,14 +971,19 @@ function V.key_impl(c)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
         local f = flat()[V.cur.fi]
         if f then
-          local v = (c == ('a'):byte()) and (not f.folded) or (c == ('c'):byte())
+          local v = (c == ('a'):byte()) and (not (f.folded or f.compact)) or (c == ('c'):byte())
           ctx.fold(f.col, v); ctx.relayout()
-          -- курсор остаётся на том же треке
+          -- курсор остаётся на том же треке; поле — в пределах новой подколонки
           for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end
+          clamp_cur()
         end
       elseif c == ('f'):byte() then
         local f = flat()[V.cur.fi]
         if f and ctx.fold_folder then ctx.fold_folder(f.col); ctx.relayout() end
+      elseif c == ('C'):byte() then
+        -- zC — прежний fold: трек в полоску шириной в символ
+        local f = flat()[V.cur.fi]
+        if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
       elseif c == ('M'):byte() then ctx.fold_all(true); ctx.relayout(); clamp_cur()
       elseif c == ('R'):byte() then ctx.fold_all(false); ctx.relayout(); clamp_cur()
       end
@@ -956,9 +1068,14 @@ function V.key_impl(c)
       apply(c == ctrl('a') and '+' or '-', f0, f1, r0, r1); V.mode = 'normal'; finish_edit(); done = true
     elseif c == ('p'):byte() then
       local reg = V.regs['"']
-      local heads = V.heads_in(f0, f1, r0, r1)
-      E.delete(heads, lpb())
-      E.paste(reg, lpb(), r0, paste_targets(f0))
+      local env = f0 == f1 and env_of(f0)
+      if env and reg and reg.kind == 'env' then
+        ctx.env_del_range(env, r0, r1); ctx.env_paste(env, r0, reg)
+      elseif not env and not (reg and reg.kind == 'env') then
+        local heads = V.heads_in(f0, f1, r0, r1)
+        E.delete(heads, lpb())
+        E.paste(reg, lpb(), r0, paste_targets(f0))
+      else V.msg = 'register and selection differ (envelope points vs notes)' end
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; finish_edit(); done = true
     elseif c == ('r'):byte() then V.pending = 'r'; return
     elseif c == ('V'):byte() then V.mode = 'vline'; done = true
@@ -1021,7 +1138,8 @@ function V.key_impl(c)
   elseif env_of(V.cur.fi) and (ch == 'x' or c == BS or c == DEL or c == ctrl('a') or c == ctrl('x')) then
     -- колонка огибающей в NORMAL: x/BS — удалить точку, ^A/^X — ±1/64
     local env = env_of(V.cur.fi)
-    if c == ctrl('a') then ctx.env_nudge(env, V.cur.row, n / 64)
+    if (V.cur.field or 1) == 2 and nfields() >= 2 and (c == ctrl('a') or c == ctrl('x')) then ctx.env_shape_step(env, V.cur.row, c == ctrl('a') and 1 or -1)
+    elseif c == ctrl('a') then ctx.env_nudge(env, V.cur.row, n / 64)
     elseif c == ctrl('x') then ctx.env_nudge(env, V.cur.row, -n / 64)
     else for r = V.cur.row, V.cur.row + n - 1 do ctx.env_del(env, r) end end
     finish_edit()
@@ -1034,8 +1152,16 @@ function V.key_impl(c)
   elseif c == ctrl('a') then apply('+', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
   elseif c == ctrl('x') then apply('-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
   elseif ch == 'p' or ch == 'P' then
-    for _ = 1, n do E.paste(V.regs['"'], lpb(), V.cur.row, paste_targets(V.cur.fi)) end
-    finish_edit()
+    local reg = V.regs['"']
+    if reg and reg.kind == 'env' then
+      local env = env_of(V.cur.fi)
+      if env then for k = 0, n - 1 do ctx.env_paste(env, V.cur.row + k * (reg.rows or 1), reg) end; finish_edit()
+      else V.msg = 'register has envelope points - put the cursor on an envelope column' end
+    elseif env_of(V.cur.fi) then V.msg = 'register has notes - put the cursor on a note column'
+    else
+      for _ = 1, n do E.paste(reg, lpb(), V.cur.row, paste_targets(V.cur.fi)) end
+      finish_edit()
+    end
   elseif ch == 'u' then E.undo(); finish_move()
   elseif c == ctrl('r') then E.redo(); finish_move()
   elseif ch == '.' then
@@ -1240,7 +1366,11 @@ end
 
 -- обёртка: оператор, начатый из INSERT (d…), по завершении возвращает в INSERT
 function V.key(c)
+  local p0 = V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)
   local r = V.key_impl(c)
+  -- набор сокращения формы живёт только на месте: курсор ушёл — сброс (ревью 2 окт)
+  if V.shapebuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.shapebuf = nil end
+  if V.mode ~= 'insert' then V.shapebuf = nil end
   if V.back_insert and not V.pending and not V.op then
     if V.mode == 'normal' then V.mode = 'insert' end
     V.back_insert = nil
