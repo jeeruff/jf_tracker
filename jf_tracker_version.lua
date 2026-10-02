@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.29'
+V.VERSION = '0.5.30'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.30', d = '2026-10-02', items = {
+    'fix: an open picker (fzf) or hydra menu gets the keys before the focused module - in the modulation tab a (modulate parameter) and the link source picker could not be typed into or confirmed; same for the DSP parameter picker',
+  } },
   { v = '0.5.29', d = '2026-10-02', items = {
     'Shift+1 (!) listens to the selected instrument from any module (its own length, a slice plays only its piece)',
     'browser: track button - files are heard through the selected track and its FX (on, default) or directly to the output (off)',

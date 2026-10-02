@@ -4877,6 +4877,10 @@ local function frame()
     state.last_key = c
     vim.msg = ''
     local ok, r = pcall(function()
+      -- открытый пикер (fzf) / hydra-меню модальны: клавиши им, а не модулю в
+      -- фокусе (2 окт: в модуляции a открывал выбор параметра, а набор и Enter
+      -- съедала матрица модуляции — выбрать было нельзя)
+      if vim.picker or vim.hydra then return vim.key(c) end
       if state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
