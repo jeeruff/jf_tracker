@@ -858,9 +858,7 @@ ctx = {
   -- ── fzf-поиск в браузере и инструментах (2 окт) ─────────────────────
   browser_find = function()
     if not state.side then state.side = true end
-    vim.msg = 'indexing…'
-    local items, title = B.find_items()
-    vim.open_picker(title, items, function(it) ctx.set_focus('browser'); B.find_pick(it.data) end)
+    ctx.set_focus('browser'); B.start_find()
   end,
   inst_find = function()
     local col = cur_col(); local pool = col and col.pool or {}
@@ -2504,7 +2502,7 @@ local function frame()
     state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to depot; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
   elseif type(hover.browser) == 'string' then
-    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', find = 'find (fzf): files mode searches the whole browse root, other modes the current list; also /', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
+    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif hover.header_col or hover.col then
     local c = hover.header_col or hover.col

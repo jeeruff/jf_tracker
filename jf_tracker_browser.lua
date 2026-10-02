@@ -77,18 +77,107 @@ function B.refresh()
   B.set_all(out)
 end
 
--- применить фильтр к B.all → B.entries
+-- ── поиск прямо в списке (fzf-синтаксис, 2 окт) ─────────────────────────
+-- Контекст: в папке (files) — рекурсивно от ТЕКУЩЕЙ папки (индекс на папку,
+-- строится при первом символе, до 20000 строк); в открытой базе — по базе;
+-- список баз / pm / proj — по текущему списку. Термы через пробел — все
+-- должны совпасть: обычный — нечётко (подпоследовательность, бонус за начало
+-- слова и подряд), 'text — точная подстрока, ^text — начало имени,
+-- text$ — конец имени, !text — исключить.
+local function fz(hay, q)
+  local score, pos, prev = 0, 1, -1
+  for i = 1, #q do
+    local c = q:sub(i, i)
+    local f = hay:find(c, pos, true)
+    if not f then return nil end
+    score = score + ((f == prev + 1) and 5 or 1) - math.min(f - pos, 20) * 0.05
+    if f == 1 or hay:sub(f - 1, f - 1):match('[/%s_%-%.%(%)%[%]]') then score = score + 3 end
+    prev, pos = f, f + 1
+  end
+  return score - #hay * 0.01
+end
+local function fmatch(e, terms)
+  local hay = (e.label or e.name):lower()
+  local base = (e.name:match('[^/]+$') or e.name):lower()
+  local total = 0
+  for _, t0 in ipairs(terms) do
+    local t, neg = t0, false
+    if t:sub(1, 1) == '!' then neg, t = true, t:sub(2) end
+    local sc
+    if t == '' then sc = 0
+    elseif t:sub(1, 1) == "'" then sc = hay:find(t:sub(2), 1, true) and 10 or nil
+    elseif t:sub(1, 1) == '^' then sc = (base:sub(1, #t - 1) == t:sub(2)) and 10 or nil
+    elseif #t > 1 and t:sub(-1) == '$' then local s = t:sub(1, -2); sc = (base:sub(-#s) == s) and 10 or nil
+    else sc = fz(hay, t) end
+    if neg then if sc then return nil end
+    else if not sc then return nil end; total = total + sc end
+  end
+  return total
+end
+
+B.findidx = {}
+-- рекурсивный индекс папки (относительные пути, папки тоже)
+function B.folder_index(path)
+  local idx = B.findidx[path]
+  if idx then return idx end
+  idx = {}
+  local function scan(dir, rel, depth)
+    if #idx >= 20000 or depth > 12 then return end
+    local i = 0
+    while true do
+      local d = R.EnumerateSubdirectories(dir, i)
+      if not d then break end
+      if d:sub(1, 1) ~= '.' then
+        local r = (rel ~= '' and (rel .. '/') or '') .. d
+        idx[#idx + 1] = { name = r, label = r, path = dir .. '/' .. d, dir = true }
+        scan(dir .. '/' .. d, r, depth + 1)
+      end
+      i = i + 1
+    end
+    i = 0
+    while true do
+      local f = R.EnumerateFiles(dir, i)
+      if not f then break end
+      local ext = f:match('%.([%w]+)$')
+      if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then
+        local r = (rel ~= '' and (rel .. '/') or '') .. f
+        idx[#idx + 1] = { name = r, label = r, path = dir .. '/' .. f, dir = false }
+      end
+      i = i + 1
+    end
+  end
+  scan(path, '', 0)
+  B.findidx[path] = idx
+  return idx
+end
+
+-- применить запрос к B.all → B.entries (запрос пуст — обычный список)
 function B.set_all(list)
   B.all = list
-  local f = B.filter:lower()
-  if f == '' then B.entries = list
+  local q = B.filter:lower()
+  if q == '' then B.entries = list
   else
-    local out = {}
-    for _, e in ipairs(list) do if e.name:lower():find(f, 1, true) then out[#out + 1] = e end end
-    B.entries = out
+    local src = (B.mode == 'files' and B.path) and B.folder_index(B.path) or list
+    local terms = {}
+    for t in q:gmatch('%S+') do terms[#terms + 1] = t end
+    local hits = {}
+    for _, e in ipairs(src) do
+      local sc = fmatch(e, terms)
+      if sc then hits[#hits + 1] = { e = e, sc = sc } end
+    end
+    table.sort(hits, function(a, b) return a.sc > b.sc end)
+    B.entries = {}
+    for i = 1, math.min(#hits, 3000) do B.entries[i] = hits[i].e end
   end
   if B.cur > #B.entries then B.cur = math.max(1, #B.entries) end
+  if B.cur < 1 then B.cur = 1 end
   B.scroll = 0
+end
+
+-- начать поиск в списке (/ или кнопка find)
+function B.start_find()
+  B.filtering = true; B.filter = ''; B.cur = 1
+  B.set_all(B.all)
 end
 
 -- ── базы Media Explorer ───────────────────────────────────────────────────
@@ -305,7 +394,7 @@ end
 function B.click(what)
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
-  elseif what == 'find' then if ctx.browser_find then ctx.browser_find() end
+  elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
   elseif what == 'wave' then B.wave = not B.wave
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
   elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
@@ -377,68 +466,21 @@ function B.preview()
 end
 
 -- клавиши в фокусе браузера; true — съедена
--- ── fzf-поиск (2 окт): / или кнопка find ─────────────────────────────────
--- files — рекурсивно по корню :browse (индекс строится один раз за сеанс,
--- до 20000 файлов); db / pm / proj — по текущему списку.
-B.findidx = {}
-function B.find_items()
-  if B.mode == 'files' and B.root then
-    local idx = B.findidx[B.root]
-    if not idx then
-      idx = {}
-      local function scan(dir, rel, depth)
-        if #idx >= 20000 or depth > 10 then return end
-        local i = 0
-        while true do
-          local f = R.EnumerateFiles(dir, i)
-          if not f then break end
-          local ext = f:match('%.([%w]+)$')
-          if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then
-            idx[#idx + 1] = { label = (rel ~= '' and (rel .. '/') or '') .. f, data = { dir = dir, name = f } }
-          end
-          i = i + 1
-        end
-        i = 0
-        while true do
-          local d = R.EnumerateSubdirectories(dir, i)
-          if not d then break end
-          if d:sub(1, 1) ~= '.' then scan(dir .. '/' .. d, (rel ~= '' and (rel .. '/') or '') .. d, depth + 1) end
-          i = i + 1
-        end
-      end
-      scan(B.root, '', 0)
-      B.findidx[B.root] = idx
-    end
-    return idx, ('find: %d files under %s'):format(#idx, B.root:match('[^/]+$') or B.root)
-  end
-  local out = {}
-  for i, e in ipairs(B.all) do out[#out + 1] = { label = e.name .. (e.dir and '/' or ''), data = { i = i } } end
-  return out, 'find: ' .. B.mode
-end
-
-function B.find_pick(d)
-  B.filter, B.filtering = '', false
-  if d.dir then
-    B.path = d.dir; B.refresh()
-    for i, e in ipairs(B.entries) do if e.name == d.name then B.cur = i end end
-  else
-    B.set_all(B.all); B.cur = math.max(1, math.min(#B.entries, d.i or 1))
-  end
-  if B.auto then B.preview() end
-end
-
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
   if B.filtering then
-    -- набор фильтра: печатные символы сужают список, BS стирает, Enter/Esc — выход
-    if c == 27 or c == 13 then B.filtering = false
-    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.set_all(B.all)
-    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.set_all(B.all)
+    -- набор запроса: символы сужают список (fzf), стрелки ходят по результатам,
+    -- Enter — закончить набор (результаты остаются), Esc — сбросить, BS — стереть
+    if c == 27 then B.filtering = false; B.filter = ''; B.set_all(B.all)
+    elseif c == 13 then B.filtering = false
+    elseif c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
+    elseif c == 30064 then B.cur = math.max(1, B.cur - 1)
+    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.cur = 1; B.set_all(B.all)
+    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.cur = 1; B.set_all(B.all)
     else return false end
     return true
   end
-  if ch == '/' then if ctx.browser_find then ctx.browser_find() end      -- fzf (2 окт)
-  elseif ch == 'f' then B.filtering = true                                -- старый фильтр подстрокой
+  if ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
   elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
@@ -499,7 +541,10 @@ function B.draw(U, L, x, y, w, h)
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or ('jf_pm: %d projects'):format(#B.all)
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
-  if B.filter ~= '' or B.filtering then where = where .. ' /' .. B.filter .. (B.filtering and '_' or '') end
+  if B.filter ~= '' or B.filtering then
+    local scope = B.mode == 'files' and 'in folder' or (B.mode == 'db' and B.db and 'in db' or 'in list')
+    where = where .. ' /' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries)
+  end
   U.text(x + L.pad + 2, y + 1, ctx.fit(where, w - 2 * L.pad), (B.filtering and U.AMBER or U.GREY))
   y = y + L.rh; h = h - L.rh
   local nvis = math.floor(h / L.rh)
