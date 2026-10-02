@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.8'
+V.VERSION = '0.5.9'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.9', d = '2026-10-02', items = {
+    'browser preview playhead also on the big wave of the sample tab',
+    'file info panel right of the big wave for browser files: format, length, rate, channels, bits, size, bpm / key metadata, folder',
+    'browser preview plays the whole file (the next selection stops it)',
+  } },
   { v = '0.5.8', d = '2026-10-02', items = {
     'new pattern: entering a note / paste / drop on a row with no region creates a region for that bar (empty name like a new REAPER region), in the same undo step',
     'regions without a name show as #N in the matrix and Garden',

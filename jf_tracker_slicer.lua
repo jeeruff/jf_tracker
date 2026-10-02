@@ -436,6 +436,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     else gfx.line(x, cy, x + w, cy) end
   end
+  -- позиция проигрывания файла из браузера (превью) и на большой волне (2 окт)
+  if e.file and ctx.preview_pos then
+    local pos, plen, ppath = ctx.preview_pos()
+    if pos and ppath == e.path and (e.len or 0) > 0 then
+      local px = x + math.floor(math.max(0, math.min(1, pos / e.len)) * (w - 1))
+      U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
+    end
+  end
   -- транзиенты (только в правке) и слайсы с буквами
   local len = e.len > 0 and e.len or 1
   if editing then

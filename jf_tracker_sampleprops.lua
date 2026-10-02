@@ -71,6 +71,23 @@ function SP.draw(L, x, y, w, h, e, focused)
   end
 end
 
+-- информация о файле браузера (2 окт): вместо свойств, когда в модуле файл
+-- info = { name, dir, rows = { {label, value} … } } — собирает main (ctx.file_info)
+function SP.draw_info(L, x, y, w, h, info, playing)
+  SP.hover = nil
+  U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
+  if not info then U.text(x + L.pad, y, ctx.fit('file: no info', w - L.pad), U.GREY); return end
+  U.text(x + L.pad, y, ctx.fit((playing and '> ' or '') .. info.name, w - L.pad), playing and U.CYAN or U.AMBER)
+  local lw = math.floor(w * 0.36)
+  local n = math.floor((h - L.rh) / L.rh)
+  for i = 1, math.min(n, #info.rows) do
+    local r = info.rows[i]
+    local ry = y + i * L.rh
+    U.text(x + L.pad, ry, ctx.fit(r[1], lw - L.pad), U.GREY)
+    U.text(x + lw, ry, ctx.fit(r[2], w - lw - L.pad), U.TEXT)
+  end
+end
+
 -- клавиши; true — съедена
 function SP.key(c, e)
   local ch = c < 256 and string.char(c) or ''

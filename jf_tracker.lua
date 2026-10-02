@@ -1116,6 +1116,44 @@ ctx = {
     local c = cur_col()
     if SL.open_file(path, c and c.track) then vim.msg = 'sample: ' .. (path:match('[^/]+$') or path) end
   end,
+  -- информация о файле (панель справа от большой волны, 2 окт); кэш по пути
+  file_info = (function()
+    local cache = {}
+    return function(path)
+      if not path then return nil end
+      if cache[path] ~= nil then return cache[path] or nil end
+      local src = reaper.PCM_Source_CreateFromFile(path)
+      if not src then cache[path] = false; return nil end
+      local len = reaper.GetMediaSourceLength(src) or 0
+      local sr = reaper.GetMediaSourceSampleRate(src) or 0
+      local ch = reaper.GetMediaSourceNumChannels(src) or 0
+      local typ = reaper.GetMediaSourceType(src, '') or ''
+      local bits = reaper.CF_GetMediaSourceBitDepth and reaper.CF_GetMediaSourceBitDepth(src) or 0
+      local function meta(k)
+        local ok, v = false, ''
+        if reaper.GetMediaFileMetadata then ok, v = reaper.GetMediaFileMetadata(src, k) end
+        return (ok and v ~= '') and v or nil
+      end
+      local bpm = meta('ID3:TBPM') or meta('XMP:dm/tempo') or meta('BWF:Description')
+      local key = meta('ID3:TKEY') or meta('XMP:dm/key')
+      reaper.PCM_Source_Destroy(src)
+      local size
+      local fh = io.open(path, 'rb')
+      if fh then size = fh:seek('end'); fh:close() end
+      local rows = {
+        { 'format', typ:lower() }, { 'length', ('%.3f s'):format(len) },
+        { 'rate', ('%d Hz'):format(math.floor(sr + 0.5)) }, { 'channels', ch == 1 and 'mono' or (ch == 2 and 'stereo' or tostring(ch)) },
+      }
+      if bits and bits > 0 then rows[#rows + 1] = { 'bits', tostring(bits) } end
+      if size then rows[#rows + 1] = { 'size', size > 1048576 and ('%.1f MB'):format(size / 1048576) or ('%d KB'):format(math.floor(size / 1024)) } end
+      if bpm then rows[#rows + 1] = { 'bpm / desc', bpm } end
+      if key then rows[#rows + 1] = { 'key', key } end
+      rows[#rows + 1] = { 'folder', path:match('(.*)/[^/]+$') or '' }
+      local info = { name = path:match('[^/]+$') or path, rows = rows }
+      cache[path] = info
+      return info
+    end
+  end)(),
   -- мини-плеер внизу браузера (2 окт): позиция, громкость, старт с места
   preview_pos = function() return PV.position() end,
   preview_vol = function() return PV.vol end,
@@ -1127,7 +1165,7 @@ ctx = {
     PV.file(c and c.track, path, nil, frac * len)
   end,
   preview_file = function(path, sec)
-    local c = cur_col(); PV.file(c and c.track, path, sec or 1.0)
+    local c = cur_col(); PV.file(c and c.track, path, sec)               -- без лимита: файл целиком, следующий выбор останавливает
     -- проигрываемый файл сразу открывается в сэмпл-модуле
     if state.top and SL.open_file then
       if state.toptab ~= 'sample' then state.toptab = 'sample' end
@@ -2448,9 +2486,15 @@ local function frame()
         e = p
       end
       -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
-      local pw = (sel_e and not sel_e.file) and math.min(L.cw * 30, math.floor(w * 0.34)) or 0
+      local pw = sel_e and math.min(L.cw * 30, math.floor(w * 0.34)) or 0
       if pw > L.cw * 12 then
-        SPROP.draw(L, x + w - pw, y, pw, h, sel_e, state.focus == 'top')
+        if sel_e.file then
+          -- файл браузера: информация о файле (> — играет сейчас)
+          local _, _, ppath = PV.position()
+          SPROP.draw_info(L, x + w - pw, y, pw, h, ctx.file_info(sel_e.path), ppath == sel_e.path)
+        else
+          SPROP.draw(L, x + w - pw, y, pw, h, sel_e, state.focus == 'top')
+        end
       else pw = 0; SPROP.hover = nil end
       return SL.draw_in(U, L, x, y, w - (pw > 0 and pw + L.pad or 0), h, e, col and col.track, zone)
     end,
@@ -2985,7 +3029,7 @@ local function frame()
     browse_last = B.cur
     local pth = B.preview_path(B.entries[B.cur])
     if pth then
-      ctx.preview_file(pth, 3.0)
+      ctx.preview_file(pth)          -- целиком (2 окт)
     end
   end
 
