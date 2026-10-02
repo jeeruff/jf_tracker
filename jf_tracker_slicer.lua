@@ -335,7 +335,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- громкость item и нормализация — справа в строке подсказки (1 окт)
   local hover_vol, hover_norm
   local hint_w = w
-  if editing and e.item and e.vol then
+  if S.show_vol and editing and e.item and e.vol then    -- громкость переехала в панель свойств (2 окт)
     local db = e.vol > 0 and 20 * math.log(e.vol, 10) or -150
     local nb = 'normalize'
     local nbw = U.measure(nb) + 2 * L.pad

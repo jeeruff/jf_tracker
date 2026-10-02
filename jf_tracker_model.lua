@@ -425,28 +425,14 @@ function M.build(lpb)
   for _, col in ipairs(snap.cols) do
     for _, e in ipairs(col.pool or {}) do
       local g = seen[e.gkey]
-      if not g then g = e; g.tracks = {}; g.track_set = {}; seen[e.gkey] = g; all[#all + 1] = g end
+      if not g then g = e; g.tracks = {}; g.track_set = {}; g.home = col.name; seen[e.gkey] = g; all[#all + 1] = g end
       if not e.depot and not g.track_set[col.name] then g.track_set[col.name] = true; g.tracks[#g.tracks + 1] = col.name end
     end
   end
-  -- порядок номеров: по первому треку использования (порядок колонок),
-  -- библиотека после всех; внутри группы — по длине (просьба 1 окт)
-  for i, e in ipairs(all) do e._i = i end
-  local pos = {}
-  for ci, col in ipairs(snap.cols) do pos[col.name] = pos[col.name] or ci end
-  table.sort(all, function(a, b)
-    local pa = a.tracks[1] and (pos[a.tracks[1]] or 1e9) or 2e9
-    local pb = b.tracks[1] and (pos[b.tracks[1]] or 1e9) or 2e9
-    if pa ~= pb then return pa < pb end
-    if a.len ~= b.len then return a.len < b.len end
-    return a._i < b._i
-  end)
-  snap.pool = all
-  for _, col in ipairs(snap.cols) do col.pool = all end
   -- родитель: более длинный инструмент того же файла, покрывающий этот
-  -- диапазон источника (слайс/кусок → исходник; сэмпл-модуль показывает
-  -- исходник и подсвечивает играемую зону, просьба 1 окт). Предпочтение —
-  -- нарезанному, затем самому длинному.
+  -- диапазон источника (слайс/кусок → исходник). Предпочтение — нарезанному,
+  -- затем самому длинному. Цепочки сворачиваются к корню.
+  for i, e in ipairs(all) do e._i = i end
   for _, e in ipairs(all) do
     local best, blen
     local e0, e1 = e.offs, e.offs + e.len * e.rate
@@ -460,13 +446,47 @@ function M.build(lpb)
       end
     end
     e.parent = best
-    -- номер слайса родителя, если кусок начинается на границе слайса
-    if best and best.slices then
-      local t0 = (e.offs - best.offs) / (best.rate ~= 0 and best.rate or 1)
-      for k, st in ipairs(best.slices) do if math.abs(st - t0) < 0.01 then e.slice_k = k end end
+  end
+  for _, e in ipairs(all) do
+    local p = e.parent
+    while p and p.parent and p.parent ~= e do p = p.parent end
+    e.parent = p
+    e.slice_k = nil
+    if p and p.slices then
+      local t0 = (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1)
+      for k, st in ipairs(p.slices) do if math.abs(st - t0) < 0.01 then e.slice_k = k end end
       if not e.slice_k and t0 < 0.01 then e.slice_k = 0 end   -- начало сэмпла до первого слайса
     end
   end
+  -- порядок номеров = дерево (2 окт, как список сэмплов Renoise): по трекам
+  -- в порядке колонок; на треке — исходные сэмплы (корни, где лежат —
+  -- хоть в библиотеке за =LIB), под каждым его слайсы/куски
+  local kids = {}
+  for _, e in ipairs(all) do
+    if e.parent then kids[e.parent] = kids[e.parent] or {}; table.insert(kids[e.parent], e) end
+  end
+  for _, list in pairs(kids) do
+    table.sort(list, function(x, y)
+      local kx, ky = x.slice_k or 1e9, y.slice_k or 1e9
+      if kx ~= ky then return kx < ky end
+      if x.offs ~= y.offs then return x.offs < y.offs end
+      return x._i < y._i
+    end)
+  end
+  local ordered, placed = {}, {}
+  local function put(e, depth)
+    if placed[e] then return end
+    placed[e] = true; e.depth = depth; ordered[#ordered + 1] = e
+    for _, k in ipairs(kids[e] or {}) do put(k, 1) end
+  end
+  for _, col in ipairs(snap.cols) do
+    for _, e in ipairs(all) do if not e.parent and e.home == col.name then put(e, 0) end end
+  end
+  for _, e in ipairs(all) do if not e.parent then put(e, 0) end end
+  for _, e in ipairs(all) do put(e, e.parent and 1 or 0) end
+  all = ordered
+  snap.pool = all
+  for _, col in ipairs(snap.cols) do col.pool = all end
   -- номер инструмента по item (показывается в строке имени ячейки)
   local by_key = {}
   for i, e in ipairs(all) do by_key[e.gkey] = i end
@@ -564,6 +584,19 @@ local function pool_add(pool, seen, it, from_depot)
     rgb = M.item_rgb(it), depot = from_depot,
     muted = R.GetMediaItemInfo_Value(it, 'B_MUTE') == 1,
     vol = R.GetMediaItemInfo_Value(it, 'D_VOL'),
+    -- свойства для панели сэмпла (2 окт): всё нативное, item/take
+    tpan = R.GetMediaItemTakeInfo_Value(take, 'D_PAN'),
+    pitch = R.GetMediaItemTakeInfo_Value(take, 'D_PITCH'),
+    ppitch = R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH') == 1,
+    pmode = math.floor(R.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE')),
+    loop = R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1,
+    fin = R.GetMediaItemInfo_Value(it, 'D_FADEINLEN'), fout = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN'),
+    nfx = R.TakeFX_GetCount and R.TakeFX_GetCount(take) or 0,
+    fxnames = (function()
+      local t = {}
+      for k = 0, (R.TakeFX_GetCount and R.TakeFX_GetCount(take) or 0) - 1 do local _, nm = R.TakeFX_GetFXName(take, k, ''); t[#t + 1] = (nm or ''):gsub('^%w+: ', '') end
+      return t
+    end)(),
     file = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }

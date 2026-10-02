@@ -28,6 +28,7 @@ local edit = dofile(DIR .. '/jf_tracker_edit.lua')
 local vim = dofile(DIR .. '/jf_tracker_vim.lua')
 local OPT = dofile(DIR .. '/jf_tracker_options.lua')   -- окно Options (1 окт)
 local VER = dofile(DIR .. '/jf_tracker_version.lua')    -- версия и изменения (Options → about)
+local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель свойств сэмпла (вкладка Sample)
 local MX = dofile(DIR .. '/jf_tracker_matrix.lua')
 local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
@@ -350,6 +351,8 @@ ctx = {
     if n then pool_select(n) end
     local e = col.pool[n or vim.inst]
     if not e then vim.msg = 'no instrument'; return end
+    -- слайс / кусок: редактируется исходник (его нарезка), кусок подсвечен зоной (2 окт)
+    if e.parent then e = e.parent end
     SL.open(e, col.track)
     state.toptab = 'sample'
     state.focus = 'top'; MX.focus = false; B.focus = false
@@ -795,6 +798,60 @@ ctx = {
     local steps = (reaper.TimeMap2_timeToQN(0, t1) - rg.qn0) * state.lpb
     vim.msg = ('region %s: %d steps (%+.3fs; later regions and items moved)'):format(rg.name, math.floor(steps + 0.5), dt)
   end,
+  -- ── панель свойств сэмпла (2 окт) ───────────────────────────────────
+  pitch_mode_name = function(m)
+    if not m or m < 0 then return 'project' end
+    local ok, name = reaper.EnumPitchShiftModes(m >> 16)
+    return (ok and name and name ~= '') and name or ('mode ' .. (m >> 16))
+  end,
+  sp_adjust = function(e, k, d)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
+    local fine = ctx.mods().shift
+    if k == 'vol' then
+      local v = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
+      local db = v > 1e-6 and 20 * math.log(v, 10) or -60
+      edit.item_set(it, 'D_VOL', 10 ^ (math.max(-60, math.min(24, db + d * 0.5)) / 20), 'sample volume')
+    elseif k == 'pan' then edit.take_set(tk, 'D_PAN', math.max(-1, math.min(1, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + d * 0.02)), 'sample pan')
+    elseif k == 'st' then edit.take_set(tk, 'D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d, 'sample transpose')
+    elseif k == 'cent' then edit.take_set(tk, 'D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d * 0.01, 'sample finetune')
+    elseif k == 'rate' then
+      local r = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+      local nr = math.max(0.1, math.min(10, r + d * 0.01))
+      local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      edit.run('sample rate', function()
+        reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', nr)
+        reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', len * r / nr)
+      end)
+    elseif k == 'ppitch' then edit.take_set(tk, 'B_PPITCH', e.ppitch and 0 or 1, 'sample keep pitch')
+    elseif k == 'mode' then
+      -- цикл алгоритмов растяжения: project → 0 → 1 … (EnumPitchShiftModes)
+      local modes = { -1 }
+      for m = 0, 63 do local ok, nm = reaper.EnumPitchShiftModes(m); if ok and nm and nm ~= '' then modes[#modes + 1] = m << 16 end end
+      local cur = reaper.GetMediaItemTakeInfo_Value(tk, 'I_PITCHMODE')
+      local k0 = 1
+      for i, m in ipairs(modes) do if m == cur or (m >= 0 and cur >= 0 and (m >> 16) == (math.floor(cur) >> 16)) then k0 = i end end
+      edit.take_set(tk, 'I_PITCHMODE', modes[(k0 - 1 + d) % #modes + 1], 'sample stretch mode')
+    elseif k == 'loop' then edit.item_set(it, 'B_LOOPSRC', e.loop and 0 or 1, 'sample loop')
+    elseif k == 'fin' or k == 'fout' then
+      local key = k == 'fin' and 'D_FADEINLEN' or 'D_FADEOUTLEN'
+      edit.item_set(it, key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'sample fade')
+    elseif k == 'fx' then reaper.TakeFX_Show(tk, 0, 1)                   -- окно цепочки take FX
+    elseif k == 'norm' then edit.normalize(it); vim.msg = 'normalized (peak 0 dB)' end
+    model.invalidate()
+  end,
+  sp_reset = function(e, k)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
+    if k == 'vol' then edit.item_set(it, 'D_VOL', 1, 'sample volume reset')
+    elseif k == 'pan' then edit.take_set(tk, 'D_PAN', 0, 'sample pan reset')
+    elseif k == 'st' or k == 'cent' then edit.take_set(tk, 'D_PITCH', 0, 'sample pitch reset')
+    elseif k == 'mode' then edit.take_set(tk, 'I_PITCHMODE', -1, 'sample stretch reset')
+    elseif k == 'fin' then edit.item_set(it, 'D_FADEINLEN', 0, 'sample fade reset')
+    elseif k == 'fout' then edit.item_set(it, 'D_FADEOUTLEN', 0, 'sample fade reset')
+    else ctx.sp_adjust(e, k, 1); return end
+    model.invalidate()
+  end,
   -- окно Options: список строит здесь (знает state / vim); модуль — только показ и клавиши
   options = function()
     local function flag(k, label, desc) return { key = k, label = label, kind = 'toggle', desc = desc, get = function() return state[k] end, set = function(v) state[k] = v end } end
@@ -1239,6 +1296,7 @@ B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 MMX.init(U, ctx)
 GD.init(U, ctx)
+SPROP.init(U, ctx)
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
 local function hint_go(t)
@@ -2288,13 +2346,19 @@ local function frame()
       -- файл из браузера (v / Space / auto) показывается вместо инструмента
       if SL.entry and SL.entry.file then e = SL.entry end
       -- слайс / кусок: показываем исходник (родителя) с подсветкой играемой зоны
+      local sel_e = e
       local zone
       if e and e.parent and not (SL.active and SL.entry == e) then
         local p = e.parent
         zone = { (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1), (e.offs - p.offs + e.len * e.rate) / (p.rate ~= 0 and p.rate or 1), vim.inst }
         e = p
       end
-      return SL.draw_in(U, L, x, y, w, h, e, col and col.track, zone)
+      -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
+      local pw = (sel_e and not sel_e.file) and math.min(L.cw * 30, math.floor(w * 0.34)) or 0
+      if pw > L.cw * 12 then
+        SPROP.draw(L, x + w - pw, y, pw, h, sel_e, state.focus == 'top')
+      else pw = 0; SPROP.hover = nil end
+      return SL.draw_in(U, L, x, y, w - (pw > 0 and pw + L.pad or 0), h, e, col and col.track, zone)
     end,
     browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
   })
@@ -2343,7 +2407,7 @@ local function frame()
     local e, parts = hover.poolmark.e, {}
     parts[#parts + 1] = hover.poolmark.here and '@ = used on the cursor track' or '(no @: not on the cursor track)'
     if e.slices then parts[#parts + 1] = ('$ = sliced (%d slices)'):format(#e.slices) end
-    if hover.poolmark.lib then parts[#parts + 1] = '* = library (after =LIB)' end
+    parts[#parts + 1] = 'stored on ' .. tostring(e.home) .. (hover.poolmark.lib and ' (library after =LIB)' or '')
     if e.parent then parts[#parts + 1] = ('s%s = slice of %s (%.3f-%.3fs of its source)'):format(e.slice_k and tostring(e.slice_k) or '?', e.parent.name, (e.offs - e.parent.offs) / (e.parent.rate ~= 0 and e.parent.rate or 1), (e.offs - e.parent.offs + e.len * e.rate) / (e.parent.rate ~= 0 and e.parent.rate or 1)) end
     state.status = table.concat(parts, '   ')
   elseif hover.caption then state.status = ({
@@ -2360,6 +2424,8 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
+  elseif SPROP.hover and state.top and state.toptab == 'sample' then
+    state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.trs then
     local names = { vol = 'volume', pan = 'pan', width = 'width (stereo pan)', panl = 'left pan (dual pan)', panr = 'right pan (dual pan)' }
     state.status = ('%s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what)
@@ -2514,6 +2580,14 @@ local function frame()
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
+    elseif SPROP.hover and state.top and state.toptab == 'sample' then
+      ctx.set_focus('top')
+      local e = cur_col() and (cur_col().pool or {})[vim.inst]
+      local same = click.zone == 'sprop' and click.row == SPROP.hover.row
+      SPROP.sel = SPROP.hover.row
+      if e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
+      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
     elseif hover.trs then
       local t = hover.trs
       if dbl and click.zone == 'trs' and click.row == t.what then
@@ -2780,6 +2854,12 @@ local function frame()
     end
   end
 
+  if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
+    local e = cur_col() and (cur_col().pool or {})[vim.inst]
+    SPROP.sel = SPROP.hover.row
+    if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
+    gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and hover.trs then
     local t, d = hover.trs, gfx.mouse_wheel > 0 and 1 or -1
     local key = TRS_KEY[t.what]
@@ -2952,6 +3032,8 @@ local function frame()
       elseif state.focus == 'top' and state.top then
         local ch = c < 256 and string.char(c) or ''
         if c == 9 then ctx.toggle_focus()
+        elseif state.toptab == 'sample' and SPROP.key(c, cur_col() and (cur_col().pool or {})[vim.inst]) then
+          -- панель свойств: J K строка, H L значение, R сброс
         elseif state.toptab == 'sample' and SL.active then
           SL.key(c)
           if not SL.active then ctx.set_focus('tracker') end

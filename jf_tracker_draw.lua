@@ -1033,27 +1033,15 @@ function D.pool_rows(pool, sort, col, cols)
     for _, i in ipairs(idx) do rows[#rows + 1] = { i = i } end
     return rows
   end
-  local groups, order = {}, {}
+  -- дерево (2 окт): пул уже упорядочен моделью — трек (где лежит исходник),
+  -- исходный сэмпл, под ним его слайсы; заголовок при смене трека корня
+  local cur_home
   for i, e in ipairs(pool) do
-    local g = (e.tracks and e.tracks[1]) or '*library'
-    if not groups[g] then groups[g] = {}; order[#order + 1] = g end
-    groups[g][#groups[g] + 1] = i
-  end
-  -- группы в порядке колонок; библиотека последней
-  local pos = {}
-  for ci, c in ipairs(cols or {}) do pos[c.name] = pos[c.name] or ci end
-  table.sort(order, function(a, b)
-    local pa, pb = pos[a] or 1e9, pos[b] or 1e9
-    if a == '*library' then pa = 2e9 end
-    if b == '*library' then pb = 2e9 end
-    if pa ~= pb then return pa < pb end
-    return a < b
-  end)
-  for _, g in ipairs(order) do
-    local list = groups[g]
-    table.sort(list, function(a, b) if pool[a].len ~= pool[b].len then return pool[a].len < pool[b].len end; return a < b end)
-    rows[#rows + 1] = { hdr = g == '*library' and 'library' or g, name = g }
-    for _, i in ipairs(list) do rows[#rows + 1] = { i = i } end
+    if (e.depth or 0) == 0 and e.home ~= cur_home then
+      cur_home = e.home
+      rows[#rows + 1] = { hdr = e.home or '?', name = e.home }
+    end
+    rows[#rows + 1] = { i = i }
   end
   return rows
 end
@@ -1102,7 +1090,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     tbtn('select', info.poolprev, 'prevbtn')
     tbtn('insert', info.inspreview, 'insprevbtn')
     -- легенда меток
-    local lg = '@ cursor track  $ sliced  * library'
+    local lg = '@ on cursor track  $ sliced  sN slice'
     text(bx + L.pad, by, fit(lg, ix + w - bx - 2 * L.pad), U.DIM)
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
@@ -1141,11 +1129,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local lib = e.depot and not (e.tracks and e.tracks[1])
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       set(rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
-      -- метки фиксированной ширины: @ трек курсора, $ нарезан, * библиотека,
-      -- sN — кусок = слайс N родителя (просьба 2 окт); наведение → статус-бар
-      local sl = e.parent and ('s' .. (e.slice_k and tostring(e.slice_k) or '?')) or '  '
-      local marks = (here and '@' or ' ') .. (e.slices and '$' or (lib and '*' or ' ')) .. sl
-      local lbl = ('%02d %s %s%s%s'):format(i, marks, e.name, e.slices and (' /' .. #e.slices) or '', e.muted and ' (muted)' or '')
+      -- метки: @ трек курсора, $ нарезан; ребёнок (слайс / кусок исходника) —
+      -- с отступом и sN вместо имени исходника (дерево как в Renoise, 2 окт)
+      local child = (e.depth or 0) > 0
+      local marks = (here and '@' or ' ') .. (e.slices and '$' or ' ')
+      local body
+      if child then body = ' ' .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut') .. ' ' .. ('%.2fs'):format(e.len)
+      else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
+      local lbl = ('%02d %s %s%s'):format(i, marks, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
       do
         local mx0 = ix + 6 + ms('00 ')

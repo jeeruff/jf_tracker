@@ -1420,6 +1420,9 @@ end
 -- ── громкость / панорама трека из шапки (2 окт) ──────────────────────────
 -- Во время протяжки — без undo (каждый кадр), точка undo — на отпускании.
 function E.track_value(tr, key, v) R.SetMediaTrackInfo_Value(tr, key, v) end
+-- свойства сэмпла из панели (undo на каждое изменение)
+function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R.SetMediaItemInfo_Value(it, key, v); R.UpdateItemInProject(it) end) end
+function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 
 -- ── Garden: посадка событий Orca (F2, 2 окт) ─────────────────────────────

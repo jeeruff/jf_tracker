@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.0'
+V.VERSION = '0.5.1'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.1', d = '2026-10-02', items = {
+    'instruments list is a tree per track: source sample, its slices / cuts indented below (no library group)',
+    'sample tab: properties panel right of the wave (volume, pan, transpose, finetune, rate, keep pitch, stretch mode, loop, fades, take fx, normalize)',
+    'Tab into the sample tab opens the source sample, the selected slice is shown as a zone',
+    'restart helper never launches REAPER itself',
+  } },
   { v = '0.5.0', d = '2026-10-02', items = {
     'Garden tab: loop grid region x track, Orca field (A-Z operators) planting notes / slices while playing',
     'loops in regions: > item to region end, N> loop period N steps (section source), < region to item end',
