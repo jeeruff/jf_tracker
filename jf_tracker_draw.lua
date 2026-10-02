@@ -204,7 +204,9 @@ function D.layout(snap, state, nregions)
   L.env_w = L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
-  L.win_w = gfx.w - L.side_w
+  -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
+  L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
+  L.win_w = gfx.w - L.side_w - L.rstrip_w
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
@@ -1063,11 +1065,22 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local cur = pool[inst]
   local head = ('instruments %d'):format(#pool)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
-  -- справа — кнопка сортировки (track / len / mark)
+  -- справа — кнопки find (fzf, 2 окт) и сортировки (track / len / mark)
   local sort = info.poolsort or 'track'
   local sb = 'sort ' .. sort
   local sbw = ms(sb) + 2 * L.pad
   local sbx = ix + w - sbw - L.pad
+  do
+    local fw = ms('find') + 2 * L.pad
+    local fx = sbx - fw - L.pad
+    local hot = mx >= fx and mx < fx + fw and my >= iy + 2 and my < iy + 2 + L.rh
+    set(hot and D.CURROW or U.BG); gfx.rect(fx, iy + 2, fw, L.rh, 1)
+    set(U.LINE); gfx.rect(fx, iy + 2, fw, L.rh, 0)
+    text(fx + L.pad, iy + 3, 'find', hot and U.AMBER or U.GREY)
+    if hot then hover.poolfind = true end
+    hint('poolfind', fx, iy + 2, fw, L.rh, true)
+    sbx = fx                                 -- заголовок обрезается до кнопок
+  end
   do
     local hot = mx >= sbx and mx < sbx + sbw and my >= iy + 2 and my < iy + 2 + L.rh
     set(hot and D.CURROW or U.BG); gfx.rect(sbx, iy + 2, sbw, L.rh, 1)
@@ -1185,6 +1198,7 @@ function D.frame(L, snap, rows, state, info)
     local th = draw_topbar(L, info)
     hover.ctrl, hover.scope, hover.pool, hover.tab, hover.mod, hover.sample, hover.prevbtn = th.ctrl, th.scope, th.pool, th.tab, th.mod, th.sample, th.prevbtn
     hover.insprevbtn = th.insprevbtn
+    hover.poolfind = th.poolfind
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro
     hover.mm = th.mm
     hover.garden = th.garden
@@ -1637,6 +1651,29 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + bw + L.pad
     end
     L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
+  end
+
+  -- кнопки у линии раздела трекер | правая панель (2 окт): > свернуть, < развернуть,
+  -- = тянуть ширину; стоят слева от линии, чтобы не закрывать кнопки браузера
+  do
+    local bw = ms('<') + 2 * L.pad
+    local bot = gfx.h - L.status_h
+    local lx = L.win_w                               -- левый край правой панели / полосы
+    if not state.side then
+      set(U.PANEL); gfx.rect(lx, L.header_y, L.rstrip_w, bot - L.header_y, 1)
+      set(D.SEP); gfx.rect(lx, L.header_y, 2, bot - L.header_y, 1)
+    end
+    local function knob(y, lbl, what)
+      local bx = state.side and (lx - bw - 2) or (lx + 3)
+      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
+      set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
+      text(bx + L.pad, y, lbl, hot and U.AMBER or U.TEXT)
+      if hot then hover.sidectl = what end
+      hint('sidectl', bx, y, bw, L.rh, what)
+    end
+    knob(bot - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
+    if state.side then knob(bot - 2 * L.rh - 4, '=', 'grip') end
   end
 
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши

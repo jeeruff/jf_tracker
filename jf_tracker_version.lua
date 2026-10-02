@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.2'
+V.VERSION = '0.5.3'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.3', d = '2026-10-02', items = {
+    'fzf find: browser (files mode searches the whole browse root) and instruments; find buttons and / when focused; old browser filter moved to f',
+    'click on any module moves the keyboard focus to it',
+    'sidebar divider buttons: > folds instruments + browser to a strip, < opens, = drags the width',
+  } },
   { v = '0.5.2', d = '2026-10-02', items = {
     'matrix is always shown (also with no regions, + adds the first one)',
     'divider buttons: < folds the matrix to a strip, > opens it, = drags its width (dblclick: auto)',

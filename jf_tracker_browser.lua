@@ -305,6 +305,7 @@ end
 function B.click(what)
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
+  elseif what == 'find' then if ctx.browser_find then ctx.browser_find() end
   elseif what == 'wave' then B.wave = not B.wave
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
   elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
@@ -376,6 +377,56 @@ function B.preview()
 end
 
 -- клавиши в фокусе браузера; true — съедена
+-- ── fzf-поиск (2 окт): / или кнопка find ─────────────────────────────────
+-- files — рекурсивно по корню :browse (индекс строится один раз за сеанс,
+-- до 20000 файлов); db / pm / proj — по текущему списку.
+B.findidx = {}
+function B.find_items()
+  if B.mode == 'files' and B.root then
+    local idx = B.findidx[B.root]
+    if not idx then
+      idx = {}
+      local function scan(dir, rel, depth)
+        if #idx >= 20000 or depth > 10 then return end
+        local i = 0
+        while true do
+          local f = R.EnumerateFiles(dir, i)
+          if not f then break end
+          local ext = f:match('%.([%w]+)$')
+          if ext and AUDIO[ext:lower()] and f:sub(1, 1) ~= '.' then
+            idx[#idx + 1] = { label = (rel ~= '' and (rel .. '/') or '') .. f, data = { dir = dir, name = f } }
+          end
+          i = i + 1
+        end
+        i = 0
+        while true do
+          local d = R.EnumerateSubdirectories(dir, i)
+          if not d then break end
+          if d:sub(1, 1) ~= '.' then scan(dir .. '/' .. d, (rel ~= '' and (rel .. '/') or '') .. d, depth + 1) end
+          i = i + 1
+        end
+      end
+      scan(B.root, '', 0)
+      B.findidx[B.root] = idx
+    end
+    return idx, ('find: %d files under %s'):format(#idx, B.root:match('[^/]+$') or B.root)
+  end
+  local out = {}
+  for i, e in ipairs(B.all) do out[#out + 1] = { label = e.name .. (e.dir and '/' or ''), data = { i = i } } end
+  return out, 'find: ' .. B.mode
+end
+
+function B.find_pick(d)
+  B.filter, B.filtering = '', false
+  if d.dir then
+    B.path = d.dir; B.refresh()
+    for i, e in ipairs(B.entries) do if e.name == d.name then B.cur = i end end
+  else
+    B.set_all(B.all); B.cur = math.max(1, math.min(#B.entries, d.i or 1))
+  end
+  if B.auto then B.preview() end
+end
+
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
   if B.filtering then
@@ -386,7 +437,8 @@ function B.key(c)
     else return false end
     return true
   end
-  if ch == '/' then B.filtering = true
+  if ch == '/' then if ctx.browser_find then ctx.browser_find() end      -- fzf (2 окт)
+  elseif ch == 'f' then B.filtering = true                                -- старый фильтр подстрокой
   elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
@@ -434,7 +486,7 @@ function B.draw(U, L, x, y, w, h)
   do
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
-    for _, b in ipairs({ { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
+    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

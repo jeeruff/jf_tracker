@@ -855,6 +855,36 @@ ctx = {
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
   end,
+  -- ── fzf-поиск в браузере и инструментах (2 окт) ─────────────────────
+  browser_find = function()
+    if not state.side then state.side = true end
+    vim.msg = 'indexing…'
+    local items, title = B.find_items()
+    vim.open_picker(title, items, function(it) ctx.set_focus('browser'); B.find_pick(it.data) end)
+  end,
+  inst_find = function()
+    local col = cur_col(); local pool = col and col.pool or {}
+    local items = {}
+    for i, e in ipairs(pool) do
+      local nm = (e.depth or 0) > 0 and e.parent
+        and (((e.slice_k and e.slice_k > 0) and ('s' .. e.slice_k) or 'cut') .. ' of ' .. e.parent.name)
+        or e.name
+      items[#items + 1] = { label = ('%02d %s  [%s]'):format(i, nm, e.home or ''), data = i }
+    end
+    vim.open_picker('find instrument', items, function(it) ctx.set_focus('inst'); pool_select(it.data) end)
+  end,
+  -- клик по модулю переносит в него фокус (по прямоугольникам модулей)
+  focus_at = function(x, y)
+    local function inr(r) return r and x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
+    local f
+    if inr(L.inst_rect) then f = 'inst'
+    elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
+    elseif inr(L.dsp_rect) then f = 'dsp'
+    elseif inr(L.top_rect) then f = 'top'
+    elseif not state.mx_hidden and x < L.matrix_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'matrix'
+    elseif x >= L.matrix_w and x < L.win_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'tracker' end
+    if f and f ~= state.focus then ctx.set_focus(f) end
+  end,
   -- окно Options: список строит здесь (знает state / vim); модуль — только показ и клавиши
   options = function()
     local function flag(k, label, desc) return { key = k, label = label, kind = 'toggle', desc = desc, get = function() return state[k] end, set = function(v) state[k] = v end } end
@@ -1323,6 +1353,7 @@ local function hint_go(t)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
     if d == 'zoom' then ctx.mx_zoom() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() end
+  elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
@@ -2405,6 +2436,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar; then name it (+, :add [bars] [name])'
   elseif hover.prevbtn then state.status = 'select: play the sample when an instrument is selected - ' .. (state.poolprev and 'on' or 'off') .. ' (:poolprev)'
+  elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the instruments have focus'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
   elseif hover.poolmark then
@@ -2428,6 +2460,8 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
+  elseif hover.sidectl then
+    state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and state.top and state.toptab == 'sample' then
@@ -2470,7 +2504,7 @@ local function frame()
     state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to depot; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
   elseif type(hover.browser) == 'string' then
-    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
+    state.status = ({ files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', find = 'find (fzf): files mode searches the whole browse root, other modes the current list; also /', size = 'sidebar width: narrow / wide (w)', hide = 'hide sidebar (:side, q)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif hover.header_col or hover.col then
     local c = hover.header_col or hover.col
@@ -2487,7 +2521,7 @@ local function frame()
   -- ресайз мышью: левый край браузера (ширина), нижний край верхней панели (высота)
   do
     local edge
-    local W0 = gfx.w - L.side_w
+    local W0 = gfx.w - L.side_w - (L.rstrip_w or 0)
     if state.side and math.abs(gfx.mouse_x - W0) <= 3 and gfx.mouse_y < gfx.h - L.status_h then edge = 'side'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
     elseif state.top and math.abs(gfx.mouse_y - L.top_h) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
@@ -2512,6 +2546,7 @@ local function frame()
     end
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()
     local dbl = (now2 - click.t) < 0.4
@@ -2519,6 +2554,9 @@ local function frame()
       ctx.set_focus('inst')
       state.poolprev = not state.poolprev; vim.msg = 'play on select ' .. (state.poolprev and 'on' or 'off')
       click = { t = now2, zone = 'prevbtn' }
+    elseif hover.poolfind then
+      ctx.set_focus('inst'); ctx.inst_find()
+      click = { t = now2, zone = 'poolfind' }
     elseif hover.insprevbtn then
       ctx.set_focus('inst')
       state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
@@ -2587,6 +2625,13 @@ local function frame()
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
+    elseif hover.sidectl then
+      if hover.sidectl == 'open' then state.side = true; vim.msg = 'sidebar shown'
+      elseif hover.sidectl == 'close' then ctx.side_hide(); vim.msg = 'sidebar folded (< to open)'
+      elseif hover.sidectl == 'grip' then
+        if dbl and click.zone == 'sidegrip' then state.side_px = nil; vim.msg = 'sidebar width: auto' else resize_drag = 'side' end
+      end
+      click = { t = now2, zone = hover.sidectl == 'grip' and 'sidegrip' or 'sidectl' }
     elseif hover.mxctl then
       if hover.mxctl == 'open' then state.mx_hidden = false; vim.msg = 'matrix shown'
       elseif hover.mxctl == 'close' then state.mx_hidden = true; if state.focus == 'matrix' then ctx.set_focus('tracker') end; vim.msg = 'matrix folded (> to open)'
@@ -2996,10 +3041,11 @@ local function frame()
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and state.side then
         if not B.key(c) then return vim.key(c) end
-      elseif state.focus == 'inst' and state.top then
+      elseif state.focus == 'inst' and (state.top or state.side) then
         local ch = c < 256 and string.char(c) or ''
         local col = cur_col()
         if c == 27 then ctx.set_focus('tracker')
+        elseif ch == '/' then ctx.inst_find()
         elseif ch == 'j' or c == keys.down then pool_select(vim.inst + 1)
         elseif ch == 'k' or c == keys.up then pool_select(vim.inst - 1)
         elseif ch == 'g' then pool_select(1)
