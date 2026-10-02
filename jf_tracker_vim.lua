@@ -513,6 +513,7 @@ V.COMMANDS = {
   { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
+  { 'midi', '', 'MIDI learn tab: knobs and pads of a controller drive the slicer (Enter: learn)' },
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
@@ -592,7 +593,7 @@ local function run_cmd(line)
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
     local a = arg == 'mod' and 'modulation' or arg
-    st.toptab = (a == 'sample' or a == 'modulation' or a == 'retro' or a == 'garden') and a or 'master'
+    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or a == 'retro' or a == 'garden') and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
     st.top = true; st.toptab = 'retro'
@@ -611,6 +612,7 @@ local function run_cmd(line)
   elseif cmd == 'tname' then ctx.rename_track(arg)
   elseif cmd == 'iname' then ctx.rename_inst(arg)
   elseif cmd == 'garden' or cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
+  elseif cmd == 'midi' then st.top = true; st.toptab = 'midi'; if ctx.set_focus then ctx.set_focus('top') end
   elseif cmd == 'loops' then if ctx.mx_loops_toggle then ctx.mx_loops_toggle() end
   elseif cmd == 'vel' and n then V.vel = math.max(1, math.min(127, math.floor(n))); V.msg = 'velocity ' .. V.vel
   elseif cmd == 'loop' then

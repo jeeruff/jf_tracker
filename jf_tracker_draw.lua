@@ -914,7 +914,7 @@ local function draw_topbar(L, info)
   local tab = info.toptab or 'scope'
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
-  for _, t in ipairs({ 'sample', 'modulation', 'retro', 'garden', 'master' }) do   -- garden подписан «orca» (2 окт)
+  for _, t in ipairs({ 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca» (2 окт), midi — learn (2 окт)
     local lbl = D.ic(t, t == 'garden' and 'orca' or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
@@ -983,6 +983,9 @@ local function draw_topbar(L, info)
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK
     if info.mm_draw then hover.mm = info.mm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
+  elseif tab == 'midi' then
+    -- MIDI learn (jf_tracker_midimap.lua): цели слайсера и их CC / ноты
+    if info.midi_draw then hover.midimap = info.midi_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'garden' then
     -- Garden (jf_tracker_garden.lua): лупы регион × трек и поле Orca
     if info.garden_draw then hover.garden = info.garden_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
@@ -1222,7 +1225,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     tbtn('insert', info.inspreview, 'insprevbtn')
     -- легенда меток
     local lg = '@ on cursor track  $ sliced  sN slice'
-    text(bx + L.pad, by, fit(lg, ix + w - bx - 2 * L.pad), U.DIM)
+    text(bx + L.pad, by, fit(lg, ix + w - bx - 2 * L.pad - (L.inst_knob_w or 0)), U.DIM)
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
   L.pool_rows = rows
@@ -1333,6 +1336,7 @@ function D.frame(L, snap, rows, state, info)
     hover.poolfind = th.poolfind
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro
     hover.mm = th.mm
+    hover.midimap = th.midimap
     hover.garden = th.garden
   end
 
@@ -1901,11 +1905,27 @@ function D.frame(L, snap, rows, state, info)
     L.inst_side_h = ih
     L.side_y0 = sy0
     local hh = L.hint_h or 0
+    -- ручка = высоты инструментов (2 окт): справа над линией раздела — в строке
+    -- подсказок (она короче на ширину ручки), без подсказок — в нижнем ряду инструментов
+    local gw = ms('=') + 2 * L.pad
+    L.inst_knob_w = hh > 0 and 0 or (gw + L.pad)
     D.draw_instruments(L, info, W, sy0, L.side_w, ih - hh, hover)
     hover.browser = info.browser_draw(L, W, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
     if hh > 0 then
-      D.hint_bar(L, W, sy0 + ih - hh, L.side_w, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
+      D.hint_bar(L, W, sy0 + ih - hh, L.side_w - gw - 2 * L.pad, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
       D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)('browser'), info.focus == 'browser')
+    end
+    -- линия раздела инструменты | браузер — той же толщины, что между модулями
+    set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, 2, 1)
+    do
+      local gx = W + L.side_w - gw - L.pad
+      local gy = hh > 0 and (sy0 + ih - hh + math.max(0, math.floor((hh - L.rh) / 2))) or (sy0 + ih - L.rh - 3)
+      local hot = mx >= gx and mx < gx + gw and my >= gy and my < gy + L.rh
+      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(gx, gy, gw, L.rh, 1)
+      set(hot and U.AMBER or U.LINE); gfx.rect(gx, gy, gw, L.rh, 0)
+      text(gx + L.pad, gy, '=', hot and U.AMBER or U.TEXT)
+      if hot then hover.sidectl = 'instgrip' end
+      hint('sidectl', gx, gy, gw, L.rh, 'instgrip')
     end
   end
 

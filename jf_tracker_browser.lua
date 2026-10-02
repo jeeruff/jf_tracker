@@ -651,7 +651,7 @@ function B.draw(U, L, x, y, w, h)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto },
-                         { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden }, { '<>', 'size', false }, { 'hide', 'hide', false } }) do
+                         { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

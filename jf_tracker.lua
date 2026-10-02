@@ -43,6 +43,7 @@ local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эфф
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
 local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
+local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
@@ -2206,6 +2207,7 @@ vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
 IK.init(ctx)
+MM.hint = HN.add
 MX.ruler = state.mxruler
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
@@ -2259,6 +2261,7 @@ local function hint_go(t)
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
+  elseif t.kind == 'midirow' then state.toptab = 'midi'; ctx.set_focus('top'); MM.cur = d
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
@@ -2497,6 +2500,148 @@ local function spec_frame(slot) return reaper.gmem_read(slot * 512 + 259) end
 -- Aftertouch (poly A0 / channel D0) и CC — в тот же MIDI-item, по времени
 -- удержания от начала строки (кривая внутри длины шага).
 local midiin = { seq = nil, held = {}, nheld = 0, row = nil, t0 = 0, wall0 = 0 }
+
+-- ── MIDI learn (2 окт): ручки и пэды контроллера → слайсер ──────────────
+-- Привязки — jf_tracker_midimap.lua (глобальный ExtState midimap). Ручка зоны
+-- / громкости / чувствительности меняет вид сразу, а правку в проект пишет
+-- одну, через полсекунды тишины (иначе каждый тик ручки — шаг undo).
+MM.parse(reaper.GetExtState(EXT, 'midimap'))
+local function mm_save() reaper.SetExtState(EXT, 'midimap', MM.serialize(), true) end
+local mm_pend = {}            -- отложенные правки: zone = {…}, vol = { item, db }, retrans = true; t — время последнего тика
+local mm_devname = {}
+local function mm_dev(idx)
+  if mm_devname[idx] == nil then
+    local ok, nm = false, nil
+    if reaper.GetMIDIInputName then ok, nm = reaper.GetMIDIInputName(idx & 0xFFFF, '') end
+    mm_devname[idx] = (ok and nm) or (idx == 62 and 'virtual keyboard') or ''
+  end
+  return mm_devname[idx]
+end
+-- выбранный инструмент и (для слайса) его исходник; слайсер открыт на нужном
+local function mm_entry(open)
+  local col = cur_col()
+  local e = col and (col.pool or {})[vim.inst]
+  if not e then return nil end
+  local p = e.parent
+  local want = p or e
+  if open and not (SL.entry and SL.entry == want) and not (SL.entry and SL.entry.file) then
+    SL.open(want, col.track)
+    state.top = true
+    if state.toptab ~= 'midi' then state.toptab = 'sample' end
+  end
+  return e, p, col
+end
+local function mm_zone(field, a)
+  local e, p, col = mm_entry(true)
+  if not e then return end
+  if p and e.item then
+    -- слайс большого сэмпла: зона по исходнику (как треугольники мышью)
+    local pr = (p.rate and p.rate ~= 0) and p.rate or 1
+    local z = mm_pend.zone
+    if not (z and z.e.item == e.item) then
+      local a0, b0 = (e.offs - p.offs) / pr, (e.offs - p.offs + e.len * (e.rate or 1)) / pr
+      z = { e = e, p = p, a = a0, b = b0, a0 = a0, b0 = b0, inst = vim.inst }
+      mm_pend.zone = z
+    end
+    local len = p.len or 0
+    local step = a.d and a.d * len / 1024 or nil
+    if field == 'zone_start' then z.a = math.max(0, math.min(z.b - 0.005, SL.snap_t(step and z.a + step or a.v * len)))
+    elseif field == 'zone_end' then z.b = math.min(len, math.max(z.a + 0.005, SL.snap_t(step and z.b + step or a.v * len)))
+    else
+      local w = z.b - z.a
+      local na = step and z.a + step or a.v * (len - w)
+      na = SL.snap_t(math.max(0, math.min(len - w, na)))
+      z.a, z.b = na, na + w
+    end
+    mm_pend.t = reaper.time_precise()
+    vim.msg = ('midi slice %.3f - %.3fs (%.3fs)'):format(z.a, z.b, z.b - z.a)
+    return
+  end
+  -- целый сэмпл: выделение слайсера
+  local len = SL.entry and SL.entry.len or 0
+  if len <= 0 then return end
+  local sa, sb = SL.span()
+  sa, sb = sa or 0, sb or len
+  local step = a.d and a.d * len / 1024 or nil
+  if field == 'zone_start' then sa = math.max(0, math.min(sb - 0.005, SL.snap_t(step and sa + step or a.v * len)))
+  elseif field == 'zone_end' then sb = math.min(len, math.max(sa + 0.005, SL.snap_t(step and sb + step or a.v * len)))
+  else
+    local w = sb - sa
+    sa = SL.snap_t(math.max(0, math.min(len - w, step and sa + step or a.v * (len - w)))); sb = sa + w
+  end
+  SL.sel = { a = sa, b = sb }
+  vim.msg = ('midi selection %.3f - %.3fs'):format(sa, sb)
+end
+local MM_TRIG = { eq2 = 'eq2', eq4 = 'eq4', eq8 = 'eq8', eq16 = 'eq16', eq32 = 'eq32', trans = 'trans', clear = 'clear', quant = 'quant', snap = 'snap' }
+local function mm_apply(a)
+  if a.learned then
+    mm_save()
+    local t = MM.BY_ID[a.learned]
+    vim.msg = ('learned %s: %s%s'):format(t.label, MM.bind_text(a.bind), (t.kind == 'value' and a.bind.kind == 'cc') and ' - m: abs / rel / rel64 for endless encoders' or '')
+    return
+  end
+  if a.eaten then return end
+  local id = a.t
+  if id == 'zone_start' or id == 'zone_end' or id == 'zone_move' then mm_zone(id, a)
+  elseif id == 'sens' then
+    mm_entry(true)
+    SL.sens = math.max(0, math.min(1, a.v or (SL.sens + a.d * 0.01)))
+    if SL.env then SL.detect() end
+    if SL.mode and SL.mode:match('^transients') then mm_pend.retrans = true; mm_pend.t = reaper.time_precise() end
+    vim.msg = ('sensitivity %.2f: %d transients'):format(SL.sens, #(SL.trans or {}))
+  elseif id == 'vol' then
+    local e = mm_entry(false)
+    if not (e and e.item) then return end
+    local cur = mm_pend.vol and mm_pend.vol.item == e.item and mm_pend.vol.db
+      or ((e.vol or 1) > 0 and 20 * math.log(e.vol, 10) or -60)
+    local db = a.v and (-60 + a.v * 84) or (cur + a.d * 0.5)
+    db = math.max(-60, math.min(24, db))
+    mm_pend.vol = { item = e.item, db = db, e = e }
+    mm_pend.t = reaper.time_precise()
+    vim.msg = ('volume %+.1f dB'):format(db)
+  elseif id == 'inst' then
+    local col = cur_col(); local n = #(col and col.pool or {})
+    if n == 0 then return end
+    if a.v then pool_select(1 + math.floor(a.v * (n - 1) + 0.5)) else pool_select(vim.inst + (a.d > 0 and 1 or -1)) end
+  elseif id == 'pads' then
+    local e, p, col = mm_entry(false)
+    if not e or not col then return end
+    local src = (e.slices and e) or (p and p.slices and p) or nil
+    if src then
+      local k = a.k
+      if src.slices[k] then PV.slice(col.track, src, src.slices[k], src.slices[k + 1] or src.len); vim.msg = ('pad %d -> slice %d'):format(k, k) end
+    elseif e.item then PV.audio(col.track, e.item, a.k - 1); vim.msg = ('pad %d: %+d st'):format(a.k, a.k - 1) end
+  elseif MM_TRIG[id] then
+    local e = mm_entry(true)
+    if e then SL.button(MM_TRIG[id]); vim.msg = SL.msg ~= '' and SL.msg or id end
+  elseif id == 'detect' then mm_entry(true); if SL.env then SL.detect(); vim.msg = ('%d transients'):format(#SL.trans) end
+  elseif id == 'all' then mm_entry(true); SL.select_all()
+  elseif id == 'view' then SL.cycle_view()
+  elseif id == 'preview' then
+    local e, p, col = mm_entry(false)
+    local z = mm_pend.zone
+    local sa, sb = SL.span()
+    if z and e and z.e.item == e.item then PV.slice(col.track, p, z.a, z.b)
+    elseif sa and SL.entry then ctx.preview_slice(SL.track, SL.entry, sa, sb)
+    elseif e and e.item and col then PV.audio(col.track, e.item, 0, 1.0) end
+  elseif id == 'insert' then local sa, sb = SL.span(); if sa and SL.entry then ctx.drop_span_cursor(SL.entry, sa, sb) else vim.msg = 'insert: no selection' end
+  elseif id == 'depot' then local sa, sb = SL.span(); if sa and SL.entry then ctx.depot_span(SL.entry, sa, sb) else vim.msg = 'to library: no selection' end
+  elseif id == 'norm' then local e = mm_entry(false); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized' end
+  elseif id == 'inst_next' then pool_select(vim.inst + 1)
+  elseif id == 'inst_prev' then pool_select(vim.inst - 1)
+  elseif id == 'slicer' then state.top = true; state.toptab = 'sample'; mm_entry(true)
+  elseif id == 'play' then edit.play_stop() end
+end
+-- отложенные правки ручек: через 0.5 с тишины — одна правка в проект
+local function mm_settle(now)
+  if not mm_pend.t or now - mm_pend.t < 0.5 then return end
+  local z, v = mm_pend.zone, mm_pend.vol
+  local retrans = mm_pend.retrans
+  mm_pend = {}
+  if z and (math.abs(z.a - z.a0) > 1e-6 or math.abs(z.b - z.b0) > 1e-6) then ctx.slice_bounds(z) end
+  if v and reaper.ValidatePtr(v.item, 'MediaItem*') then edit.item_vol(v.item, v.db); v.e.vol = 10 ^ (v.db / 20) end
+  if retrans and SL.entry and not SL.entry.file then SL.use_transients() end
+end
 local function midi_input_ok(col)
   if not col or not col.armed then return false end
   local inp = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'I_RECINPUT'))
@@ -2518,6 +2663,18 @@ local function poll_midi_in()
   if #fresh == 0 then return end
   if not midiin.seq then midiin.seq = fresh[1].seq; return end   -- старт: старое не пишем
   midiin.seq = fresh[1].seq
+  -- MIDI learn: привязанные CC / ноты (и learn) — не дальше (2 окт)
+  do
+    local rest = {}
+    for k = #fresh, 1, -1 do
+      local b = fresh[k].buf
+      local a = MM.feed(b:byte(1), b:byte(2) or 0, b:byte(3) or 0, mm_dev(fresh[k].dev or 0))
+      if a then local ok, err = pcall(mm_apply, a); if not ok then vim.msg = 'midi: ' .. tostring(err):match('[^\n]*$') end
+      else table.insert(rest, 1, fresh[k]) end
+    end
+    fresh = rest
+    if #fresh == 0 then return end
+  end
   local f = L and L.flat[vim.cur.fi]
   local col = f and f.col
   -- вкладка Sample в фокусе: MIDI-вход прослушивает инструмент (2 окт). Нарезанный —
@@ -3264,7 +3421,7 @@ local function frame()
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
-  publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise())
+  publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise()); mm_settle(reaper.time_precise())
 
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
   -- в REAPER → курсор трекера прыгает туда (вид — следом); курсор трекера
@@ -3438,6 +3595,10 @@ local function frame()
       return GD.draw(Lx, x, y, w, h, snap, seq, { play_row = ph_row, queued = MX.queued, garden_on = garden.f and garden.f.on },
                      state.focus == 'top' and state.toptab == 'garden')
     end,
+    midi_draw = function(Lx, x, y, w, h)
+      local hv = MM.draw(U, Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'midi', ctx.fit)
+      return hv
+    end,
     mm_draw = function(Lx, x, y, w, h)
       local col = cur_col()
       return MMX.draw(Lx, x, y, w, h, col and col.mods or {}, state.focus == 'top', col and (col.name .. ' modulation') or 'modulation')
@@ -3455,6 +3616,7 @@ local function frame()
         zone = { (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1), (e.offs - p.offs + e.len * e.rate) / (p.rate ~= 0 and p.rate or 1), vim.inst }
         -- тянется край — зона живая
         if SL.zone_drag and SL.zone_drag.e.item == e.item then zone = { SL.zone_drag.a, SL.zone_drag.b, vim.inst } end
+        if mm_pend.zone and mm_pend.zone.e.item == e.item then zone = { mm_pend.zone.a, mm_pend.zone.b, vim.inst } end   -- ручка MIDI
         e = p
       end
       -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
@@ -3547,6 +3709,9 @@ local function frame()
   elseif hover.garden and hover.garden.ox then
     local ch = garden.f and garden.f.cells[hover.garden.oy][hover.garden.ox] or '.'
     state.status = ('orca (%d,%d) %s'):format(hover.garden.ox, hover.garden.oy, ORCA.DOC[ch] or ORCA.DOC[ch:upper()] or 'click to place the cursor, type to write')
+  elseif hover.midimap then
+    local t = MM.TARGETS[hover.midimap.row]
+    state.status = t and (t.label .. ': ' .. t.d .. (hover.midimap.btn == 'mode' and ' - click: abs / rel / rel64' or ' - click: select, click again / Enter: learn, d: clear')) or ''
   elseif hover.mm then
     local c = MMX.COLS[hover.mm.col]
     local hints = { name = 'parameter - dblclick / o: FX window, w: native modulation window', num = 'value - wheel / + - (Shift ×10)', toggle = 'on/off - click twice / Enter', enum = 'LFO shape - Enter / wheel', link = 'link source - Enter: pick parameter (fzf)' }
@@ -3555,7 +3720,7 @@ local function frame()
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
-  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
@@ -3601,7 +3766,7 @@ local function frame()
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
     state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
-    state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto' })[hover.sidectl]
+    state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: instruments / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
@@ -3737,6 +3902,13 @@ local function frame()
         GD.ocur = { x = hover.garden.ox, y = hover.garden.oy }
         click = { t = now2, zone = 'gardenorca' }
       end
+    elseif hover.midimap then
+      ctx.set_focus('top')
+      local i = hover.midimap.row
+      if hover.midimap.btn == 'mode' then MM.cur = i; if MM.key(('m'):byte()) == 'save' then mm_save() end
+      elseif MM.cur == i then MM.key(13)          -- второй клик по строке — learn
+      else MM.cur = i end
+      click = { t = now2, zone = 'midimap' }
     elseif hover.mm then
       ctx.set_focus('top')
       local same = click.zone == 'mm' and click.row == hover.mm.row and click.ci == hover.mm.col
@@ -3819,8 +3991,10 @@ local function frame()
       elseif hover.sidectl == 'close' then ctx.side_hide(); vim.msg = 'sidebar folded (< to open)'
       elseif hover.sidectl == 'grip' then
         if dbl and click.zone == 'sidegrip' then state.side_px = nil; vim.msg = 'sidebar width: auto' else resize_drag = 'side' end
+      elseif hover.sidectl == 'instgrip' then
+        if dbl and click.zone == 'instgrip' then state.inst_px = nil; vim.msg = 'instruments height: auto' else resize_drag = 'inst' end
       end
-      click = { t = now2, zone = hover.sidectl == 'grip' and 'sidegrip' or 'sidectl' }
+      click = { t = now2, zone = (hover.sidectl == 'grip' and 'sidegrip') or (hover.sidectl == 'instgrip' and 'instgrip') or 'sidectl' }
     elseif hover.mxctl then
       if hover.mxctl == 'open' then state.mx_hidden = false; vim.msg = 'matrix shown'
       elseif hover.mxctl == 'close' then state.mx_hidden = true; if state.focus == 'matrix' then ctx.set_focus('tracker') end; vim.msg = 'matrix folded (> to open)'
@@ -4609,7 +4783,7 @@ local function frame()
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Option-Tab / Option-Shift-Tab: вкладки верхнего дока по кругу (sample → … → master → sample)
   if (c == 9 or c == 25) and ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    local TABS = { 'sample', 'modulation', 'retro', 'garden', 'master' }
+    local TABS = { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }
     local i = 1
     for k, t in ipairs(TABS) do if t == state.toptab then i = k end end
     local back = c == 25 or ctx.mods().shift
@@ -4725,6 +4899,11 @@ local function frame()
             if c == 27 then ctx.set_focus('tracker')
             elseif vim.mode ~= 'insert' then return vim.key(c) end   -- INSERT не пишет ноты из вкладки
           end
+        elseif state.toptab == 'midi' then
+          local r = MM.key(c)
+          if r == 'leave' then ctx.set_focus('tracker')
+          elseif r == 'save' then mm_save()
+          elseif not r then return vim.key(c) end
         elseif state.toptab == 'modulation' then
           local col = cur_col(); local mods = col and col.mods or {}
           if c == 27 then ctx.set_focus('tracker')

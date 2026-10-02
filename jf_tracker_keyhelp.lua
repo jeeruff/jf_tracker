@@ -204,6 +204,16 @@ KH.PAGES = {
     { k = 'zone', d = 'slice of a big sample: top triangles = start / end, bottom strip = move it' },
     { k = 'Esc', d = 'clear selection / close' },
   } },
+  midi = { title = 'MIDI learn (slicer from a controller)', e = {
+    { k = 'j k g G', d = 'target down / up / first / last' },
+    { k = 'Enter l', d = 'learn: the next CC / note becomes the binding (Esc cancels)' },
+    { k = 'd x BS', d = 'clear binding' },
+    { k = 'm', d = 'knob mode: abs 0..127 / rel (1..63 up, 65..127 down) / rel64 (64 +- n)' },
+    { k = 'knobs', d = 'slice start / end / move, sensitivity, volume, instrument - edits land 0.5 s after the knob stops (one undo)' },
+    { k = 'pads', d = 'learned note = slice 1, next notes = next slices (preview)' },
+    { k = 'buttons', d = 'equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play' },
+    { k = 'Esc', d = 'back to tracker' },
+  } },
   modulation = { title = 'modulation matrix', e = {
     { k = 'h j k l', d = 'cell' },
     { k = 'g G 0 $', d = 'first / last row, first / last column' },
@@ -284,10 +294,11 @@ KH.BARS = {
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },
   orca = { { 'arrows', 'move' }, { 'A-Z', 'operator' }, { '!', 'bang' }, { '.', 'erase' }, { 'Space', 'play' }, { 'Esc', 'back' } },
+  midi = { { 'j k', 'target' }, { 'Enter', 'learn' }, { 'd', 'clear' }, { 'm', 'abs/rel' }, { 'Esc', 'back' } },
   master = { { 'm', 'scope mode' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

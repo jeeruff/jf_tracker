@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.26'
+V.VERSION = '0.5.27'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.27', d = '2026-10-02', items = {
+    'midi tab (next to modulation, :midi): MIDI learn for the slicer - knobs for slice start / end / move, sensitivity, volume, instrument (abs or relative encoders), pads = slices, buttons for equal / transients / detect / clear / snap / quantize / preview / insert / to library / play; knob edits land as one undo 0.5 s after the knob stops; bound CC / notes do not reach note recording',
+    'browser: the <> and hide buttons are gone (the sidebar has > and =)',
+    'instruments / browser split: separator as thick as between the other modules, = on the right drags the height (dblclick: auto)',
+  } },
   { v = '0.5.26', d = '2026-10-02', items = {
     'instruments module has a Vim grammar like the matrix and DSP: dd / x cut an instrument (its events and library item, to the register), yy yank, p / P put a copy into the cursor track library, yp duplicates, v selects a range; pending operators show their hints',
     'f hint labels jump into the instruments (also on the empty .. slots) and move the focus there; fix: the instruments in the sidebar could not take focus while the top dock was closed',
