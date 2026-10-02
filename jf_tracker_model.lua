@@ -899,13 +899,17 @@ function M.regions(lpb)
   local key = string.format('%d|%d', R.GetProjectStateChangeCount(0), lpb)
   if rcache.key == key then return rcache.list end
   local out = {}
+  local markers = {}      -- маркеры для линейки трекера (2 окт): имя, строка (дробная), цвет
   -- библиотека паттернов: всё после маркера =LIB не входит в последовательность
   local lib_pos
   local i = 0
   while true do
-    local ret, isrgn, pos, _, name = R.EnumProjectMarkers3(0, i)
+    local ret, isrgn, pos, _, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
-    if not isrgn and name == M.LIB_MARKER then lib_pos = pos end
+    if not isrgn then
+      if name == M.LIB_MARKER then lib_pos = pos end
+      markers[#markers + 1] = { idx = idx, name = name or '', pos = pos, row_f = R.TimeMap2_timeToQN(0, pos) * lpb, color = color }
+    end
     i = i + 1
   end
   i = 0
@@ -924,6 +928,7 @@ function M.regions(lpb)
   end
   table.sort(out, function(a, b) return a.pos < b.pos end)
   out.lib_pos = lib_pos
+  out.markers = markers
   rcache.key, rcache.list = key, out
   return out
 end

@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.5'
+V.VERSION = '0.5.6'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.6', d = '2026-10-02', items = {
+    'ruler left of the row numbers: region names and colours, marker names on their rows (vertical REAPER ruler); click: go to the row',
+    'track header: volume and pan on one line (header is 5 rows)',
+    'items are translucent and the grid dots stay faintly visible under them',
+  } },
   { v = '0.5.5', d = '2026-10-02', items = {
     'browser mini player: peaks of the playing / selected file with the play position, click plays from that point',
     'browser preview volume slider (drag, wheel 1 dB, dblclick 0 dB), remembered between runs',

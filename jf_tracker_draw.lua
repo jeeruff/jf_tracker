@@ -45,6 +45,7 @@ function D.init(u, peaks_fn, matrix)
   D.EDITTOP = U.readable({ 0.30, 0.95, 0.40 }, U.BG, 4.5)  -- зелёная кромка edit-курсора
   D.VIS   = U.tint(U.CYAN, 0.25)
   D.EMPTY = U.mix(U.BG, U.TEXT, 0.34)
+  D.EMPTY_UNDER = U.mix(U.BG, U.TEXT, 0.20)     -- точки сетки под item: слегка видны (2 окт)
   D.CONT  = U.GREY
   D.ENVBAR = U.tint(U.CYAN, 0.45)
   D.FX    = U.mix(U.TEXT, U.AMBER, 0.5)
@@ -212,7 +213,10 @@ function D.layout(snap, state, nregions)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
   if state.mx_hidden then L.matrix_w = L.mx_strip_w
   elseif state.mx_px and MX then L.matrix_w = math.max((MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
-  L.label_w = ms('0000') + 2 * L.pad
+  -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
+  -- горизонтально на своих строках, цвет регионов — как линейка REAPER
+  L.ruler_w = (state.ruler == false) and 0 or (L.cw * 9 + L.pad)
+  L.label_w = L.ruler_w + ms('0000') + 2 * L.pad
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
   L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh), math.floor(gfx.h * 0.19)))) or 0
@@ -223,7 +227,7 @@ function D.layout(snap, state, nregions)
   L.header_y = L.top_h
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
-  L.header_h = 6 * L.rh + 3
+  L.header_h = 5 * L.rh + 3      -- имя | R I M S A | громкость + панорама | лейн / огибающие | подписи
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.rh + 4
   L.dsp_h = state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0
@@ -529,6 +533,17 @@ local function draw_cell(L, cell, x, y, ty, inv)
   elseif k == 'cont' then
     local head = cell.of
     if head.kind == 'audio' then
+      -- сетка трекера слегка просматривается под item (2 окт): бледные точки
+      -- в полях, где ничего не написано
+      local named = cell.i == 1 and head.name ~= ''
+      local fxv = head.fx or {}
+      for fld = named and 2 or 1, nf do
+        local skip = fld > 3 and L.nfx > 0 and cell.i >= 1 and fxv[cell.i * L.nfx + (fld - 3)] ~= nil
+        if not skip then
+          local fx = D.field_rect(L, fld)
+          text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
+        end
+      end
       if cell.i == 1 and head.name ~= '' then
         -- строка имени: номер инструмента, затем имя — только если влезает
         -- целиком в ширину item (от поля ноты до края подколонки); иначе
@@ -1272,22 +1287,26 @@ function D.frame(L, snap, rows, state, info)
       end
       local function db_of(v) return v > 1e-6 and 20 * math.log(v, 10) or -150 end
       local function pan_txt(p) if math.abs(p) < 0.005 then return 'C' end; return (p < 0 and 'L' or 'R') .. math.floor(math.abs(p) * 100 + 0.5) end
+      -- одна строка (2 окт): громкость слева, панорама справа (stereo pan — p + w, dual — L + R)
       local sx, sw = c.x + L.pad + indent, c.w - 2 * L.pad - indent
+      local py = hy + 2 * L.rh + 1
       local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
       local db = db_of(vol)
-      slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
-      local py = hy + 3 * L.rh + 1
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
+      local two = col.panmode == 5 or col.panmode == 6
+      local vw = math.floor(sw * (two and 0.42 or 0.55))
+      slider(sx, py, vw - L.pad, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
+      local px, pw = sx + vw, sw - vw
       if col.panmode == 5 then
-        local half = math.floor(sw / 2)
-        slider(sx, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
-        slider(sx + half, py, sw - half, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width')
+        local half = math.floor(pw / 2)
+        slider(px, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
+        slider(px + half, py, pw - half, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width')
       elseif col.panmode == 6 then
-        local half = math.floor(sw / 2)
-        slider(sx, py, half - L.pad, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl')
-        slider(sx + half, py, sw - half, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr')
+        local half = math.floor(pw / 2)
+        slider(px, py, half - L.pad, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl')
+        slider(px + half, py, pw - half, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr')
       else
-        slider(sx, py, sw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
+        slider(px, py, pw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
       end
     end
     for li, ln in ipairs(c.lanes) do
@@ -1295,10 +1314,10 @@ function D.frame(L, snap, rows, state, info)
       local bw2 = c.folded and 0 or (2 * L.btn_w + 2)
       if col.fixed and not c.folded then
         local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
-        text(ln.x + L.pad, hy + 4 * L.rh + 2, fit(lname, ln.w - 2 * L.pad - bw2), U.GREY)
+        text(ln.x + L.pad, hy + 3 * L.rh + 2, fit(lname, ln.w - 2 * L.pad - bw2), U.GREY)
       end
       if not c.folded then
-        local by = hy + 4 * L.rh + 1
+        local by = hy + 3 * L.rh + 1
         for k, b in ipairs({ { '-', -1 }, { '+', 1 } }) do
           local bx = ln.x + ln.w - bw2 + (k - 1) * (L.btn_w + 2)
           local hot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
@@ -1309,18 +1328,18 @@ function D.frame(L, snap, rows, state, info)
           hint('lanebtn', bx, by, L.btn_w, L.rh, { col = col, lane = ln.lane, d = b[2], n = ln.nsub })
         end
       end
-      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1) end
+      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 3 * L.rh + 1, 1, L.rh, 1) end
     end
     for _, ev in ipairs(c.envs) do
-      text(ev.x + L.pad, hy + 4 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
-      hint('env', ev.x, hy + 4 * L.rh, ev.w, L.rh, ev.fi)
-      set(U.DIM); gfx.rect(ev.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1)
+      text(ev.x + L.pad, hy + 3 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
+      hint('env', ev.x, hy + 3 * L.rh, ev.w, L.rh, ev.fi)
+      set(U.DIM); gfx.rect(ev.x - 1, hy + 3 * L.rh + 1, 1, L.rh, 1)
     end
     -- третья строка: что делает каждая подколонка (просьба 1 окт). Подписи
     -- короче ширины поля на символ, чтобы соседние не слипались; полное
     -- описание — в статус-баре при наведении (hover.caption)
     if not c.folded then
-      local cy3 = hy + 5 * L.rh + 2
+      local cy3 = hy + 4 * L.rh + 2
       local function cap(x, w, txt, kind)
         text(x, cy3, fit(txt, w), U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
@@ -1347,7 +1366,7 @@ function D.frame(L, snap, rows, state, info)
     local rg = info.cur_region
     local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
     local bx, bw = tx0 + 1, L.label_w - 2
-    local y2, y3 = hy + 4 * L.rh + 2, hy + 5 * L.rh + 2
+    local y2, y3 = hy + 3 * L.rh + 2, hy + 4 * L.rh + 2
     set(U.LINE); gfx.rect(bx, y2 - 1, bw, 2 * L.rh + 1, 0)
     text(bx + math.max(1, math.floor((bw - ms(s)) / 2)), y2, fit(s, bw - 2), U.TEXT)
     local hl = mx >= bx and mx < bx + bw / 2 and my >= y3 and my < y3 + L.rh
@@ -1378,7 +1397,31 @@ function D.frame(L, snap, rows, state, info)
     -- кромки: строка курсора — яркая янтарная сверху, edit-курсор — зелёная
     if is_cur_row then set(D.CURTOP); gfx.rect(tx0, y, W - tx0, 1, 1) end
     if r.row == cur then set(D.EDITTOP); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.rect(tx0, y, 3, L.rh, 1) end
-    text(tx0 + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    -- линейка: регион (полоса цвета, имя на первой строке), маркеры (имя + черта)
+    if L.ruler_w > 0 and info.ruler then
+      local rx, rw = tx0 + 1, L.ruler_w - 3
+      local label, lcol
+      for _, rg in ipairs(info.ruler.regions) do
+        if r.row >= rg.r0 and r.row < rg.r1 then
+          local c = rg.rgb or U.LINE
+          set(c); gfx.rect(rx, y, 3, L.rh, 1)
+          if r.row == rg.r0 then
+            set(U.tint(c, 0.35)); gfx.rect(rx + 3, y, rw - 3, L.rh, 1)
+            label, lcol = rg.name ~= '' and rg.name or '#' .. rg.idx, U.TEXT
+          end
+        end
+      end
+      for _, mk in ipairs(info.ruler.markers) do
+        if math.floor(mk.row_f + 1e-6) == r.row then
+          local c = mk.rgb or U.AMBER
+          set(c); gfx.rect(rx, y, rw, 1, 1); gfx.rect(rx, y, 2, L.rh, 1)
+          label, lcol = mk.name ~= '' and mk.name or tostring(mk.idx), c
+        end
+      end
+      if label then text(rx + 5, ty, fit(label, rw - 6), lcol) end
+      if mx >= tx0 and mx < tx0 + L.ruler_w and my >= y and my < y + L.rh then hover.ruler = r.row end
+    end
     local in_body = my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     for _, c in ipairs(L.cols) do
@@ -1453,7 +1496,7 @@ function D.frame(L, snap, rows, state, info)
               local col = it.sel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
               -- почти прозрачная заливка с отливом цвета item (один rect — дёшево)
-              set(rgb); gfx.a = it.sel and 0.16 or 0.10
+              set(rgb); gfx.a = it.sel and 0.09 or 0.05                     -- полупрозрачно: сетка видна (2 окт)
               gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
               gfx.a = 1
               set(col)

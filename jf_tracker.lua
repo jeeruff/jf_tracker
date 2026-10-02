@@ -2136,6 +2136,23 @@ local jump_row_done = nil
 -- (без undo, тег = регион строки-цели); при входе плейхеда в регион прежний
 -- урожай этого региона сносится (кроме посаженного на текущую строку).
 local orca_row_done, orca_pass = nil, nil
+-- линейка трекера: регионы и маркеры REAPER с цветами (кэш по таблице регионов)
+local ruler_cache = {}
+local ruler_info
+local function native_rgb(c)
+  if not c or c == 0 then return nil end
+  local r, g, b = reaper.ColorFromNative(c & 0xFFFFFF)
+  return { r / 255, g / 255, b / 255 }
+end
+ruler_info = function()
+  if ruler_cache.src == regions then return ruler_cache.v end
+  local v = { regions = {}, markers = {} }
+  for _, rg in ipairs(regions or {}) do v.regions[#v.regions + 1] = { r0 = rg.r0, r1 = rg.r1, name = rg.name, idx = rg.idx, rgb = native_rgb(rg.color) } end
+  for _, mk in ipairs((regions and regions.markers) or {}) do v.markers[#v.markers + 1] = { row_f = mk.row_f, name = mk.name, idx = mk.idx, rgb = native_rgb(mk.color) } end
+  ruler_cache.src, ruler_cache.v = regions, v
+  return v
+end
+
 local function track_has_midi(tr)
   for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
     local it = reaper.GetTrackMediaItem(tr, i)
@@ -2351,6 +2368,7 @@ local function frame()
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = left, status_right = state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
+    ruler = ruler_info(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
@@ -2470,6 +2488,11 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
+  elseif hover.ruler then
+    local names = {}
+    for _, rg in ipairs(regions or {}) do if hover.ruler >= rg.r0 and hover.ruler < rg.r1 then names[#names + 1] = 'region ' .. (rg.name ~= '' and rg.name or ('#' .. rg.idx)) end end
+    for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
+    state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
     state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
@@ -2635,6 +2658,9 @@ local function frame()
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
+    elseif hover.ruler then
+      ctx.set_focus('tracker'); vim.cur.row = hover.ruler
+      click = { t = now2, zone = 'ruler' }
     elseif hover.sidectl then
       if hover.sidectl == 'open' then state.side = true; vim.msg = 'sidebar shown'
       elseif hover.sidectl == 'close' then ctx.side_hide(); vim.msg = 'sidebar folded (< to open)'
