@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.25'
+V.VERSION = '0.5.26'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.26', d = '2026-10-02', items = {
+    'instruments module has a Vim grammar like the matrix and DSP: dd / x cut an instrument (its events and library item, to the register), yy yank, p / P put a copy into the cursor track library, yp duplicates, v selects a range; pending operators show their hints',
+    'f hint labels jump into the instruments (also on the empty .. slots) and move the focus there; fix: the instruments in the sidebar could not take focus while the top dock was closed',
+    'preview on select moved from p to a (p now puts)',
+  } },
   { v = '0.5.25', d = '2026-10-02', items = {
     'live speed: hard pattern bounds (trim) take one pass over each track instead of regions x tracks x items (about 67x fewer REAPER calls per edit)',
     'live speed: pattern autosync only rewrites tracks whose content differs from the source (no delete / recreate of identical items, smaller undo steps)',

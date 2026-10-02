@@ -43,6 +43,7 @@ local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эфф
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
 local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
+local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 local HELP = DIR .. '/jf_tracker_help.html'
@@ -1414,6 +1415,58 @@ ctx = {
     if not state.side then state.side = true end
     ctx.set_focus('browser'); B.start_find()
   end,
+  -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
+  -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
+  inst_select = function(n) pool_select(n) end,
+  inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then PV.audio(col.track, e.item, 0, 1.0) end end,
+  inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
+  inst_track = function(d) vim.key((d < 0 and 'H' or 'L'):byte()) end,
+  inst_items = function(i)
+    local items = {}
+    for it, k in pairs((snap and snap.inst_of) or {}) do if k == i then items[#items + 1] = it end end
+    return items
+  end,
+  inst_yank = function(i0, i1, quiet)
+    local col = cur_col(); local pool = col and col.pool or {}
+    local reg = {}
+    for i = i0, i1 do
+      local e = pool[i]
+      local sn = e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.inst_snapshot(e.item)
+      if sn then reg[#reg + 1] = sn end
+    end
+    if #reg == 0 then vim.msg = 'nothing to yank'; return end
+    state.inst_reg = reg
+    if not quiet then vim.msg = ('yank %d instrument(s): %s - p / P puts a copy into the track library'):format(#reg, reg[1].name) end
+  end,
+  inst_cut = function(i0, i1)
+    local col = cur_col(); local pool = col and col.pool or {}
+    ctx.inst_yank(i0, i1, true)
+    local items = {}
+    for i = i0, i1 do for _, it in ipairs(ctx.inst_items(i)) do items[#items + 1] = it end end
+    if #items == 0 then vim.msg = 'no instrument here'; return end
+    local first = pool[i0]
+    local n = edit.inst_delete(items)
+    vim.msg = ('cut %d instrument(s) (%s): %d item(s) - events and library; p puts it back, u undo'):format(i1 - i0 + 1, first and first.name or '?', n)
+    model.invalidate()
+  end,
+  inst_put = function(before)
+    local reg = state.inst_reg
+    local col = cur_col()
+    if not reg or #reg == 0 then vim.msg = 'instrument register empty (yy / dd)'; return end
+    if not col then vim.msg = 'no track'; return end
+    -- имя занято (оригинал на месте) — новое «имя 2», иначе пул склеит копию с ним
+    local names, used = {}, {}
+    for _, e in ipairs(col.pool or {}) do used[e.name] = true end
+    for k, sn in ipairs(reg) do
+      local nm = sn.name
+      if used[nm] then nm = alias.free_name(col.pool or {}, nm); while used[nm] do nm = alias.free_name({ { name = nm } }, nm) end end
+      used[nm] = true
+      names[k] = nm
+    end
+    local items = edit.inst_put(col.track, reg, names)
+    if items[1] then reselect_item = items[1] end
+    vim.msg = ('put %d instrument(s) into the %s library: %s'):format(#items, col.name, table.concat(names, ', '))
+  end,
   inst_find = function()
     local col = cur_col(); local pool = col and col.pool or {}
     local items = {}
@@ -1891,7 +1944,7 @@ ctx = {
     if f == 'fxb' and not (state.dsp and state.fxb and not state.khelp) then f = 'tracker' end
     if f == 'notes' and not (state.dsp and state.notes_open and not state.khelp) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
-    if f == 'inst' and not state.top then f = 'tracker' end
+    if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
     if f == 'dsp' and state.focus ~= 'dsp' then KH.from = state.focus end
     state.focus = f
@@ -2152,6 +2205,7 @@ ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font 
 vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
+IK.init(ctx)
 MX.ruler = state.mxruler
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
@@ -2204,7 +2258,7 @@ local function hint_go(t)
     elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'add' then ctx.retro_add() end
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
-  elseif t.kind == 'pool' then pool_select(d)
+  elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
@@ -3316,8 +3370,8 @@ local function frame()
   local hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = left,
-    status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint())
-      or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and vim.pending_hint()) or state.status,
+    status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
+      or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     timesel = (function()
@@ -3334,6 +3388,7 @@ local function frame()
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
@@ -4607,20 +4662,12 @@ local function frame()
       elseif state.focus == 'browser' and state.side then
         if not B.key(c) then return vim.key(c) end
       elseif state.focus == 'inst' and (state.top or state.side) then
-        local ch = c < 256 and string.char(c) or ''
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local col = cur_col()
-        if c == 27 then ctx.set_focus('tracker')
-        elseif ch == '/' then ctx.inst_find()
-        elseif ch == 'j' or c == keys.down then pool_select(vim.inst + 1)
-        elseif ch == 'k' or c == keys.up then pool_select(vim.inst - 1)
-        elseif ch == 'g' then pool_select(1)
-        elseif ch == 'G' then pool_select(#(col and col.pool or {}))
-        elseif c == 13 or ch == 's' then ctx.open_slicer()
-        elseif ch == ' ' then local e = col and col.pool[vim.inst]; if e then PV.audio(col.track, e.item, 0, 1.0) end
-        elseif ch == 'p' then state.poolprev = not state.poolprev
-        elseif ch == 'h' or c == keys.left then vim.key(('H'):byte())
-        elseif ch == 'l' or c == keys.right then vim.key(('L'):byte())
-        else return vim.key(c) end
+        local n = #(col and col.pool or {})
+        local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))
+        if r == 'leave' then ctx.set_focus('tracker')
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'notes' and state.notes_open then
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then

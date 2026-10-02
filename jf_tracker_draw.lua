@@ -1259,14 +1259,18 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       elseif hot and info.dragging then set(U.tint(U.CYAN, 0.25)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       text(ix + 6, y + 1, ('%02d    ..'):format(row.empty), sel and U.AMBER or U.DIM)
       if hot then hover.pool = { ci = info.pool_ci, i = row.empty, empty = true } end
+      hint('pool', ix + 2, y, w - 4, L.rh, row.empty)
     else
       local i = row.i
       local e = pool[i]
       local rgb = e.rgb or (e.tracks and trgb[e.tracks[1]]) or (col and col.rgb) or U.GREY
       local sel = i == inst
+      local rr = info.inst_range                -- диапазон v (2 окт)
+      local inr = rr and i >= rr[1] and i <= rr[2] and not sel
       local here = col and e.track_set and e.track_set[col.name]
       local lib = e.depot and not (e.tracks and e.tracks[1])
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      elseif inr then set(U.tint(U.CYAN, 0.22)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       set(rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
       -- метки: @ трек курсора, $ нарезан; ребёнок (слайс / кусок исходника) —
       -- с отступом и sN вместо имени исходника (дерево как в Renoise, 2 окт)

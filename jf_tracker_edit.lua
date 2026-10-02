@@ -1491,6 +1491,58 @@ function E.depot_add(path, track)
   return item
 end
 
+-- ── инструменты как объекты Vim (2 окт): dd / yy / p в модуле инструментов ──
+-- Снимок инструмента: чанк его item без GUID и имя take (нарезка P_EXT
+-- остаётся в чанке — дубль нарезанного сэмпла тоже нарезан).
+function E.inst_snapshot(item)
+  local ok, chunk = R.GetItemStateChunk(item, '', false)
+  if not ok then return nil end
+  local tk = R.GetActiveTake(item)
+  return { chunk = strip_guids(chunk), name = tk and R.GetTakeName(tk) or '' }
+end
+
+-- вырезать: все items инструмента (события и библиотека) одним undo-шагом;
+-- страховка сэмплов выключена — сэмпл уходит нарочно (он в регистре)
+function E.inst_delete(items)
+  local n = 0
+  E.no_rescue = true
+  run('instrument cut', function()
+    for _, it in ipairs(items) do
+      if R.ValidatePtr(it, 'MediaItem*') then
+        local tr = R.GetMediaItem_Track(it)
+        if tr and R.DeleteTrackMediaItem(tr, it) then n = n + 1 end
+      end
+    end
+  end)
+  return n
+end
+
+-- положить снимки в библиотеку трека (за =LIB, после последнего item);
+-- names[k] — имя take копии (новое, иначе пул склеит её с оригиналом).
+-- Возвращает новые items.
+function E.inst_put(track, snaps, names)
+  local out = {}
+  run('instrument put', function()
+    local pos = E.ensure_lib()
+    for i = 0, R.CountTrackMediaItems(track) - 1 do
+      local it = R.GetTrackMediaItem(track, i)
+      local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if e > pos then pos = e end
+    end
+    for k, sn in ipairs(snaps) do
+      local it = R.AddMediaItemToTrack(track)
+      R.SetItemStateChunk(it, sn.chunk, false)
+      R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
+      if R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', 0) end
+      local tk = R.GetActiveTake(it)
+      if tk and names and names[k] then R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', names[k], true) end
+      pos = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      out[#out + 1] = it
+    end
+  end)
+  return out
+end
+
 -- ── копия файла в папку проекта (2 окт) ───────────────────────────────────
 -- Файл из браузера (drop, вставка, замена, депо) копируется в папку медиа
 -- проекта (GetProjectPath), если проект сохранён и опция E.copy_media
