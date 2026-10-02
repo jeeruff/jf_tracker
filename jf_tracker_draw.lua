@@ -880,8 +880,8 @@ local function draw_topbar(L, info)
   local c = info.ctrl or {}
 
   -- контрол (2 окт): три группы — control (транспорт, размер и доли,
-  -- метроном, ввод), options (вид), help; группы разделены линией, подпись
-  -- группы — если хватает высоты. monome переехал во вкладку grid.
+  -- метроном, ввод), options (вид), help; каждая группа — с новой строки,
+  -- без линий и подписей (просьба пользователя). monome — во вкладке grid.
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
   local groups = {
     { name = 'control', items = {
@@ -909,14 +909,6 @@ local function draw_topbar(L, info)
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
-  -- строк нужно: ряды групп + строка долей; подписи групп — если влезают
-  local need = 0
-  for _, g in ipairs(groups) do
-    local n = 0
-    for _, it in ipairs(g.items) do if it[1] == 'beats' then need = need + 1 + math.ceil(n / 3); n = 0 else n = n + 1 end end
-    need = need + math.ceil(n / 3)
-  end
-  local labels = (H - 4) >= (need + #groups - 1) * L.rh + (#groups - 1) * 4
   D.ctrl_rect = D.ctrl_rect or {}
   local y = 2
   local function cell(it, ci)
@@ -957,15 +949,6 @@ local function draw_topbar(L, info)
     y = y + L.rh
   end
   for gi, g in ipairs(groups) do
-    if gi > 1 then
-      if y + 4 > H - 2 then break end
-      set(D.SEP); gfx.rect(L.pad, y + 1, L.ctrl_w - 2 * L.pad, 1, 1)
-      y = y + 3
-      if labels and y + L.rh <= H - 2 then
-        text(L.pad + 2, y, g.name, U.DIM)
-        y = y + L.rh
-      end
-    end
     local ci = 0
     for _, it in ipairs(g.items) do
       if it[1] == 'beats' then
