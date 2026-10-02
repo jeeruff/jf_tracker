@@ -143,6 +143,8 @@ local click = { t = 0, fi = nil, row = nil, zone = nil }   -- для двойн�
 local browse_last = nil                                     -- строка браузера, которую уже слушали (auto)
 local inject_last = reaper.GetExtState(EXT, 'inject')       -- стартовое значение не исполняем
 local body_drag = nil                                       -- Shift+протяжка блока в теле
+local pt_drag = nil                                         -- протяжка точки огибающей (время + значение)
+local ai_drag = nil                                         -- протяжка automation item (сдвиг / начало / длина)
 local ev_drag = nil                                         -- протяжка события / блока мышью (перенос)
 local cmd_text_cache                                        -- ctx.cmd_by_text
 local dsp_drag = nil                                        -- перетаскивание DSP-блока
@@ -3752,6 +3754,26 @@ local function frame()
         ctx.rename_track_prompt(hover.header_col)
       end
       click = { t = now2, zone = 'header', guid = hover.header_col.guid }
+    elseif hover.envpt then
+      -- точка огибающей: тянуть в любом режиме (по строкам и по значению), один undo
+      local e, row = hover.envpt.e, hover.envpt.row
+      local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+      local idx = reaper.GetEnvelopePointByTime(e.env, t1 - 1e-6)
+      local ok, pt_t = false, nil
+      if idx and idx >= 0 then ok, pt_t = reaper.GetEnvelopePoint(e.env, idx) end
+      if ok and pt_t >= t0 - 1e-6 then
+        pt_drag = { e = e, idx = idx, t0 = pt_t, y0 = gfx.mouse_y, x0 = gfx.mouse_x, active = false }
+        if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, row, 1 end
+      end
+      click = { t = now2, zone = 'envpt' }
+    elseif hover.aiedge then
+      -- automation item: ручка слева — сдвиг, край сверху — начало, снизу — длина (как в REAPER)
+      ctx.set_focus('tracker')
+      local a = hover.aiedge
+      local grab = 0
+      if a.edge == 'move' and hover.row then grab = edit.row_time(hover.row.row, state.lpb, 0) - a.pos end
+      ai_drag = { env = a.e.env, idx = a.idx, edge = a.edge, pos0 = a.pos, len0 = a.len, grab = grab, y0 = gfx.mouse_y, active = false, name = a.e.name }
+      click = { t = now2, zone = 'aiedge' }
     elseif hover.itemedge and hover.itemedge.edge ~= 'move' and gfx.mouse_cap & 8 ~= 8 then
       -- край рамки item: trim как в аранжировке
       ctx.set_focus('tracker')
@@ -3833,6 +3855,65 @@ local function frame()
   elseif hover.itemedge and hover.itemedge.edge ~= 'move' then
     state.status = ('item %s %s: drag = trim, Option+drag = stretch (playrate), Cmd = no snap; inside: drag = move event, Option = move item'):format(hover.itemedge.col.name, hover.itemedge.edge)
   end
+  -- точка огибающей мышью: строка (Cmd — свободно) и значение от x
+  if pt_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not pt_drag.active and (math.abs(gfx.mouse_y - pt_drag.y0) > 2 or math.abs(gfx.mouse_x - pt_drag.x0) > 2) then
+        pt_drag.active = true; edit.item_drag_begin('envelope point')
+      end
+      if pt_drag.active and rows[1] then
+        local rowf = rows[1].row + (gfx.mouse_y - L.body_y) / L.rh
+        if gfx.mouse_cap & 4 ~= 4 then rowf = math.floor(rowf + 1e-6) end
+        local t = reaper.TimeMap2_QNToTime(0, math.max(0, rowf) / state.lpb)
+        local e = pt_drag.e
+        local _, _, raw = reaper.GetEnvelopePoint(e.env, pt_drag.idx)
+        if hover.env == e and hover.envx then raw = e.min + math.max(0, math.min(1, hover.envx)) * (e.max - e.min) end
+        reaper.SetEnvelopePoint(e.env, pt_drag.idx, t, raw, nil, nil, nil, true)
+        pt_drag.moved = true
+        state.status = ('%s point → row %.2f, value %.3f (Cmd: free)'):format(e.name or 'envelope', rowf, raw or 0)
+        model.invalidate()
+      end
+    else
+      if pt_drag.active then reaper.Envelope_SortPoints(pt_drag.e.env); edit.item_drag_end() end
+      pt_drag = nil
+    end
+  elseif hover.envpt then
+    state.status = 'envelope point - drag: move it (rows, value by x), any mode; Cmd: free'
+  end
+  -- automation item мышью: привязка к строке (Cmd — свободно), один undo на жест
+  if ai_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not ai_drag.active and math.abs(gfx.mouse_y - ai_drag.y0) > 2 then ai_drag.active = true; edit.item_drag_begin('automation item ' .. ai_drag.edge) end
+      if ai_drag.active and rows[1] then
+        local rowf = rows[1].row + (gfx.mouse_y - L.body_y) / L.rh
+        if gfx.mouse_cap & 4 ~= 4 then rowf = math.floor(rowf + 0.5) end
+        local t = reaper.TimeMap2_QNToTime(0, math.max(0, rowf) / state.lpb)
+        local env, k = ai_drag.env, ai_drag.idx
+        local minlen = edit.row_time(1, state.lpb, 0) / 4
+        if ai_drag.edge == 'move' then
+          reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', math.max(0, t - ai_drag.grab), true)
+        elseif ai_drag.edge == 'end' then
+          reaper.GetSetAutomationItemInfo(env, k, 'D_LENGTH', math.max(minlen, t - ai_drag.pos0), true)
+        else
+          local fin = ai_drag.pos0 + ai_drag.len0
+          t = math.max(0, math.min(t, fin - minlen))
+          local rate = reaper.GetSetAutomationItemInfo(env, k, 'D_PLAYRATE', 0, false) or 1
+          local offs0 = ai_drag.offs0 or reaper.GetSetAutomationItemInfo(env, k, 'D_STARTOFFS', 0, false) or 0
+          ai_drag.offs0 = offs0
+          reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', t, true)
+          reaper.GetSetAutomationItemInfo(env, k, 'D_LENGTH', fin - t, true)
+          reaper.GetSetAutomationItemInfo(env, k, 'D_STARTOFFS', math.max(0, offs0 + (t - ai_drag.pos0) * rate), true)
+        end
+        state.status = ('automation item %s %s → row %.2f (Cmd: free)'):format(ai_drag.name or '', ai_drag.edge, rowf)
+        model.invalidate()
+      end
+    else
+      if ai_drag.active then edit.item_drag_end() end
+      ai_drag = nil
+    end
+  elseif hover.aiedge then
+    state.status = ('automation item %s: %s'):format(hover.aiedge.e.name or '', ({ move = 'drag the left strip to move it', start = 'drag the top edge: start (trim)', ['end'] = 'drag the bottom edge: length (loops repeat)' })[hover.aiedge.edge])
+  end
   -- перенос события / блока мышью: на отпускании — один undo (взять, удалить, вставить)
   if ev_drag then
     if gfx.mouse_cap & 1 == 1 then
@@ -3886,7 +3967,7 @@ local function frame()
   end
   -- огибающая мышью, как в аранжировке: клик/протяжка — точка со значением
   -- от x, правый клик — удалить точку строки, колесо — ±1/64
-  if hover.env and hover.row then
+  if hover.env and hover.row and not ai_drag and not hover.aiedge and not pt_drag and click.zone ~= 'envpt' then
     local down = gfx.mouse_cap & 1 == 1
     if down then
       -- клик по автоматизации открывает вкладку modulation (фокус остаётся тут) — 2 окт

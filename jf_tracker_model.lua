@@ -869,8 +869,21 @@ function M.track_envs(tr, lpb)
         for k = 0, R.CountAutomationItems(env) - 1 do
           local pos = R.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false)
           local len = R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false)
-          e.ais[#e.ais + 1] = { r0 = R.TimeMap2_timeToQN(0, pos) * lpb, r1 = R.TimeMap2_timeToQN(0, pos + len) * lpb,
-                                sel = R.GetSetAutomationItemInfo(env, k, 'D_UISEL', 0, false) ~= 0, idx = k }
+          local ai = { r0 = R.TimeMap2_timeToQN(0, pos) * lpb, r1 = R.TimeMap2_timeToQN(0, pos + len) * lpb,
+                       sel = R.GetSetAutomationItemInfo(env, k, 'D_UISEL', 0, false) ~= 0, idx = k, pos = pos, len = len }
+          -- луп (2 окт): стыки повторов пула — срезами, как в аранжировке
+          if R.GetSetAutomationItemInfo(env, k, 'D_LOOPSRC', 0, false) ~= 0 then
+            local pq = R.GetSetAutomationItemInfo(env, k, 'D_POOL_QNLEN', 0, false) or 0
+            local rate = R.GetSetAutomationItemInfo(env, k, 'D_PLAYRATE', 0, false) or 1
+            local offs = R.GetSetAutomationItemInfo(env, k, 'D_STARTOFFS', 0, false) or 0
+            if pq > 1e-6 and rate > 1e-6 then
+              ai.loop_rows = pq / rate * lpb
+              local q0 = R.TimeMap2_timeToQN(0, pos)
+              local offs_rows = (R.TimeMap2_timeToQN(0, pos + offs) - q0) * lpb
+              ai.loop_first = ai.r0 + (ai.loop_rows - (offs_rows % ai.loop_rows))
+            end
+          end
+          e.ais[#e.ais + 1] = ai
         end
       end
       out[#out + 1] = e

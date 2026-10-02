@@ -218,8 +218,10 @@ function D.layout(snap, state, nregions)
   L.env_hex_w = ms('FF')
   L.env_bar_w = ms('WWWW')
   -- поле формы сегмента (2 окт): lin sqr slo fas fae bez — справа от значения
+  -- форма сегмента (2 окт, правка): не отдельной колонкой, а под значением точки
+  -- и только если не lin — правая часть колонки шириной в «bez»
   L.env_shape_w = ms('bez')
-  L.env_w = L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad + L.env_shape_w + L.pad
+  L.env_w = L.pad + L.env_bar_w + L.pad + math.max(L.env_hex_w, L.env_shape_w) + L.pad
   L.env_cw = L.pad + L.cw + L.pad + L.env_hex_w + L.pad
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
@@ -674,25 +676,27 @@ D.env_colour = function(e) return env_colour(e) end   -- для матрицы (
 
 -- формы сегмента REAPER 0..5 → сокращения (как меню Set segment shape)
 D.ENV_SHAPES = { [0] = 'lin', [1] = 'sqr', [2] = 'slo', [3] = 'fas', [4] = 'fae', [5] = 'bez' }
-local function draw_env_cell(L, ev, prev, x, y, ty, e)
+local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   if not ev then return end
-  -- ломаная по подточкам строки (M.ENV_SUB) — без изломов на границах строк;
-  -- цвет — тот же, что у этой огибающей в аранжировке (ключ темы)
+  -- ломаная по подточкам строки (M.ENV_SUB) и дальше до первого значения
+  -- следующей строки — линия сплошная, в 1 px, как в аранжировке (2 окт: без
+  -- разрывов на границах строк); цвет — тот же, что у этой огибающей (ключ темы)
   local function px_of(v) return x + L.pad + math.floor(v * (L.env_bar_w - 1) + 0.5) end
   set(env_colour(e))
   local pts = { { px_of(ev.v), y } }
   local sub = ev.sub or {}
   local n = #sub + 1
   for j, v in ipairs(sub) do pts[#pts + 1] = { px_of(v), y + L.rh * j / n } end
+  pts[#pts + 1] = { px_of(nxt and nxt.v or (sub[#sub] or ev.v)), y + L.rh }
   for k = 2, #pts do gfx.line(pts[k - 1][1], pts[k - 1][2], pts[k][1], pts[k][2]) end
   local ex, cy = pts[1][1], y + 1
+  local tx = x + L.pad + L.env_bar_w + L.pad
   if ev.pt then
     gfx.rect(ex - 2, cy - 2, L.env_compact and 3 or 5, L.env_compact and 3 or 5, 1)
-    text(x + L.pad + L.env_bar_w + L.pad, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
-    -- форма сегмента от этой точки (полная колонка)
-    if not L.env_compact and ev.shape then
-      text(x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad, ty, D.ENV_SHAPES[ev.shape] or '?', ev.shape == 0 and U.DIM or U.CYAN)
-    end
+    text(tx, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
+  elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
+    -- форма сегмента точки строкой выше — под её значением, только если не lin
+    text(tx, ty, D.ENV_SHAPES[prev.shape] or '?', U.CYAN)
   end
 end
 
@@ -1571,17 +1575,25 @@ function D.frame(L, snap, rows, state, info)
         if r.clip then goto env_next end
         if vc and vc.fi == ev.fi and vc.row == r.row then
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
-          if (vc.field or 1) == 2 and not ev.G then
-            local sx = ev.x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad
-            gfx.rect(sx - 1, y, L.env_shape_w + 2, L.rh, 0)
-          else gfx.rect(ev.x, y, ev.w, L.rh, 0) end
+          if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
         end
-        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e)
+        -- курсор поля формы — под значением точки (строка ниже курсора)
+        if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
+          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          gfx.rect(ev.x + L.pad + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
+        end
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1])
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
           hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (EG.env_bar_w - 1)))
-          -- поле: 1 — линия и значение, 2 — форма (только полная колонка)
-          hover.field = (not ev.G and mx >= ev.x + L.pad + L.env_bar_w + L.pad + L.env_hex_w + L.pad) and 2 or 1
+          -- поле формы — с клавиатуры (l, буквы в INSERT); мышь — всегда значение
+          hover.field = 1
+          -- точный клик по точке (±4 px) — её можно тянуть в любом режиме (2 окт)
+          local ev0 = env_vals[ev][i]
+          if ev0 and ev0.pt then
+            local px = ev.x + EG.pad + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
+            if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row } end
+          end
         end
         ::env_next::
       end
@@ -1637,14 +1649,38 @@ function D.frame(L, snap, rows, state, info)
             local y0, y1 = yr(ai.r0), yr(ai.r1)
             if y1 > by0 and y0 < by1 then
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
-              -- как в аранжировке REAPER (2 окт): еле заметная заливка — линия
-              -- огибающей видна, рамка цветом item, полоса-шапка сверху
-              local col = ai_colour(ev.e.ai_key or 'env_item_pitch')
+              -- как в аранжировке REAPER (2 окт): цвет кривой, еле заметная
+              -- заливка, рамка; слева полоса потолще — ручка (тянуть = сдвиг,
+              -- как шапка item в REAPER), край сверху / снизу — начало / длина;
+              -- стыки лупа — срезами поперёк
+              local col = env_colour(ev.e)
               set(col); gfx.a = ai.sel and 0.16 or 0.08
               gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
               gfx.a = 1
               set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
-              if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, 2, 1) end
+              local hot = hover.aiedge and hover.aiedge.e == ev.e and hover.aiedge.idx == ai.idx
+              gfx.rect(ev.x, cy0, (hot and hover.aiedge.edge == 'move') and 5 or 3, cy1 - cy0, 1)
+              if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, (hot and hover.aiedge.edge == 'start') and 3 or 2, 1) end
+              if hot and hover.aiedge.edge == 'end' and y1 <= by1 then gfx.rect(ev.x, y1 - 2, ev.w, 3, 1) end
+              if ai.loop_rows and ai.loop_rows > 0 then
+                local rr = ai.loop_first or (ai.r0 + ai.loop_rows)
+                local guard = 0
+                while rr < ai.r1 - 1e-6 and guard < 512 do
+                  local ly = yr(rr)
+                  if ly > cy0 and ly < cy1 then
+                    gfx.a = 0.8; gfx.rect(ev.x + 3, ly, ev.w - 3, 1, 1)
+                    gfx.line(ev.x + 3, ly - 2, ev.x + 6, ly + 1); gfx.a = 1    -- косой срез, как стык лупа
+                  end
+                  rr = rr + ai.loop_rows; guard = guard + 1
+                end
+              end
+              -- мышь: ручка слева — сдвиг, край сверху — начало, снизу — длина
+              if mx >= ev.x and mx < ev.x + ev.w and my >= y0 - 3 and my <= y1 + 3 then
+                local edge
+                if math.abs(my - y0) <= 3 then edge = 'start' elseif math.abs(my - y1) <= 3 then edge = 'end'
+                elseif mx < ev.x + 6 then edge = 'move' end
+                if edge then hover.aiedge = { e = ev.e, idx = ai.idx, edge = edge, pos = ai.pos, len = ai.len, col = c.col } end
+              end
             end
           end
         end

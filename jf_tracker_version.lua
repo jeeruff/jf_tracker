@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.19'
+V.VERSION = '0.5.20'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.20', d = '2026-10-02', items = {
+    'envelope line is continuous and 1 px like REAPER; the segment shape shows under the point value, only when not lin',
+    'automation items: colour of their curve, thicker left strip to move them, top / bottom edges = start / length, loop seams drawn as cuts',
+    'envelope points: a precise click on a point drags it (rows and value) in any mode, one undo',
+  } },
   { v = '0.5.19', d = '2026-10-02', items = {
     'fold (za, zM): the track keeps only the wave and note columns; envelopes stay visible as a thin line with point values; zC = the old one-letter strip',
     'envelope column: segment shape of every point (lin sqr slo fas fae bez); INSERT letters on the shape field, ^A ^X cycle, :shape',
