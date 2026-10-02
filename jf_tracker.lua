@@ -1766,8 +1766,10 @@ ctx = {
   -- позиции слайсов из файла; XRNI (Renoise / Redux) — распаковка в папку
   -- проекта (несохранённый — ~/samples/_imported), каждый настоящий сэмпл —
   -- инструмент в библиотеке трека со своими слайсами. Один undo-шаг.
-  import_sliced = function(path)
-    local c = cur_col()
+  -- col — трек-цель (бросок на колонку); по умолчанию трек курсора.
+  -- Возвращает первый импортированный item (для вставки на строку броска).
+  import_sliced = function(path, col)
+    local c = col or cur_col()
     if not c then vim.msg = 'import: no track'; return end
     local kind = IMP.kind(path)
     local name = (path:match('([^/]+)%.[^.]+$') or path)
@@ -1780,7 +1782,7 @@ ctx = {
       end)
       vim.msg = it and ('REX → lib %s: %s, %s'):format(c.name, name, r and (#r.slices .. ' slices') or ('no slices: ' .. tostring(why)))
         or 'REX import failed (REAPER could not open the file)'
-      return
+      return it
     end
     if kind ~= 'xrni' then return end
     local _, proj = reaper.EnumProjects(-1, '')
@@ -1798,6 +1800,7 @@ ctx = {
     local listing = table.concat(list, '\n')
     local samples = IMP.xrni_samples(xml)
     local n, ns = 0, 0
+    local first
     edit.run('import XRNI ' .. name, function()
       for si, smp in ipairs(samples) do
         local rel = not smp.alias and IMP.xrni_file(listing, si - 1)
@@ -1806,6 +1809,7 @@ ctx = {
           local it = edit.depot_add(file, c.track)
           if it then
             n = n + 1
+            first = first or it
             local tk = reaper.GetActiveTake(it)
             if tk and smp.name ~= '' then reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', smp.name, true) end
             if #smp.slices > 1 then
@@ -1824,10 +1828,23 @@ ctx = {
       end
     end)
     vim.msg = ('XRNI → lib %s: %s, %d sample(s), %d slice(s)'):format(c.name, name, n, ns)
+    return first
   end,
   -- drag & drop из браузера: файл → item / .rpp → сабпроект на трек в строке
   drop_to = function(fi, row, path)
     local f = L.flat[fi]; if not f or not f.col or f.folded then return end
+    -- REX / XRNI — архив инструмента, не звук (2 окт: брошенный на трек
+    -- становился пустым item без волны и слайсов): импорт с нарезкой в
+    -- библиотеку этого трека, затем инструмент — на строку броска
+    if IMP.kind(path) then
+      local it = ctx.import_sliced(path, f.col)
+      if it then
+        local msg = vim.msg
+        edit.insert_note(f.col.track, f.col.fixed and f.lane and f.lane.idx or nil, state.lpb, row, model.BASE_NOTE, vim.vel or 100, 1, it)
+        vim.msg = msg .. (' - placed at %04d'):format(row)
+      end
+      return
+    end
     local it = edit.drop(f.col.track, f.col.fixed and f.lane and f.lane.idx or nil, state.lpb, row, path)
     vim.msg = it and ('dropped ' .. (path:match('[^/]+$') or path) .. ' → ' .. f.col.name) or 'drop failed'
   end,

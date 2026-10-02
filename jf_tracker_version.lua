@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.31'
+V.VERSION = '0.5.32'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.32', d = '2026-10-02', items = {
+    'fix: an XRNI / REX dragged from the browser onto a track column became an empty item (no wave, no slices) - it is now imported with its slices into that track library and the instrument is placed at the drop row',
+    'control block: control / options / help simply start on new rows (no lines or labels)',
+  } },
   { v = '0.5.31', d = '2026-10-02', items = {
     'control block split into control / options / help groups; control has the metronome (metro), the time signature (sig) and a beats row: bar, beat of the bar, beat squares (downbeat edge, current lit), rows per beat / per bar',
     'monome moved from the control block into its own grid tab; the tab can be switched off in options (grid tab) - on by default only when jf_grid is installed',
