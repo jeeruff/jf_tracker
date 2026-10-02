@@ -1110,7 +1110,8 @@ local function draw_topbar(L, info)
       text(bx, y + 1, fit((c and c.col.name or '?') .. ' #' .. tostring(c and c.slot or '?'), L.cw * 10), U.AMBER); bx = bx + L.cw * 10 + 2
       btn('>', 'next')
       bx = bx + L.pad
-      btn('all', 'all'); btn('play', 'play', c and c.playing); btn('stop', 'stop'); btn('put', 'put'); btn('depot', 'depot'); btn('add', 'add')
+      btn('all', 'all'); btn('play', 'play', c and c.playing); btn('stop', 'stop'); btn('put', 'put'); btn('depot', 'depot')
+      btn('loop ' .. tostring(r.loop_bars or 2), 'loop'); btn('add', 'add')
       local st = c and (c.alive and (('%ds %s head %d%%'):format(c.len, c.writing and 'rec' or 'paused', math.floor(c.head * 100))) or 'jf_rec silent: open its panel / enable') or ''
       text(bx + L.pad, y + 1, fit(st, sx1 - bx - 2 * L.pad), c and c.alive and (c.writing and U.RED or U.GREY) or U.GREY)
       y = y + L.rh + 2

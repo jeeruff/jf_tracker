@@ -368,6 +368,13 @@ local function dsp_target()
   end
   return { track = col.track, fx = col.fx or {}, name = col.name, col = col }
 end
+-- ретро (2 окт): объявлены до ctx — ctx и hint_go обращаются к ним раньше
+-- определений (иначе это были глобальные nil: a / j k / h l во вкладке retro падали)
+local retro = { sel = { a = 0.5, b = 1.0 }, cur = nil, msg = '', peaks_t = 0, alive_t = 0, put_t = nil, drag = nil, pb_t = 0 }
+local retro_current, retro_preview, retro_put, retro_loop
+-- то же для меню (hydra), monome и контрола: используются в ctx / hint_go раньше определения
+local track_actions, region_actions, event_actions, view_actions, mono_request, ctrl_action
+local MONO_ID = 9             -- id мода трекера на шине jf_mono
 local ctx
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
@@ -1078,7 +1085,8 @@ ctx = {
     vim.msg = 'analyzer: ' .. state.scopemode
   end,
   mono_take = function(on) mono_request(on and MONO_ID or -1) end,
-  retro_put = retro_put, retro_preview = retro_preview,
+  retro_put = function(...) return retro_put(...) end, retro_preview = function(on) return retro_preview(on) end,
+  retro_loop = function(n) retro_loop(n) end,
   retro_all = function() retro.sel.a, retro.sel.b = 0, 1 end,
   retro_cycle = function(d)
     local _, trs = retro_current()
@@ -2191,6 +2199,7 @@ ctx = {
     PV.file(ctx.preview_track(), path, nil, frac * len)
   end,
   preview_file = function(path, sec)
+    local c = cur_col()
     PV.file(ctx.preview_track(), path, sec)               -- без лимита: файл целиком, следующий выбор останавливает
     -- проигрываемый файл сразу открывается в сэмпл-модуле
     if state.top and SL.open_file then
@@ -2522,7 +2531,7 @@ local function hint_go(t)
     ctx.set_focus('top')
     if d == 'prev' then ctx.retro_cycle(-1) elseif d == 'next' then ctx.retro_cycle(1) elseif d == 'all' then ctx.retro_all()
     elseif d == 'play' then retro_preview(true) elseif d == 'stop' then retro_preview(false)
-    elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'add' then ctx.retro_add() end
+    elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'loop' then retro_loop() elseif d == 'add' then ctx.retro_add() end
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
@@ -2540,7 +2549,7 @@ end
 -- ── контекстное меню (правый клик) ────────────────────────────────────────
 -- Пункты зависят от зоны: событие / пустая ячейка / выделение / заголовок
 -- трека / матрица / пул. Разделителей нет — индексы gfx.showmenu прямые.
-local function track_actions(col)
+function track_actions(col)
   local tr = col.track
   return {
     { 'Mute track', key = 'm', fn = function() edit.run('track mute', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1 and 0 or 1) end) end },
@@ -2554,7 +2563,7 @@ end
 -- mute-track пункт: fn в поле .fn (см. выше), остальные — тоже
 
 
-local function region_actions(rg)
+function region_actions(rg)
   if not rg then return {} end
   return {
     { 'Queue / play region (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
@@ -2570,7 +2579,7 @@ local function region_actions(rg)
 end
 
 -- действия над событием/выделением у курсора (или hover): {label, fn, key}
-local function event_actions(hover)
+function event_actions(hover)
   local lpb = state.lpb
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local out = {}
@@ -2621,7 +2630,7 @@ local function event_actions(hover)
   return out
 end
 
-local function view_actions()
+function view_actions()
   return {
     { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
@@ -3019,10 +3028,10 @@ local AUD_THR, AUD_GAP, AUD_PRE = 0.08, 0.25, 0.01
 -- СВОЁМ кадре (@gfx), позже заказа. Поэтому заказ запоминает items трека, а
 -- кадр трекера ловит новый item и ставит его точно в нужную позицию.
 local put_pending = {}
-local function expect_put(track, pos)
+local function expect_put(track, pos, loop_len)
   local before = {}
   for i = 0, reaper.CountTrackMediaItems(track) - 1 do before[reaper.GetTrackMediaItem(track, i)] = true end
-  put_pending[#put_pending + 1] = { track = track, pos = pos, before = before, t = reaper.time_precise() }
+  put_pending[#put_pending + 1] = { track = track, pos = pos, before = before, t = reaper.time_precise(), loop = loop_len }
 end
 local function settle_puts(now)
   for k = #put_pending, 1, -1 do
@@ -3038,6 +3047,11 @@ local function settle_puts(now)
       reaper.SetMediaItemInfo_Value(found, 'D_POSITION', p.pos)
       local tk = reaper.GetActiveTake(found)
       if tk then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', 1) end
+      -- ретро-луп: кусок N тактов повторяется до заданной длины
+      if p.loop then
+        reaper.SetMediaItemInfo_Value(found, 'B_LOOPSRC', 1)
+        reaper.SetMediaItemInfo_Value(found, 'D_LENGTH', p.loop)
+      end
       reaper.UpdateArrange(); model.invalidate()
       table.remove(put_pending, k)
     elseif now - p.t > 4 then
@@ -3113,7 +3127,6 @@ end
 
 -- ── шина jf_mono (демон jf_grid): [0] hb [1] владелец [2] запрос [3] grid [4] arc ──
 local MONO_NAMES = { [1] = 'reel', [2] = 'looper', [4] = 'slixer', [5] = 'arcloop', [7] = 'phatfx', [8] = 'angle', [9] = 'tracker' }
-local MONO_ID = 9
 local mono = { t = 0, hb = -1, hb_t = 0, alive = false, grid = false, arc = false, owner = 0, leds = nil }
 local function mono_leds()
   local rows = {}
@@ -3166,7 +3179,7 @@ local function mono_read()
   return mono
 end
 -- запрос владения поверхностью: 9 — трекер, -1 — вернуть в GRID
-local function mono_request(id)
+function mono_request(id)
   with_ns('jf_mono', function() reaper.gmem_write(2, id) end)
   vim.msg = id == MONO_ID and 'mono: requested surface for tracker' or 'mono: surface back to GRID'
 end
@@ -3175,13 +3188,12 @@ end
 -- Владелец зеркала — слот, записанный в gmem[26]; экранный слой шириной
 -- gmem[4] лежит в 1000000 (max) / 1050000 (min) по индексу кольца; почтовый
 -- ящик вставки 10..15 (трек, позиция, старт/длина в сэмплах), превью 16..18.
-local retro = { sel = { a = 0.5, b = 1.0 }, cur = nil, msg = '', peaks_t = 0, alive_t = 0, put_t = nil, drag = nil, pb_t = 0 }
 local function retro_tracks()
   local out = {}
   for _, col in ipairs(snap and snap.cols or {}) do if col.rec_slot then out[#out + 1] = col end end
   return out
 end
-local function retro_current()
+function retro_current()
   local trs = retro_tracks()
   if #trs == 0 then retro.cur = nil; return nil, trs end
   local col = retro.cur and retro.cur.col
@@ -3234,7 +3246,7 @@ local function retro_read(width)
     elseif retro.put_t and reaper.gmem_read(10) < 0.5 then retro.put_t = nil; model.invalidate() end
   end)
   c.playing = retro.pb_t > 0 and (now - retro.pb_t) < c.len * math.abs(retro.sel.b - retro.sel.a) + 0.1
-  return { tracks = trs, cur = c, sel = retro.sel, msg = retro.msg }
+  return { tracks = trs, cur = c, sel = retro.sel, msg = retro.msg, loop_bars = retro.loop_bars }
 end
 -- выделение → старт и длина в сэмплах кольца
 local function retro_span()
@@ -3246,7 +3258,7 @@ local function retro_span()
   local samps = math.floor((b - a) * ring_n)
   return start, samps, c
 end
-local function retro_preview(on)
+function retro_preview(on)
   local start, samps, c = retro_span(); if not c then return end
   with_ns('jf_rec', function()
     if on then reaper.gmem_write(17, start); reaper.gmem_write(18, math.max(1, samps)); reaper.gmem_write(16, 1)
@@ -3271,7 +3283,7 @@ local function retro_first_transient()
   end
 end
 
-local function retro_put(target, raw)
+function retro_put(target, raw, at_pos, loop_len)
   -- в строку курсора — с первого транзиента выделения (атака ровно на строке);
   -- raw / депо — как выделено
   if target == 'cursor' and not raw then
@@ -3290,10 +3302,10 @@ local function retro_put(target, raw)
       if e > pos then pos = e end
     end
   else
-    pos = edit.row_time(vim.cur.row, state.lpb, 0)
+    pos = at_pos or edit.row_time(vim.cur.row, state.lpb, 0)
   end
   local tnum = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')) - 1
-  expect_put(tr, pos)
+  expect_put(tr, pos, loop_len)
   with_ns('jf_rec', function()
     reaper.gmem_write(11, tnum); reaper.gmem_write(12, pos)
     reaper.gmem_write(13, start); reaper.gmem_write(14, samps); reaper.gmem_write(15, 0)
@@ -3303,6 +3315,37 @@ local function retro_put(target, raw)
   retro.msg = ('retro: %.2fs → %s @ %.2fs'):format(samps / c.srate, target == 'depot' and 'depot (=LIB)' or c.col.name, pos)
   vim.msg = retro.msg
 end
+-- ретро-лупер (2 окт): «подхватить уже сыгранное и лупить». Во время игры
+-- берёт из кольца jf_rec последние N тактов, кончающиеся на последней
+-- границе такта перед плейхедом, и ставит их с ближайшей следующей границы
+-- такта зацикленным item: до конца региона плейхеда, иначе 4 повтора.
+-- Длина куска — ровно N тактов по темпу, поэтому стык лупа в такт.
+retro.loop_bars = 2
+function retro_loop(bars)
+  bars = bars or retro.loop_bars
+  local c = retro.cur
+  if not c then vim.msg = 'retro loop: no jf_rec buffer (a in the retro tab adds one)'; return end
+  if not playing() then vim.msg = 'retro loop: play first - it loops what was just played'; return end
+  local now = reaper.GetPlayPosition2()             -- блок, который пишет jf_rec
+  local qn = reaper.TimeMap2_timeToQN(0, now)
+  local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn)
+  if not (qms and qme and qme > qms) then vim.msg = 'retro loop: no bar grid here'; return end
+  local bar_qn = qme - qms
+  local t_end = reaper.TimeMap2_QNToTime(0, qms)
+  local t_start = reaper.TimeMap2_QNToTime(0, qms - bars * bar_qn)
+  local dur = t_end - t_start
+  local back = now - t_end
+  if dur + back > c.len - 0.05 then vim.msg = ('retro loop: %d bars do not fit the %ds buffer'):format(bars, c.len); return end
+  retro.sel.b = 1 - back / c.len
+  retro.sel.a = retro.sel.b - dur / c.len
+  -- куда: следующая граница такта; длина — до конца региона, иначе 4 повтора
+  local pos = reaper.TimeMap2_QNToTime(0, qme)
+  local rg = alias.region_at(regions, now)
+  local total = (rg and rg.rgnend > pos + dur * 0.5) and (rg.rgnend - pos) or (dur * 4)
+  retro_put('cursor', true, pos, total)
+  vim.msg = ('retro loop: last %d bar%s of %s -> loop from %.2fs, %.2fs long'):format(bars, bars == 1 and '' or 's', c.col.name, pos, total)
+end
+
 local function scope_read(slot)
   local v = scope_cache[slot]
   if v then return v end
@@ -3326,7 +3369,7 @@ local function track_peaks(col)
 end
 
 -- клик / колесо по контролу верхней панели
-local function ctrl_action(name, delta)
+function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
@@ -4013,7 +4056,7 @@ local function frame()
     state.status = (c and c.head or '') .. ': ' .. (c and hints[c.kind] or '') .. '   a: add parameter, x: remove'
   elseif hover.scopemode then state.status = ({ scope = 'oscilloscope (ring 256 samples, 8 kHz)', spec = 'spectrum analyzer: 48 log bands 30 Hz..Nyquist, -60..0 dB', sgram = 'spectrogram: time → right, 48 bands, heat = level' })[hover.scopemode] .. ' (:scopemode)'
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
-  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
+  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'sample editor: slices, selection, drag to track', modulation = 'native parameter modulation of the cursor track', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
@@ -4230,7 +4273,12 @@ local function frame()
       ctx.set_focus('top')
       if b == 'prev' then ctx.retro_cycle(-1) elseif b == 'next' then ctx.retro_cycle(1)
       elseif b == 'all' then ctx.retro_all() elseif b == 'play' then retro_preview(true) elseif b == 'stop' then retro_preview(false)
-      elseif b == 'put' then retro_put('cursor') elseif b == 'depot' then retro_put('depot') elseif b == 'add' then ctx.retro_add() end
+      elseif b == 'put' then retro_put('cursor') elseif b == 'depot' then retro_put('depot') elseif b == 'add' then ctx.retro_add()
+      elseif b == 'loop' then
+        -- во время игры — подхватить и лупить; в стопе — следующая длина 1 / 2 / 4 / 8
+        if playing() then retro_loop()
+        else retro.loop_bars = ({ [1] = 2, [2] = 4, [4] = 8, [8] = 1 })[retro.loop_bars] or 2; vim.msg = 'retro loop length: ' .. retro.loop_bars .. ' bar(s)' end
+      end
       click = { t = now2, zone = 'retrobtn' }
     elseif hover.retro then
       ctx.set_focus('top')
@@ -5251,6 +5299,8 @@ local function frame()
             local col = cur_col()
             if col and vim.inst > #(col.pool or {}) then retro_put('depot') else retro_put('cursor') end
           elseif ch == 'P' then retro_put('cursor', true)
+          elseif ch == 'L' then retro_loop()
+          elseif ch == '1' or ch == '2' or ch == '4' or ch == '8' then retro.loop_bars = tonumber(ch); vim.msg = 'retro loop length: ' .. ch .. ' bar(s) - L loops what was just played'
           elseif ch == 'd' then retro_put('depot')
           elseif ch == '+' or ch == '=' then ctx.retro_add()
           elseif ch == 'j' or c == keys.down then ctx.retro_cycle(1)

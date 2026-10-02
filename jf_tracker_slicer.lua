@@ -33,6 +33,7 @@ S.file_src = nil     -- PCM-источник файла браузера (оди
 S.view = 'peaks'     -- вид волны: 'peaks' | 'spec' (спектральные пики REAPER: цвет по частоте, как в колонке трека)
 
 function S.init(c) ctx = c end
+local commit                 -- объявлен заранее: S.mouse_up зовёт его раньше определения (2 окт)
 
 -- огибающая пиков 500 Гц по окну item (источник от offs на len*rate секунд)
 local function build_env(e)
@@ -149,7 +150,7 @@ function S.span() if S.sel then return math.min(S.sel.a, S.sel.b), math.max(S.se
 
 -- ровная нарезка: n кусков по длине item (в секундах item, не источника)
 -- нарезка виртуальная → применяется сразу (P_EXT), Enter не нужен
-local function commit()
+function commit()
   if S.entry and S.entry.item and ctx.edit and ctx.edit.set_slices then
     ctx.edit.set_slices(S.entry.item, S.slices)
     S.entry.slices = {}
