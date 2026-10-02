@@ -1116,6 +1116,20 @@ ctx = {
     local c = cur_col()
     if SL.open_file(path, c and c.track) then vim.msg = 'sample: ' .. (path:match('[^/]+$') or path) end
   end,
+  -- Cmd+Enter в браузере: выделенный файл заменяет сэмпл выбранного инструмента
+  browser_replace = function()
+    local e = B.entries[B.cur]
+    local path = B.preview_path(e)
+    if not path or (e and e.pm) then vim.msg = 'select an audio file in the browser'; return end
+    local col = cur_col(); local inst = col and (col.pool or {})[vim.inst]
+    if not inst then vim.msg = 'no instrument selected'; return end
+    local items = {}
+    for it, i in pairs((snap and snap.inst_of) or {}) do if i == vim.inst then items[#items + 1] = it end end
+    if #items == 0 and inst.item then items[1] = inst.item end
+    local n = edit.replace_source(items, path)
+    model.invalidate()
+    vim.msg = ('instrument %02d: %s -> %s (%d item%s)'):format(vim.inst, inst.name, path:match('[^/]+$') or path, n, n == 1 and '' or 's')
+  end,
   -- информация о файле (панель справа от большой волны, 2 окт); кэш по пути
   file_info = (function()
     local cache = {}

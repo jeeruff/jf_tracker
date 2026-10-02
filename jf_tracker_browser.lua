@@ -493,6 +493,7 @@ function B.key(c)
   elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - 1)
   elseif ch == 'g' then B.cur = 1
   elseif ch == 'G' then B.cur = #B.entries
+  elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
   elseif ch == ' ' then B.preview()

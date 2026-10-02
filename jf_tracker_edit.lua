@@ -1425,6 +1425,33 @@ function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R
 function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 
+-- ── замена сэмпла инструмента файлом из браузера (Cmd+Enter, 2 окт) ──────
+-- Все items инструмента получают новый источник; позиция и длина нот те же,
+-- offset в начало файла, имя take = имя файла, старая нарезка снимается.
+function E.replace_source(items, path)
+  local n = 0
+  local name = path:match('([^/]+)%.[^.]+$') or path:match('[^/]+$') or path
+  run('replace sample: ' .. name, function()
+    for _, it in ipairs(items) do
+      local take = R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
+      if take and not R.TakeIsMIDI(take) then
+        local src = R.PCM_Source_CreateFromFile(path)
+        if src then
+          local old = R.GetMediaItemTake_Source(take)
+          R.SetMediaItemTake_Source(take, src)
+          if old then pcall(R.PCM_Source_Destroy, old) end
+          R.SetMediaItemTakeInfo_Value(take, 'D_STARTOFFS', 0)
+          R.GetSetMediaItemTakeInfo_String(take, 'P_NAME', name, true)
+          R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', true)
+          R.UpdateItemInProject(it)
+          n = n + 1
+        end
+      end
+    end
+  end)
+  return n
+end
+
 -- ── Garden: посадка событий Orca (F2, 2 окт) ─────────────────────────────
 -- Посаженное помечено P_EXT:jf_garden = тег (регион); пишется БЕЗ undo-блоков
 -- (решение пользователя: сотни точек в минуту похоронили бы историю).
