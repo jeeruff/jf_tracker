@@ -140,12 +140,13 @@ for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
 state.captions = tostring(ext('captions', '0')) == '1'     -- строка подписей колонок (по умолчанию выкл, 2 окт)
 -- заливка шапки трека цветом (3 окт): line — полоска под именем, header —
--- строка имени, full — вся шапка (ниже имени тусклее); fathdr — старый флаг
+-- строка имени, full — вся шапка (ниже имени тусклее). Один параметр, без
+-- отдельного флага fat header (его ключ стирается)
 state.hdrfill = (function()
   local v = reaper.GetExtState(EXT, 'hdrfill')
-  if v == 'line' or v == 'header' or v == 'full' then return v end
-  return tostring(ext('fathdr', '0')) == '1' and 'full' or 'line'
+  return (v == 'header' or v == 'full') and v or 'line'
 end)()
+reaper.DeleteExtState(EXT, 'fathdr', true)
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
 PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
