@@ -1945,6 +1945,7 @@ ctx = {
   inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
   inst_preview = function(...) return PV.inst_preview(...) end,
   inst_preview_pos = function(item) return PV.inst_position(item) end,
+  preview_src_pos = function() return PV.src_position() end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
   inst_track = function(d) vim.key((d < 0 and 'H' or 'L'):byte()) end,
   inst_items = function(i)

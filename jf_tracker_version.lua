@@ -6,6 +6,7 @@ V.DATE = '2026-10-03'
 V.CHANGES = {
   { v = '0.5.68', d = '2026-10-03', items = {
     'themes (options, :theme): reaper - native colours of the REAPER theme (default); modus vivendi, modus operandi, gruvbox, catppuccin - full-screen palettes; mono - everything grey except the cursor cell',
+    'playhead on the item wave for every preview: Shift+note on the keyboard, the MIDI keyboard, slices (q..p) - matched by the source file, so it shows on the sample and on its slices; the note preview plays at the item rate like the note',
     'timeline ruler right of the row numbers (options: off / beats / time / both): REAPER ruler labels on every beat, bar brighter, native formats; the line right of the row numbers is gone',
     'about: 20 logos, real ANSI text with colour codes, box drawing, dots; native logos take the palette roles (text / accent / line) and follow the theme',
   } },

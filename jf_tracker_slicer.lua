@@ -542,12 +542,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local px = x + math.floor(math.max(0, math.min(1, pos / e.len)) * (w - 1))
       U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
     end
-  elseif e.item and ctx.inst_preview_pos then
-    -- превью инструмента (3 окт): плейхед на его волне
-    local pos = ctx.inst_preview_pos(e.item)
-    if pos and (e.len or 0) > 0 then
-      local px = x + math.floor(math.max(0, math.min(1, pos / e.len)) * (w - 1))
-      U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
+  elseif e.item and ctx.preview_src_pos then
+    -- превью инструмента, слайса, Shift+нота, MIDI-клавиатура (3 окт): плейхед
+    -- на волне любой записи того же файла, если позиция в её отрезке
+    local spos, path = ctx.preview_src_pos()
+    if spos and path ~= '' and path == e.fpath and (e.len or 0) > 0 then
+      local pos = (spos - (e.offs or 0)) / ((e.rate and e.rate ~= 0) and e.rate or 1)
+      if pos >= 0 and pos <= e.len then
+        local px = x + math.floor(pos / e.len * (w - 1))
+        U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
+      end
     end
   end
   -- транзиенты (только в правке) и слайсы с буквами

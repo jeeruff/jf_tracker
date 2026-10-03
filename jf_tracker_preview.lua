@@ -51,10 +51,16 @@ function P.audio(track, depot_item, semis, max_sec)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_PITCH', semis or 0)
   R.CF_Preview_SetValue(pv, 'D_VOLUME', take and R.GetMediaItemTakeInfo_Value(take, 'D_VOL') or 1)
-  R.CF_Preview_SetValue(pv, 'D_POSITION', take and R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') or 0)
+  local offs = take and R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') or 0
+  local rate = take and R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE') or 1
+  if rate <= 0 then rate = 1 end
+  R.CF_Preview_SetValue(pv, 'D_POSITION', offs)
+  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)              -- как прозвучит нота (3 окт)
+  if take then R.CF_Preview_SetValue(pv, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH')) end
   if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
   R.CF_Preview_Play(pv)
   cur = pv
+  P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
   return true
 end
 
@@ -95,6 +101,16 @@ function P.inst_position(item)
   return (pos - P.cur_offs) / P.cur_rate
 end
 function P.playing() return cur ~= nil or stop_at ~= nil end
+-- позиция в источнике (секунды файла) и путь файла звучащего инструмента /
+-- слайса — плейхед на любой записи lib того же файла (родитель или слайс)
+function P.src_position()
+  if not (cur and P.cur_item and R.ValidatePtr(P.cur_item, 'MediaItem*')) then return nil end
+  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ok then return nil end
+  local tk = R.GetActiveTake(P.cur_item)
+  local src = tk and R.GetMediaItemTake_Source(tk)
+  return pos, src and R.GetMediaSourceFileName(src, '') or ''
+end
 
 -- слайс инструмента: от t0 до t1 секунд item (через трек)
 function P.slice(track, entry, t0, t1)
@@ -111,6 +127,8 @@ function P.slice(track, entry, t0, t1)
   if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
   R.CF_Preview_Play(pv)
   cur = pv
+  -- плейхед слайса на волне инструмента (3 окт: Shift+нота / MIDI-клавиатура)
+  P.cur_item, P.cur_offs, P.cur_rate = entry.item, entry.offs or 0, rate ~= 0 and rate or 1
   return true
 end
 
