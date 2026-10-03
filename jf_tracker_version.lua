@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.0'
+V.VERSION = '0.6.1'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.1', d = '2026-10-03', items = {
+    'jf_pm from the tracker: in the pm tab T edits the project tags (:pmtag words, shown as #tags), s picks its jf_pm status (the kanban classes; x clears back to STATUS of the .rpp); written into jf_pm_index.json by the jf_pm core, the previous index kept as .bak',
+  } },
   { v = '0.6.0', d = '2026-10-03', items = {
     'PT-mode is now the dumbed-down ProTracker view it was meant to be: exactly 4 channels (from the track scroll), each note / sample / volume / one command, no wave column, no envelopes, no folds, LPB 4, bitmap x4 (the largest scale where 4 channels fit: x4 -> x3 -> x2), scopes of the 4 channels on top; :pt new creates the channels CH1..CH4 in the project (one undo) and enters the mode; :pt again restores every setting',
   } },

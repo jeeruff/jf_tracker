@@ -363,6 +363,41 @@ function B.read_pm()
   return out
 end
 
+-- правка карточки jf_pm (3 окт): теги (tags_extra) и статус (status_over —
+-- поверх STATUS из .rpp, как в канбане jf_pm); пишется индекс jf_pm_index.json
+-- ядром jf_pm. fn(card) правит карточку; true — записано
+function B.pm_core()
+  local ok, core = pcall(dofile, res_path() .. '/Scripts/jf_pm/jf_pm_core.lua')
+  return ok and type(core) == 'table' and core.load_index and core or nil
+end
+function B.pm_edit(path, fn)
+  local core = B.pm_core()
+  if not core then return false end
+  local idx = core.load_index()
+  local card = idx and idx.projects and idx.projects[path]
+  if not card then return false end
+  fn(card)
+  -- безопасная запись: JSON собирается заранее (save_index открывает файл до
+  -- кодирования — ошибка оставила бы пустой индекс), прежний — в .bak
+  local okj = pcall(core.json_encode, idx)
+  if not okj then return false end
+  local src = io.open(core.index_path(), 'rb')
+  if src then
+    local data = src:read('*a'); src:close()
+    local bak = io.open(core.index_path() .. '.bak', 'wb')
+    if bak then bak:write(data); bak:close() end
+  end
+  core.save_index(idx)
+  B.pm = nil                                   -- перечитать мету
+  if B.mode == 'pm' and not B.pmproj then B.set_all(B.read_pm()) end
+  return true
+end
+function B.pm_card(path)
+  local core = B.pm_core()
+  local idx = core and core.load_index()
+  return idx and idx.projects and idx.projects[path], core
+end
+
 -- файл для прослушивания проекта: рендер из карточки, иначе jf_preview.wav рядом
 function B.pm_preview(e)
   if e.render and e.render ~= '' then return e.render end
@@ -578,7 +613,7 @@ function B.describe(idx)
   if e.dir then return ('folder %s - Enter: open'):format(e.name) end
   if e.pm then
     local len = e.len and e.len > 0 and (' %d:%02d'):format(math.floor(e.len / 60), math.floor(e.len % 60)) or ''
-    return ('project %s%s - Enter: inside (tracks / samples / regions), o: open in REAPER, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
+    return ('project %s%s - Enter: inside, o: open in REAPER, T: tags, s: status, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
   end
   if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
@@ -618,6 +653,8 @@ function B.key(c)
   elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
+  elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
+  elseif ch == 's' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_status then ctx.pm_status(e) end     -- статус jf_pm
   elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
   elseif ch == 'w' then B.click('size')
   elseif ch == 'q' then B.click('hide')

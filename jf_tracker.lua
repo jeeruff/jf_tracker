@@ -1983,6 +1983,41 @@ ctx = {
       end },
     })
   end,
+  -- jf_pm (3 окт): теги — :pmtag со словами (правится строка), статус — меню
+  -- классов jf_pm (status_over, как канбан); B.pm_edit пишет индекс
+  pm_tags = function(e)
+    local card = B.pm_card(e.path)
+    local cur = {}
+    for _, t in ipairs(card and card.tags_extra or {}) do cur[#cur + 1] = t end
+    state.pm_target = e.path
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pmtag ' .. table.concat(cur, ' ')
+  end,
+  pm_set_tags = function(text)
+    local path = state.pm_target
+    if not path then vim.msg = 'pmtag: pick a project in the pm tab (T)'; return end
+    local tags = {}
+    for w in (text or ''):gmatch('[^%s,]+') do tags[#tags + 1] = (w:gsub('^#', '')) end
+    local ok = B.pm_edit(path, function(c) c.tags_extra = #tags > 0 and tags or nil end)
+    vim.msg = ok and ('jf_pm tags: ' .. (#tags > 0 and ('#' .. table.concat(tags, ' #')) or '(none)')) or 'jf_pm: project not in the index'
+  end,
+  pm_status = function(e)
+    local _, core = B.pm_card(e.path)
+    local list = core and core.STATUSES or {}
+    local keysq = '1234567890-='
+    local items = {}
+    for k, st in ipairs(list) do
+      if k > #keysq then break end
+      items[#items + 1] = { key = keysq:sub(k, k), label = st, fn = function()
+        local ok = B.pm_edit(e.path, function(c) c.status_over = st; c.status_over_base = (c.ext or {}).STATUS or '' end)
+        vim.msg = ok and ('jf_pm status: ' .. e.name .. ' -> ' .. st) or 'jf_pm: project not in the index'
+      end }
+    end
+    items[#items + 1] = { key = 'x', label = '(clear - back to STATUS of the .rpp)', fn = function()
+      B.pm_edit(e.path, function(c) c.status_over, c.status_over_base = nil, nil end)
+      vim.msg = 'jf_pm status cleared: ' .. e.name
+    end }
+    vim.open_hydra({ title = 'status ' .. e.name, items = items })
+  end,
   -- большой редактор сэмпла (3 окт, :big / кнопка big): вкладка item на всё окно
   sample_big = function()
     state.sample_big = not state.sample_big
