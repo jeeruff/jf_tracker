@@ -891,14 +891,21 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local mon = col.recmon or 0
   local btns = { { 'R', col.armed, D.ARM, 'arm' }, { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                  { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
-                 { 'ph', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
+                 { 'ø', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
   for _, b in ipairs(btns) do
-    local bw = math.max(L.btn_w, ms(b[1]) + 4)
+    local glyph = b[1] == 'ø'                    -- ø фазы: битмап-шрифт его не знает — рисуем кругом и чертой
+    local bw = glyph and L.btn_w or math.max(L.btn_w, ms(b[1]) + 4)
     if bx + bw > x + w - L.pad then break end
     local on = b[2]
     set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
     set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
-    text(bx + 2, yy, b[1], on and b[3] or U.GREY)
+    if glyph then
+      local cx, cy = bx + bw / 2, yy + (L.rh - 2) / 2
+      local r = math.max(2, math.floor(math.min(bw, L.rh - 2) / 2) - 2)
+      set(on and b[3] or U.GREY)
+      gfx.circle(cx, cy, r, false, true)
+      gfx.line(cx - r - 1, cy + r + 1, cx + r + 1, cy - r - 1)
+    else text(bx + 2, yy, b[1], on and b[3] or U.GREY) end
     if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
       if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
     end
