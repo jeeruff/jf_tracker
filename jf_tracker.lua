@@ -290,6 +290,7 @@ local dsp_learn = nil         -- { k = блок, name = имя FX, last = клю
 local learn_poll            -- объявлен заранее: определение ниже, вызов из кадра
 local tok_drag = nil          -- перетаскивание инструмента / региона на поле Orca (3 окт)
 local orca_pending = nil      -- файл из браузера на Orca: ждём номер инструмента после снимка
+local act_cache = { t = 0 }   -- список действий REAPER для \\ a / :! (2 мин)
 local fxv_cache = {}
 
 -- ── окно ──────────────────────────────────────────────────────────────────
@@ -1928,6 +1929,51 @@ ctx = {
   orca_targets = function(f) return ORCA.targets(f) end,
   orca_doc = function(ch) return ORCA.DOC[ch] or ORCA.DOC[(ch or ''):upper()] end,
   orca_set = function(x, y, ch) if garden.f then ORCA.set(garden.f, x, y, ch); garden_save() end end,
+  -- ── действия REAPER (3 окт): весь список Main (kbd_enumerateActions —
+  -- нативно, со скриптами и custom actions), fzf; недавние сверху (ExtState
+  -- actrecent: именованные id скриптов переживают перезапуск). Отдельно от
+  -- команд трекера: \ a или :!текст
+  reaper_actions = function(query)
+    local now = reaper.time_precise()
+    if not act_cache.list or now - act_cache.t > 120 then
+      local list = {}
+      local sec = reaper.SectionFromUniqueID and reaper.SectionFromUniqueID(0)
+      local i = 0
+      while i < 100000 do
+        local id, name
+        if reaper.kbd_enumerateActions and sec then id, name = reaper.kbd_enumerateActions(sec, i)
+        elseif reaper.CF_EnumerateActions then id, name = reaper.CF_EnumerateActions(0, i, '') end
+        if not id or id <= 0 then break end
+        if name and name ~= '' then list[#list + 1] = { label = name, data = id } end
+        i = i + 1
+      end
+      table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
+      act_cache.list, act_cache.t = list, now
+    end
+    -- недавние — сверху
+    local items, seen = {}, {}
+    for key in (reaper.GetExtState(EXT, 'actrecent') or ''):gmatch('[^,]+') do
+      local id = tonumber(key) or reaper.NamedCommandLookup(key)
+      if id and id > 0 and not seen[id] then
+        seen[id] = true
+        local nm = reaper.kbd_getTextFromCmd and reaper.kbd_getTextFromCmd(id, 0) or ''
+        if nm and nm ~= '' then items[#items + 1] = { label = '* ' .. nm, data = id } end
+      end
+    end
+    for _, it in ipairs(act_cache.list) do if not seen[it.data] then items[#items + 1] = it end end
+    vim.open_picker(('REAPER actions (%d)'):format(#act_cache.list), items, function(it)
+      local id = it.data
+      reaper.Main_OnCommand(id, 0)
+      -- в недавние: скрипты — по имени (их числовой id меняется между запусками)
+      local key = reaper.ReverseNamedCommandLookup and reaper.ReverseNamedCommandLookup(id)
+      key = (key and key ~= '') and ('_' .. key) or tostring(id)
+      local rec = { key }
+      for k in (reaper.GetExtState(EXT, 'actrecent') or ''):gmatch('[^,]+') do if k ~= key and #rec < 12 then rec[#rec + 1] = k end end
+      reaper.SetExtState(EXT, 'actrecent', table.concat(rec, ','), true)
+      model.invalidate()
+      vim.msg = 'REAPER: ' .. it.label:gsub('^%* ', '')
+    end, query)
+  end,
   -- бросок на клетку Orca (3 окт): готовый оператор с аргументами — инструмент
   -- ($ слайс 1 нарезанного / : нота C4 целого), регион (; слот). Банг — свой.
   orca_drop = function(kind, v, ox, oy)
@@ -2450,6 +2496,7 @@ ctx = {
           return { title = 'instrument', items = it }
         end },
       { key = 'f', label = 'add FX (fzf by all installed) …', fn = ctx.fx_picker },
+      { key = 'a', label = 'REAPER actions (all, fzf) … (:!)', fn = function() ctx.reaper_actions() end },
       { key = 'l', label = 'loop in region (polymeter) …', sub = function() return { title = 'loop', items = {
           { key = 'i', label = 'item -> region end (loop)  [>]', fn = function() ctx.loop('item') end },
           { key = 'r', label = 'region -> item end  [<]', fn = function() ctx.loop('region') end },

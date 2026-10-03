@@ -513,6 +513,7 @@ V.COMMANDS = {
   { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
+  { '!', 'text', 'REAPER actions (all, incl. scripts / custom): fzf, recent first - kept apart from tracker commands; also \\ a' },
   { 'midi', '', 'MIDI learn tab: knobs and pads of a controller drive the slicer (Enter: learn)' },
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT)' },
@@ -533,6 +534,9 @@ end
 
 local function run_cmd(line)
   local st = ctx.state
+  -- :!текст — действия REAPER (отдельно от команд трекера): fzf с запросом
+  local bang = line:match('^%s*!%s*(.*)$')
+  if bang then if ctx.reaper_actions then ctx.reaper_actions(bang) end; return end
   local cmd, arg = line:match('^%s*(%S+)%s*(.*)$')
   if not cmd then return end
   local n = tonumber(arg)
@@ -1248,18 +1252,19 @@ end
 local function picker_filter()
   local pk = V.picker
   local out = {}
-  for _, it in ipairs(pk.items) do
+  for i, it in ipairs(pk.items) do
     local sc = fuzzy_score(it.label, pk.query)
-    if sc then out[#out + 1] = { it = it, sc = sc } end
+    if sc then out[#out + 1] = { it = it, sc = sc, i = i } end
   end
-  table.sort(out, function(a, b) return a.sc > b.sc end)
+  -- при равном счёте — порядок списка (недавние действия сверху остаются сверху)
+  table.sort(out, function(a, b) if a.sc ~= b.sc then return a.sc > b.sc end return a.i < b.i end)
   pk.matches = {}
   for i, m in ipairs(out) do pk.matches[i] = m.it end
   if pk.sel > #pk.matches then pk.sel = math.max(1, #pk.matches) end
 end
 
-function V.open_picker(title, items, on_pick)
-  V.picker = { title = title, items = items, query = '', sel = 1, matches = {}, on_pick = on_pick }
+function V.open_picker(title, items, on_pick, query)
+  V.picker = { title = title, items = items, query = query or '', sel = 1, matches = {}, on_pick = on_pick }
   picker_filter()
 end
 

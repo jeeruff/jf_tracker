@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.42'
+V.VERSION = '0.5.43'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.43', d = '2026-10-03', items = {
+    'REAPER actions from the tracker, kept apart from tracker commands: \\ a or :!text opens fzf over every Main action (native list incl. scripts and custom actions), recently run ones on top (scripts remembered by name)',
+  } },
   { v = '0.5.42', d = '2026-10-03', items = {
     'Orca: drag and drop onto field cells - an instrument from the instruments panel writes $ track inst 1 (sliced) or : track inst 4C, a region dragged by its matrix name writes ; slot, a browser file goes into the track library first and then lands as an instrument; the bang is yours (D4 next to it)',
   } },
