@@ -319,7 +319,9 @@ function M.cache_key(lpb, now)
 end
 
 local pool_by_item = {}        -- item → gkey (все items, не только первый) — номер инструмента в ячейке
+M.bprof = { envs = 0, pool = 0, mods = 0, fx = 0 }
 function M.build(lpb)
+  M.bprof = { envs = 0, pool = 0, mods = 0, fx = 0 }
   pool_by_item = {}
   local snap = { lpb = lpb, cols = {}, last_row = 0 }
   local depot_tr
@@ -413,10 +415,18 @@ function M.build(lpb)
       for _, lane in ipairs(col.lanes) do
         if lane.last_row and lane.last_row > snap.last_row then snap.last_row = lane.last_row end
       end
+      -- части пересборки — в M.bprof (пульс hb: что дорого на большом проекте)
+      local t0 = R.time_precise()
       col.envs = M.track_envs(tr, lpb)
+      local t1 = R.time_precise()
       col.pool = M.track_pool(tr, depot_tr, snap.lib_pos, snap.end_pos)
+      local t2 = R.time_precise()
       col.mods = M.track_mods(tr)
+      local t3 = R.time_precise()
       col.fx = M.track_fx(tr)
+      local t4 = R.time_precise()
+      M.bprof.envs = M.bprof.envs + (t1 - t0); M.bprof.pool = M.bprof.pool + (t2 - t1)
+      M.bprof.mods = M.bprof.mods + (t3 - t2); M.bprof.fx = M.bprof.fx + (t4 - t3)
       -- мост осциллоскопа (JSFX jf_tracker_scope): слот из slider1
       local sfx = R.TrackFX_GetByName and R.TrackFX_GetByName(tr, 'jf_tracker_scope', false)
       if sfx and sfx >= 0 then col.scope_slot = math.floor(R.TrackFX_GetParam(tr, sfx, 0)) end
@@ -847,9 +857,46 @@ function M.auto_module(tr, fx, short, np)
   auto_cache[key] = out
   return out
 end
-function M.auto_reset(short) for k in pairs(auto_cache) do if not short or k:sub(1, #short + 1) == short .. '|' then auto_cache[k] = nil end end end
+function M.auto_reset(short) M.fx_gen = M.fx_gen + 1; for k in pairs(auto_cache) do if not short or k:sub(1, #short + 1) == short .. '|' then auto_cache[k] = nil end end end
 
+-- кэш цепочки (3 окт, скорость): пересборка снимка на каждую правку проекта
+-- собирала FX заново (90 % времени); цепочка меняется редко — кэш по подписи:
+-- число FX, их GUID и bypass, состав контейнеров, счётчик правок модулей
+-- (M.fx_gen). Значения параметров читаются вживую каждый кадр (fx_values);
+-- файл сэмплера (FILE0) обновляется при каждом обращении.
+M.fx_gen = 0
+local fx_cache = setmetatable({}, { __mode = 'k' })
+local build_track_fx
 function M.track_fx(tr)
+  local A = M.fxapi(tr)
+  if not A.GetCount then return {} end
+  local n = A.GetCount(tr)
+  local parts = { M.fx_gen, n }
+  for fx = 0, n - 1 do
+    parts[#parts + 1] = A.GetFXGUID and A.GetFXGUID(tr, fx) or fx
+    parts[#parts + 1] = A.GetEnabled(tr, fx) and 1 or 0
+    if A.GetNamedConfigParm then
+      local ok, cc = A.GetNamedConfigParm(tr, fx, 'container_count')
+      if ok then parts[#parts + 1] = 'c' .. tostring(cc) end
+    end
+  end
+  local key = table.concat(parts, '|')
+  local c = fx_cache[tr]
+  if c and c.key == key then
+    for _, e in ipairs(c.out) do
+      if e.wave and A.GetNamedConfigParm then
+        local ok, file = A.GetNamedConfigParm(tr, e.i, 'FILE0')
+        e.file = ok and file ~= '' and file or nil
+      end
+    end
+    return c.out
+  end
+  local out = build_track_fx(tr)
+  fx_cache[tr] = { key = key, out = out }
+  return out
+end
+
+function build_track_fx(tr)
   local out = {}
   local A = M.fxapi(tr)
   if not A.GetCount then return out end

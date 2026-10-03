@@ -279,6 +279,7 @@ local function umod_load()
   return t
 end
 local function umod_save(t)
+  model.fx_gen = (model.fx_gen or 0) + 1        -- модули поменялись — кэш цепочек FX сбросить
   reaper.RecursiveCreateDirectory(UMOD_DIR, 0)
   local f = io.open(UMOD_FILE, 'w')
   if not f then return false end
@@ -4083,7 +4084,11 @@ local function frame()
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
   local t_1 = reaper.time_precise()
-  if changed then prof.rebuild = (t_1 - t_0) * 1000 end            -- пересборка снимка (пульс hb)
+  if changed then
+    prof.rebuild = (t_1 - t_0) * 1000                              -- пересборка снимка (пульс hb)
+    local b = model.bprof or {}
+    prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000)
+  end
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
@@ -4163,10 +4168,10 @@ local function frame()
     fps.v = fps.n / (now - fps.t); fps.n = 0; fps.t = now
     local n = math.max(1, prof.n)
     -- лайв (2 окт): кроме средних — худший кадр секунды и последняя правка
-    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f',
+    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or ''), false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
