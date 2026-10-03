@@ -67,9 +67,13 @@ V.octave = 4
 V.step = 1
 V.vel = 100            -- velocity вставляемых нот (c / C в KEYS, :vel N)
 V.step_auto = false   -- авто-шаг: курсор за конец вставленного item / слайса (1 окт)
+V.step_next = false   -- шаг next (3 окт): курсор на следующий объект трека — ноту, item, команду, точку огибающей
 
+-- шаг после правки поля (hex, огибающие): next — до следующего объекта, иначе V.step
+local function step_rows() if V.step_next then return V.next_rows and V.next_rows() or 1 end return V.step end
 -- строк, на сколько двигать курсор после вставки инструмента e (слайс k)
 local function adv_rows(e, k)
+  if V.step_next then return V.next_rows and V.next_rows() or 1 end
   if not V.step_auto then return V.step end
   if not e or not e.len or not ctx.edit or not ctx.edit.row_time then return 1 end
   local lp = ctx.state.lpb or 4
@@ -268,6 +272,13 @@ local function next_head(fi, row, dir, any_sub)
     r = r + dir
   end
   return nil
+end
+
+-- шаг next (3 окт): строк до следующего объекта трека курсора (любая его
+-- подколонка; в колонке огибающей — следующая точка); нет дальше — 1
+function V.next_rows()
+  local r = next_head(V.cur.fi, V.cur.row, 1, true)
+  return r and math.max(1, r - V.cur.row) or 1
 end
 
 -- W / B — следующее / предыдущее событие в ЛЮБОЙ колонке (все треки, подколонки
@@ -496,7 +507,7 @@ end
 -- Таблица команд: исполнение, подсказка (список снизу при наборе) и Tab.
 V.COMMANDS = {
   { 'q', '', 'close window' }, { 'w', '', 'save project' }, { 'wq', '', 'save and close' },
-  { 'lpb', 'N', 'rows per beat (1..64)' }, { 'step', 'N|auto', 'step after input / note length' },
+  { 'lpb', 'N', 'rows per beat (1..64)' }, { 'step', 'N|auto|next', 'step after input: rows / to the end of the item / to the next object' },
   { 'oct', 'N', 'input octave' }, { 'inst', 'N', 'instrument slot' },
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
@@ -568,8 +579,9 @@ local function run_cmd(line)
       local xx = math.min(255, len * 16)
       for _, h in ipairs(heads) do if h.kind == 'audio' then ctx.edit.set_fx({ h }, lpb(), dir == 'in' and 'I' or 'O', xx) end end
     end
-  elseif cmd == 'step' and arg == 'auto' then V.step_auto = not V.step_auto; V.msg = 'step: ' .. (V.step_auto and 'auto (to the end of the inserted item / slice)' or tostring(V.step))
-  elseif cmd == 'step' and n then V.step = math.max(0, math.floor(n)); V.step_auto = false
+  elseif cmd == 'step' and arg == 'auto' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto (to the end of the inserted item / slice)' or tostring(V.step))
+  elseif cmd == 'step' and arg == 'next' then V.step_next = not V.step_next; V.step_auto = false; V.msg = 'step: ' .. (V.step_next and 'next (to the next note / item / command / envelope point of the track)' or tostring(V.step))
+  elseif cmd == 'step' and n then V.step = math.max(0, math.floor(n)); V.step_auto = false; V.step_next = false
   elseif cmd == 'oct' and n then V.octave = math.max(0, math.min(8, math.floor(n)))
   elseif cmd == 'inst' and n then ctx.pool_select(math.floor(n))
   elseif cmd == 'follow' then st.follow = not st.follow
@@ -693,7 +705,7 @@ local function keys_control(c)
   elseif ch == 'C' then V.vel = math.min(127, (V.vel or 100) + 8); V.msg = 'velocity ' .. V.vel; return true
   elseif ch == ',' then ctx.pool_select(V.inst - 1); return true
   elseif ch == '.' then ctx.pool_select(V.inst + 1); return true
-  elseif ch == 'a' then V.step_auto = not V.step_auto; V.msg = 'step: ' .. (V.step_auto and 'auto' or tostring(V.step)); return true
+  elseif ch == 'a' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto' or tostring(V.step)); return true
   elseif ch == 's' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = 'step '; return true
   elseif ch == 'd' then
     -- d — оператор Vim (d3w, dd, dG…): ждёт счётчик и движение, потом обратно в INSERT (2 окт)
@@ -849,7 +861,7 @@ function V.key_impl(c)
         local m = V.shape_match(buf)
         if m == false then V.shapebuf = nil; V.msg = 'shape: lin sqr slo fas fae bez'
         elseif m == nil then V.shapebuf = buf; V.msg = 'shape ' .. buf .. '…'
-        else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + V.step; ensure_visible() end
+        else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       end
       return
     end
@@ -867,7 +879,7 @@ function V.key_impl(c)
         if #buf < 2 then V.hexbuf = buf; return end
         V.hexbuf = nil
         ctx.env_set(env, V.cur.row, tonumber(buf, 16) / 255)
-        V.cur.row = V.cur.row + V.step; ensure_visible()
+        V.cur.row = V.cur.row + step_rows(); ensure_visible()
       end
       return
     end
@@ -894,14 +906,14 @@ function V.key_impl(c)
     if fld > 1 then
       -- поля vol / delay / команд: hex-ввод, потом шаг вниз; не-hex → управление KEYS
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
-      if hex_entry(c, fld, heads) then V.cur.row = V.cur.row + V.step; ensure_visible(); return end
+      if hex_entry(c, fld, heads) then V.cur.row = V.cur.row + step_rows(); ensure_visible(); return end
       if V.hexbuf then return end
       keys_control(c); return
     end
     if keys_control(c) then return end
     if c == ('`'):byte() or c == ('~'):byte() then
       E.note_off(V.covering(V.cur.fi, V.cur.row), lpb(), V.cur.row)
-      V.cur.row = V.cur.row + V.step; ensure_visible(); return
+      V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
     if c == (']'):byte() then V.octave = math.min(8, V.octave + 1); return end
@@ -1443,7 +1455,7 @@ function V.status()
   if V.pending then extra = extra .. ' ' .. V.pending end
   if V.hexbuf then extra = extra .. ' [' .. V.hexbuf .. '_]' end
   if V.count then extra = extra .. ' ' .. V.count end
-  return m .. extra, ('oct %d vel %d step %s inst %d'):format(V.octave, V.vel or 100, V.step_auto and 'auto' or tostring(V.step), V.inst)
+  return m .. extra, ('oct %d vel %d step %s inst %d'):format(V.octave, V.vel or 100, V.step_next and 'next' or (V.step_auto and 'auto' or tostring(V.step)), V.inst)
 end
 
 -- обёртка: оператор, начатый из INSERT (d…), по завершении возвращает в INSERT

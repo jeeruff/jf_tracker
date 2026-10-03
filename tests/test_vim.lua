@@ -489,5 +489,14 @@ V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → ran
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw from empty env row → next point', last(), 'envdelr:Vol@9-9')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('db'); eq('db from empty env row → back to previous point', last(), 'envdelr:Vol@3-5')
 V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W reaches env point in any column', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 20)
+-- шаг next (3 окт): на следующий объект трека — любая его подколонка
+reset()
+V.cur = { fi = 1, row = 0, field = 1 }
+V.step_next = true
+eq('next: kick 0 → ov 2 (other subcolumn)', V.next_rows(), 2)
+V.cur.row = 2; eq('next: 2 → snare 8', V.next_rows(), 6)
+V.cur.row = 8; eq('next: 8 → hat 16', V.next_rows(), 8)
+V.cur.row = 16; eq('next: nothing after → 1', V.next_rows(), 1)
+V.step_next = false
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

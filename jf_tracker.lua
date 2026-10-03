@@ -176,6 +176,7 @@ PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
 model.OVERSAMPLE = state.wave_os
 vim.step_auto = tostring(ext('step_auto', '0')) == '1'
+vim.step_next = tostring(ext('step_next', '0')) == '1'
 reaper.SetExtState(EXT, 'font_v', '3', true)
 -- fold: «guid» — компактный, «guid=m» — полоска (zC), ревью 2 окт
 for g in tostring(ext('folds', '')):gmatch('[^,]+') do
@@ -354,7 +355,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
-  S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
+  S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
@@ -4069,9 +4070,14 @@ function ctrl_action(name, delta)
   elseif name == 'oct' then vim.octave = math.max(0, math.min(8, vim.octave + (delta ~= 0 and delta or 1)))
   elseif name == 'vel' then vim.vel = math.max(1, math.min(127, (vim.vel or 100) + (delta ~= 0 and delta * 4 or 8)))
   elseif name == 'step' then
-    -- клик — auto on/off (шаг = до конца вставленного item / слайса), колесо — число
-    if delta == 0 then vim.step_auto = not vim.step_auto
-    else vim.step = math.max(0, vim.step + delta); vim.step_auto = false end
+    -- клик — по кругу: число → auto (до конца вставленного item / слайса) → next
+    -- (на следующий объект трека) → число; колесо — число
+    if delta == 0 then
+      if vim.step_next then vim.step_next = false
+      elseif vim.step_auto then vim.step_auto = false; vim.step_next = true
+      else vim.step_auto = true end
+      vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
+    else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
   elseif name == 'inst' then pool_select(vim.inst + (delta ~= 0 and delta or 1))
   elseif name == 'follow' then state.follow = not state.follow
   elseif name == 'lock' then state.lock = not state.lock; lock_sync = {}; vim.msg = 'lock to REAPER cursor: ' .. (state.lock and 'on' or 'off')
@@ -4700,7 +4706,7 @@ local function frame()
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     ctrl = {
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
-      lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_auto and 'auto' or vim.step, inst = vim.inst,
+      lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,

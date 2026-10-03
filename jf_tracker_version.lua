@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.79'
+V.VERSION = '0.5.80'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.80', d = '2026-10-03', items = {
+    'step next: after an entry the cursor jumps to the next object of the track - note, item, command, envelope point (any subcolumn; in an envelope column the next point); click the step cell to go number -> auto -> next, or :step next',
+  } },
   { v = '0.5.79', d = '2026-10-03', items = {
     'curscope reworked: not a line through the middle of the row - the bright green REAPER cursor line itself scatters into dots, each track column shows its oscilloscope as points around the line (they may reach the neighbour rows); the amber cursor line stays as a plain top line',
   } },
