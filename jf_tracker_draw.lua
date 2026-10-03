@@ -1709,17 +1709,22 @@ function D.frame(L, snap, rows, state, info)
       local labels = { { 'R', col.armed, D.ARM, 'arm' },
                        { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                        { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
-                       { 'A', nenv > 0, U.CYAN or U.AMBER, 'auto' } }
+                       { 'trim', nenv > 0, U.CYAN or U.AMBER, 'auto' } }
+      -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
+      local trim_w = ms('trim') + 4
+      local trim_x = c.x + c.w - L.pad - trim_w
       for k, b in ipairs(labels) do
         local x = bx + (k - 1) * (L.btn_w + 1)
-        if x + L.btn_w > c.x + c.w - 1 then break end
+        local bwk = L.btn_w
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 4 * (L.btn_w + 1) + L.pad then break end end
+        if x + bwk > c.x + c.w - 1 then break end
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
-        set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, L.btn_w, L.rh - 2, 1)
-        set(on and b[3] or U.DIM); gfx.rect(x, by, L.btn_w, L.rh - 2, 0)
+        set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, L.rh - 2, 1)
+        set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, L.rh - 2, 0)
         text(x + 2, by, b[1], on and b[3] or U.GREY)
-        if mx >= x and mx < x + L.btn_w and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
-        hint('btn', x, by, L.btn_w, L.rh, { col = col, what = b[4] })
+        if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
+        hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
