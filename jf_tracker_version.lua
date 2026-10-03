@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.59'
+V.VERSION = '0.5.60'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.60', d = '2026-10-03', items = {
+    'fix: the window flickered when idle - skipping frames is switched off (a skipped gfx frame does not keep the previous picture); the tracker draws every frame again',
+  } },
   { v = '0.5.59', d = '2026-10-03', items = {
     'matrix naming like Renoise: alias (als next to the region name, A) is the linked repeat - same pattern, MIDI pooled, items grouped; clone (cln, C, D, ^D) is a free copy with a new name; make unique (U, region menu) unlinks a repeat - new name, own MIDI pool, no group',
   } },

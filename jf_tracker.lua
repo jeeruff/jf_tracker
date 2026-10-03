@@ -4219,7 +4219,8 @@ local function frame()
       idle.active_t, idle.mkey = now_t, mkey
     end
     idle.n = idle.n + 1
-    idle_skip = (now_t - idle.active_t) > 1.5 and (idle.n % 3 ~= 0) and idle.hover ~= nil
+    -- ОТКЛЮЧЕНО (3 окт): пропущенный кадр не держит прошлую картинку — окно мигало
+    idle_skip = false
   end
   if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
