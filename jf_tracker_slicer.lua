@@ -100,13 +100,41 @@ end
 function S.snap_t(t, skip)
   if not S.snap or not t then return t end
   local w = S.wave and S.wave.w or 0
-  local thr = (w > 0 and S.wave.len and S.wave.len > 0) and (8 / w * S.wave.len) or 0.02
+  local thr = (w > 0 and S.wave.len and S.wave.len > 0) and (8 / w * ((S.wave.vb or S.wave.len) - (S.wave.va or 0))) or 0.02
   local best, bd = t, thr
   local function try(c) local dd = math.abs(c - t); if dd < bd then best, bd = c, dd end end
   for _, c in ipairs(S.trans or {}) do try(c) end
   local sl = (S.active and S.slices) or (S.entry and S.entry.slices) or {}
   for k, c in ipairs(sl) do if k ~= skip then try(c) end end
   return best
+end
+
+-- экран → секунды e по окну вида (зум); x вне волны — к краю окна
+function S.x_to_t(mx)
+  local wv = S.wave
+  if not wv or wv.w <= 0 then return 0 end
+  local va, vb = wv.va or 0, wv.vb or wv.len
+  return va + math.max(0, math.min(1, (mx - wv.x) / wv.w)) * (vb - va)
+end
+-- зум у секунды t (k < 1 — ближе), прокрутка на долю окна
+function S.zoom(k, t)
+  local wv = S.wave; if not wv then return end
+  local len = wv.len
+  local va, vb = wv.va or 0, wv.vb or len
+  local span = math.max(0.005, math.min(len, (vb - va) * k))
+  t = t or (va + vb) / 2
+  local f = (t - va) / math.max(1e-9, vb - va)
+  local na = math.max(0, math.min(len - span, t - f * span))
+  S.va, S.vb = na, na + span
+  if span >= len - 1e-6 then S.va, S.vb = 0, nil end
+end
+function S.scroll(d)
+  local wv = S.wave; if not wv then return end
+  local len = wv.len
+  local va, vb = wv.va or 0, wv.vb or len
+  local span = vb - va
+  local na = math.max(0, math.min(len - span, va + d * span))
+  S.va, S.vb = na, na + span
 end
 
 function S.select_all() if S.entry then S.sel = { a = 0, b = S.entry.len } end end
@@ -377,10 +405,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- кнопки вида справа в заголовке
   local vx = x + w
   local hover_view
-  for _, v in ipairs({ 'spec', 'peaks' }) do
+  for _, v in ipairs({ 'big', 'spec', 'peaks' }) do
     local bw = U.measure(v) + 2 * L.pad
     vx = vx - bw
-    local on = S.view == v
+    local on = (v == 'big' and ctx.state and ctx.state.sample_big) or S.view == v
     local hot = gfx.mouse_x >= vx and gfx.mouse_x < vx + bw and gfx.mouse_y >= y and gfx.mouse_y < y + rh
     U.set(on and U.tint(U.CYAN, 0.3) or U.BG); gfx.rect(vx, y, bw, rh, 1)
     U.set(on and U.CYAN or U.LINE); gfx.rect(vx, y, bw, rh, 0)
@@ -450,6 +478,17 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- убрана 1 окт
   local wy, wh = y + 2 * rh + 2, h - 3 * rh - 4
   if wh < 6 then return end
+  -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
+  -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком
+  local len = e.len > 0 and e.len or 1
+  if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
+  local va = math.max(0, math.min(len, S.va or 0))
+  local vb = math.max(va + 1e-3, math.min(len, S.vb or len))
+  local span = vb - va
+  local function tx(t) return x + math.floor((t - va) / span * w) end
+  -- пики на всю длину с плотностью окна; пиксель → индекс по окну
+  local ntot = math.max(w, math.min(16384, math.floor(w * len / span)))
+  local function idx_of(px, n) return math.floor((va + px / w * span) / len * n) + 1 end
   U.set(U.PANEL); gfx.rect(x, wy, w, wh, 1)
   local cy, hh = wy + wh / 2, wh / 2 - 1
   local base = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
@@ -460,10 +499,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- за концом файла играет начало — картинки расходились. S.env — для детекции
   local env = (editing and S.view == 'peaks' and not (ctx.peaks and e.item)) and S.env or nil
   if S.view == 'spec' and ctx.peaks then
-    local pk = ctx.peaks(e, w, true)
+    local pk = ctx.peaks(e, ntot, true)
     if pk and pk.n > 0 then
       for px = 0, w - 1 do
-        local idx = math.floor(px / w * pk.n) + 1
+        local idx = idx_of(px, pk.n)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
         if b - a < 0.02 then a, b = -0.01, 0.01 end
         local cc = (pk.spec and ctx.spec_colour) and ctx.spec_colour(pk.spec[idx]) or base
@@ -474,18 +513,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     else gfx.line(x, cy, x + w, cy) end
   elseif env and env.n > 0 then
     for px = 0, w - 1 do
-      local i0 = math.floor(px / w * env.n) + 1
-      local i1 = math.floor((px + 1) / w * env.n)
+      local i0 = idx_of(px, env.n)
+      local i1 = idx_of(px + 1, env.n) - 1
       local m = 0
       for i = i0, math.max(i0, i1) do if env.v[i] and env.v[i] > m then m = env.v[i] end end
       gfx.line(x + px, cy - m * hh, x + px, cy + m * hh)
     end
   else
-    local pk = ctx.peaks and ctx.peaks(e, w)
+    local pk = ctx.peaks and ctx.peaks(e, ntot)
     S.dbg = ('sample w=%d src=%s len=%.3f rate=%.2f offs=%.3f pk=%s guid=%s'):format(w, tostring(e.src), e.len or -1, e.rate or -1, e.offs or -1, pk and pk.n or 'nil', tostring(e.guid))
     if pk and pk.n > 0 then
       for px = 0, w - 1 do
-        local idx = math.floor(px / w * pk.n) + 1
+        local idx = idx_of(px, pk.n)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
         if b - a < 0.02 then a, b = -0.01, 0.01 end
         gfx.line(x + px, cy - b * hh, x + px, cy - a * hh)
@@ -496,7 +535,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if e.file and ctx.preview_pos then
     local pos, plen, ppath = ctx.preview_pos()
     if pos and ppath == e.path and (e.len or 0) > 0 then
-      local px = x + math.floor(math.max(0, math.min(1, pos / e.len)) * (w - 1))
+      local px = tx(math.max(0, math.min(e.len, pos)))
       U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
     end
   elseif e.item and ctx.preview_src_pos then
@@ -505,18 +544,17 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local spos, path = ctx.preview_src_pos()
     if spos and path ~= '' and path == e.fpath and (e.len or 0) > 0 then
       local pos = (spos - (e.offs or 0)) / ((e.rate and e.rate ~= 0) and e.rate or 1)
-      if pos >= 0 and pos <= e.len then
-        local px = x + math.floor(pos / e.len * (w - 1))
+      if pos >= va and pos <= vb then
+        local px = math.min(x + w - 1, tx(pos))
         U.set(U.AMBER); gfx.rect(px, wy, 1, wh, 1)
       end
     end
   end
   -- транзиенты (только в правке) и слайсы с буквами
-  local len = e.len > 0 and e.len or 1
   if editing then
     U.set(U.GREY)
     for _, t in ipairs(S.trans) do
-      local px = x + math.floor(t / len * w)
+      local px = tx(t)
       if px >= x and px < x + w then gfx.line(px, wy, px, wy + 6); gfx.line(px, wy + wh - 6, px, wy + wh) end
     end
   end
@@ -524,10 +562,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- края зоны слайса тянутся мышью (2 окт): S.zone_hot = 'a' | 'b' под мышью,
   -- S.wave = прямоугольник волны и длина — main считает долю и правит item
   S.zone_hot = nil
-  S.wave = { x = x, y = wy, w = w, h = wh, len = len }
+  S.wave = { x = x, y = wy, w = w, h = wh, len = len, va = va, vb = vb }
   if zone then
     local za, zb = math.max(0, math.min(len, zone[1])), math.max(0, math.min(len, zone[2]))
-    local px0, px1 = x + math.floor(za / len * w), x + math.floor(zb / len * w)
+    local px0, px1 = math.max(x, math.min(x + w, tx(za))), math.max(x, math.min(x + w, tx(zb)))
     local mxw, myw = gfx.mouse_x, gfx.mouse_y
     local inw = myw >= wy and myw < wy + wh
     local dragging = S.zone_drag and S.zone_drag.edge
@@ -564,9 +602,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local hover_slice
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
   for k, t in ipairs(slices) do
-    local px = x + math.floor(t / len * w)
+    local px = tx(t)
     -- только в рамках волны (3 окт: слайсы исходника за концом показанного куска лезли на свойства)
-    if t < -1e-6 or px > x + w - 1 then goto next_slice end
+    if t < va - 1e-6 or px > x + w - 1 then goto next_slice end
     local hot = (in_wave and math.abs(gfx.mouse_x - px) <= 4) or (S.drag and S.drag.kind == 'slice' and S.drag.k == k)
     if hot then hover_slice = k end
     U.set(hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
@@ -578,7 +616,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local sel = (S.entry and (S.entry == e or S.entry.item == e.item and e.item)) and S.sel or nil
   if sel then
     local a, b = math.min(sel.a, sel.b), math.max(sel.a, sel.b)
-    local px0, px1 = x + math.floor(a / len * w), x + math.floor(b / len * w)
+    local px0, px1 = tx(a), tx(b)
     px0, px1 = math.max(x, math.min(x + w, px0)), math.max(x, math.min(x + w, px1))
     U.set(U.AMBER); gfx.a = 0.25; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
@@ -586,13 +624,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
     or (#slices > 0 and ('%d slices; Sxx in fx column = slice'):format(#slices) or '')
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
+  if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
   U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end
   if hover_norm then return { e = e, norm = true } end
   if gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh then
-    return { e = e, frac = (gfx.mouse_x - x) / w, slice = hover_slice }
+    return { e = e, frac = S.x_to_t(gfx.mouse_x) / len, slice = hover_slice, wave = true }
   end
 end
 

@@ -273,6 +273,8 @@ function D.layout(snap, state, nregions)
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
   L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh), math.floor(gfx.h * 0.19)))) or 0
   if state.top and state.top_px then L.top_h = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), state.top_px)) end
+  -- большой редактор сэмпла (3 окт, :big): вкладка item на всю высоту окна
+  if state.top and state.sample_big and state.toptab == 'sample' then L.top_h = math.max(L.top_h, gfx.h - (state.statpos == 'tracker' and 0 or (L.rh + 4)) - 2) end
   L.pool_h = L.top_h
   L.ctrl_w = L.cw * 30 + 2 * L.pad
   L.inst_w = state.side and 0 or (L.cw * 32 + 2 * L.pad)

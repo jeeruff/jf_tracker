@@ -1951,6 +1951,12 @@ ctx = {
       end
     end
   end,
+  -- большой редактор сэмпла (3 окт, :big / кнопка big): вкладка item на всё окно
+  sample_big = function()
+    state.sample_big = not state.sample_big
+    if state.sample_big then state.top = true; state.toptab = 'sample'; ctx.set_focus('top') end
+    vim.msg = state.sample_big and 'big sample editor: wheel zoom at the mouse, sideways / Shift+wheel scroll; :big or big - back' or 'sample editor back to the top panel'
+  end,
   -- PT-mode (3 окт, :pt): вид ProTracker — только трекер и скопы видимых
   -- треков сверху; матрица, lib / браузер, DSP спрятаны, курсор в центре, метры.
   -- Повтор — всё как было (state.pt_saved)
@@ -5428,7 +5434,8 @@ local function frame()
     elseif hover.sample and hover.sample.vol then
       ctx.set_focus('top'); if hover.sample.e.item then edit.item_vol(hover.sample.e.item, 0); hover.sample.e.vol = 1; vim.msg = 'vol 0 dB' end
     elseif hover.sample and hover.sample.view then
-      ctx.set_focus('top'); SL.view = hover.sample.view
+      ctx.set_focus('top')
+      if hover.sample.view == 'big' then ctx.sample_big() else SL.view = hover.sample.view end
       click = { t = now2, zone = 'sampleview' }
     elseif hover.sample and SL.zone_hot then
       -- край зоны слайса: тянуть начало / конец слайса по большому сэмплу (2 окт)
@@ -5438,7 +5445,7 @@ local function frame()
         local p = e.parent; local pr = (p.rate and p.rate ~= 0) and p.rate or 1
         local a0, b0 = (e.offs - p.offs) / pr, (e.offs - p.offs + e.len * (e.rate or 1)) / pr
         local wv = SL.wave
-        local grab = (wv and wv.w > 0) and ((gfx.mouse_x - wv.x) / wv.w * wv.len) or a0
+        local grab = (wv and wv.w > 0) and SL.x_to_t(gfx.mouse_x) or a0
         SL.zone_drag = { edge = SL.zone_hot, e = e, p = p, a = a0, b = b0, a0 = a0, b0 = b0, inst = vim.inst, grab = grab }
       end
       click = { t = now2, zone = 'slicezone' }
@@ -6139,7 +6146,7 @@ local function frame()
     local zd, wv = SL.zone_drag, SL.wave
     if gfx.mouse_cap & 1 == 1 then
       if wv and wv.w > 0 then
-        local raw = math.max(0, math.min(wv.len, (gfx.mouse_x - wv.x) / wv.w * wv.len))
+        local raw = math.max(0, math.min(wv.len, SL.x_to_t(gfx.mouse_x)))   -- по окну зума
         if zd.edge == 'move' then
           -- полоса внизу: вся зона едет, длина та же; начало липнет (snap)
           local w = zd.b0 - zd.a0
@@ -6328,6 +6335,13 @@ local function frame()
   if gfx.mouse_wheel ~= 0 and hover.rglen then
     ctx.region_len_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
+  end
+  -- волна во вкладке item (3 окт): колесо — зум у мыши, Shift / вбок — прокрутка
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and hover.sample and hover.sample.wave and not hover.sample.vol then
+    if (gfx.mouse_hwheel or 0) ~= 0 then SL.scroll(gfx.mouse_hwheel > 0 and 0.15 or -0.15)
+    elseif gfx.mouse_cap & 8 == 8 then SL.scroll(gfx.mouse_wheel > 0 and -0.15 or 0.15)
+    else SL.zoom(gfx.mouse_wheel > 0 and 0.7 or 1 / 0.7, SL.x_to_t(gfx.mouse_x)) end
+    gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
   end
   if gfx.mouse_wheel ~= 0 and hover.sample and hover.sample.vol then
     SL.entry = SL.entry or hover.sample.e
