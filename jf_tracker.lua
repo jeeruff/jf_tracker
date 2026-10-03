@@ -98,6 +98,7 @@ local state = {
   -- режим превью инструмента (3 окт): full — до конца item / Esc, hold — пока
   -- держишь кнопку мыши на строке, sec — первая секунда
   theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
+  tlruler = (function() local v = reaper.GetExtState(EXT, 'tlruler'); return (v == 'beats' or v == 'time' or v == 'both') and v or 'off' end)(),   -- линейка у номеров (3 окт)
   curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
@@ -341,7 +342,7 @@ local function save_win()
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
-  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper')
+  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
   S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
@@ -2052,6 +2053,7 @@ ctx = {
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
+      { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'line', 'header', 'full' }, desc = 'line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name)', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
@@ -4369,6 +4371,12 @@ local function frame()
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
+    -- метки линейки таймлайна для строки (3 окт): форматы REAPER (2 — такты.доли, 0 — время)
+    tl_label = state.tlruler ~= 'off' and function(row)
+      local t = reaper.TimeMap2_QNToTime(0, row / state.lpb)
+      local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')
+      return b, reaper.format_timestr_pos(t, '', 0)
+    end or nil,
     timesel = (function()
       local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
       if b - a < 1e-6 then return nil end

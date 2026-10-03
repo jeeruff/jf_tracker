@@ -249,7 +249,13 @@ function D.layout(snap, state, nregions)
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
   -- две узкие дорожки с вертикальным текстом: регионы (полоса цвета) и маркеры
   L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
-  L.label_w = L.ruler_w + ms('0000') + 2 * L.pad
+  -- линейка таймлайна справа от номеров (3 окт, опция tlruler): метки REAPER
+  -- на долях — beats (такт.доля), time (время), both
+  local tlr = state.tlruler or 'off'
+  L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
+    or (tlr == 'both' and ms('999.4') + ms('0:00.000') + 2 * L.pad) or 0
+  L.num_w = ms('0000') + 2 * L.pad
+  L.label_w = L.ruler_w + L.num_w + L.tl_w
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
   L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh), math.floor(gfx.h * 0.19)))) or 0
@@ -1769,8 +1775,17 @@ function D.frame(L, snap, rows, state, info)
       if is_cur_row then set(D.CURTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.CURTOP } end
       if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.EDITTOP } end
     end
-    if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + L.label_w - 4, y, 3, L.rh, 1) end
+    if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + L.ruler_w + L.num_w - 4, y, 3, L.rh, 1) end
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки REAPER)
+    if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
+      local b, t = info.tl_label(r.row)
+      local tx = tx0 + L.ruler_w + L.num_w
+      local tcol = r.bar and U.TEXT or U.GREY
+      local tlr = state.tlruler
+      if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
+      if tlr == 'time' or tlr == 'both' then text(tx, ty, t, tlr == 'both' and U.GREY or tcol) end
+    end
     local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     -- номера шагов (2 окт): протяжка = time selection REAPER
@@ -2069,7 +2084,7 @@ function D.frame(L, snap, rows, state, info)
       if info.timesel[2] <= row0 + nr then gfx.rect(sx - 5, y1 - 2, 7, 2, 1) end
     end
   end
-  set(D.SEP); gfx.rect(tx0 + L.label_w - 1, L.body_y, 1, L.body_h, 1)
+  -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
