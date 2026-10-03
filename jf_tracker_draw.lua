@@ -2400,35 +2400,38 @@ function D.frame(L, snap, rows, state, info)
     local g = info.seam_guide
     set(U.CYAN); gfx.rect(g.x, g.y, g.w, 2, 1)
   end
-  -- пик-метры ПОВЕРХ колонок, как в ProTracker: столбик от самого низа
-  -- колонки вверх, высота = уровень × высота тела, полупрозрачный — текст
-  -- под ним читается
+  -- пик-метры ПОВЕРХ колонок, псевдографикой (3 окт): два столбика L R
+  -- шириной в символ у левого края колонки, из клеток строк трекера (зазор 1 px,
+  -- как текстовые блоки ▁▂▃▄▅▆▇█): полные клетки снизу, верхняя — восьмыми
+  -- долями; зелёный / янтарный / красный по высоте, полупрозрачно — текст виден
   if state.meters and info.peaks then
-    do
-      local by = L.body_y + L.body_h
-      do
-        local maxh = math.floor(L.body_h * 0.5)          -- до середины тела
-        for _, c in ipairs(L.cols) do
-          local pl, pr = info.peaks(c.col)
-          local v = math.min(1, math.max(pl, pr))
-          local h = math.floor(v * maxh + 0.5)
-          if h > 0 then
-            local x0, w0 = c.x + 2, math.max(2, math.floor(c.w * 0.3))
-            local y0 = math.max(L.body_y, by - h)
-            local g, a, r = U.GREEN, U.AMBER, U.RED
-            -- три сегмента снизу вверх: зелёный / янтарный / красный
-            local seg = { { 0, 0.6, g }, { 0.6, 0.85, a }, { 0.85, 1, r } }
-            for _, sg in ipairs(seg) do
-              local s0, s1 = math.floor(sg[1] * maxh), math.floor(math.min(v, sg[2]) * maxh)
-              if s1 > s0 then
-                gfx.set(sg[3][1], sg[3][2], sg[3][3], 0.45)
-                gfx.rect(x0, math.max(L.body_y, by - s1), w0, s1 - s0, 1)
-              end
-            end
+    local rh = L.rh
+    local ncell = math.max(1, math.floor(L.nrows * 0.5))       -- до середины тела
+    local by = L.body_y + L.nrows * rh
+    local cwm = math.max(3, L.cw - 1)
+    for _, c in ipairs(L.cols) do
+      if c.x and not c.folded then
+        local pl, pr = info.peaks(c.col)
+        for k, v in ipairs({ pl or 0, pr or 0 }) do
+          v = math.min(1, math.max(0, v))
+          local eighths = math.floor(v * ncell * 8 + 0.5)
+          local x0 = c.x + 2 + (k - 1) * (cwm + 1)
+          local cell = 0
+          while eighths > 0 and cell < ncell do
+            local part = math.min(8, eighths)
+            local frac = (cell + 1) / ncell
+            local col = frac > 0.85 and U.RED or (frac > 0.6 and U.AMBER or U.GREEN)
+            local cy1 = by - cell * rh - 1                  -- низ клетки (зазор 1 px сверху и снизу)
+            local hh = math.max(1, math.floor((rh - 2) * part / 8 + 0.5))
+            gfx.set(col[1], col[2], col[3], 0.5)
+            gfx.rect(x0, cy1 - hh, cwm, hh, 1)
+            eighths = eighths - part
+            cell = cell + 1
           end
         end
       end
     end
+    gfx.a = 1
   end
 
   -- разделители
