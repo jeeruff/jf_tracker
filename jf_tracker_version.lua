@@ -7,6 +7,7 @@ V.CHANGES = {
   { v = '0.5.65', d = '2026-10-03', items = {
     'about moved to the main module (cell next to help / hints, :about) and opens on its own; Esc closes it',
     'about logo: the generated graffiti styles are gone - five hand-made JFTRACKER logos instead, a different one each time; drawn on a character grid by the tracker itself (blocks, shades, diagonals), so the block art stays aligned in the bitmap-only UI and shrinks to the window width',
+    'about: colour ANSI logos as pictures - every PNG in jf_tracker/logos/ joins the rotation (tools/logo_import.py crops a new one); shrunk smoothly, enlarged by whole factors without smoothing',
   } },
   { v = '0.5.64', d = '2026-10-03', items = {
     'TTF fonts and Nerd icons removed: the tracker is bitmap only (REAPER pixel font, x1..x3); non-ASCII text (Cyrillic names) falls back to the system mono font at the bitmap height; :font / :nerd / :fontface / :hybrid / :icons only say so',

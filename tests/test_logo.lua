@@ -33,6 +33,15 @@ for i = 1, 40 do
 end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
 eq('pick never repeats', same, false); eq('pick covers all', cnt, 5)
+-- с картинками из logos/: n = текстовые + картинки
+seen, prev, same = {}, nil, false
+for i = 1, 200 do
+  local k = LG.pick(prev, function(a, b) return a + ((i * 7) % (b - a + 1)) end, 17)
+  if k == prev then same = true end
+  seen[k] = true; prev = k
+end
+cnt = 0; for k in pairs(seen) do if k >= 1 and k <= 17 then cnt = cnt + 1 end end
+eq('pick with images never repeats', same, false); eq('pick with images covers all 17', cnt, 17)
 -- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
 local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
 eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)

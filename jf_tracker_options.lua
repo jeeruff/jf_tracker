@@ -97,8 +97,9 @@ end
 local function draw_about(L, W, H)
   local rh = L.rh
   local LGO = ctx.logo
-  local lw = O.logo and LGO and LGO.size(O.logo) or 0
-  local bw = math.min(W - 2 * L.pad - 20, math.max(lw * L.cw, L.cw * 80) + 4 * L.pad)
+  local img = O.logo and O.logo.image
+  local lw = img and O.logo.w or (O.logo and LGO and LGO.size(O.logo) * L.cw or 0)
+  local bw = math.min(W - 2 * L.pad - 20, math.max(lw, L.cw * 80) + 4 * L.pad)
   local bh = math.min(H - 2 * rh, math.max(rh * 12, H - 6 * rh))
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
   O.box = { bx, by, bw, bh }
@@ -108,7 +109,18 @@ local function draw_about(L, W, H)
   U.text(bx + L.pad, by + 2, ctx.fit('about   j k / wheel: scroll   Esc: close', bw - 2 * L.pad), U.AMBER)
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local y = by + rh + 2 + L.pad
-  if O.logo and LGO then
+  if img then
+    -- картинка ANSI: вписать в ширину и в треть высоты; уменьшение — со
+    -- сглаживанием, увеличение — целым множителем без него (пиксели чёткие)
+    local aw, ah = bw - 2 * L.pad, math.floor(bh / 3)
+    local s = math.min(aw / O.logo.w, ah / O.logo.h)
+    if s > 1 then s = math.floor(s) end
+    local dw, dh = math.floor(O.logo.w * s), math.floor(O.logo.h * s)
+    gfx.mode = s >= 1 and 4 or 0
+    gfx.blit(img, 1, 0, 0, 0, O.logo.w, O.logo.h, bx + math.floor((bw - dw) / 2), y, dw, dh)
+    gfx.mode = 0
+    y = y + dh + L.pad
+  elseif O.logo and LGO then
     local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad, L.cw, rh)
     if cw then
       local w, h = LGO.size(O.logo)
