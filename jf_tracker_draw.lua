@@ -2231,13 +2231,13 @@ function D.frame(L, snap, rows, state, info)
     -- шапка: [track] [take] — чья цепочка показана (t переключает), затем имя
     do
       local hx = fbw + L.pad
-      for _, b in ipairs({ { 'track', false }, { 'take', true } }) do
+      for _, b in ipairs({ { 'track', false, 'track fx' }, { 'take', true, 'take fx' } }) do
         local on = (info.dsp_is_take or false) == b[2]
-        local bw = ms(b[1]) + 2 * L.pad
+        local bw = ms(b[3]) + 2 * L.pad
         local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
         set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(hx, dy + 2, bw, L.rh, 1)
         set(on and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, b[1], on and U.AMBER or (hot and U.TEXT or U.GREY))
+        text(hx + L.pad, dy + 3, b[3], on and U.AMBER or (hot and U.TEXT or U.GREY))
         if hot then hover.dsptarget = b[1] end
         hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
         hx = hx + bw + L.pad
@@ -2420,13 +2420,10 @@ function D.frame(L, snap, rows, state, info)
           end
         else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
-          set(acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
-        end
-        -- цвет категории (3 окт): громкость / фильтр / время / высота / микс /
-        -- динамика / стерео / модуляция — полоска слева от имени
-        if p.cat and p.cat ~= 'other' and p.cat ~= 'mode' then
-          local cc = D.cat_colour(p.cat)
-          if cc then set(cc); gfx.rect(bxc + 2, py + 2, 2, L.rh - 4, 1) end
+          -- цвет категории (громкость / фильтр / время …) — заливкой слайдера,
+          -- не полоской у имени (3 окт: полоска липла к первой букве)
+          local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
+          set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
         if vw > 4 then text(vx, py, fit(v.s, vw), U.GREY) end
