@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.43'
+V.VERSION = '0.5.44'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.44', d = '2026-10-03', items = {
+    'the sample tab is called item (REAPER terms: it edits the selected instrument item); :tab item works, :tab sample still too',
+  } },
   { v = '0.5.43', d = '2026-10-03', items = {
     'REAPER actions from the tracker, kept apart from tracker commands: \\ a or :!text opens fzf over every Main action (native list incl. scripts and custom actions), recently run ones on top (scripts remembered by name)',
   } },

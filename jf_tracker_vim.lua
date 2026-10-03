@@ -596,7 +596,7 @@ local function run_cmd(line)
   elseif cmd == 'scale' and n then ctx.set_scale(math.max(1, math.min(4, math.floor(n)))); V.msg = 'bitmap x' .. math.floor(n)
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
-    local a = arg == 'mod' and 'modulation' or arg
+    local a = (arg == 'mod' or arg == 'modulate') and 'modulation' or ((arg == 'item') and 'sample' or arg)
     st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or a == 'garden') and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then

@@ -186,7 +186,7 @@ KH.PAGES = {
     { k = 'drag title', d = 'move fx: the amber line shows where it lands' },
     { k = 'Esc', d = 'back to tracker' },
   } },
-  sample = { title = 'sample tab (slicer + properties)', e = {
+  sample = { title = 'item tab (slicer + properties of the item)', e = {
     { k = 'Enter', d = 'apply slicing / insert selection at cursor' },
     { k = 'a', d = 'select all' },
     { k = 'v', d = 'view: peaks / spectral' },
