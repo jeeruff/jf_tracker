@@ -7,8 +7,8 @@ local function eq(name, got, want)
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
 eq('at least ten logos', #LG.LOGOS >= 10, true)
-local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1, ['■'] = 1, ['▬'] = 1, ['·'] = 1, ['.'] = 1, ['═'] = 1 }
-local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 }, ansi_stone = { 99, 7 }, ansi_pipes = { 110, 6, ansi_wire = { 81, 6 }, ansi_magenta = { 63, 5 }, ansi_flagbar = { 75, 7 }, ansi_rings = { 71, 7 }, native_blocks = { 103, 5 }, ansi_white = { 88, 6 }, box_dots = { 92, 6 }, ansi_plum = { 95, 7 }, ansi_moss = { 100, 8 }, ansi_jungle = { 87, 8 }, ansi_marquee = { 152, 7 } } }
+local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1, ['■'] = 1, ['▬'] = 1, ['·'] = 1, ['.'] = 1, ['═'] = 1, ['<'] = 1, ['>'] = 1 }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 }, ansi_stone = { 99, 7 }, ansi_pipes = { 110, 6, ansi_wire = { 81, 6 }, ansi_magenta = { 63, 5 }, ansi_flagbar = { 75, 7 }, ansi_rings = { 71, 7 }, native_blocks = { 103, 5 }, ansi_white = { 88, 6 }, box_dots = { 92, 6 }, ansi_plum = { 95, 7 }, ansi_moss = { 100, 8 }, ansi_jungle = { 87, 8 }, ansi_marquee = { 152, 7 }, ansi_lines = { 78, 6 } } }
 for _, lg in ipairs(LG.LOGOS) do
   local w, h = LG.size(lg)
   if SIZES[lg.name] then eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])

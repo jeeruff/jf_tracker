@@ -139,7 +139,19 @@ local function draw_about(L, W, H)
         local a0, a1 = math.max(dx, sx), math.min(dx + aw, sx + iw)
         if a1 > a0 then gfx.blit(1022, 1, 0, a0 - sx, 0, a1 - a0, ih, a0, y, a1 - a0, ih) end
       else
-        gfx.blit(1022, 1, 0, 0, 0, iw, ih, bx + math.floor((bw - iw) / 2), y, iw, ih)
+        local lx0 = bx + math.floor((bw - iw) / 2)
+        gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
+        if O.logo.pulse then
+          -- перелив (3 окт): медленная волна по столбцам — от полной яркости до
+          -- чёрного; поверх готовой картинки полупрозрачные чёрные полосы
+          local t = ctx.now and ctx.now() or os.clock()
+          local ncol = math.floor(iw / cw)
+          for k = 0, ncol - 1 do
+            local a = 0.5 - 0.5 * math.cos(t * 0.9 - k * 0.18)
+            if a > 0.02 then gfx.set(0, 0, 0, a); gfx.rect(lx0 + k * cw, y, cw, ih, 1) end
+          end
+          gfx.a = 1
+        end
       end
       y = y + ih + L.pad
     else
