@@ -109,11 +109,24 @@ local function draw_about(L, W, H)
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local y = by + rh + 2 + L.pad
   if O.logo and LGO then
-    local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad, L.cw, rh)
+    -- чёрная плашка с полем в клетку, как в генераторах ANSI; рисуется один
+    -- раз в картинку 1022 (дизеринг попиксельный), дальше только blit
+    local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad - 4 * L.cw, L.cw, rh)
     if cw then
       local w, h = LGO.size(O.logo)
-      LGO.draw(O.logo, bx + math.floor((bw - w * cw) / 2), y, cw, ch, U.AMBER, U.BG)
-      y = y + h * ch + L.pad
+      local iw, ih = (w + 2) * cw, (h + 1) * ch
+      local key = O.logo.name .. cw .. 'x' .. ch
+      if O.logo_key ~= key then
+        local old = gfx.dest
+        gfx.setimgdim(1022, -1, -1); gfx.setimgdim(1022, iw, ih)
+        gfx.dest = 1022
+        gfx.set(0, 0, 0, 1); gfx.rect(0, 0, iw, ih, 1)
+        LGO.draw(O.logo, cw, math.floor(ch / 2), cw, ch, U.AMBER)
+        gfx.dest = old
+        O.logo_key = key
+      end
+      gfx.blit(1022, 1, 0, 0, 0, iw, ih, bx + math.floor((bw - iw) / 2), y, iw, ih)
+      y = y + ih + L.pad
     else
       U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad
     end

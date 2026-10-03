@@ -6,9 +6,9 @@ local function eq(name, got, want)
   n = n + 1
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
-eq('five logos', #LG.LOGOS, 5)
-local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▒'] = 1, ['▓'] = 1 }
-local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 } }
+eq('six logos', #LG.LOGOS, 6)
+local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1 }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 } }
 for _, lg in ipairs(LG.LOGOS) do
   local w, h = LG.size(lg)
   eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
@@ -32,17 +32,33 @@ for i = 1, 40 do
   seen[k] = true; prev = k
 end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
-eq('pick never repeats', same, false); eq('pick covers all', cnt, 5)
+eq('pick never repeats', same, false); eq('pick covers all', cnt, 6)
 -- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
 local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
 eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)
 cw, ch = LG.cell(LG.LOGOS[1], 404, 8, 16)
 eq('cell shrinks', cw, 4); eq('cell shrinks h', ch, 8)
 eq('cell too narrow', LG.cell(LG.LOGOS[1], 150, 8, 16), nil)
+-- раскраска: у каждого логотипа схема, все цвета из палитры
+for _, lg in ipairs(LG.LOGOS) do
+  local sc, ok = LG.SCHEME[lg.name], true
+  if not sc then ok = false else for _, st in ipairs(sc) do if not LG.PAL[st[2]] or (st[3] and not LG.PAL[st[3]]) then ok = false end end end
+  eq(lg.name .. ' scheme', ok, true)
+end
+local rub = LG.LOGOS[6]
+local f1 = LG.row_colour(rub, 1); local f3 = LG.row_colour(rub, 3); local f9, s9 = LG.row_colour(rub, 9)
+eq('rubble edge lightgrey', f1, LG.PAL.lightgrey); eq('rubble top darkgrey', f3, LG.PAL.darkgrey)
+eq('rubble bottom brown', f9, LG.PAL.brown); eq('rubble dither yellow', s9, LG.PAL.yellow)
+-- дизеринг: доля горящих точек 1/4, 1/2, 3/4
+for c, want in pairs({ ['░'] = 1, ['▒'] = 2, ['▓'] = 3 }) do
+  local on = 0
+  for x = 0, 1 do for y = 0, 1 do if LG.DITHER[c](x, y) then on = on + 1 end end end
+  eq('dither ' .. c, on, want)
+end
 -- отрисовка со стабом gfx не падает
 local rects = 0
 gfx = { set = function() end, rect = function() rects = rects + 1 end, line = function() end }
-for _, lg in ipairs(LG.LOGOS) do LG.draw(lg, 0, 0, 4, 8, { 1, 0.7, 0 }, { 0, 0, 0 }) end
+for _, lg in ipairs(LG.LOGOS) do LG.draw(lg, 0, 0, 4, 8, { 1, 0.7, 0 }) end
 eq('draw makes rects', rects > 500, true)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
