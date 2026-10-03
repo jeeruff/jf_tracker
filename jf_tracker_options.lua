@@ -335,7 +335,7 @@ function O.draw(L, W, H)
   U.set(U.LINE); gfx.rect(bx, by + bh - rh - 2, bw, 1, 1)
   -- описание — строки под мышью, иначе выбранной клавишами
   local it = O.items[O.hover or O.sel]
-  U.text(bx + L.pad, by + bh - rh, ctx.fit(it and it.desc or '', bw - 2 * L.pad), U.GREY)
+  U.text(bx + L.pad, by + bh - rh, ctx.fit(it and it.desc or '', bw - 2 * L.pad), U.GREY)   -- описания короткие (3 окт), в строку
 end
 
 return O

@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.82'
+V.VERSION = '0.5.83'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.83', d = '2026-10-03', items = {
+    'options: every description shortened to one line - it fits the bottom line of the window',
+  } },
   { v = '0.5.82', d = '2026-10-03', items = {
     'fix: the wave column no longer darkens when the cursor is on the note - only the wave inside the note field (wave: note) follows the cursor highlight',
   } },
