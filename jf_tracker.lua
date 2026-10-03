@@ -350,6 +350,8 @@ draw.set_font(state)
 local function save_win()
   local d, x, y = gfx.dock(-1, 0, 0, 0, 0)
   local S = function(k, v) reaper.SetExtState(EXT, k, tostring(v), true) end
+  -- PT-mode не сохраняется (3 окт): пишется раскладка, бывшая до него
+  if state.ptmode and state.pt_saved then for k, v in pairs(state.pt_saved) do state[k] = v end; state.ptmode = false end
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
@@ -1948,6 +1950,33 @@ ctx = {
         model.invalidate()
       end
     end
+  end,
+  -- PT-mode (3 окт, :pt): вид ProTracker — только трекер и скопы видимых
+  -- треков сверху; матрица, lib / браузер, DSP спрятаны, курсор в центре, метры.
+  -- Повтор — всё как было (state.pt_saved)
+  pt_toggle = function()
+    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'khelp' }
+    if state.ptmode then
+      for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
+      state.ptmode, state.pt_saved = false, nil
+      if state.focus ~= 'tracker' then ctx.set_focus('tracker') end
+      vim.msg = 'PT-mode off: layout back'
+    else
+      state.pt_saved = {}
+      for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
+      state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
+      state.fixed, state.meters, state.khelp = true, true, false
+      if not state.scopes then ctx.toggle_scopes(true) end
+      state.ptmode = true
+      ctx.set_focus('tracker')
+      vim.msg = 'PT-mode: tracker + scopes of the visible tracks (:pt again - back)'
+    end
+  end,
+  -- треки, видимые сейчас в трекере (скопы PT-mode)
+  visible_cols = function()
+    local out = {}
+    for _, c in ipairs(L and L.cols or {}) do if c.x and not c.hidden then out[#out + 1] = c.col end end
+    return out
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -4742,7 +4771,7 @@ local function frame()
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = snap.cols, peaks = track_peaks, poolsort = state.poolsort,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
