@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.88'
+V.VERSION = '0.5.89'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.89', d = '2026-10-03', items = {
+    'lib: no @ / $ marks and legend; the mini wave of a sliced sample shows its slice boundaries and lights the zone of the slice in play (selected or under the cursor)',
+    'item tab: with the cursor on a slice note it shows the parent sample with that slice zone and the slice properties',
+  } },
   { v = '0.5.88', d = '2026-10-03', items = {
     'cleanup: dead code removed - unused ctx entries (browser_find, ctrl_held, inst_preview_pos, depot, set_fontface + the TTF font list, retro_put / retro_loop wrappers), edit fx_value / depot_items / item_set / take_set, keyhelp animating, draw ai_colour, cmds tk_time, slicer fft; profile checked: a frame draws in ~4.6 ms (scopes tab open), worst ~9 ms, of a ~30 ms tick',
   } },

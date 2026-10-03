@@ -4471,6 +4471,7 @@ local function frame()
   snap, changed = model.snapshot(state.lpb)
   draw.inst_of = snap and snap.inst_of
   draw.inst_num = snap and snap.inst_num
+  draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
@@ -4808,15 +4809,26 @@ local function frame()
       local e = col and (col.pool or {})[vim.inst]
       -- файл из браузера (v / Space / auto) показывается вместо инструмента
       if SL.entry and SL.entry.file then e = SL.entry end
+      -- слайсы вложены (3 окт): курсор на ноте-слайсе этого исходника — его зона
+      local zi = vim.inst
+      if e and not e.parent and not e.file and snap and snap.inst_of then
+        local f = L and L.flat[vim.cur.fi]
+        local cell = f and f.sub and f.sub[vim.cur.row]
+        if cell and cell.kind == 'cont' then cell = cell.of end
+        local ci = cell and cell.item and snap.inst_of[cell.item]
+        local ce = ci and col.pool[ci]
+        if ce and ce.parent == e then e, zi = ce, ci end
+      end
       -- слайс / кусок: показываем исходник (родителя) с подсветкой играемой зоны
       local sel_e = e
       local zone
       if e and e.parent and not (SL.active and SL.entry == e) then
         local p = e.parent
-        zone = { (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1), (e.offs - p.offs + e.len * e.rate) / (p.rate ~= 0 and p.rate or 1), vim.inst }
+        zone = { (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1), (e.offs - p.offs + e.len * e.rate) / (p.rate ~= 0 and p.rate or 1), zi }
         -- тянется край — зона живая
-        if SL.zone_drag and SL.zone_drag.e.item == e.item then zone = { SL.zone_drag.a, SL.zone_drag.b, vim.inst } end
-        if mm_pend.zone and mm_pend.zone.e.item == e.item then zone = { mm_pend.zone.a, mm_pend.zone.b, vim.inst } end   -- ручка MIDI
+        if SL.zone_drag and SL.zone_drag.e.item == e.item then zone = { SL.zone_drag.a, SL.zone_drag.b, zi } end
+        if mm_pend.zone and mm_pend.zone.e.item == e.item then zone = { mm_pend.zone.a, mm_pend.zone.b, zi } end   -- ручка MIDI
+        draw.lib_zone = { root = p, a = zone[1], b = zone[2] }
         e = p
       end
       -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
@@ -4955,19 +4967,12 @@ local function frame()
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len; numbers stay'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
-  elseif hover.poolmark then
-    local e, parts = hover.poolmark.e, {}
-    parts[#parts + 1] = hover.poolmark.here and '@ = used on the cursor track' or '(no @: not on the cursor track)'
-    if e.slices then parts[#parts + 1] = ('$ = sliced (%d slices)'):format(#e.slices) end
-    parts[#parts + 1] = 'stored on ' .. tostring(e.home) .. (hover.poolmark.lib and ' (library after =LIB)' or '')
-    if e.parent then parts[#parts + 1] = ('s%s = slice of %s (%.3f-%.3fs of its source)'):format(e.slice_k and tostring(e.slice_k) or '?', e.parent.name, (e.offs - e.parent.offs) / (e.parent.rate ~= 0 and e.parent.rate or 1), (e.offs - e.parent.offs + e.len * e.rate) / (e.parent.rate ~= 0 and e.parent.rate or 1)) end
-    state.status = table.concat(parts, '   ')
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
     vol = 'vl: volume / velocity, hex 00..FF (80 = unity)',
     delay = 'dl: delay inside the row, hex xx/256 of a row',
-    fx = 'fx: effect command, letter + hex hex (Sxx offset / slice as in Renoise, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
+    fx = 'fx: effect command, letter + hex hex (Sxx slice of the sample / offset, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'

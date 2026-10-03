@@ -1635,9 +1635,6 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     tbtn('preview', info.poolprev, 'prevbtn')
     tbtn('insert', info.inspreview, 'insprevbtn')
-    -- легенда меток
-    local lg = '@ on cursor track  $ sliced'
-    text(bx + L.pad, by, fit(lg, ix + w - bx - 2 * L.pad - (L.inst_knob_w or 0)), U.DIM)
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
   L.pool_rows = rows
@@ -1709,7 +1706,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- метки: @ трек курсора, $ нарезан; ребёнок (слайс / кусок исходника) —
       -- с отступом и sN вместо имени исходника (дерево как в Renoise, 2 окт)
       local child = (e.depth or 0) > 0
-      local marks = (here and '@' or ' ') .. (e.slices and '$' or ' ')
+      -- меток @ / $ нет (3 окт): слайсы вложены, трек виден по цветной полоске
       local body
       if child then
         -- ветка дерева: |- у среднего ребёнка, `- у последнего (2 окт: видно, что слайс — часть сэмпла)
@@ -1719,12 +1716,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local last = not (nxt and (nxt.depth or 0) > 0 and nxt.parent == e.parent)
         body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut')
       else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
-      local lbl = ('%02d %s %s%s'):format(e.num or i, marks, body, e.muted and ' (muted)' or '')
+      local lbl = ('%02d %s%s'):format(e.num or i, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
-      do
-        local mx0 = ix + 6 + ms('00 ')
-        if mx >= mx0 and mx < mx0 + ms(marks) + L.pad and my >= y and my < y + L.rh then hover.poolmark = { i = i, e = e, here = here, lib = lib } end
-      end
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
       local dw = ms('88.88s') + L.pad
       local len = e.len or 0
@@ -1749,6 +1742,21 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
             gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
           end
         else gfx.line(wx, cy, wx + npix, cy) end
+        -- слайсы вложены (3 окт): границы слайсов исходника тонкими чёрточками,
+        -- зона слайса под курсором / выбранного — подсвечена
+        if e.slices and (e.len or 0) > 0 then
+          set(U.mix(wc, U.BG, 0.35))
+          for _, t in ipairs(e.slices) do
+            local px = wx + math.floor(t / e.len * npix)
+            if px > wx and px < wx + npix then gfx.rect(px, y + 1, 1, L.rh - 2, 1) end
+          end
+        end
+        local z = D.lib_zone
+        if z and z.root == e and (e.len or 0) > 0 then
+          local za = wx + math.floor(math.max(0, z.a) / e.len * npix)
+          local zb = wx + math.floor(math.min(e.len, z.b) / e.len * npix)
+          set(U.AMBER); gfx.a = 0.35; gfx.rect(za, y, math.max(1, zb - za), L.rh, 1); gfx.a = 1
+        end
         dbg[#dbg + 1] = ('%02d wx%d n%d pk%s wc%.2f,%.2f,%.2f'):format(i, wx, npix, pk and pk.n or '-', wc[1], wc[2], wc[3])
       end
       if mx >= ix and mx < ix + w and my >= y and my < y + L.rh then hover.pool = { ci = info.pool_ci, i = i } end
