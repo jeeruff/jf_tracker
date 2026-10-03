@@ -1566,7 +1566,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local tree = (info.poolsort or 'track') == 'track'
         local nxt = pool[i + 1]
         local last = not (nxt and (nxt.depth or 0) > 0 and nxt.parent == e.parent)
-        body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut') .. ' ' .. ('%.2fs'):format(e.len)
+        body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut')
       else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
       local lbl = ('%02d %s %s%s'):format(i, marks, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
@@ -1574,7 +1574,15 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local mx0 = ix + 6 + ms('00 ')
         if mx >= mx0 and mx < mx0 + ms(marks) + L.pad and my >= y and my < y + L.rh then hover.poolmark = { i = i, e = e, here = here, lib = lib } end
       end
-      local wx = ix + 6 + label_w + L.pad
+      -- длительность (3 окт): колонка перед мини-волной, место — у волны
+      local dw = ms('88.88s') + L.pad
+      local len = e.len or 0
+      local dtxt = len < 10 and ('%.2fs'):format(len) or (len < 100 and ('%.1fs'):format(len) or ('%dm%02d'):format(len // 60, math.floor(len % 60)))
+      local dx = ix + 6 + label_w + L.pad
+      if w - (dx - ix) - L.pad > dw + 8 then
+        text(dx + dw - L.pad - ms(dtxt), y + 1, dtxt, sel and U.AMBER or U.GREY)
+      else dw = 0 end
+      local wx = dx + dw
       local npix = w - (wx - ix) - L.pad
       if npix > 8 then
         local pk = get_peaks and get_peaks(e, npix)
