@@ -853,6 +853,92 @@ function D.cat_colour(cat)
   return c and U.readable(c, U.BG, 2.5) or nil
 end
 
+-- ── блок трека слева в DSP (3 окт): полноценное управление выбранным треком ──
+-- имя, R I M S A + фаза / FX, громкость, панорама, вход (меню), master send,
+-- отправки (клик — окно маршрутизации REAPER). Фон — цвет трека, как шапка
+-- канала; слайдеры и кнопки — те же hover.trs / hover.btn, что в шапке
+function D.track_block(L, info, col, x, y, w, h, hover, rawc)
+  local io = info.trk_io and info.trk_io(col)
+  if not (col and io) then return 0 end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local mode = info.hdrfill or 'line'
+  local base = (info.trsel or {})[col.guid] and D.HDRSEL or D.HDR
+  local tint = col.rgb and mode ~= 'off'
+  local nbg = tint and U.mix(base, col.rgb, 0.30) or base
+  local rbg = tint and U.mix(base, col.rgb, 0.18) or base
+  local fill = tint and rawc or set
+  fill(rbg); gfx.rect(x, y, w, h, 1)
+  fill(nbg); gfx.rect(x, y, w, L.rh + 1, 1)
+  local T0, G0 = U.TEXT, U.GREY
+  U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
+  text(x + L.pad, y + 1, fit(col.name ~= '' and col.name or 'track', w - 2 * L.pad), U.readable(T0, nbg, 4.5))
+  local yy = y + L.rh + 2
+  -- кнопки
+  local bx = x + L.pad
+  local mon = col.recmon or 0
+  local btns = { { 'R', col.armed, U.RED, 'arm' }, { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
+                 { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
+                 { 'ph', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
+  for _, b in ipairs(btns) do
+    local bw = math.max(L.btn_w, ms(b[1]) + 4)
+    if bx + bw > x + w - L.pad then break end
+    local on = b[2]
+    set((on and not b[5]) and U.tint(b[3], 0.5) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
+    set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
+    text(bx + 2, yy, b[1], on and b[3] or U.GREY)
+    if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
+      if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
+    end
+    bx = bx + bw + 1
+  end
+  yy = yy + L.rh
+  -- слайдеры громкости и панорамы (как в шапке)
+  local live = info.trs_live
+  local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
+  local function slider(sy, frac, centered, label, val, what)
+    local lw, vw = ms(label) + L.pad, ms(val) + L.pad
+    local wx0, ww = x + L.pad + lw, math.max(4, w - 2 * L.pad - lw - vw)
+    local cy = sy + math.floor(L.rh / 2)
+    local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
+    text(x + L.pad, sy, label, U.GREY)
+    set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)
+    frac = math.max(0, math.min(1, frac))
+    set(hot and U.AMBER or U.TEXT)
+    if centered then
+      local mid, px = wx0 + math.floor(ww / 2), wx0 + math.floor(frac * ww + 0.5)
+      gfx.rect(math.min(mid, px), sy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
+    else gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1) end
+    text(wx0 + ww + L.pad, sy, val, U.GREY)
+    if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww } end
+  end
+  local vol = lv('vol', col.vol or 1)
+  local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
+  if yy + L.rh <= y + h then slider(yy, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'vol', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol'); yy = yy + L.rh end
+  local pan = lv('pan', col.pan or 0)
+  local ptxt = math.abs(pan) < 0.005 and 'C' or ((pan < 0 and 'L' or 'R') .. math.floor(math.abs(pan) * 100 + 0.5))
+  if yy + L.rh <= y + h then slider(yy, (pan + 1) / 2, true, 'pan', ptxt, 'pan'); yy = yy + L.rh end
+  -- строки-кнопки: вход, выход, отправки
+  local function row(label, val, what, on)
+    if yy + L.rh > y + h then return end
+    local hot = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
+    if hot then set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, yy, w - 2, L.rh, 1); hover.trkio = { col = col, what = what } end
+    text(x + L.pad, yy, label, U.GREY)
+    local lx = x + L.pad + ms('send ') + L.pad
+    text(lx, yy, fit(val, x + w - L.pad - lx), on == false and U.GREY or U.TEXT)
+    yy = yy + L.rh
+  end
+  row('in', io.input, 'input')
+  row('out', (io.mainsend and 'master' or 'no master') .. (io.hw > 0 and ('  + hw ' .. io.hw) or ''), 'mainsend', io.mainsend)
+  for _, sd in ipairs(io.sends) do
+    local sdb = sd.vol > 1e-6 and 20 * math.log(sd.vol, 10) or -150
+    row('send', ('%s  %s'):format(sd.name, sdb <= -60 and '-inf' or ('%+.1f'):format(sdb)), 'routing', not sd.mute)
+  end
+  row('', ('routing  %d snd %d rcv'):format(#io.sends, io.recv), 'routing')
+  U.TEXT, U.GREY = T0, G0
+  set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
+  return w
+end
+
 -- «призрак» перетаскивания (DSP-блок и т.п.): янтарная бирка у курсора
 function D.ghost(label)
   if not label then return end
@@ -2234,9 +2320,19 @@ function D.frame(L, snap, rows, state, info)
     else L.fxb_rect = nil end
     -- граница список эффектов | DSP (3 окт: была чёрная щель)
     if fbw > 0 then set(D.SEP); gfx.rect(fbw - 2, dy, D.SEPW, L.dsp_h, 1) end
-    -- шапка: [track] [take] — чья цепочка показана (t переключает), затем имя
+    -- шапка: имя трека (цвет как шапка канала), [track fx] [take fx], затем имя цепочки
     do
       local hx = fbw + L.pad
+      local tcol = info.pool_col
+      if tcol then
+        local nm = tcol.name ~= '' and tcol.name or 'track'
+        local nw = ms(nm) + 2 * L.pad
+        local nb = (tcol.rgb and (info.hdrfill or 'line') ~= 'off') and U.mix(D.HDR, tcol.rgb, 0.30) or D.HDR
+        if tcol.rgb and (info.hdrfill or 'line') ~= 'off' then rawset_col(nb) else set(nb) end
+        gfx.rect(hx, dy + 2, nw, L.rh, 1)
+        text(hx + L.pad, dy + 3, nm, U.readable(U.TEXT, nb, 4.5))
+        hx = hx + nw + L.pad
+      end
       for _, b in ipairs({ { 'track', false, 'track fx' }, { 'take', true, 'take fx' } }) do
         local on = (info.dsp_is_take or false) == b[2]
         local bw = ms(b[3]) + 2 * L.pad
@@ -2248,9 +2344,16 @@ function D.frame(L, snap, rows, state, info)
         hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
         hx = hx + bw + L.pad
       end
-      text(hx, dy + 3, fit((info.dsp_title or (col and col.name) or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
+      -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
+      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
+    -- блок трека — первый слева, закреплён (не перетаскивается с FX)
+    if info.pool_col and info.trk_io then
+      local tw = L.cw * 24
+      local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, L.dsp_h - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
+      if used > 0 then bx = bx + used + L.pad end
+    end
     local drag = info.dsp_drag                 -- { k = блок } | { new = true } — идёт перетаскивание
     local blocks = {}
     local bw = L.cw * 22

@@ -1869,6 +1869,42 @@ ctx = {
     local n = e.bsync + d
     if n < 1 then ctx.bsync_set(e, nil) else ctx.bsync_set(e, n) end
   end,
+  -- блок трека в DSP (3 окт): вход, master send, фаза, FX, маршрутизация
+  track_io = function(col, what)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local function toggle(key, desc)
+      local v = reaper.GetMediaTrackInfo_Value(tr, key)
+      edit.run(desc, function() reaper.SetMediaTrackInfo_Value(tr, key, v == 1 and 0 or 1) end)
+      model.invalidate()
+    end
+    if what == 'mainsend' then toggle('B_MAINSEND', 'track master send')
+    elseif what == 'phase' then toggle('B_PHASE', 'track phase')
+    elseif what == 'fxen' then toggle('I_FXEN', 'track fx on / off')
+    elseif what == 'routing' then
+      reaper.SetOnlyTrackSelected(tr)
+      reaper.Main_OnCommand(40914, 0)              -- Track: set first selected track as last touched
+      reaper.Main_OnCommand(40293, 0)              -- Track: view routing and I/O
+    elseif what == 'input' then
+      -- меню входа: нет, моно, стерео пары, MIDI все входы / все каналы
+      local items, vals = { 'none' }, { -1 }
+      local n = reaper.GetNumAudioInputs()
+      local mono, ster = {}, {}
+      for i = 0, n - 1 do mono[#mono + 1] = reaper.GetInputChannelName(i) or ('in ' .. (i + 1)); vals[#vals + 1] = i end
+      for i = 0, n - 2, 2 do ster[#ster + 1] = ('%s / %s'):format(reaper.GetInputChannelName(i) or (i + 1), reaper.GetInputChannelName(i + 1) or (i + 2)); vals[#vals + 1] = 1024 + i end
+      if #mono > 0 then mono[1] = '>mono|' .. mono[1]; mono[#mono] = '<' .. mono[#mono] end
+      if #ster > 0 then ster[1] = '>stereo|' .. ster[1]; ster[#ster] = '<' .. ster[#ster] end
+      for _, m in ipairs(mono) do items[#items + 1] = m end
+      for _, m in ipairs(ster) do items[#items + 1] = m end
+      items[#items + 1] = 'MIDI: all inputs, all channels'; vals[#vals + 1] = 4096 + (63 << 5)
+      gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
+      local k = gfx.showmenu(table.concat(items, '|'))
+      if k > 0 and vals[k] then
+        edit.run('track input', function() reaper.SetMediaTrackInfo_Value(tr, 'I_RECINPUT', vals[k]) end)
+        model.invalidate()
+      end
+    end
+  end,
   -- items инструмента записи e (все связанные копии; без них — сам item)
   inst_group = function(e)
     local col = cur_col()
@@ -4446,6 +4482,33 @@ local function frame()
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
+    hdrfill = state.hdrfill,
+    -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
+    trk_io = (state.dsp and not state.khelp) and function(col)
+      local tr = col and col.track
+      if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
+      local v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
+      local inp
+      if v < 0 then inp = 'none'
+      elseif v & 4096 ~= 0 then
+        local dev, ch = (v >> 5) & 63, v & 31
+        inp = 'MIDI ' .. (dev == 63 and 'all' or ('dev ' .. dev)) .. (ch == 0 and '' or (' ch ' .. ch))
+      else
+        local ch = v & 1023
+        local nm = reaper.GetInputChannelName(ch) or ('in ' .. (ch + 1))
+        if v & 1024 ~= 0 then nm = nm .. ' / ' .. (reaper.GetInputChannelName(ch + 1) or ('in ' .. (ch + 2))) end
+        inp = nm
+      end
+      local sends = {}
+      for i = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
+        local _, nm = reaper.GetTrackSendName(tr, i, '')
+        sends[#sends + 1] = { name = nm, vol = reaper.GetTrackSendInfo_Value(tr, 0, i, 'D_VOL'), mute = reaper.GetTrackSendInfo_Value(tr, 0, i, 'B_MUTE') == 1 }
+      end
+      return { input = inp, sends = sends, hw = reaper.GetTrackNumSends(tr, 1), recv = reaper.GetTrackNumSends(tr, -1),
+               mainsend = reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1,
+               phase = reaper.GetMediaTrackInfo_Value(tr, 'B_PHASE') == 1,
+               fxen = reaper.GetMediaTrackInfo_Value(tr, 'I_FXEN') == 1 }
+    end or nil,
     -- метки линейки таймлайна для строки (3 окт): форматы REAPER (2 — такты.доли, 0 — время)
     tl_label = state.tlruler ~= 'off' and function(row)
       local t = reaper.TimeMap2_QNToTime(0, row / state.lpb)
@@ -4734,6 +4797,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
   elseif hover.poolfind then state.status = 'find in the lib (fzf) - also / when the lib has focus'
+  elseif hover.trkio then state.status = ({ input = 'track input - click: choose (audio mono / stereo, MIDI all)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
@@ -5103,6 +5167,9 @@ local function frame()
       elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
+    elseif hover.trkio then
+      ctx.track_io(hover.trkio.col, hover.trkio.what)
+      click = { t = now2, zone = 'trkio' }
     elseif hover.trs then
       local t = hover.trs
       if dbl and click.zone == 'trs' and click.row == t.what then
