@@ -1,5 +1,5 @@
 -- test_options.lua — окно Options на стабах: lua tests/test_options.lua
--- cycle — список значений по клику (выбор, повторный клик закрывает),
+-- cycle — значения кнопками в ряд,
 -- num — слайдер (клик и протяжка), toggle — клик.
 package.path = './?.lua;' .. package.path
 _G.gfx = { mouse_x = 0, mouse_y = 0, mouse_cap = 0, rect = function() end }
@@ -19,17 +19,14 @@ local function eq(name, got, want) n = n + 1; if got ~= want then bad = bad + 1;
 local function at(x, y) gfx.mouse_x, gfx.mouse_y = x, y; O.draw(L, 1200, 800) end
 O.draw(L, 1200, 800)
 local r1, r2, r3 = O.vrect[1], O.vrect[2], O.vrect[3]
--- cycle: клик открывает список, выбор mono
-at(r1[1] + 2, r1[2] + 2); O.click(gfx.mouse_x, gfx.mouse_y)
-eq('list open', O.list and O.list.i, 1)
-at(r1[1] + 4, r1[2] + 16 + 1 + 16 + 2)    -- вторая строка списка
-eq('list hover', O.list_hover, 2)
+-- cycle: значения кнопками в ряд — клик по второй кнопке ставит mono
+local bx2 = r1[1] + (#'reaper' * 8 + 8 + 2) + 4          -- вторая кнопка: после 'reaper' (ширина + 2 pad + 2)
+at(bx2, r1[2] + 2)
+eq('button hover', O.hbtn and O.hbtn.k, 2)
 O.click(gfx.mouse_x, gfx.mouse_y)
-eq('picked mono', st.theme, 'mono'); eq('list closed', O.list, nil)
--- повторный клик по ячейке закрывает, значение не меняется
-at(r1[1] + 2, r1[2] + 2); O.click(gfx.mouse_x, gfx.mouse_y)
-at(r1[1] + 2, r1[2] + 2); O.click(gfx.mouse_x, gfx.mouse_y)
-eq('second click closes', O.list, nil); eq('value kept', st.theme, 'mono')
+eq('picked mono', st.theme, 'mono')
+-- описание внизу — у строки под мышью
+eq('hover row', O.hover, 1)
 -- num: клик посередине дорожки ≈ 30, протяжка в конец = 60
 at(r2[1] + math.floor(r2[3] / 2), r2[2] + 2); O.click(gfx.mouse_x, gfx.mouse_y)
 eq('slider middle', math.abs(st.alpha - 30) <= 1, true)

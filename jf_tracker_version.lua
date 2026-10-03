@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.76'
+V.VERSION = '0.5.77'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.77', d = '2026-10-03', items = {
+    'options window: no dropdowns - every choice shows all its values as buttons in a row (the current one lit), click a button to set it; descriptions moved to the bottom line and follow the mouse',
+  } },
   { v = '0.5.76', d = '2026-10-03', items = {
     'track header: input row - i <input> (click: the list of inputs by fzf under it - none, mono, stereo pairs, MIDI all and each MIDI device; click again closes) and a smart button (jf_smart_set_input on this track); options -> input row',
     'DSP track block: the sends row opens a send panel above it - each send with a volume slider, m (mute), x (remove); + send picks the target track by fzf; routing opens the REAPER window; the in row opens the same input list',

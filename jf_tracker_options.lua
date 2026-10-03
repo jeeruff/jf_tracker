@@ -27,7 +27,7 @@ function O.open_about(fn)
   O.logo, O.about = a.logo, a.text or {}
   O.page, O.ascroll, O.active = 'about', 0, true
 end
-function O.close() O.active = false; O.list, O.drag = nil, nil end
+function O.close() O.active = false; O.drag = nil end
 
 local function val_text(it)
   local v = it.get()
@@ -69,8 +69,7 @@ function O.key(c)
   local shift = ctx.mods and ctx.mods().shift
   local n = #O.items
   local it = O.items[O.sel]
-  if O.list and (c == 27 or ch == 'q') then O.list = nil
-  elseif c == 27 or ch == 'q' then O.close()
+  if c == 27 or ch == 'q' then O.close()
   elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1)
   elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1)
   elseif ch == 'g' then O.sel = 1
@@ -100,17 +99,14 @@ end
 
 function O.click(mx, my)
   if O.close_hot and O.page ~= 'about' then O.close(); return end
-  if O.list then
-    local l = O.list
-    O.list = nil
-    if O.list_hover then O.items[l.i].set(O.items[l.i].values[O.list_hover]); return end
-    if O.hover == l.i then return end                     -- повторный клик по ячейке — закрыть
-  end
   if O.hover then
     O.sel = O.hover
     local it = O.items[O.sel]
     local r = O.vrect and O.vrect[O.sel]
-    if it.kind == 'cycle' then O.list = { i = O.sel }
+    -- cycle (3 окт): значения кнопками в ряд — клик по кнопке ставит его;
+    -- кнопки не влезли — клик по строке шагает по кругу, как раньше
+    if it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
+    elseif it.kind == 'cycle' then O.adjust(it, 1)
     elseif it.kind == 'num' and it.min and it.max and r then
       if mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
     else O.adjust(it, 0) end
@@ -244,8 +240,14 @@ function O.draw(L, W, H)
   local n = #O.items
   local lw, vw = L.cw * 22, L.cw * 12
   local dw = 0
-  for _, it in ipairs(O.items) do dw = math.max(dw, U.measure(it.desc or '')) end
-  local bw = math.min(W - 2 * L.pad - 20, lw + vw + math.min(dw, L.cw * 40) + 4 * L.pad)
+  for _, it in ipairs(O.items) do
+    if it.kind == 'cycle' then
+      local tot = 0
+      for _, v in ipairs(it.values) do tot = tot + U.measure(tostring(v)) + 2 * L.pad + 2 end
+      dw = math.max(dw, tot - vw)
+    end
+  end
+  local bw = math.min(W - 2 * L.pad - 20, math.max(lw + vw + dw + 3 * L.pad, L.cw * 72))
   local nvis = math.max(3, math.min(n, math.floor((H - 6 * rh) / rh)))
   local bh = (nvis + 3) * rh
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
@@ -269,6 +271,7 @@ function O.draw(L, W, H)
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   O.hover = nil
+  O.hbtn = nil
   O.vrect = {}
   -- протяжка слайдера: пока кнопка мыши держится
   if O.drag then
@@ -301,38 +304,37 @@ function O.draw(L, W, H)
         U.set(U.DIM); gfx.rect(vx, cy - 1, tw, 2, 1)
         U.set(shot and U.AMBER or U.TEXT); gfx.rect(vx, y + 4, math.max(1, math.floor(fr * tw + 0.5)), rh - 8, 1)
         U.text(vx + tw + L.pad, y + 1, vt, U.TEXT)
+      elseif it.kind == 'cycle' then
+        -- все значения кнопками в ряд до правого края (описание — внизу при наведении)
+        local room = bx + bw - L.pad - vx
+        local tot = 0
+        for _, v in ipairs(it.values) do tot = tot + U.measure(tostring(v)) + 2 * L.pad + 2 end
+        if tot <= room then
+          local cur = it.get()
+          local x = vx
+          for k, v in ipairs(it.values) do
+            local lb = tostring(v)
+            local w = U.measure(lb) + 2 * L.pad
+            local on2 = v == cur
+            local h2 = mx >= x and mx < x + w and my >= y and my < y + rh
+            if h2 then O.hbtn = { i = i, k = k } end
+            U.set(on2 and U.tint(U.AMBER, 0.35) or (h2 and U.PANEL or U.BG)); gfx.rect(x, y + 1, w, rh - 2, 1)
+            U.set(on2 and U.AMBER or (h2 and U.TEXT or U.LINE)); gfx.rect(x, y + 1, w, rh - 2, 0)
+            U.text(x + L.pad, y + 1, lb, on2 and U.AMBER or (h2 and U.TEXT or U.GREY))
+            x = x + w + 2
+          end
+        else
+          U.text(vx, y + 1, ctx.fit(vt, room), U.TEXT)
+        end
       else
-        U.text(vx, y + 1, ctx.fit(vt .. (it.kind == 'cycle' and ' v' or ''), vw - L.pad), on and U.CYAN or (it.kind == 'toggle' and U.GREY or U.TEXT))
+        U.text(vx, y + 1, ctx.fit(vt, vw - L.pad), on and U.CYAN or (it.kind == 'toggle' and U.GREY or U.TEXT))
       end
-      if it.desc then U.text(bx + L.pad + lw + vw, y + 1, ctx.fit(it.desc, bw - lw - vw - 2 * L.pad), U.GREY) end
     end
   end
   O.vrect_last = O.vrect
-  -- список значений cycle — под ячейкой (не влезает вниз — над ней)
-  O.list_hover = nil
-  if O.list and O.vrect[O.list.i] then
-    local li = O.items[O.list.i]
-    local r = O.vrect[O.list.i]
-    local lwid = vw - L.pad
-    for _, v in ipairs(li.values) do lwid = math.max(lwid, U.measure(tostring(v)) + 2 * L.pad) end
-    local lh = #li.values * rh + 2
-    local ly = r[2] + rh
-    if ly + lh > H - 2 then ly = math.max(2, r[2] - lh) end
-    local lx = math.min(r[1] - 1, W - lwid - 2)
-    U.set(U.PANEL); gfx.rect(lx, ly, lwid, lh, 1)
-    U.set(U.AMBER); gfx.rect(lx, ly, lwid, lh, 0)
-    local cur = li.get()
-    for k, v in ipairs(li.values) do
-      local yy = ly + 1 + (k - 1) * rh
-      local hot = mx >= lx and mx < lx + lwid and my >= yy and my < yy + rh
-      if hot then O.list_hover = k end
-      if hot then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(lx + 1, yy, lwid - 2, rh, 1) end
-      U.text(lx + L.pad, yy + 1, tostring(v), (v == cur) and U.AMBER or U.TEXT)
-    end
-    if O.list_hover then O.hover = nil end
-  end
   U.set(U.LINE); gfx.rect(bx, by + bh - rh - 2, bw, 1, 1)
-  local it = O.items[O.sel]
+  -- описание — строки под мышью, иначе выбранной клавишами
+  local it = O.items[O.hover or O.sel]
   U.text(bx + L.pad, by + bh - rh, ctx.fit(it and it.desc or '', bw - 2 * L.pad), U.GREY)
 end
 
