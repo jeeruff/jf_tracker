@@ -97,7 +97,7 @@ end
 local function draw_about(L, W, H)
   local rh = L.rh
   local LGO = ctx.logo
-  local lw = O.logo and LGO and LGO.size(O.logo) * L.cw or 0
+  local lw = (O.logo and LGO and not O.logo.scroll) and LGO.size(O.logo) * L.cw or 0   -- бегущей строке ширина не нужна
   local bw = math.min(W - 2 * L.pad - 20, math.max(lw, L.cw * 80) + 4 * L.pad)
   local bh = math.min(H - 2 * rh, math.max(rh * 12, H - 6 * rh))
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
@@ -112,6 +112,7 @@ local function draw_about(L, W, H)
     -- чёрная плашка с полем в клетку, как в генераторах ANSI; рисуется один
     -- раз в картинку 1022 (дизеринг попиксельный), дальше только blit
     local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad - 4 * L.cw, L.cw, rh)
+    if O.logo.scroll then cw, ch = L.cw, rh end          -- бегущая строка: без сжатия
     if cw then
       local w, h = LGO.size(O.logo)
       local iw, ih = (w + 2) * cw, (h + 1) * ch
@@ -126,7 +127,20 @@ local function draw_about(L, W, H)
         gfx.dest = old
         O.logo_key = key
       end
-      gfx.blit(1022, 1, 0, 0, 0, iw, ih, bx + math.floor((bw - iw) / 2), y, iw, ih)
+      if O.logo.scroll then
+        -- бегущая строка (3 окт): окно шириной с about едет по картинке по
+        -- кругу, между повторами — зазор в ширину окна; ~6 символов в секунду
+        local aw = bw - 2 * L.pad
+        local per = iw + aw
+        local off = math.floor(((ctx.now and ctx.now() or os.clock()) * cw * 6) % per)
+        local dx = bx + L.pad
+        -- картинка входит справа: экранная x = dx + aw - off
+        local sx = dx + aw - off
+        local a0, a1 = math.max(dx, sx), math.min(dx + aw, sx + iw)
+        if a1 > a0 then gfx.blit(1022, 1, 0, a0 - sx, 0, a1 - a0, ih, a0, y, a1 - a0, ih) end
+      else
+        gfx.blit(1022, 1, 0, 0, 0, iw, ih, bx + math.floor((bw - iw) / 2), y, iw, ih)
+      end
       y = y + ih + L.pad
     else
       U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad

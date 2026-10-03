@@ -529,6 +529,7 @@ ctx = {
   end,
   depot = function() local c = cur_col(); return c and c.pool or {} end,
   fit = draw.fit,
+  now = function() return reaper.time_precise() end,     -- бегущая строка about (3 окт)
   logo = LOGO,                                             -- about рисует логотип (options)
   set_pitchmode = function(col, mode) state.pitchmodes[col.guid] = mode end,
   -- TTF: размер 10..32 (3 окт), 0 — битмап
