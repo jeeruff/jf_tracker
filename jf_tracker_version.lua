@@ -8,6 +8,8 @@ V.CHANGES = {
     'M in NORMAL: piano layer (like M in Ableton) - the top row and digits play notes, other keys stay Vim commands; M or Esc turns it off',
     'Cmd+note (INSERT and the piano layer): the note lasts as long as the key is held, growing at the project tempo; j / down add a step while holding, Esc cancels; Cmd+Shift+note stretches the sample to that length (keeps pitch, becomes unique); slices too',
     'Cmd+digit in INSERT / piano layer is now a held black key; slot selection stays on Cmd+digit in NORMAL, Cmd+HJKL and , . everywhere',
+    'wave in options, three modes: column (own column, spectral peaks), note (inside the note field on the item rows - the old off), off (no wave at all, faster); :wave column|note|off; the wv cell left the main module',
+    'items: option item colours (off - neutral grey) and a fill opacity slider (0..60 %); in mono the item border is brighter',
     'a slice (q..p) on a row that already has a note or slice overwrites it, like a note (it used to open a new lane); held notes overwrite too, at commit',
     'cells: the instrument number sits on the note row, as in Renoise (C-4 01 80); the item name is on the second row - option item names',
     'lib: the sort button is gone - a header row # / name / len / preview sorts by clicking (# again: marks); sort by name added',

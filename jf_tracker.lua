@@ -118,6 +118,15 @@ local state = {
   mx_fold_px = tonumber(reaper.GetExtState(EXT, 'mx_fold_px')),   -- ширина свёрнутой матрицы (fold)
   mx_hidden = reaper.GetExtState(EXT, 'mx_hidden') == '1',  -- матрица свёрнута в полосу
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
+  -- волна (3 окт): column — своя колонка со спектральными пиками, note — в поле
+  -- ноты на строках item (бывший «off»), off — без волны совсем
+  wavemode = (function()
+    local v = reaper.GetExtState(EXT, 'wavemode')
+    if v == 'column' or v == 'note' or v == 'off' then return v end
+    return reaper.GetExtState(EXT, 'wave') == 'off' and 'note' or 'column'
+  end)(),
+  itemcol = flag('itemcol', true),               -- заливка и кайма item его цветом (3 окт)
+  itemalpha = tonumber(reaper.GetExtState(EXT, 'itemalpha')) or 5,   -- прозрачность заливки item, %
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
@@ -147,6 +156,7 @@ state.font = 0                                                         -- TTF у
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
+state.wave = state.wavemode == 'column' and 'spec' or 'off'   -- старое поле — из трёх режимов волны (3 окт)
 state.captions = tostring(ext('captions', '0')) == '1'     -- строка подписей колонок (по умолчанию выкл, 2 окт)
 -- заливка шапки трека цветом (3 окт): line — полоска под именем, header —
 -- строка имени, full — вся шапка (ниже имени тусклее). Один параметр, без
@@ -338,13 +348,13 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
-  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off')
+  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
   S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
@@ -1293,10 +1303,13 @@ ctx = {
   -- колонка волны: off → peaks → rect → spec (контрол «wave», :wave [режим])
   wave_mode = function(m, delta)
     -- колонка волны: только on/off — спектральные пики REAPER + stretch-маркеры
-    if m == 'off' then state.wave = 'off'
-    elseif m then state.wave = 'spec'
-    else state.wave = (state.wave == 'off') and 'spec' or 'off' end
-    vim.msg = 'wave column: ' .. (state.wave == 'off' and 'off' or 'on (spectral peaks, colour = frequency; amber = stretch markers)')
+    -- три режима (3 окт): column → note → off; :wave column|note|off (on = column)
+    local nxt = { column = 'note', note = 'off', off = 'column' }
+    if m == 'on' or m == 'spec' or m == 'column' then state.wavemode = 'column'
+    elseif m == 'note' or m == 'off' then state.wavemode = m
+    else state.wavemode = nxt[state.wavemode or 'column'] end
+    state.wave = state.wavemode == 'column' and 'spec' or 'off'
+    vim.msg = 'wave: ' .. ({ column = 'own column - spectral peaks (colour = frequency), amber = stretch markers', note = 'in the note field on the item rows', off = 'off' })[state.wavemode]
   end,
   -- анализатор: scope → spec → sgram (кнопки у вкладок, :scopemode)
   scopemode = function(m)
@@ -2105,6 +2118,9 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'column: an own column with spectral peaks (colour = frequency) and stretch markers; note: the wave inside the note field on the item rows; off: no wave (faster)', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
+      flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
+      { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only); h l / wheel, Shift x10', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'the item name on the second row under the note; the instrument number is on the note row, as in Renoise'),
       flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },

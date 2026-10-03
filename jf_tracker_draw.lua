@@ -206,7 +206,8 @@ function D.layout(snap, state, nregions)
   -- колонка волны слева от ноты (:wave peaks|rect|spec|off) — нативные пики REAPER, вертикально
   -- колонка волны: всегда спектральные пики REAPER (цвет = частота) +
   -- stretch-маркеры; только on/off (просьба 1 окт, режимы peaks/rect убраны)
-  L.wave = (state.wave == 'off') and 'off' or 'spec'
+  L.wave = (state.wavemode == 'column') and 'spec' or 'off'
+  D.wave_none = state.wavemode == 'off'                -- без волны совсем (3 окт)
   L.w_wave = L.wave == 'off' and 0 or L.cw * 3
   L.x_wave = L.pad
   L.x_note = L.pad + (L.w_wave > 0 and (L.w_wave + L.pad) or 0)
@@ -642,7 +643,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     -- колонка волны: голова и все cont-строки аудио-item
     if k == 'audio' then draw_wave(L, cell, 0, x, y, cell.muted, inv == 1)
     elseif k == 'cont' and cell.of.kind == 'audio' then draw_wave(L, cell.of, cell.i, x, y, cell.of.muted, inv == 1) end
-  elseif k == 'cont' and cell.of.kind == 'audio' then
+  elseif k == 'cont' and cell.of.kind == 'audio' and not D.wave_none then
     local head = cell.of
     local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
@@ -1055,7 +1056,6 @@ local function draw_topbar(L, info)
     { name = 'options', items = {
       { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) },
       { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
-      { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
       { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
       { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
     } },
@@ -2066,11 +2066,13 @@ function D.frame(L, snap, rows, state, info)
                   hover.itemedge = { item = it.item, edge = edge, col = c.col, lane = ln.lane, r0 = it.r0, r1 = it.r1 }
                 end
               end
-              local rgb = it.rgb or c.col.rgb or U.GREY
+              -- цвет item (опция item colours) и прозрачность заливки (item fill opacity), 3 окт
+              local rgb = state.itemcol ~= false and (it.rgb or c.col.rgb) or U.GREY
               local col = it.sel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
+              if D.mono then col = U.mix(col, U.TEXT, 0.35) end   -- mono: кайма светлее (была слишком тёмной)
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
-              -- почти прозрачная заливка с отливом цвета item (один rect — дёшево)
-              set(rgb); gfx.a = it.sel and 0.09 or 0.05                     -- полупрозрачно: сетка видна (2 окт)
+              local fa = (state.itemalpha or 5) / 100
+              set(rgb); gfx.a = it.sel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
               gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
               gfx.a = 1
               set(col)

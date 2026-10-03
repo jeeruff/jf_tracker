@@ -43,6 +43,11 @@
 - [ ] lib: строка `# name len preview` — клик сортирует (# второй раз — по меткам), кнопки sort больше нет
 - [ ] Вкладка item: метки слайсов не вылезают за волну на свойства
 
+## Волна и item
+- [ ] options → wave: column / note / off (off — волны нет совсем); `:wave column|note|off`
+- [ ] options → item colours вкл / выкл; item fill opacity — слайдер (h l, колесо)
+- [ ] mono: кайма item светлее, видна
+
 ## Вид
 - [ ] Темы (options → theme или `:theme`): reaper, modus-vivendi, modus-operandi, gruvbox, catppuccin, mono
 - [ ] mono: тусклый текст читается; рамка INSERT и слово INSERT в статусе красные; цвета треков в шапках остались
