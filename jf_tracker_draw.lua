@@ -949,8 +949,22 @@ local function draw_topbar(L, info)
   -- метроном, ввод), options (вид), help; каждая группа — с новой строки,
   -- без линий и подписей (просьба пользователя). monome — во вкладке grid.
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
+  -- 3 окт (просьба): сверху — help / about / options / notes; тонкая линия;
+  -- опции вида; тонкая линия; внизу модуля, прижато ко дну — транспорт и ввод
   local groups = {
-    { name = 'control', items = {
+    { name = 'help', items = {
+      { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'about', 'about', U.GREY },
+      { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
+    } },
+    { name = 'options', items = {
+      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
+      { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
+      { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
+      { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
+      { 'hdr', 'hdr ' .. (c.hdrfill or 'line'), ((c.hdrfill or 'line') == 'header' or c.hdrfill == 'full') and U.CYAN or U.GREY },
+      { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
+    } },
+    { name = 'control', bottom = true, items = {
       { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
       { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
       { 'sig', 'sig ' .. sig }, { 'metro', D.ic('metro', 'metro ' .. (c.metro and 'on' or 'off')), c.metro and U.CYAN or U.GREY },
@@ -963,18 +977,6 @@ local function draw_topbar(L, info)
       { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
       { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
       { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
-    } },
-    { name = 'options', items = {
-      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
-      { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
-      { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
-      { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
-      { 'hdr', 'hdr ' .. (c.hdrfill or 'line'), ((c.hdrfill or 'line') == 'header' or c.hdrfill == 'full') and U.CYAN or U.GREY },
-      { 'notes', 'notes', c.notes and U.AMBER or U.GREY }, { 'options', 'options', U.AMBER },
-    } },
-    { name = 'help', items = {
-      { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
-      { 'about', 'about', U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
@@ -1021,8 +1023,37 @@ local function draw_topbar(L, info)
     if hot then hover.ctrl = 'beats' end
     y = y + L.rh
   end
+  -- строк в группе (доли — своя строка во всю ширину)
+  local function grows(g)
+    local n, ci = 0, 0
+    for _, it in ipairs(g.items) do
+      if it[1] == 'beats' then if ci > 0 then n = n + 1; ci = 0 end; n = n + 1
+      else ci = ci + 1; if ci == 3 then ci = 0; n = n + 1 end end
+    end
+    return n + (ci > 0 and 1 or 0)
+  end
+  local function thin(yy) set(D.SEP); gfx.rect(L.pad, yy, L.ctrl_w - 2 * L.pad, 1, 1) end
   for gi, g in ipairs(groups) do
     local ci = 0
+    if gi > 1 then
+      local gap = 3
+      if g.bottom then
+        -- транспорт прижат ко дну модуля (если места хватает)
+        local yb = H - 3 - grows(g) * L.rh
+        -- notes (3 окт): редактор заметок — в свободном месте над транспортом
+        L.notes_rect = nil
+        if info.notes_draw and yb - y - 2 * gap >= 3 * L.rh then
+          local nx, ny, nw, nh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
+          thin(y + 1)
+          local ok, hn = pcall(info.notes_draw, L, nx, ny, nw, nh)
+          if ok then hover.notes = hn end
+          L.notes_rect = { nx, ny, nw, nh }
+          y = y + gap + nh
+        end
+        if yb > y + gap then y = yb - gap end
+      end
+      thin(y + 1); y = y + gap
+    end
     for _, it in ipairs(g.items) do
       if it[1] == 'beats' then
         if ci > 0 then y = y + L.rh; ci = 0 end
@@ -1507,6 +1538,7 @@ function D.frame(L, snap, rows, state, info)
       -- прямоугольники для фокуса и меню — в координаты окна
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
       if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + ty end
+      if L.notes_rect then L.notes_rect[2] = L.notes_rect[2] + ty end
       if L.inst_w > 0 and L.inst_rect then L.inst_rect[2] = L.inst_rect[2] + ty end
       for _, r in pairs(D.ctrl_rect or {}) do r[2] = r[2] + ty; r.shifted = true end
     end
@@ -1517,6 +1549,7 @@ function D.frame(L, snap, rows, state, info)
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro
     hover.mm = th.mm
     hover.midimap = th.midimap
+    hover.notes = th.notes or hover.notes
     hover.garden = th.garden
   end
 
@@ -2180,13 +2213,12 @@ function D.frame(L, snap, rows, state, info)
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
-    if info.notes_draw or info.fxb_draw then
+    if info.fxb_draw then
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
       local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
       fbw = (L.matrix_w and L.matrix_w > 0 and not state.mx_hidden) and math.max(L.matrix_w, math.floor(own * 0.6)) or own
       if info.fxb_px then fbw = math.max(L.cw * 12, math.min(math.floor(L.win_w * 0.5), info.fxb_px)) end   -- ширина мышью (3 окт)
-      if info.notes_draw then hover.notes = info.notes_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
-      elseif info.fxb_expand then
+      if info.fxb_expand then
         -- фокус на браузере: он раскрывается на всю левую колонку (за счёт
         -- матрицы и главного модуля) в конце кадра, после статуса; здесь — место
         set(U.PANEL); gfx.rect(0, dy + 2, fbw, L.dsp_h - 2, 1)
@@ -2469,6 +2501,7 @@ function D.frame(L, snap, rows, state, info)
       inst = (L.inst_w > 0 or L.side_w > 0) and L.inst_rect or nil,
       dsp = L.dsp_h > 0 and L.dsp_rect or nil,
       fxb = L.dsp_h > 0 and L.fxb_rect or nil,
+      notes = L.notes_rect,
     }
     D.module_rects = rects          -- только для рамки фокуса: границы модулей — разделители D.SEP (1 px)
   end
@@ -2476,7 +2509,7 @@ function D.frame(L, snap, rows, state, info)
   do
     local f = info.focus
     local rects = D.module_rects or {}
-    local r = rects[(f == 'notes') and 'fxb' or f]
+    local r = rects[f]
     if r then
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'

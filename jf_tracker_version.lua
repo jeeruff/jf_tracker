@@ -9,6 +9,8 @@ V.CHANGES = {
     'timeline ruler moved left of the row numbers (between the region lanes and the numbers); the cursor line starts at the lanes edge and runs through the ruler; the green mark right of the row number is gone',
     'strict borders: the hint rows no longer draw their own bit of the module border (it made small corners sticking out); the matrix | tracker border runs the whole tracker module - body, status, hints',
     'mono theme: darkest text a bit brighter (it vanished), the INSERT frame and the INSERT word in the status bar stay red, track colours stay in the headers',
+    'Shift in INSERT only plays, never writes: the MIDI keyboard with Shift sounds through the track monitoring; audio-in recording (jf_rec) ignores the tracker preview sound (it goes through the track FX) and Shift - it printed previewed notes into the track',
+    'main module: help / about / options / notes on top, a thin line, the view options, a thin line, transport and input at the bottom; notes open in the main module (between the options and the transport), the fx list stays in place',
     'playback stops at =END (option stop at =END, on): only when it started before =END - playing the library after it is not stopped, recording never',
     'the hint row of the top panel tabs no longer covers the main module border (small corner above it)',
     'track header colour: off - no track colour at all (every theme), then line / header / full',

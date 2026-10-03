@@ -133,7 +133,7 @@ local state = {
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
   hints = flag('hints', true),
-  notes_open = flag('notes', false),            -- редактор заметок на месте списка эффектов
+  notes_open = flag('notes', false),            -- редактор заметок в главном модуле (3 окт; раньше — на месте списка эффектов)
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
@@ -594,7 +594,7 @@ ctx = {
   end,
   notes_toggle = function()
     state.notes_open = not state.notes_open
-    if state.notes_open then state.dsp = true; ctx.notes_load(); ctx.set_focus('notes')
+    if state.notes_open then state.top = true; ctx.notes_load(); ctx.set_focus('notes')
     else ctx.notes_save(); if state.focus == 'notes' then ctx.set_focus('tracker') end end
     vim.msg = state.notes_open and ('notes: ' .. (NT.title or '')) or 'notes closed'
   end,
@@ -2014,7 +2014,8 @@ ctx = {
     local f
     if inr(L.inst_rect) then f = 'inst'
     elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
-    elseif inr(L.fxb_rect) then f = state.notes_open and 'notes' or 'fxb'
+    elseif inr(L.notes_rect) then f = 'notes'
+    elseif inr(L.fxb_rect) then f = 'fxb'
     elseif inr(L.dsp_rect) then f = 'dsp'
     elseif inr(L.ctrl_area) then f = 'ctrl'
     elseif inr(L.top_rect) then f = 'top'
@@ -2618,7 +2619,7 @@ ctx = {
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
     if f == 'fxb' and not (state.dsp and state.fxb and not state.khelp) then f = 'tracker' end
-    if f == 'notes' and not (state.dsp and state.notes_open and not state.khelp) then f = 'tracker' end
+    if f == 'notes' and not (state.top and state.notes_open) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
     if f == 'ctrl' and not state.top then f = 'tracker' end
@@ -2637,7 +2638,7 @@ ctx = {
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
     if state.dsp or state.khelp then order[#order + 1] = 'dsp' end
-    if state.dsp and state.notes_open and not state.khelp then order[#order + 1] = 'notes'
+    if state.top and state.notes_open then order[#order + 1] = 'notes'
     elseif state.dsp and state.fxb and not state.khelp then order[#order + 1] = 'fxb' end
     if not state.mx_hidden then order[#order + 1] = 'matrix' end
     if state.top then order[#order + 1] = 'ctrl'; order[#order + 1] = 'top' end
@@ -3459,7 +3460,11 @@ local function poll_midi_in()
     local kind, ch = st and (st & 0xF0), st and (st & 0x0F)
     local dev_ok = want_dev == 63 or e.dev == want_dev or e.dev == 62   -- 62 = виртуальная клавиатура
     local ch_ok = want_ch == 0 or (ch + 1) == want_ch
-    if kind and dev_ok and ch_ok then
+    -- Shift — только звук (3 окт): нота слышна через мониторинг трека, в
+    -- проект ничего не пишется (как Shift+нота с клавиатуры)
+    if kind and dev_ok and ch_ok and gfx.mouse_cap & 8 == 8 then
+      if kind == 0x90 and d2 > 0 then vim.msg = ('MIDI %s (Shift: listen only)'):format(model.note_name(d1)) end
+    elseif kind and dev_ok and ch_ok then
       if kind == 0x90 and d2 > 0 then
         if midiin.nheld == 0 then
           -- новый аккорд: строка курсора; без Shift — перезапись того, что там стоит
@@ -3559,6 +3564,13 @@ local function poll_audio_in(now)
     end
   end)
   if not head or len <= 0 then return end
+  -- превью трекера идёт через FX трека — jf_rec его слышит; это не игра:
+  -- пока звучит превью (и полсекунды хвоста) и пока зажат Shift — не пишем (3 окт)
+  if PV.playing() or gfx.mouse_cap & 8 == 8 then audin.mute_until = now + 0.5 end
+  if now < (audin.mute_until or 0) then
+    if audin.state == 'sound' then audin.state = 'idle'; vim.msg = 'rec audio: preview / Shift - not recorded' end
+    return
+  end
   if audin.state == 'idle' then
     if amp >= AUD_THR then
       audin.state = 'sound'
@@ -4479,7 +4491,7 @@ local function frame()
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
-    notes_draw = (state.dsp and state.notes_open and not state.khelp) and function(Lx, x, y, w, h)
+    notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
       return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
     end or nil,
     -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
@@ -4704,7 +4716,7 @@ local function frame()
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
   elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
-  elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor, editor left of the DSP panel'
+  elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
   elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type; Esc / Tab: leave (saved)' or ('show ' .. hover.notes .. ' notes')
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
