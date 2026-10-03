@@ -4823,7 +4823,7 @@ local function frame()
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
     vol = 'vl: volume / velocity, hex 00..FF (80 = unity)',
     delay = 'dl: delay inside the row, hex xx/256 of a row',
-    fx = 'fx: effect command, letter + hex hex (9xx offset, Sxx slice, Bxx beatsync ...)',
+    fx = 'fx: effect command, letter + hex hex (Sxx offset / slice as in Renoise, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'

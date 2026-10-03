@@ -148,7 +148,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
-    if slen and slen > 0 then fx[#fx + 1] = '9' .. M.hex2(offs / slen * 255) end
+    -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
+    if slen and slen > 0 then fx[#fx + 1] = 'S' .. M.hex2(offs / slen * 256) end
   end
   local pan = R.GetMediaItemTakeInfo_Value(take, 'D_PAN')
   if math.abs(pan) > 1e-6 then fx[#fx + 1] = '8' .. M.hex2((pan + 1) / 2 * 255) end

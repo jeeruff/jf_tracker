@@ -452,6 +452,7 @@ local function apply_fx(h, lpb, cmd, xx)
       if bs then E.bsync_fit(it, bs) end
     else
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
+      E.note_modified(it)                               -- смещение копии — видоизменение (как 9xx)
     end
   elseif cmd == 'T' then
     -- beatsync (как в Renoise): источник от offset растянут ровно на xx строк

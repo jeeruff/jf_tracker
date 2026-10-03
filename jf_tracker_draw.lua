@@ -683,7 +683,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
       end
       if named then
         -- вторая строка: имя item (опция item names, 3 окт); номер — на строке ноты
-        text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), c(1, head.muted and U.GREY or U.GREY))
+        -- курсор на этой строке: подложка — шириной поля ноты, не всего имени (3 окт)
+        if inv == 1 then text(x + L.x_note, ty, fit(head.name, L.w_note), U.BG)
+        else text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), U.GREY) end
       end
       local fx = head.fx or {}
       if L.nfx > 0 and cell.i >= 1 then
