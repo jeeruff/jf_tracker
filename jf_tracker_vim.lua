@@ -512,7 +512,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'arp', '[up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -656,6 +656,37 @@ local function run_cmd(line)
   elseif cmd == 'slice' then ctx.open_slicer()
   elseif cmd == 'poolprev' then st.poolprev = not st.poolprev; V.msg = 'pool preview ' .. (st.poolprev and 'on' or 'off')
   elseif cmd == 'side' then st.side = not st.side
+  elseif cmd == 'arp' then
+    -- :arp [up|down|updown|random|played] [шаг] [октав] [gate %] (3 окт): аккорд
+    -- строки курсора (все подколонки трека) → арпеджио на его длину
+    local o = V.arp_opt or { order = 'up', step = 1, oct = 1, gate = 100 }
+    local nums = {}
+    for w in (arg or ''):gmatch('%S+') do
+      local lw = w:lower()
+      if lw == 'up' or lw == 'down' or lw == 'updown' or lw == 'random' or lw == 'played' then o.order = lw
+      elseif lw:match('^%d+%%$') then o.gate = tonumber(lw:sub(1, -2))
+      elseif tonumber(lw) then nums[#nums + 1] = tonumber(lw) end
+    end
+    if nums[1] then o.step = math.max(1, math.floor(nums[1])) end
+    if nums[2] then o.oct = math.max(1, math.min(4, math.floor(nums[2]))) end
+    if nums[3] then o.gate = nums[3] end
+    V.arp_opt = o
+    local f = flat()[V.cur.fi]
+    local heads = {}
+    if f and f.col then
+      for _, g in ipairs(flat()) do
+        if g.col == f.col and g.sub then
+          local h = g.sub[V.cur.row]
+          if h and (h.kind == 'audio' or h.kind == 'midi') then heads[#heads + 1] = h end
+        end
+      end
+    end
+    if #heads < 1 then V.msg = 'arp: no notes start on the cursor row of this track (put a chord there: notes in its subcolumns)'
+    else
+      local n = ctx.edit.arpeggiate(f.col.track, f.col.fixed and f.lane and f.lane.idx or nil, lpb(), V.cur.row, heads,
+        { order = o.order, step = o.step, oct = o.oct, gate = (o.gate or 100) / 100, seed = math.floor((V.cur.row + 1) * 7919) })
+      V.msg = ('arp %s: %d notes, step %d, %d oct, gate %d%%'):format(o.order, n, o.step, o.oct, o.gate or 100)
+    end
   elseif cmd == 'fixslices' then local n = ctx.edit.fix_slices(); ctx.model.invalidate(); V.msg = ('fixslices: %d slice note(s) now play their own piece'):format(n)
   elseif cmd == 'dock' then ctx.toggle_dock()
   elseif cmd == 'reg' then

@@ -83,6 +83,7 @@ function E.redo() calls[#calls + 1] = 'redo' end
 function E.save() calls[#calls + 1] = 'save' end
 function E.play_stop() calls[#calls + 1] = 'play' end
 function E.cursor_to(t) calls[#calls + 1] = 'cursor:' .. t end
+function E.arpeggiate(track, lane, lpb, row, heads, opt) calls[#calls + 1] = ('arp:%s@%d:%s:%d:%d:%.2f'):format(names(heads), row, opt.order, opt.step, opt.oct, opt.gate); return 4 end
 function E.beatsync(heads, lpb, unit) calls[#calls + 1] = ('beatsync:%s:%s'):format(names(heads), unit); return #heads end
 
 local lpb_calls = {}
@@ -498,5 +499,14 @@ V.cur.row = 2; eq('next: 2 → snare 8', V.next_rows(), 6)
 V.cur.row = 8; eq('next: 8 → hat 16', V.next_rows(), 8)
 V.cur.row = 16; eq('next: nothing after → 1', V.next_rows(), 1)
 V.step_next = false
+-- :arp (3 окт): аккорд строки — все подколонки трека курсора
+reset()
+V.cur = { fi = 1, row = 0, field = 1 }
+keysin(':arp down 2 3 50%'); V.key(13)
+eq(':arp collects the chord of the row', last(), 'arp:kick@0:down:2:3:0.50')
+V.cur = { fi = 1, row = 2, field = 1 }
+keysin(':arp'); V.key(13)
+eq(':arp repeats last options, other subcolumn note', last(), 'arp:ov@2:down:2:3:0.50')
+V.arp_opt = nil
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

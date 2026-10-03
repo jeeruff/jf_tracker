@@ -1201,6 +1201,87 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
   return made
 end
 
+-- ── арпеджиатор (3 окт, :arp) ─────────────────────────────────────────────
+-- Аккорд на строке row (heads — ноты, начинающиеся в ней: MIDI и аудио) →
+-- арпеджио на всю длину аккорда: шаг opt.step строк, порядок opt.order
+-- (up / down / updown / random / played — как стоят в подколонках), opt.oct
+-- октав, opt.gate — доля шага (длина ноты). Аудио: копия своего item с питчем
+-- ноты; MIDI — нота в MIDI-item строки. Аккорд удаляется. Один undo.
+-- Возвращает число нот арпеджио.
+function E.arp_order(pitches, order, oct, seed)
+  local base = {}
+  for _, p in ipairs(pitches) do base[#base + 1] = p end
+  if order ~= 'played' then table.sort(base) end
+  local seq = {}
+  for o = 0, math.max(1, oct or 1) - 1 do for _, p in ipairs(base) do seq[#seq + 1] = p + 12 * o end end
+  if order == 'down' then
+    local r = {}; for i = #seq, 1, -1 do r[#r + 1] = seq[i] end; seq = r
+  elseif order == 'updown' and #seq > 2 then
+    for i = #seq - 1, 2, -1 do seq[#seq + 1] = seq[i] end
+  elseif order == 'random' then
+    local x = seed or 12345
+    for i = #seq, 2, -1 do x = (x * 1103515245 + 12345) % 2147483648; local j = x % i + 1; seq[i], seq[j] = seq[j], seq[i] end
+  end
+  return seq
+end
+
+function E.arpeggiate(track, lane_idx, lpb, row, heads, opt)
+  if #heads == 0 then return 0 end
+  opt = opt or {}
+  local step = math.max(1, math.floor(opt.step or 1))
+  local gate = math.max(0.05, math.min(1, opt.gate or 1))
+  local notes, total = {}, 1
+  for _, h in ipairs(heads) do
+    local p, vel, chunk = h.pitch, h.vel, nil
+    if h.kind == 'audio' and h.take then
+      p = model.BASE_NOTE + model.take_semitones(R.GetMediaItemTakeInfo_Value(h.take, 'D_PITCH'), R.GetMediaItemTakeInfo_Value(h.take, 'D_PLAYRATE'), R.GetMediaItemTakeInfo_Value(h.take, 'B_PPITCH') == 1)
+      local ok, c = R.GetItemStateChunk(h.item, '', false)
+      chunk = ok and c or nil
+    end
+    if p then notes[#notes + 1] = { pitch = math.floor(p + 0.5), vel = vel or 100, chunk = chunk, kind = h.kind } end
+    total = math.max(total, math.floor((h.rows_f or h.rows or 1) + 0.5))
+  end
+  if #notes == 0 then return 0 end
+  local by_pitch = {}
+  local pitches = {}
+  for _, n in ipairs(notes) do pitches[#pitches + 1] = n.pitch; by_pitch[n.pitch] = by_pitch[n.pitch] or n end
+  local seq = E.arp_order(pitches, opt.order or 'up', opt.oct, opt.seed)
+  local count = math.max(1, total // step)
+  local made = 0
+  run('arpeggio', function()
+    E.delete(heads, lpb)
+    local lowest = by_pitch[math.min(table.unpack(pitches))]
+    for k = 0, count - 1 do
+      local p = seq[k % #seq + 1]
+      -- шаблон — нота аккорда той же ступени (октавные копии), иначе нижняя
+      local src = by_pitch[p]
+      if not src then for _, q in ipairs(pitches) do if (p - q) % 12 == 0 then src = by_pitch[q]; break end end end
+      src = src or lowest
+      local r0 = row + k * step
+      local t0 = row_time(r0, lpb, 0)
+      local t1 = row_time(r0 + step, lpb, 0)
+      local dur = (t1 - t0) * gate
+      if src.chunk then
+        local it = insert_chunk(track, lane_idx, t0, strip_guids(src.chunk))
+        R.SetMediaItemInfo_Value(it, 'B_MUTE', 0)
+        local tk = R.GetActiveTake(it)
+        if tk then
+          local ppitch = R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH') == 1
+          local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+          local rate_semis = (not ppitch and rate > 0) and 12 * math.log(rate, 2) or 0
+          R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', p - model.BASE_NOTE - rate_semis)
+        end
+        if R.GetMediaItemInfo_Value(it, 'D_LENGTH') > dur then R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur) end
+        finish_insert(track, lane_idx, it)
+      else
+        insert_midi(track, lane_idx, t0, t0 + dur, p, src.vel, 0, false)
+      end
+      made = made + 1
+    end
+  end)
+  return made
+end
+
 -- ── нота с удержанием (3 окт, Cmd+нота): длина = сколько держали ──────────
 -- rows — строк; аудио: без stretch — item обрезается до этой длины (длиннее
 -- сэмпла не тянется), stretch (Cmd+Shift) — сэмпл растягивается ровно на неё

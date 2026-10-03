@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.93'
+V.VERSION = '0.5.94'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.94', d = '2026-10-03', items = {
+    'arpeggiator :arp [up|down|updown|random|played] [step] [octaves] [gate%] - a chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over the chord length: MIDI notes, or copies of the audio notes at the arp pitch; options are remembered (:arp alone repeats), one undo step',
+  } },
   { v = '0.5.93', d = '2026-10-03', items = {
     'meters (main module: meters on) are pseudographic: two columns L R a character wide at the left of each track, made of row cells with a 1 px gap like text blocks, the top cell filled in eighths; green / amber / red by height, see-through over the notes',
   } },
