@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.61'
+V.VERSION = '0.5.62'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.62', d = '2026-10-03', items = {
+    'module borders made uniform: the extra frames from 0.5.61 sat next to the old separators (double lines) - removed; every module separator is now one 1 px dim line, the focus frame stays bright',
+  } },
   { v = '0.5.61', d = '2026-10-03', items = {
     'every visible module has a thin dim frame (main module, fx list, tabs, tracker, matrix, instruments, browser, DSP) - the focus frame stays bright on top',
     'options: frame rate max / 30 / 25 / 24 - the lower rates draw into a buffer that is shown on every tick, so nothing flickers; 60 / 120 are not possible for a script (REAPER runs defer ~30 times a second)',
