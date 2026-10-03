@@ -14,19 +14,22 @@ local U, ctx
 
 function O.init(u, c) U, ctx = u, c end
 
-function O.open(items, about)
+function O.open(items)
   O.items = items or O.items
-  -- about может быть функцией (3 окт): страница собирается заново при каждом
-  -- входе — логотип каждый раз в новом стиле
-  if type(about) == 'function' then O.about_fn = about; O.about = about() else O.about = about or O.about end
   O.page = 'list'
   O.active = true
   O.sel = math.max(1, math.min(#O.items, O.sel))
 end
+-- about отдельно, из главного модуля (3 окт): fn() → { logo = { lines = … }, text = { строки } };
+-- Esc закрывает окно целиком, не возвращает в список опций
+function O.open_about(fn)
+  local a = fn()
+  O.logo, O.about = a.logo, a.text or {}
+  O.page, O.ascroll, O.active = 'about', 0, true
+end
 function O.close() O.active = false end
 
 local function val_text(it)
-  if it.kind == 'about' then return 'Enter' end
   local v = it.get()
   if it.kind == 'toggle' then return v and 'on' or 'off' end
   if it.kind == 'cycle' then return tostring(v) end
@@ -37,7 +40,6 @@ end
 -- изменить строку: d = +1/-1 (num/cycle), 0 = переключить (toggle) / шаг вперёд
 function O.adjust(it, d)
   if not it then return end
-  if it.kind == 'about' then O.page = 'about'; O.ascroll = 0; if O.about_fn then O.about = O.about_fn() end; return end
   if it.kind == 'toggle' then it.set(not it.get())
   elseif it.kind == 'cycle' then
     local v = it.get(); local k = 1
@@ -57,8 +59,8 @@ end
 function O.key(c)
   local ch = c < 256 and string.char(c) or ''
   if O.page == 'about' then
-    local n = #(O.about or {})
-    if c == 27 or ch == 'q' or c == 13 then O.page = 'list'
+    local n = O.about_n or #(O.about or {})
+    if c == 27 or ch == 'q' or c == 13 then O.close()
     elseif ch == 'j' or c == 1685026670 then O.ascroll = math.min(math.max(0, n - 1), O.ascroll + 1)
     elseif ch == 'k' or c == 30064 then O.ascroll = math.max(0, O.ascroll - 1)
     elseif ch == 'g' then O.ascroll = 0 end
@@ -91,8 +93,63 @@ function O.click(mx, my)
 end
 
 -- отрисовка поверх всего: панель по центру окна
+-- about: логотип (jf_tracker_logo.lua рисует сам, по сетке) и версия / изменения
+local function draw_about(L, W, H)
+  local rh = L.rh
+  local LGO = ctx.logo
+  local lw = O.logo and LGO and LGO.size(O.logo) or 0
+  local bw = math.min(W - 2 * L.pad - 20, math.max(lw * L.cw, L.cw * 80) + 4 * L.pad)
+  local bh = math.min(H - 2 * rh, math.max(rh * 12, H - 6 * rh))
+  local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
+  O.box = { bx, by, bw, bh }
+  O.hover = nil                       -- клик по about не должен переключать опции под ним
+  U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
+  U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
+  U.text(bx + L.pad, by + 2, ctx.fit('about   j k / wheel: scroll   Esc: close', bw - 2 * L.pad), U.AMBER)
+  U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
+  local y = by + rh + 2 + L.pad
+  if O.logo and LGO then
+    local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad, L.cw, rh)
+    if cw then
+      local w, h = LGO.size(O.logo)
+      LGO.draw(O.logo, bx + math.floor((bw - w * cw) / 2), y, cw, ch, U.AMBER, U.BG)
+      y = y + h * ch + L.pad
+    else
+      U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad
+    end
+  end
+  -- перенос по словам под ширину окна (продолжение — с отступом пункта);
+  -- пересчёт только при смене ширины или текста
+  local tw = bw - 2 * L.pad
+  if O.wrap_w ~= tw or O.wrap_src ~= O.about then
+    local out = {}
+    for _, s in ipairs(O.about or {}) do
+      local col = s:match('^%d+%.%d') and U.AMBER or (s:match('^jf_tracker') and U.CYAN or U.TEXT)
+      local ind = s:match('^(%s*%-?%s*)') or ''
+      local cur = ''
+      for w in s:gmatch('%S+') do
+        local try = cur == '' and (s:match('^%s*') .. w) or (cur .. ' ' .. w)
+        if cur ~= '' and U.measure(try) > tw then
+          out[#out + 1] = { cur, col }; cur = (' '):rep(#ind) .. w
+        else cur = try end
+      end
+      out[#out + 1] = { cur, col }
+    end
+    O.wrapped, O.wrap_w, O.wrap_src = out, tw, O.about
+  end
+  local lines = O.wrapped
+  O.about_n = #lines
+  local nv = math.floor((by + bh - y) / rh)
+  for r = 1, nv do
+    local l = lines[O.ascroll + r]
+    if not l then break end
+    U.text(bx + L.pad, y + (r - 1) * rh, ctx.fit(l[1], tw), l[2])
+  end
+end
+
 function O.draw(L, W, H)
   if not O.active then return end
+  if O.page == 'about' then return draw_about(L, W, H) end
   local rh = L.rh
   local n = #O.items
   local lw, vw = L.cw * 22, L.cw * 12
@@ -107,21 +164,6 @@ function O.draw(L, W, H)
   if O.sel > O.scroll + nvis then O.scroll = O.sel - nvis end
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
-  if O.page == 'about' then
-    -- about: версия и список изменений (jf_tracker_version.lua)
-    O.hover = nil                     -- клик по about не должен переключать опции под ним
-    U.text(bx + L.pad, by + 2, ctx.fit('about   j k / wheel: scroll   Esc: back', bw - 2 * L.pad), U.AMBER)
-    U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
-    local lines = O.about or {}
-    local nv = math.floor((bh - rh - 6) / rh)
-    for r = 1, nv do
-      local s = lines[O.ascroll + r]
-      if not s then break end
-      local col = s:match('^%d+%.%d') and U.AMBER or (s:match('^jf_tracker') and U.CYAN or U.TEXT)
-      U.text(bx + L.pad, by + rh + 4 + (r - 1) * rh, ctx.fit(s, bw - 2 * L.pad), col)
-    end
-    return
-  end
   U.text(bx + L.pad, by + 2, 'options', U.AMBER)
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
   U.text(hx, by + 2, ctx.fit('j k: row   Enter / Space / h l + -: change   Esc: close', bx + bw - L.pad - hx), U.GREY)

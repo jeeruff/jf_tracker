@@ -933,6 +933,7 @@ local function draw_topbar(L, info)
     } },
     { name = 'help', items = {
       { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
+      { 'about', 'about', U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)

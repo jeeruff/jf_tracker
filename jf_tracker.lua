@@ -45,7 +45,7 @@ local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
 local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
 local LG = dofile(DIR .. '/jf_tracker_lfogen.lua')        -- генератор LFO в точки / automation item (2 окт)
-local LOGO = dofile(DIR .. '/jf_tracker_logo.lua')        -- граффити-логотип для about (3 окт)
+local LOGO = dofile(DIR .. '/jf_tracker_logo.lua')        -- логотипы about (3 окт)
 math.randomseed(math.floor(os.time() + (reaper.time_precise() % 1) * 1e6))   -- стиль логотипа — новый от запуска к запуску
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
@@ -502,6 +502,7 @@ ctx = {
   end,
   depot = function() local c = cur_col(); return c and c.pool or {} end,
   fit = draw.fit,
+  logo = LOGO,                                             -- about рисует логотип (options)
   set_pitchmode = function(col, mode) state.pitchmodes[col.guid] = mode end,
   -- TTF: размер 10..32 (3 окт), 0 — битмап
   -- TTF убран (3 окт): только битмап REAPER; set_font оставлен для совместимости
@@ -1983,19 +1984,14 @@ ctx = {
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
-      { sep = true },
-      { key = 'about', label = 'about  v' .. VER.VERSION, kind = 'about', desc = 'version and changes (' .. VER.DATE .. ')', get = function() return VER.VERSION end, set = function() end },
     }
-    OPT.open(items, function()
-      -- граффити JFTRACKER — каждый раз новый стиль (jf_tracker_logo.lua)
-      local logo, style = LOGO.make()
-      local out = {}
-      for _, l in ipairs(logo) do out[#out + 1] = l end
-      out[#out + 1] = ''
-      out[#out + 1] = '   style: ' .. style
-      out[#out + 1] = ''
-      for _, l in ipairs(VER.lines()) do out[#out + 1] = l end
-      return out
+    OPT.open(items)
+  end,
+  -- about (3 окт): ячейка в главном модуле, :about; логотип каждый раз другой
+  about = function()
+    OPT.open_about(function()
+      LOGO.last = LOGO.pick(LOGO.last)                       -- не тот же, что в прошлый раз
+      return { logo = LOGO.LOGOS[LOGO.last], text = VER.lines() }
     end)
   end,
   -- ── лупы в регионе (F1): > item до конца региона, N> период N шагов, < регион до конца item
@@ -3752,6 +3748,7 @@ end
 function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
+  elseif name == 'about' then if delta == 0 then ctx.about() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
@@ -4563,6 +4560,7 @@ local function frame()
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
+  elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
   elseif hover.ruler then

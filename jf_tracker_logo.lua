@@ -1,184 +1,148 @@
--- jf_tracker_logo.lua — граффити-логотип JFTRACKER для страницы about (3 окт).
+-- jf_tracker_logo.lua — логотип JFTRACKER для about (главный модуль, 3 окт).
 --
--- Каждый показ — новый стиль, как логотипы на pouet: буквы берутся из своего
--- пиксельного шрифта 5×7 (ровные всегда), а стиль решает, чем «рисовать»
--- пиксели: блок #, олдскул с тенью, бабл-граффити, металл (курсив, шипы,
--- потёки), 3D-тень; плюс классический figlet «standard» (pouet ASCII).
--- Только ASCII — битмап-шрифт REAPER другого не знает.
+-- Пять логотипов, присланных пользователем; каждый показ about — другой.
+-- Блочные символы (░ ▒ ▓ █ ▀ ▄ ╱ ╲) битмап-шрифт REAPER не знает, а запасной
+-- системный шрифт сбил бы колонки — поэтому логотип рисуется сам, по сетке
+-- символов: прямоугольники, оттенки (░ ▒ ▓ = цвет 30 / 55 / 80 % на фоне),
+-- диагонали линиями, ASCII-штрихи (: + # _ -) — палочками. Сетка ужимается
+-- под ширину окна; меньше 2 px на символ — about пишет LG.SHORT строкой.
 --
--- Без reaper.*: тестируется tests/test_logo.lua.
+-- Без reaper.* (только gfx в LG.draw): тестируется tests/test_logo.lua.
 
 local LG = {}
 
-local FONT = {
-  J = { '..###', '...#.', '...#.', '...#.', '#..#.', '#..#.', '.##..' },
-  F = { '#####', '#....', '#....', '####.', '#....', '#....', '#....' },
-  T = { '#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..' },
-  R = { '####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#' },
-  A = { '.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#' },
-  C = { '.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.' },
-  K = { '#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#' },
-  E = { '#####', '#....', '#....', '####.', '#....', '#....', '#####' },
+LG.LOGOS = {
+  { name = 'alligator', lines = {
+    [[::::::::::: :::::::::: ::::::::::: :::::::::      :::      ::::::::  :::    ::: :::::::::: :::::::::]],
+    [[    :+:     :+:            :+:     :+:    :+:   :+: :+:   :+:    :+: :+:   :+:  :+:        :+:    :+:]],
+    [[    +:+     +:+            +:+     +:+    +:+  +:+   +:+  +:+        +:+  +:+   +:+        +:+    +:+]],
+    [[    +#+     :#::+::#       +#+     +#++:++#:  +#++:++#++: +#+        +#++:++    +#++:++#   +#++:++#:]],
+    [[    +#+     +#+            +#+     +#+    +#+ +#+     +#+ +#+        +#+  +#+   +#+        +#+    +#+]],
+    [[#+# #+#     #+#            #+#     #+#    #+# #+#     #+# #+#    #+# #+#   #+#  #+#        #+#    #+#]],
+    [[ #####      ###            ###     ###    ### ###     ###  ########  ###    ### ########## ###    ###]],
+  } },
+  { name = 'drip', lines = {
+    [[  ▓▄▓ ▓▄▓▀▓ ▓▀▓▄▓▀▓ ▓▄▓▀ ▄▄ ▓▄▓▀ ▄▓ ▓▄▓▀▓ ▓▄▓  ▄▓ ▓▄▓▀▓ ▓▄▓▀ ▄▄]],
+    [[  ▒▓▒ ▒▓▒ ▒ ▒ ▒▓▒ ▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒ ▒▓▒ ▒▓▒]],
+    [[  ░▒░ ░▒░ ░ ░ ░▒░ ░ ░▒░ ░▒░ ░▒░ ░▒░ ░▒░ ░ ░▒░ ░▒░ ░▒░ ░ ░▒░ ░▒░]],
+    [[  █░   ░       ░█    ░█  ░█  ░█  ░█ █░█    ░█  ░█ █░█    ░█  ░█]],
+    [[  █▀█ █▀█▀    █▀    █▀█▀█▀▄ █▀█▀█▀█ █▀█   █▀█▀█▀▄ █▀█▀  █▀█▀█▀▄]],
+    [[   ░█  ░      █░    █░  █░  █░  █░  █░█   █░  █░  █░█   █░  █░]],
+    [[░ ░▒░ ░▒░     ░▒░   ░▒░ ░▒░ ░▒░ ░▒░ ░▒░ ░ ░▒░ ░▒░ ░▒░ ░ ░▒░ ░▒░]],
+    [[▒ ▒▓▒ ▒▓▒     ▒▓▒   ▒▓▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒ ▒▓▒ ▒▓▒ ▒▓▒ ▒ ▒▓▒ ▒▓▒]],
+    [[▓ ▓█▓ ▓█▓     ▓█▓   ▓█▓ ▓█▓ ▓█▓ ▓█▓ ▓█▓ ▓ ▓█▓ ▓█▓ ▓█▓ ▓ ▓█▓ ▓█▓]],
+    [[▀▀▀▀▀ ▀▀▀     ▀▀▀   ▀▀▀ ▀▀▀ ▀▀▀ ▀▀▀ ▀▀▀▀▀ ▀▀▀ ▀▀▀ ▀▀▀▀▀ ▀▀▀ ▀▀▀]],
+  } },
+  { name = 'slant', lines = {
+    [[    ______  ________  ________  ________  ________  ________  ____ ___  ________  ________]],
+    [[   ╱      ╲╱        ╲╱        ╲╱        ╲╱        ╲╱        ╲╱    ╱   ╲╱        ╲╱        ╲]],
+    [[  ╱       ╱       __╱        _╱         ╱         ╱         ╱         ╱         ╱         ╱]],
+    [[_╱       ╱        _╱╱       ╱╱        _╱         ╱       --╱        _╱        _╱        _╱]],
+    [[╲_______╱╲_______╱  ╲______╱ ╲____╱___╱╲___╱____╱╲________╱╲____╱___╱╲________╱╲____╱___╱]],
+  } },
+  { name = 'shade', lines = {
+    [[░        ░░        ░░        ░░       ░░░░      ░░░░      ░░░  ░░░░  ░░        ░░       ░░]],
+    [[▒▒▒▒▒▒▒  ▒▒  ▒▒▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒  ▒▒▒▒  ▒▒  ▒▒▒▒  ▒▒  ▒▒▒▒  ▒▒  ▒▒▒  ▒▒▒  ▒▒▒▒▒▒▒▒  ▒▒▒▒  ▒]],
+    [[▓▓▓▓▓▓▓  ▓▓      ▓▓▓▓▓▓▓  ▓▓▓▓▓       ▓▓▓  ▓▓▓▓  ▓▓  ▓▓▓▓▓▓▓▓     ▓▓▓▓▓      ▓▓▓▓       ▓▓]],
+    [[█  ████  ██  ███████████  █████  ███  ███        ██  ████  ██  ███  ███  ████████  ███  ██]],
+    [[██      ███  ███████████  █████  ████  ██  ████  ███      ███  ████  ██        ██  ████  █]],
+  } },
+  { name = 'bloody', lines = {
+    [[ ▄▄▄██▀▀▀█████▒▄▄▄█████▓ ██▀███   ▄▄▄       ▄████▄   ██ ▄█▀▓█████  ██▀███]],
+    [[   ▒██ ▓██   ▒ ▓  ██▒ ▓▒▓██ ▒ ██▒▒████▄    ▒██▀ ▀█   ██▄█▒ ▓█   ▀ ▓██ ▒ ██▒]],
+    [[   ░██ ▒████ ░ ▒ ▓██░ ▒░▓██ ░▄█ ▒▒██  ▀█▄  ▒▓█    ▄ ▓███▄░ ▒███   ▓██ ░▄█ ▒]],
+    [[▓██▄██▓░▓█▒  ░ ░ ▓██▓ ░ ▒██▀▀█▄  ░██▄▄▄▄██ ▒▓▓▄ ▄██▒▓██ █▄ ▒▓█  ▄ ▒██▀▀█▄]],
+    [[ ▓███▒ ░▒█░      ▒██▒ ░ ░██▓ ▒██▒ ▓█   ▓██▒▒ ▓███▀ ░▒██▒ █▄░▒████▒░██▓ ▒██▒]],
+    [[ ▒▓▒▒░  ▒ ░      ▒ ░░   ░ ▒▓ ░▒▓░ ▒▒   ▓▒█░░ ░▒ ▒  ░▒ ▒▒ ▓▒░░ ▒░ ░░ ▒▓ ░▒▓░]],
+    [[ ▒ ░▒░  ░          ░      ░▒ ░ ▒░  ▒   ▒▒ ░  ░  ▒   ░ ░▒ ▒░ ░ ░  ░  ░▒ ░ ▒░]],
+    [[ ░ ░ ░  ░ ░      ░        ░░   ░   ░   ▒   ░        ░ ░░ ░    ░     ░░   ░]],
+    [[ ░   ░                     ░           ░  ░░ ░      ░  ░      ░  ░   ░]],
+    [[                                           ░]],
+  } },
 }
-LG.WORD = 'JFTRACKER'
+LG.SHORT = 'J F T R A C K E R'
 
--- пиксельная сетка слова: rows[y][x] = true; буквы через 1 пустой столбец
-function LG.grid(word)
-  word = word or LG.WORD
-  local rows = {}
-  for y = 1, 7 do rows[y] = {} end
-  local x0 = 0
-  for i = 1, #word do
-    local g = FONT[word:sub(i, i)]
-    if g then
-      for y = 1, 7 do
-        for x = 1, 5 do rows[y][x0 + x] = g[y]:sub(x, x) == '#' end
-      end
-      x0 = x0 + 6
-    end
-  end
-  return rows, x0 - 1
+-- символы строки (UTF-8 → таблица строк по одному символу)
+local function chars(s)
+  local t = {}
+  for _, cp in utf8.codes(s) do t[#t + 1] = utf8.char(cp) end
+  return t
+end
+LG.chars = chars
+
+-- размер логотипа в символах: ширина, высота
+function LG.size(logo)
+  local w = 0
+  for _, l in ipairs(logo.lines) do w = math.max(w, utf8.len(l)) end
+  return w, #logo.lines
 end
 
-local function px(rows, x, y) return rows[y] and rows[y][x] or false end
-
-local function trim(lines)
-  for i, l in ipairs(lines) do lines[i] = l:gsub('%s+$', '') end
-  return lines
-end
-
--- стили: функция (rows, w) → строки
-local STYLES = {}
-
--- блок: просто #
-STYLES.block = function(rows, w)
-  local out = {}
-  for y = 1, 7 do
-    local t = {}
-    for x = 1, w do t[x] = px(rows, x, y) and '#' or ' ' end
-    out[y] = table.concat(t)
-  end
-  return out
-end
-
--- олдскул: буквы @, тень : со сдвигом вправо-вниз (Amiga / C64)
-STYLES.oldskool = function(rows, w)
-  local out = {}
-  for y = 1, 8 do
-    local t = {}
-    for x = 1, w + 1 do
-      if px(rows, x, y) then t[x] = '@'
-      elseif px(rows, x - 1, y - 1) then t[x] = ':'
-      else t[x] = ' ' end
-    end
-    out[y] = table.concat(t)
-  end
-  return out
-end
-
--- бабл: каждая полоса пикселей — пузырь (ooo), одиночный пиксель — o
-STYLES.bubble = function(rows, w)
-  local out = {}
-  for y = 1, 7 do
-    local t = {}
-    local x = 1
-    while x <= w do
-      if px(rows, x, y) then
-        local x1 = x
-        while px(rows, x1 + 1, y) do x1 = x1 + 1 end
-        local len = x1 - x + 1
-        t[#t + 1] = len == 1 and 'o' or ('(' .. ('o'):rep(len - 2) .. ')')
-        x = x1 + 1
-      else t[#t + 1] = ' '; x = x + 1 end
-    end
-    out[y] = table.concat(t)
-  end
-  return out
-end
-
--- металл: курсив (каждая строка левее), шипы ^ над верхним краем, потёки
--- | и ' под нижним — продолжают наклон; шипастые концы >> << посередине
-STYLES.metal = function(rows, w)
-  local out = {}
-  local slant = 8
-  local function pre(y) return (' '):rep(math.max(0, slant - y)) end
-  local top = {}
-  for x = 1, w do top[x] = (px(rows, x, 1) and (x % 2 == 1)) and '^' or ' ' end
-  out[#out + 1] = pre(0) .. '  ' .. table.concat(top)
-  for y = 1, 7 do
-    local t = {}
-    for x = 1, w do t[x] = px(rows, x, y) and '#' or ' ' end
-    out[#out + 1] = pre(y) .. (y == 4 and '>>' or '  ') .. table.concat(t) .. (y == 4 and ' <<' or '')
-  end
-  for d = 1, 2 do
-    local t = {}
-    for x = 1, w do t[x] = (px(rows, x, 7) and ((x * 7 + d) % 3 == 0)) and (d == 1 and '|' or "'") or ' ' end
-    out[#out + 1] = pre(7 + d) .. '  ' .. table.concat(t)
-  end
-  return out
-end
-
--- 3D: # и грань / справа от каждой полосы
-STYLES.shadow3d = function(rows, w)
-  local out = {}
-  for y = 1, 7 do
-    local t = {}
-    for x = 1, w + 1 do
-      if px(rows, x, y) then t[x] = '#'
-      elseif px(rows, x - 1, y) then t[x] = '/'
-      else t[x] = ' ' end
-    end
-    out[y] = table.concat(t)
-  end
-  return out
-end
-
--- хром: градиент сверху вниз, как хромированные олдскул-логотипы
-STYLES.chrome = function(rows, w)
-  local ink = { '@', '@', '#', '=', '+', ':', '.' }
-  local out = {}
-  for y = 1, 7 do
-    local t = {}
-    for x = 1, w do t[x] = px(rows, x, y) and ink[y] or ' ' end
-    out[y] = table.concat(t)
-  end
-  return out
-end
-
--- pouet ASCII: figlet «standard», буквы как в ASCII-интро
-local FIG = {
-  J = { '     _ ', '    | |', ' _  | |', '| |_| |', ' \\___/ ' },
-  F = { ' _____ ', '|  ___|', '| |_   ', '|  _|  ', '|_|    ' },
-  T = { ' _____ ', '|_   _|', '  | |  ', '  | |  ', '  |_|  ' },
-  R = { ' ____  ', '|  _ \\ ', '| |_) |', '|  _ < ', '|_| \\_\\' },
-  A = { '    _    ', '   / \\   ', '  / _ \\  ', ' / ___ \\ ', '/_/   \\_\\' },
-  C = { '  ____ ', ' / ___|', '| |    ', '| |___ ', ' \\____|' },
-  K = { ' _  __', '| |/ /', "| ' / ", '| . \\ ', '|_|\\_\\' },
-  E = { ' _____ ', '| ____|', '|  _|  ', '| |___ ', '|_____|' },
-}
-function LG.figlet(word)
-  word = word or LG.WORD
-  local out = { '', '', '', '', '' }
-  for i = 1, #word do
-    local g = FIG[word:sub(i, i)]
-    if g then for y = 1, 5 do out[y] = out[y] .. g[y] end end
-  end
-  return out
-end
-
-LG.STYLE_NAMES = { 'pouet', 'block', 'oldskool', 'bubble', 'metal', 'shadow3d', 'chrome' }
-
--- логотип стиля name (nil — случайный); вторым — имя стиля
-function LG.make(name, rnd)
+-- следующий логотип: не тот же, что prev (индекс); rnd — для тестов
+function LG.pick(prev, rnd)
   rnd = rnd or math.random
-  name = name or LG.STYLE_NAMES[rnd(1, #LG.STYLE_NAMES)]
-  local lines
-  if name == 'pouet' then lines = LG.figlet()
-  else
-    local rows, w = LG.grid()
-    lines = STYLES[name](rows, w)
+  local n = #LG.LOGOS
+  if n < 2 then return 1 end
+  local k = rnd(1, n - 1)
+  if prev and k >= prev then k = k + 1 end
+  return k
+end
+
+-- ячейка: ширина символа, чтобы логотип влез в aw px, при соотношении
+-- сторон шрифта (cw0 × ch0); nil — не влезает (меньше 2 px)
+function LG.cell(logo, aw, cw0, ch0)
+  local w = LG.size(logo)
+  local cw = math.min(cw0, math.floor(aw / math.max(1, w)))
+  if cw < 2 then return nil end
+  return cw, math.max(2, math.floor(cw * ch0 / cw0 + 0.5))
+end
+
+local SHADE = { ['░'] = 0.3, ['▒'] = 0.55, ['▓'] = 0.8 }
+
+-- нарисовать: левый верх x, y; ячейка cw × ch; ink / bg — { r, g, b } 0..1
+function LG.draw(logo, x, y, cw, ch, ink, bg)
+  local t = math.max(1, math.floor(cw / 4))
+  local function col(a)
+    gfx.set(bg[1] + (ink[1] - bg[1]) * a, bg[2] + (ink[2] - bg[2]) * a, bg[3] + (ink[3] - bg[3]) * a, 1)
   end
-  return trim(lines), name
+  local function r(x0, y0, w, h) gfx.rect(x0, y0, math.max(1, w), math.max(1, h), 1) end
+  for li, l in ipairs(logo.lines) do
+    local cy = y + (li - 1) * ch
+    for k, c in ipairs(chars(l)) do
+      local cx = x + (k - 1) * cw
+      if c ~= ' ' then
+        local sh = SHADE[c]
+        if sh then col(sh); r(cx, cy, cw, ch)
+        else
+          col(1)
+          local hm = math.floor(ch / 2)
+          if c == '█' then r(cx, cy, cw, ch)
+          elseif c == '▀' then r(cx, cy, cw, hm)
+          elseif c == '▄' then r(cx, cy + hm, cw, ch - hm)
+          elseif c == '╱' or c == '╲' then
+            for d = 0, t - 1 do
+              if c == '╱' then gfx.line(cx + d, cy + ch - 1, cx + cw - 1 + d, cy)
+              else gfx.line(cx + d, cy, cx + cw - 1 + d, cy + ch - 1) end
+            end
+          elseif c == '_' then r(cx, cy + ch - t, cw, t)
+          elseif c == '-' then r(cx, cy + hm, cw, t)
+          -- : + # — плотность «аллигатора» (светлый → тёмный): штрихи толще и во
+          -- всю клетку, иначе буквы на пиксельной сетке рассыпаются в точки
+          elseif c == ':' then
+            local s = math.max(1, math.floor(cw / 2)); local ox = cx + math.floor((cw - s) / 2)
+            r(ox, cy + math.floor(ch * 0.2), s, s); r(ox, cy + math.floor(ch * 0.8) - s, s, s)
+          elseif c == '+' then
+            local s = math.max(1, math.floor(cw / 2))
+            r(cx + math.floor((cw - s) / 2), cy, s, ch)
+            r(cx, cy + hm - math.floor(s / 2), cw, s)
+          elseif c == '#' then
+            local s = math.max(1, math.floor(cw / 3))
+            r(cx, cy, s, ch); r(cx + cw - s, cy, s, ch)
+            r(cx, cy + math.floor(ch * 0.25), cw, s); r(cx, cy + math.floor(ch * 0.75) - s, cw, s)
+          else r(cx, cy, cw, ch) end                         -- неизвестный — сплошной
+        end
+      end
+    end
+  end
 end
 
 return LG

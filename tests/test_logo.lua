@@ -1,4 +1,4 @@
--- test_logo.lua — граффити-логотип: lua tests/test_logo.lua
+-- test_logo.lua — логотипы about: lua tests/test_logo.lua
 package.path = './?.lua;' .. package.path
 local LG = dofile('jf_tracker_logo.lua')
 local n, bad = 0, 0
@@ -6,27 +6,43 @@ local function eq(name, got, want)
   n = n + 1
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
-for _, st in ipairs(LG.STYLE_NAMES) do
-  local lines, name = LG.make(st)
-  eq(st .. ': name', name, st)
-  eq(st .. ': has lines', #lines >= 5, true)
-  local ascii, maxw, ink = true, 0, 0
-  for _, l in ipairs(lines) do
-    if l:find('[^\32-\126]') then ascii = false end
-    if #l > maxw then maxw = #l end
-    ink = ink + #l:gsub('%s', '')
+eq('five logos', #LG.LOGOS, 5)
+local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▒'] = 1, ['▓'] = 1 }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 } }
+for _, lg in ipairs(LG.LOGOS) do
+  local w, h = LG.size(lg)
+  eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
+  local ok, trail = true, false
+  for _, l in ipairs(lg.lines) do
+    for _, c in ipairs(LG.chars(l)) do if not KNOWN[c] then ok = false end end
+    if l:find('%s$') then trail = true end
   end
-  eq(st .. ': ascii only (bitmap font)', ascii, true)
-  eq(st .. ': fits 72 columns', maxw <= 72, true)
-  eq(st .. ': has ink', ink > 50, true)
+  eq(lg.name .. ' glyphs drawable', ok, true)
+  eq(lg.name .. ' no trailing spaces', trail, false)
 end
--- случайный стиль — из списка
-local seen = {}
-for i = 1, 60 do local _, s = LG.make(nil, function(a, b) return a + (i % (b - a + 1)) end); seen[s] = true end
+-- колонки не съехали
+local al = LG.LOGOS[1].lines
+eq('alligator J top', al[1]:sub(1, 11), ':::::::::::')
+eq('alligator R leg', al[2]:sub(-3) .. al[7]:sub(-3), ':+:###')
+-- выбор: никогда не тот же подряд, покрывает все
+local seen, prev, same = {}, nil, false
+for i = 1, 40 do
+  local k = LG.pick(prev, function(a, b) return a + (i % (b - a + 1)) end)
+  if k == prev then same = true end
+  seen[k] = true; prev = k
+end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
-eq('random covers every style', cnt, #LG.STYLE_NAMES)
--- сетка: 9 букв по 5 + 8 промежутков
-local _, w = LG.grid()
-eq('grid width', w, 9 * 5 + 8)
+eq('pick never repeats', same, false); eq('pick covers all', cnt, 5)
+-- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
+local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
+eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)
+cw, ch = LG.cell(LG.LOGOS[1], 404, 8, 16)
+eq('cell shrinks', cw, 4); eq('cell shrinks h', ch, 8)
+eq('cell too narrow', LG.cell(LG.LOGOS[1], 150, 8, 16), nil)
+-- отрисовка со стабом gfx не падает
+local rects = 0
+gfx = { set = function() end, rect = function() rects = rects + 1 end, line = function() end }
+for _, lg in ipairs(LG.LOGOS) do LG.draw(lg, 0, 0, 4, 8, { 1, 0.7, 0 }, { 0, 0, 0 }) end
+eq('draw makes rects', rects > 500, true)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
