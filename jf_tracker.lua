@@ -100,7 +100,7 @@ local state = {
   -- держишь кнопку мыши на строке, sec — первая секунда
   theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
   tlruler = (function() local v = reaper.GetExtState(EXT, 'tlruler'); return (v == 'beats' or v == 'time' or v == 'both') and v or 'off' end)(),   -- линейка у номеров (3 окт)
-  curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off' or v == 'scope') and v or 'top' end)(),   -- линия курсора (3 окт); scope — curscope
+  curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
@@ -1669,7 +1669,7 @@ ctx = {
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     local t = { 'retro', 'sample', 'modulation', 'midi' }
     if state.gridtab then t[#t + 1] = 'grid' end
-    for _, x in ipairs({ 'garden', 'master' }) do t[#t + 1] = x end
+    for _, x in ipairs({ 'garden', 'scopes', 'master' }) do t[#t + 1] = x end   -- scopes — скоп на каждый трек (3 окт)
     return t
   end,
   mx_loops_toggle = function()
@@ -1965,14 +1965,6 @@ ctx = {
       end
     end
   end,
-  -- линия курсора (3 окт): scope (curscope) — курсор фиксирован в центре; выход
-  -- из scope возвращает прежний fixed
-  set_curline = function(v)
-    if v == 'scope' and state.curline ~= 'scope' then state.fixed_prev = state.fixed; state.fixed = true
-    elseif v ~= 'scope' and state.curline == 'scope' then state.fixed = state.fixed_prev or false end
-    state.curline = v
-    if v == 'scope' and not state.scopes then vim.msg = 'curscope: turn track scopes on (options) to see the signal' end
-  end,
   -- имя входа записи трека (шапка, блок трека DSP)
   input_name = function(tr)
     local v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
@@ -2250,7 +2242,7 @@ ctx = {
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
-      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'scope', 'off' }, desc = 'cursor lines: top / bottom edge; scope - green line is a scope (:curscope)', get = function() return state.curline or 'top' end, set = function(v) ctx.set_curline(v) end },
+      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
     }
     OPT.open(items)
@@ -4533,7 +4525,6 @@ local function frame()
   end
 
   -- fixed cursor: вид всегда ставит строку курсора в середину тела
-  if state.curline == 'scope' then state.fixed = true end     -- curscope: курсор всегда в центре (3 окт)
   if state.fixed and L and L.nrows then
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
   end
@@ -5502,6 +5493,8 @@ local function frame()
       if hover.ctrl ~= 'beats' then state.ctrl_sel = hover.ctrl end     -- курсор клавиатуры — на нажатую ячейку
       ctrl_action(hover.ctrl, 0)
       click = { t = now2, zone = 'ctrl' }
+    elseif hover.scopes_on then
+      ctx.toggle_scopes(true); click = { t = now2, zone = 'scopes_on' }
     elseif hover.scope then
       for i, f in ipairs(L.flat) do if f.col == hover.scope then vim.cur.fi = i; break end end
       ctx.set_focus('top')

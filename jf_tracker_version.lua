@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.84'
+V.VERSION = '0.5.85'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.85', d = '2026-10-03', items = {
+    'new top tab scopes (before master): a scope for every track in a grid - analyzer (scope / spec / sgram buttons), L R meters, track name; click a cell - cursor to that track; scopes off - one click puts the bridges on',
+    'curscope removed (the cursor line as an oscilloscope did not follow playback); cursor line is top / bottom / off again',
+  } },
   { v = '0.5.84', d = '2026-10-03', items = {
     'fix: slices of a sample with stretch markers (after smart quantize) all played its start - the copies kept the markers of the whole sample, and REAPER maps markers from the start of the file, ignoring the offset; a slice copy now gets its own piece of the source (offset and rate from the marker map, pitch kept) without the markers; same for a selection dragged out of the item tab',
     ':fixslices repairs slice notes inserted before this fix (one undo step)',

@@ -1320,7 +1320,7 @@ local function draw_topbar(L, info)
   -- режим анализатора (scope / spec / sgram) — для вкладок scope и master, как
   -- переключатель режима пиков в REAPER
   local amode = info.scopemode or 'scope'
-  if tab == 'master' and info.scope then                 -- скопы убраны: без моста кнопок режима нет
+  if (tab == 'master' or tab == 'scopes') and info.scope then   -- режим анализатора: master и scopes
     local bx = sx1 - L.pad
     for _, m in ipairs({ 'sgram', 'spec', 'scope' }) do
       local bw = ms(m) + 2 * L.pad
@@ -1480,32 +1480,46 @@ local function draw_topbar(L, info)
         text(wx, y, 'select a track with jf_rec (< >)', U.GREY)
       end
     end
-  elseif #cols > 0 and sx1 - sx0 > 20 then
-    -- квадраскоп: осциллограф из gmem (мост jf_tracker_scope), под ним метры
-    local w = math.min(L.cw * 14, math.floor((sx1 - sx0) / #cols))
-    local mh = H - cy0 - L.rh - 4
-    for i, col in ipairs(cols) do
-      local x = sx0 + (i - 1) * w
-      if x + w > sx1 then break end
-      local pl, pr = 0, 0
-      if info.peaks then pl, pr = info.peaks(col) end
-      local bw = math.max(2, math.floor((w - 6) / 2))
-      if col.scope_slot and info.scope then
-        local ox, ow, oh = x + 2, w - 4 - bw * 2 - 4, mh
-        if ow > 8 then
-          draw_analyzer(ox, cy0, ow, oh, col.scope_slot, amode, info)
-          x = x + ow + 2   -- метры правее скопа
+  elseif tab == 'scopes' then
+    -- вкладка scopes (3 окт): скоп на каждый трек сеткой — ячейка не уже 12
+    -- символов, рядов сколько нужно; в ячейке анализатор (режим кнопками
+    -- справа вверху), метры L R и имя трека; клик — курсор на трек
+    local n = #cols
+    local aw, ah = sx1 - sx0, H - cy0 - 2
+    if n == 0 then text(sx0, cy0, 'no tracks', U.GREY)
+    elseif not info.scope or not cols[1].scope_slot then
+      local msg = 'track scopes are off - click here to put the scope bridge on every track'
+      text(sx0, cy0, fit(msg, aw), U.GREY)
+      if mx >= sx0 and mx < sx1 and my >= cy0 and my < cy0 + L.rh then hover.scopes_on = true end
+    elseif aw > 20 and ah > 2 * L.rh then
+      local minw = L.cw * 12
+      local ncol = math.max(1, math.min(n, math.floor(aw / minw)))
+      local nrow = math.ceil(n / ncol)
+      local cw = math.floor(aw / ncol)
+      local ch = math.floor(ah / nrow)
+      if ch < 2 * L.rh then nrow = math.max(1, math.floor(ah / (2 * L.rh))); ch = math.floor(ah / nrow) end
+      for i, col in ipairs(cols) do
+        local r = math.floor((i - 1) / ncol)
+        if r >= nrow then break end
+        local x = sx0 + ((i - 1) % ncol) * cw
+        local y = cy0 + r * ch
+        local sh = ch - L.rh - 2
+        local pl, pr = 0, 0
+        if info.peaks then pl, pr = info.peaks(col) end
+        local bw = math.max(2, math.floor(L.cw / 2))
+        local ow = cw - 2 * (bw + 1) - 6
+        if col.scope_slot and ow > 8 and sh > 4 then draw_analyzer(x + 2, y, ow, sh, col.scope_slot, amode, info) end
+        for k, v in ipairs({ pl, pr }) do
+          local bx = x + 2 + ow + 2 + (k - 1) * (bw + 1)
+          set(U.DIM); gfx.rect(bx, y, bw, sh, 1)
+          local hpx = math.floor(math.min(1, v) * sh + 0.5)
+          if hpx > 0 then set(meter_color(v)); gfx.rect(bx, y + sh - hpx, bw, hpx, 1) end
         end
+        if col.rgb then set(col.rgb); gfx.rect(x + 2, y + sh + 1, 2, L.rh - 2, 1) end
+        text(x + 6, y + sh + 1, fit(col.name, cw - 10), col == info.pool_col and U.AMBER or U.GREY)
+        if mx >= x and mx < x + cw and my >= y and my < y + ch then hover.scope = col end
+        hint('scope', x, y, cw, ch, col)
       end
-      for k, v in ipairs({ pl, pr }) do
-        local bx = x + 2 + (k - 1) * (bw + 1)
-        set(U.DIM); gfx.rect(bx, cy0, bw, mh, 1)
-        local hpx = math.floor(math.min(1, v) * mh + 0.5)
-        if hpx > 0 then set(meter_color(v)); gfx.rect(bx, cy0 + mh - hpx, bw, hpx, 1) end
-      end
-      text(x + 2, cy0 + mh + 1, fit(col.name, w - 4), col == info.pool_col and U.AMBER or U.GREY)
-      if mx >= x and mx < x + w and my < H then hover.scope = col end
-      hint('scope', x, cy0, w, mh, col)
     end
   end
 
@@ -1779,6 +1793,7 @@ function D.frame(L, snap, rows, state, info)
       if L.inst_w > 0 and L.inst_rect then L.inst_rect[2] = L.inst_rect[2] + ty end
       for _, r in pairs(D.ctrl_rect or {}) do r[2] = r[2] + ty; r.shifted = true end
     end
+    hover.scopes_on = th.scopes_on
     hover.ctrl, hover.scope, hover.pool, hover.tab, hover.mod, hover.sample, hover.prevbtn = th.ctrl, th.scope, th.pool, th.tab, th.mod, th.sample, th.prevbtn
     hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
@@ -2131,7 +2146,7 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     -- скопы на полоске курсора (3 окт, scopeat = cursor): осциллограмма каждого
     -- трека по ширине его колонки, под текстом ячеек, приглушённо — ноты читаются
-    if is_cur_row and state.scopes and state.scopeat ~= 'header' and info.scope and state.curline ~= 'scope' then
+    if is_cur_row and state.scopes and state.scopeat ~= 'header' and info.scope then
       local sc_col = U.mix(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW, U.GREEN, 0.55)
       for _, c in ipairs(L.cols) do
         if c.x and not c.folded and c.col.scope_slot then draw_analyzer(c.x + 2, y, c.w - 4, L.rh, c.col.scope_slot, 'scope', info, sc_col) end
@@ -2148,16 +2163,8 @@ function D.frame(L, snap, rows, state, info)
       -- от края полос регионов / маркеров вправо (через линейку, если она
       -- включена): на сами полосы не заходит (3 окт)
       local lx = tx0 + L.ruler_w
-      if cl == 'scope' then
-        -- curscope (3 окт): янтарная линия курсора — как top; зелёная линия
-        -- (курсор REAPER) — осциллограф точками, рисуется после строк (D.cs_y)
-        ly = y
-        if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
-        if r.row == cur then D.cs_y, D.cs_lx = ly, lx end
-      else
-        if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
-        if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
-      end
+      if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+      if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
     end
     text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
@@ -2980,34 +2987,6 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.ctrl, hover.notes = hv.ctrl, hv.notes end
   end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
-  -- curscope (3 окт): зелёная линия курсора REAPER рассыпается на точки —
-  -- в колонке каждого трека его осциллограмма точками вокруг линии, между
-  -- колонками — сама линия; поверх строк (точки заходят на соседние строки)
-  if D.cs_y then
-    local cy, lx = D.cs_y, D.cs_lx
-    D.cs_y = nil
-    local amp = L.rh * 1.2
-    local top, bot = L.body_y, L.body_y + L.body_h - 1
-    set(D.EDITTOP)
-    local x = lx
-    for _, c in ipairs(L.cols) do
-      local x0, w = c.x or x, c.w or 0
-      if x0 >= W then break end
-      local wv = math.min(w, W - x0)                  -- последняя колонка — до края трекера
-      if x0 > x then gfx.rect(x, cy, x0 - x, 1, 1) end
-      local sc = (c.x and not c.folded and state.scopes and info.scope and c.col.scope_slot) and info.scope(c.col.scope_slot)
-      if sc and #sc > 0 and w > 4 then
-        for px = 1, wv - 2 do
-          local v = sc[math.floor(px / w * #sc) + 1] or 0
-          if v > 1 then v = 1 elseif v < -1 then v = -1 end
-          local yy = math.floor(cy - v * amp + 0.5)
-          if yy >= top and yy < bot then gfx.rect(x0 + px, yy, 1, 2, 1) end
-        end
-      elseif wv > 0 then gfx.rect(x0, cy, wv, 1, 1) end
-      x = math.max(x, x0 + wv)
-    end
-    if x < W then gfx.rect(x, cy, W - x, 1, 1) end
-  end
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   return hover
