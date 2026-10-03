@@ -3113,6 +3113,7 @@ edit.after = function(desc)
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   alias.trim(regions)
 end
+draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
 draw.themes = dofile(DIR .. '/jf_tracker_themes.lua')   -- темы трекера (3 окт); полем draw: у главного чанка предел локальных
 if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
@@ -3171,6 +3172,7 @@ B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 MMX.init(U, ctx)
 MMX.PP.init(U, ctx)
+draw.macro.init(U)
 GD.init(U, ctx)
 SPROP.init(U, ctx)
 
@@ -4944,6 +4946,12 @@ local function frame()
   if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   if ev_drag and ev_drag.active then draw.ghost(('%d event(s) %+d'):format(#ev_drag.heads, ev_drag.drow or 0)) end
   SL.draw_drag(U, L)
+  -- макро-вид (3 окт, :macro): поверх тела трекера; клики по скрытым ячейкам не идут
+  if state.macro and L.body_h > 0 then
+    draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,
+      beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
+    hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
+  end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
   if vim.mode ~= 'cmd' and not vim.picker then state.popup_at = nil end
@@ -6472,6 +6480,12 @@ local function frame()
       -- фокусе (2 окт: в модуляции a открывал выбор параметра, а набор и Enter
       -- съедала матрица модуляции — выбрать было нельзя)
       if vim.picker or vim.hydra then return vim.key(c) end
+      -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
+      if state.macro and state.focus == 'tracker' and vim.mode == 'normal' then
+        local mr = draw.macro.key(c, vim.cur.row, beat_info.rows_bar or (state.lpb * 4), snap and snap.last_row)
+        if mr == 'leave' then state.macro = false; vim.msg = 'macro off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end
+        if mr then vim.cur.row = mr; return end
+      end
       if state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)

@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.95'
+V.VERSION = '0.5.96'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.96', d = '2026-10-03', items = {
+    'macro view (:macro): bird view over the tracker body - a row is a bar, per track the event density as blocks and the first note of the bar, region names at their bars; j k bars, J K by 4, g G, h l tracks, Enter / Esc back to the tracker on that bar',
+  } },
   { v = '0.5.95', d = '2026-10-03', items = {
     'PT-mode (:pt): a ProTracker view - only the tracker and, on top, the scopes tab with the scopes of the tracks visible in it; matrix, lib / browser, DSP hidden, cursor fixed in the centre, meters on; :pt again restores the layout (quitting in PT-mode saves the layout from before it)',
   } },
