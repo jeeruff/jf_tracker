@@ -35,6 +35,7 @@ local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
 local B = dofile(DIR .. '/jf_tracker_browser.lua')
 local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
+MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
@@ -1054,6 +1055,59 @@ ctx = {
     local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
     if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action' end
   end,
+  -- ── панель params (3 окт, jf_tracker_params.lua) ──
+  edit_run = function(name, fn) edit.run(name, fn); model.invalidate() end,
+  msg = function(s) vim.msg = s end,
+  fx_addresses = function(tr) return model.fx_addresses(tr) end,
+  open_picker = function(title, items, fn) vim.open_picker(title, items, fn) end,
+  fx_show = function(fx) local col = cur_col(); if col then edit.fx_show(col.track, fx) end end,
+  envs_shown = function()
+    local col = cur_col(); if not col then return false end
+    local v = state.trackenvs[col.guid]; if v == nil then v = state.envs end
+    return v
+  end,
+  -- действие над треком, выделенным одним; выделение пользователя возвращается
+  with_only_track = function(tr, fn)
+    local sel = {}
+    for i = 0, reaper.CountSelectedTracks(0) - 1 do sel[#sel + 1] = reaper.GetSelectedTrack(0, i) end
+    reaper.SetOnlyTrackSelected(tr)
+    fn()
+    reaper.SetTrackSelected(tr, false)
+    for _, t in ipairs(sel) do reaper.SetTrackSelected(t, true) end
+  end,
+  mod_add = function(r)
+    local col = cur_col(); if not col then return end
+    local base = reaper.TrackFX_GetParamNormalized(col.track, r.fx, r.param)
+    edit.mod_field(col.track, r.fx, r.param, 'mod.baseline', ('%.4f'):format(base))
+    edit.mod_field(col.track, r.fx, r.param, 'lfo.active', 1)
+    model.invalidate()
+    vim.msg = 'modulating ' .. r.label .. ' (L1 on) - m again: to the matrix'
+  end,
+  -- строка параметра в матрице модуляции
+  mod_goto = function(r)
+    local col = cur_col()
+    for i, m in ipairs(col and col.mods or {}) do
+      if m.fx == r.fx and m.param == r.param then MMX.row = i; break end
+    end
+    mod_pane = 'matrix'
+  end,
+  -- кривая LFO-генератора в огибающую строки (создаётся видимой)
+  curve_to = function(tr, r)
+    local env = MMX.PP.env_of(tr, r, false)
+    if not env then MMX.PP.toggle_env(tr, r); env = MMX.PP.env_of(tr, r, false) end
+    if not env then vim.msg = 'no envelope for ' .. r.label; return end
+    reaper.SetCursorContext(2, env)
+    model.invalidate()
+    mod_pane = 'lfo'
+    vim.msg = 'curves → ' .. r.label .. ' (g: automation item, p: points)'
+  end,
+  -- trim ПКМ: вкладка modulation, панель params на этом треке
+  open_params = function(col)
+    for i, f in ipairs(L and L.flat or {}) do if f.col == col then vim.cur.fi = i; break end end
+    state.top = true; state.toptab = 'modulation'; mod_pane = 'params'
+    ctx.set_focus('top')
+    vim.msg = col.name .. ': all parameters - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
+  end,
   -- все параметры FX трека для fzf
   mod_param_items = function(skip)
     local col = cur_col(); if not col then return {} end
@@ -1436,50 +1490,30 @@ ctx = {
     model.invalidate()
     vim.msg = on and 'scopes on: a scope row in every track header (jf_tracker_scope on the tracks and the master)' or 'scopes off: bridges taken off the tracks'
   end,
-  -- fzf по всем параметрам автоматизации трека курсора: огибающие трека
-  -- (действия «Toggle track … envelope visible», найденные по тексту) и
-  -- каждый параметр каждого FX (GetFXEnvelope создаёт и показывает)
-  automation_picker = function()
-    local col = cur_col(); if not col then return end
+  -- fzf по всем параметрам автоматизации трека (кнопка trim — её трек, иначе
+  -- трек курсора): огибающие трека и каждый параметр каждого FX, включая
+  -- детей контейнеров (перечень панели params). Есть огибающая — сверху, ●;
+  -- выбор — создать / показать огибающую (уже видна — не прятать)
+  automation_picker = function(col)
+    col = col or cur_col(); if not col then return end
     local tr = col.track
-    local items = {}
-    for _, range in ipairs({ { 40400, 40420 }, { 40860, 40870 }, { 41860, 41870 } }) do
-      for id = range[1], range[2] do
-        local txt = reaper.kbd_getTextFromCmd(id, 0) or ''
-        if txt:match('^Track: Toggle track .*envelope visible') then
-          local nm = txt:gsub('^Track: Toggle track ', ''):gsub(' envelope visible', '')
-          items[#items + 1] = { label = 'track: ' .. nm, data = { kind = 'track', id = id, name = nm } }
-        end
-      end
+    local PP = MMX.PP
+    local items, rest = {}, {}
+    for _, r in ipairs(PP.build(tr, model.fx_addresses)) do
+      local env = PP.env_of(tr, r, false)
+      local it = { label = (env and '● ' or '  ') .. r.label, data = r }
+      if env then items[#items + 1] = it else rest[#rest + 1] = it end
     end
-    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do
-      local _, fxname = reaper.TrackFX_GetFXName(tr, fx, '')
-      fxname = (fxname or ''):gsub('^[^:]*: ', '')
-      for pi = 0, math.min(512, reaper.TrackFX_GetNumParams(tr, fx)) - 1 do
-        local _, pname = reaper.TrackFX_GetParamName(tr, fx, pi, '')
-        items[#items + 1] = { label = fxname .. ' / ' .. (pname or ('p' .. pi)), data = { kind = 'fx', fx = fx, param = pi } }
-      end
-    end
+    for _, it in ipairs(rest) do items[#items + 1] = it end
     if #items == 0 then vim.msg = 'nothing to automate'; return end
-    vim.open_picker('automation ' .. col.name, items, function(it)
-      local d = it.data
-      edit.run('show envelope', function()
-        if d.kind == 'fx' then reaper.GetFXEnvelope(tr, d.fx, d.param, true)
-        else
-          -- уже видна — не прятать
-          local env = reaper.GetTrackEnvelopeByName(tr, d.name:gsub('^%l', string.upper))
-          local visible = false
-          if env and reaper.BR_EnvAlloc then
-            local be = reaper.BR_EnvAlloc(env, false)
-            local act, vis = reaper.BR_EnvGetProperties(be); reaper.BR_EnvFree(be, false)
-            visible = act and vis
-          end
-          if not visible then reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(d.id, 0) end
-        end
-      end)
-      state.envs = true
+    vim.open_picker('automation ' .. col.name .. ' (rclick trim: all parameters)', items, function(it)
+      local r = it.data
+      local env = PP.env_of(tr, r, false)
+      local vis = env and select(2, reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)) == '1'
+      if not vis then PP.toggle_env(tr, r) end
+      state.trackenvs[col.guid] = true
       model.invalidate()
-      vim.msg = 'envelope: ' .. it.label
+      vim.msg = 'envelope: ' .. r.label
     end)
   end,
   preview_slice = function(track, entry, t0, t1) PV.slice(track, entry, t0, t1) end,
@@ -2970,6 +3004,7 @@ MX.fold = state.mxfold
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 MMX.init(U, ctx)
+MMX.PP.init(U, ctx)
 GD.init(U, ctx)
 SPROP.init(U, ctx)
 
@@ -2981,7 +3016,7 @@ local function hint_go(t)
   elseif t.kind == 'header' or t.kind == 'scope' then
     ctx.set_focus('tracker')
     for i, f in ipairs(L.flat) do if f.col == d then vim.cur.fi = i; break end end
-  elseif t.kind == 'btn' and d.what == 'auto' then ctx.toggle_track_envs(d.col)
+  elseif t.kind == 'btn' and d.what == 'auto' then ctx.automation_picker(d.col)
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -4643,10 +4678,11 @@ local function frame()
       LG.src_names = names
       if LG.src_i > #names then LG.src_i = math.max(1, #names) end
       local focused = state.focus == 'top'
-      if not wide then
-        -- узко: переключатель страниц сверху, ниже — одна страница во всю ширину
-        local bx = x
-        for _, b in ipairs({ { 'matrix', 'matrix' }, { 'curves', 'lfo' } }) do
+      -- переключатель страниц сверху: узко — matrix / params / curves во всю
+      -- ширину; широко — matrix / params слева, curves (LFO) всегда справа
+      local function pages(px, list)
+        local bx = px
+        for _, b in ipairs(list) do
           local bw = U.measure(b[1]) + 2 * Lx.pad
           local on = mod_pane == b[2]
           local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y and gfx.mouse_y < y + Lx.rh
@@ -4656,6 +4692,17 @@ local function frame()
           if hot then lfo_hover = { pane = b[2] } end
           bx = bx + bw + 2
         end
+      end
+      local function left(lx, ly, lw2, lh)
+        if mod_pane == 'params' then
+          local hv = MMX.PP.draw(Lx, lx, ly, lw2, lh, col, focused)
+          if hv then lfo_hover = lfo_hover or { pane = 'params', pp = hv } end
+          return nil
+        end
+        return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
+      end
+      if not wide then
+        pages(x, { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'curves', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -4663,12 +4710,13 @@ local function frame()
           lfo_hover = lfo_hover or hv
           return nil
         end
-        return MMX.draw(Lx, x, y, w, h, col and col.mods or {}, focused, col and (col.name .. ' modulation') or 'modulation')
+        return left(x, y, w, h)
       end
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      return MMX.draw(Lx, x, y, w - lw - 2 * Lx.pad, h, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
+      pages(x, { { 'matrix', 'matrix' }, { 'params', 'params' } })
+      return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
     end,
     sample_draw = function(x, y, w, h)
       local col = cur_col()
@@ -4866,7 +4914,7 @@ local function frame()
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
     for _, e in ipairs(hover.btn.col.envs or {}) do names[#names + 1] = e.name end
-    state.status = hover.btn.col.name .. ': ' .. (#names > 0 and (#names .. ' envelopes: ' .. table.concat(names, ', ')) or 'no automation') .. ' - click: this track only, a: all tracks'
+    state.status = hover.btn.col.name .. ': ' .. (#names > 0 and (#names .. ' envelopes: ' .. table.concat(names, ', ')) or 'no automation') .. ' - click: find a parameter (fzf), rclick: all parameters (modulation tab), Shift+click: envelopes in the tracker'
   elseif hover.btn and hover.btn.what == 'monitor' then
     local m = hover.btn.col.recmon or 0
     state.status = hover.btn.col.name .. ': input monitoring ' .. ({ [0] = 'off', [1] = 'on', [2] = 'auto (tape)' })[m] .. ' - click: off → on → auto'
@@ -5036,6 +5084,7 @@ local function frame()
       click = { t = now2, zone = 'midimap' }
     elseif lfo_hover and state.top and state.toptab == 'modulation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
+      if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
       if lfo_hover.field then
         LG.sel = lfo_hover.field
         local f = LG.FIELDS[lfo_hover.field]
@@ -5330,7 +5379,9 @@ local function frame()
       if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.open_slicer(hover.pool.i) end
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
-      ctx.toggle_track_envs(hover.btn.col); click = { t = now2, zone = 'btn' }
+      -- trim (3 окт): клик — fzf по параметрам трека и его FX, Shift — огибающие в трекере, ПКМ — панель params
+      if gfx.mouse_cap & 8 == 8 then ctx.toggle_track_envs(hover.btn.col) else ctx.automation_picker(hover.btn.col) end
+      click = { t = now2, zone = 'btn' }
     elseif hover.btn then
       local tr, what = hover.btn.col.track, hover.btn.what
       edit.run('track ' .. what, function()
@@ -5758,6 +5809,8 @@ local function frame()
       end
     else env_drag.key = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
+  elseif U.rclick and hover.btn and hover.btn.what == 'auto' then
+    ctx.open_params(hover.btn.col)
   elseif U.rclick then
     local ok, e = pcall(context_menu, hover)
     if not ok then vim.msg = tostring(e):match('[^\n]*$') end
@@ -5962,6 +6015,10 @@ local function frame()
   if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'modulation' then
     LG.sel = lfo_hover.field
     LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
+    gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.pane == 'params' and state.top and state.toptab == 'modulation' then
+    MMX.PP.wheel(gfx.mouse_wheel > 0 and -3 or 3)
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.mm and hover.mm.row then
@@ -6243,6 +6300,11 @@ local function frame()
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
           elseif r == 'pick' then ctx.lfo_pick_env()
           elseif not r then return vim.key(c) end
+        elseif state.toptab == 'modulation' and mod_pane == 'params' then
+          local r = MMX.PP.key(c, cur_col())
+          if r == 'leave' then mod_pane = 'matrix'
+          elseif not r then return vim.key(c) end
+        elseif state.toptab == 'modulation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
         elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
         elseif state.toptab == 'modulation' then
           local col = cur_col(); local mods = col and col.mods or {}
