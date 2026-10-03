@@ -8,6 +8,8 @@ V.CHANGES = {
     'M in NORMAL: piano layer (like M in Ableton) - the top row and digits play notes, other keys stay Vim commands; M or Esc turns it off',
     'Cmd+note (INSERT and the piano layer): the note lasts as long as the key is held, growing at the project tempo; j / down add a step while holding, Esc cancels; Cmd+Shift+note stretches the sample to that length (keeps pitch, becomes unique); slices too',
     'Cmd+digit in INSERT / piano layer is now a held black key; slot selection stays on Cmd+digit in NORMAL, Cmd+HJKL and , . everywhere',
+    'track scopes are back (options: track scopes, :scopes): an oscilloscope row in every track header, the master tab analyzer works again; turning them on puts jf_tracker_scope on every track and the master, off removes it',
+    'DSP: the parameter category colour moved from a strip at the name (it stuck to the first letter) to the slider fill; buttons track fx / take fx',
     'about: logos that move - marquee, shimmering lines, dripping blood (:about name opens one)',
   } },
   { v = '0.5.68', d = '2026-10-03', items = {

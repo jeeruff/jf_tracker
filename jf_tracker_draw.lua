@@ -271,7 +271,7 @@ function D.layout(snap, state, nregions)
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
-  L.header_rows = 5 + (state.captions and 1 or 0)
+  L.header_rows = 5 + (state.captions and 1 or 0) + (state.scopes and 1 or 0)   -- + строка скопа (3 окт)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -1715,6 +1715,12 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
+    end
+    -- скоп дорожки (3 окт): осциллограф моста в нижней строке шапки
+    if state.scopes and not c.folded and col.scope_slot and info.scope then
+      local sy = hy + (5 + (state.captions and 1 or 0)) * L.rh + 2
+      set(U.BG); gfx.rect(c.x + 2, sy, c.w - 4, L.rh - 1, 1)
+      draw_analyzer(c.x + 2, sy, c.w - 4, L.rh - 1, col.scope_slot, 'scope', info)
     end
     U.TEXT, U.GREY = T0, G0
     set(U.LINE); gfx.rect(c.x, hy, 1, L.header_h, 1)

@@ -103,7 +103,7 @@ local state = {
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
-  scopes = false,                               -- скопы убраны (2 окт): JSFX-мост больше не ставится
+  scopes = flag('scopes', false),               -- скопы дорожек в шапках (3 окт, вернули): JSFX-мост jf_tracker_scope на треках
   scopemode = (function() local v = reaper.GetExtState(EXT, 'scopemode'); return (v == 'spec' or v == 'sgram') and v or 'scope' end)(),
   icons = flag('icons', true),                    -- Nerd-иконки (TTF или гибрид с битмапом, :icons)
   glyphface = (function() local v = reaper.GetExtState(EXT, 'glyphface'); return v ~= '' and v or nil end)(),
@@ -337,7 +337,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -1413,12 +1413,14 @@ ctx = {
     return items
   end,
   toggle_dsp = function() state.dsp = not state.dsp; if not state.dsp and state.focus == 'dsp' then ctx.set_focus('tracker') end end,
-  -- скопы убраны (2 окт): живой звук шины читает только JSFX, а мост больше не
-  -- нужен; :scopes только снимает старые мосты jf_tracker_scope с треков
-  toggle_scopes = function()
-    state.scopes = false
-    edit.scopes(snap.cols, false)
-    vim.msg = 'scopes removed: old jf_tracker_scope bridges taken off the tracks'
+  -- скопы (3 окт, вернули): мост jf_tracker_scope на каждый трек и мастер —
+  -- осциллограф в шапке трека, анализатор вкладки master; выкл — мосты сняты
+  toggle_scopes = function(on)
+    if on == nil then on = not state.scopes end
+    state.scopes = on
+    edit.scopes(snap.cols, on)
+    model.invalidate()
+    vim.msg = on and 'scopes on: a scope row in every track header (jf_tracker_scope on the tracks and the master)' or 'scopes off: bridges taken off the tracks'
   end,
   -- fzf по всем параметрам автоматизации трека курсора: огибающие трека
   -- (действия «Toggle track … envelope visible», найденные по тексту) и
@@ -2077,6 +2079,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
+      { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
