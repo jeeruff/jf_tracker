@@ -2065,9 +2065,11 @@ ctx = {
     OPT.open(items)
   end,
   -- about (3 окт): ячейка в главном модуле, :about; логотип каждый раз другой
-  about = function()
+  about = function(name)
     OPT.open_about(function()
       LOGO.last = LOGO.pick(LOGO.last)                       -- не тот же, что в прошлый раз
+      -- :about имя — конкретный логотип (часть имени: marquee, rubble …)
+      if name and name ~= '' then for i, lg in ipairs(LOGO.LOGOS) do if lg.name:find(name, 1, true) then LOGO.last = i; break end end end
       return { logo = LOGO.LOGOS[LOGO.last], text = VER.lines() }
     end)
   end,
