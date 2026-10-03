@@ -916,7 +916,9 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local live = info.trs_live
   local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
   local function slider(sy, frac, centered, label, val, what)
-    local lw, vw = ms(label) + L.pad, ms(val) + L.pad
+    -- место под значение постоянное (3 окт): дорожка и её центр не прыгают от C к R100
+    local vres = math.max(ms('-00.0'), ms(val))
+    local lw, vw = ms(label) + L.pad, vres + L.pad
     local wx0, ww = x + L.pad + lw, math.max(4, w - 2 * L.pad - lw - vw)
     local cy = sy + math.floor(L.rh / 2)
     local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
@@ -928,7 +930,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       local mid, px = wx0 + math.floor(ww / 2), wx0 + math.floor(frac * ww + 0.5)
       gfx.rect(math.min(mid, px), sy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
     else gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1) end
-    text(wx0 + ww + L.pad, sy, val, U.GREY)
+    text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY)
     if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww } end
   end
   local vol = lv('vol', col.vol or 1)
@@ -1732,12 +1734,16 @@ function D.frame(L, snap, rows, state, info)
         text(x + 2, by, b[1], on and b[3] or U.GREY)
         if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
         hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
+        if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live
       local function slider(sx, sy, sw, frac, centered, label, val, what)
-        local vw = ms(val) + L.pad
+        -- место под значение постоянное (3 окт): центр панорамы не съезжает,
+        -- когда C становится L37 / R100; значение прижато вправо
+        local vres = math.max(ms('-00.0'), ms(val))
+        local vw = vres + L.pad
         local lw = ms(label) + L.pad
         -- узкий трек (свёрнутый): значение не влезает — без него, не в соседа (ревью 2 окт)
         local show_val = sw >= lw + vw + L.pad + 12
@@ -1757,7 +1763,7 @@ function D.frame(L, snap, rows, state, info)
         else
           set(acc); gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1)
         end
-        if show_val then text(wx0 + ww + L.pad, sy, val, U.GREY) end
+        if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
       end
@@ -2748,7 +2754,10 @@ function D.popup(L, p, anchor)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2
   if anchor then
-    x = math.max(L.pad, math.min(W - w - L.pad, anchor.x))
+    -- right: не влезает вправо — правый край меню у правого края кнопки
+    local ax = anchor.x
+    if anchor.right and ax + w > W - L.pad then ax = anchor.right - w end
+    x = math.max(L.pad, math.min(W - w - L.pad, ax))
     local bottom = gfx.h - (L.status_h or 0) - 2
     if anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end

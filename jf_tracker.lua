@@ -1494,7 +1494,7 @@ ctx = {
   -- трек курсора): огибающие трека и каждый параметр каждого FX, включая
   -- детей контейнеров (перечень панели params). Есть огибающая — сверху, ●;
   -- выбор — создать / показать огибающую (уже видна — не прятать)
-  automation_picker = function(col)
+  automation_picker = function(col, from_btn)
     col = col or cur_col(); if not col then return end
     local tr = col.track
     local PP = MMX.PP
@@ -1515,6 +1515,7 @@ ctx = {
       model.invalidate()
       vim.msg = 'envelope: ' .. r.label
     end)
+    if from_btn then vim.picker.trim = col.guid; state.popup_at = { kind = 'trim', guid = col.guid } end
   end,
   preview_slice = function(track, entry, t0, t1) PV.slice(track, entry, t0, t1) end,
   mx_zoom = function() MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail' end,
@@ -4766,6 +4767,9 @@ local function frame()
     local pa = state.popup_at
     if pa and pa.kind == 'track' then
       for _, c in ipairs(L.cols or {}) do if c.col.guid == pa.guid and c.x then anchor = { x = c.x, y = L.header_y + L.rh } end end
+    elseif pa and pa.kind == 'trim' then
+      local r = draw.trim_at and draw.trim_at[pa.guid]
+      if r then anchor = { x = r[1], y = r[2], right = r[3] } end
     elseif pa and pa.kind == 'mxrow' then
       local y = MX.row_y and MX.row_y[pa.ri]
       if y then anchor = { x = 2, y = y + L.rh } end
@@ -5380,7 +5384,10 @@ local function frame()
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
       -- trim (3 окт): клик — fzf по параметрам трека и его FX, Shift — огибающие в трекере, ПКМ — панель params
-      if gfx.mouse_cap & 8 == 8 then ctx.toggle_track_envs(hover.btn.col) else ctx.automation_picker(hover.btn.col) end
+      -- меню — под кнопкой; повторный клик по ней закрывает (3 окт)
+      if gfx.mouse_cap & 8 == 8 then ctx.toggle_track_envs(hover.btn.col)
+      elseif vim.picker and vim.picker.trim == hover.btn.col.guid then vim.picker = nil
+      else ctx.automation_picker(hover.btn.col, true) end
       click = { t = now2, zone = 'btn' }
     elseif hover.btn then
       local tr, what = hover.btn.col.track, hover.btn.what

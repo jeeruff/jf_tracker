@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.70'
+V.VERSION = '0.5.71'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.71', d = '2026-10-03', items = {
+    'item preview is the same every time: it loops like the item (an item longer than its file plays the start again), the edit view draws the same peaks as the plain view, one title and footer - a double click no longer changes the picture or the sound',
+    'trim menu opens right under the button; a second click on trim closes it',
+    'pan / volume sliders (track header and DSP track block): fixed room for the value, right-aligned - the pan centre no longer jumps when C becomes L37 or R100',
+  } },
   { v = '0.5.70', d = '2026-10-03', items = {
     'trim in the track header: click - find a parameter of the track and its FX (fzf, containers too, the ones with an envelope on top with a dot) and show its envelope; Shift+click - envelopes in the tracker on / off (the old click); rclick - the params page',
     'modulation tab, new page params (P): every parameter of the track in one table - track envelopes and all FX params; ENV (create / show / hide), ACT, ARM, PTS, MOD (L E K), value; header: automation mode, all / used, in tracker, find, native envelopes window; m modulates (or jumps to the matrix row), c sends the curves generator to that envelope',

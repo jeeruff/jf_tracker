@@ -87,6 +87,9 @@ function P.inst(track, item, max_sec)
   R.CF_Preview_SetValue(pv, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH'))
   local pm = R.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE'); if pm >= 0 then R.CF_Preview_SetValue(pv, 'I_PITCHMODE', pm) end
   R.CF_Preview_SetValue(pv, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * R.GetMediaItemInfo_Value(item, 'D_VOL'))
+  -- луп источника как у item (3 окт): item длиннее файла играет начало заново —
+  -- превью звучит так же, как нота на таймлайне и как нарисована волна
+  R.CF_Preview_SetValue(pv, 'B_LOOP', R.GetMediaItemInfo_Value(item, 'B_LOOPSRC'))
   if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
   R.CF_Preview_Play(pv)
   cur = pv

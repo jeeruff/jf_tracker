@@ -396,10 +396,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   local editing = S.active and S.entry and S.entry.item == e.item
   local rh = L.rh
-  local title = editing
-    and ('%s  (%.3fs)  %d slices%s'):format(e.name, e.len, #S.slices, S.mode ~= '' and ('  - ' .. S.mode) or '')
-    or ('%s  offs %.3f  len %.3f  rate %.2f%s'):format(e.name, e.offs or 0, e.len or 0, e.rate or 1,
-        e.slices and ('  slices ' .. #e.slices) or '')
+  -- один заголовок в просмотре и правке (3 окт: двойной клик менял экран)
+  local nsl = editing and #S.slices or (e.slices and #e.slices or 0)
+  local title = ('%s  offs %.3f  len %.3f  rate %.2f%s'):format(e.name, e.offs or 0, e.len or 0, e.rate or 1,
+        nsl > 0 and ('  slices ' .. nsl) or '')
+  if editing and S.mode ~= '' and S.mode ~= 'stored' then title = title .. '  - ' .. S.mode end
   if zone then title = title .. ('  [inst %02d plays %.3f-%.3fs]'):format(zone[3] or 0, zone[1], zone[2]) end
   -- кнопки вида справа в заголовке
   local vx = x + w
@@ -417,7 +418,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     vx = vx - 2
   end
   if e.muted then title = title .. '  (muted)' end
-  U.text(x, y, ctx.fit(title, vx - x - L.pad), editing and U.AMBER or U.TEXT)
+  U.text(x, y, ctx.fit(title, vx - x - L.pad), U.TEXT)
   local hint = editing
     and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  [ ]: edges'
          or '2/4/8 1(16) 3(32) 6(64) equal  t transients (+ - sens)  x clear  v view')
@@ -482,7 +483,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local base = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
   if e.muted then base = U.mix(base, U.BG, 0.45) end      -- заглушённый — волна тусклее
   U.set(base)
-  local env = editing and S.view == 'peaks' and S.env or nil
+  -- волна правки — теми же пиками item, что просмотр (3 окт): огибающая
+  -- S.env читалась линейно и растягивала файл на всю ширину, а item в лупе
+  -- за концом файла играет начало — картинки расходились. S.env — для детекции
+  local env = (editing and S.view == 'peaks' and not (ctx.peaks and e.item)) and S.env or nil
   if S.view == 'spec' and ctx.peaks then
     local pk = ctx.peaks(e, w, true)
     if pk and pk.n > 0 then
@@ -607,8 +611,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(U.AMBER); gfx.a = 0.25; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
-  local foot = editing and (S.msg ~= '' and S.msg or ('%d slices; Sxx in fx column = slice'):format(#S.slices))
-    or (#slices > 0 and ('%d slices stored'):format(#slices) or '')
+  local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
+    or (#slices > 0 and ('%d slices; Sxx in fx column = slice'):format(#slices) or '')
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
