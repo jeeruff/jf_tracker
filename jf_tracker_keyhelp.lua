@@ -329,7 +329,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

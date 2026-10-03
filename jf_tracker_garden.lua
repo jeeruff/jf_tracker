@@ -72,7 +72,8 @@ function GD.draw(L, x, y, w, h, snap, seq, info, focused)
   local hover
   local f = ctx.garden_field()
   local on = f and f.on and info.garden_on
-  local head = ('garden  %s  orca %s  frame %d'):format(GD.page == 'orca' and '[orca]' or '[grid]', on and 'on' or 'off', f and f.frame or 0)
+  GD.page = 'orca'                  -- Garden больше нет (3 окт): вкладка — только поле Orca; лупы — слой матрицы
+  local head = ('orca %s  frame %d'):format(on and 'on' or 'off', f and f.frame or 0)
   if GD.numbuf then head = head .. '  loop ' .. GD.numbuf .. '_' end
   U.text(x, y, ctx.fit(head, w), on and U.AMBER or U.GREY)
   local top = y + L.rh + 2

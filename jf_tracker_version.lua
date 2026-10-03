@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.55'
+V.VERSION = '0.5.56'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.56', d = '2026-10-03', items = {
+    'fx list opens over the whole left column (matrix and main module under it) whenever it has the focus - click or Tab - and closes when the focus leaves; drawn last, so the status bar no longer cuts it',
+    'fx list: right-click an effect - native menu: add to the cursor track / take, to selected tracks, on a new track, favourite, native FX browser',
+    'Garden is gone: the Orca tab shows only the Orca field (header: orca on/off, frame); its help page is out of the help order',
+  } },
   { v = '0.5.55', d = '2026-10-03', items = {
     'main module (control block) takes the keyboard focus: Tab or a click puts a frame around it, the cursor lands on BPM; h j k l / arrows move between cells, + - change the value, Enter / Space press it (BPM: type the tempo), Esc back',
   } },

@@ -941,7 +941,7 @@ ctx = {
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
-      if t == 'garden' then return GD.page == 'orca' and 'orca' or 'garden' end
+      if t == 'garden' then return 'orca' end                   -- Garden убран: только Orca
       if t == 'scope' then return 'master' end
       return KH.PAGES[t] and t or 'tracker'
     end
@@ -2957,7 +2957,33 @@ local function context_menu(hover)
   local function add(label, fn, key) items[#items + 1] = { label, fn, key = key } end
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local lpb = state.lpb
-  if hover.matrix and hover.matrix.ri then
+  if type(hover.fxb) == 'table' and hover.fxb.row then
+    -- эффект в браузере (3 окт): куда добавить, избранное, нативный браузер
+    FB.cur = hover.fxb.row
+    local it = FB.selected()
+    if it then
+      local t = dsp_target()
+      add('Add to ' .. (t and (t.take and ('take FX of ' .. t.name) or t.name) or 'cursor track'), function() ctx.fxb_add(it) end)
+      add('Add to selected tracks', function()
+        edit.run('fx add selected', function()
+          for i = 0, reaper.CountSelectedTracks(0) - 1 do reaper.TrackFX_AddByName(reaper.GetSelectedTrack(0, i), it.data, false, -1) end
+        end)
+        FB.push_recent(it); ctx.fxb_save(); model.invalidate()
+      end)
+      add('Add on a new track', function()
+        edit.run('fx new track', function()
+          local n = reaper.CountTracks(0)
+          reaper.InsertTrackAtIndex(n, true)
+          local tr = reaper.GetTrack(0, n)
+          reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', (FB.short(it.label)), true)
+          reaper.TrackFX_AddByName(tr, it.data, false, -1)
+        end)
+        FB.push_recent(it); ctx.fxb_save(); model.invalidate()
+      end)
+      add((FB.is_fav(it) and '!' or '') .. 'Favourite', function() FB.toggle_fav(it); ctx.fxb_save() end)
+      add('Native FX browser', function() reaper.Main_OnCommand(40271, 0) end)
+    end
+  elseif hover.matrix and hover.matrix.ri then
     MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci or MX.cur.ci)
     for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key) end
   elseif hover.pool then
@@ -4241,12 +4267,12 @@ local function frame()
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
-    top_page = (state.toptab == 'garden' and (GD.page == 'orca' and 'orca' or 'garden')) or (state.toptab == 'scope' and 'master') or state.toptab,
+    top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_draw = (state.dsp and state.notes_open and not state.khelp) and function(Lx, x, y, w, h)
       return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
     end or nil,
     -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
-    fxb_expand = state.focus == 'fxb' and FB.query ~= '',
+    fxb_expand = state.focus == 'fxb',                          -- фокус (клик / Tab) — раскрыт
     fxb_px = state.fxb_px,
     fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
