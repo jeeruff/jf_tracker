@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.63'
+V.VERSION = '0.5.64'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.64', d = '2026-10-03', items = {
+    'TTF fonts and Nerd icons removed: the tracker is bitmap only (REAPER pixel font, x1..x3); non-ASCII text (Cyrillic names) falls back to the system mono font at the bitmap height; :font / :nerd / :fontface / :hybrid / :icons only say so',
+  } },
   { v = '0.5.63', d = '2026-10-03', items = {
     'fonts: TTF size 10..32 (options, control cell, :font); options get text font (bitmap / ttf), ttf size and ttf face (the Nerd font list)',
     'about: a JFTRACKER graffiti logo on top, a new style every time - pouet ASCII (figlet), block, oldskool with a shadow, bubble, metal (italic, spikes, drips), 3D, chrome',

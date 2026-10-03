@@ -499,7 +499,7 @@ V.COMMANDS = {
   { 'lpb', 'N', 'rows per beat (1..64)' }, { 'step', 'N|auto', 'step after input / note length' },
   { 'oct', 'N', 'input octave' }, { 'inst', 'N', 'instrument slot' },
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
-  { 'font', '[N]', 'TTF (Nerd) font size, 0 = bitmap; no number: Nerd 24 <-> bitmap' }, { 'nerd', '', 'same as :font without a number' }, { 'fontface', '[name]', 'Nerd font: DepartureMono, BigBlueTerm, Gohu, Proggy, Terminess...; no name: next' }, { 'hybrid', '', 'bitmap text + Nerd icons' }, { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[on|off]', 'wave column left of the note: spectral peaks + stretch markers' }, { 'icons', '', 'Nerd icons on buttons and tabs (TTF mode :font N)' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
+  { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[on|off]', 'wave column left of the note: spectral peaks + stretch markers' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
   { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
@@ -583,16 +583,9 @@ local function run_cmd(line)
     local f = flat()[V.cur.fi]
     if f and (arg == 'shift' or arg == 'resample') then ctx.set_pitchmode(f.col, arg); V.msg = f.col.name .. ': ' .. arg
     else V.msg = ':pitchmode shift|resample' end
-  elseif cmd == 'font' and n then ctx.set_font(math.floor(n)); V.msg = 'font ' .. math.floor(n)
-  elseif cmd == 'fontface' or cmd == 'face' then ctx.set_fontface(arg)
-  elseif cmd == 'hybrid' then
-    -- битмап-текст + Nerd-иконки
-    ctx.set_font(0); st.icons = true; V.msg = 'bitmap text + nerd icons (:fontface — glyph font)'
-  elseif cmd == 'font' or cmd == 'nerd' then
-    -- без числа: Nerd Font (TTF 24 + иконки) ↔ битмап
-    local to = ((st.font or 0) > 0) and 0 or 24
-    ctx.set_font(to); if to > 0 then st.icons = true end
-    V.msg = to > 0 and 'font: JetBrainsMono Nerd Font 24 + icons (:font 0 — bitmap)' or 'font: bitmap'
+  elseif cmd == 'font' or cmd == 'nerd' or cmd == 'fontface' or cmd == 'face' or cmd == 'hybrid' then
+    -- TTF и Nerd-иконки убраны (3 окт): только битмап REAPER, масштаб :scale 1..3
+    V.msg = 'TTF fonts and icons are gone - bitmap only (:scale 1..3, Ctrl +/-)'
   elseif cmd == 'scale' and n then local k = math.max(1, math.min(3, math.floor(n))); ctx.set_scale(k); V.msg = 'bitmap x' .. k .. (n > 3 and ' (x4 is kept for PT-mode)' or '')
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
@@ -611,7 +604,7 @@ local function run_cmd(line)
   elseif cmd == 'fixed' then st.fixed = not st.fixed; V.msg = 'fixed cursor: ' .. (st.fixed and 'on' or 'off')
   elseif cmd == 'xfade' then
     if n then ctx.xfade_len(0, math.floor(n)) elseif arg == 'now' then ctx.xfade_now() elseif arg == 'off' or arg == 'on' then if (arg == 'on') ~= (st.xfade == true) then ctx.xfade_toggle() end else ctx.xfade_toggle() end
-  elseif cmd == 'icons' then st.icons = not st.icons; V.msg = 'nerd icons ' .. (st.icons and 'on' or 'off') .. ((st.font or 0) > 0 and '' or ' (TTF only: :font 24)')
+  elseif cmd == 'icons' then V.msg = 'icons are gone - bitmap only'
   elseif cmd == 'mxzoom' then ctx.mx_zoom()
   elseif cmd == 'trim' then if ctx.mx_trim then ctx.mx_trim() end
   elseif cmd == 'quantize' or cmd == 'squant' then ctx.smart_quantize()

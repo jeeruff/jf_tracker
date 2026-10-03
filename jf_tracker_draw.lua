@@ -68,7 +68,7 @@ local tcache, next_img = {}, 100
 local IMG_FIRST, IMG_LAST = 100, 799
 
 function D.set_font(state)
-  local n = tonumber(state.font) or 0
+  local n = 0                      -- TTF убран (3 окт): всегда битмап
   if n > 0 then
     gfx.setfont(1, state.fontface or 'JetBrainsMono Nerd Font Mono', n)
     D.font_id = 1
@@ -79,7 +79,6 @@ function D.set_font(state)
     D.SCALE = math.max(1, math.min(D.SCALE_MAX, math.floor(tonumber(state.fontscale) or 2)))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
-  if state.glyphface and state.glyphface ~= '' then D.glyph_face = state.glyphface end
   tcache, next_img = {}, IMG_FIRST
   if D.reset_vcache then D.reset_vcache() end      -- вертикальные имена — тоже из старого шрифта
   if D.reset_glyph then D.reset_glyph(); D.reset_measure() end
@@ -92,7 +91,7 @@ end
 -- строка режется на ASCII-куски (битмап, слот 0) и глифы (TTF, слот 2,
 -- размер = высота битмапа). D.hybrid ставит main (:font 0 + :icons).
 D.hybrid = false
-D.glyph_face = 'JetBrainsMono Nerd Font Mono'
+D.glyph_face = 'Menlo'          -- не-ASCII (кириллица) в битмап-режиме — системный моно (3 окт: TTF / Nerd убраны)
 -- Разбор без исключений: utf8.codes бросает ошибку на битой UTF-8 (имя,
 -- обрезанное посреди символа, cp1251 из чужих проектов) — так скрипт и падал.
 -- gmatch по utf8.charpattern не бросает; одиночный «хвостовой» байт — пропуск.

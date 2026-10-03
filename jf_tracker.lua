@@ -134,6 +134,7 @@ local state = {
 -- и шрифт сбрасывался в битмап при каждом старте)
 if tostring(ext('font_v', '')) ~= '3' then state.font = 0; state.fontscale = 2 end
 if (tonumber(state.fontscale) or 2) > 3 then state.fontscale = 3 end   -- x4 — только PT-mode (3 окт)
+state.font = 0                                                         -- TTF убран (3 окт): только битмап
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
@@ -503,7 +504,8 @@ ctx = {
   fit = draw.fit,
   set_pitchmode = function(col, mode) state.pitchmodes[col.guid] = mode end,
   -- TTF: размер 10..32 (3 окт), 0 — битмап
-  set_font = function(n) n = math.floor(tonumber(n) or 0); state.font = (n <= 0) and 0 or math.max(10, math.min(32, n)); draw.set_font(state) end,
+  -- TTF убран (3 окт): только битмап REAPER; set_font оставлен для совместимости
+  set_font = function() state.font = 0; draw.set_font(state) end,
   -- Nerd-шрифт для текста (TTF-режим) или для глифов (гибрид); ищем по подстроке
   FONT_FACES = { 'DepartureMono Nerd Font Mono', 'BigBlueTerm437 Nerd Font Mono', 'BigBlueTermPlus Nerd Font Mono',
       'GohuFont 14 Nerd Font Mono', 'GohuFont 11 Nerd Font Mono', 'ProggyClean Nerd Font Mono', 'Terminess Nerd Font Mono',
@@ -1977,14 +1979,10 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
-      flag('icons', 'nerd icons', 'icons on buttons (TTF font only)'),
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
-      { key = 'fontmode', label = 'text font', kind = 'cycle', values = { 'bitmap', 'ttf' }, desc = 'bitmap: REAPER pixel font (scale x1..x3); ttf: a Nerd font (size and face below)', get = function() return (state.font or 0) > 0 and 'ttf' or 'bitmap' end, set = function(v) ctx.set_font(v == 'ttf' and ((state.ttf_size or 0) > 0 and state.ttf_size or 18) or 0) end },
-      { key = 'font', label = 'ttf size', kind = 'num', min = 10, max = 32, desc = 'TTF font size 10..32 (switches to ttf)', get = function() return (state.font or 0) > 0 and state.font or (state.ttf_size or 18) end, set = function(v) ctx.set_font(v); state.ttf_size = state.font end },
-      { key = 'fontface', label = 'ttf face', kind = 'cycle', values = (function() local t = {}; for _, f in ipairs(ctx.FONT_FACES) do t[#t + 1] = (f:gsub(' Nerd Font Mono$', '')) end; return t end)(), desc = 'Nerd font family (installed ones from the list; :fontface name for any other)', get = function() return ((state.fontface or ''):gsub(' Nerd Font Mono$', '')) end, set = function(v) ctx.set_fontface(v) end },
       { sep = true },
       { key = 'about', label = 'about  v' .. VER.VERSION, kind = 'about', desc = 'version and changes (' .. VER.DATE .. ')', get = function() return VER.VERSION end, set = function() end },
     }
@@ -3780,8 +3778,7 @@ function ctrl_action(name, delta)
   elseif name == 'pitch' then
     if col then ctx.set_pitchmode(col, state.pitchmodes[col.guid] == 'resample' and 'shift' or 'resample') end
   elseif name == 'font' then
-    if (state.font or 0) == 0 then ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale) + (delta ~= 0 and delta or 1))))
-    else ctx.set_font(math.max(0, state.font + (delta ~= 0 and delta or 1))) end
+    ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale) + (delta ~= 0 and delta or 1))))
   elseif name == 'fx' then state.fxcols = math.max(0, math.min(4, state.fxcols + (delta ~= 0 and delta or 1)))
   elseif name == 'meters' then state.meters = not state.meters
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
@@ -4253,8 +4250,8 @@ local function frame()
   end
   if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
-  draw.icons = state.icons and true or false
-  draw.hybrid = state.icons and (state.font or 0) == 0   -- битмап-текст + Nerd-глифы
+  draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
+  draw.hybrid = true                                     -- не-ASCII (кириллица) — системным моно-шрифтом высотой с битмап
   local hover
   if idle_skip then hover = idle.hover else
   hover = draw.frame(L, snap, rows, state, {
