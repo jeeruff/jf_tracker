@@ -2095,7 +2095,7 @@ ctx = {
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
       flag('keepsamples', 'keep deleted samples', 'last item of a file deleted: the sample goes to the track library (=LIB)'),
       flag('copymedia', 'copy files to project', 'files from the browser are copied into the project media folder (saved projects)'),
-      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'len', 'mark' }, desc = 'track groups / by length / by marks @ $ *', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
+      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark' }, desc = 'track groups / by name / by length / by marks @ $ * (also: click the lib column headers)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       { sep = true },
       flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
@@ -2987,6 +2987,7 @@ local function hint_go(t)
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
+  elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
@@ -4790,6 +4791,7 @@ local function frame()
   elseif hover.trkio then state.status = ({ input = 'track input - click: choose (audio mono / stereo, MIDI all)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
+  elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len; numbers stay'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
   elseif hover.poolmark then
     local e, parts = hover.poolmark.e, {}
@@ -4986,6 +4988,11 @@ local function frame()
       ctx.set_focus('inst')
       state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
       click = { t = now2, zone = 'insprevbtn' }
+    elseif hover.poolsortcol then
+      local k = hover.poolsortcol
+      state.poolsort = (k == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or k
+      vim.msg = 'lib order: ' .. ({ track = 'tree by track', mark = 'marks @ $ *', name = 'name', len = 'length' })[state.poolsort]
+      click = { t = now2, zone = 'poolsortcol' }
     elseif hover.poolsort then
       ctx.set_focus('inst')
       state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'

@@ -1031,6 +1031,10 @@ end
 function E.hold_insert(spec)
   local made
   run(spec.stretch and 'hold note (stretch)' or 'hold note', function()
+    -- поверх события в строке — перезапись (как обычная нота)
+    local rc = spec.replace
+    if rc and rc.kind == 'cont' and rc.of then E.note_off({ rc.of }, spec.lpb, spec.row)
+    elseif rc and (rc.kind == 'audio' or rc.kind == 'midi') and rc.item and R.ValidatePtr(rc.item, 'MediaItem*') then E.delete({ rc }, spec.lpb) end
     local it
     if spec.slice then it = E.insert_slice(spec.track, spec.lane_idx, spec.lpb, spec.row, spec.item, spec.slice)
     else it = E.insert_note(spec.track, spec.lane_idx, spec.lpb, spec.row, spec.pitch, spec.vel, spec.rows, spec.item) end

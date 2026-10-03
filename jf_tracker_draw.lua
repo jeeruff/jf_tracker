@@ -1421,7 +1421,7 @@ local function add_empty(rows, pool)
 end
 function D.pool_rows(pool, sort, col, cols)
   local rows = {}
-  if sort == 'len' or sort == 'mark' then
+  if sort == 'len' or sort == 'mark' or sort == 'name' then
     local idx = {}
     for i = 1, #pool do idx[i] = i end
     local function rank(e)
@@ -1431,6 +1431,7 @@ function D.pool_rows(pool, sort, col, cols)
     table.sort(idx, function(a, b)
       local ea, eb = pool[a], pool[b]
       if sort == 'mark' then local ra, rb = rank(ea), rank(eb); if ra ~= rb then return ra < rb end end
+      if sort == 'name' and ea.name ~= eb.name then return (ea.name or ''):lower() < (eb.name or ''):lower() end
       if ea.len ~= eb.len then return ea.len < eb.len end
       return a < b
     end)
@@ -1475,10 +1476,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     if hot then hover[key] = true end
     hint(key, x, by0, bw, L.rh, true)
   end
-  local sb = 'sort ' .. sort
-  local sbw = ms(sb) + 2 * L.pad
-  local sbx = ix + w - sbw - L.pad
-  hbtn(sbx, sbw, sb, false, U.GREY, 'poolsort')
+  -- сортировка — строкой заголовков колонок под шапкой (3 окт), не кнопкой
+  local sbx = ix + w - L.pad
   local fw = ms('find') + 2 * L.pad
   local fx = sbx - fw - L.pad
   hbtn(fx, fw, 'find', false, U.GREY, 'poolfind')
@@ -1513,7 +1512,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
   L.pool_rows = rows
-  local nvis = math.max(1, math.floor((H - 2 * L.rh - 6) / L.rh))
+  local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
   for r, row in ipairs(rows) do if row.i == inst or row.empty == inst then sel_r = r end end
@@ -1524,13 +1523,32 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if D.pool_scroll > math.max(0, #rows - nvis) then D.pool_scroll = math.max(0, #rows - nvis) end
   if D.pool_scroll < 0 then D.pool_scroll = 0 end
   local label_w = math.min(L.cw * 18, math.floor(w * 0.55))
+  -- заголовки колонок (3 окт): # (порядок: дерево треков / метки), name, len,
+  -- preview; клик — сортировка, активная — янтарём
+  do
+    local hy2 = iy + 2 + L.rh
+    local cols_h = { { '#', ix + 6, sort == 'track' or sort == 'mark', sort == 'mark' and '#@' or '#', 'index' },
+                     { 'name', ix + 6 + ms('00 @ '), sort == 'name', 'name', 'name' },
+                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' },
+                     { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'preview', nil } }
+    for k, h2 in ipairs(cols_h) do
+      local x1 = cols_h[k + 1] and cols_h[k + 1][2] or (ix + w - L.pad)
+      if h2[2] + ms(h2[4]) <= x1 then
+        local hot = h2[5] and mx >= h2[2] and mx < x1 and my >= hy2 and my < hy2 + L.rh
+        text(h2[2], hy2, h2[4], h2[3] and U.AMBER or (hot and U.TEXT or U.GREY))
+        if hot then hover.poolsortcol = h2[5] end
+        if h2[5] then hint('poolsortcol', h2[2], hy2, x1 - h2[2], L.rh, h2[5]) end
+      end
+    end
+    set(U.DIM); gfx.rect(ix + 2, hy2 + L.rh - 1, w - 4, 1, 1)
+  end
   -- цвет трека по имени — запасной цвет волны, когда у item нет своего
   local trgb = {}
   for _, c in ipairs(info.cols or {}) do if c.rgb and not trgb[c.name] then trgb[c.name] = c.rgb end end
   local dbg = {}
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
-    local y = iy + 2 + L.rh + (r - D.pool_scroll - 1) * L.rh
+    local y = iy + 2 + 2 * L.rh + (r - D.pool_scroll - 1) * L.rh
     if row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
@@ -1649,6 +1667,8 @@ function D.frame(L, snap, rows, state, info)
     hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
     hover.poolfind = th.poolfind
+    hover.poolsortcol = th.poolsortcol
+    hover.poolbsync = th.poolbsync or hover.poolbsync
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro
     hover.mm = th.mm
     hover.midimap = th.midimap

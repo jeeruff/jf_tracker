@@ -918,7 +918,7 @@ function V.key_impl(c)
       if how == 'hold' or how == 'hold_stretch' then
         local lane = f0.lane or f0.col.lanes[1]
         if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, slice = k,
-          item = inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
+          item = inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq, replace = f0.sub and f0.sub[V.cur.row] }) end
         return
       end
       if how == 'audition' or how == 'capture' then
@@ -928,6 +928,13 @@ function V.key_impl(c)
       end
       local lane = f0.lane or f0.col.lanes[1]
       E.beside = how == 'beside'
+      -- слайс поверх события в строке — ПЕРЕЗАПИСЬ, как нота (3 окт: второй q
+      -- ставил новый лейн); Option — рядом
+      if how ~= 'beside' then
+        local cell = f0.sub and f0.sub[V.cur.row]
+        if cell and cell.kind == 'cont' and cell.of then E.note_off({ cell.of }, lpb(), V.cur.row)
+        elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
+      end
       E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k)
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
@@ -942,7 +949,7 @@ function V.key_impl(c)
         if how == 'hold' or how == 'hold_stretch' then
           local chh = (c < 256) and string.char(c) or ''
           if ctx.hold_start then ctx.hold_start({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,
-            item = inst and inst.item, vel = V.vel, stretch = how == 'hold_stretch', key = chh }) end
+            item = inst and inst.item, vel = V.vel, stretch = how == 'hold_stretch', key = chh, replace = f.sub and f.sub[V.cur.row] }) end
           return
         end
         -- Shift+нота — только звук; Ctrl+нота — захват (F5, пока звук)
