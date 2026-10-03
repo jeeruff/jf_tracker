@@ -2085,7 +2085,12 @@ function D.frame(L, snap, rows, state, info)
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
       local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
       fbw = (L.matrix_w and L.matrix_w > 0 and not state.mx_hidden) and math.max(L.matrix_w, math.floor(own * 0.6)) or own
+      if info.fxb_px then fbw = math.max(L.cw * 12, math.min(math.floor(L.win_w * 0.5), info.fxb_px)) end   -- ширина мышью (3 окт)
       if info.notes_draw then hover.notes = info.notes_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0))
+      elseif info.fxb_expand then
+        -- набор: список раскрывается всплывашкой в конце кадра, здесь — место
+        set(U.PANEL); gfx.rect(0, dy + 2, fbw, L.dsp_h - 2, 1)
+        D.fxb_popup = { bottom = dy + L.dsp_h - (L.hint_h or 0), w0 = fbw }
       else hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
@@ -2373,6 +2378,18 @@ function D.frame(L, snap, rows, state, info)
 
   -- статус — в самом низу окна, под DSP-панелью (раньше делил y с ней и
   -- перекрывал её шапку)
+  -- всплывашка браузера эффектов при наборе (3 окт): удобный размер, низом
+  -- к низу DSP-панели, поверх всего; янтарная рамка
+  if D.fxb_popup and info.fxb_draw then
+    local p = D.fxb_popup
+    D.fxb_popup = nil
+    local pw = math.max(p.w0, math.min(L.cw * 64, math.floor(L.win_w * 0.6)))
+    local ph = math.min(math.floor(gfx.h * 0.6), math.max(L.dsp_h, L.rh * 28))
+    local py = math.max(0, p.bottom - ph)
+    set(U.BG); gfx.rect(0, py - 2, pw + 2, ph + 4, 1)
+    hover.fxb = info.fxb_draw(L, 1, py, pw, ph)
+    set(U.AMBER); gfx.rect(0, py - 2, pw + 2, ph + 4, 0)
+  else D.fxb_popup = nil end
   -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
   -- по ширине матрица + трекер (tracker)
   local sx, sy, sw, sh = 0, gfx.h - L.status_h, gfx.w, L.status_h

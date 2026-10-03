@@ -22,7 +22,7 @@
 -- (main переводит в сырые: min + v·(max − min)).
 --
 -- Клавиши (панель в фокусе): j k — поле, h l + - — значение (Shift ×10 в
--- main), Enter — на кнопке: сделать, g — AI сразу, p — точки сразу,
+-- main), Enter — на кнопке: сделать, g — auto-item сразу, p — точки сразу,
 -- L / Esc — назад к матрице.
 --
 -- Без reaper.*: тестируется tests/test_lfogen.lua.
@@ -80,7 +80,7 @@ local F = {
   frel = { key = 'frel', label = 'release', min = 0, max = 64, step = 0.25, fmt = '%.2f rows' },
   shift = { key = 'shift', label = 'shift', min = -16, max = 16, step = 0.25, fmt = '%+.2f rows' },
   invert = { key = 'invert', label = 'invert', toggle = true },
-  ai = { key = 'ai', label = 'make AI', button = true },
+  ai = { key = 'ai', label = 'auto-item', button = true },          -- automation item REAPER (3 окт: «make AI» было непонятно)
   points = { key = 'points', label = 'write points', button = true },
 }
 local LAYOUT = {

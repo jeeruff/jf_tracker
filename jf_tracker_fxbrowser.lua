@@ -10,12 +10,61 @@
 --
 -- Без reaper.*: тестируется стабами.
 
+-- Папки (3 окт, как нативный браузер): all, fav (избранное REAPER — папка
+-- Favorites в reaper-fxfolders.ini — плюс своё, кнопка *), dev / type / cat
+-- (разработчик и категория из reaper-fxtags.ini, тип по префиксу VST3: / AU: …)
+-- с заголовками групп, rec — недавно добавленные. Данные из ini читает main
+-- (FB.set_tags). Набор текста в фокусе — браузер раскрывается всплывашкой.
+
 local FB = {}
 FB.list = {}           -- { label=, data= } от main
 FB.query = ''
 FB.cur = 1
 FB.scroll = 0
-local cache = { q = nil, list = nil, res = nil }
+FB.folder = 'all'
+FB.FOLDERS = { 'all', 'fav', 'dev', 'type', 'cat', 'rec' }
+FB.tags = { cat = {}, dev = {} }   -- ключ (имя файла, пробелы → _) → категория / разработчик
+FB.natfav = {}                     -- ключи избранного REAPER
+FB.ownfav = {}                     -- своё избранное: метка → true
+FB.recent = {}                     -- метки недавно добавленных, свежие первыми
+local cache = { q = nil, list = nil, res = nil, folder = nil, gen = 0 }
+FB.gen = 0                         -- меняется при правке избранного / недавних (сброс кэша)
+
+-- ключ эффекта как в reaper-fxtags.ini: имя файла без пути и «<uid», пробелы → _
+function FB.fxkey(it)
+  if it._key then return it._key end
+  local id = tostring(it.data or '')
+  local base = id:gsub('<.*$', ''):match('([^/\\]+)$') or id
+  if base == '' then base = (it.label or ''):gsub('^%w+i?:%s*', '') end
+  it._key = base:gsub(' ', '_')
+  return it._key
+end
+-- тип: префикс метки (VST3 / VST / AU / JS / CLAP / LV2 / DX), иначе other
+function FB.kind(it)
+  local k = (it.label or ''):match('^(%w+i?):')
+  return k and k:upper():gsub('I$', '') or 'other'
+end
+function FB.dev(it)
+  local d = FB.tags.dev[FB.fxkey(it)]
+  if d and d ~= '' then return d end
+  local p = (it.label or ''):match('%(([^()]+)%)%s*$')
+  return p or '?'
+end
+function FB.cat(it) return FB.tags.cat[FB.fxkey(it)] or '?' end
+function FB.is_fav(it) return FB.natfav[FB.fxkey(it)] or FB.ownfav[it.label] or false end
+function FB.set_tags(cat, dev, natfav) FB.tags = { cat = cat or {}, dev = dev or {} }; FB.natfav = natfav or {}; FB.gen = FB.gen + 1 end
+function FB.toggle_fav(it)
+  if not it then return end
+  if FB.ownfav[it.label] then FB.ownfav[it.label] = nil else FB.ownfav[it.label] = true end
+  FB.gen = FB.gen + 1
+end
+function FB.push_recent(it)
+  if not it then return end
+  for i = #FB.recent, 1, -1 do if FB.recent[i] == it.label then table.remove(FB.recent, i) end end
+  table.insert(FB.recent, 1, it.label)
+  while #FB.recent > 40 do table.remove(FB.recent) end
+  FB.gen = FB.gen + 1
+end
 
 local UP, DOWN = 30064, 1685026670
 
@@ -46,12 +95,23 @@ local function score(hay, term)
 end
 
 -- отфильтрованный и отсортированный список (кэш по запросу)
+local function group_of(it)
+  if FB.folder == 'dev' then return FB.dev(it)
+  elseif FB.folder == 'type' then return FB.kind(it)
+  elseif FB.folder == 'cat' then return (FB.cat(it):gsub('|.*$', '')) end
+  return nil
+end
+-- строки списка: { it = } и заголовки групп { hdr = } (dev / type / cat)
 function FB.results()
-  if cache.q == FB.query and cache.list == FB.list then return cache.res end
+  if cache.q == FB.query and cache.list == FB.list and cache.folder == FB.folder and cache.gen == FB.gen then return cache.res end
   local res = {}
   local terms = {}
   for t in FB.query:lower():gmatch('%S+') do terms[#terms + 1] = t end
+  local rec_i = {}
+  if FB.folder == 'rec' then for i, l in ipairs(FB.recent) do rec_i[l] = i end end
   for _, it in ipairs(FB.list) do
+    if (FB.folder == 'fav' and not FB.is_fav(it)) or (FB.folder == 'rec' and not rec_i[it.label]) then goto skip end
+    do
     local name = FB.short(it.label)
     local hay = name:lower()
     local total, ok = 0, true
@@ -60,10 +120,26 @@ function FB.results()
       if not s then ok = false; break end
       total = total + s
     end
-    if ok then res[#res + 1] = { it = it, s = total, name = name:lower() } end
+    if ok then res[#res + 1] = { it = it, s = total, name = name:lower(), g = group_of(it), r = rec_i[it.label] } end
+    end
+    ::skip::
   end
-  if #terms > 0 then table.sort(res, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.name < b.name end) end
-  cache.q, cache.list, cache.res = FB.query, FB.list, res
+  if FB.folder == 'rec' then table.sort(res, function(a, b) return a.r < b.r end)
+  elseif FB.folder == 'dev' or FB.folder == 'type' or FB.folder == 'cat' then
+    table.sort(res, function(a, b)
+      if a.g ~= b.g then if a.g == '?' then return false elseif b.g == '?' then return true end return a.g:lower() < b.g:lower() end
+      if #terms > 0 and a.s ~= b.s then return a.s > b.s end
+      return a.name < b.name
+    end)
+    -- заголовки групп
+    local out, last = {}, nil
+    for _, r in ipairs(res) do
+      if r.g ~= last then out[#out + 1] = { hdr = r.g }; last = r.g end
+      out[#out + 1] = r
+    end
+    res = out
+  elseif #terms > 0 then table.sort(res, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.name < b.name end) end
+  cache.q, cache.list, cache.res, cache.folder, cache.gen = FB.query, FB.list, res, FB.folder, FB.gen
   return res
 end
 
@@ -71,6 +147,20 @@ function FB.selected()
   local r = FB.results()[FB.cur]
   return r and r.it
 end
+-- курсор не стоит на заголовке группы: шаг d (+1 / −1) до строки эффекта
+local function skip_hdr(d)
+  local res = FB.results()
+  local n = #res
+  if n == 0 then FB.cur = 1; return end
+  FB.cur = math.max(1, math.min(n, FB.cur))
+  local guard = 0
+  while res[FB.cur] and res[FB.cur].hdr and guard < n do
+    FB.cur = FB.cur + (d or 1)
+    if FB.cur > n then FB.cur = n; d = -1 elseif FB.cur < 1 then FB.cur = 1; d = 1 end
+    guard = guard + 1
+  end
+end
+FB.skip_hdr = skip_hdr
 
 -- клавиши в фокусе: 'add' — добавить выбранный; 'leave' — фокус дальше
 function FB.key(c, mods)
@@ -80,10 +170,10 @@ function FB.key(c, mods)
     if FB.query ~= '' then FB.query = ''; FB.cur = 1; FB.scroll = 0; return true end
     return 'leave'
   elseif c == 13 then return 'add'
-  elseif c == DOWN or (mods.ctrl and c == 10) then FB.cur = math.min(math.max(1, n), FB.cur + 1)
-  elseif c == UP or (mods.ctrl and c == 11) then FB.cur = math.max(1, FB.cur - 1)
-  elseif c == 8 then FB.query = FB.query:sub(1, -2); FB.cur = 1; FB.scroll = 0
-  elseif c >= 32 and c <= 126 then FB.query = FB.query .. string.char(c); FB.cur = 1; FB.scroll = 0
+  elseif c == DOWN or (mods.ctrl and c == 10) then FB.cur = math.min(math.max(1, n), FB.cur + 1); skip_hdr(1)
+  elseif c == UP or (mods.ctrl and c == 11) then FB.cur = math.max(1, FB.cur - 1); skip_hdr(-1)
+  elseif c == 8 then FB.query = FB.query:sub(1, -2); FB.cur = 1; FB.scroll = 0; skip_hdr(1)
+  elseif c >= 32 and c <= 126 then FB.query = FB.query .. string.char(c); FB.cur = 1; FB.scroll = 0; skip_hdr(1)
   else return false end
   return true
 end
@@ -94,6 +184,38 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   local hover
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.LINE); gfx.rect(x + w - 1, y, 1, h, 1)
+  -- папки (как нативный браузер) и * — избранное для выбранного
+  do
+    local bx = x + L.pad
+    local by = y + 2
+    local rows = 1
+    for _, fname in ipairs(FB.FOLDERS) do
+      local bw = U.measure(fname) + 2 * L.pad
+      -- не влезает — на следующую строку (узкая колонка), не обрезать
+      if bx + bw > x + w - L.pad - (rows == 1 and (U.measure('*') + 2 * L.pad) or 0) then
+        if rows >= 2 then break end
+        rows = rows + 1; bx = x + L.pad; by = by + L.rh
+      end
+      local on = FB.folder == fname
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      U.set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.TEXT, 0.08) or U.BG)); gfx.rect(bx, by, bw, L.rh - 1, 1)
+      U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh - 1, 0)
+      U.text(bx + L.pad, by, fname, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      if hot then hover = { folder = fname } end
+      bx = bx + bw + 2
+    end
+    local sel = FB.selected()
+    local fav = sel and FB.is_fav(sel)
+    local sw = U.measure('*') + 2 * L.pad
+    local sx = x + w - L.pad - sw - 1
+    local sy0 = y + 2                                   -- * — всегда в первой строке справа
+    local hot = mx >= sx and mx < sx + sw and my >= sy0 and my < sy0 + L.rh
+    U.set(fav and U.tint(U.AMBER, 0.35) or (hot and U.tint(U.TEXT, 0.08) or U.BG)); gfx.rect(sx, sy0, sw, L.rh - 1, 1)
+    U.set(fav and U.AMBER or U.LINE); gfx.rect(sx, sy0, sw, L.rh - 1, 0)
+    U.text(sx + L.pad, sy0, '*', fav and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hover = { star = true } end
+    y, h = y + rows * L.rh + 2, h - rows * L.rh - 2
+  end
   -- строка поиска
   local res = FB.results()
   local sy = y + 3
@@ -116,13 +238,23 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     local r = res[idx]
     if not r then break end
     local ry = top + (i - 1) * L.rh
+    if r.hdr then
+      -- заголовок группы (разработчик / тип / категория)
+      U.text(x + L.pad, ry + 1, fit(r.hdr, w - 2 * L.pad), U.AMBER)
+      U.set(U.LINE); gfx.rect(x + L.pad + math.min(w - 3 * L.pad, U.measure(r.hdr) + L.pad), ry + math.floor(L.rh / 2), math.max(0, w - 3 * L.pad - U.measure(r.hdr) - L.pad), 1, 1)
+      goto next_row
+    end
+    do
     local sel = idx == FB.cur
     if sel then U.set(focused and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 3, L.rh, 1) end
     local name, kind = FB.short(r.it.label)
+    if FB.is_fav(r.it) then name = '* ' .. name end          -- избранное видно в любой папке
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
     U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and U.BG or U.TEXT)
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.BG or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
+    end
+    ::next_row::
   end
   return hover
 end

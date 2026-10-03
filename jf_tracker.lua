@@ -105,6 +105,7 @@ local state = {
   top_px = tonumber(reaper.GetExtState(EXT, 'top_px')),     -- высота верхней панели мышью
   inst_px = tonumber(reaper.GetExtState(EXT, 'inst_px')),   -- высота инструментов в сайдбаре
   mx_px = tonumber(reaper.GetExtState(EXT, 'mx_px')),       -- ширина матрицы мышью (nil = авто)
+  fxb_px = tonumber(reaper.GetExtState(EXT, 'fxb_px')),     -- ширина браузера эффектов мышью
   mx_fold_px = tonumber(reaper.GetExtState(EXT, 'mx_fold_px')),   -- ширина свёрнутой матрицы (fold)
   mx_hidden = reaper.GetExtState(EXT, 'mx_hidden') == '1',  -- матрица свёрнута в полосу
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
@@ -322,7 +323,7 @@ local function save_win()
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
-  S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
+  S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
   S('glyphface', state.glyphface or ''); S('fontface', state.fontface or '')
   local pm = {}
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
@@ -834,11 +835,61 @@ ctx = {
   dsp_bypass = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_bypass(col.track, f.i) end end,
   dsp_show = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_show(col.track, f.i) end end,
   -- браузер эффектов: добавить выбранный FX на трек курсора (pos — место в цепочке)
+  -- своё избранное и недавние браузера эффектов (persistent ExtState, метки)
+  fxb_save = function()
+    local fav = {}
+    for l in pairs(FB.ownfav) do fav[#fav + 1] = l end
+    table.sort(fav)
+    reaper.SetExtState(EXT, 'fxfav', table.concat(fav, '\n'), true)
+    reaper.SetExtState(EXT, 'fxrecent', table.concat(FB.recent, '\n'), true)
+  end,
+  -- нативные папки и метки: reaper-fxtags.ini ([category] / [developer]) и
+  -- Favorites из reaper-fxfolders.ini (пути плагинов → ключ имени файла)
+  fxb_load_native = function()
+    local res = reaper.GetResourcePath()
+    local cat, dev, fav = {}, {}, {}
+    local f = io.open(res .. '/reaper-fxtags.ini', 'r')
+    if f then
+      local sec
+      for line in f:lines() do
+        local s2 = line:match('^%[(.-)%]')
+        if s2 then sec = s2
+        else
+          local k, v = line:match('^(.-)=(.*)$')
+          if k then if sec == 'category' then cat[k] = v elseif sec == 'developer' then dev[k] = v end end
+        end
+      end
+      f:close()
+    end
+    local g = io.open(res .. '/reaper-fxfolders.ini', 'r')
+    if g then
+      local secs, sec = {}, nil
+      for line in g:lines() do
+        local s2 = line:match('^%[(.-)%]')
+        if s2 then sec = s2; secs[sec] = secs[sec] or {}
+        elseif sec then local k, v = line:match('^(.-)=(.*)$'); if k then secs[sec][k] = v end end
+      end
+      g:close()
+      local idx = secs.Folders or {}
+      for i = 0, (tonumber(idx.NbFolders) or 0) - 1 do
+        if (idx['Name' .. i] or ''):lower() == 'favorites' then
+          for k, v in pairs(secs['Folder' .. (idx['Id' .. i] or i)] or {}) do
+            if k:match('^Item%d+$') then fav[((v:gsub('<.*$', ''):match('([^/\\]+)$') or v):gsub(' ', '_'))] = true end
+          end
+        end
+      end
+    end
+    FB.set_tags(cat, dev, fav)
+    for l in (reaper.GetExtState(EXT, 'fxfav') or ''):gmatch('[^\n]+') do FB.ownfav[l] = true end
+    FB.recent = {}
+    for l in (reaper.GetExtState(EXT, 'fxrecent') or ''):gmatch('[^\n]+') do FB.recent[#FB.recent + 1] = l end
+  end,
   fxb_add = function(it, pos)
     it = it or FB.selected()
     local col = dsp_target()
     if not (it and col) then vim.msg = 'fx: nothing selected'; return end
     edit.fx_add(col.track, it.data, pos)
+    FB.push_recent(it); ctx.fxb_save()
     state.dsp = true
     vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
   end,
@@ -1147,7 +1198,7 @@ ctx = {
     local what = LG.type == 'lfo' and ('LFO %s %d rows'):format(LG.shape, LG.period)
       or (LG.type == 'podkat' and ('podkat %s from %s'):format(LG.hits, LG.src_names[LG.src_i] or '?'))
       or ('follow %s'):format(LG.fsrc == 'env' and (LG.src_env or '?') or ('audio of ' .. (LG.src_names[LG.src_i] or '?')))
-    vim.msg = ('%s -> %s: %s, %d points (%s)'):format(what, mode == 'ai' and 'automation item' or 'envelope', tg.label, n, where)
+    vim.msg = ('%s -> %s: %s, %d points (%s)'):format(what, mode == 'ai' and 'auto-item' or 'envelope', tg.label, n, where)
   end,
   mod_add_pick = function()
     local col = cur_col(); if not col then return end
@@ -4155,8 +4206,11 @@ local function frame()
     notes_draw = (state.dsp and state.notes_open and not state.khelp) and function(Lx, x, y, w, h)
       return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
     end or nil,
+    -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
+    fxb_expand = state.focus == 'fxb' and FB.query ~= '',
+    fxb_px = state.fxb_px,
     fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
-      if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list() end
+      if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
     end or nil,
     dsp_drag = (dsp_drag and dsp_drag.active and { k = dsp_drag.fx }) or (fxb_drag and fxb_drag.active and { new = true }) or nil,
@@ -4480,12 +4534,14 @@ local function frame()
     local edge
     local W0 = gfx.w - L.side_w - (L.rstrip_w or 0)
     if state.side and math.abs(gfx.mouse_x - W0) <= 3 and gfx.mouse_y < gfx.h - L.status_h then edge = 'side'
+    elseif L.fxb_rect and math.abs(gfx.mouse_x - (L.fxb_rect[1] + L.fxb_rect[3])) <= 3 and gfx.mouse_y >= L.fxb_rect[2] and gfx.mouse_y < L.fxb_rect[2] + L.fxb_rect[4] then edge = 'fxb'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
     elseif state.top and math.abs(gfx.mouse_y - (((L.top_y or 0) == 0) and L.top_h or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
         if resize_drag == 'mx' and MX.fold then state.mx_fold_px = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('folded matrix width %d px'):format(state.mx_fold_px)
         elseif resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
+        elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x)); state.status = ('fx list width %d px'):format(state.fxb_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
         else
@@ -4493,14 +4549,14 @@ local function frame()
           local want = ((L.top_y or 0) == 0) and gfx.mouse_y or ((L.top_y + L.top_h) - gfx.mouse_y)
           state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
         end
-        if resize_drag ~= 'mx' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
+        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
-      state.status = edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: instruments / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
+      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: instruments / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
       if U.click then
         local now2 = reaper.time_precise()
         if (now2 - click.t) < 0.4 and click.zone == 'resize' then
-          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil else state.top_px = nil end
+          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil elseif edge == 'fxb' then state.fxb_px = nil else state.top_px = nil end
         else resize_drag = edge end
         click = { t = now2, zone = 'resize' }
         U.click = false
@@ -4771,7 +4827,13 @@ local function frame()
       click = { t = now2, zone = 'notes' }
     elseif hover.fxb then
       ctx.set_focus('fxb')
-      if type(hover.fxb) == 'table' then
+      if type(hover.fxb) == 'table' and hover.fxb.folder then
+        FB.folder = hover.fxb.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
+        vim.msg = 'fx: ' .. FB.folder .. ({ all = ' - every installed fx', fav = ' - favourites (REAPER Favorites + * here)', dev = ' - by developer', type = ' - by type', cat = ' - by category (REAPER fx tags)', rec = ' - recently added' })[FB.folder]
+      elseif type(hover.fxb) == 'table' and hover.fxb.star then
+        local it = FB.selected()
+        if it then FB.toggle_fav(it); ctx.fxb_save(); vim.msg = (FB.is_fav(it) and '* favourite: ' or 'not a favourite: ') .. FB.short(it.label) end
+      elseif type(hover.fxb) == 'table' then
         local same = FB.cur == hover.fxb.row
         FB.cur = hover.fxb.row
         if dbl and same and click.zone == 'fxb' then ctx.fxb_add()
@@ -5713,7 +5775,7 @@ local function frame()
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
           elseif r == 'pick' then ctx.lfo_pick_env()
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g make AI, p write points, L back'
+        elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
         elseif state.toptab == 'modulation' then
           local col = cur_col(); local mods = col and col.mods or {}
           if c == 27 then ctx.set_focus('tracker')

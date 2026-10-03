@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.52'
+V.VERSION = '0.5.53'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.53', d = '2026-10-03', items = {
+    'fx list: folders like the native browser - all, fav (REAPER Favorites + your own, * toggles), dev / type / cat with group headers (reaper-fxtags.ini), rec (recently added); favourites marked * everywhere',
+    'curve generator: the make AI button is called auto-item (an automation item with the curve)',
+    'fx list: folder buttons wrap to a second row when the column is narrow',
+    'fx list: drag its right edge to resize (dblclick: auto); typing opens it as a popup of a comfortable size over the panels (amber frame), Esc clears and shrinks it',
+  } },
   { v = '0.5.52', d = '2026-10-03', items = {
     'fix: the folded matrix could not be resized (it ignored the dragged width) - fold has its own width now: drag the = grip, double-click = compact again; the unfolded width is kept separately',
   } },
