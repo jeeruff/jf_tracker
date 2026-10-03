@@ -1170,13 +1170,16 @@ local function draw_topbar(L, info)
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
   for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
-    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'modulate') or (t == 'sample' and 'item') or t)
+    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'modulate') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or t)
     local tw = ms(lbl) + 2 * L.pad
-    local on = t == tab or (t == 'sample' and tab == 'retro')        -- rec — режим вкладки item
+    local on = t == tab
     local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
-    set(on and U.tint(U.AMBER, 0.35) or (hot and D.CURROW or U.BG)); gfx.rect(tx, 1, tw, L.rh, 1)
-    set(on and U.AMBER or U.LINE); gfx.rect(tx, 1, tw, L.rh, 0)
-    text(tx + L.pad, 1, lbl, on and U.AMBER or U.GREY)
+    -- rec — оттенок кнопки записи (фиолетовый, как R), остальные — янтарь
+    local acc, acc_t = U.AMBER, U.tint(U.AMBER, 0.35)
+    if t == 'retro' then acc, acc_t = D.ARM, D.ARM_T end
+    set(on and acc_t or (hot and D.CURROW or (t == 'retro' and U.mix(U.BG, D.ARM, 0.15) or U.BG))); gfx.rect(tx, 1, tw, L.rh, 1)
+    set((on or t == 'retro') and acc or U.LINE); gfx.rect(tx, 1, tw, L.rh, 0)
+    text(tx + L.pad, 1, lbl, on and (t == 'retro' and U.TEXT or acc) or (t == 'retro' and D.ARM or U.GREY))
     if hot then hover.tab = t end
     hint('tab', tx, 1, tw, L.rh, t)
     tx = tx + tw + 2
@@ -1233,16 +1236,8 @@ local function draw_topbar(L, info)
       end
       if mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then hover.sample = e end
     else
-      -- пустой трек: [rec] — записать в item (кольцо jf_rec)
-      local lbl = '[rec]'
-      local bw = ms(lbl) + 2 * L.pad
-      local hot = mx >= sx0 and mx < sx0 + bw and my >= cy0 and my < cy0 + L.rh
-      set(hot and U.tint(U.RED, 0.45) or U.tint(U.RED, 0.2)); gfx.rect(sx0, cy0, bw, L.rh, 1)
-      set(U.RED); gfx.rect(sx0, cy0, bw, L.rh, 0)
-      text(sx0 + L.pad, cy0 + 1, lbl, U.RED)
-      if hot then hover.recbtn = true end
-      hint('recbtn', sx0, cy0, bw, L.rh, true)
-      text(sx0 + bw + L.pad, cy0 + 1, 'no instrument - [rec] records one', U.GREY)
+      -- пустой трек: запись — во вкладке rec (3 окт: кнопки [rec] здесь больше нет)
+      text(sx0, cy0 + 1, 'no instrument - the rec tab records one', U.GREY)
     end
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK
@@ -1313,18 +1308,6 @@ local function draw_topbar(L, info)
         if hot then hover.retrobtn = what end
         hint('retrobtn', bx, y, bw, L.rh, what)
         bx = bx + bw + 2
-      end
-      -- [rec] в левом углу, горит: режим записи вкладки item (клик — назад к правке)
-      do
-        local lbl = '[rec]'
-        local bw = ms(lbl) + 2 * L.pad
-        local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
-        set(hot and U.tint(U.RED, 0.6) or U.tint(U.RED, 0.45)); gfx.rect(bx, y, bw, L.rh, 1)
-        set(U.RED); gfx.rect(bx, y, bw, L.rh, 0)
-        text(bx + L.pad, y + 1, lbl, U.TEXT)
-        if hot then hover.recbtn = true end
-        hint('recbtn', bx, y, bw, L.rh, true)
-        bx = bx + bw + L.pad
       end
       btn('<', 'prev'); 
       text(bx, y + 1, fit((c and c.col.name or '?') .. ' #' .. tostring(c and c.slot or '?'), L.cw * 10), U.AMBER); bx = bx + L.cw * 10 + 2

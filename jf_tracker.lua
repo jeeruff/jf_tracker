@@ -1624,9 +1624,9 @@ ctx = {
   -- слой лупов в матрице (2 окт, бывший Garden): ячейка = период лупа item
   -- вкладки верхней панели; grid — по опции (monome есть не у всех)
   top_tabs = function()
-    local t = { 'sample', 'modulation', 'midi' }
+    -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
+    local t = { 'retro', 'sample', 'modulation', 'midi' }
     if state.gridtab then t[#t + 1] = 'grid' end
-    -- retro — не вкладка, а режим [rec] вкладки item (3 окт): записываем в item
     for _, x in ipairs({ 'garden', 'master' }) do t[#t + 1] = x end
     return t
   end,
@@ -3633,7 +3633,9 @@ local function poll_audio_in(now)
   if not head or len <= 0 then return end
   -- превью трекера идёт через FX трека — jf_rec его слышит; это не игра:
   -- пока звучит превью (и полсекунды хвоста) и пока зажат Shift — не пишем (3 окт)
-  if PV.playing() or gfx.mouse_cap & 8 == 8 then audin.mute_until = now + 0.5 end
+  -- и пока проект играет (3 окт): jf_rec слышит проигрывание самого трека —
+  -- принимал его за игру на входе и печатал куски (пробел, play, «rec audio»)
+  if PV.playing() or gfx.mouse_cap & 8 == 8 or reaper.GetPlayState() & 1 == 1 then audin.mute_until = now + 0.5 end
   if now < (audin.mute_until or 0) then
     if audin.state == 'sound' then audin.state = 'idle'; vim.msg = 'rec audio: preview / Shift - not recorded' end
     return
