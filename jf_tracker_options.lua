@@ -16,7 +16,9 @@ function O.init(u, c) U, ctx = u, c end
 
 function O.open(items, about)
   O.items = items or O.items
-  O.about = about or O.about
+  -- about может быть функцией (3 окт): страница собирается заново при каждом
+  -- входе — логотип каждый раз в новом стиле
+  if type(about) == 'function' then O.about_fn = about; O.about = about() else O.about = about or O.about end
   O.page = 'list'
   O.active = true
   O.sel = math.max(1, math.min(#O.items, O.sel))
@@ -35,7 +37,7 @@ end
 -- изменить строку: d = +1/-1 (num/cycle), 0 = переключить (toggle) / шаг вперёд
 function O.adjust(it, d)
   if not it then return end
-  if it.kind == 'about' then O.page = 'about'; O.ascroll = 0; return end
+  if it.kind == 'about' then O.page = 'about'; O.ascroll = 0; if O.about_fn then O.about = O.about_fn() end; return end
   if it.kind == 'toggle' then it.set(not it.get())
   elseif it.kind == 'cycle' then
     local v = it.get(); local k = 1

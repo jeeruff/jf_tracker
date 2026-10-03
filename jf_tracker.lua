@@ -45,6 +45,8 @@ local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
 local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
 local LG = dofile(DIR .. '/jf_tracker_lfogen.lua')        -- генератор LFO в точки / automation item (2 окт)
+local LOGO = dofile(DIR .. '/jf_tracker_logo.lua')        -- граффити-логотип для about (3 окт)
+math.randomseed(math.floor(os.time() + (reaper.time_precise() % 1) * 1e6))   -- стиль логотипа — новый от запуска к запуску
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
@@ -500,12 +502,14 @@ ctx = {
   depot = function() local c = cur_col(); return c and c.pool or {} end,
   fit = draw.fit,
   set_pitchmode = function(col, mode) state.pitchmodes[col.guid] = mode end,
-  set_font = function(n) state.font = n; draw.set_font(state) end,
+  -- TTF: размер 10..32 (3 окт), 0 — битмап
+  set_font = function(n) n = math.floor(tonumber(n) or 0); state.font = (n <= 0) and 0 or math.max(10, math.min(32, n)); draw.set_font(state) end,
   -- Nerd-шрифт для текста (TTF-режим) или для глифов (гибрид); ищем по подстроке
-  set_fontface = function(name)
-    local faces = { 'DepartureMono Nerd Font Mono', 'BigBlueTerm437 Nerd Font Mono', 'BigBlueTermPlus Nerd Font Mono',
+  FONT_FACES = { 'DepartureMono Nerd Font Mono', 'BigBlueTerm437 Nerd Font Mono', 'BigBlueTermPlus Nerd Font Mono',
       'GohuFont 14 Nerd Font Mono', 'GohuFont 11 Nerd Font Mono', 'ProggyClean Nerd Font Mono', 'Terminess Nerd Font Mono',
-      'ProFont IIx Nerd Font Mono', '3270 Nerd Font Mono', 'JetBrainsMono Nerd Font Mono' }
+      'ProFont IIx Nerd Font Mono', '3270 Nerd Font Mono', 'JetBrainsMono Nerd Font Mono' },
+  set_fontface = function(name)
+    local faces = ctx.FONT_FACES
     local pick
     if not name or name == '' then
       local i = 0
@@ -1978,11 +1982,23 @@ ctx = {
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
-      { key = 'font', label = 'ttf font size', kind = 'num', min = 0, max = 40, desc = '0 = bitmap font; N = Nerd font size', get = function() return state.font or 0 end, set = function(v) ctx.set_font(math.floor(v)) end },
+      { key = 'fontmode', label = 'text font', kind = 'cycle', values = { 'bitmap', 'ttf' }, desc = 'bitmap: REAPER pixel font (scale x1..x3); ttf: a Nerd font (size and face below)', get = function() return (state.font or 0) > 0 and 'ttf' or 'bitmap' end, set = function(v) ctx.set_font(v == 'ttf' and ((state.ttf_size or 0) > 0 and state.ttf_size or 18) or 0) end },
+      { key = 'font', label = 'ttf size', kind = 'num', min = 10, max = 32, desc = 'TTF font size 10..32 (switches to ttf)', get = function() return (state.font or 0) > 0 and state.font or (state.ttf_size or 18) end, set = function(v) ctx.set_font(v); state.ttf_size = state.font end },
+      { key = 'fontface', label = 'ttf face', kind = 'cycle', values = (function() local t = {}; for _, f in ipairs(ctx.FONT_FACES) do t[#t + 1] = (f:gsub(' Nerd Font Mono$', '')) end; return t end)(), desc = 'Nerd font family (installed ones from the list; :fontface name for any other)', get = function() return ((state.fontface or ''):gsub(' Nerd Font Mono$', '')) end, set = function(v) ctx.set_fontface(v) end },
       { sep = true },
       { key = 'about', label = 'about  v' .. VER.VERSION, kind = 'about', desc = 'version and changes (' .. VER.DATE .. ')', get = function() return VER.VERSION end, set = function() end },
     }
-    OPT.open(items, VER.lines())
+    OPT.open(items, function()
+      -- граффити JFTRACKER — каждый раз новый стиль (jf_tracker_logo.lua)
+      local logo, style = LOGO.make()
+      local out = {}
+      for _, l in ipairs(logo) do out[#out + 1] = l end
+      out[#out + 1] = ''
+      out[#out + 1] = '   style: ' .. style
+      out[#out + 1] = ''
+      for _, l in ipairs(VER.lines()) do out[#out + 1] = l end
+      return out
+    end)
   end,
   -- ── лупы в регионе (F1): > item до конца региона, N> период N шагов, < регион до конца item
   loop = function(what, n)
