@@ -45,7 +45,7 @@ vim.init({
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   set_lpb = function() end, fold = function() end, fold_all = function() end,
-  depot = function() return edit.depot_items() end, toggle_focus = function() end,
+  toggle_focus = function() end,
   set_pitchmode = function(col, m) pitchmodes[col.guid] = m end,
   sync_here = function() return 0 end,
 })

@@ -547,9 +547,4 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
   return hover
 end
 
--- идёт ли анимация (main держит перерисовку)
-function KH.animating(now)
-  return KH.flash ~= nil and (now - KH.flash.t0) < FLASH_T
-end
-
 return KH

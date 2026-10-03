@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.87'
+V.VERSION = '0.5.88'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.88', d = '2026-10-03', items = {
+    'cleanup: dead code removed - unused ctx entries (browser_find, ctrl_held, inst_preview_pos, depot, set_fontface + the TTF font list, retro_put / retro_loop wrappers), edit fx_value / depot_items / item_set / take_set, keyhelp animating, draw ai_colour, cmds tk_time, slicer fft; profile checked: a frame draws in ~4.6 ms (scopes tab open), worst ~9 ms, of a ~30 ms tick',
+  } },
   { v = '0.5.87', d = '2026-10-03', items = {
     'scopes at removed: no scope on the cursor row and no scope row in the track header - track scopes live in the scopes tab (and master)',
   } },

@@ -767,9 +767,8 @@ end
 -- огибающая как в аранжировке REAPER: линия значения по строкам, точки —
 -- квадратики, hex только у точек
 local env_col_cache = {}
-local ai_col_cache = {}
 -- смена темы / Theme Adjuster (2 окт): сбросить кэши цветов огибающих
-function D.reset_colours() env_col_cache = {}; ai_col_cache = {} end
+function D.reset_colours() env_col_cache = {} end
 -- цвет огибающих — исходный цвет темы (флаг 1), без обработки Theme Adjuster:
 -- так их рисует аранжировка (2 окт: громкость зелёная, а не жёлтая после Tint)
 local function theme_orig(key, fb)
@@ -779,12 +778,6 @@ local function theme_orig(key, fb)
   if r + g + b == 0 then return fb end
   return { r / 255, g / 255, b / 255 }
 end
-local function ai_colour(key)
-  local c = ai_col_cache[key]
-  if not c then c = theme_orig(key, { 0.4, 0.7, 1.0 }); ai_col_cache[key] = c end
-  return c
-end
-
 local function env_colour(e)
   if not e.key then return U.GREEN end
   local c = env_col_cache[e.key]

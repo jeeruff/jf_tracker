@@ -552,7 +552,6 @@ ctx = {
       reaper.UpdateTimeline()
     end)
   end,
-  depot = function() local c = cur_col(); return c and c.pool or {} end,
   fit = draw.fit,
   now = function() return reaper.time_precise() end,     -- бегущая строка about (3 окт)
   logo = LOGO,                                             -- about рисует логотип (options)
@@ -561,30 +560,10 @@ ctx = {
   -- TTF убран (3 окт): только битмап REAPER; set_font оставлен для совместимости
   set_font = function() state.font = 0; draw.set_font(state) end,
   -- Nerd-шрифт для текста (TTF-режим) или для глифов (гибрид); ищем по подстроке
-  FONT_FACES = { 'DepartureMono Nerd Font Mono', 'BigBlueTerm437 Nerd Font Mono', 'BigBlueTermPlus Nerd Font Mono',
-      'GohuFont 14 Nerd Font Mono', 'GohuFont 11 Nerd Font Mono', 'ProggyClean Nerd Font Mono', 'Terminess Nerd Font Mono',
-      'ProFont IIx Nerd Font Mono', '3270 Nerd Font Mono', 'JetBrainsMono Nerd Font Mono' },
-  set_fontface = function(name)
-    local faces = ctx.FONT_FACES
-    local pick
-    if not name or name == '' then
-      local i = 0
-      for k, f in ipairs(faces) do if f == state.fontface then i = k end end
-      pick = faces[i % #faces + 1]
-    else
-      for _, f in ipairs(faces) do if f:lower():find(name:lower(), 1, true) then pick = f; break end end
-      pick = pick or name
-    end
-    state.fontface = pick
-    if (state.font or 0) == 0 then state.glyphface = pick end
-    draw.set_font(state)
-    vim.msg = ((state.font or 0) > 0 and 'font: ' or 'glyphs: ') .. pick
-  end,
   set_scale = function(n) state.fontscale = n; draw.set_font(state) end,
   set_space = function(n) state.fontspace = n; draw.set_font(state) end,
   mod_toggle = function(col, m, what) edit.mod_toggle(col.track, m, what) end,
   toggle_dock = toggle_dock,
-  ctrl_held = function() return gfx.mouse_cap & 32 == 32 end,
   -- macOS: бит 4 = Cmd, 32 = Ctrl, 16 = Option
   msg = function(m) vim.msg = m end,
   -- ── заметки (2 окт): project — заметки проекта; context — item под курсором,
@@ -1385,8 +1364,7 @@ ctx = {
     vim.msg = 'analyzer: ' .. state.scopemode
   end,
   mono_take = function(on) mono_request(on and MONO_ID or -1) end,
-  retro_put = function(...) return retro_put(...) end, retro_preview = function(on) return retro_preview(on) end,
-  retro_loop = function(n) retro_loop(n) end,
+  retro_preview = function(on) return retro_preview(on) end,
   retro_all = function() retro.sel.a, retro.sel.b = 0, 1 end,
   retro_cycle = function(d)
     local _, trs = retro_current()
@@ -2125,11 +2103,6 @@ ctx = {
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
   end,
-  -- ── fzf-поиск в браузере и инструментах (2 окт) ─────────────────────
-  browser_find = function()
-    if not state.side then state.side = true end
-    ctx.set_focus('browser'); B.start_find()
-  end,
   -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
   -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
   inst_select = function(n) pool_select(n) end,
@@ -2157,7 +2130,6 @@ ctx = {
     state.hold = spec
     vim.msg = 'hold: release to insert' .. (spec.stretch and ' (stretched)' or '') .. ' - j / down add a step, Esc cancels'
   end,
-  inst_preview_pos = function(item) return PV.inst_position(item) end,
   preview_src_pos = function() return PV.src_position() end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
   inst_track = function(d) vim.key((d < 0 and 'H' or 'L'):byte()) end,

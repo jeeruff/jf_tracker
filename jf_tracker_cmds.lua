@@ -94,13 +94,6 @@ local function ensure_take_env(it, take, name)
   return R.GetTakeEnvelopeByName(take, name)
 end
 
--- время точки take-огибающей: от начала item, в секундах источника (× rate)
-local function tk_time(it, take, t_abs)
-  local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-  local rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
-  return (t_abs - pos) * rate
-end
-
 local function env_range(env, dmin, dmax)
   if R.BR_EnvAlloc then
     local be = R.BR_EnvAlloc(env, false)

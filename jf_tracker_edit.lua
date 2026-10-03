@@ -548,14 +548,6 @@ function E.set_fx(heads, lpb, cmd, xx)
   end)
 end
 
--- значение команды cmd у головы (из head.fx модели), nil если нет
-function E.fx_value(head, cmd)
-  for _, f in ipairs(head.fx or {}) do
-    if f:sub(1, 1) == cmd then return tonumber(f:sub(2), 16) end
-  end
-  return nil
-end
-
 function E.clear_fx(heads, lpb, cmd)
   if E.cmds and E.cmds.LETTERS[cmd] then
     run('fx clear ' .. cmd, function()
@@ -1967,24 +1959,6 @@ function E.drop_region(track, lane_idx, lpb, row, path, region)
   return it
 end
 
--- items депо (трек DEPOT) — «инструменты» для аудио-вставки
-function E.depot_items()
-  local out = {}
-  for ti = 0, R.CountTracks(0) - 1 do
-    local tr = R.GetTrack(0, ti)
-    local _, name = R.GetTrackName(tr)
-    if name == model.DEPOT then
-      for i = 0, R.CountTrackMediaItems(tr) - 1 do
-        local it = R.GetTrackMediaItem(tr, i)
-        local tk = R.GetActiveTake(it)
-        out[#out + 1] = { item = it, name = tk and R.GetTakeName(tk) or ('#' .. i) }
-      end
-      break
-    end
-  end
-  return out
-end
-
 -- ── лупы в регионах (F1, 2 окт) ──────────────────────────────────────────
 -- Полиметрия: item лупится своей длиной внутри региона. Период аудио-лупа =
 -- длина источника / rate, поэтому «луп N шагов» делает SECTION-источник
@@ -2168,8 +2142,6 @@ function E.inst_prop(items, rep, key, v, how, desc)
     end
   end)
 end
-function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R.SetMediaItemInfo_Value(it, key, v); R.UpdateItemInProject(it) end) end
-function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 
 -- ── smart quantize (2 окт; принципы jf_transient_stretch_quantize и
