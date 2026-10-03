@@ -174,6 +174,7 @@ local beat_info = { bar = 1, beat = 0, num = 4, den = 4, rows_bar = 16 }   -- р
 local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 окт)
 local dspxy_drag = nil        -- XY-пэд модуля DSP (TG33 vector, 2 окт)
 local dspview_drag = nil      -- протяжка по живому виду модуля (гранулятор)
+local idle = { n = 0, active_t = 0, input_t = 0, mkey = '' }   -- простой: реже рисуем (3 окт)
 local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
@@ -1654,10 +1655,11 @@ ctx = {
     local rg = seq[ri]
     if not rg then return end
     local sl
-    -- dup (3 окт): связанный повтор — то же имя, items в общем пуле MIDI и
-    -- одной группе с оригиналом; p слота, чей паттерн ещё есть, — тоже повтор
+    -- clone (3 окт, имена по просьбе): связанный повтор — то же имя, items в
+    -- общем пуле MIDI и одной группе с оригиналом; p слота, чей паттерн ещё
+    -- есть, — тоже повтор. dup — копия без связи (новое имя)
     local alias_src
-    if kind == 'dup' and not rg.gap then alias_src = rg end
+    if kind == 'clone' and not rg.gap then alias_src = rg end
     if kind == 'put' then
       local reg = state.mx_reg
       if not reg then vim.msg = 'matrix register empty (yy / dd / Ctrl+C)'; return end
@@ -1672,10 +1674,10 @@ ctx = {
       local n = 0
       ctx.slot_op('matrix repeat ' .. alias_src.name, function() n = alias.put_alias(alias_src, t) end)
       MX.goto_cell(seq, snap, before and ri or ri + 1, MX.cur.ci)
-      vim.msg = ('repeat of "%s": %d item(s), linked - MIDI pooled, items grouped (clone C: a free copy)'):format(alias_src.name, n)
+      vim.msg = ('clone of "%s": %d item(s), linked - MIDI pooled, items grouped (dup D: a free copy)'):format(alias_src.name, n)
       return
     end
-    if kind == 'clone' then
+    if kind == 'dup' then
       sl = alias.slot_snapshot(seq, snap, ri)
       if not sl then return end
       sl.name = alias.free_name(regions, sl.name)
@@ -1688,14 +1690,14 @@ ctx = {
     end
     local t = before and rg.pos or rg.rgnend
     local n = 0
-    ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', dup = 'matrix duplicate slot', clone = 'matrix clone slot' })[kind],
+    ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', dup = 'matrix duplicate slot' })[kind],
       function() n = alias.put_slot(snap, t, sl) end)
     local target = before and ri or ri + 1
     MX.goto_cell(seq, snap, target, MX.cur.ci)
     if kind == 'empty' then
       vim.msg = 'new 1-bar slot - n: name, = / [ ]: length'
     else
-      vim.msg = ('%s slot "%s": %d item(s)%s'):format(kind == 'clone' and 'cloned' or 'put', sl.name, n, kind == 'clone' and ' - free copy, no link' or '')
+      vim.msg = ('%s slot "%s": %d item(s)%s'):format(kind == 'dup' and 'duplicated' or 'put', sl.name, n, kind == 'dup' and ' - free copy, no link' or '')
     end
   end,
   slot_delete = function()
@@ -4081,6 +4083,7 @@ local function frame()
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
   local t_1 = reaper.time_precise()
+  if changed then prof.rebuild = (t_1 - t_0) * 1000 end            -- пересборка снимка (пульс hb)
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
@@ -4160,10 +4163,10 @@ local function frame()
     fps.v = fps.n / (now - fps.t); fps.n = 0; fps.t = now
     local n = math.max(1, prof.n)
     -- лайв (2 окт): кроме средних — худший кадр секунды и последняя правка
-    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s)',
+    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or ''), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0), false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
@@ -4183,11 +4186,27 @@ local function frame()
     local f0, f1, r0, r1 = vim.visual_range()
     vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1 }
   end
-  HN.reset()
+  -- простой (3 окт): 1.5 с без мыши / клавиш / правок проекта, не играет,
+  -- нет превью — рисуем каждый третий кадр (~10 fps); любое действие сразу
+  -- возвращает полную частоту. Пропущенный кадр берёт hover прошлого.
+  local idle_skip = false
+  do
+    local now_t = reaper.time_precise()
+    local mkey = gfx.mouse_x .. ',' .. gfx.mouse_y .. ',' .. gfx.mouse_cap .. ',' .. gfx.w .. ',' .. gfx.h
+    if mkey ~= idle.mkey or is_playing or changed or gfx.mouse_wheel ~= 0 or (now_t - idle.input_t) < 1.5
+       or PV.position() or vim.picker or vim.hydra or state.bpm_edit then
+      idle.active_t, idle.mkey = now_t, mkey
+    end
+    idle.n = idle.n + 1
+    idle_skip = (now_t - idle.active_t) > 1.5 and (idle.n % 3 ~= 0) and idle.hover ~= nil
+  end
+  if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
   draw.icons = state.icons and true or false
   draw.hybrid = state.icons and (state.font or 0) == 0   -- битмап-текст + Nerd-глифы
-  local hover = draw.frame(L, snap, rows, state, {
+  local hover
+  if idle_skip then hover = idle.hover else
+  hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = left,
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
@@ -4361,6 +4380,8 @@ local function frame()
     end,
     browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
   })
+  idle.hover = hover
+  end
 
   HN.draw(U, L)
   B.draw_drag(U, L)
@@ -4454,7 +4475,7 @@ local function frame()
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
-  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'repeat the pattern to the right, linked: same name, MIDI pooled, items grouped - edits in one change all (D in the matrix)', clone = 'clone: an exact copy to the right with a new name, not linked (C in the matrix)' })[hover.rgbtn]
+  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate: an exact copy to the right with a new name, not linked (D in the matrix)', clone = 'clone: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (C in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
@@ -5624,6 +5645,7 @@ local function frame()
   if t_4 - t_0 > prof.max then prof.max = t_4 - t_0 end
 
   local c = gfx.getchar()
+  if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')
@@ -5892,10 +5914,21 @@ end
 reaper.SetExtState(EXT, 'owner', MY_ID, false)
 reaper.DeleteExtState(EXT, 'quit', false)
 reaper.DeleteExtState(EXT, 'err', false)
+-- надёжность (3 окт): ошибка кадра не закрывает трекер — пишется в ExtState
+-- err с местом (traceback), показывается в статусе, следующий кадр идёт как
+-- обычно; закрываемся, только если ошибка повторяется ~3 с подряд (цикл)
+local err_streak, err_last = 0, nil
 frame = (function(inner)
   return function()
-    local ok, e = pcall(inner)
-    if not ok then reaper.SetExtState(EXT, 'err', tostring(e), false); save_win(); gfx.quit() end
+    local ok, e = xpcall(inner, debug.traceback)
+    if ok then err_streak = 0; return end
+    err_streak = err_streak + 1
+    local msg = tostring(e)
+    if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg end
+    vim.msg = 'error (tracker keeps running): ' .. (msg:match('^[^\n]*') or msg)
+    if err_streak > 100 then save_win(); gfx.quit(); return end
+    gfx.update()
+    reaper.defer(frame)
   end
 end)(frame)
 

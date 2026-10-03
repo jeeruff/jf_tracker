@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.56'
+V.VERSION = '0.5.57'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.57', d = '2026-10-03', items = {
+    'matrix names swapped (clearer): clone (cln, C) is the linked repeat - same pattern, MIDI pooled, items grouped; dup (D, ^D) is a free copy with a new name',
+    'reliability: an error inside a frame no longer closes the tracker - it is logged with its traceback (ExtState err) and shown in the status, the tracker keeps running; it quits only if the error repeats for ~3 s',
+    'speed: when idle (1.5 s without mouse, keys or project changes, not playing, no preview) the tracker draws every third frame (~10 fps); any action brings 33 fps back at once',
+  } },
   { v = '0.5.56', d = '2026-10-03', items = {
     'fx list opens over the whole left column (matrix and main module under it) whenever it has the focus - click or Tab - and closes when the focus leaves; drawn last, so the status bar no longer cuts it',
     'fx list: right-click an effect - native menu: add to the cursor track / take, to selected tracks, on a new track, favourite, native FX browser',
