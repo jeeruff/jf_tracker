@@ -2136,7 +2136,8 @@ ctx = {
   options = function()
     local function flag(k, label, desc) return { key = k, label = label, kind = 'toggle', desc = desc, get = function() return state[k] end, set = function(v) state[k] = v end } end
     local items = {
-      -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт)
+      -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
+      -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel (track column and sample view); higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
@@ -2149,7 +2150,6 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
-      flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
