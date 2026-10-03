@@ -116,6 +116,7 @@ local function draw_about(L, W, H)
     if cw then
       local w, h = LGO.size(O.logo)
       local iw, ih = (w + 2) * cw, (h + 1) * ch
+      local drip_h = O.logo.drip and 4 * ch or 0             -- место для капель под логотипом
       local roles = { text = U.TEXT, accent = U.AMBER, line = U.LINE }
       local key = O.logo.name .. cw .. 'x' .. ch .. (O.logo.native and ('|' .. U.TEXT[1] .. U.AMBER[1] .. U.LINE[1]) or '')
       if O.logo_key ~= key then
@@ -141,6 +142,29 @@ local function draw_about(L, W, H)
       else
         local lx0 = bx + math.floor((bw - iw) / 2)
         gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
+        if O.logo.drip and LGO.drops then
+          -- кровь (3 окт): капля растёт из нижнего края буквы, отрывается и
+          -- падает блоком с тёмным хвостом, уходит за край; под логотипом — место
+          local t = ctx.now and ctx.now() or os.clock()
+          local base = y + ih - math.floor(ch / 2)
+          local fall = 4 * ch
+          local red, dark = LGO.PAL.lightred, LGO.PAL.red
+          for _, d in ipairs(LGO.drops(O.logo)) do
+            local ph = (t * d.speed + d.phase) % 1
+            local x0 = lx0 + d.col * cw + math.floor(cw / 4)
+            local dw = math.max(1, math.floor(cw / 2))
+            if ph < 0.35 then
+              -- набухает: потёк вниз от буквы
+              local h = math.floor(ph / 0.35 * ch)
+              gfx.set(dark[1], dark[2], dark[3], 1); gfx.rect(x0, base, dw, h + 1, 1)
+            else
+              local yy = base + math.floor((ph - 0.35) / 0.65 * fall)
+              gfx.set(dark[1], dark[2], dark[3], 0.6); gfx.rect(x0, yy - math.floor(ch / 2), dw, math.floor(ch / 2), 1)
+              gfx.set(red[1], red[2], red[3], 1); gfx.rect(x0, yy, dw, math.max(2, math.floor(ch / 2)), 1)
+            end
+          end
+          gfx.a = 1
+        end
         if O.logo.pulse then
           -- перелив (3 окт): медленная волна по столбцам — от полной яркости до
           -- чёрного; поверх готовой картинки полупрозрачные чёрные полосы
@@ -153,7 +177,7 @@ local function draw_about(L, W, H)
           gfx.a = 1
         end
       end
-      y = y + ih + L.pad
+      y = y + ih + drip_h + L.pad
     else
       U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad
     end
