@@ -115,13 +115,14 @@ local function draw_about(L, W, H)
     if cw then
       local w, h = LGO.size(O.logo)
       local iw, ih = (w + 2) * cw, (h + 1) * ch
-      local key = O.logo.name .. cw .. 'x' .. ch
+      local roles = { text = U.TEXT, accent = U.AMBER, line = U.LINE }
+      local key = O.logo.name .. cw .. 'x' .. ch .. (O.logo.native and ('|' .. U.TEXT[1] .. U.AMBER[1] .. U.LINE[1]) or '')
       if O.logo_key ~= key then
         local old = gfx.dest
         gfx.setimgdim(1022, -1, -1); gfx.setimgdim(1022, iw, ih)
         gfx.dest = 1022
         gfx.set(0, 0, 0, 1); gfx.rect(0, 0, iw, ih, 1)
-        LGO.draw(O.logo, cw, math.floor(ch / 2), cw, ch, U.AMBER)
+        LGO.draw(O.logo, cw, math.floor(ch / 2), cw, ch, U.AMBER, roles)
         gfx.dest = old
         O.logo_key = key
       end

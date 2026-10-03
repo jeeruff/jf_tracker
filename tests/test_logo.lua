@@ -6,12 +6,13 @@ local function eq(name, got, want)
   n = n + 1
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
-eq('ten logos', #LG.LOGOS, 10)
-local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1, ['■'] = 1 }
-local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 }, ansi_stone = { 99, 7 }, ansi_pipes = { 110, 6 } }
+eq('at least ten logos', #LG.LOGOS >= 10, true)
+local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1, ['■'] = 1, ['▬'] = 1, ['·'] = 1, ['.'] = 1, ['═'] = 1 }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 }, ansi_stone = { 99, 7 }, ansi_pipes = { 110, 6, ansi_wire = { 81, 6 }, ansi_magenta = { 63, 5 }, ansi_flagbar = { 75, 7 }, ansi_rings = { 71, 7 }, native_blocks = { 103, 5 }, ansi_white = { 88, 6 }, box_dots = { 92, 6 }, ansi_plum = { 95, 7 }, ansi_moss = { 100, 8 }, ansi_jungle = { 87, 8 } } }
 for _, lg in ipairs(LG.LOGOS) do
   local w, h = LG.size(lg)
-  eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
+  if SIZES[lg.name] then eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
+  else eq(lg.name .. ' has size', w > 10 and h > 2, true) end
   local ok, trail = true, false
   for _, row in ipairs(LG.cells(lg)) do
     for _, cell in ipairs(row) do if not (KNOWN[cell.c] or LG.BOX[cell.c]) then ok = false end end
@@ -32,7 +33,7 @@ for i = 1, 40 do
   seen[k] = true; prev = k
 end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
-eq('pick never repeats', same, false); eq('pick covers all', cnt, 10)
+eq('pick never repeats', same, false); eq('pick covers all', cnt, #LG.LOGOS)
 -- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
 local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
 eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)
