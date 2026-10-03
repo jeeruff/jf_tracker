@@ -210,8 +210,12 @@ function D.layout(snap, state, nregions)
   L.w_wave = L.wave == 'off' and 0 or L.cw * 3
   L.x_wave = L.pad
   L.x_note = L.pad + (L.w_wave > 0 and (L.w_wave + L.pad) or 0)
-  L.x_vol = L.x_note + L.w_note + L.pad
-  -- порядок: волна | нота | vol | fx1..n | delay (просьба 1 окт)
+  -- номер инструмента на строке ноты, как в Renoise (3 окт): поле только для
+  -- показа, поля курсора Vim прежние (нота, vol, delay, fx)
+  L.w_inst = ms('00')
+  L.x_inst = L.x_note + L.w_note + L.pad
+  L.x_vol = L.x_inst + L.w_inst + L.pad
+  -- порядок: волна | нота | инстр. | vol | fx1..n | delay (просьба 1 окт)
   L.x_fx = {}
   local x = L.x_vol + L.w_vol + L.pad
   for k = 1, L.nfx do L.x_fx[k] = x; x = x + L.w_fx + L.pad end
@@ -221,14 +225,14 @@ function D.layout(snap, state, nregions)
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
   L.sub_w_narrow = L.pad + L.w_note + L.pad + L.w_vol + L.pad
-  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad,
+  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false,
     x_vol = L.pad + L.w_note + L.pad, x_fx = {}, x_del = L.pad + L.w_note + L.pad, sub_w = L.sub_w_narrow }, { __index = L })
   -- свёрнутый трек (fold, 2 окт): только волна и нота; ноты аккорда — только нота;
   -- огибающие — узкая схема: линия в символ шириной + hex значения точек
   L.sub_w_compact = L.x_note + L.w_note + L.pad
-  L.GC = setmetatable({ notes_only = true, nfx = 0, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
+  L.GC = setmetatable({ notes_only = true, nfx = 0, x_inst = false, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
-  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_fx = {},
+  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
   L.env_hex_w = ms('FF')
@@ -619,6 +623,13 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if inv and col == U.BG then text_(tx, tyy, str, col, D.inv_bg or U.TEXT) else text_(tx, tyy, str, col) end
   end
   local nf = L.notes_only and 1 or (L.narrow and 2 or (3 + L.nfx))
+  local name_row = cell and cell.kind == 'cont' and cell.i == 1 and cell.of.kind == 'audio' and D.itemnames and cell.of.name ~= ''
+  if L.x_inst and not name_row then
+    -- поле инструмента: номер на строке ноты; пустое — точки
+    local n = cell and (cell.kind == 'audio') and D.inst_of and D.inst_of[cell.item]
+    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), cell.muted and U.GREY or U.GREEN)
+    else text(x + L.x_inst, ty, '..', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY) end
+  end
   if not cell then
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
@@ -633,7 +644,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     elseif k == 'cont' and cell.of.kind == 'audio' then draw_wave(L, cell.of, cell.i, x, y, cell.of.muted, inv == 1) end
   elseif k == 'cont' and cell.of.kind == 'audio' then
     local head = cell.of
-    local text_rows = head.name ~= '' and 2 or 1
+    local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
   end
   if k == 'audio' or k == 'midi' then
@@ -660,25 +671,18 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if head.kind == 'audio' then
       -- сетка трекера слегка просматривается под item (2 окт): бледные точки
       -- в полях, где ничего не написано
-      local named = cell.i == 1 and head.name ~= ''
+      local named = D.itemnames and cell.i == 1 and head.name ~= ''
       local fxv = head.fx or {}
-      for fld = named and 2 or 1, nf do
+      for fld = named and (nf + 1) or 1, nf do      -- строка имени: без точек под текстом
         local skip = fld > 3 and L.nfx > 0 and cell.i >= 1 and fxv[cell.i * L.nfx + (fld - 3)] ~= nil
         if not skip then
           local fx = D.field_rect(L, fld)
           text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
         end
       end
-      if cell.i == 1 and head.name ~= '' then
-        -- строка имени: номер инструмента, затем имя — только если влезает
-        -- целиком в ширину item (от поля ноты до края подколонки); иначе
-        -- один номер (просьба 1 окт: имя не выезжает за рамку)
-        local avail = L.sub_w - L.x_note - L.pad
-        local n = D.inst_of and D.inst_of[head.item]
-        local lbl = n and ('%02d'):format(n) or ''
-        local full = (lbl ~= '' and (lbl .. ' ') or '') .. head.name
-        if ms(full) <= avail then lbl = full elseif lbl == '' then lbl = fit(head.name, avail) end
-        text(x + L.x_note, ty, lbl, c(1, head.muted and U.GREY or U.TEXT))
+      if named then
+        -- вторая строка: имя item (опция item names, 3 окт); номер — на строке ноты
+        text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), c(1, head.muted and U.GREY or U.GREY))
       end
       local fx = head.fx or {}
       if L.nfx > 0 and cell.i >= 1 then

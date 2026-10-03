@@ -120,7 +120,8 @@ local state = {
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
-  endstop = flag('endstop', true),               -- стоп транспорта на =END (3 окт)
+  endstop = flag('endstop', true),
+  itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
@@ -337,7 +338,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -2104,6 +2105,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      flag('itemnames', 'item names', 'the item name on the second row under the note; the instrument number is on the note row, as in Renoise'),
       flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
@@ -4321,6 +4323,7 @@ local function frame()
   local changed
   snap, changed = model.snapshot(state.lpb)
   draw.inst_of = snap and snap.inst_of
+  draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
   local t_1 = reaper.time_precise()

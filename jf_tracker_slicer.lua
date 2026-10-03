@@ -560,7 +560,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(U.GREY)
     for _, t in ipairs(S.trans) do
       local px = x + math.floor(t / len * w)
-      gfx.line(px, wy, px, wy + 6); gfx.line(px, wy + wh - 6, px, wy + wh)
+      if px >= x and px < x + w then gfx.line(px, wy, px, wy + 6); gfx.line(px, wy + wh - 6, px, wy + wh) end
     end
   end
   -- играемая зона исходника: чуть светлее фон и края
@@ -608,17 +608,21 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
   for k, t in ipairs(slices) do
     local px = x + math.floor(t / len * w)
+    -- только в рамках волны (3 окт: слайсы исходника за концом показанного куска лезли на свойства)
+    if t < -1e-6 or px > x + w - 1 then goto next_slice end
     local hot = (in_wave and math.abs(gfx.mouse_x - px) <= 4) or (S.drag and S.drag.kind == 'slice' and S.drag.k == k)
     if hot then hover_slice = k end
     U.set(hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
     local lbl = k <= 10 and ('qwertyuiop'):sub(k, k) or tostring(k)
-    U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN))
+    if px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)) end
+    ::next_slice::
   end
   -- выделение (общее для правки и просмотра: S.entry совпадает с e)
   local sel = (S.entry and (S.entry == e or S.entry.item == e.item and e.item)) and S.sel or nil
   if sel then
     local a, b = math.min(sel.a, sel.b), math.max(sel.a, sel.b)
     local px0, px1 = x + math.floor(a / len * w), x + math.floor(b / len * w)
+    px0, px1 = math.max(x, math.min(x + w, px0)), math.max(x, math.min(x + w, px1))
     U.set(U.AMBER); gfx.a = 0.25; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
