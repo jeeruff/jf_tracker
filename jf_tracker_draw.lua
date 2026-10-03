@@ -1172,7 +1172,7 @@ local function draw_topbar(L, info)
       text(bx, y + 1, fit((c and c.col.name or '?') .. ' #' .. tostring(c and c.slot or '?'), L.cw * 10), U.AMBER); bx = bx + L.cw * 10 + 2
       btn('>', 'next')
       bx = bx + L.pad
-      btn('all', 'all'); btn('play', 'play', c and c.playing); btn('stop', 'stop'); btn('put', 'put'); btn('depot', 'depot')
+      btn('all', 'all'); btn('play', 'play', c and c.playing); btn('stop', 'stop'); btn('put', 'put'); btn('depot', 'lib')
       btn('loop ' .. tostring(r.loop_bars or 2), 'loop'); btn('add', 'add')
       local st = c and (c.alive and (('%ds %s head %d%%'):format(c.len, c.writing and 'rec' or 'paused', math.floor(c.head * 100))) or 'jf_rec silent: open its panel / enable') or ''
       text(bx + L.pad, y + 1, fit(st, sx1 - bx - 2 * L.pad), c and c.alive and (c.writing and U.RED or U.GREY) or U.GREY)
@@ -1201,7 +1201,7 @@ local function draw_topbar(L, info)
         if mx >= wx and mx < wx + ww and my >= y and my < y + wh then hover.retro = (mx - wx) / ww end
         hint('retro', wx, y, ww, wh, true)
         local secs = c.len * (b - a)
-        text(wx, y + wh + 1, fit(('sel %.2fs  drag: select · a: all · Space: play · p: put @cursor · d: to depot (=LIB) · [ ]: edges'):format(secs), ww), U.GREY)
+        text(wx, y + wh + 1, fit(('sel %.2fs  drag: select · a: all · Space: play · p: put @cursor · d: to lib (=LIB) · [ ]: edges'):format(secs), ww), U.GREY)
       elseif not c then
         text(wx, y, 'select a track with jf_rec (< >)', U.GREY)
       end
@@ -1302,7 +1302,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local pool = col and col.pool or {}
   local inst = info.inst or 1
   local cur = pool[inst]
-  local head = ('items %d'):format(#pool)
+  local head = ('lib %d'):format(#pool)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
   -- справа налево: sort (track / len / mark), find (fzf, 2 окт), bsync (3 окт);
   -- у каждой своя x (раньше sort рисовалась поверх find — от неё торчало «d»)

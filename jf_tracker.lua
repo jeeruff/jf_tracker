@@ -2333,7 +2333,7 @@ ctx = {
     if IMP.kind(path) then ctx.import_sliced(path); return end
     local c = cur_col()
     local it = edit.depot_add(path, c and c.track)
-    vim.msg = it and ('→ lib ' .. (c and c.name or 'DEPOT') .. ': ' .. path:match('[^/]+$')) or 'depot add failed'
+    vim.msg = it and ('→ lib ' .. (c and c.name or 'DEPOT') .. ': ' .. path:match('[^/]+$')) or 'lib add failed'
   end,
   -- браузер *.* (2 окт): не звук — MIDI / видео / картинка в строку курсора (REAPER
   -- сам делает источник), остальное — программой macOS по умолчанию
@@ -2469,7 +2469,7 @@ ctx = {
   depot_span = function(entry, a, b)
     local c = cur_col(); if not c then return end
     local it = edit.depot_span(c.track, entry, a, b)
-    vim.msg = it and ('span %.2fs → depot of %s (=LIB)'):format(b - a, c.name) or 'depot: failed'
+    vim.msg = it and ('span %.2fs → lib of %s (=LIB)'):format(b - a, c.name) or 'lib: failed'
     model.invalidate()
   end,
   -- файл браузера в сэмпл-модуле
@@ -4623,10 +4623,10 @@ local function frame()
     state.status = (c and c.head or '') .. ': ' .. (c and hints[c.kind] or '') .. '   a: add parameter, x: remove'
   elseif hover.scopemode then state.status = ({ scope = 'oscilloscope (ring 256 samples, 8 kHz)', spec = 'spectrum analyzer: 48 log bands 30 Hz..Nyquist, -60..0 dB', sgram = 'spectrogram: time → right, 48 bands, heat = level' })[hover.scopemode] .. ' (:scopemode)'
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
-  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
+  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
-  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
@@ -4636,7 +4636,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
-  elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the items have focus'
+  elseif hover.poolfind then state.status = 'find in the lib (fzf) - also / when the lib has focus'
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
@@ -4680,7 +4680,7 @@ local function frame()
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
     state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
-    state.status = ({ open = 'open the sidebar (items + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: items / browser height, dblclick: auto' })[hover.sidectl]
+    state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
@@ -4724,7 +4724,7 @@ local function frame()
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move'):format(hover.sample.slice)
   elseif hover.sample then
     local e = hover.sample.e or hover.sample
-    state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to depot; :slice / \\is: slicer'
+    state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to lib; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
   elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d$') then
     local i = tonumber(hover.browser:sub(3))
@@ -4792,10 +4792,10 @@ local function frame()
           local want = ((L.top_y or 0) == 0) and gfx.mouse_y or ((L.top_y + L.top_h) - gfx.mouse_y)
           state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
         end
-        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('items %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
+        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('lib %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
-      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: items / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
+      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: lib / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
       if U.click then
         local now2 = reaper.time_precise()
         if (now2 - click.t) < 0.4 and click.zone == 'resize' then
@@ -4982,7 +4982,7 @@ local function frame()
       elseif hover.sidectl == 'grip' then
         if dbl and click.zone == 'sidegrip' then state.side_px = nil; vim.msg = 'sidebar width: auto' else resize_drag = 'side' end
       elseif hover.sidectl == 'instgrip' then
-        if dbl and click.zone == 'instgrip' then state.inst_px = nil; vim.msg = 'items height: auto' else resize_drag = 'inst' end
+        if dbl and click.zone == 'instgrip' then state.inst_px = nil; vim.msg = 'lib height: auto' else resize_drag = 'inst' end
       end
       click = { t = now2, zone = (hover.sidectl == 'grip' and 'sidegrip') or (hover.sidectl == 'instgrip' and 'instgrip') or 'sidectl' }
     elseif hover.mxctl then

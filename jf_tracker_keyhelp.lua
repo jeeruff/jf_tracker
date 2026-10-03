@@ -25,6 +25,16 @@ local LEFT, RIGHT, UP, DOWN = 1818584692, 1919379572, 30064, 1685026670
 
 -- k — как клавиша написана в справке; t — явные токены (иначе k по пробелам)
 KH.PAGES = {
+  -- первая страница (3 окт): что это и почему так близко к REAPER
+  intro = { title = 'jf_tracker - what it is', e = {
+    { k = 'idea', t = {}, d = 'build a whole track from the keyboard in one window: patterns, their order, sounds; mixing later in REAPER on the same tracks' },
+    { k = 'native', t = {}, d = 'the tracker is a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes, FX - no format of its own' },
+    { k = 'why', t = {}, d = 'nothing to export or lose: close the window and the project plays and edits as usual; tempo map, routing, render, other scripts keep working; every edit is one REAPER undo step' },
+    { k = 'lib', t = {}, d = 'the sounds you play (right panel): every audio item of the project, one entry per sound; library entries sit on their track after the =LIB marker' },
+    { k = 'linked', t = {}, d = 'notes of a lib entry are linked copies: change it in the item panel and all its notes follow; a stretched note becomes unique (or apply to all)' },
+    { k = 'item', t = {}, d = 'item tab (top): the selected lib entry - wave, slices, properties, preview, beatsync' },
+    { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
+  } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
     { k = 'H L', d = 'previous / next track' },
@@ -113,7 +123,7 @@ KH.PAGES = {
     { k = 'R', d = 'ruler of bars on the left on / off (button ruler)' },
     { k = 'Esc Tab', d = 'next module' },
   } },
-  inst = { title = 'items', e = {
+  inst = { title = 'lib', e = {
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'g G', d = 'first / last' },
@@ -199,7 +209,7 @@ KH.PAGES = {
     { k = 'v', d = 'view: peaks / spectral' },
     { k = '2 4 8 1 3 6', d = 'equal slices 2 4 8 16 32 64' },
     { k = 's t', d = 'slice at transients' },
-    { k = 'd', d = 'detect transients (with selection: to depot)' },
+    { k = 'd', d = 'detect transients (with selection: to lib)' },
     { k = '+ -', d = 'transient sensitivity' },
     { k = 'x', d = 'clear slices' },
     { k = 'Q', d = 'smart quantize: strong hits to strong beats' },
@@ -207,7 +217,7 @@ KH.PAGES = {
     { k = '< >', d = 'volume -1 / +1 dB' },
     { k = 'n', d = 'normalize' },
     { k = '[ ]', d = 'widen selection left / right' },
-    { k = 'D', d = 'selection to depot' },
+    { k = 'D', d = 'selection to lib' },
     { k = 'Space', d = 'preview selection' },
     { k = 'J K', d = 'properties: row down / up' },
     { k = 'H L', d = 'properties: value down / up' },
@@ -254,7 +264,7 @@ KH.PAGES = {
     { k = 'P', d = 'put at cursor, keep original timing' },
     { k = 'L', d = 'looper: while playing, the last N bars (ending at the last bar line) loop from the next bar - to the region end, else 4 times' },
     { k = '1 2 4 8', d = 'looper length in bars' },
-    { k = 'd', d = 'capture to depot' },
+    { k = 'd', d = 'capture to lib' },
     { k = 'a', d = 'all channels' },
     { k = '+', d = 'add channel' },
     { k = 'j k', d = 'channel down / up' },
@@ -278,7 +288,7 @@ KH.PAGES = {
     { k = 'arrows ^hjkl', d = 'move cursor', t = { 'Left', 'Right', 'Up', 'Down' } },
     { k = 'A-Z a-z 0-9', d = 'place operator / value' },
     { k = '!', d = 'bang *' },
-    { k = 'drag', d = 'drop an instrument (items panel) on a cell: $ track inst 1 (sliced) or : track inst 4C; a region (matrix name): ; slot; a browser file: into the track library, then as an instrument - add a bang (D4)' },
+    { k = 'drag', d = 'drop an instrument (lib panel) on a cell: $ track inst 1 (sliced) or : track inst 4C; a region (matrix name): ; slot; a browser file: into the track library, then as an instrument - add a bang (D4)' },
     { k = '. BS Del', d = 'erase' },
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },
@@ -323,7 +333,7 @@ KH.BARS = {
   sample = { { 'Enter', 'apply' }, { '2 4 8 1 3 6', 'slices' }, { 's', 'transients' }, { 'Q', 'quantize' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'JK HL', 'props' }, { '?', 'help' } },
   modulation = { { 'L', 'curves' }, { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
-  retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'depot' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
+  retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },
   orca = { { 'arrows', 'move' }, { 'A-Z', 'operator' }, { '!', 'bang' }, { '.', 'erase' }, { 'Space', 'play' }, { 'Esc', 'back' } },
@@ -333,7 +343,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

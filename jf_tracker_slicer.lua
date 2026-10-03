@@ -255,7 +255,7 @@ function S.key(c)
   elseif ch == '[' and a then S.sel.a = math.max(0, a - S.entry.len * 0.01); S.sel.b = b
   elseif ch == ']' and a then S.sel.a = a; S.sel.b = math.min(S.entry.len, b + S.entry.len * 0.01)
   elseif S.entry and S.entry.file and (ch == '8' or ch == '1' or ch == '3' or ch == '6' or ch == '4' or ch == '2' or ch == 'x' or ch == 't') then
-    S.msg = 'file: slices live on items - drag selection to a track or D: to depot, then slice'
+    S.msg = 'file: slices live on items - drag selection to a track or D: to lib, then slice'
   elseif ch == '8' then S.equal(8)
   elseif ch == '1' then S.equal(16)
   elseif ch == '3' then S.equal(32)
@@ -427,7 +427,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if e.muted then title = title .. '  (muted)' end
   U.text(x, y, ctx.fit(title, vx - x - L.pad), editing and U.AMBER or U.TEXT)
   local hint = editing
-    and (e.file and 'Enter: insert @cursor  D: to depot  a: all  Space: play  [ ]: edges'
+    and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  [ ]: edges'
          or '2/4/8 1(16) 3(32) 6(64) equal  t transients (+ - sens)  x clear  v view')
     or 'dblclick / :slice / \\is — edit slices;  q..p insert slices (INSERT)  drag: select → drop on track'
   -- громкость item и нормализация — справа в строке подсказки (1 окт)
@@ -620,7 +620,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   local foot = editing and (S.msg ~= '' and S.msg or ('%d slices; Sxx in fx column = slice'):format(#S.slices))
     or (#slices > 0 and ('%d slices stored'):format(#slices) or '')
-  if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: depot  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
+  if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end

@@ -570,9 +570,9 @@ function B.describe(idx)
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
   if e.rgn then return ('region %s [%.2f - %.2f] - Enter: subproject trimmed to region @cursor, drag: to track/row'):format(e.name, e.pos, e.fin) end
   if e.mark then return 'marker ' .. e.name end
-  if e.proj then return ('%s - used %d× (first on %s); Enter: to depot of cursor track, drag: to track, v: sample view'):format(e.path, e.n, e.track or '?') end
+  if e.proj then return ('%s - used %d× (first on %s); Enter: to the lib of the cursor track, drag: to track, v: sample view'):format(e.path, e.n, e.track or '?') end
   local len = e.len and (' %d:%05.2f'):format(math.floor(e.len / 60), e.len % 60) or ''
-  return ('%s%s - Enter: to depot (instrument), Space: preview, v: view in sample tab, drag: to track'):format(B.full(e), len)
+  return ('%s%s - Enter: to lib, Space: preview, v: view in sample tab, drag: to track'):format(B.full(e), len)
 end
 
 function B.preview()
