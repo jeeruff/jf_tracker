@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.73'
+V.VERSION = '0.5.74'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.74', d = '2026-10-03', items = {
+    'track scrollbar under the tracker body: the thumb is the visible tracks out of all; drag it, click beside it for a page; the trackpad sideways scrolls tracks too',
+    'Cmd + trackpad sideways: width zoom - as set per track / all compact (note + wave) / all strips; Cmd + wheel: LPB zoom (up - more rows per beat)',
+  } },
   { v = '0.5.73', d = '2026-10-03', items = {
     'experimental: main module position is its own option - top (top left above the matrix), mid (bottom of the left column above the DSP panel), bottom (left in the DSP band, the fx list moves right); same as the top panel position - inside the top panel, as before; the top panel tabs then start at the left edge',
     'options window: numbers are sliders like in DSP (click / drag), choices open a list under the cell (click a value; click the cell again or Esc closes); keys h l still step',

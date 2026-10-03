@@ -292,8 +292,12 @@ function D.layout(snap, state, nregions)
   L.body_y = L.header_y + L.header_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - (L.toppos ~= 'top' and L.top_h or 0))
-  L.stat_y = L.body_y + L.body_h                    -- статус в трекере (status_in)
+  -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
+  -- чтобы тело не прыгало, когда треки перестают помещаться
+  L.hsb_h = 8
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.hsb_h - (L.toppos ~= 'top' and L.top_h or 0))
+  L.hsb_y = L.body_y + L.body_h
+  L.stat_y = L.body_y + L.body_h + L.hsb_h          -- статус в трекере (status_in)
   L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
   local after = L.under_y + L.hint_h
   L.trk_bot = after                                 -- низ модуля трекера (тело, статус в нём, подсказки)
@@ -329,6 +333,7 @@ function D.layout(snap, state, nregions)
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
+  L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
   local hide_below = nil          -- глубина свёрнутой папки: дети не показываются
@@ -340,6 +345,9 @@ function D.layout(snap, state, nregions)
     local vis = (not hidden) and ci >= first and cx < L.win_w
     -- fold: true — компактный вид (волна + нота), 'mini' — полоска в символ (прежний fold)
     local fs = state.folds[col.guid]
+    -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
+    -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
+    if (state.wzoom or 0) >= 2 then fs = 'mini' elseif (state.wzoom or 0) == 1 and fs == nil then fs = true end
     local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini', compact = fs == true, hidden = hidden }
     local lx = (c.x or 0) + 1
     if c.folded then
@@ -380,7 +388,8 @@ function D.layout(snap, state, nregions)
       end
     end
     c.w = lx - (c.x or 0)
-    if vis then L.cols[#L.cols + 1] = c; cx = lx end
+    if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1 end end
+    if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
     -- скрытые дети свёрнутой папки: записи L.flat остаются (курсор не ломается), x = nil
     if hidden then for _, f in ipairs(L.flat) do if f.ci == ci then f.x = nil end end end
   end
@@ -2338,7 +2347,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии
-  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h - hy, 1) end
+  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.hsb_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   if MX and L.matrix_w > 0 and not state.mx_hidden then
@@ -2722,8 +2731,8 @@ function D.frame(L, snap, rows, state, info)
   -- разделители D.SEP: 1 px, тусклые (одна линия, без наложений)
   do
     local rects = {
-      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h - hy },
-      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h - hy } or nil,
+      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h + L.hsb_h - hy },
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h + L.hsb_h - hy } or nil,
       browser = L.side_w > 0 and { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,
@@ -2796,6 +2805,27 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.fxb = hv or true end
     set(U.AMBER); gfx.rect(0, py, pw, pb - py, 0)
   else D.fxb_popup = nil end
+  -- скролл-бар треков (3 окт): дорожка под телом от номеров строк до края,
+  -- ползунок = видимые треки из всех; клик мимо — страница, протяжка — скролл
+  do
+    local x0 = tx0 + L.label_w
+    local w = W - x0 - L.pad
+    local y = L.hsb_y + 1
+    local h = L.hsb_h - 2
+    hover.hsb = nil
+    if w > 20 and L.hs_n > 0 then
+      local n = L.hs_n
+      local tw = math.max(12, math.floor(w * math.min(1, math.max(1, L.hs_full) / n)))
+      local tx = x0 + math.floor((w - tw) * (n > L.hs_full and (L.hs_before / math.max(1, n - L.hs_full)) or 0))
+      tx = math.min(tx, x0 + w - tw)
+      local inbar = mx >= x0 and mx < x0 + w and my >= L.hsb_y and my < L.hsb_y + L.hsb_h
+      local onthumb = inbar and mx >= tx and mx < tx + tw
+      set(U.BG); gfx.rect(x0, y, w, h, 1)
+      set(U.DIM); gfx.rect(x0, y + math.floor(h / 2), w, 1, 1)
+      set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.LINE or U.DIM)); gfx.rect(tx, y, tw, h, 1)
+      if inbar then hover.hsb = { thumb = onthumb, x0 = x0, w = w, n = n, page = math.max(1, L.hs_full), dir = mx < tx and -1 or 1 } end
+    end
+  end
   -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
   -- место; мышь, метки f и прямоугольники — со сдвигом, как у верхней панели
   if L.ctrl_alone and L.ctrl_box then

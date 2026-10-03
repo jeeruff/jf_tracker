@@ -136,6 +136,7 @@ local state = {
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
+  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -355,7 +356,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -4913,6 +4914,8 @@ local function frame()
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
+  elseif hover.hsb then
+    state.status = 'tracks: drag the bar, click beside it - a page; trackpad sideways / Shift+wheel scroll, Cmd+sideways - width zoom, Cmd+wheel - LPB zoom'
   elseif hover.trsbtn then
     state.status = hover.trsbtn.col.name .. ' ' .. hover.trsbtn.what .. ' - narrow track: click opens the slider, click again closes'
   elseif hover.trs then
@@ -5248,6 +5251,14 @@ local function frame()
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
       click = { t = now2, zone = 'trkio' }
+    elseif hover.hsb then
+      -- скролл-бар треков (3 окт): ползунок тянется, клик мимо — страница
+      if hover.hsb.thumb then draw.hsb_drag = { x0 = gfx.mouse_x, b0 = L.hs_before, w = hover.hsb.w, n = hover.hsb.n }
+      else
+        local b = math.max(0, math.min(L.hs_n - 1, L.hs_before + hover.hsb.dir * hover.hsb.page))
+        state.hscroll = L.hs_list[b + 1] or state.hscroll
+      end
+      click = { t = now2, zone = 'hsb' }
     elseif hover.trsbtn then
       local t = hover.trsbtn
       local open = draw.trspop and draw.trspop.guid == t.col.guid and draw.trspop.what == t.what
@@ -5908,6 +5919,14 @@ local function frame()
   end
   -- DSP: перетаскивание блока за заголовок → перестановка FX в цепи трека
   -- протяжка слайдера шапки: значение каждый кадр без undo, точка undo на отпускании
+  if draw.hsb_drag then
+    local d = draw.hsb_drag
+    if gfx.mouse_cap & 1 == 1 then
+      local b = d.b0 + math.floor((gfx.mouse_x - d.x0) / math.max(1, d.w) * d.n + 0.5)
+      b = math.max(0, math.min(L.hs_n - 1, b))
+      state.hscroll = L.hs_list[b + 1] or state.hscroll
+    else draw.hsb_drag = nil end
+  end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then
       local frac = math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
@@ -6047,6 +6066,19 @@ local function frame()
     MMX.adjust(cur_col() and cur_col().mods or {}, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
     gfx.mouse_wheel = 0
   end
+  -- горизонтальное колесо / трекпад (3 окт): прокрутка треков; Cmd — зум ширины
+  -- (0 как у треков, 1 все компактно, 2 все полоской)
+  if (gfx.mouse_hwheel or 0) ~= 0 then
+    local d = gfx.mouse_hwheel > 0 and 1 or -1
+    if gfx.mouse_cap & 4 == 4 then
+      state.wzoom = math.max(0, math.min(2, (state.wzoom or 0) - d))
+      vim.msg = 'width zoom: ' .. ({ [0] = 'as set per track', [1] = 'all compact', [2] = 'all strips' })[state.wzoom]
+    elseif not hover.dsp and not hover.browser and not hover.fxb then
+      local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
+      state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll
+    end
+    gfx.mouse_hwheel = 0
+  end
   if gfx.mouse_wheel ~= 0 then
     local step = gfx.mouse_wheel > 0 and -3 or 3
     if hover.dsp and hover.dsp.param then
@@ -6055,6 +6087,9 @@ local function frame()
     -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
+    elseif gfx.mouse_cap & 4 == 4 and not hover.dsp then
+      -- Cmd + колесо — зум LPB (3 окт): вверх — мельче шаг (больше строк на долю)
+      ctrl_action('lpb', step > 0 and -1 or 1)
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
     else
