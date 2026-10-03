@@ -300,6 +300,33 @@ function D.layout(snap, state, nregions)
   if L.toppos == 'mid' then L.top_y = after; L.dsp_y = after + L.top_h
   elseif L.toppos == 'bottom' then L.dsp_y = after; L.top_y = after + L.dsp_h
   else L.top_y = 0; L.dsp_y = after end
+  -- главный модуль отдельно от верхней панели (3 окт, экспериментально):
+  -- state.ctrlpos top — левый верх (над матрицей), mid — низ левой колонки над
+  -- DSP, bottom — слева в полосе DSP (список эффектов сдвигается вправо).
+  -- Совпадает с положением верхней панели — внутри неё, как раньше.
+  L.ctrlpos = (state.ctrlpos == 'mid' or state.ctrlpos == 'bottom') and state.ctrlpos or 'top'
+  if L.ctrlpos == 'bottom' and L.dsp_h <= 0 then L.ctrlpos = 'mid' end
+  L.ctrl_alone = L.top_h > 0 and L.ctrlpos ~= L.toppos or false
+  L.mx_top, L.mx_bot, L.ctrl_box, L.ctrl_dsp, L.ctrl_area = nil, nil, nil, nil, nil
+  if L.ctrl_alone then
+    if L.ctrlpos == 'bottom' then
+      L.ctrl_dsp = true
+      L.ctrl_box = { 0, L.dsp_y, L.ctrl_w, L.dsp_h }
+    else
+      -- в левой колонке: колонка не уже модуля
+      if not state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
+      local cw = state.mx_hidden and L.ctrl_w or (L.matrix_w - D.SEPW)
+      if L.ctrlpos == 'top' then
+        L.ctrl_box = { 0, L.header_y, cw, L.top_h }
+        L.mx_top = L.header_y + L.top_h
+      else
+        L.ctrl_box = { 0, L.trk_bot - L.top_h, cw, L.top_h }
+        L.mx_bot = L.trk_bot - L.top_h
+      end
+      if state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
+    end
+    L.ctrl_w = L.ctrl_box[3]
+  end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   local cx = L.matrix_w + L.label_w
@@ -1042,17 +1069,11 @@ local function draw_mono(L, info, X0, Y0, MW, H, hover)
   end
 end
 
-local function draw_topbar(L, info)
-  local hover = {}
-  local H = L.top_h
-  set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
-  -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
-  -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
-  -- иначе стык без линии или две линии рядом
-  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, D.SEPW, 1)
+-- главный модуль (help / options / транспорт) в своих координатах: x от 0,
+-- y от 0, высота H, ширина L.ctrl_w; рисует верхняя панель или отдельно (3 окт)
+local function draw_ctrl(L, info, H, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local c = info.ctrl or {}
-
   -- контрол (2 окт): три группы — control (транспорт, размер и доли,
   -- метроном, ввод), options (вид), help; каждая группа — с новой строки,
   -- без линий и подписей (просьба пользователя). monome — во вкладке grid.
@@ -1173,9 +1194,22 @@ local function draw_topbar(L, info)
     if ci > 0 then y = y + L.rh end
   end
   set(D.SEP); gfx.rect(L.ctrl_w, 0, D.SEPW, H, 1)
+end
+
+local function draw_topbar(L, info)
+  local hover = {}
+  local H = L.top_h
+  set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
+  -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
+  -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
+  -- иначе стык без линии или две линии рядом
+  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, D.SEPW, 1)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+
+  if not L.ctrl_alone then draw_ctrl(L, info, H, hover) end
 
   -- центр: вкладки scope | sample | mod | retro | master
-  local sx0 = L.ctrl_w + L.pad
+  local sx0 = L.ctrl_alone and L.pad or (L.ctrl_w + L.pad)
   local sx1 = L.win_w - L.inst_w - L.pad
   local tab = info.toptab or 'scope'
   local tx = sx0
@@ -2377,10 +2411,11 @@ function D.frame(L, snap, rows, state, info)
   -- режим справки (?): то же место внизу занимает контекстная справка
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
+    local xo = L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0     -- главный модуль слева в полосе DSP (3 окт)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, D.SEPW, 1)
-    hover.khelp = info.khelp_draw(L, 0, dy, L.win_w, L.dsp_h) or true
-    L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
+    hover.khelp = info.khelp_draw(L, xo, dy, L.win_w - xo, L.dsp_h) or true
+    L.dsp_rect = { xo, dy, L.win_w - xo, L.dsp_h }
   elseif L.dsp_h > 0 then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
@@ -2389,6 +2424,7 @@ function D.frame(L, snap, rows, state, info)
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
+    local xo = L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0     -- главный модуль слева в полосе DSP (3 окт)
     if info.fxb_draw then
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
       local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
@@ -2397,11 +2433,12 @@ function D.frame(L, snap, rows, state, info)
       if info.fxb_expand then
         -- фокус на браузере: он раскрывается на всю левую колонку (за счёт
         -- матрицы и главного модуля) в конце кадра, после статуса; здесь — место
-        set(U.PANEL); gfx.rect(0, dy + 2, fbw, L.dsp_h - 2, 1)
+        set(U.PANEL); gfx.rect(xo, dy + 2, fbw, L.dsp_h - 2, 1)
         D.fxb_popup = { w0 = fbw }
-      else hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
-      L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
+      else hover.fxb = info.fxb_draw(L, xo, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
+      L.fxb_rect = { xo, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
+    fbw = fbw + xo
     -- граница список эффектов | DSP (3 окт: была чёрная щель)
     if fbw > 0 then set(D.SEP); gfx.rect(fbw - 2, dy, D.SEPW, L.dsp_h, 1) end
     -- шапка: имя трека (цвет как шапка канала), [track fx] [take fx], затем имя цепочки
@@ -2759,6 +2796,29 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.fxb = hv or true end
     set(U.AMBER); gfx.rect(0, py, pw, pb - py, 0)
   else D.fxb_popup = nil end
+  -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
+  -- место; мышь, метки f и прямоугольники — со сдвигом, как у верхней панели
+  if L.ctrl_alone and L.ctrl_box then
+    local bx, by, bw, bh = L.ctrl_box[1], L.ctrl_box[2], L.ctrl_box[3], L.ctrl_box[4]
+    if D.ctrl_buf_w ~= bw or D.ctrl_buf_h ~= bh then gfx.setimgdim(99, bw + D.SEPW, bh); D.ctrl_buf_w, D.ctrl_buf_h = bw, bh end
+    local dest0, my0, hint0 = gfx.dest, gfx.mouse_y, D.hint
+    gfx.dest = 99
+    gfx.mouse_y = my0 - by
+    if hint0 then D.hint = function(kind, x, y, w, h, data) return hint0(kind, x, y + by, w, h, data) end end
+    set(U.PANEL); gfx.rect(0, 0, bw + D.SEPW, bh, 1)
+    local hv = {}
+    local ok, err = pcall(draw_ctrl, L, info, bh, hv)
+    -- граница модуля сверху (к матрице / трекеру) — у mid / bottom
+    if by > 0 then set(D.SEP); gfx.rect(0, 0, bw + D.SEPW, D.SEPW, 1) end
+    gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
+    if not ok then error(err, 0) end
+    gfx.blit(99, 1, 0, 0, 0, bw + D.SEPW, bh, bx, by, bw + D.SEPW, bh)
+    if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + by end
+    if L.notes_rect then L.notes_rect[2] = L.notes_rect[2] + by end
+    for _, r in pairs(D.ctrl_rect or {}) do if not r.shifted then r[2] = r[2] + by; r.shifted = true end end
+    local inside = mx >= bx and mx < bx + bw and my >= by and my < by + bh
+    if inside then hover.ctrl, hover.notes = hv.ctrl, hv.notes end
+  end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   return hover

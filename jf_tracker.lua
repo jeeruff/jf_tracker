@@ -136,6 +136,7 @@ local state = {
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
+  ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
@@ -354,7 +355,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2124,9 +2125,9 @@ ctx = {
     if inr(L.inst_rect) then f = 'inst'
     elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
     elseif inr(L.notes_rect) then f = 'notes'
+    elseif inr(L.ctrl_area) then f = 'ctrl'
     elseif inr(L.fxb_rect) then f = 'fxb'
     elseif inr(L.dsp_rect) then f = 'dsp'
-    elseif inr(L.ctrl_area) then f = 'ctrl'
     elseif inr(L.top_rect) then f = 'top'
     elseif not state.mx_hidden and x < L.matrix_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'matrix'
     elseif x >= L.matrix_w and x < L.win_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'tracker' end
@@ -2148,7 +2149,8 @@ ctx = {
       { sep = true },
       flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
-      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
+      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs (rec / item / modulate ...): top - above the tracker, mid - above the DSP panel, bottom - below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
+      { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental - help / options / transport: top - top left above the matrix, mid - bottom of the left column above the DSP panel, bottom - left in the DSP band; same as the top panel position - inside the top panel, as before', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
@@ -5013,7 +5015,7 @@ local function frame()
       if gfx.mouse_cap & 1 == 1 then
         if resize_drag == 'mx' and MX.fold then state.mx_fold_px = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('folded matrix width %d px'):format(state.mx_fold_px)
         elseif resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
-        elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x)); state.status = ('fx list width %d px'):format(state.fxb_px)
+        elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x - (L.fxb_rect and L.fxb_rect[1] or 0))); state.status = ('fx list width %d px'):format(state.fxb_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
         else

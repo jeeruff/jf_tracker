@@ -146,8 +146,10 @@ function MX.draw(L, snap, regions, info)
   local W = L.matrix_w
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover = {}
-  local hy = L.header_y
-  U.set(U.PANEL); gfx.rect(0, hy, W, L.body_y + L.body_h - hy, 1)
+  -- верх / низ матрицы: главный модуль может стоять в левой колонке (3 окт)
+  local hy = L.mx_top or L.header_y
+  local ybot = L.mx_bot or (L.body_y + L.body_h)
+  U.set(U.PANEL); gfx.rect(0, hy, W, ybot - hy, 1)
   -- кнопки
   local bx = L.pad
   for _, b in ipairs(MX.fold and FOLD_BTNS or BTNS) do
@@ -191,7 +193,7 @@ function MX.draw(L, snap, regions, info)
     U.text(lx, y + 1, mk.name, c)
   end
   if marks.start then mark_row(marks.start, top); top = top + L.rh end
-  local bottom = L.body_y + L.body_h - (marks.stop and L.rh or 0)
+  local bottom = ybot - (marks.stop and L.rh or 0)
   local nvis = math.max(1, math.floor((bottom - top) / rh))
   MX.scroll = MX.scroll or 0
   if MX.cur.ri - 1 < MX.scroll then MX.scroll = MX.cur.ri - 1 end
@@ -353,7 +355,7 @@ function MX.draw(L, snap, regions, info)
   if marks.stop then
     local last = math.min(#regions, MX.scroll + nvis)
     local ye = top + (last - MX.scroll) * rh
-    if last == #regions and ye + L.rh <= L.body_y + L.body_h then mark_row(marks.stop, ye) end
+    if last == #regions and ye + L.rh <= ybot then mark_row(marks.stop, ye) end
   end
   return hover
 end
