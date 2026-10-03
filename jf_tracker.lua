@@ -937,7 +937,7 @@ ctx = {
   help_page = function()
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -1923,6 +1923,7 @@ ctx = {
     elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
     elseif inr(L.fxb_rect) then f = state.notes_open and 'notes' or 'fxb'
     elseif inr(L.dsp_rect) then f = 'dsp'
+    elseif inr(L.ctrl_area) then f = 'ctrl'
     elseif inr(L.top_rect) then f = 'top'
     elseif not state.mx_hidden and x < L.matrix_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'matrix'
     elseif x >= L.matrix_w and x < L.win_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'tracker' end
@@ -2018,6 +2019,25 @@ ctx = {
   orca_targets = function(f) return ORCA.targets(f) end,
   orca_doc = function(ch) return ORCA.DOC[ch] or ORCA.DOC[(ch or ''):upper()] end,
   orca_set = function(x, y, ch) if garden.f then ORCA.set(garden.f, x, y, ch); garden_save() end end,
+  -- курсор главного модуля: ближайшая ячейка в направлении (геометрия ячеек)
+  ctrl_move = function(sel, dx, dy)
+    local rects = draw.ctrl_rect or {}
+    local r0 = rects[sel]
+    if not r0 then return 'bpm' end
+    local cx, cy = r0[1] + r0[3] / 2, r0[2] + r0[4] / 2
+    local best, bd
+    for name, r in pairs(rects) do
+      if name ~= sel then
+        local x, y = r[1] + r[3] / 2, r[2] + r[4] / 2
+        local ok = (dx > 0 and x > cx + 1) or (dx < 0 and x < cx - 1) or (dy > 0 and y > cy + 1) or (dy < 0 and y < cy - 1)
+        if ok then
+          local d = dx ~= 0 and (math.abs(x - cx) + 4 * math.abs(y - cy)) or (math.abs(y - cy) + 4 * math.abs(x - cx))
+          if not bd or d < bd then best, bd = name, d end
+        end
+      end
+    end
+    return best or sel
+  end,
   -- ── действия REAPER (3 окт): весь список Main (kbd_enumerateActions —
   -- нативно, со скриптами и custom actions), fzf; недавние сверху (ExtState
   -- actrecent: именованные id скриптов переживают перезапуск). Отдельно от
@@ -2493,6 +2513,8 @@ ctx = {
     if f == 'notes' and not (state.dsp and state.notes_open and not state.khelp) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
+    if f == 'ctrl' and not state.top then f = 'tracker' end
+    if f == 'ctrl' and state.focus ~= 'ctrl' then state.ctrl_sel = 'bpm' end   -- фокус на главном модуле: курсор на BPM (3 окт)
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
     if f == 'dsp' and state.focus ~= 'dsp' then KH.from = state.focus end
     state.focus = f
@@ -2510,7 +2532,7 @@ ctx = {
     if state.dsp and state.notes_open and not state.khelp then order[#order + 1] = 'notes'
     elseif state.dsp and state.fxb and not state.khelp then order[#order + 1] = 'fxb' end
     if not state.mx_hidden then order[#order + 1] = 'matrix' end
-    if state.top then order[#order + 1] = 'top' end
+    if state.top then order[#order + 1] = 'ctrl'; order[#order + 1] = 'top' end
     local i = 1
     for k, v in ipairs(order) do if v == state.focus then i = k end end
     ctx.set_focus(order[(i - 1 + dir) % #order + 1])
@@ -4193,6 +4215,7 @@ local function frame()
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
     retro = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad))) or nil,
     dsp_sel = state.focus == 'dsp' and dsp_sel or nil,
+    ctrl_sel = state.ctrl_sel,
     dsp_learn = dsp_learn and dsp_learn.k or nil,
     dsp_range = (state.focus == 'dsp' and DK.anchor) and { DK.range(dsp_sel) } or nil,
     fx_values = function(f) local col = dsp_target(); if not col then return {} end
@@ -4901,6 +4924,7 @@ local function frame()
       else bpm_menu = bpm_menu and nil or { sel = 1 } end
       click = { t = now2, zone = 'bpm' }
     elseif hover.ctrl then
+      if hover.ctrl ~= 'beats' then state.ctrl_sel = hover.ctrl end     -- курсор клавиатуры — на нажатую ячейку
       ctrl_action(hover.ctrl, 0)
       click = { t = now2, zone = 'ctrl' }
     elseif hover.scope then
@@ -5716,6 +5740,24 @@ local function frame()
         local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))
         if r == 'leave' then ctx.set_focus('tracker')
         elseif not r then return vim.key(c) end
+      elseif state.focus == 'ctrl' and state.top then
+        -- главный модуль с клавиатуры (3 окт): hjkl / стрелки — ячейка, + − —
+        -- значение (как колесо), Enter / Space — как клик (BPM — ввод числа)
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local ch = c < 256 and string.char(c) or ''
+        local sel = state.ctrl_sel or 'bpm'
+        local dx, dy = 0, 0
+        if ch == 'h' or c == keys.left then dx = -1 elseif ch == 'l' or c == keys.right then dx = 1
+        elseif ch == 'k' or c == keys.up then dy = -1 elseif ch == 'j' or c == keys.down then dy = 1 end
+        if dx ~= 0 or dy ~= 0 then
+          state.ctrl_sel = ctx.ctrl_move(sel, dx, dy)
+        elseif c == 27 then ctx.set_focus('tracker')
+        elseif c == 13 or ch == ' ' then
+          if sel == 'bpm' then state.bpm_edit = '' else ctrl_action(sel, 0) end
+        elseif ch == '+' or ch == '=' then ctrl_action(sel, 1)
+        elseif ch == '-' then ctrl_action(sel, -1)
+        elseif sel == 'bpm' and ch:match('%d') then state.bpm_edit = ch
+        else return vim.key(c) end
       elseif state.focus == 'notes' and state.notes_open then
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then

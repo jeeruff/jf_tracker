@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.54'
+V.VERSION = '0.5.55'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.55', d = '2026-10-03', items = {
+    'main module (control block) takes the keyboard focus: Tab or a click puts a frame around it, the cursor lands on BPM; h j k l / arrows move between cells, + - change the value, Enter / Space press it (BPM: type the tempo), Esc back',
+  } },
   { v = '0.5.54', d = '2026-10-03', items = {
     'pattern repeats are linked natively: a repeated region (dup / D / ^D, p of a yanked slot whose pattern exists, autosync, slot -> pattern, append) puts its MIDI items into a shared pool and each item with its copies into one item group - editing in the arrange view (notes, move, trim, mute) changes all repeats, not only edits made in the tracker',
     'clone (button cln next to the region name, C in the matrix): an exact copy with a new name, not linked - own MIDI pool, no group',

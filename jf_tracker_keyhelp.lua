@@ -279,6 +279,13 @@ KH.PAGES = {
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },
   } },
+  ctrl = { title = 'main module (control)', e = {
+    { k = 'h j k l', d = 'move between cells (arrows too); focus lands on BPM' },
+    { k = '+ -', d = 'value up / down (like the wheel): BPM, LPB, oct, step, vel, x-fade, font...' },
+    { k = 'Enter Space', d = 'press the cell (like a click); on BPM - type the number, Enter applies' },
+    { k = '0-9', d = 'on BPM: start typing the tempo' },
+    { k = 'Esc', d = 'back to tracker' },
+  } },
   master = { title = 'master', e = {
     { k = 'm', d = 'scope mode' },
     { k = 'Esc', d = 'back to tracker' },
@@ -319,9 +326,10 @@ KH.BARS = {
   grid = { { 'take', 'grid to tracker' }, { 'grid', 'back to mixer' }, { 'Esc', 'back' } },
   midi = { { 'j k', 'target' }, { 'Enter', 'learn' }, { 'd', 'clear' }, { 'm', 'abs/rel' }, { 'Esc', 'back' } },
   master = { { 'm', 'scope mode' }, { 'Esc', 'back' } },
+  ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'Esc', 'back' } },
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

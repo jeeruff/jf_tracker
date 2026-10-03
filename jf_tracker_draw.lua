@@ -937,13 +937,17 @@ local function draw_topbar(L, info)
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
+  L.ctrl_area = { 0, 0, L.ctrl_w, H - 2 }                 -- главный модуль: фокус ctrl (3 окт)
   D.ctrl_rect = D.ctrl_rect or {}
   local y = 2
   local function cell(it, ci)
     local x = L.pad + ci * colw
     if y + L.rh > H - 2 then return end
     local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
-    if hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1); hover.ctrl = it[1] end
+    local kbd = info.focus == 'ctrl' and info.ctrl_sel == it[1]       -- курсор клавиатуры (3 окт)
+    if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(x, y, colw - 2, L.rh, 1)
+    elseif hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1) end
+    if hot then hover.ctrl = it[1] end
     D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
     text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
     hint('ctrl', x, y, colw, L.rh, it[1])
@@ -1457,6 +1461,7 @@ function D.frame(L, snap, rows, state, info)
       gfx.blit(1020, 1, 0, 0, 0, gfx.w, L.top_h, 0, ty, gfx.w, L.top_h)
       -- прямоугольники для фокуса и меню — в координаты окна
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
+      if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + ty end
       if L.inst_w > 0 and L.inst_rect then L.inst_rect[2] = L.inst_rect[2] + ty end
       for _, r in pairs(D.ctrl_rect or {}) do r[2] = r[2] + ty; r.shifted = true end
     end
@@ -2367,6 +2372,7 @@ function D.frame(L, snap, rows, state, info)
     elseif f == 'matrix' and L.matrix_w > 0 then r = { 0, hy, L.matrix_w, L.body_y + L.body_h - hy }
     elseif f == 'browser' and L.side_w > 0 then r = { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }
     elseif f == 'top' and L.top_rect then r = L.top_rect
+    elseif f == 'ctrl' and L.ctrl_area then r = L.ctrl_area
     elseif f == 'inst' and L.inst_rect then r = L.inst_rect
     elseif f == 'dsp' and L.dsp_rect then r = L.dsp_rect
     elseif (f == 'fxb' or f == 'notes') and L.fxb_rect then r = L.fxb_rect end
