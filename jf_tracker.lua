@@ -110,6 +110,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   mxruler = flag('mxruler', true),
+  mxfold = flag('mxfold', false),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -310,7 +311,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -1375,6 +1376,7 @@ ctx = {
   end,
   preview_slice = function(track, entry, t0, t1) PV.slice(track, entry, t0, t1) end,
   mx_zoom = function() MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail' end,
+  mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
   env_set = function(e, row, v)
@@ -2686,6 +2688,7 @@ DK.init(ctx)
 IK.init(ctx)
 MM.hint = function(...) return draw.hint(...) end
 MX.ruler = state.mxruler
+MX.fold = state.mxfold
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 MMX.init(U, ctx)
@@ -2713,7 +2716,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() end
+    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -4335,6 +4338,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
+  elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'select: play the sample when an instrument is selected - ' .. (state.poolprev and 'on' or 'off') .. ' (:poolprev)'
   elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the instruments have focus'
@@ -4708,6 +4712,7 @@ local function frame()
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       if hover.matrix.btn == 'zoom' then ctx.mx_zoom()
+      elseif hover.matrix.btn == 'fold' then ctx.mx_fold_toggle()
       elseif hover.matrix.btn == 'fill' then MX.fill = not MX.fill
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()

@@ -41,9 +41,11 @@ function MX.init(u, c) U, ctx = u, c end
 local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
-local BTNS = { { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
+local BTNS = { { 'fold', 'fold' }, { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
+local FOLD_BTNS = { { 'fold', 'fold' } }        -- свёрнутая: одна кнопка — развернуть
 MX.loops = false         -- слой лупов (бывший Garden, 2 окт): период лупа в ячейках, клавиши лупов
 MX.ruler = true          -- вертикальная линейка тактов слева (кнопка ruler, R)
+MX.fold = false          -- свёрнутая матрица (3 окт): номера, имена треков, ячейки — без имён / длин / линейки (кнопка fold, F)
 MX.ENV_PTS = 12          -- отсчётов огибающей на ячейку в детальном зуме
 
 function MX.grid(snap, regions)
@@ -108,15 +110,15 @@ function MX.width(L, nregions, ncols)
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
   L.mx_arrow_w = U.measure('<')
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
-  L.mx_ruler_w = MX.ruler and (U.measure('999.9') + 2 * L.pad + 4) or 0
+  L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
-  L.mx_dur_w = U.measure('9999') + L.pad                  -- колонка длины региона в шагах
-  L.mx_label_w = L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_dur_w
+  L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
+  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_dur_w)
   L.mx_cell_w = (MX.zoom == 'detail' and L.cw * 3 or L.cw * 2) + 2 * L.pad
   L.mx_row_h = MX.zoom == 'detail' and L.rh * MX.DETAIL_ROWS or L.rh
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
   local bw = L.pad
-  for _, b in ipairs(BTNS) do
+  for _, b in ipairs(MX.fold and FOLD_BTNS or BTNS) do
     local label = b[2]
     if b[1] == 'zoom' then label = 'zoom' elseif b[1] == 'fill' then label = 'grid' end
     if ctx and ctx.ic then label = ctx.ic(b[1], label) end
@@ -126,7 +128,9 @@ function MX.width(L, nregions, ncols)
   -- шапка матрицы: вертикальные имена треков (до 10 букв) + полоса кнопок
   MX.name_h = L.cw * 12 + 4
   L.mx_head_h = L.rh + 2 + MX.name_h + 4
-  return math.max(L.mx_label_w + ncols * L.mx_cell_w + L.pad, MX.btns_w + L.pad)
+  -- справа — колонка кнопок < > = у линии раздела: ячейки под неё не уходят
+  local knob_w = U.measure('>') + 2 * L.pad + 6
+  return math.max(L.mx_label_w + ncols * L.mx_cell_w + L.pad + knob_w, MX.btns_w + L.pad)
 end
 
 -- ── отрисовка ─────────────────────────────────────────────────────────────
@@ -146,7 +150,7 @@ function MX.draw(L, snap, regions, info)
   U.set(U.PANEL); gfx.rect(0, hy, W, L.body_y + L.body_h - hy, 1)
   -- кнопки
   local bx = L.pad
-  for _, b in ipairs(BTNS) do
+  for _, b in ipairs(MX.fold and FOLD_BTNS or BTNS) do
     local label = b[2]
     if b[1] == 'zoom' then label = 'zoom' end
     if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end
@@ -155,7 +159,7 @@ function MX.draw(L, snap, regions, info)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.fold)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -251,7 +255,9 @@ function MX.draw(L, snap, regions, info)
     -- имя и длина — интерактивные (1 окт): dblclick имени → :name, клик по
     -- длине → :len; hover.name / hover.dur = ri
     local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - 2 - L.pad   -- mx_idx_w уже с линейкой
-    local hot_name = hover.ri == ri and mx >= nx and mx < nx + nw
+    if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
+    local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
+    if nw > 0 then
     U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
@@ -264,6 +270,7 @@ function MX.draw(L, snap, regions, info)
       U.text(L.mx_label_w - L.pad - U.measure(ds), y + 1, ds, hot_dur and U.AMBER or U.GREY)
       if hot_dur then hover.dur = ri end
       if ctx.hint then ctx.hint('mxdur', dx, y, L.mx_dur_w, L.rh, ri) end
+    end
     end
     for ci = 1, #snap.cols do
       local x = L.mx_label_w + (ci - 1) * L.mx_cell_w
@@ -457,6 +464,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'm' or c == 13 then MX.toggle_mute(regions, snap)
   elseif ch == 'z' then MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail'
   elseif ch == 'f' then MX.fill = not MX.fill
+  elseif ch == 'F' then if ctx.mx_fold_toggle then ctx.mx_fold_toggle() else MX.fold = not MX.fold end
   elseif ch == 'R' then ctx.mx_ruler_toggle()
   elseif ch == 't' then if ctx.mx_trim then ctx.mx_trim() end
   elseif ch == '+' then ctx.mx_add(nil, nil, count)

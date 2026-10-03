@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.49'
+V.VERSION = '0.5.50'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.50', d = '2026-10-03', items = {
+    'matrix fold (button fold, F): only slot numbers, track names and cells - no region names, lengths or ruler, the matrix gets narrow; the state is remembered',
+  } },
   { v = '0.5.49', d = '2026-10-03', items = {
     'status bar in the tracker module starts under the tracks (from the matrix edge), not under the matrix',
   } },
