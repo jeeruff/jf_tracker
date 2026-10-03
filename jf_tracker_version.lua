@@ -12,6 +12,7 @@ V.CHANGES = {
     'track headers take the REAPER TCP colour (col_tr1_bg, selected: col_seltrack) with the track colour mixed like REAPER does; header text contrast follows',
     'items header: sort was drawn over find (only its d showed) - sort, find and bsync now each have their place',
     'a stretched (=, Txx, Option+edge) or offset (9xx, start trim) note becomes unique at once; a question offers u: keep it unique (Enter) or a: apply the same offset / rate to all linked notes',
+    'module borders 2 px (lines inside modules stay 1 px); missing verticals drawn: fx list | DSP, and between the hint rows of neighbour modules (they showed black gaps); the cursor line runs through the region / marker lanes up to the row numbers',
     'the items module is now lib (and depot is lib everywhere: retro button, slicer and browser hints); help ? opens with a short page on what the tracker is, why it stays native to REAPER and what lib is; F1 help: philosophy updated (lib, linked notes, bitmap only)',
     'browser: sync button - while the project plays, a file starts on the next bar (native measure align)',
     'ruler markers without their own colour take the REAPER theme marker colour, as on the timeline (=START was amber)',

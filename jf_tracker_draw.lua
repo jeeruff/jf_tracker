@@ -51,7 +51,8 @@ function D.init(u, peaks_fn, matrix)
   D.CONT  = U.GREY
   D.ENVBAR = U.tint(U.CYAN, 0.45)
   D.FX    = U.mix(U.TEXT, U.AMBER, 0.5)
-  D.SEP   = U.mix(U.BG, U.TEXT, 0.38)           -- границы модулей: 1 px, тусклые (3 окт; фокус — ярче)
+  D.SEP   = U.mix(U.BG, U.TEXT, 0.38)           -- границы модулей: тусклые (3 окт; фокус — ярче)
+  D.SEPW  = 2                                   -- толщина границ модулей (3 окт: жирнее), линии внутри модулей — 1 px
   D.FOCUS = U.mix(U.TEXT, { 1, 1, 1 }, 0.55)    -- светлый ободок модуля с фокусом (просьба 1 окт: без розового)
   D.FOCUS_INS = { 1.0, 0.15, 0.1 }              -- та же рамка в INSERT (красная, толще)
   D.ENVLINE = U.readable(U.CYAN, U.BG, 4.5)
@@ -392,6 +393,9 @@ function D.hint_bar(L, x, y, w, items, active)
   if not L.hint_h or L.hint_h <= 0 or not items or w <= 0 then return end
   set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
   set(U.LINE); gfx.rect(x, y, w, 1, 1)
+  -- строка подсказок — часть модуля: его левая граница продолжается и здесь
+  -- (3 окт: между подсказками соседних модулей была чёрная щель)
+  if x > 0 then set(D.SEP); gfx.rect(x - 2, y, D.SEPW, L.hint_h, 1) end
   local sp = math.max(L.pad, ms(' '))        -- в битмапе ширина пробела 0
   local cx = x + L.pad
   for _, it in ipairs(items) do
@@ -909,7 +913,7 @@ local function draw_topbar(L, info)
   -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
   -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
   -- иначе стык без линии или две линии рядом
-  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, 1, 1)
+  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, D.SEPW, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local c = info.ctrl or {}
 
@@ -1003,7 +1007,7 @@ local function draw_topbar(L, info)
     end
     if ci > 0 then y = y + L.rh end
   end
-  set(D.SEP); gfx.rect(L.ctrl_w, 0, 1, H - 2, 1)
+  set(D.SEP); gfx.rect(L.ctrl_w, 0, D.SEPW, H, 1)
 
   -- центр: вкладки scope | sample | mod | retro | master
   local sx0 = L.ctrl_w + L.pad
@@ -1296,7 +1300,7 @@ D.pool_dbg = ''
 function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(ix, iy, w, H, 1)
-  set(D.SEP); gfx.rect(ix - 2, iy, 1, H - 2, 1)
+  set(D.SEP); gfx.rect(ix - 2, iy, D.SEPW, H, 1)
   L.inst_rect = { ix, iy, w, H - 2 }
   local col = info.pool_col
   local pool = col and col.pool or {}
@@ -1733,6 +1737,7 @@ function D.frame(L, snap, rows, state, info)
   for _, c in ipairs(L.cols) do
     if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
   end
+  local curl = {}                                -- линии курсора: дорисовать поверх полос регионов
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
@@ -1748,8 +1753,8 @@ function D.frame(L, snap, rows, state, info)
     local cl = state.curline or 'top'
     if cl ~= 'off' then
       local ly = cl == 'bottom' and (y + L.rh - 1) or y
-      if is_cur_row then set(D.CURTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1) end
-      if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1) end
+      if is_cur_row then set(D.CURTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.CURTOP } end
+      if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.EDITTOP } end
     end
     if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + L.label_w - 4, y, 3, L.rh, 1) end
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
@@ -2018,6 +2023,8 @@ function D.frame(L, snap, rows, state, info)
     end
     if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
+  -- линия курсора идёт и через полосы регионов / маркеров (3 окт: обрывалась у номеров)
+  for _, c in ipairs(curl) do set(c[2]); gfx.rect(tx0 + 1, c[1], L.ruler_w, 1, 1) end
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
   if L.ruler_w > 0 and info.ruler and #rows > 0 then
@@ -2050,7 +2057,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   set(D.SEP); gfx.rect(tx0 + L.label_w - 1, L.body_y, 1, L.body_h, 1)
-  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 1, hy, 1, L.body_y + L.body_h - hy, 1) end
+  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   if MX and L.matrix_w > 0 and not state.mx_hidden then
@@ -2065,7 +2072,7 @@ function D.frame(L, snap, rows, state, info)
     local lx = L.matrix_w - 1
     if state.mx_hidden then
       set(U.PANEL); gfx.rect(0, hy, L.matrix_w - 1, bot - hy, 1)
-      set(D.SEP); gfx.rect(lx - 1, hy, 1, bot - hy, 1)
+      set(D.SEP); gfx.rect(lx - 1, hy, D.SEPW, bot - hy, 1)
     end
     local function knob(y, lbl, what)
       local bx = math.max(1, lx - bw - 1)          -- целиком слева от линии: не налезает на номера строк
@@ -2100,7 +2107,7 @@ function D.frame(L, snap, rows, state, info)
       D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)('browser'), info.focus == 'browser')
     end
     -- линия раздела инструменты | браузер — той же толщины, что между модулями
-    set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, 1, 1)
+    set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, D.SEPW, 1)
     do
       local gx = W + L.side_w - gw - L.pad
       local gy = hh > 0 and (sy0 + ih - hh + math.max(0, math.floor((hh - L.rh) / 2))) or (sy0 + ih - L.rh - 3)
@@ -2124,13 +2131,13 @@ function D.frame(L, snap, rows, state, info)
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(0, dy, L.win_w, 1, 1)
+    set(D.SEP); gfx.rect(0, dy, L.win_w, D.SEPW, 1)
     hover.khelp = info.khelp_draw(L, 0, dy, L.win_w, L.dsp_h) or true
     L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
   elseif L.dsp_h > 0 then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(0, dy, L.win_w, 1, 1)
+    set(D.SEP); gfx.rect(0, dy, L.win_w, D.SEPW, 1)
     local col = info.pool_col
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
@@ -2149,6 +2156,8 @@ function D.frame(L, snap, rows, state, info)
       else hover.fxb = info.fxb_draw(L, 0, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
       L.fxb_rect = { 0, dy + 2, fbw, L.dsp_h - 2 }
     else L.fxb_rect = nil end
+    -- граница список эффектов | DSP (3 окт: была чёрная щель)
+    if fbw > 0 then set(D.SEP); gfx.rect(fbw - 2, dy, D.SEPW, L.dsp_h, 1) end
     -- шапка: [track] [take] — чья цепочка показана (t переключает), затем имя
     do
       local hx = fbw + L.pad
@@ -2392,7 +2401,7 @@ function D.frame(L, snap, rows, state, info)
     local lx = L.win_w                               -- левый край правой панели / полосы
     if not state.side then
       set(U.PANEL); gfx.rect(lx, L.header_y, L.rstrip_w, bot - L.header_y, 1)
-      set(D.SEP); gfx.rect(lx, L.header_y, 1, bot - L.header_y, 1)
+      set(D.SEP); gfx.rect(lx, L.header_y, D.SEPW, bot - L.header_y, 1)
     end
     local function knob(y, lbl, what)
       local bx = state.side and (lx - bw - 2) or (lx + 3)
@@ -2452,7 +2461,7 @@ function D.frame(L, snap, rows, state, info)
   end
   if sh > 0 then
     set(U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
-    set(D.SEP); gfx.rect(sx, sy, sw, 1, 1)
+    set(D.SEP); gfx.rect(sx, sy, sw, D.SEPW, 1)
     -- слева режим/сообщение (не шире трети), дальше — описание того, на что
     -- наведена мышь, во всю оставшуюся ширину
     local left = fit(info.status_left or '', sw / 3)
@@ -2464,7 +2473,7 @@ function D.frame(L, snap, rows, state, info)
       text(hx, sy + 2, fit(desc, sx + sw - hx - L.pad), U.TEXT)
     end
   end
-  if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, 1, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
+  if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
   -- браузер эффектов в фокусе (3 окт): во всю левую колонку — от верха матрицы
   -- до низа окна (матрица и главный модуль под ним), рисуется последним, мышь
   -- над ним не достаёт до того, что под ним
