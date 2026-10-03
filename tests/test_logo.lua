@@ -6,9 +6,9 @@ local function eq(name, got, want)
   n = n + 1
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
-eq('eight logos', #LG.LOGOS, 8)
+eq('ten logos', #LG.LOGOS, 10)
 local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1, ['■'] = 1 }
-local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 } }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 }, ansi_small = { 50, 3 }, ansi_stone = { 99, 7 }, ansi_pipes = { 110, 6 } }
 for _, lg in ipairs(LG.LOGOS) do
   local w, h = LG.size(lg)
   eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
@@ -32,7 +32,7 @@ for i = 1, 40 do
   seen[k] = true; prev = k
 end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
-eq('pick never repeats', same, false); eq('pick covers all', cnt, 8)
+eq('pick never repeats', same, false); eq('pick covers all', cnt, 10)
 -- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
 local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
 eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)
