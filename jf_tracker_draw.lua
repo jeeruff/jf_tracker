@@ -2251,7 +2251,8 @@ function D.frame(L, snap, rows, state, info)
         for _, ln in ipairs(c.lanes) do
           for _, it in ipairs(ln.lane.items or {}) do
             local x0, w0 = ln.x, ln.w
-            if it.si then local f = L.flat[ln.f0 + it.si - 1]; x0, w0 = f and f.x, f and f.w end
+            local G = L
+            if it.si then local f = L.flat[ln.f0 + it.si - 1]; x0, w0 = f and f.x, f and f.w; G = (f and f.G) or L end
             local y0, y1 = yr(it.r0), yr(it.r1)
             if x0 and y1 > by0 and y0 < by1 then
               -- мышь: край рамки (±3 px) — trim начала/конца, внутри — сдвиг
@@ -2270,11 +2271,18 @@ function D.frame(L, snap, rows, state, info)
               set(rgb); gfx.a = it.sel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
               gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
               gfx.a = 1
-              set(col)
-              gfx.rect(x0, cy0, w0, cy1 - cy0, 0)                           -- кайма 2 px
-              gfx.rect(x0 + 1, cy0 + 1, math.max(0, w0 - 2), math.max(0, cy1 - cy0 - 2), 0)
-              if y0 < by0 then set(U.BG); gfx.rect(x0, by0, w0, 2, 1) end   -- срез сверху: без верхней кромки
-              if y1 > by1 then set(U.BG); gfx.rect(x0, by1 - 2, w0, 2, 1) end
+              -- рамка (опция item frame, 3 окт): item — вокруг всего item, wave —
+              -- только вокруг колонки волны (нет колонки — вокруг item), off — без
+              local fr = state.itemframe or 'item'
+              local fx0, fw0 = x0, w0
+              if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
+              if fr ~= 'off' then
+                set(col)
+                gfx.rect(fx0, cy0, fw0, cy1 - cy0, 0)                         -- кайма 2 px
+                gfx.rect(fx0 + 1, cy0 + 1, math.max(0, fw0 - 2), math.max(0, cy1 - cy0 - 2), 0)
+                if y0 < by0 then set(U.BG); gfx.rect(fx0, by0, fw0, 2, 1) end   -- срез сверху: без верхней кромки
+                if y1 > by1 then set(U.BG); gfx.rect(fx0, by1 - 2, fw0, 2, 1) end
+              end
               -- стыки лупа item (2 окт): косые срезы поперёк, как у automation items
               if it.loop_rows and it.loop_rows > 1e-6 then
                 set(col)

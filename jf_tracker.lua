@@ -137,7 +137,9 @@ local state = {
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,
-  hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
+  hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',
+  curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,     -- упреждение курсора при игре, мс (3 окт)
+  itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- строка входа в шапке трека (3 окт)
   scopeat = reaper.GetExtState(EXT, 'scopeat') == 'header' and 'header' or 'cursor',   -- скопы: полоска курсора / строка шапки (3 окт)      -- зум ширины треков (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
@@ -359,7 +361,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrin', state.hdrin and '1' or '0'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2237,6 +2239,8 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'while playing the cursor is drawn this far ahead: a frame reaches the screen later than the position is read (REAPER runs scripts ~30 times a second); raise it if the cursor trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
+      { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'item: border around the whole item; wave: only around the wave column (needs wave: column); off: fill only', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'track header: the input row (list by click) and the smart input button', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
       { key = 'scopeat', label = 'scopes at', kind = 'cycle', values = { 'cursor', 'header' }, desc = 'cursor: each track oscilloscope right on the cursor row strip, under the notes; header: an own row in the track header', get = function() return state.scopeat or 'cursor' end, set = function(v) state.scopeat = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'column: an own column with spectral peaks (colour = frequency) and stretch markers; note: the wave inside the note field on the item rows; off: no wave (faster)', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
@@ -4450,7 +4454,11 @@ local function frame()
   if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
   env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
   local is_playing = playing()
+  -- упреждение курсора (3 окт, опция cursor lead): позиция читается в начале
+  -- тика defer, а на экран кадр попадает позже (~полкадра при 30 Гц) — курсор
+  -- рисуется туда, где звук будет в момент показа
   local playpos = is_playing and reaper.GetPlayPosition() or nil
+  local playpos_view = playpos and (playpos + (state.curlead or 15) / 1000 * (reaper.Master_GetPlayRate(0) or 1))   -- только для вида
   -- стоп на =END (3 окт): песня кончается маркером, а не концом проекта
   -- (библиотека за =LIB отодвигает конец проекта). Только если играть начали
   -- до =END — прослушивание библиотеки за ним не мешаем; запись не трогаем
@@ -4529,7 +4537,7 @@ local function frame()
   if state.fixed and L and L.nrows then
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
   end
-  local ph_row = playpos and model.row_of_time(playpos, state.lpb) or nil
+  local ph_row = playpos_view and model.row_of_time(playpos_view, state.lpb) or nil   -- вид: с упреждением
   if is_playing and state.follow and ph_row then
     local r = math.floor(ph_row)
     if r < state.row0 or r > state.row0 + math.floor(L.nrows * 2 / 3) then

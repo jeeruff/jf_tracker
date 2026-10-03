@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.80'
+V.VERSION = '0.5.81'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.81', d = '2026-10-03', items = {
+    'cursor lead: while playing the playhead row is drawn 15 ms ahead (options -> cursor lead, 0..60 ms) - the frame reaches the screen later than the position is read, the cursor trailed the sound; logic (Orca, jumps, queue, =END) still uses the real position',
+    'item frame option: item (border around the whole item) / wave (only around the wave column) / off',
+  } },
   { v = '0.5.80', d = '2026-10-03', items = {
     'step next: after an entry the cursor jumps to the next object of the track - note, item, command, envelope point (any subcolumn; in an envelope column the next point); click the step cell to go number -> auto -> next, or :step next',
   } },
