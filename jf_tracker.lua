@@ -137,6 +137,7 @@ local state = {
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,
+  hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   scopeat = reaper.GetExtState(EXT, 'scopeat') == 'header' and 'header' or 'cursor',   -- скопы: полоска курсора / строка шапки (3 окт)      -- зум ширины треков (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
@@ -357,7 +358,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrin', state.hdrin and '1' or '0'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1938,7 +1939,11 @@ ctx = {
       reaper.Main_OnCommand(40914, 0)              -- Track: set first selected track as last touched
       reaper.Main_OnCommand(40293, 0)              -- Track: view routing and I/O
     elseif what == 'input' then
-      -- меню входа: нет, моно, стерео пары, MIDI все входы / все каналы
+      ctx.input_picker(col, { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 })
+    elseif what == 'sends' then
+      draw.sendpop = draw.sendpop ~= col.guid and col.guid or nil
+    elseif what == 'input_menu' then
+      -- (старое) меню входа: нет, моно, стерео пары, MIDI все входы / все каналы
       local items, vals = { 'none' }, { -1 }
       local n = reaper.GetNumAudioInputs()
       local mono, ster = {}, {}
@@ -1956,6 +1961,72 @@ ctx = {
         model.invalidate()
       end
     end
+  end,
+  -- имя входа записи трека (шапка, блок трека DSP)
+  input_name = function(tr)
+    local v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
+    if v < 0 then return 'none' end
+    if v & 4096 ~= 0 then
+      local dev, ch = (v >> 5) & 63, v & 31
+      local dn = dev == 63 and 'all' or ((select(2, reaper.GetMIDIInputName(dev, ''))) or ('dev ' .. dev))
+      return 'MIDI ' .. dn .. (ch == 0 and '' or (' ch ' .. ch))
+    end
+    local ch = v & 1023
+    local nm = reaper.GetInputChannelName(ch) or ('in ' .. (ch + 1))
+    if v & 1024 ~= 0 then nm = nm .. ' / ' .. (reaper.GetInputChannelName(ch + 1) or ('in ' .. (ch + 2))) end
+    return nm
+  end,
+  -- список входов (3 окт): fzf под строкой входа; текущий отмечен ●; повторный
+  -- клик по той же строке закрывает (picker.inp = guid трека)
+  input_picker = function(col, anchor)
+    if not col then return end
+    if vim.picker and vim.picker.inp == col.guid then vim.picker = nil; return end
+    local tr = col.track
+    local cur = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
+    local items = {}
+    local function add(label, v) items[#items + 1] = { label = (v == cur and '● ' or '  ') .. label, data = v } end
+    add('none', -1)
+    local n = reaper.GetNumAudioInputs()
+    for i = 0, n - 1 do add('mono  ' .. (reaper.GetInputChannelName(i) or ('in ' .. (i + 1))), i) end
+    for i = 0, n - 2 do add(('stereo  %s / %s'):format(reaper.GetInputChannelName(i) or (i + 1), reaper.GetInputChannelName(i + 1) or (i + 2)), 1024 + i) end
+    add('MIDI  all inputs, all channels', 4096 + (63 << 5))
+    for d = 0, reaper.GetNumMIDIInputs() - 1 do
+      local ok, nm = reaper.GetMIDIInputName(d, '')
+      if ok then add('MIDI  ' .. nm .. ', all channels', 4096 + (d << 5)) end
+    end
+    vim.open_picker('input ' .. col.name, items, function(it)
+      edit.run('track input', function() reaper.SetMediaTrackInfo_Value(tr, 'I_RECINPUT', it.data) end)
+      model.invalidate()
+      vim.msg = col.name .. ' input: ' .. it.label:sub(4)
+    end)
+    vim.picker.inp = col.guid
+    state.popup_at = anchor or { kind = 'in', guid = col.guid }
+  end,
+  -- + send (3 окт): fzf по трекам проекта → отправка с этого трека
+  send_add = function(col)
+    local items = {}
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i)
+      if t ~= col.track then local _, nm = reaper.GetTrackName(t); items[#items + 1] = { label = ('%02d  %s'):format(i + 1, nm), data = t } end
+    end
+    if reaper.GetMasterTrack then items[#items + 1] = nil end
+    vim.open_picker('send ' .. col.name .. ' to', items, function(it)
+      edit.run('add send', function() reaper.CreateTrackSend(col.track, it.data) end)
+      model.invalidate()
+      vim.msg = col.name .. ' → ' .. it.label:gsub('^%d+%s+', '')
+    end)
+  end,
+  send_action = function(sp)
+    local tr = sp.col.track
+    if sp.what == 'add' then ctx.send_add(sp.col)
+    elseif sp.what == 'routing' then ctx.track_io(sp.col, 'routing')
+    elseif sp.what == 'mute' then
+      local v = reaper.GetTrackSendInfo_Value(tr, 0, sp.idx, 'B_MUTE')
+      edit.run('send mute', function() reaper.SetTrackSendInfo_Value(tr, 0, sp.idx, 'B_MUTE', v == 1 and 0 or 1) end)
+    elseif sp.what == 'del' then
+      edit.run('remove send', function() reaper.RemoveTrackSend(tr, 0, sp.idx) end)
+    end
+    model.invalidate()
   end,
   -- items инструмента записи e (все связанные копии; без них — сам item)
   inst_group = function(e)
@@ -2157,6 +2228,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'track header: the input row (list by click) and the smart input button', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
       { key = 'scopeat', label = 'scopes at', kind = 'cycle', values = { 'cursor', 'header' }, desc = 'cursor: each track oscilloscope right on the cursor row strip, under the notes; header: an own row in the track header', get = function() return state.scopeat or 'cursor' end, set = function(v) state.scopeat = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'column: an own column with spectral peaks (colour = frequency) and stretch markers; note: the wave inside the note field on the item rows; off: no wave (faster)', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
@@ -2413,8 +2485,8 @@ ctx = {
     local col = cur_col(); if not col then return end
     edit.run('rec arm', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_RECARM', col.armed and 0 or 1) end)
   end,
-  smart_input = function()
-    local col = cur_col(); if not col then return end
+  smart_input = function(col)
+    col = col or cur_col(); if not col then return end
     reaper.SetOnlyTrackSelected(col.track)
     local path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua'
     local ok, e = pcall(dofile, path)
@@ -3023,6 +3095,8 @@ local function hint_go(t)
     ctx.set_focus('tracker')
     for i, f in ipairs(L.flat) do if f.col == d then vim.cur.fi = i; break end end
   elseif t.kind == 'btn' and d.what == 'auto' then ctx.automation_picker(d.col)
+  elseif t.kind == 'hdrin' then
+    if d.what == 'smart' then ctx.smart_input(d.col) else ctx.input_picker(d.col) end
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
@@ -4537,21 +4611,12 @@ local function frame()
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
+    input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
+    in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
-      local v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
-      local inp
-      if v < 0 then inp = 'none'
-      elseif v & 4096 ~= 0 then
-        local dev, ch = (v >> 5) & 63, v & 31
-        inp = 'MIDI ' .. (dev == 63 and 'all' or ('dev ' .. dev)) .. (ch == 0 and '' or (' ch ' .. ch))
-      else
-        local ch = v & 1023
-        local nm = reaper.GetInputChannelName(ch) or ('in ' .. (ch + 1))
-        if v & 1024 ~= 0 then nm = nm .. ' / ' .. (reaper.GetInputChannelName(ch + 1) or ('in ' .. (ch + 2))) end
-        inp = nm
-      end
+      local inp = ctx.input_name(tr)
       local sends = {}
       for i = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
         local _, nm = reaper.GetTrackSendName(tr, i, '')
@@ -4775,6 +4840,11 @@ local function frame()
     local pa = state.popup_at
     if pa and pa.kind == 'track' then
       for _, c in ipairs(L.cols or {}) do if c.col.guid == pa.guid and c.x then anchor = { x = c.x, y = L.header_y + L.rh } end end
+    elseif pa and pa.kind == 'in' then
+      local r = draw.in_at and draw.in_at[pa.guid]
+      if r then anchor = { x = r[1], y = r[2], right = r[3] } end
+    elseif pa and pa.kind == 'xy' then
+      anchor = { x = pa.x, y = pa.y }
     elseif pa and pa.kind == 'trim' then
       local r = draw.trim_at and draw.trim_at[pa.guid]
       if r then anchor = { x = r[1], y = r[2], right = r[3] } end
@@ -4866,7 +4936,10 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
   elseif hover.poolfind then state.status = 'find in the lib (fzf) - also / when the lib has focus'
-  elseif hover.trkio then state.status = ({ input = 'track input - click: choose (audio mono / stereo, MIDI all)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
+  elseif hover.sendpop then state.status = ({ add = '+ send: pick a track (fzf)', routing = 'REAPER routing window', mute = 'mute this send', del = 'remove this send' })[hover.sendpop.what] or ''
+  elseif hover.sendvol then state.status = 'send volume - drag'
+  elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
+  elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len; numbers stay'
@@ -5054,6 +5127,7 @@ local function frame()
   end
   -- всплывающий слайдер свёрнутой кнопки: клик мимо него и мимо кнопок — закрыть
   if U.click and draw.trspop and not hover.trspop_in and not hover.trsbtn then draw.trspop = nil end
+  if U.click and draw.sendpop and not hover.sendpop_in and not (hover.trkio and hover.trkio.what == 'sends') then draw.sendpop = nil end
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()
@@ -5253,6 +5327,13 @@ local function frame()
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
       click = { t = now2, zone = 'trkio' }
+    elseif hover.sendpop then
+      ctx.send_action(hover.sendpop); click = { t = now2, zone = 'sendpop' }
+    elseif hover.sendvol then
+      draw.send_drag = hover.sendvol; click = { t = now2, zone = 'sendvol' }
+    elseif hover.hdrin then
+      if hover.hdrin.what == 'smart' then ctx.smart_input(hover.hdrin.col) else ctx.input_picker(hover.hdrin.col) end
+      click = { t = now2, zone = 'hdrin' }
     elseif hover.hsb then
       -- скролл-бар треков (3 окт): ползунок тянется, клик мимо — страница
       if hover.hsb.thumb then draw.hsb_drag = { x0 = gfx.mouse_x, b0 = L.hs_before, w = hover.hsb.w, n = hover.hsb.n }
@@ -5921,6 +6002,19 @@ local function frame()
   end
   -- DSP: перетаскивание блока за заголовок → перестановка FX в цепи трека
   -- протяжка слайдера шапки: значение каждый кадр без undo, точка undo на отпускании
+  if draw.send_drag then
+    local d = draw.send_drag
+    local tr = d.col.track
+    if gfx.mouse_cap & 1 == 1 and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      local fr = math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.w)))
+      local db = fr * 72 - 60
+      reaper.SetTrackSendInfo_Value(tr, 0, d.idx, 'D_VOL', db <= -59.9 and 0 or 10 ^ (db / 20))
+      d.moved = true
+    else
+      if d.moved then edit.track_undo('send volume') end
+      draw.send_drag = nil
+    end
+  end
   if draw.hsb_drag then
     local d = draw.hsb_drag
     if gfx.mouse_cap & 1 == 1 then

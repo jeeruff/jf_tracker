@@ -283,7 +283,10 @@ function D.layout(snap, state, nregions)
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
   -- строка скопа в шапке — только если скопы не на полоске курсора (scopeat, 3 окт)
-  L.header_rows = 5 + (state.captions and 1 or 0) + ((state.scopes and state.scopeat == 'header') and 1 or 0)
+  -- строка входа (3 окт, опция hdrin): in <вход> [smart] — под панорамой, лейны ниже
+  L.hr_in = (state.hdrin ~= false) and 1 or 0
+  L.lane_row = 4 + L.hr_in
+  L.header_rows = 5 + L.hr_in + (state.captions and 1 or 0) + ((state.scopes and state.scopeat == 'header') and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -987,16 +990,87 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     text(lx, yy, fit(val, x + w - L.pad - lx), on == false and U.GREY or U.TEXT)
     yy = yy + L.rh
   end
-  row('in', io.input, 'input')
+  row('in', io.input .. ' v', 'input')
   row('out', (io.mainsend and 'master' or 'no master') .. (io.hw > 0 and ('  + hw ' .. io.hw) or ''), 'mainsend', io.mainsend)
   for _, sd in ipairs(io.sends) do
     local sdb = sd.vol > 1e-6 and 20 * math.log(sd.vol, 10) or -150
     row('send', ('%s  %s'):format(sd.name, sdb <= -60 and '-inf' or ('%+.1f'):format(sdb)), 'routing', not sd.mute)
   end
-  row('', ('routing  %d snd %d rcv'):format(#io.sends, io.recv), 'routing')
+  -- раскрывашка сендов (3 окт): клик по строке — панель сендов над блоком
+  local ry0 = yy
+  row('', ('sends %d  rcv %d  %s'):format(#io.sends, io.recv, D.sendpop == col.guid and '^' or 'v'), 'sends')
+  if D.sendpop == col.guid then
+    D.late_send = function() D.draw_sendpop(L, info, col, io, x, ry0, hover) end
+  end
   U.TEXT, U.GREY = T0, G0
   set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
   return w
+end
+
+-- панель сендов трека (3 окт): над строкой sends блока трека DSP (не влезает —
+-- под ней); строка — имя, громкость слайдером, m (mute), x (удалить); сверху
+-- + send (fzf по трекам) и routing (окно REAPER)
+function D.draw_sendpop(L, info, col, io, ax, ay, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local pw = math.min(L.win_w - 2 * L.pad, L.cw * 40 + 2 * L.pad)
+  local n = #io.sends
+  local ph = (n + 1 + (n == 0 and 1 or 0)) * L.rh + 2 * L.pad
+  local px = math.max(L.pad, math.min(L.win_w - pw - L.pad, ax))
+  local py = ay - ph
+  if py < 2 then py = ay + L.rh end
+  local inside = mx >= px and mx < px + pw and my >= py and my < py + ph
+  if inside then for k in pairs(hover) do hover[k] = nil end; hover.sendpop_in = true end
+  set(U.PANEL); gfx.rect(px, py, pw, ph, 1)
+  set(U.AMBER); gfx.rect(px, py, pw, ph, 0)
+  local y = py + L.pad
+  local x = px + L.pad
+  text(x, y, fit('sends ' .. (col.name or ''), pw - 2 * L.pad - ms('+ send routing') - 3 * L.pad), U.AMBER)
+  local bx = px + pw - L.pad
+  for _, b in ipairs({ { 'routing', 'routing' }, { '+ send', 'add' } }) do
+    local bw = ms(b[1]) + 2 * L.pad
+    bx = bx - bw
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh - 1, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh - 1, 0)
+    text(bx + L.pad, y, b[1], hot and U.AMBER or U.TEXT)
+    if hot then hover.sendpop = { col = col, what = b[2] } end
+    bx = bx - 2
+  end
+  y = y + L.rh
+  if n == 0 then text(x, y, fit('no sends - + send: pick a track (fzf)', pw - 2 * L.pad), U.GREY) end
+  local nw = math.floor((pw - 2 * L.pad) * 0.35)
+  for i, sd in ipairs(io.sends) do
+    local db = sd.vol > 1e-6 and 20 * math.log(sd.vol, 10) or -150
+    text(x, y, fit(sd.name, nw - L.pad), sd.mute and U.GREY or U.TEXT)
+    -- кнопки справа: m x
+    local rx = px + pw - L.pad
+    for _, b in ipairs({ { 'x', 'del' }, { 'm', 'mute' } }) do
+      local bw = L.btn_w
+      rx = rx - bw
+      local on = b[2] == 'mute' and sd.mute
+      local hot = mx >= rx and mx < rx + bw and my >= y and my < y + L.rh
+      set(on and U.tint(U.AMBER, 0.5) or (hot and D.CURROW or U.BG)); gfx.rect(rx, y + 1, bw, L.rh - 2, 1)
+      set(U.DIM); gfx.rect(rx, y + 1, bw, L.rh - 2, 0)
+      text(rx + 2, y, b[1], (on or hot) and U.AMBER or U.GREY)
+      if hot then hover.sendpop = { col = col, what = b[2], idx = i - 1 } end
+      rx = rx - 2
+    end
+    -- громкость: дорожка, число справа (место постоянное)
+    local vt = db <= -60 and '-inf' or ('%+.1f'):format(db)
+    local vres = ms('-00.0')
+    local sx0 = x + nw
+    local sw = rx - L.pad - vres - L.pad - sx0
+    if sw > 8 then
+      local fr = (math.max(-60, math.min(12, db)) + 60) / 72
+      local cy = y + math.floor(L.rh / 2)
+      local hot = mx >= sx0 - 2 and mx < sx0 + sw + 2 and my >= y and my < y + L.rh
+      set(U.DIM); gfx.rect(sx0, cy - 1, sw, 2, 1)
+      set(hot and U.AMBER or U.TEXT); gfx.rect(sx0, y + 4, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 8, 1)
+      text(sx0 + sw + L.pad + vres - ms(vt), y, vt, U.GREY)
+      if hot then hover.sendvol = { col = col, idx = i - 1, x0 = sx0, w = sw } end
+    end
+    y = y + L.rh
+  end
 end
 
 -- «призрак» перетаскивания (DSP-блок и т.п.): янтарная бирка у курсора
@@ -1864,11 +1938,38 @@ function D.frame(L, snap, rows, state, info)
       else
         slider(px, py, pw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
       end
+      -- строка входа (3 окт): in <вход> — клик: список входов (fzf) под ней,
+      -- повторный клик закрывает; справа кнопка smart (jf_smart_set_input)
+      if L.hr_in > 0 and info.input_name then
+        local iy = hy + 4 * L.rh + 1
+        local sbw = ms('smart') + 4
+        local show_smart = sw >= ms('in ') + 4 * L.cw + sbw + L.pad
+        local iw = show_smart and (sw - sbw - L.pad) or sw
+        local hot = mx >= sx and mx < sx + iw and my >= iy and my < iy + L.rh
+        local open = info.in_open and info.in_open(col)
+        if hot or open then set(open and U.tint(U.AMBER, 0.3) or D.CURROW); gfx.rect(sx, iy, iw, L.rh - 1, 1) end
+        text(sx, iy, 'i', U.GREY)
+        local nm = info.input_name(col):gsub(' / in ', '/'):gsub(' / ', '/')    -- in 3 / in 4 → in 3/4
+        text(sx + ms('i') + L.pad, iy, fit(nm .. ' v', iw - ms('i') - L.pad), nm == 'none' and U.GREY or ((hot or open) and U.AMBER or U.TEXT))
+        D.in_at = D.in_at or {}
+        D.in_at[col.guid] = { sx, iy + L.rh, sx + iw }
+        if hot then hover.hdrin = { col = col, what = 'list' } end
+        hint('hdrin', sx, iy, iw, L.rh, { col = col, what = 'list' })
+        if show_smart then
+          local bx2 = sx + sw - sbw
+          local hot2 = mx >= bx2 and mx < bx2 + sbw and my >= iy and my < iy + L.rh
+          set(hot2 and D.CURROW or U.PANEL); gfx.rect(bx2, iy + 1, sbw, L.rh - 2, 1)
+          set(U.DIM); gfx.rect(bx2, iy + 1, sbw, L.rh - 2, 0)
+          text(bx2 + 2, iy, 'smart', hot2 and U.AMBER or U.GREY)
+          if hot2 then hover.hdrin = { col = col, what = 'smart' } end
+          hint('hdrin', bx2, iy, sbw, L.rh, { col = col, what = 'smart' })
+        end
+      end
     end
     for li, ln in ipairs(c.lanes) do
       -- −+ подколонок — над нотным полем (3 окт; раньше справа в строке лейна);
       -- справа в строке последнего лейна — −+ колонок эффектов (вместо опции fx)
-      local by = hy + 4 * L.rh + 1
+      local by = hy + L.lane_row * L.rh + 1
       local G1 = (L.flat[ln.f0] or {}).G or L
       local nx = ln.x + (ln.sx and ln.sx[1] or 0) + (G1.x_note or 0)
       local function pm(x0, kind, onhot)
@@ -1885,7 +1986,7 @@ function D.frame(L, snap, rows, state, info)
       local bw2 = 2 * L.btn_w + 2
       if col.fixed and not c.folded then
         local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
-        text(ln.x + L.pad, hy + 4 * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
+        text(ln.x + L.pad, hy + L.lane_row * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
       end
       if not c.folded then
         if nx + bw2 <= ln.x + ln.w then
@@ -1896,20 +1997,20 @@ function D.frame(L, snap, rows, state, info)
           pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = d end)
         end
       end
-      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1) end
+      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1) end
     end
     for _, ev in ipairs(c.envs) do
-      text(ev.x + L.pad, hy + 4 * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
+      text(ev.x + L.pad, hy + L.lane_row * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
       -- имя огибающей — своё меню (клик: удалить кривую / очистить точки), 2 окт
-      if mx >= ev.x and mx < ev.x + ev.w and my >= hy + 4 * L.rh and my < hy + 5 * L.rh then hover.header_env = { e = ev.e, col = c.col } end
-      hint('env', ev.x, hy + 4 * L.rh, ev.w, L.rh, ev.fi)
-      set(U.DIM); gfx.rect(ev.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1)
+      if mx >= ev.x and mx < ev.x + ev.w and my >= hy + L.lane_row * L.rh and my < hy + (L.lane_row + 1) * L.rh then hover.header_env = { e = ev.e, col = c.col } end
+      hint('env', ev.x, hy + L.lane_row * L.rh, ev.w, L.rh, ev.fi)
+      set(U.DIM); gfx.rect(ev.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
     end
     -- третья строка: что делает каждая подколонка (просьба 1 окт). Подписи
     -- короче ширины поля на символ, чтобы соседние не слипались; полное
     -- описание — в статус-баре при наведении (hover.caption)
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
-      local cy3 = hy + 5 * L.rh + 2
+      local cy3 = hy + (L.lane_row + 1) * L.rh + 2
       local function cap(x, w, txt, kind)
         text(x, cy3, fit(txt, w), U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
@@ -1931,7 +2032,7 @@ function D.frame(L, snap, rows, state, info)
     end
     -- скоп дорожки (3 окт): осциллограф моста в нижней строке шапки
     if state.scopes and state.scopeat == 'header' and not c.folded and col.scope_slot and info.scope then
-      local sy = hy + (5 + (state.captions and 1 or 0)) * L.rh + 2
+      local sy = hy + (L.lane_row + 1 + (state.captions and 1 or 0)) * L.rh + 2
       set(U.BG); gfx.rect(c.x + 2, sy, c.w - 4, L.rh - 1, 1)
       draw_analyzer(c.x + 2, sy, c.w - 4, L.rh - 1, col.scope_slot, 'scope', info)
     end
@@ -2860,6 +2961,7 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.ctrl, hover.notes = hv.ctrl, hv.notes end
   end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
+  if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   return hover
 end
