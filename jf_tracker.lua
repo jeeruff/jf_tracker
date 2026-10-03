@@ -1654,12 +1654,28 @@ ctx = {
     local rg = seq[ri]
     if not rg then return end
     local sl
+    -- dup (3 окт): связанный повтор — то же имя, items в общем пуле MIDI и
+    -- одной группе с оригиналом; p слота, чей паттерн ещё есть, — тоже повтор
+    local alias_src
+    if kind == 'dup' and not rg.gap then alias_src = rg end
     if kind == 'put' then
       local reg = state.mx_reg
       if not reg then vim.msg = 'matrix register empty (yy / dd / Ctrl+C)'; return end
       if reg.kind == 'cells' then ctx.mx_block('paste'); return end
       sl = reg.sl
-    elseif kind == 'dup' then
+      if sl and sl.name and sl.name ~= '' then
+        for _, r in ipairs(seq) do if not r.gap and r.name == sl.name then alias_src = r; break end end
+      end
+    end
+    if alias_src then
+      local t = before and rg.pos or rg.rgnend
+      local n = 0
+      ctx.slot_op('matrix repeat ' .. alias_src.name, function() n = alias.put_alias(alias_src, t) end)
+      MX.goto_cell(seq, snap, before and ri or ri + 1, MX.cur.ci)
+      vim.msg = ('repeat of "%s": %d item(s), linked - MIDI pooled, items grouped (clone C: a free copy)'):format(alias_src.name, n)
+      return
+    end
+    if kind == 'clone' then
       sl = alias.slot_snapshot(seq, snap, ri)
       if not sl then return end
       sl.name = alias.free_name(regions, sl.name)
@@ -1672,14 +1688,14 @@ ctx = {
     end
     local t = before and rg.pos or rg.rgnend
     local n = 0
-    ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', dup = 'matrix duplicate slot' })[kind],
+    ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', dup = 'matrix duplicate slot', clone = 'matrix clone slot' })[kind],
       function() n = alias.put_slot(snap, t, sl) end)
     local target = before and ri or ri + 1
     MX.goto_cell(seq, snap, target, MX.cur.ci)
     if kind == 'empty' then
       vim.msg = 'new 1-bar slot - n: name, = / [ ]: length'
     else
-      vim.msg = ('%s slot "%s": %d item(s)'):format(kind == 'dup' and 'duplicated' or 'put', sl.name, n)
+      vim.msg = ('%s slot "%s": %d item(s)%s'):format(kind == 'clone' and 'cloned' or 'put', sl.name, n, kind == 'clone' and ' - free copy, no link' or '')
     end
   end,
   slot_delete = function()
@@ -2146,9 +2162,9 @@ ctx = {
   region_btn = function(what)
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'cursor is not inside a region'; return end
-    if what == 'dup' then
+    if what == 'dup' or what == 'clone' then
       for i, r in ipairs(seq) do
-        if not r.gap and r.idx == rg.idx then MX.cur.ri = i; ctx.slot_new('dup'); return end
+        if not r.gap and r.idx == rg.idx then MX.cur.ri = i; ctx.slot_new(what); return end
       end
       vim.msg = 'region is not in the sequence (=START..=END)'
       return
@@ -4389,7 +4405,7 @@ local function frame()
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
-  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
+  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'repeat the pattern to the right, linked: same name, MIDI pooled, items grouped - edits in one change all (D in the matrix)', clone = 'clone: an exact copy to the right with a new name, not linked (C in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'

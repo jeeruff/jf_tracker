@@ -1644,8 +1644,12 @@ function D.frame(L, snap, rows, state, info)
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
       set(c); gfx.rect(bx, ny, 3, L.rh, 1)
-      -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»
-      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
+      -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»;
+      -- справа cln — независимая копия паттерна (3 окт), имя — до неё
+      local cw1 = ms('cln') + 2
+      local cx = bx + bw - cw1
+      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), cx - bx - 7), U.TEXT)
+      small(cx, ny, 'cln', 'clone', false, 'rgbtn')
     else
       text(bx + 5, ny, fit('no region', bw - 7), U.DIM)
     end

@@ -392,7 +392,8 @@ end
 -- Vim-раскладка слотов (2 окт): слот = строка матрицы (регион или свободный такт).
 --   o O       новый пустой такт после / перед      dd   удалить слот (в регистр)
 --   yy Y      взять слот в регистр                  p P  вставить после / перед
---   D ^D      дублировать слот (новое имя)          x    вырезать ячейку / блок
+--   D ^D      повтор слота, связанный (пул MIDI + группа)   C  clone — копия без связи, новое имя
+--   x         вырезать ячейку / блок
 --   n cc cw r i  имя    =  длина    [ ] ± такт   { } ± шаг    < > паттерн слота
 --   m Enter mute   Space очередь / play   + регион в конце (N+ — N штук)   u ^R undo / redo
 -- В блоке (v / Shift+hjkl): y копия, d x вырезать, m (Ctrl+N) mute.
@@ -473,6 +474,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'p' then ctx.slot_new('put', false)
   elseif ch == 'P' then ctx.slot_new('put', true)
   elseif ch == 'D' then ctx.slot_new('dup')
+  elseif ch == 'C' then ctx.slot_new('clone')
   elseif ch == 'Y' then ctx.slot_yank()
   elseif ch == 'x' then ctx.mx_block('cut')
   elseif ch == 'n' or ch == 'r' or ch == 'i' then ctx.mx_name_prompt()

@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.53'
+V.VERSION = '0.5.54'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.54', d = '2026-10-03', items = {
+    'pattern repeats are linked natively: a repeated region (dup / D / ^D, p of a yanked slot whose pattern exists, autosync, slot -> pattern, append) puts its MIDI items into a shared pool and each item with its copies into one item group - editing in the arrange view (notes, move, trim, mute) changes all repeats, not only edits made in the tracker',
+    'clone (button cln next to the region name, C in the matrix): an exact copy with a new name, not linked - own MIDI pool, no group',
+  } },
   { v = '0.5.53', d = '2026-10-03', items = {
     'fx list: folders like the native browser - all, fav (REAPER Favorites + your own, * toggles), dev / type / cat with group headers (reaper-fxtags.ini), rec (recently added); favourites marked * everywhere',
     'curve generator: the make AI button is called auto-item (an automation item with the curve)',

@@ -28,12 +28,15 @@ reaper = {
   CountTrackMediaItems = function(tr) return #tr.items end,
   GetTrackMediaItem = function(tr, i) sort_items(tr); return tr.items[i + 1] end,
   GetMediaItemInfo_Value = function(it, k)
-    if k == 'D_POSITION' then return it.pos elseif k == 'D_LENGTH' then return it.len end
+    if k == 'D_POSITION' then return it.pos elseif k == 'D_LENGTH' then return it.len elseif k == 'I_GROUPID' then return it.gid or 0 end
     return 0
   end,
   SetMediaItemInfo_Value = function(it, k, v)
-    if k == 'D_POSITION' then it.pos = v elseif k == 'D_LENGTH' then it.len = v end
+    if k == 'D_POSITION' then it.pos = v elseif k == 'D_LENGTH' then it.len = v elseif k == 'I_GROUPID' then it.gid = v end
   end,
+  GetActiveTake = function(it) return it.midi and it or nil end,
+  TakeIsMIDI = function(tk) return tk.midi == true end,
+  genGuid = function() guidn = (guidn or 0) + 1; return ('{G%d}'):format(guidn) end,
   GetMediaTrackInfo_Value = function() return 0 end,
   SplitMediaItem = function(it, t)
     if t <= it.pos or t >= it.pos + it.len then return nil end
@@ -44,7 +47,8 @@ reaper = {
   end,
   GetItemStateChunk = function(it)
     calls.getchunk = calls.getchunk + 1
-    return true, ('<ITEM\nPOSITION %.6f\nLENGTH %.6f\nIGUID {%s}\nIID 7\nSEL 0\nBODY %s\n>'):format(it.pos, it.len, tostring(it):sub(-6), it.body)
+    return true, ('<ITEM\nPOSITION %.6f\nLENGTH %.6f\nIGUID {%s}\nIID 7\nSEL 0\nBODY %s\n%s>'):format(it.pos, it.len, tostring(it):sub(-6), it.body,
+      it.midi and ('<SOURCE MIDI\n' .. (it.pool and ('POOLEDEVTS ' .. it.pool .. '\n') or '') .. '>\n') or '')
   end,
   AddMediaItemToTrack = function(tr)
     calls.add = calls.add + 1
@@ -56,6 +60,8 @@ reaper = {
     calls.setchunk = calls.setchunk + 1
     it.len = tonumber(chunk:match('LENGTH ([%d%.]+)')) or 0
     it.body = chunk:match('BODY ([^\n]*)') or ''
+    it.midi = chunk:find('<SOURCE MIDI') ~= nil
+    it.pool = chunk:match('POOLEDEVTS (%b{})')
   end,
   DeleteTrackMediaItem = function(tr, it)
     calls.del = calls.del + 1
@@ -112,6 +118,23 @@ eq('sync again: no items created', calls.add, 0)
 local c1 = A._norm_chunk('<ITEM\nPOSITION 1\nSEL 1\nIID 3\nIGUID {a}\nBODY z\n>')
 local c2 = A._norm_chunk('<ITEM\nPOSITION 9\nSEL 0\nIID 8\nIGUID {b}\nBODY z\n>')
 eq('norm chunk ignores position/sel/iid/guid', c1, c2)
+
+-- связь повторов (3 окт): MIDI — общий пул, items — общая группа
+reset({ { { 0, 1, 'm' }, { 12, 1, 'OLD' } } })
+P.tracks[1].items[1].midi = true
+A.reset_groups()
+A.sync(regs, regs[1])
+local src, cp
+for _, it in ipairs(P.tracks[1].items) do if it.pos < 4 then src = it elseif it.pos >= 12 and it.pos < 16 then cp = it end end
+eq('alias copy exists', cp ~= nil, true)
+eq('src got a pool', src.pool ~= nil, true)
+eq('copy shares the pool', cp and cp.pool, src.pool)
+eq('src grouped', (src.gid or 0) > 0, true)
+eq('copy in the same group', cp and cp.gid, src.gid)
+-- clone: свой пул, без группы
+local ch = A.unlink_chunk('<ITEM\nGROUP 5\n<SOURCE MIDI\nPOOLEDEVTS {G1}\n>\n>')
+eq('clone: group removed', ch:find('GROUP') == nil, true)
+eq('clone: new pool guid', ch:find('{G1}', 1, true) == nil and ch:find('POOLEDEVTS') ~= nil, true)
 
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

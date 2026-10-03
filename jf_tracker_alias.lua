@@ -51,14 +51,63 @@ local function items_in(tr, t0, t1)
   return out
 end
 
--- скопировать items трека из [src.pos, src.end) в dst (смещение dt)
-local function copy_span(tr, src, dst, tag)
+-- ── связь повторов, нативно (3 окт) ──────────────────────────────────────
+-- Повтор паттерна (алиас) связан средствами REAPER, а не только синком
+-- трекера: MIDI — общий пул (POOLEDEVTS: правка нот в одном меняет все),
+-- каждый item и его копии — одна группа (I_GROUPID: перенос, обрезка, mute
+-- вместе, «как в трекере», и в аранжировке). Clone / библиотека — без связи:
+-- свой пул у каждой копии, группа снята.
+local gid_next
+local function new_group_id()
+  if not gid_next then
+    gid_next = 0
+    for ti = 0, R.CountTracks(0) - 1 do
+      local tr = R.GetTrack(0, ti)
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do
+        local g = math.floor(R.GetMediaItemInfo_Value(R.GetTrackMediaItem(tr, i), 'I_GROUPID'))
+        if g > gid_next then gid_next = g end
+      end
+    end
+  end
+  gid_next = gid_next + 1
+  return gid_next
+end
+function A.reset_groups() gid_next = nil end
+local function new_guid() return R.genGuid and R.genGuid('') or ('{%08X-0000-0000-0000-%012X}'):format(math.random(0, 0x7fffffff), math.random(0, 0x7fffffff)) end
+-- свой пул каждой копии (clone): новый GUID в POOLEDEVTS; группа снята
+local function unlink_chunk(chunk)
+  chunk = chunk:gsub('POOLEDEVTS %b{}', function() return 'POOLEDEVTS ' .. new_guid() end)
+  chunk = chunk:gsub('\n%s*GROUP %d+', '')
+  return chunk
+end
+A.unlink_chunk = unlink_chunk
+-- исходник повтора: MIDI — в пул (нет POOLEDEVTS — назначить), группа — своя
+-- или новая. Возвращает чанк копии и id группы.
+local function link_src(it)
+  local gid = math.floor(R.GetMediaItemInfo_Value(it, 'I_GROUPID'))
+  if gid <= 0 then gid = new_group_id(); R.SetMediaItemInfo_Value(it, 'I_GROUPID', gid) end
+  local ok, chunk = R.GetItemStateChunk(it, '', false)
+  if not ok then return nil, gid end
+  local tk = R.GetActiveTake(it)
+  if tk and R.TakeIsMIDI(tk) and not chunk:find('POOLEDEVTS') then
+    local nc, n = chunk:gsub('(<SOURCE MIDI[^\n]*\n)', '%1POOLEDEVTS ' .. new_guid() .. '\n', 1)
+    if n > 0 then R.SetItemStateChunk(it, nc, false); chunk = nc end
+  end
+  return strip_guids(chunk), gid
+end
+
+-- скопировать items трека из [src.pos, src.end) в dst (смещение dt);
+-- link = true — связанный повтор (общий пул MIDI + общая группа), иначе
+-- независимая копия
+local function copy_span(tr, src, dst, tag, link)
   local dt = dst.pos - src.pos
   local chunks = {}
   for _, it in ipairs(items_in(tr, src.pos, src.rgnend)) do
-    local ok, chunk = R.GetItemStateChunk(it, '', false)
-    if ok then
-      chunks[#chunks + 1] = { chunk = strip_guids(chunk),
+    local chunk, gid
+    if link then chunk, gid = link_src(it)
+    else local ok, c = R.GetItemStateChunk(it, '', false); chunk = ok and unlink_chunk(strip_guids(c)) or nil end
+    if chunk then
+      chunks[#chunks + 1] = { chunk = chunk, gid = gid,
         pos = R.GetMediaItemInfo_Value(it, 'D_POSITION'),
         lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') }
       if tag then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_pattern', tag, true) end
@@ -68,6 +117,7 @@ local function copy_span(tr, src, dst, tag)
     local it = R.AddMediaItemToTrack(tr)
     R.SetItemStateChunk(it, c.chunk, false)
     R.SetMediaItemInfo_Value(it, 'D_POSITION', c.pos + dt)
+    R.SetMediaItemInfo_Value(it, 'I_GROUPID', c.gid or 0)
     if R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
     if tag then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_pattern', tag, true) end
   end
@@ -108,7 +158,7 @@ function A.sync(regions, src)
     for _, dst in ipairs(dsts) do
       if span_print(tr, dst.pos, dst.rgnend) ~= sp then
         for _, it in ipairs(items_in(tr, dst.pos, dst.rgnend)) do R.DeleteTrackMediaItem(tr, it) end
-        copy_span(tr, src, dst, src.name)
+        copy_span(tr, src, dst, src.name, true)
         n = n + 1
       end
     end
@@ -234,7 +284,8 @@ function A.cells_paste(regions, snap, ri, ci, clip)
           local pos = rg.pos + c.rel
           if pos < rg.rgnend - EPS then
             local it = R.AddMediaItemToTrack(col.track)
-            R.SetItemStateChunk(it, c.chunk, false)
+            R.SetItemStateChunk(it, unlink_chunk(c.chunk), false)        -- копия ячеек — без связи
+            R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
             R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
             if R.GetMediaTrackInfo_Value(col.track, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
             local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
@@ -262,7 +313,7 @@ function A.append(regions, src)
   local dst = { pos = t0, rgnend = t0 + len, name = src.name }
   edit.run('pattern copy ' .. src.name, function()
     R.AddProjectMarker2(0, true, t0, t0 + len, src.name, -1, src.color or 0)
-    for _, tr in ipairs(tracks()) do copy_span(tr, src, dst, src.name) end
+    for _, tr in ipairs(tracks()) do copy_span(tr, src, dst, src.name, true) end
   end)
   return t0
 end
@@ -454,7 +505,7 @@ function A.set_slot(regions, slot, pat)
     local src = { pos = pat.src.pos, rgnend = pat.src.rgnend, name = pat.name }
     if src.pos >= slot.rgnend - EPS then src.pos = src.pos + delta; src.rgnend = src.rgnend + delta end
     local dst = { pos = slot.pos, rgnend = slot.pos + newlen, name = pat.name }
-    for _, tr in ipairs(tracks()) do copy_span(tr, src, dst, pat.name) end
+    for _, tr in ipairs(tracks()) do copy_span(tr, src, dst, pat.name, true) end
   end)
   return true
 end
@@ -487,6 +538,23 @@ function A.put_slot(snap, t, sl)
   if not sl.gap then R.AddProjectMarker2(0, true, t, t + sl.len, sl.name or '', -1, sl.color or 0) end
   if sl.clip then return A.cells_paste({ { pos = t, rgnend = t + sl.len } }, snap, 1, 1, sl.clip) end
   return 0
+end
+
+-- связанный повтор (dup, 3 окт): регион src повторяется в t — то же имя,
+-- items связаны (пул MIDI + группа); всё после t едет на длину
+function A.put_alias(src, t)
+  local len = src.rgnend - src.pos
+  local s0 = src.pos
+  A.open_time(t, len)
+  -- исходник мог уехать, если он после t
+  local sp = { pos = s0 >= t - EPS and (s0 + len) or s0 }
+  sp.rgnend = sp.pos + len
+  R.AddProjectMarker2(0, true, t, t + len, src.name or '', -1, src.color or 0)
+  A.reset_groups()
+  local dst = { pos = t, rgnend = t + len }
+  local n = 0
+  for _, tr in ipairs(tracks()) do n = n + copy_span(tr, sp, dst, src.name, true) end
+  return n
 end
 
 -- удалить слот: регион, время слота во всех треках, простые маркеры внутри;
