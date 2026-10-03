@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.47'
+V.VERSION = '0.5.48'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.48', d = '2026-10-03', items = {
+    '[rec] is red and sits in the left corner of the item tab (start of the slice button row, also for browser files and an empty track); in the recording mode it is the first, lit button of the ring row and takes you back',
+  } },
   { v = '0.5.47', d = '2026-10-03', items = {
     'options: top panel position - top (above the tracker), mid (above the DSP panel), bottom (below the DSP panel); in mid / bottom its upper edge drags the height',
     'options: status bar - bottom (window bottom) or tracker (a line under the tracker body, the sidebar then reaches the window bottom)',

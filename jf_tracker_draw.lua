@@ -1025,19 +1025,6 @@ local function draw_topbar(L, info)
       bx = bx - 2
     end
   end
-  -- [rec] справа на полосе вкладок, пока открыта item: запись в item (jf_rec)
-  if tab == 'sample' or tab == 'retro' then
-    local lbl = '[rec]'
-    local bw = ms(lbl) + 2 * L.pad
-    local bx = sx1 - bw
-    local on = tab == 'retro'
-    local hot = mx >= bx and mx < bx + bw and my >= 1 and my < 1 + L.rh
-    set(on and U.tint(U.RED, 0.35) or (hot and D.CURROW or U.BG)); gfx.rect(bx, 1, bw, L.rh, 1)
-    set(on and U.RED or U.LINE); gfx.rect(bx, 1, bw, L.rh, 0)
-    text(bx + L.pad, 1, lbl, on and U.RED or (hot and U.TEXT or U.GREY))
-    if hot then hover.recbtn = true end
-    hint('recbtn', bx, 1, bw, L.rh, true)
-  end
   local cy0 = 1 + L.rh + 3           -- верх содержимого вкладки
   L.top_rect = { sx0 - L.pad, 0, sx1 - sx0 + 2 * L.pad, H - 2 }
   local HT = H
@@ -1072,7 +1059,16 @@ local function draw_topbar(L, info)
       end
       if mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then hover.sample = e end
     else
-      text(sx0, cy0, 'no instrument', U.GREY)
+      -- пустой трек: [rec] — записать в item (кольцо jf_rec)
+      local lbl = '[rec]'
+      local bw = ms(lbl) + 2 * L.pad
+      local hot = mx >= sx0 and mx < sx0 + bw and my >= cy0 and my < cy0 + L.rh
+      set(hot and U.tint(U.RED, 0.45) or U.tint(U.RED, 0.2)); gfx.rect(sx0, cy0, bw, L.rh, 1)
+      set(U.RED); gfx.rect(sx0, cy0, bw, L.rh, 0)
+      text(sx0 + L.pad, cy0 + 1, lbl, U.RED)
+      if hot then hover.recbtn = true end
+      hint('recbtn', sx0, cy0, bw, L.rh, true)
+      text(sx0 + bw + L.pad, cy0 + 1, 'no instrument - [rec] records one', U.GREY)
     end
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK
@@ -1143,6 +1139,18 @@ local function draw_topbar(L, info)
         if hot then hover.retrobtn = what end
         hint('retrobtn', bx, y, bw, L.rh, what)
         bx = bx + bw + 2
+      end
+      -- [rec] в левом углу, горит: режим записи вкладки item (клик — назад к правке)
+      do
+        local lbl = '[rec]'
+        local bw = ms(lbl) + 2 * L.pad
+        local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+        set(hot and U.tint(U.RED, 0.6) or U.tint(U.RED, 0.45)); gfx.rect(bx, y, bw, L.rh, 1)
+        set(U.RED); gfx.rect(bx, y, bw, L.rh, 0)
+        text(bx + L.pad, y + 1, lbl, U.TEXT)
+        if hot then hover.recbtn = true end
+        hint('recbtn', bx, y, bw, L.rh, true)
+        bx = bx + bw + L.pad
       end
       btn('<', 'prev'); 
       text(bx, y + 1, fit((c and c.col.name or '?') .. ' #' .. tostring(c and c.slot or '?'), L.cw * 10), U.AMBER); bx = bx + L.cw * 10 + 2

@@ -4613,6 +4613,11 @@ local function frame()
       state.toptab = hover.tab
       ctx.set_focus('top')
       click = { t = now2, zone = 'tab' }
+    elseif hover.sample and hover.sample.sbtn == 'rec' then
+      -- [rec] в углу вкладки item: в режим записи (кольцо jf_rec)
+      state.toptab = 'retro'; ctx.set_focus('top')
+      vim.msg = 'item rec: jf_rec ring - select, Space listen, p put, L loop, d to library; [rec] again: back'
+      click = { t = now2, zone = 'recbtn' }
     elseif hover.sample and hover.sample.sbtn then
       ctx.set_focus('top')
       local e = hover.sample.e

@@ -389,7 +389,19 @@ end
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
 -- когда e — его исходник (слайс/кусок показывается на фоне целого сэмпла)
 function S.draw_in(U, L, x, y, w, h, e, track, zone)
-  if not e then U.text(x, y, 'no instrument', U.GREY); return end
+  if not e then
+    -- пустой трек: [rec] — записать в item (кольцо jf_rec), рядом подсказка
+    local lbl = '[rec]'
+    local rh = L.rh
+    local bw = U.measure(lbl) + 2 * L.pad
+    local hot = gfx.mouse_x >= x and gfx.mouse_x < x + bw and gfx.mouse_y >= y and gfx.mouse_y < y + rh
+    U.set(hot and U.tint(U.RED, 0.45) or U.tint(U.RED, 0.2)); gfx.rect(x, y, bw, rh, 1)
+    U.set(U.RED); gfx.rect(x, y, bw, rh, 0)
+    U.text(x + L.pad, y + 1, lbl, U.RED)
+    if ctx.hint then ctx.hint('recbtn', x, y, bw, rh, true) end
+    U.text(x + bw + L.pad, y + 1, ctx.fit('no instrument - [rec] records one', w - bw - L.pad), U.GREY)
+    return hot and { sbtn = 'rec' } or nil
+  end
   local editing = S.active and S.entry and S.entry.item == e.item
   local rh = L.rh
   local title = editing
@@ -446,11 +458,23 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- кнопки нарезки (2 окт): вместо строки-подсказки у инструмента (не у файла
   -- браузера). Клик по кнопке открывает правку этого сэмпла, если она не открыта.
   local hover_sbtn
+  -- [rec] в левом углу ряда (3 окт): запись в item — режим вкладки (кольцо
+  -- jf_rec); есть всегда — и у файла браузера
+  local bx = x
+  do
+    local lbl = '[rec]'
+    local bw = U.measure(lbl) + 2 * L.pad
+    local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
+    U.set(hot and U.tint(U.RED, 0.45) or U.tint(U.RED, 0.2)); gfx.rect(bx, y + rh, bw, rh, 1)
+    U.set(U.RED); gfx.rect(bx, y + rh, bw, rh, 0)
+    U.text(bx + L.pad, y + rh + 1, lbl, U.RED)
+    if hot then hover_sbtn = 'rec' end
+    if ctx.hint then ctx.hint('recbtn', bx, y + rh, bw, rh, true) end
+    bx = bx + bw + L.pad
+  end
   if not e.file and e.item then
-    local bx = x
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
                   { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' } }
-    U.text(bx, y + rh, 'slice', U.GREY); bx = bx + U.measure('slice') + L.pad
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end
@@ -465,7 +489,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
     if editing and #S.trans > 0 then U.text(bx + L.pad, y + rh + 1, ctx.fit(('sens %.2f'):format(S.sens), x + hint_w - bx - L.pad), U.GREY) end
   else
-    U.text(x, y + rh, ctx.fit(hint, hint_w), U.GREY)
+    U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
   -- волна: peaks / spec — нативные спектральные пики REAPER, цвет той же
   -- функцией, что колонка волны трека (ctx.spec_colour); спектрограмма
