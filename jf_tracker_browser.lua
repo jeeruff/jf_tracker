@@ -337,7 +337,21 @@ function B.read_pm()
         local ext = (path:match('%.(%w+)$') or ''):lower()
         local base = path:match('[^/]+$') or ''
         if ext == 'rpp' and base:sub(1, 1) ~= '.' and not base:find('TemporaryUnsaved', 1, true) then
-          out[#out + 1] = { name = c.name or (path:match('[^/]+$') or path), path = path, pm = true, dir = false,
+          -- мета карточки (3 окт): темп, тональности, теги (Finder + свои), статус —
+          -- видны справа от имени и ищутся поиском списка
+          local meta = {}
+          local bpm = core.card_bpm and core.card_bpm(c)
+          if bpm then meta[#meta + 1] = math.floor(bpm + 0.5) .. 'bpm' end
+          if type(c.keys) == 'table' and #c.keys > 0 then meta[#meta + 1] = table.concat(c.keys, ' ') end
+          if type(c.fs_tags) == 'table' then for t in pairs(c.fs_tags) do meta[#meta + 1] = '#' .. t end end
+          if type(c.tags_extra) == 'table' then for _, t in ipairs(c.tags_extra) do meta[#meta + 1] = '#' .. t end
+          elseif type(c.tags_extra) == 'string' and c.tags_extra ~= '' then meta[#meta + 1] = '#' .. c.tags_extra end
+          local st = c.status_over or c.status
+          if st and st ~= '' then meta[#meta + 1] = '[' .. st .. ']' end
+          local nm = c.name or (path:match('[^/]+$') or path)
+          local ms = table.concat(meta, ' ')
+          out[#out + 1] = { name = nm, path = path, pm = true, dir = false, meta = ms ~= '' and ms or nil,
+                            label = ms ~= '' and (nm .. ' ' .. ms) or nil,
                             mtime = tonumber(c.mtime) or 0, len = tonumber(c.duration),
                             render = c.render_file ~= '' and c.render_file or nil, tracks = c.track_names }
         end
@@ -564,7 +578,7 @@ function B.describe(idx)
   if e.dir then return ('folder %s - Enter: open'):format(e.name) end
   if e.pm then
     local len = e.len and e.len > 0 and (' %d:%02d'):format(math.floor(e.len / 60), math.floor(e.len % 60)) or ''
-    return ('project %s%s - Enter: open as folder (tracks / samples / regions), drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
+    return ('project %s%s - Enter: inside (tracks / samples / regions), o: open in REAPER, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
   end
   if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
@@ -603,6 +617,7 @@ function B.key(c)
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
   elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
+  elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'v' then local e = B.entries[B.cur]; local pth = B.preview_path(e); if pth and ctx.sample_view then ctx.sample_view(pth) end
   elseif ch == 'w' then B.click('size')
   elseif ch == 'q' then B.click('hide')
@@ -795,6 +810,13 @@ function B.draw(U, L, x, y, w, h)
     local tw = w - 2 * L.pad
     if B.wave and is_file then tw = math.floor(tw * 0.55) end
     U.text(x + L.pad, ry + 1, ctx.fit(glyph .. e.name, tw), col)
+    -- мета проекта pm справа (темп, тональность, теги, статус) — если влезает
+    if e.meta then
+      local nw = U.measure(glyph .. e.name) + L.pad
+      if nw + U.measure('000bpm') < tw then
+        U.text(x + L.pad + nw, ry + 1, ctx.fit(e.meta, tw - nw), (idx == B.cur and B.focus) and U.BG or U.GREY)
+      end
+    end
     if B.wave and is_file and ctx.file_peaks then
       -- мини-волна файла справа от имени (нативные пики REAPER, кеш по пути)
       local wx, ww = x + L.pad + tw + L.pad, w - 2 * L.pad - tw - L.pad

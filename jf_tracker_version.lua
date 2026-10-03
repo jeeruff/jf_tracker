@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.98'
+V.VERSION = '0.5.99'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.99', d = '2026-10-03', items = {
+    'jf_pm in the browser: each project shows its tempo, keys, tags (#Finder and own) and status next to the name, and the list search finds them (find 160bpm, Bm, #tag, [джем]); o opens the project in REAPER - switches to its tab if it is open, otherwise asks and opens a new tab (REAPER stops scripts on project open, the tracker starts itself again there)',
+  } },
   { v = '0.5.98', d = '2026-10-03', items = {
     'big sample editor: :big or the big button in the item tab - the tab takes the whole window height; the wave zooms with the wheel at the mouse, sideways / Shift+wheel scrolls (also in the normal tab); slices, zone, selection, transients and the playhead follow the zoom; zoom out fully - whole sample',
   } },

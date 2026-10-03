@@ -1951,6 +1951,27 @@ ctx = {
       end
     end
   end,
+  -- jf_pm (3 окт): открыть проект из вкладки pm (o). Уже открыт — переключить
+  -- вкладку; иначе — вопрос: REAPER останавливает скрипты при открытии проекта,
+  -- поэтому трекер перезапускает себя в новой вкладке (-nonewinst run_tracker)
+  pm_open_project = function(path, name)
+    local i = 0
+    while true do
+      local proj, fn = reaper.EnumProjects(i)
+      if not proj then break end
+      if fn == path then reaper.SelectProjectInstance(proj); vim.msg = 'pm: switched to the open tab ' .. (name or path); return end
+      i = i + 1
+    end
+    OPT.ask.open('open ' .. (name or path), 'in a new REAPER tab - scripts stop when a project opens, the tracker starts again there', {
+      { key = 'n', label = 'cancel', fn = function() vim.msg = 'pm: not opened' end },
+      { key = 'o', label = 'open in a new tab', fn = function()
+        local exe = reaper.GetExePath() .. '/REAPER.app/Contents/MacOS/REAPER'
+        reaper.Main_OnCommand(40859, 0)                      -- File: New project tab
+        reaper.Main_openProject(path)
+        reaper.ExecProcess(('"%s" -nonewinst "%s/tests/run_tracker.lua"'):format(exe, DIR), -1)
+      end },
+    })
+  end,
   -- большой редактор сэмпла (3 окт, :big / кнопка big): вкладка item на всё окно
   sample_big = function()
     state.sample_big = not state.sample_big
