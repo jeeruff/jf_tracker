@@ -62,6 +62,12 @@ function D.init(u, peaks_fn, matrix)
   D.HDRSEL = U.HDRSEL or U.theme('col_seltrack', U.mix(D.HDR, U.TEXT, 0.10))
   -- темы (3 окт, jf_tracker_themes.lua): mono — всё серым, кроме ячейки курсора
   D.mono = U.MONO and true or false
+  -- цвета кнопок как в REAPER (3 окт): запись — фиолетовая, FX трека — зелёная;
+  -- во всех темах, в mono тоже (исключения серого фильтра)
+  D.ARM, D.FXG = { 0.66, 0.36, 0.90 }, { 0.40, 0.66, 0.30 }
+  D.ARM_T, D.FXG_T = U.mix(U.PANEL, D.ARM, 0.55), U.mix(U.PANEL, D.FXG, 0.85)
+  D.FXTXT = { 0.94, 1.0, 0.90 }                -- светлый текст на зелёном, как FX в REAPER
+  D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true }
   D.CURCELL = U.MONO_CURSOR or U.TEXT
   U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
@@ -353,7 +359,7 @@ end
 -- ── примитивы ─────────────────────────────────────────────────────────────
 -- mono: серый по яркости, кроме ячейки курсора (D.CURCELL)
 local function mono(c)
-  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS then return c end   -- курсор и рамка INSERT — цветные
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end   -- курсор, рамка INSERT, R и FX — цветные
   local l = 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]
   return { l, l, l }
 end
@@ -361,7 +367,7 @@ D.mono_col = mono
 -- текст в mono: не темнее порога — тусклые подписи (=START, пустые слоты,
 -- подсказки) иначе пропадали на тёмном фоне (3 окт); фон и линии — как есть
 local function mono_text(c)
-  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS then return c end
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end
   local l = math.max(0.40, 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3])
   return { l, l, l }
 end
@@ -876,14 +882,14 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   -- кнопки
   local bx = x + L.pad
   local mon = col.recmon or 0
-  local btns = { { 'R', col.armed, U.RED, 'arm' }, { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
+  local btns = { { 'R', col.armed, D.ARM, 'arm' }, { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                  { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
                  { 'ph', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
   for _, b in ipairs(btns) do
     local bw = math.max(L.btn_w, ms(b[1]) + 4)
     if bx + bw > x + w - L.pad then break end
     local on = b[2]
-    set((on and not b[5]) and U.tint(b[3], 0.5) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
+    set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
     set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
     text(bx + 2, yy, b[1], on and b[3] or U.GREY)
     if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
@@ -1047,7 +1053,6 @@ local function draw_topbar(L, info)
       { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
       { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
       { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
-      { 'hdr', 'hdr ' .. (c.hdrfill or 'line'), ((c.hdrfill or 'line') == 'header' or c.hdrfill == 'full') and U.CYAN or U.GREY },
       { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
     } },
     { name = 'control', bottom = true, items = {
@@ -1684,7 +1689,7 @@ function D.frame(L, snap, rows, state, info)
       -- M S R — буквами всегда (решение пользователя); A и мониторинг — иконками,
       -- без иконок — A и I. Мониторинг: 0 выкл, 1 вкл, 2 авто (tape) — контур
       local mon = col.recmon or 0
-      local labels = { { 'R', col.armed, U.RED, 'arm' },
+      local labels = { { 'R', col.armed, D.ARM, 'arm' },
                        { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                        { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
                        { 'A', nenv > 0, U.CYAN or U.AMBER, 'auto' } }
@@ -1693,7 +1698,7 @@ function D.frame(L, snap, rows, state, info)
         if x + L.btn_w > c.x + c.w - 1 then break end
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
-        set(fill and U.tint(b[3], 0.5) or U.PANEL); gfx.rect(x, by, L.btn_w, L.rh - 2, 1)
+        set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, L.btn_w, L.rh - 2, 1)
         set(on and b[3] or U.DIM); gfx.rect(x, by, L.btn_w, L.rh - 2, 0)
         text(x + 2, by, b[1], on and b[3] or U.GREY)
         if mx >= x and mx < x + L.btn_w and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
@@ -2337,9 +2342,11 @@ function D.frame(L, snap, rows, state, info)
         local on = (info.dsp_is_take or false) == b[2]
         local bw = ms(b[3]) + 2 * L.pad
         local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
-        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(hx, dy + 2, bw, L.rh, 1)
-        set(on and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, b[3], on and U.AMBER or (hot and U.TEXT or U.GREY))
+        -- track fx включена — зелёная, как FX на канале REAPER (3 окт)
+        local g = on and not b[2]
+        set(g and D.FXG_T or (hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG))); gfx.rect(hx, dy + 2, bw, L.rh, 1)
+        set(g and D.FXG or (on and U.AMBER or U.LINE)); gfx.rect(hx, dy + 2, bw, L.rh, 0)
+        text(hx + L.pad, dy + 3, b[3], g and D.FXTXT or (on and U.AMBER or (hot and U.TEXT or U.GREY)))
         if hot then hover.dsptarget = b[1] end
         hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
         hx = hx + bw + L.pad
