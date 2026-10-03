@@ -5,6 +5,7 @@
 --   + - ^A ^X    значение (Shift — грубо)   Enter b    тоггл / bypass
 --   dd           удалить эффект (v — диапазон)
 --   dc           распаковать контейнер (дети в цепочку, контейнер долой)
+--   dm da        снять модуляцию параметра / удалить его автоматизацию
 --   yy p P       взять эффект, вставить копию после / перед
 --   cc           упаковать эффект (v — диапазон) в новый контейнер
 --   aa           огибающая выбранного параметра (автоматизация)
@@ -29,7 +30,7 @@ local LEFT, RIGHT, UP, DOWN = 1818584692, 1919379572, 30064, 1685026670
 function DK.init(c) ctx = c end
 
 local HINT = {
-  d = 'd: d delete fx (v: range) | c unpack container | Esc',
+  d = 'd: d delete fx (v: range) | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | Esc',
   a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | Esc',
@@ -55,6 +56,8 @@ function DK.key(c, sel, n, np, mods)
     local r0, r1 = DK.range(sel)
     if op == 'd' and ch == 'd' then ctx.dsp_delete(r0, r1); DK.anchor = nil
     elseif op == 'd' and ch == 'c' then ctx.dsp_unpack(sel.fx)
+    elseif op == 'd' and ch == 'm' then ctx.dsp_unmodulate(sel.fx, sel.param)
+    elseif op == 'd' and ch == 'a' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'y' and ch == 'y' then ctx.dsp_yank(sel.fx)
     elseif op == 'c' and ch == 'c' then ctx.dsp_pack(r0, r1); DK.anchor = nil
     elseif op == 'a' and ch == 'a' then ctx.dsp_automate(sel.fx, sel.param)

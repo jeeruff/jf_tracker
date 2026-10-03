@@ -496,12 +496,19 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   local column = L.w_wave > 0
   local mode = L.wave
   local pk = get_peaks and get_peaks(head, math.min(total, 8192), column and mode == 'spec')
-  if not pk or pk.n == 0 then return end
   local cx, hw, x0w
   if column then cx = x + L.x_wave + L.w_wave / 2; hw = (L.w_wave / 2) - 1; x0w = x + L.x_wave
   else cx = x + L.x_note + L.w_note / 2; hw = (L.w_note / 2) - 1 end
   local base_col = inv and U.BG or (muted and D.PEAKM or D.PEAK)
   set(base_col)
+  -- непрерывная ось (3 окт): без спектральных пиков волна не рвётся на тишине
+  -- и у item без пиков (офлайн) — сплошная линия в границах item, пики поверх
+  if not (column and mode == 'spec') then
+    local p0 = math.max(0, off - i * L.rh)
+    local p1 = math.min(L.rh, total - (i * L.rh - off))
+    if p1 > p0 then gfx.rect(math.floor(cx), y + p0, 1, p1 - p0, 1) end
+  end
+  if not pk or pk.n == 0 then return end
   local scale = pk.n / total
   for py = 0, L.rh - 1 do
     local q = i * L.rh + py - off          -- пиксель от начала item
@@ -980,7 +987,7 @@ local function draw_topbar(L, info)
   for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
     local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'modulate') or (t == 'sample' and 'item') or t)
     local tw = ms(lbl) + 2 * L.pad
-    local on = t == tab
+    local on = t == tab or (t == 'sample' and tab == 'retro')        -- rec — режим вкладки item
     local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
     set(on and U.tint(U.AMBER, 0.35) or (hot and D.CURROW or U.BG)); gfx.rect(tx, 1, tw, L.rh, 1)
     set(on and U.AMBER or U.LINE); gfx.rect(tx, 1, tw, L.rh, 0)
@@ -1006,6 +1013,19 @@ local function draw_topbar(L, info)
       hint('scopemode', bx, 1, bw, L.rh, m)
       bx = bx - 2
     end
+  end
+  -- [rec] справа на полосе вкладок, пока открыта item: запись в item (jf_rec)
+  if tab == 'sample' or tab == 'retro' then
+    local lbl = '[rec]'
+    local bw = ms(lbl) + 2 * L.pad
+    local bx = sx1 - bw
+    local on = tab == 'retro'
+    local hot = mx >= bx and mx < bx + bw and my >= 1 and my < 1 + L.rh
+    set(on and U.tint(U.RED, 0.35) or (hot and D.CURROW or U.BG)); gfx.rect(bx, 1, bw, L.rh, 1)
+    set(on and U.RED or U.LINE); gfx.rect(bx, 1, bw, L.rh, 0)
+    text(bx + L.pad, 1, lbl, on and U.RED or (hot and U.TEXT or U.GREY))
+    if hot then hover.recbtn = true end
+    hint('recbtn', bx, 1, bw, L.rh, true)
   end
   local cy0 = 1 + L.rh + 3           -- верх содержимого вкладки
   L.top_rect = { sx0 - L.pad, 0, sx1 - sx0 + 2 * L.pad, H - 2 }
@@ -1399,6 +1419,7 @@ function D.frame(L, snap, rows, state, info)
   if L.top_h > 0 then
     local th = draw_topbar(L, info)
     hover.ctrl, hover.scope, hover.pool, hover.tab, hover.mod, hover.sample, hover.prevbtn = th.ctrl, th.scope, th.pool, th.tab, th.mod, th.sample, th.prevbtn
+    hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
     hover.poolfind = th.poolfind
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro

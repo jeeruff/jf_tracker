@@ -776,6 +776,16 @@ ctx = {
     umod_save(model.user_mods); model.invalidate()
     return true
   end,
+  -- dm: снять нативную модуляцию выбранного параметра (LFO / ACS / link)
+  dsp_unmodulate = function(k, pi)
+    local t = dsp_target()
+    local f = t and t.fx[k]
+    local p = f and f.params[pi]
+    if not p then vim.msg = 'dm: no parameter'; return end
+    if t.take then vim.msg = 'dm: take FX modulation is edited in the plugin window'; return end
+    edit.mod_remove(t.track, p.fx or f.i, p.i)
+    vim.msg = 'modulation removed: ' .. f.name .. ' / ' .. p.name
+  end,
   dsp_autoitem = function(k, pi)
     local t = dsp_target()
     if t and t.take then vim.msg = 'ai: automation items exist only on track envelopes (switch DSP to track: t)'; return end
@@ -1503,7 +1513,8 @@ ctx = {
   top_tabs = function()
     local t = { 'sample', 'modulation', 'midi' }
     if state.gridtab then t[#t + 1] = 'grid' end
-    for _, x in ipairs({ 'retro', 'garden', 'master' }) do t[#t + 1] = x end
+    -- retro — не вкладка, а режим [rec] вкладки item (3 окт): записываем в item
+    for _, x in ipairs({ 'garden', 'master' }) do t[#t + 1] = x end
     return t
   end,
   mx_loops_toggle = function()
@@ -2720,6 +2731,7 @@ local function hint_go(t)
     elseif d == 'play' then retro_preview(true) elseif d == 'stop' then retro_preview(false)
     elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'loop' then retro_loop() elseif d == 'add' then ctx.retro_add() end
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
+  elseif t.kind == 'recbtn' then ctx.set_focus('top'); state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
   elseif t.kind == 'midirow' then state.toptab = 'midi'; ctx.set_focus('top'); MM.cur = d
@@ -4310,6 +4322,7 @@ local function frame()
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track depot after =LIB - then slice it in the sample tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
+  elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to depot', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'view only the region of the cursor (playhead with follow) - :reg' or 'view the whole track - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', dup = 'duplicate region to the right as a new pattern (D in the matrix)' })[hover.rgbtn]
@@ -4581,6 +4594,12 @@ local function frame()
         retro.sel.a = hover.retro; retro.sel.b = hover.retro; retro.drag = true
       end
       click = { t = now2, zone = 'retro' }
+    elseif hover.recbtn then
+      -- [rec] вкладки item: правка item <-> запись (кольцо jf_rec, бывшая вкладка retro)
+      state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
+      ctx.set_focus('top')
+      vim.msg = state.toptab == 'retro' and 'item rec: jf_rec ring - select, Space listen, p put, L loop, d to library' or 'item: edit'
+      click = { t = now2, zone = 'recbtn' }
     elseif hover.tab then
       state.toptab = hover.tab
       ctx.set_focus('top')
@@ -5523,7 +5542,7 @@ local function frame()
   if (c == 9 or c == 25) and ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local TABS = ctx.top_tabs()
     local i = 1
-    for k, t in ipairs(TABS) do if t == state.toptab then i = k end end
+    for k, t in ipairs(TABS) do if t == state.toptab or (t == 'sample' and state.toptab == 'retro') then i = k end end
     local back = c == 25 or ctx.mods().shift
     state.top = true
     state.toptab = TABS[(i - 1 + (back and -1 or 1)) % #TABS + 1]

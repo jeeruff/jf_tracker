@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.45'
+V.VERSION = '0.5.46'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.46', d = '2026-10-03', items = {
+    'DSP: dm removes the modulation of the selected parameter, da its automation (ad still works)',
+    'retro is no longer a tab: [rec] on the tab bar of the item tab switches it between editing the item and recording into an item (the jf_rec ring - select, listen, put, loop, to library); :tab retro / :retro still work',
+    'the wave in the tracker cells is continuous without spectral peaks: a solid axis inside the item bounds, peaks on top - no dashes on silence or offline items',
+  } },
   { v = '0.5.45', d = '2026-10-03', items = {
     'curve generator: numbers are horizontal sliders, choices are buttons (shape sin tri saw+ saw- sqr rnd, type, hits, dir, from), toggles are buttons; the panel is wider when there is room',
     'modulation matrix: a strip under the table for the selected row - L1 / ENV / LNK toggles, LFO shape buttons, sliders for BASE and the numbers of the cursor group (one undo per drag)',
