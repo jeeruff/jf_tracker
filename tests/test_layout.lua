@@ -42,5 +42,23 @@ for _, sc in ipairs({ 1, 2, 4 }) do
   local ok3, L3 = pcall(D.layout, snap, state, 0)
   eq(ok3 and L3.flat[2].folded, true, 'mini fold x' .. sc)
 end
+-- PT-mode (3 окт): ровно 4 канала, без огибающих и свёрток, x4 разрешён
+do
+  local cols6 = {}
+  for k = 1, 6 do cols6[k] = col('T' .. k, 1, { { name = 'Volume' } }) end
+  local state = { fontscale = 4, folds = { T2 = 'mini' }, fxcols = 1, envs = true, hscroll = 1, wave = 'off', ptmode = true }
+  D.set_font(state)
+  gfx.w = 4000
+  local ok, L = pcall(D.layout, { cols = cols6 }, state, 0)
+  eq(ok, true, 'pt layout ' .. tostring(not ok and L or ''))
+  if ok then
+    eq(#L.cols, 4, 'pt: 4 channels shown')
+    eq(L.pt_n, 4, 'pt: counted 4'); eq(L.pt_avail, 6, 'pt: 6 available')
+    local envs = 0; for _, f in ipairs(L.flat) do if f.env then envs = envs + 1 end end
+    eq(envs, 0, 'pt: no envelope columns')
+    eq(L.cols[2].folded, false, 'pt: folds ignored')
+  end
+  gfx.w = 1600
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

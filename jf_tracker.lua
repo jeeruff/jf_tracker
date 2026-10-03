@@ -381,7 +381,18 @@ local function save_win()
 end
 
 -- ── помощники ─────────────────────────────────────────────────────────────
-local function relayout() L = draw.layout(snap, state, #regions) end
+local function relayout()
+  L = draw.layout(snap, state, #regions)
+  -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
+  -- (x4 → x3 → x2 → x1); заново при смене ширины окна
+  if state.ptmode then
+    if state.pt_w ~= gfx.w then state.pt_w, state.pt_fit = gfx.w, true; state.fontscale = 4; draw.set_font(state); L = draw.layout(snap, state, #regions) end
+    while state.pt_fit and L.pt_n < math.min(4, L.pt_avail) and (state.fontscale or 1) > 1 do
+      state.fontscale = state.fontscale - 1; draw.set_font(state); L = draw.layout(snap, state, #regions)
+    end
+    state.pt_fit = false
+  end
+end
 local function cur_col() local f = L and L.flat[vim.cur.fi]; return f and f.col end
 local function playing() return reaper.GetPlayState() & 1 == 1 end
 
@@ -1982,10 +1993,11 @@ ctx = {
   -- треков сверху; матрица, lib / браузер, DSP спрятаны, курсор в центре, метры.
   -- Повтор — всё как было (state.pt_saved)
   pt_toggle = function()
-    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'khelp' }
+    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'wzoom', 'captions' }
     if state.ptmode then
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
       state.ptmode, state.pt_saved = false, nil
+      draw.set_font(state); model.invalidate()
       if state.focus ~= 'tracker' then ctx.set_focus('tracker') end
       vim.msg = 'PT-mode off: layout back'
     else
@@ -1993,11 +2005,29 @@ ctx = {
       for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
       state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
       state.fixed, state.meters, state.khelp = true, true, false
+      -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
+      -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
+      state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.wzoom, state.captions = 1, 'off', 'off', false, 4, 0, false
+      state.fontscale = 4
+      state.pt_fit = true                                    -- кадр уменьшит масштаб, если 4 канала не влезли
       if not state.scopes then ctx.toggle_scopes(true) end
       state.ptmode = true
+      draw.set_font(state); model.invalidate()
       ctx.set_focus('tracker')
-      vim.msg = 'PT-mode: tracker + scopes of the visible tracks (:pt again - back)'
+      vim.msg = 'PT-mode: 4 channels, scopes on top (:pt again - back, :pt new - create CH1..CH4)'
     end
+  end,
+  -- :pt new (3 окт): в проекте ровно 4 канала CH1..CH4 (недостающие — новыми
+  -- треками в конце), прокрутка на CH1, PT-mode включается
+  pt_new = function()
+    local have = {}
+    for i = 0, reaper.CountTracks(0) - 1 do local _, nm = reaper.GetTrackName(reaper.GetTrack(0, i)); have[nm] = i end
+    local made = edit.pt_tracks(have)
+    model.invalidate()
+    snap = model.snapshot(state.lpb)
+    for ci, c in ipairs(snap.cols) do if c.name == 'CH1' then state.hscroll = ci; break end end
+    if not state.ptmode then ctx.pt_toggle() end
+    vim.msg = ('PT-mode: channels CH1..CH4 (%d new)'):format(made)
   end,
   -- треки, видимые сейчас в трекере (скопы PT-mode)
   visible_cols = function()

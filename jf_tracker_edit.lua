@@ -950,6 +950,25 @@ function E.unwarp_piece(it, pts, rate, a, b)
   return true
 end
 
+-- PT-mode (3 окт, :pt new): треки CH1..CH4, которых нет (have — имя → индекс);
+-- в конце проекта, один undo. Возвращает число новых
+function E.pt_tracks(have)
+  local n = 0
+  run('PT channels', function()
+    for k = 1, 4 do
+      local nm = 'CH' .. k
+      if not have[nm] then
+        R.InsertTrackAtIndex(R.CountTracks(0), true)
+        local tr = R.GetTrack(0, R.CountTracks(0) - 1)
+        R.GetSetMediaTrackInfo_String(tr, 'P_NAME', nm, true)
+        n = n + 1
+      end
+    end
+    R.TrackList_AdjustWindows(false)
+  end)
+  return n
+end
+
 -- порядок исходников в lib (3 окт, перетаскивание / J K): items — item-представители
 -- исходников в новом порядке; метка P_EXT:jf_ord = номер ставится на все копии
 -- исходника (та же jf_iid), новые ноты наследуют её через чанк. Один undo.

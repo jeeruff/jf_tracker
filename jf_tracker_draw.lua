@@ -92,7 +92,7 @@ function D.set_font(state)
   else
     D.font_id = 0
     -- только целые x1..x4 (дробный пробовали 1 окт — кривой; Ctrl +/- шаг 1)
-    D.SCALE = math.max(1, math.min(D.SCALE_MAX, math.floor(tonumber(state.fontscale) or 2)))
+    D.SCALE = math.max(1, math.min(state.ptmode and 4 or D.SCALE_MAX, math.floor(tonumber(state.fontscale) or 2)))   -- x4 — только PT-mode
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
   tcache, next_img = {}, IMG_FIRST
@@ -342,6 +342,7 @@ function D.layout(snap, state, nregions)
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
+  L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
   local hide_below = nil          -- глубина свёрнутой папки: дети не показываются
@@ -351,8 +352,14 @@ function D.layout(snap, state, nregions)
     local hidden = hide_below ~= nil and depth > hide_below
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.win_w
+    -- PT-mode (3 окт): ровно 4 канала от прокрутки
+    if state.ptmode and not hidden and ci >= first then
+      L.pt_avail = L.pt_avail + 1
+      if L.pt_n >= 4 then vis = false end
+    end
     -- fold: true — компактный вид (волна + нота), 'mini' — полоска в символ (прежний fold)
     local fs = state.folds[col.guid]
+    if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
     if (state.wzoom or 0) >= 2 then fs = 'mini' elseif (state.wzoom or 0) == 1 and fs == nil then fs = true end
@@ -385,6 +392,7 @@ function D.layout(snap, state, nregions)
       local show_env = state.trackenvs and state.trackenvs[col.guid]
       if show_env == nil then show_env = state.envs end
       if c.compact then show_env = true end         -- свёрнутый: автоматизация видна всегда, схемой
+      if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
         local ew = c.compact and L.env_cw or L.env_w
         for _, e in ipairs(col.envs) do
@@ -396,7 +404,7 @@ function D.layout(snap, state, nregions)
       end
     end
     c.w = lx - (c.x or 0)
-    if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1 end end
+    if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
     if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
     -- скрытые дети свёрнутой папки: записи L.flat остаются (курсор не ломается), x = nil
     if hidden then for _, f in ipairs(L.flat) do if f.ci == ci then f.x = nil end end end

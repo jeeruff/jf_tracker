@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.99'
+V.VERSION = '0.6.0'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.0', d = '2026-10-03', items = {
+    'PT-mode is now the dumbed-down ProTracker view it was meant to be: exactly 4 channels (from the track scroll), each note / sample / volume / one command, no wave column, no envelopes, no folds, LPB 4, bitmap x4 (the largest scale where 4 channels fit: x4 -> x3 -> x2), scopes of the 4 channels on top; :pt new creates the channels CH1..CH4 in the project (one undo) and enters the mode; :pt again restores every setting',
+  } },
   { v = '0.5.99', d = '2026-10-03', items = {
     'jf_pm in the browser: each project shows its tempo, keys, tags (#Finder and own) and status next to the name, and the list search finds them (find 160bpm, Bm, #tag, [джем]); o opens the project in REAPER - switches to its tab if it is open, otherwise asks and opens a new tab (REAPER stops scripts on project open, the tracker starts itself again there)',
   } },
