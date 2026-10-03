@@ -1649,6 +1649,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     tbtn('preview', info.poolprev, 'prevbtn')
     tbtn('insert', info.inspreview, 'insprevbtn')
+    -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
+    if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
   L.pool_rows = rows

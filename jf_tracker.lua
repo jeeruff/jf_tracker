@@ -1949,6 +1949,29 @@ ctx = {
       end
     end
   end,
+  -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
+  -- звук (on) или выбранный в браузере (off)
+  swap_info = function()
+    local col = cur_col(); local e = col and col.pool[vim.inst]
+    if e and e.parent then e = e.parent end
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then return 'none' end
+    if edit.swapped(e.item) then
+      local tk = reaper.GetActiveTake(e.item); local src = tk and reaper.GetMediaItemTake_Source(tk)
+      return 'on', src and reaper.GetMediaSourceFileName(src, ''):match('[^/]+$'), e
+    end
+    local be = B.entries and B.entries[B.cur]
+    local path = be and not be.dir and not be.db and not be.trk and B.full(be)
+    if path and not path:lower():match('%.wav$') and not path:lower():match('%.aiff?$') and not path:lower():match('%.flac$')
+       and not path:lower():match('%.mp3$') and not path:lower():match('%.ogg$') and not path:lower():match('%.wv$') and not path:lower():match('%.caf$') and not path:lower():match('%.m4a$') then path = nil end
+    return 'off', path and path:match('[^/]+$'), e, path
+  end,
+  swap_click = function()
+    local st, file, e, path = ctx.swap_info()
+    if st == 'on' then local n = edit.swap_source(e.item, nil); vim.msg = ('swap back: %d note(s) play the original again'):format(n)
+    elseif st == 'off' and path then local n = edit.swap_source(e.item, path); vim.msg = ('swap: %s now plays %s in %d note(s)'):format(e.name or '?', file, n)
+    else vim.msg = 'swap: select an audio file in the browser first' end
+    model.invalidate()
+  end,
   -- перестановка исходника в lib (3 окт): from — индекс пула (исходник),
   -- before — индекс пула исходника, перед которым встать (nil — в конец)
   lib_move = function(from, before)
@@ -3180,6 +3203,7 @@ local function hint_go(t)
   elseif t.kind == 'midirow' then state.toptab = 'midi'; ctx.set_focus('top'); MM.cur = d
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
+  elseif t.kind == 'swapbtn' then ctx.swap_click()
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param
@@ -4658,6 +4682,7 @@ local function frame()
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
+    swap_state = function() return (ctx.swap_info()) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
     trk_io = (state.dsp and not state.khelp) and function(col)
@@ -4999,6 +5024,10 @@ local function frame()
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
+  elseif hover.swapbtn then
+    local st, file = ctx.swap_info()
+    state.status = st == 'on' and ('swap: the sample plays ' .. (file or '?') .. ' - click: back to the original file')
+      or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len; numbers stay'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
@@ -5193,6 +5222,9 @@ local function frame()
     elseif hover.poolbsync then
       ctx.set_focus('inst'); ctx.bsync_toggle()
       click = { t = now2, zone = 'poolbsync' }
+    elseif hover.swapbtn then
+      ctx.set_focus('inst'); ctx.swap_click()
+      click = { t = now2, zone = 'swapbtn' }
     elseif hover.insprevbtn then
       ctx.set_focus('inst')
       state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')

@@ -39,6 +39,11 @@ _G.reaper = {
   GetTakeNumStretchMarkers = function(tk) return #(tk.sm or {}) end,
   GetTakeStretchMarker = function(tk, i) local m = tk.sm[i + 1]; return i, m.pos, m.src end,
   DeleteTakeStretchMarkers = function(tk) tk.sm = {} end,
+  PCM_Source_CreateFromFile = function(path) return { file = path } end,
+  GetMediaItemTake_Source = function(tk) return tk.src end,
+  SetMediaItemTake_Source = function(tk, src) tk.src = src end,
+  GetMediaSourceFileName = function(src) return src and src.file or '' end,
+  Main_OnCommand = function() end,
 }
 local E = dofile('jf_tracker_edit.lua')
 E.init({ invalidate = function() end })
@@ -127,5 +132,19 @@ E.lib_order({ o2, o1 })
 eq('first gets 1', o2.ext['P_EXT:jf_ord'], '1')
 eq('second gets 2', o1.ext['P_EXT:jf_ord'], '2')
 eq('copies follow', o1c.ext['P_EXT:jf_ord'], '2')
+-- swap (3 окт): файл у исходника и всех его нот, слайсы тоже; повтор — назад
+local sw1 = item(600, 2, 0, 1, { ['P_EXT:jf_iid'] = 'SW' }); sw1.take.src = { file = '/a/amen.wav' }
+local sw2 = item(602, 0.5, 0.5, 1, { ['P_EXT:jf_iid'] = 'SW#3' }); sw2.take.src = { file = '/a/amen.wav' }
+local other = item(604, 1, 0, 1, { ['P_EXT:jf_iid'] = 'SWX' }); other.take.src = { file = '/a/other.wav' }
+eq('swap count', E.swap_source(sw1, '/b/think.wav'), 2)
+eq('root swapped', sw1.take.src.file, '/b/think.wav')
+eq('slice swapped, offset kept', sw2.take.src.file .. '@' .. sw2.take.offs, '/b/think.wav@0.5')
+eq('other untouched', other.take.src.file, '/a/other.wav')
+eq('swapped remembers', E.swapped(sw1), '/a/amen.wav')
+E.swap_source(sw1, '/c/funky.wav')
+eq('second swap keeps the original to return to', E.swapped(sw1), '/a/amen.wav')
+eq('swap back', E.swap_source(sw1, nil), 2)
+eq('back to original', sw2.take.src.file, '/a/amen.wav')
+eq('mark cleared', E.swapped(sw1), nil)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

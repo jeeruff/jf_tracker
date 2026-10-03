@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.91'
+V.VERSION = '0.5.92'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.92', d = '2026-10-03', items = {
+    'lib: swap button - the selected sample plays the audio file selected in the browser in all its notes, slices too (offsets, lengths, slicing stay, as sample replace in Renoise); lit while swapped, click again - back to the original file; one undo step each',
+  } },
   { v = '0.5.91', d = '2026-10-03', items = {
     'lib order is yours: drag a sample row up / down (amber insert line) or J / K in the lib - the numbers follow the position everywhere (lib, cells); stored as P_EXT:jf_ord on the sample and its notes, one undo step; samples without a place go after',
   } },

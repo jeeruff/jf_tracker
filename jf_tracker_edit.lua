@@ -965,6 +965,55 @@ function E.lib_order(items)
   end)
 end
 
+-- swap (3 окт): звук инструмента — другой файл во всех его нотах (исходник,
+-- копии, слайсы: все item с той же меткой jf_iid до # / @ / ~). Прежний файл
+-- запоминается в P_EXT:jf_swap — повторный swap возвращает его. Смещения,
+-- длины и нарезка остаются (как замена сэмпла в Renoise). Один undo.
+function E.items_with_base(base)
+  local out = {}
+  if not base or base == '' then return out end
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, ii)
+      if iid_base(E.get_iid(it)) == base then out[#out + 1] = it end
+    end
+  end
+  return out
+end
+function E.swap_source(root, path)
+  local base = iid_base(E.ensure_iid(root))
+  local items = E.items_with_base(base)
+  if #items == 0 then items = { root } end
+  local n = 0
+  run(path and 'swap sample' or 'swap back', function()
+    for _, it in ipairs(items) do
+      local tk = R.GetActiveTake(it)
+      if tk then
+        local _, prev = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_swap', '', false)
+        local target = path or (prev ~= '' and prev or nil)
+        if target then
+          local src = R.PCM_Source_CreateFromFile(target)
+          if src then
+            if path and prev == '' then
+              local old = R.GetMediaItemTake_Source(tk)
+              R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_swap', old and R.GetMediaSourceFileName(old, '') or '', true)
+            elseif not path then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_swap', '', true) end
+            R.SetMediaItemTake_Source(tk, src)
+            n = n + 1
+          end
+        end
+      end
+    end
+    R.Main_OnCommand(40047, 0)                           -- Peaks: build any missing peak files
+  end)
+  return n
+end
+function E.swapped(root)
+  local _, prev = R.GetSetMediaItemInfo_String(root, 'P_EXT:jf_swap', '', false)
+  return prev ~= '' and prev or nil
+end
+
 -- починка уже вставленных слайсов (:fixslices, 3 окт): нота слайса k с
 -- маркерами, скопированными от растянутого корня, получает свой кусок
 -- источника. Возвращает число исправленных
