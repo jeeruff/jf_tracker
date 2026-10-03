@@ -296,5 +296,23 @@ do
   eq('untagged cut merged, longest kept', by.offs3 and by.offs3.len, 2)
   eq('untagged other offset separate', by['offs3.5'] ~= nil, true)
 end
+-- порядок lib (3 окт): метка P_EXT:jf_ord на исходнике задаёт номер; без
+-- метки — после размеченных; слайс носит номер исходника
+do
+  for k in pairs(tracks) do tracks[k] = nil end
+  local function au(pos, name, ord, srclen)
+    local tk = { name = name, src = { len = srclen, qn = false } }
+    local it = { pos = pos, len = 1, take = tk, ext = { ['P_EXT:jf_ord'] = ord } }
+    tk.item = it
+    return it
+  end
+  tracks[1] = { name = 'T', items = { au(0, 'kick', '3', 1), au(2, 'snare', '1', 2), au(4, 'hat', nil, 3), au(6, 'clap', '2', 4) } }
+  state_count = state_count + 1
+  local snap = M.build(4)
+  local names = {}
+  for _, e in ipairs(snap.pool) do names[#names + 1] = e.name .. e.num end
+  eq('order by jf_ord, unmarked last', table.concat(names, ' '), 'snare1 clap2 kick3 hat4')
+  eq('roots counted', snap.nroots, 4)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -128,6 +128,7 @@ KH.PAGES = {
   inst = { title = 'lib', e = {
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
+    { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
     { k = 'g G', d = 'first / last' },
     { k = 'h l', d = 'track left / right' },
     { k = 'dd x', d = 'cut instrument: its events on the tracks and the library item (to the register)' },
@@ -326,7 +327,7 @@ KH.BARS = {
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'D', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { '< >', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
-  inst = { { 'j k', 'select' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'slicer' },
+  inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'slicer' },
            { 'Space', 'listen' }, { '/', 'find' }, { '?', 'help' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },

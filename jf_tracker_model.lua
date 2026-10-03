@@ -509,6 +509,22 @@ function M.build(lpb)
   end
   for _, e in ipairs(all) do if not e.parent then put(e, 0) end end
   for _, e in ipairs(all) do put(e, e.parent and 1 or 0) end
+  -- свой порядок исходников (3 окт): перетаскивание в lib пишет P_EXT:jf_ord
+  -- на item исходника; без метки — после размеченных, в порядке дерева
+  local any_ord = false
+  for _, e in ipairs(ordered) do if not e.parent and e.ord then any_ord = true; break end end
+  if any_ord then
+    local roots = {}
+    for k, e in ipairs(ordered) do if not e.parent then roots[#roots + 1] = { e = e, k = k } end end
+    table.sort(roots, function(a, b)
+      local oa, ob = a.e.ord or 1e9, b.e.ord or 1e9
+      if oa ~= ob then return oa < ob end
+      return a.k < b.k
+    end)
+    ordered, placed = {}, {}
+    for _, r in ipairs(roots) do put(r.e, 0) end
+    for _, e in ipairs(all) do put(e, e.parent and 1 or 0) end
+  end
   all = ordered
   snap.pool = all
   for _, col in ipairs(snap.cols) do col.pool = all end
@@ -627,13 +643,16 @@ local function pool_add(pool, seen, it, from_depot)
   if at then
     local cur = pool[at]
     cur.n = (cur.n or 1) + 1
+    if not cur.ord then local _, o = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ord', '', false); cur.ord = tonumber(o) end
     -- представитель: библиотека, затем самый длинный (не обрезанная копия)
     local better = (from_depot and not cur.depot) or ((not from_depot) == (not cur.depot) and len > cur.len + 1e-6)
     if not better then return end
     local n = cur.n
+    local ord = cur.ord
     pool[at] = nil
     pool_add_entry(pool, at, it, take, name, key, from_depot)
     pool[at].n = n
+    pool[at].ord = pool[at].ord or ord
     return
   end
   seen[key] = #pool + 1
@@ -644,6 +663,7 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   local gkey = key
   pool[at] = {
     item = it, take = take, name = name, src = R.GetMediaItemTake_Source(take),
+    ord = tonumber((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ord', '', false)))),   -- порядок в lib (3 окт, перетаскивание)
     offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS'),
     len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
     rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE'),

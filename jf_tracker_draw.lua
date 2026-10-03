@@ -1686,6 +1686,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local trgb = {}
   for _, c in ipairs(info.cols or {}) do if c.rgb and not trgb[c.name] then trgb[c.name] = c.rgb end end
   local dbg = {}
+  -- перестановка протяжкой (3 окт): цель — перед исходником строки под мышью
+  -- (нижняя половина строки — перед следующим), линия вставки янтарём
+  local drag = D.lib_drag and D.lib_drag.active
+  D.lib_drop = nil
+  local drop_y
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
     local y = iy + 2 + 2 * L.rh + (r - D.pool_scroll - 1) * L.rh
@@ -1775,8 +1780,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
       if mx >= ix and mx < ix + w and my >= y and my < y + L.rh then hover.pool = { ci = info.pool_ci, i = i } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
+      if drag and my >= y and my < y + L.rh then
+        if my < y + L.rh / 2 then D.lib_drop, drop_y = { before = i }, y
+        else
+          local nx                                   -- следующий исходник ниже
+          for r2 = r + 1, #rows do if rows[r2].i then nx = rows[r2].i; break end end
+          D.lib_drop, drop_y = { before = nx }, y + L.rh
+        end
+      end
     end
   end
+  if drop_y then set(U.AMBER); gfx.rect(ix + 2, drop_y - 1, w - 4, 2, 1) end
   D.pool_dbg = table.concat(dbg, ' | ')
 end
 

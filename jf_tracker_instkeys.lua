@@ -69,6 +69,7 @@ function IK.key(c, cur, n, nslots)
   if ch == 'd' or ch == 'y' then IK.pending = ch; ctx.msg(ch .. '...'); return true end
   if ch == 'j' or c == DOWN then ctx.inst_select(math.min(math.max(1, nslots), cur + 1))
   elseif ch == 'k' or c == UP then ctx.inst_select(math.max(1, cur - 1))
+  elseif ch == 'J' or ch == 'K' then ctx.lib_step(ch == 'J' and 1 or -1)   -- исходник ниже / выше (3 окт)
   elseif ch == 'g' then ctx.inst_select(1)
   elseif ch == 'G' then ctx.inst_select(math.max(1, n))
   elseif ch == 'v' then IK.anchor = IK.anchor and nil or cur

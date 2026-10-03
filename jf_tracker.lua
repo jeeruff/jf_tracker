@@ -1949,6 +1949,41 @@ ctx = {
       end
     end
   end,
+  -- перестановка исходника в lib (3 окт): from — индекс пула (исходник),
+  -- before — индекс пула исходника, перед которым встать (nil — в конец)
+  lib_move = function(from, before)
+    local col = cur_col(); local pool = col and col.pool or {}
+    local src = pool[from]
+    if not src or src.parent or from == before then return end
+    local roots = {}
+    for _, e in ipairs(pool) do if not e.parent and e ~= src then roots[#roots + 1] = e end end
+    local at = #roots + 1
+    for k, e in ipairs(roots) do if pool[before or 0] == e then at = k end end
+    table.insert(roots, at, src)
+    local items = {}
+    for _, e in ipairs(roots) do items[#items + 1] = e.item end
+    edit.lib_order(items)
+    model.invalidate()
+    reselect_item = src.item                 -- после пересборки выбор остаётся на нём
+    vim.msg = ('lib: %s -> %02d'):format(src.name or '?', at)
+  end,
+  -- J / K в lib: выбранный исходник на место ниже / выше
+  lib_step = function(d)
+    local col = cur_col(); local pool = col and col.pool or {}
+    local cur = pool[vim.inst]; if cur and cur.parent then cur = cur.parent end
+    if not cur then return end
+    local roots, at = {}, nil
+    for i, e in ipairs(pool) do if not e.parent then roots[#roots + 1] = i; if e == cur then at = #roots end end end
+    if not at then return end
+    local from = roots[at]
+    if d > 0 then
+      if at >= #roots then return end
+      ctx.lib_move(from, roots[at + 2])                -- перед тем, что был через один (nil — в конец)
+    else
+      if at <= 1 then return end
+      ctx.lib_move(from, roots[at - 1])
+    end
+  end,
   -- Shift+Enter (3 окт): какой item / слайс под курсором — номер инструмента,
   -- исходник, слайс k или весь сэмпл, кусок файла, длина и rate
   describe_cell = function(cell)
@@ -5506,7 +5541,8 @@ local function frame()
       state.prev_by_mouse = true
       pool_select(hover.pool.i)
       state.prev_by_mouse = nil
-      if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.open_slicer(hover.pool.i) end
+      if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.open_slicer(hover.pool.i)
+      else draw.lib_drag = { i = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y } end   -- протяжка — перестановка
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
       -- trim (3 окт): клик — fzf по параметрам трека и его FX, Shift — огибающие в трекере, ПКМ — панель params
@@ -6020,6 +6056,18 @@ local function frame()
   end
   -- DSP: перетаскивание блока за заголовок → перестановка FX в цепи трека
   -- протяжка слайдера шапки: значение каждый кадр без undo, точка undo на отпускании
+  -- перестановка в lib протяжкой (3 окт): ушли > 6 px — линия вставки (рисует
+  -- lib, D.lib_drop), отпустили — исходник встаёт туда
+  if draw.lib_drag then
+    local d = draw.lib_drag
+    if gfx.mouse_cap & 1 == 1 then
+      if not d.active and math.abs(gfx.mouse_y - d.y0) > 6 then d.active = true end
+      if d.active then state.status = 'lib: drop to place the sample here (numbers follow the order)' end
+    else
+      if d.active and draw.lib_drop then ctx.lib_move(d.i, draw.lib_drop.before) end
+      draw.lib_drag, draw.lib_drop = nil, nil
+    end
+  end
   if draw.send_drag then
     local d = draw.send_drag
     local tr = d.col.track

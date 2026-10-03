@@ -950,6 +950,21 @@ function E.unwarp_piece(it, pts, rate, a, b)
   return true
 end
 
+-- порядок исходников в lib (3 окт, перетаскивание / J K): items — item-представители
+-- исходников в новом порядке; метка P_EXT:jf_ord = номер ставится на все копии
+-- исходника (та же jf_iid), новые ноты наследуют её через чанк. Один undo.
+function E.lib_order(items)
+  run('lib order', function()
+    for k, it in ipairs(items) do
+      if R.ValidatePtr(it, 'MediaItem*') then
+        local copies = E.items_with_iid(E.ensure_iid(it))
+        if #copies == 0 then copies = { it } end
+        for _, c in ipairs(copies) do R.GetSetMediaItemInfo_String(c, 'P_EXT:jf_ord', tostring(k), true) end
+      end
+    end
+  end)
+end
+
 -- починка уже вставленных слайсов (:fixslices, 3 окт): нота слайса k с
 -- маркерами, скопированными от растянутого корня, получает свой кусок
 -- источника. Возвращает число исправленных
