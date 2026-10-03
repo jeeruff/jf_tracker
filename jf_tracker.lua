@@ -139,7 +139,13 @@ state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
 state.captions = tostring(ext('captions', '0')) == '1'     -- строка подписей колонок (по умолчанию выкл, 2 окт)
-state.fathdr = tostring(ext('fathdr', '0')) == '1'         -- fat header: шапка трека залита его цветом (3 окт)
+-- заливка шапки трека цветом (3 окт): line — полоска под именем, header —
+-- строка имени, full — вся шапка (ниже имени тусклее); fathdr — старый флаг
+state.hdrfill = (function()
+  local v = reaper.GetExtState(EXT, 'hdrfill')
+  if v == 'line' or v == 'header' or v == 'full' then return v end
+  return tostring(ext('fathdr', '0')) == '1' and 'full' or 'line'
+end)()
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
 PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
@@ -322,12 +328,12 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'fathdr', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1984,7 +1990,7 @@ ctx = {
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
-      flag('fathdr', 'fat header', 'the whole track header filled with the track colour (as REAPER tints the TCP); off: a colour strip under the name'),
+      { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'line', 'header', 'full' }, desc = 'line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name)', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
     }
     OPT.open(items)
@@ -3781,7 +3787,10 @@ function ctrl_action(name, delta)
   elseif name == 'fx' then state.fxcols = math.max(0, math.min(4, state.fxcols + (delta ~= 0 and delta or 1)))
   elseif name == 'meters' then state.meters = not state.meters
   elseif name == 'caps' then state.captions = not state.captions; vim.msg = 'column captions ' .. (state.captions and 'on' or 'off')
-  elseif name == 'fat' then state.fathdr = not state.fathdr; vim.msg = 'fat header ' .. (state.fathdr and 'on' or 'off')
+  elseif name == 'hdr' then
+    local order = { line = 'header', header = 'full', full = 'line' }
+    local back = { line = 'full', header = 'line', full = 'header' }
+    state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
   elseif name == 'sig' or name == 'beats' then
     vim.msg = ('time signature %d/%d at the cursor: %d rows per bar at LPB %d (change it with a REAPER tempo marker)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
@@ -4324,7 +4333,7 @@ local function frame()
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
-      captions = state.captions, fathdr = state.fathdr,
+      captions = state.captions, hdrfill = state.hdrfill,
       xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
       metro = reaper.GetToggleCommandState(40364) == 1,
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -4576,7 +4585,7 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
-  elseif hover.ctrl == 'fat' then state.status = 'fat header: the whole track header filled with the track colour (off: a colour strip under the name)'
+  elseif hover.ctrl == 'hdr' then state.status = 'track header colour - click / wheel: line (strip under the name), header (name row filled), full (whole header, dimmer below the name)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
   elseif hover.ruler then

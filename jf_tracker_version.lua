@@ -6,8 +6,8 @@ V.DATE = '2026-10-03'
 V.CHANGES = {
   { v = '0.5.66', d = '2026-10-03', items = {
     'tracks selected in REAPER are shown: their column (header and body) is slightly lighter; polled every frame, so it follows clicks in the TCP at once',
-    'option fat header (options, main module cell fat, off by default): the whole track header filled with the track colour, toned to the panel like REAPER tints the TCP; the name turns dark on light colours',
-    'main module: cells caps (column captions on / off) and fat (fat header)',
+    'track header colour, three modes (options, main module cell hdr, click / wheel): line - a colour strip under the name (as before), header - the name row filled, full - the whole header filled, dimmer below the name; toned to the panel like REAPER tints the TCP, the name turns dark on light colours',
+    'main module: cells caps (column captions on / off) and hdr (track header colour)',
     'the instruments module is now called items (header, help page, status texts)',
   } },
   { v = '0.5.65', d = '2026-10-03', items = {
