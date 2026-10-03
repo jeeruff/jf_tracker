@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.81'
+V.VERSION = '0.5.82'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.82', d = '2026-10-03', items = {
+    'fix: the wave column no longer darkens when the cursor is on the note - only the wave inside the note field (wave: note) follows the cursor highlight',
+  } },
   { v = '0.5.81', d = '2026-10-03', items = {
     'cursor lead: while playing the playhead row is drawn 15 ms ahead (options -> cursor lead, 0..60 ms) - the frame reaches the screen later than the position is read, the cursor trailed the sound; logic (Orca, jumps, queue, =END) still uses the real position',
     'item frame option: item (border around the whole item) / wave (only around the wave column) / off',

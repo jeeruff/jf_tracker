@@ -595,6 +595,9 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   local off = math.floor((head.start_f or 0) * L.rh + 0.5)
   local column = L.w_wave > 0
   local mode = L.wave
+  -- своя колонка (3 окт): курсор на ноте её не касается — волна не темнеет;
+  -- инверсия только в режиме note, где волна лежит под подсвеченным полем
+  if column then inv = nil end
   local pk = get_peaks and get_peaks(head, math.min(total, 8192), column and mode == 'spec')
   local cx, hw, x0w
   if column then cx = x + L.x_wave + L.w_wave / 2; hw = (L.w_wave / 2) - 1; x0w = x + L.x_wave
