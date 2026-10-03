@@ -33,6 +33,7 @@ KH.PAGES = {
     { k = 'lib', t = {}, d = 'the sounds you play (right panel): every audio item of the project, one entry per sound; library entries sit on their track after the =LIB marker' },
     { k = 'linked', t = {}, d = 'notes of a lib entry are linked copies: change it in the item panel and all its notes follow; a stretched note becomes unique (or apply to all)' },
     { k = 'item', t = {}, d = 'item tab (top): the selected lib entry - wave, slices, properties, preview, beatsync' },
+    { k = 'slices', t = {}, d = 'a slice is not its own instrument: the note keeps the number of its sample, Sxx in the command column is the slice; Shift+Enter tells what is under the cursor' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {

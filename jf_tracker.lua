@@ -443,6 +443,13 @@ local function pool_select(n)
   local col = cur_col()
   local pool = col and col.pool or {}
   n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
+  -- слайсы в lib не показываются (3 окт): шаг на слайс — дальше, к следующему
+  -- исходнику (вниз) или к своему исходнику (вверх)
+  if pool[n] and pool[n].parent then
+    if n > (vim.inst or 1) then while pool[n] and pool[n].parent do n = n + 1 end
+    else while n > 1 and pool[n] and pool[n].parent do n = n - 1 end end
+    n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
+  end
   vim.inst = n
   if n > #pool then
     -- пустой слот (2 окт): цель для ретро-захвата и бросков
@@ -1964,6 +1971,25 @@ ctx = {
         model.invalidate()
       end
     end
+  end,
+  -- Shift+Enter (3 окт): какой item / слайс под курсором — номер инструмента,
+  -- исходник, слайс k или весь сэмпл, кусок файла, длина и rate
+  describe_cell = function(cell)
+    if not cell then return 'nothing under the cursor' end
+    if cell.kind == 'midi' then return ('MIDI note %s ch %d vel %s'):format(cell.note or '?', (cell.ch or 0) + 1, tostring(cell.vel or '')) end
+    local it = cell.item
+    if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then return 'no item under the cursor' end
+    local tk = reaper.GetActiveTake(it)
+    local src = tk and reaper.GetMediaItemTake_Source(tk)
+    local file = src and (reaper.GetMediaSourceFileName(src, ''):match('[^/]+$')) or '?'
+    local num = snap and snap.inst_num and snap.inst_num[it]
+    local _, k = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+    local offs = tk and reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0
+    local rate = tk and reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') or 1
+    local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local what = (k ~= '' and ('slice S%02X'):format(tonumber(k) or 0)) or 'whole sample'
+    return ('inst %s %s - %s | file %s @ %.3fs, %.3fs of file, len %.3fs, rate %.3f'):format(num and ('%02d'):format(num) or '--',
+      cell.name or '', what, file, offs, len * rate, len, rate)
   end,
   -- имя входа записи трека (шапка, блок трека DSP)
   input_name = function(tr)
@@ -4474,6 +4500,7 @@ local function frame()
   local changed
   snap, changed = model.snapshot(state.lpb)
   draw.inst_of = snap and snap.inst_of
+  draw.inst_num = snap and snap.inst_num
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()

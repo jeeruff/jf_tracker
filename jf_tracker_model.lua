@@ -146,6 +146,11 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local fx = {}
   if not take then return fx end
   local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+  -- слайс (P_EXT:jf_slice): Sxx = номер слайса в исходнике (3 окт) — инструмент
+  -- один, номер у ноты общий, а какой кусок — эта команда
+  local _, slk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+  slk = tonumber(slk)
+  if slk then fx[#fx + 1] = 'S' .. M.hex2(slk); offs = 0 end
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
@@ -512,6 +517,15 @@ function M.build(lpb)
   for i, e in ipairs(all) do by_key[e.gkey] = i end
   snap.inst_of = {}
   for it, key in pairs(pool_by_item) do snap.inst_of[it] = by_key[key] end
+  -- номера инструментов (3 окт): только у исходных сэмплов (корней) — 01, 02…;
+  -- слайс / кусок вложен в свой исходник и носит его номер (какой слайс —
+  -- Sxx в колонке команд). В lib слайсы не показываются.
+  local num = 0
+  for _, e in ipairs(all) do if not e.parent then num = num + 1; e.num = num end end
+  for _, e in ipairs(all) do if e.parent then e.num = e.parent.num end end
+  snap.nroots = num
+  snap.inst_num = {}
+  for it, i in pairs(snap.inst_of) do snap.inst_num[it] = all[i] and all[i].num end
   return snap
 end
 

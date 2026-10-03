@@ -670,7 +670,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local name_row = cell and cell.kind == 'cont' and cell.i == 1 and cell.of.kind == 'audio' and D.itemnames and cell.of.name ~= ''
   if L.x_inst and not name_row then
     -- поле инструмента: номер на строке ноты; пустое — точки
-    local n = cell and (cell.kind == 'audio') and D.inst_of and D.inst_of[cell.item]
+    local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), cell.muted and U.GREY or U.GREEN)
     else text(x + L.x_inst, ty, '..', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY) end
   end
@@ -1547,6 +1547,10 @@ end
 function D.empty_slots(n) return math.max(2, 8 - (n or 0)) end
 local function add_empty(rows, pool)
   for k = 1, D.empty_slots(#pool) do rows[#rows + 1] = { empty = #pool + k } end
+  -- пустые слоты продолжают номера исходников (слайсы номеров не берут)
+  local nr = 0
+  for _, e in ipairs(pool) do if not e.parent then nr = nr + 1 end end
+  for _, r in ipairs(rows) do if r.empty then r.num = nr + (r.empty - #pool) end end
   return rows
 end
 function D.pool_rows(pool, sort, col, cols)
@@ -1565,7 +1569,7 @@ function D.pool_rows(pool, sort, col, cols)
       if ea.len ~= eb.len then return ea.len < eb.len end
       return a < b
     end)
-    for _, i in ipairs(idx) do rows[#rows + 1] = { i = i } end
+    for _, i in ipairs(idx) do if not pool[i].parent then rows[#rows + 1] = { i = i } end end   -- слайсы вложены (3 окт)
     return add_empty(rows, pool)
   end
   -- дерево (2 окт): пул уже упорядочен моделью — трек (где лежит исходник),
@@ -1576,7 +1580,7 @@ function D.pool_rows(pool, sort, col, cols)
       cur_home = e.home
       rows[#rows + 1] = { hdr = e.home or '?', name = e.home }
     end
-    rows[#rows + 1] = { i = i }
+    if not e.parent then rows[#rows + 1] = { i = i } end    -- слайсы вложены в исходник (3 окт)
   end
   return add_empty(rows, pool)
 end
@@ -1592,7 +1596,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local pool = col and col.pool or {}
   local inst = info.inst or 1
   local cur = pool[inst]
-  local head = ('lib %d'):format(#pool)
+  local nroots = 0
+  for _, e in ipairs(pool) do if not e.parent then nroots = nroots + 1 end end
+  local head = ('lib %d'):format(nroots)                -- слайсы не считаются (вложены)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
   -- справа налево: sort (track / len / mark), find (fzf, 2 окт), bsync (3 окт);
   -- у каждой своя x (раньше sort рисовалась поверх find — от неё торчало «d»)
@@ -1637,7 +1643,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     tbtn('preview', info.poolprev, 'prevbtn')
     tbtn('insert', info.inspreview, 'insprevbtn')
     -- легенда меток
-    local lg = '@ on cursor track  $ sliced  sN slice'
+    local lg = '@ on cursor track  $ sliced'
     text(bx + L.pad, by, fit(lg, ix + w - bx - 2 * L.pad - (L.inst_knob_w or 0)), U.DIM)
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
@@ -1645,7 +1651,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
-  for r, row in ipairs(rows) do if row.i == inst or row.empty == inst then sel_r = r end end
+  for r, row in ipairs(rows) do if row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent) then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   if sel_r > D.pool_scroll + nvis then D.pool_scroll = sel_r - nvis end
@@ -1692,14 +1698,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot and info.dragging then set(U.tint(U.CYAN, 0.25)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, ('%02d    ..'):format(row.empty), sel and U.AMBER or U.DIM)
+      text(ix + 6, y + 1, ('%02d    ..'):format(row.num or row.empty), sel and U.AMBER or U.DIM)
       if hot then hover.pool = { ci = info.pool_ci, i = row.empty, empty = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, row.empty)
     else
       local i = row.i
       local e = pool[i]
       local rgb = e.rgb or (e.tracks and trgb[e.tracks[1]]) or (col and col.rgb) or U.GREY
-      local sel = i == inst
+      local sel = i == inst or (cur and cur.parent == e)   -- выбран слайс — горит исходник
       local rr = info.inst_range                -- диапазон v (2 окт)
       local inr = rr and i >= rr[1] and i <= rr[2] and not sel
       local here = col and e.track_set and e.track_set[col.name]
@@ -1720,7 +1726,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local last = not (nxt and (nxt.depth or 0) > 0 and nxt.parent == e.parent)
         body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut')
       else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
-      local lbl = ('%02d %s %s%s'):format(i, marks, body, e.muted and ' (muted)' or '')
+      local lbl = ('%02d %s %s%s'):format(e.num or i, marks, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
       do
         local mx0 = ix + 6 + ms('00 ')

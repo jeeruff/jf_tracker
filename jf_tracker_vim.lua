@@ -1264,6 +1264,12 @@ function V.key_impl(c)
   elseif ch == ')' then ctx.pool_select(V.inst + 1)
   elseif ch == 'F' then st.follow = not st.follow
   elseif ch == ' ' then E.play_stop()
+  elseif c == ENTER and ctx.mods and ctx.mods().shift and ctx.describe_cell then
+    -- Shift+Enter (3 окт): что именно под курсором — исходник, номер, слайс, кусок файла
+    local f = flat()[V.cur.fi]
+    local cell = f and f.sub and f.sub[V.cur.row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    V.msg = ctx.describe_cell(cell)
   elseif c == ENTER then E.cursor_to(ctx.row_time(V.cur.row))
   elseif c == TAB then ctx.toggle_focus()
   elseif c == ESC then V.count = nil; finish_move()

@@ -447,6 +447,30 @@ local function apply_fx(h, lpb, cmd, xx)
     -- слайс xx нарезанного инструмента (P_EXT:jf_slices у item); без нарезки —
     -- offset xx/256 источника (как Sxx в Renoise)
     local slices, base = E.item_slices(it)
+    -- нота-слайс (3 окт): своей таблицы нет — берётся у исходника (та же метка
+    -- jf_iid до #), Sxx = слайс xx; исходник с маркерами — кусок без них
+    local _, own_k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+    if #slices == 0 and tonumber(own_k) then
+      for _, c in ipairs(E.items_with_iid(iid_base(E.get_iid(it)))) do
+        local sl, b0 = E.item_slices(c)
+        if #sl > 0 then
+          local k = math.max(1, math.min(#sl, xx))
+          local rtk = R.GetActiveTake(c)
+          local rate = R.GetMediaItemTakeInfo_Value(rtk, 'D_PLAYRATE')
+          local a0, b1 = sl[k], sl[k + 1] or b0.len or R.GetMediaItemInfo_Value(c, 'D_LENGTH')
+          local pts = E.root_markers(rtk)
+          if pts then E.unwarp_piece(it, pts, rate, a0, b1)
+          else
+            R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate)
+            R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (b0.offs or 0) + a0 * rate)
+            R.SetMediaItemInfo_Value(it, 'D_LENGTH', b1 - a0)
+          end
+          R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
+          E.set_iid(it, iid_base(E.get_iid(c)) .. '#' .. k)
+          return
+        end
+      end
+    end
     if #slices > 0 then
       local k = math.max(1, math.min(#slices, xx))
       local bs = E.bsync_of(it)
