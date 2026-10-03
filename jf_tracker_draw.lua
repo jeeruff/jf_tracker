@@ -282,11 +282,11 @@ function D.layout(snap, state, nregions)
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
-  -- строка скопа в шапке — только если скопы не на полоске курсора (scopeat, 3 окт)
+  -- скопы треков — во вкладке scopes (3 окт), строки в шапке нет
   -- строка входа (3 окт, опция hdrin): in <вход> [smart] — под панорамой, лейны ниже
   L.hr_in = (state.hdrin ~= false) and 1 or 0
   L.lane_row = 4 + L.hr_in
-  L.header_rows = 5 + L.hr_in + (state.captions and 1 or 0) + ((state.scopes and state.scopeat == 'header') and 1 or 0)
+  L.header_rows = 5 + L.hr_in + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -2054,12 +2054,6 @@ function D.frame(L, snap, rows, state, info)
       end
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
     end
-    -- скоп дорожки (3 окт): осциллограф моста в нижней строке шапки
-    if state.scopes and state.scopeat == 'header' and not c.folded and col.scope_slot and info.scope then
-      local sy = hy + (L.lane_row + 1 + (state.captions and 1 or 0)) * L.rh + 2
-      set(U.BG); gfx.rect(c.x + 2, sy, c.w - 4, L.rh - 1, 1)
-      draw_analyzer(c.x + 2, sy, c.w - 4, L.rh - 1, col.scope_slot, 'scope', info)
-    end
     U.TEXT, U.GREY = T0, G0
     set(U.LINE); gfx.rect(c.x, hy, 1, L.header_h, 1)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
@@ -2150,14 +2144,6 @@ function D.frame(L, snap, rows, state, info)
     local is_cur_row = vc and vc.row == r.row
     if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
-    -- скопы на полоске курсора (3 окт, scopeat = cursor): осциллограмма каждого
-    -- трека по ширине его колонки, под текстом ячеек, приглушённо — ноты читаются
-    if is_cur_row and state.scopes and state.scopeat ~= 'header' and info.scope then
-      local sc_col = U.mix(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW, U.GREEN, 0.55)
-      for _, c in ipairs(L.cols) do
-        if c.x and not c.folded and c.col.scope_slot then draw_analyzer(c.x + 2, y, c.w - 4, L.rh, c.col.scope_slot, 'scope', info, sc_col) end
-      end
-    end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция

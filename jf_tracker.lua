@@ -136,11 +136,10 @@ local state = {
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
-  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,
-  hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',
+  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
+  hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,     -- упреждение курсора при игре, мс (3 окт)
-  itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- строка входа в шапке трека (3 окт)
-  scopeat = reaper.GetExtState(EXT, 'scopeat') == 'header' and 'header' or 'cursor',   -- скопы: полоска курсора / строка шапки (3 окт)      -- зум ширины треков (3 окт)
+  itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -361,7 +360,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2260,7 +2259,6 @@ ctx = {
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: list by click + smart input', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
-      { key = 'scopeat', label = 'scopes at', kind = 'cycle', values = { 'cursor', 'header' }, desc = 'scopes on the cursor row, under the notes, or a row in the header', get = function() return state.scopeat or 'cursor' end, set = function(v) state.scopeat = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'wave: own column (colour = frequency) / inside the note field / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },

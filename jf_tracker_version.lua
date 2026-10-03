@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.86'
+V.VERSION = '0.5.87'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.87', d = '2026-10-03', items = {
+    'scopes at removed: no scope on the cursor row and no scope row in the track header - track scopes live in the scopes tab (and master)',
+  } },
   { v = '0.5.86', d = '2026-10-03', items = {
     'slices are nested in their sample: the lib lists and numbers only source samples (01, 02 ...), a slice note shows the number of its sample and Sxx in the command column = the slice index (Sxx typed on a slice note picks that slice); no more 15 numbers per sliced break',
     'Shift+Enter (NORMAL): what is under the cursor - instrument number, name, slice or whole sample, file, offset, piece length, rate',
