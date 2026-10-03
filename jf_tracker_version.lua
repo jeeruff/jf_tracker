@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.44'
+V.VERSION = '0.5.45'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.45', d = '2026-10-03', items = {
+    'curve generator: numbers are horizontal sliders, choices are buttons (shape sin tri saw+ saw- sqr rnd, type, hits, dir, from), toggles are buttons; the panel is wider when there is room',
+    'modulation matrix: a strip under the table for the selected row - L1 / ENV / LNK toggles, LFO shape buttons, sliders for BASE and the numbers of the cursor group (one undo per drag)',
+    ':tab sample removed - :tab item; :tab orca opens the Orca tab',
+  } },
   { v = '0.5.44', d = '2026-10-03', items = {
     'the sample tab is called item (REAPER terms: it edits the selected instrument item); :tab item works, :tab sample still too',
   } },

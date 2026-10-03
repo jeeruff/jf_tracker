@@ -94,7 +94,10 @@ function MM.draw(L, x, y, w, h, rows, focused, title)
   end
   U.set(U.LINE); gfx.rect(x, y + L.rh, w, 1, 1)
   local top = y + L.rh + 2
-  local nvis = math.max(1, math.floor((h - L.rh - 2) / L.rh))
+  -- полоса выбранной строки снизу (3 окт): кнопки формы LFO, тумблеры групп,
+  -- слайдеры параметров группы курсора — если высоты хватает
+  local strip_h = (#rows > 0 and h >= 6 * L.rh) and (2 * L.rh + 4) or 0
+  local nvis = math.max(1, math.floor((h - L.rh - 2 - strip_h) / L.rh))
   if MM.row > #rows then MM.row = math.max(1, #rows) end
   if MM.row - 1 < MM.scroll then MM.scroll = MM.row - 1 end
   if MM.row - 1 >= MM.scroll + nvis then MM.scroll = MM.row - nvis end
@@ -121,6 +124,77 @@ function MM.draw(L, x, y, w, h, rows, focused, title)
       end
       if mx >= xs[ci] - 1 and mx < xs[ci] + ws[ci] + L.pad and my >= ry and my < ry + L.rh then hover = { row = ri, col = ci } end
       if ctx.hint and c.kind ~= 'name' then ctx.hint('mm', xs[ci], ry, ws[ci], L.rh, { row = ri, col = ci }) end
+    end
+  end
+  local r = rows[MM.row]
+  if strip_h > 0 and r then
+    local sy = y + h - strip_h + 2
+    U.set(U.LINE); gfx.rect(x, sy - 2, w, 1, 1)
+    local hv = MM.draw_strip(L, x, sy, w, r)
+    if hv then hover = hv end
+  end
+  return hover
+end
+
+-- группа колонки: lfo / acs / plink (по ближайшему слева заголовку группы)
+function MM.group_of(ci)
+  for i = ci, 1, -1 do if MM.COLS[i].group then return MM.COLS[i].group end end
+  return 'lfo'
+end
+
+-- полоса выбранной строки: { strip = 'shape', v = n } | { strip = 'toggle', key = }
+-- | { strip = 'slider', ci =, x =, w = }
+function MM.draw_strip(L, x, y, w, r)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hover
+  local v = r.v or {}
+  local bx = x
+  local function button(label, on, hv)
+    local bw = U.measure(label) + 2 * L.pad
+    if bx + bw > x + w then return end
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    U.set(on and U.tint(U.AMBER, 0.35) or (hot and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, y, bw, L.rh - 1, 1)
+    U.set((on or hot) and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh - 1, 0)
+    U.text(bx + L.pad, y, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hover = hv end
+    bx = bx + bw + 2
+  end
+  -- строка 1: тумблеры групп, форма LFO кнопками
+  for _, t in ipairs({ { 'L1', 'lfo.active' }, { 'ENV', 'acs.active' }, { 'LNK', 'plink.active' } }) do
+    button(t[1], (v[t[2]] or 0) >= 0.5, { strip = 'toggle', key = t[2] })
+  end
+  bx = bx + L.pad
+  local cur = math.floor(v['lfo.shape'] or 0)
+  for n = 0, 5 do button(SHAPES[n], cur == n, { strip = 'shape', v = n }) end
+  -- строка 2: BASE + числа группы курсора — горизонтальные слайдеры
+  local g = MM.group_of(MM.col)
+  local list = {}
+  for ci, c in ipairs(MM.COLS) do
+    if c.kind == 'num' and (c.key == 'mod.baseline' or MM.group_of(ci) == g) then list[#list + 1] = ci end
+  end
+  local y2 = y + L.rh + 2
+  local n = #list
+  if n > 0 then
+    local cw = math.floor((w - (n - 1) * L.pad) / n)
+    for k, ci in ipairs(list) do
+      local c = MM.COLS[ci]
+      local sx = x + (k - 1) * (cw + L.pad)
+      local lab = c.head
+      local lw = U.measure(lab) + L.pad
+      local val = v[c.key] or c.min or 0
+      local vt = (c.fmt or '%.2f'):format(val)
+      local vw = U.measure(vt) + L.pad
+      local tw = cw - lw - vw
+      U.text(sx, y2 + 1, lab, U.GREY)
+      if tw >= 8 then
+        local fr = (val - c.min) / math.max(1e-9, c.max - c.min)
+        local tx = sx + lw
+        local cy = y2 + math.floor(L.rh / 2)
+        U.set(U.DIM); gfx.rect(tx, cy - 1, tw, 2, 1)
+        U.set(U.TEXT); gfx.rect(tx, y2 + 3, math.max(1, math.floor(fr * tw + 0.5)), L.rh - 6, 1)
+        U.text(tx + tw + L.pad / 2, y2 + 1, vt, U.TEXT)
+        if mx >= tx - 2 and mx < tx + tw + 2 and my >= y2 and my < y2 + L.rh then hover = { strip = 'slider', ci = ci, x = tx, w = tw } end
+      end
     end
   end
   return hover

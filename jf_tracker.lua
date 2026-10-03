@@ -172,6 +172,8 @@ local view_cache = {}         -- живые виды модулей DSP за к�
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
+local lfo_drag = nil          -- протяжка слайдера генератора кривых
+local mm_drag = nil           -- слайдер полосы матрицы модуляции
 local seq_cache = {}                                        -- последовательность матрицы (ctx.sequence)
 local trs_drag = nil                                        -- протяжка слайдера громкости/панорамы в шапке
 -- BPM (2 окт): двойной клик — ввод числа [..._], клик — список темпов
@@ -4152,8 +4154,8 @@ local function frame()
     -- [matrix] [curves] (L переключает)
     mm_draw = function(Lx, x, y, w, h)
       local col = cur_col()
-      local wide = w >= Lx.cw * 70
-      local lw = wide and math.min(Lx.cw * 30, math.floor(w * 0.34)) or 0
+      local wide = w >= Lx.cw * 80
+      local lw = wide and math.min(Lx.cw * 42, math.floor(w * 0.42)) or 0      -- кнопки форм влезают в строку
       lfo_hover = nil
       local names = {}
       for i, c in ipairs(snap and snap.cols or {}) do names[i] = c.name end
@@ -4299,6 +4301,7 @@ local function frame()
   elseif hover.midimap then
     local t = MM.TARGETS[hover.midimap.row]
     state.status = t and (t.label .. ': ' .. t.d .. (hover.midimap.btn == 'mode' and ' - click: abs / rel / rel64' or ' - click: select, click again / Enter: learn, d: clear')) or ''
+  elseif hover.mm and hover.mm.strip then state.status = ({ shape = 'LFO shape (turns L1 on)', toggle = 'group on / off: L1 = LFO, ENV = audio follower, LNK = link', slider = 'drag: value (one undo on release)' })[hover.mm.strip]
   elseif hover.mm then
     local c = MMX.COLS[hover.mm.col]
     local hints = { name = 'parameter - dblclick / o: FX window, w: native modulation window', num = 'value - wheel / + - (Shift ×10)', toggle = 'on/off - click twice / Enter', enum = 'LFO shape - Enter / wheel', link = 'link source - Enter: pick parameter (fzf)' }
@@ -4528,10 +4531,26 @@ local function frame()
         LG.sel = lfo_hover.field
         local f = LG.FIELDS[lfo_hover.field]
         if f.button then ctx.lfo_make(f.key)
+        elseif lfo_hover.opt then LG.set_opt(LG.sel, lfo_hover.opt)
+        elseif lfo_hover.slider then
+          lfo_drag = { field = LG.sel, x = lfo_hover.x, w = lfo_hover.w }
+          LG.set_frac(LG.sel, (gfx.mouse_x - lfo_hover.x) / math.max(1, lfo_hover.w))
         elseif f.key == 'src' and LG.type == 'follow' and LG.fsrc == 'env' then ctx.lfo_pick_env()
-        elseif f.enum or f.toggle then LG.adjust(LG.sel, 1) end
+        elseif f.enum or f.toggle or f.key == 'src' then LG.adjust(LG.sel, 1) end
       end
       click = { t = now2, zone = 'lfo' }
+    elseif hover.mm and hover.mm.strip then
+      -- полоса матрицы: форма LFO / тумблер группы / слайдер
+      ctx.set_focus('top')
+      local rows = cur_col() and cur_col().mods or {}
+      local r = rows[MMX.row]
+      if r then
+        local h = hover.mm
+        if h.strip == 'shape' then ctx.mod_field(r, 'lfo.shape', h.v); if (r.v and r.v['lfo.active'] or 0) < 0.5 then ctx.mod_field(r, 'lfo.active', 1) end
+        elseif h.strip == 'toggle' then ctx.mod_field(r, h.key, ((r.v and r.v[h.key]) or 0) >= 0.5 and 0 or 1)
+        elseif h.strip == 'slider' then mm_drag = { r = r, ci = h.ci, x = h.x, w = h.w } end
+      end
+      click = { t = now2, zone = 'mmstrip' }
     elseif hover.mm then
       ctx.set_focus('top')
       local same = click.zone == 'mm' and click.row == hover.mm.row and click.ci == hover.mm.col
@@ -5104,6 +5123,26 @@ local function frame()
       if hover.row and hover.fi and vim.mode == 'visual' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
     else body_drag = nil end
   end
+  -- слайдер полосы матрицы модуляции: живьём без undo, на отпускании — одна правка
+  if mm_drag then
+    local c = MMX.COLS[mm_drag.ci]
+    local col = cur_col()
+    local fr = math.max(0, math.min(1, (gfx.mouse_x - mm_drag.x) / math.max(1, mm_drag.w)))
+    local val = c.min + fr * (c.max - c.min)
+    if gfx.mouse_cap & 1 == 1 then
+      if col then reaper.TrackFX_SetNamedConfigParm(col.track, mm_drag.r.fx, ('param.%d.%s'):format(mm_drag.r.param, c.key), tostring(val)) end
+      mm_drag.val = val
+      state.status = ('%s %s = %.3f'):format(mm_drag.r.pname, c.head, val)
+    else
+      if mm_drag.val then ctx.mod_field(mm_drag.r, c.key, mm_drag.val) end
+      mm_drag = nil
+    end
+  end
+  -- слайдер генератора кривых: протяжка по горизонтали
+  if lfo_drag then
+    if gfx.mouse_cap & 1 == 1 then LG.set_frac(lfo_drag.field, (gfx.mouse_x - lfo_drag.x) / math.max(1, lfo_drag.w))
+    else lfo_drag = nil end
+  end
   -- протяжка по живому виду модуля DSP (гранулятор: Position)
   if dspview_drag then
     if gfx.mouse_cap & 1 == 1 then
@@ -5384,7 +5423,7 @@ local function frame()
     LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and hover.mm then
+  if gfx.mouse_wheel ~= 0 and hover.mm and hover.mm.row then
     MMX.row, MMX.col = hover.mm.row, hover.mm.col
     MMX.adjust(cur_col() and cur_col().mods or {}, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
     gfx.mouse_wheel = 0

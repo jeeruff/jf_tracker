@@ -241,6 +241,25 @@ function LG.follow_points(src, r0, r1)
   return rdp(pts, LG.tol)
 end
 
+-- слайдер: доля 0..1 → значение поля i (с шагом поля)
+function LG.set_frac(i, fr)
+  local f = LG.FIELDS[i]
+  if not f or not f.min then return end
+  fr = math.max(0, math.min(1, fr))
+  local v = f.min + fr * (f.max - f.min)
+  v = f.min + math.floor((v - f.min) / f.step + 0.5) * f.step
+  LG[f.key] = math.max(f.min, math.min(f.max, v))
+  if f.key == 'period' or f.key == 'res' then LG[f.key] = math.floor(LG[f.key] + 0.5) end
+end
+-- выбрать вариант перечисления
+function LG.set_opt(i, o)
+  local f = LG.FIELDS[i]
+  if not f or not f.enum then return end
+  LG[f.key] = o
+  if f.key == 'shape' and o == 'rnd' then LG.seed = LG.seed + 1 end
+  if f.key == 'type' or f.key == 'hits' then LG.FIELDS = LG.fields(); LG.sel = math.min(LG.sel, #LG.FIELDS) end
+end
+
 -- изменить поле i на d шагов (shape — по кругу)
 function LG.adjust(i, d)
   local f = LG.FIELDS[i]
@@ -306,22 +325,56 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target)
   U.text(x, y, fit(LG.type .. ' -> ' .. (target or 'envelope at the cursor'), w), focused and U.AMBER or U.GREY)
   local fy = y + L.rh + 2
   local lw = U.measure('points ') + L.pad
+  -- поля (3 окт): перечисления — кнопками (форма волны, тип, хиты…), числа —
+  -- горизонтальными слайдерами (тянуть по горизонтали), тумблеры — кнопкой
   for i, f in ipairs(LG.FIELDS) do
     local ry = fy + (i - 1) * L.rh
     if ry + L.rh > y + h then break end
     local sel = focused and LG.sel == i
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    local function button(bx, label, on, hv)
+      local bw = U.measure(label) + 2 * L.pad
+      local bh = hot and mx >= bx and mx < bx + bw
+      U.set(on and U.tint(U.AMBER, 0.35) or (bh and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, ry, bw, L.rh - 1, 1)
+      U.set((on or bh) and U.AMBER or U.LINE); gfx.rect(bx, ry, bw, L.rh - 1, 0)
+      U.text(bx + L.pad, ry, label, on and U.AMBER or (bh and U.TEXT or U.GREY))
+      if bh then hover = hv end
+      return bx + bw + 2
+    end
     if f.button then
-      local bw = U.measure(f.label) + 2 * L.pad
-      U.set(sel and U.tint(U.AMBER, 0.35) or (hot and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(x, ry, bw, L.rh, 1)
-      U.set((sel or hot) and U.AMBER or U.LINE); gfx.rect(x, ry, bw, L.rh, 0)
-      U.text(x + L.pad, ry + 1, f.label, (sel or hot) and U.AMBER or U.TEXT)
-      if hot and mx < x + bw then hover = { field = i } end
+      button(x, f.label, sel, { field = i })
     else
-      if sel then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(x, ry, w, L.rh, 1) end
+      if sel then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
       U.text(x, ry + 1, f.label, sel and U.AMBER or U.GREY)
-      U.text(x + lw, ry + 1, fit(field_text(f), w - lw), U.TEXT)
-      if hot then hover = { field = i } end
+      local x0, aw = x + lw, w - lw
+      if f.enum then
+        local list = type(f.enum) == 'string' and LG[f.enum] or f.enum
+        local need = 0
+        for _, o in ipairs(list) do need = need + U.measure(o) + 2 * L.pad + 2 end
+        if need <= aw then
+          local bx = x0
+          for _, o in ipairs(list) do bx = button(bx, o, LG[f.key] == o, { field = i, opt = o }) end
+        else
+          -- не влезают все — текущая кнопкой, клик листает
+          button(x0, tostring(LG[f.key]), true, { field = i, cycle = true })
+        end
+      elseif f.toggle then
+        button(x0, LG[f.key] and 'on' or 'off', LG[f.key], { field = i, cycle = true })
+      elseif f.key == 'src' then
+        button(x0, fit(field_text(f), aw - 2 * L.pad), false, { field = i, cycle = true })
+      else
+        -- слайдер: дорожка, заливка до значения, число справа
+        local vt = field_text(f)
+        local vw = math.min(U.measure(vt) + L.pad, math.floor(aw * 0.45))
+        local sw = math.max(8, aw - vw - L.pad)
+        local fr = (LG[f.key] - f.min) / math.max(1e-9, f.max - f.min)
+        local cy = ry + math.floor(L.rh / 2)
+        U.set(U.DIM); gfx.rect(x0, cy - 1, sw, 2, 1)
+        U.set(sel and U.AMBER or U.TEXT); gfx.rect(x0, ry + 3, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 6, 1)
+        U.text(x0 + sw + L.pad, ry + 1, fit(vt, vw), U.TEXT)
+        if hot and mx >= x0 - 2 and mx < x0 + sw + 2 then hover = { field = i, slider = true, x = x0, w = sw } end
+      end
+      if hot and not hover then hover = { field = i } end
     end
   end
   -- предпросмотр: два периода
