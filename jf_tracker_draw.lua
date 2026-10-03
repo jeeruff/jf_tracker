@@ -249,7 +249,7 @@ function D.layout(snap, state, nregions)
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
   -- две узкие дорожки с вертикальным текстом: регионы (полоса цвета) и маркеры
   L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
-  -- линейка таймлайна справа от номеров (3 окт, опция tlruler): метки REAPER
+  -- линейка таймлайна между полосами регионов и номерами (3 окт, опция tlruler): метки REAPER
   -- на долях — beats (такт.доля), time (время), both
   local tlr = state.tlruler or 'off'
   L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
@@ -285,6 +285,7 @@ function D.layout(snap, state, nregions)
   L.stat_y = L.body_y + L.body_h                    -- статус в трекере (status_in)
   L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
   local after = L.under_y + L.hint_h
+  L.trk_bot = after                                 -- низ модуля трекера (тело, статус в нём, подсказки)
   if L.toppos == 'mid' then L.top_y = after; L.dsp_y = after + L.top_h
   elseif L.toppos == 'bottom' then L.dsp_y = after; L.top_y = after + L.dsp_h
   else L.top_y = 0; L.dsp_y = after end
@@ -352,18 +353,27 @@ end
 -- ── примитивы ─────────────────────────────────────────────────────────────
 -- mono: серый по яркости, кроме ячейки курсора (D.CURCELL)
 local function mono(c)
-  if not D.mono or c == D.CURCELL then return c end
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS then return c end   -- курсор и рамка INSERT — цветные
   local l = 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]
   return { l, l, l }
 end
 D.mono_col = mono
+-- текст в mono: не темнее порога — тусклые подписи (=START, пустые слоты,
+-- подсказки) иначе пропадали на тёмном фоне (3 окт); фон и линии — как есть
+local function mono_text(c)
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS then return c end
+  local l = math.max(0.40, 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3])
+  return { l, l, l }
+end
 local function set(c, a) c = mono(c); gfx.set(c[1], c[2], c[3], a or 1) end
 D.set = set
+-- мимо фильтра mono: цвета треков в шапке остаются цветными (3 окт)
+local function rawset_col(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 -- bg — непрозрачная подложка (для инверсного курсора); без bg при масштабе
 -- >1 текст блитится аддитивно (чёрный фон картинки не виден)
 local function text(x, y, s, col, bg)
   if s == nil or s == '' then return end
-  col = mono(col); if bg then bg = mono(bg) end
+  if bg then col, bg = mono(col), mono(bg) else col = mono_text(col) end   -- с подложкой (курсор) — без порога
   y = y + D.SPACE
   if D.SCALE == 1 then
     -- ×1: прямой drawstr; в гибриде глифы — через сегменты (иначе битмап
@@ -412,9 +422,8 @@ function D.hint_bar(L, x, y, w, items, active)
   if not L.hint_h or L.hint_h <= 0 or not items or w <= 0 then return end
   set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
   set(U.LINE); gfx.rect(x, y, w, 1, 1)
-  -- строка подсказок — часть модуля: его левая граница продолжается и здесь
-  -- (3 окт: между подсказками соседних модулей была чёрная щель)
-  if x > 0 then set(D.SEP); gfx.rect(x - 2, y, D.SEPW, L.hint_h, 1) end
+  -- своей вертикали у строки подсказок нет (3 окт): границы модулей рисуют сами
+  -- модули на всю высоту, со строкой подсказок — иначе стыки с выступами
   local sp = math.max(L.pad, ms(' '))        -- в битмапе ширина пробела 0
   local cx = x + L.pad
   for _, it in ipairs(items) do
@@ -960,7 +969,7 @@ local function draw_topbar(L, info)
       { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
       { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
       { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
-      { 'hdr', 'hdr ' .. (c.hdrfill or 'line'), (c.hdrfill or 'line') ~= 'line' and U.CYAN or U.GREY },
+      { 'hdr', 'hdr ' .. (c.hdrfill or 'line'), ((c.hdrfill or 'line') == 'header' or c.hdrfill == 'full') and U.CYAN or U.GREY },
       { 'notes', 'notes', c.notes and U.AMBER or U.GREY }, { 'options', 'options', U.AMBER },
     } },
     { name = 'help', items = {
@@ -1520,14 +1529,15 @@ function D.frame(L, snap, rows, state, info)
     -- header — залита строка имени, full — вся шапка (ниже имени тусклее);
     -- цвет приглушён к панели, как REAPER тонирует TCP (кнопки и слайдеры
     -- читаются); выделенный в REAPER трек — чуть светлее
-    local mode = state.hdrfill or 'line'
-    local fill = col.rgb and mode ~= 'line'
+    local mode = state.hdrfill or 'line'                -- off — без цвета трека совсем
+    local fill = col.rgb and (mode == 'header' or mode == 'full')
     local base = trsel[col.guid] and D.HDRSEL or D.HDR    -- фон TCP REAPER (выделенный — его цвет)
     local nbg = fill and U.mix(base, col.rgb, 0.30) or base
     local rbg = (fill and mode == 'full') and U.mix(base, col.rgb, 0.18) or base
     local nh = L.rh + 1                                    -- строка имени (кнопки — с hy + rh + 1)
-    set(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
-    set(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+    local hset = fill and rawset_col or set               -- цвет трека — и в mono
+    hset(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
+    hset(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
     -- фон светлее панели: текст шапки подтянуть по контрасту (на колонку)
     local T0, G0 = U.TEXT, U.GREY
     U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
@@ -1539,7 +1549,7 @@ function D.frame(L, snap, rows, state, info)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
     ncol = U.readable(ncol, nbg, 4.5)
     text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
-    if col.rgb and not fill then set(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
+    if col.rgb and mode == 'line' then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
     hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
@@ -1756,7 +1766,6 @@ function D.frame(L, snap, rows, state, info)
   for _, c in ipairs(L.cols) do
     if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
   end
-  local curl = {}                                -- линии курсора: дорисовать поверх полос регионов
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
@@ -1767,20 +1776,22 @@ function D.frame(L, snap, rows, state, info)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
-    -- метка edit-курсора — у номера строки (раньше стояла на границе с
-    -- матрицей и казалась вылезшей на неё), видна и при off
+    -- метки у номера строки нет (3 окт, просьба)
     local cl = state.curline or 'top'
     if cl ~= 'off' then
       local ly = cl == 'bottom' and (y + L.rh - 1) or y
-      if is_cur_row then set(D.CURTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.CURTOP } end
-      if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1); curl[#curl + 1] = { ly, D.EDITTOP } end
+      -- от края полос регионов / маркеров вправо (через линейку, если она
+      -- включена): на сами полосы не заходит (3 окт)
+      local lx = tx0 + L.ruler_w
+      if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+      if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
     end
-    if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + L.ruler_w + L.num_w - 4, y, 3, L.rh, 1) end
-    text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
-    -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки REAPER)
+    text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
+    -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
     if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
       local b, t = info.tl_label(r.row)
-      local tx = tx0 + L.ruler_w + L.num_w
+      local tx = tx0 + L.ruler_w + L.pad
       local tcol = r.bar and U.TEXT or U.GREY
       local tlr = state.tlruler
       if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
@@ -2051,8 +2062,6 @@ function D.frame(L, snap, rows, state, info)
     end
     if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
-  -- линия курсора идёт и через полосы регионов / маркеров (3 окт: обрывалась у номеров)
-  for _, c in ipairs(curl) do set(c[2]); gfx.rect(tx0 + 1, c[1], L.ruler_w, 1, 1) end
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
   if L.ruler_w > 0 and info.ruler and #rows > 0 then
@@ -2493,7 +2502,8 @@ function D.frame(L, snap, rows, state, info)
     -- слева режим/сообщение (не шире трети), дальше — описание того, на что
     -- наведена мышь, во всю оставшуюся ширину
     local left = fit(info.status_left or '', sw / 3)
-    text(sx + L.pad, sy + 2, left, U.AMBER)
+    -- mono: INSERT в статусе — красным, как рамка (3 окт)
+    text(sx + L.pad, sy + 2, left, (D.mono and info.vmode == 'insert') and D.FOCUS_INS or U.AMBER)
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc ~= '' then
@@ -2502,6 +2512,10 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
+  -- граница матрица | трекер — на всю высоту модуля трекера: тело, статус в
+  -- нём, строка подсказок (3 окт: обрывалась у низа тела, статус её закрывал);
+  -- рисуется после статуса и подсказок, ровно до следующего модуля
+  if L.matrix_w > 0 and not state.mx_hidden then set(D.SEP); gfx.rect(L.matrix_w - 2, L.header_y, D.SEPW, (L.trk_bot or gfx.h) - L.header_y, 1) end
   -- браузер эффектов в фокусе (3 окт): во всю левую колонку — от верха матрицы
   -- до низа окна (матрица и главный модуль под ним), рисуется последним, мышь
   -- над ним не достаёт до того, что под ним

@@ -32,7 +32,7 @@ TH.PAL = {
     amber = '#fe8019', cyan = '#8ec07c', green = '#b8bb26', red = '#fb4934', hdr = '#3c3836', hdrsel = '#504945' },
   catppuccin = { bg = '#1e1e2e', panel = '#181825', text = '#cdd6f4', grey = '#a6adc8', dim = '#313244', line = '#585b70',
     amber = '#fab387', cyan = '#94e2d5', green = '#a6e3a1', red = '#f38ba8', hdr = '#313244', hdrsel = '#45475a' },
-  mono = { bg = '#101010', panel = '#181818', text = '#d8d8d8', grey = '#8c8c8c', dim = '#2c2c2c', line = '#5c5c5c',
+  mono = { bg = '#101010', panel = '#181818', text = '#d8d8d8', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true },
 }
 

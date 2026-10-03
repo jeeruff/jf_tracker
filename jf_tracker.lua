@@ -151,7 +151,7 @@ state.captions = tostring(ext('captions', '0')) == '1'     -- строка по�
 -- отдельного флага fat header (его ключ стирается)
 state.hdrfill = (function()
   local v = reaper.GetExtState(EXT, 'hdrfill')
-  return (v == 'header' or v == 'full') and v or 'line'
+  return (v == 'header' or v == 'full' or v == 'off') and v or 'line'
 end)()
 reaper.DeleteExtState(EXT, 'fathdr', true)
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
@@ -2056,7 +2056,7 @@ ctx = {
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
-      { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'line', 'header', 'full' }, desc = 'line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name)', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
+      { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'off: no track colour, line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name); track colours stay in the mono theme too', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
     }
     OPT.open(items)
@@ -3875,8 +3875,8 @@ function ctrl_action(name, delta)
   elseif name == 'meters' then state.meters = not state.meters
   elseif name == 'caps' then state.captions = not state.captions; vim.msg = 'column captions ' .. (state.captions and 'on' or 'off')
   elseif name == 'hdr' then
-    local order = { line = 'header', header = 'full', full = 'line' }
-    local back = { line = 'full', header = 'line', full = 'header' }
+    local order = { off = 'line', line = 'header', header = 'full', full = 'off' }
+    local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
   elseif name == 'sig' or name == 'beats' then
@@ -4694,7 +4694,7 @@ local function frame()
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
-  elseif hover.ctrl == 'hdr' then state.status = 'track header colour - click / wheel: line (strip under the name), header (name row filled), full (whole header, dimmer below the name)'
+  elseif hover.ctrl == 'hdr' then state.status = 'track header colour - click / wheel: off (no colour), line (strip under the name), header (name row filled), full (whole header, dimmer below the name)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
   elseif hover.ruler then

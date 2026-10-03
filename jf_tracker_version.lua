@@ -6,6 +6,10 @@ V.DATE = '2026-10-03'
 V.CHANGES = {
   { v = '0.5.68', d = '2026-10-03', items = {
     'themes (options, :theme): reaper - native colours of the REAPER theme (default); modus vivendi, modus operandi, gruvbox, catppuccin - full-screen palettes; mono - everything grey except the cursor cell',
+    'timeline ruler moved left of the row numbers (between the region lanes and the numbers); the cursor line starts at the lanes edge and runs through the ruler; the green mark right of the row number is gone',
+    'strict borders: the hint rows no longer draw their own bit of the module border (it made small corners sticking out); the matrix | tracker border runs the whole tracker module - body, status, hints',
+    'mono theme: darkest text a bit brighter (it vanished), the INSERT frame and the INSERT word in the status bar stay red, track colours stay in the headers',
+    'track header colour: off - no track colour at all (every theme), then line / header / full',
     'playhead on the item wave for every preview: Shift+note on the keyboard, the MIDI keyboard, slices (q..p) - matched by the source file, so it shows on the sample and on its slices; the note preview plays at the item rate like the note',
     'timeline ruler right of the row numbers (options: off / beats / time / both): REAPER ruler labels on every beat, bar brighter, native formats; the line right of the row numbers is gone',
     'about: 20 logos, real ANSI text with colour codes, box drawing, dots; native logos take the palette roles (text / accent / line) and follow the theme',
