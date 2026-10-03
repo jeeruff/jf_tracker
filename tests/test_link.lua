@@ -44,6 +44,8 @@ _G.reaper = {
   SetMediaItemTake_Source = function(tk, src) tk.src = src end,
   GetMediaSourceFileName = function(src) return src and src.file or '' end,
   Main_OnCommand = function() end,
+  TakeIsMIDI = function() return false end,
+  GetSetMediaTrackInfo_String = function(tr, k, v, set) tr.ext = tr.ext or {}; if set then tr.ext[k] = v end; return true, tr.ext[k] or '' end,
 }
 local E = dofile('jf_tracker_edit.lua')
 E.init({ invalidate = function() end })
@@ -154,5 +156,20 @@ eq('arp updown', seq(E.arp_order({ 60, 64, 67 }, 'updown', 1)), '60 64 67 64')
 eq('arp played keeps order', seq(E.arp_order({ 67, 60, 64 }, 'played', 1)), '67 60 64')
 local r = E.arp_order({ 60, 64, 67 }, 'random', 1, 42)
 table.sort(r); eq('arp random is a permutation', seq(r), '60 64 67')
+-- легато (3 окт): нота до начала следующей, скорость — под новую длину
+tracks[1].items = {}
+local l1 = item(10, 0.25, 0, 1.5)              -- кусок 0.375 с источника
+local l2 = item(11, 0.25, 1, 1.5)
+local l3 = item(11.5, 0.25, 2, 1.5)
+E.legato(tracks[1], nil)
+near('legato: l1 to l2', l1.len, 1); near('l1 rate keeps the piece', l1.take.rate, 1.5 * 0.25 / 1)
+eq('l1 pitch kept', l1.take.pp, 1)
+near('l2 to l3', l2.len, 0.5); near('last note natural', l3.len, 0.25)
+E.legato(tracks[1], nil)
+near('repeat does not compound', l1.take.rate, 1.5 * 0.25 / 1)
+E.legato(tracks[1], nil, nil, nil, true)
+near('off: length back', l1.len, 0.25); near('off: rate back', l1.take.rate, 1.5); eq('off: pitch flag back', l1.take.pp, 0)
+E.legato_auto(tracks[1], true); eq('auto flag', E.legato_auto(tracks[1]), true)
+E.legato_auto(tracks[1], false); eq('auto off', E.legato_auto(tracks[1]), false)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

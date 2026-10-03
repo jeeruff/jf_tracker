@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.1'
+V.VERSION = '0.6.2'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.2', d = '2026-10-03', items = {
+    'legato (:legato): every audio note of the cursor track (or the VISUAL rows) stretches to the start of the next note - no gaps between slices; stretched by rate with the pitch kept, so it follows the tempo (slower - longer, faster - shorter); the note keeps its own length (P_EXT:jf_nat): repeating does not pile up, :legato off restores; :legato auto - the track stays legato while you insert',
+  } },
   { v = '0.6.1', d = '2026-10-03', items = {
     'jf_pm from the tracker: in the pm tab T edits the project tags (:pmtag words, shown as #tags), s picks its jf_pm status (the kanban classes; x clears back to STATUS of the .rpp); written into jf_pm_index.json by the jf_pm core, the previous index kept as .bak',
   } },

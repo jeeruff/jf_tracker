@@ -512,7 +512,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -659,6 +659,28 @@ local function run_cmd(line)
   elseif (cmd == 'pt' or cmd == 'ptmode') and (arg or ''):match('^%s*new') then ctx.pt_new()
   elseif cmd == 'pt' or cmd == 'ptmode' then ctx.pt_toggle()
   elseif cmd == 'big' then ctx.sample_big()
+  elseif cmd == 'legato' then
+    -- :legato [off|auto] (3 окт): ноты трека курсора встык со следующими, под темп;
+    -- в VISUAL / V-LINE — строки выделения
+    local f = flat()[V.cur.fi]
+    if not (f and f.col) then V.msg = 'legato: no track'; return end
+    local lane_idx = f.col.fixed and f.lane and f.lane.idx or nil
+    local w = (arg or ''):match('^%s*(%a*)')
+    if w == 'auto' then
+      local on = not ctx.edit.legato_auto(f.col.track)
+      ctx.edit.legato_auto(f.col.track, on)
+      if on then ctx.edit.legato(f.col.track, lane_idx) end
+      V.msg = 'legato auto ' .. (on and 'on' or 'off') .. ': ' .. (f.col.name or '')
+    else
+      local t0, t1
+      if V.cmd_from == 'visual' or V.cmd_from == 'vline' then
+        local _, _, r0, r1 = V.visual_range()
+        t0, t1 = ctx.row_time(r0), ctx.row_time(r1 + 1)
+      end
+      local n = ctx.edit.legato(f.col.track, lane_idx, t0, t1, w == 'off')
+      V.msg = ('legato%s: %d note(s) on %s'):format(w == 'off' and ' off' or '', n, f.col.name or '')
+    end
+    ctx.model.invalidate()
   elseif cmd == 'pmtag' then if ctx.pm_set_tags then ctx.pm_set_tags(arg) end
   elseif cmd == 'macro' then st.macro = not st.macro; V.msg = st.macro and 'macro: a row is a bar - j k bars, h l tracks, Enter back' or 'macro off'
   elseif cmd == 'arp' and (arg or ''):match('^%s*live') then
