@@ -1278,19 +1278,24 @@ function M.stretch_map(take)
   return pts, table.concat(sig, ',')
 end
 
--- время item t → время источника по карте маркеров (до первого и после
--- последнего маркера — с playrate take)
+-- время item t → секунды источника по карте маркеров. Позиция маркера в
+-- источнике у REAPER — в долях при playrate (3 окт: конец 2.667 при rate 1.5 =
+-- 4.0 с файла; раньше бралась как секунды — волна показывала 2/3 файла):
+-- карта считается в этих долях (вне маркеров — наклон 1), потом × rate
 local function map_src(pts, t, rate)
-  if t <= pts[1].pos then return pts[1].src - (pts[1].pos - t) * rate end
-  for k = 1, #pts - 1 do
-    local a, b = pts[k], pts[k + 1]
-    if t <= b.pos then
-      local d = b.pos - a.pos
-      return d > 1e-9 and (a.src + (t - a.pos) / d * (b.src - a.src)) or a.src
+  local function u()
+    if t <= pts[1].pos then return pts[1].src - (pts[1].pos - t) end
+    for k = 1, #pts - 1 do
+      local a, b = pts[k], pts[k + 1]
+      if t <= b.pos then
+        local d = b.pos - a.pos
+        return d > 1e-9 and (a.src + (t - a.pos) / d * (b.src - a.src)) or a.src
+      end
     end
+    local z = pts[#pts]
+    return z.src + (t - z.pos)
   end
-  local z = pts[#pts]
-  return z.src + (t - z.pos) * rate
+  return u() * rate
 end
 
 -- stretch-маркеры take → доли длины item (0..1); nil, если нет

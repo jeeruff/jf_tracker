@@ -36,6 +36,9 @@ _G.reaper = {
   Undo_BeginBlock2 = function() end, Undo_EndBlock2 = function() end,
   PreventUIRefresh = function() end, UpdateArrange = function() end, UpdateItemInProject = function() end,
   time_precise = function() return os.clock() end,
+  GetTakeNumStretchMarkers = function(tk) return #(tk.sm or {}) end,
+  GetTakeStretchMarker = function(tk, i) local m = tk.sm[i + 1]; return i, m.pos, m.src end,
+  DeleteTakeStretchMarkers = function(tk) tk.sm = {} end,
 }
 local E = dofile('jf_tracker_edit.lua')
 E.init({ invalidate = function() end })
@@ -99,5 +102,22 @@ near('off: rate back', c2.take.rate, 1); near('off: length back', c2.len, 1)
 eq('off: mark removed', E.bsync_of(c2), nil)
 eq('off: keep pitch restored', c2.take.pp, 0)
 
+-- слайс корня с stretch-маркерами (3 окт): копия — свой кусок источника
+-- маркеры: позиция item → позиция в источнике (в долях при rate), как у REAPER
+local rt = item(300, 2, 0, 1.5)
+rt.take.sm = { { pos = 0, src = 0 }, { pos = 1, src = 0.8 }, { pos = 2, src = 2 } }
+local pts = E.root_markers(rt.take)
+eq('root markers read', pts and #pts, 3)
+local cp = item(0, 2, 0, 1.5)
+cp.take.sm = { { pos = 0, src = 0 }, { pos = 1, src = 0.8 }, { pos = 2, src = 2 } }   -- скопированы от корня
+eq('unwarp ok', E.unwarp_piece(cp, pts, 1.5, 1, 2), true)
+eq('copy markers removed', #cp.take.sm, 0)
+near('offset = map(1) * rate', cp.take.offs, 0.8 * 1.5)
+near('rate fits 1.2 src units in 1 s', cp.take.rate, (2 - 0.8) * 1.5 / 1)
+near('length b - a', cp.len, 1)
+eq('pitch kept', cp.take.pp, 1)
+local cp2 = item(0, 1, 0, 1.5)
+E.unwarp_piece(cp2, pts, 1.5, 0.5, 1)
+near('mid-segment offset', cp2.take.offs, 0.4 * 1.5)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

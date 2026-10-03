@@ -896,6 +896,87 @@ local function finish_insert(track, lane_idx, it)
 end
 
 -- вставить слайс k инструмента inst_item на трек: копия chunk, offs/len по таблице
+-- кусок [a, b) секунд item-корня с stretch-маркерами (3 окт, баг: все слайсы
+-- звучали началом брейка). Позиция маркера в источнике у REAPER — от начала
+-- файла, в долях при playrate (конец 2.667 при rate 1.5 = 4.0 с файла), и
+-- D_STARTOFFS копии её не сдвигает: копия с маркерами корня играла с начала.
+-- Копия получает свой кусок источника без маркеров: смещение = карта(a)·rate,
+-- скорость — чтобы карта(b)−карта(a) уложилась в b − a; высота сохраняется.
+-- pts — маркеры корня { pos, src }, rate — playrate корня. true — пересчитано.
+local function smap_at(pts, t)
+  if t <= pts[1].pos then return pts[1].src - (pts[1].pos - t) end
+  for i = 1, #pts - 1 do
+    local p, q = pts[i], pts[i + 1]
+    if t <= q.pos then local d = q.pos - p.pos; return d > 1e-9 and (p.src + (t - p.pos) / d * (q.src - p.src)) or p.src end
+  end
+  local z = pts[#pts]
+  return z.src + (t - z.pos)
+end
+function E.root_markers(take)
+  local n = take and R.GetTakeNumStretchMarkers and R.GetTakeNumStretchMarkers(take) or 0
+  if n == 0 then return nil end
+  local pts = {}
+  for i = 0, n - 1 do local _, pos, src = R.GetTakeStretchMarker(take, i); if pos and src then pts[#pts + 1] = { pos = pos, src = src } end end
+  table.sort(pts, function(x, y) return x.pos < y.pos end)
+  return #pts > 0 and pts or nil
+end
+function E.unwarp_piece(it, pts, rate, a, b)
+  local tk = R.GetActiveTake(it)
+  if not (tk and pts and b > a) then return false end
+  local sa, sb = smap_at(pts, a), smap_at(pts, b)
+  local n = R.GetTakeNumStretchMarkers(tk)
+  if n > 0 then R.DeleteTakeStretchMarkers(tk, 0, n) end
+  local eff = math.max(0.01, (sb - sa) * rate / (b - a))
+  R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', math.max(0, sa * rate))
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', eff)
+  if math.abs(eff - rate) > 1e-6 then R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1) end
+  R.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
+  return true
+end
+
+-- починка уже вставленных слайсов (:fixslices, 3 окт): нота слайса k с
+-- маркерами, скопированными от растянутого корня, получает свой кусок
+-- источника. Возвращает число исправленных
+function E.fix_slices()
+  local n = 0
+  run('fix slices', function()
+    local roots = {}
+    for ti = 0, R.CountTracks(0) - 1 do
+      local tr = R.GetTrack(0, ti)
+      for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, ii)
+        local _, k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+        k = tonumber(k)
+        local tk = R.GetActiveTake(it)
+        if k and tk and R.GetTakeNumStretchMarkers(tk) > 0 then
+          local base = iid_base(E.get_iid(it))
+          local root = roots[base]
+          if root == nil then
+            root = false
+            for _, c in ipairs(E.items_with_iid(base)) do if #E.item_slices(c) > 0 then root = c; break end end
+            roots[base] = root
+          end
+          if root then
+            local sl, b0 = E.item_slices(root)
+            local rtk = R.GetActiveTake(root)
+            local pts = E.root_markers(rtk)
+            local a = sl[k]
+            local b = sl[k + 1] or b0.len or R.GetMediaItemInfo_Value(root, 'D_LENGTH')
+            if pts and a and b > a then
+              local cut = R.GetMediaItemInfo_Value(it, 'D_LENGTH')   -- обрезанная нота сохраняет свою длину
+              if E.unwarp_piece(it, pts, R.GetMediaItemTakeInfo_Value(rtk, 'D_PLAYRATE'), a, b) then
+                if cut < b - a - 1e-6 then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut) end
+                n = n + 1
+              end
+            end
+          end
+        end
+      end
+    end
+  end)
+  return n
+end
+
 function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local slices, base = E.item_slices(inst_item)
   if #slices == 0 then return end
@@ -919,6 +1000,10 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
       R.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
       R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0)
+      -- корень растянут маркерами (smart quantize): свой кусок источника
+      local rtk = R.GetActiveTake(inst_item)
+      local pts = E.root_markers(rtk)
+      if pts then E.unwarp_piece(it, pts, R.GetMediaItemTakeInfo_Value(rtk, 'D_PLAYRATE'), a, b) end
     end
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
     E.set_iid(it, root .. '#' .. k)                      -- все ноты слайса k — один инструмент
@@ -948,6 +1033,8 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
         local offs = (entry.offs or 0) + t0 * rate
         R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', offs)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
+        local pts = E.root_markers(R.GetActiveTake(entry.item))
+        if pts then E.unwarp_piece(it, pts, rate, t0, t1) end
         -- тот же кусок, вставленный ещё раз, — тот же инструмент
         E.set_iid(it, ('%s@%.3f+%.3f'):format(root, offs, (t1 - t0) * rate))
       end

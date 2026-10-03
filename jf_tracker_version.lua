@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.83'
+V.VERSION = '0.5.84'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.84', d = '2026-10-03', items = {
+    'fix: slices of a sample with stretch markers (after smart quantize) all played its start - the copies kept the markers of the whole sample, and REAPER maps markers from the start of the file, ignoring the offset; a slice copy now gets its own piece of the source (offset and rate from the marker map, pitch kept) without the markers; same for a selection dragged out of the item tab',
+    ':fixslices repairs slice notes inserted before this fix (one undo step)',
+    'fix: the wave of an item with stretch markers showed only part of the file (marker source positions are in units at the playrate)',
+  } },
   { v = '0.5.83', d = '2026-10-03', items = {
     'options: every description shortened to one line - it fits the bottom line of the window',
   } },
