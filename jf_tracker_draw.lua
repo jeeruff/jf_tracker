@@ -1049,7 +1049,7 @@ local function draw_topbar(L, info)
       { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
     } },
     { name = 'options', items = {
-      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
+      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) },
       { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
       { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
       { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
@@ -1756,22 +1756,34 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     for li, ln in ipairs(c.lanes) do
-      -- кнопки «-» «+» справа в строке лейна: число подколонок (просьба 1 окт)
-      local bw2 = c.folded and 0 or (2 * L.btn_w + 2)
-      if col.fixed and not c.folded then
-        local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
-        text(ln.x + L.pad, hy + 4 * L.rh + 2, fit(lname, ln.w - 2 * L.pad - bw2), U.GREY)
-      end
-      if not c.folded then
-        local by = hy + 4 * L.rh + 1
+      -- −+ подколонок — над нотным полем (3 окт; раньше справа в строке лейна);
+      -- справа в строке последнего лейна — −+ колонок эффектов (вместо опции fx)
+      local by = hy + 4 * L.rh + 1
+      local G1 = (L.flat[ln.f0] or {}).G or L
+      local nx = ln.x + (ln.sx and ln.sx[1] or 0) + (G1.x_note or 0)
+      local function pm(x0, kind, onhot)
         for k, b in ipairs({ { '-', -1 }, { '+', 1 } }) do
-          local bx = ln.x + ln.w - bw2 + (k - 1) * (L.btn_w + 2)
+          local bx = x0 + (k - 1) * (L.btn_w + 2)
           local hot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
           set(hot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
           set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
           text(bx + 2, by, b[1], hot and U.AMBER or U.GREY)
-          if hot then hover.lanebtn = { col = col, lane = ln.lane, d = b[2], n = ln.nsub } end
-          hint('lanebtn', bx, by, L.btn_w, L.rh, { col = col, lane = ln.lane, d = b[2], n = ln.nsub })
+          if hot then onhot(b[2]) end
+          hint(kind, bx, by, L.btn_w, L.rh, kind == 'lanebtn' and { col = col, lane = ln.lane, d = b[2], n = ln.nsub } or { d = b[2] })
+        end
+      end
+      local bw2 = 2 * L.btn_w + 2
+      if col.fixed and not c.folded then
+        local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
+        text(ln.x + L.pad, hy + 4 * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
+      end
+      if not c.folded then
+        if nx + bw2 <= ln.x + ln.w then
+          pm(nx, 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
+        end
+        local fx0 = ln.x + ln.w - bw2 - 1
+        if li == #c.lanes and fx0 > nx + bw2 + L.pad then
+          pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = d end)
         end
       end
       if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + 4 * L.rh + 1, 1, L.rh, 1) end

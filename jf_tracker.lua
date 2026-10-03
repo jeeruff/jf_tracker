@@ -2087,18 +2087,8 @@ ctx = {
   options = function()
     local function flag(k, label, desc) return { key = k, label = label, kind = 'toggle', desc = desc, get = function() return state[k] end, set = function(v) state[k] = v end } end
     local items = {
-      flag('follow', 'follow playhead', 'view scrolls with the playhead'),
-      flag('lock', 'lock to REAPER cursor', 'tracker cursor = edit cursor + selected track, both ways'),
-      flag('fixed', 'fixed cursor', 'cursor row stays centred, pattern scrolls (Impulse Tracker)'),
-      { key = 'step', label = 'edit step', kind = 'num', min = 0, max = 64, desc = 'rows to advance after a note', get = function() return vim.step end, set = function(v) vim.step = v; vim.step_auto = false end },
-      { key = 'step_auto', label = 'step auto', kind = 'toggle', desc = 'advance past the end of the inserted item / slice', get = function() return vim.step_auto end, set = function(v) vim.step_auto = v end },
-      { key = 'lpb', label = 'lines per beat', kind = 'num', min = 1, max = 32, desc = 'rows per beat (view scale only)', get = function() return state.lpb end, set = function(v) ctx.set_lpb(math.floor(v)) end },
-      { key = 'fxcols', label = 'fx columns', kind = 'num', min = 1, max = 4, desc = 'effect command columns per subcolumn', get = function() return state.fxcols end, set = function(v) state.fxcols = math.floor(v) end },
-      { sep = true },
-      { key = 'wave', label = 'wave column', kind = 'toggle', desc = 'spectral peaks + stretch markers left of the note', get = function() return state.wave ~= 'off' end, set = function(v) state.wave = v and 'spec' or 'off' end },
+      -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт)
       { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel (track column and sample view); higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },
-      flag('xfade', 'x-fade inserted notes', 'crossfade at the cut instead of a hard cut'),
-      { key = 'xfade_ms', label = 'x-fade length ms', kind = 'num', min = 1, max = 500, step = 1, desc = 'crossfade length', get = function() return state.xfade_ms or 1 end, set = function(v) state.xfade_ms = v; if ctx.xfade_len then ctx.xfade_len(0, v) end end },
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
@@ -2106,23 +2096,19 @@ ctx = {
       flag('copymedia', 'copy files to project', 'files from the browser are copied into the project media folder (saved projects)'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'len', 'mark' }, desc = 'track groups / by length / by marks @ $ *', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       { sep = true },
-      flag('meters', 'peak meters', 'meters over the columns'),
       flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
-      flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
-      flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'colour of the track in its header (and in the DSP track block): off - none; line - a colour strip under the name; header - the name row filled; full - the whole header filled, dimmer below the name; toned to the panel like REAPER tints the TCP, the name turns dark on light colours; kept in the mono theme', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
-      { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
     }
     OPT.open(items)
   end,
@@ -2997,6 +2983,7 @@ local function hint_go(t)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
+  elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
@@ -4849,6 +4836,7 @@ local function frame()
   elseif hover.trs then
     local names = { vol = 'volume', pan = 'pan', width = 'width (stereo pan)', panl = 'left pan (dual pan)', panr = 'right pan (dual pan)' }
     state.status = ('%s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what)
+  elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
@@ -5179,6 +5167,9 @@ local function frame()
         trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w }
       end
       click = { t = now2, zone = 'trs', row = t.what }
+    elseif hover.fxcolbtn then
+      ctrl_action('fx', hover.fxcolbtn); vim.msg = ('fx columns: %d'):format(state.fxcols)
+      click = { t = now2, zone = 'fxcolbtn' }
     elseif hover.lanebtn then
       ctx.lane_subs(hover.lanebtn.col, hover.lanebtn.lane, hover.lanebtn.d, hover.lanebtn.n)
       click = { t = now2, zone = 'lanebtn' }

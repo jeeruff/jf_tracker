@@ -88,6 +88,7 @@ function O.wheel(d)
 end
 
 function O.click(mx, my)
+  if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.hover then O.sel = O.hover; O.adjust(O.items[O.sel], O.items[O.sel].kind == 'num' and 0 or 0) end
   if O.box and (mx < O.box[1] or mx > O.box[1] + O.box[3] or my < O.box[2] or my > O.box[2] + O.box[4]) then O.close() end
 end
@@ -229,8 +230,17 @@ function O.draw(L, W, H)
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
   U.text(bx + L.pad, by + 2, 'options', U.AMBER)
+  -- крестик закрытия в правом углу (3 окт)
+  do
+    local cw2 = U.measure('x') + 2 * L.pad
+    local cx = bx + bw - cw2 - 1
+    local hot = gfx.mouse_x >= cx and gfx.mouse_x < cx + cw2 and gfx.mouse_y >= by + 1 and gfx.mouse_y < by + 1 + rh
+    O.close_hot = hot
+    U.set(hot and U.tint(U.RED, 0.4) or U.BG); gfx.rect(cx, by + 1, cw2, rh, 1)
+    U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
+  end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  U.text(hx, by + 2, ctx.fit('j k: row   Enter / Space / h l + -: change   Esc: close', bx + bw - L.pad - hx), U.GREY)
+  U.text(hx, by + 2, ctx.fit('j k: row   Enter / Space / h l + -: change   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY)   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   O.hover = nil
