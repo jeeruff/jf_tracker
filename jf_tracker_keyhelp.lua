@@ -174,6 +174,8 @@ KH.PAGES = {
     { k = 'ap A', d = 'pick a parameter to automate (fzf)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
     { k = 'ai', d = 'automation item over the item under the tracker cursor (track fx)' },
+    { k = 'E', d = 'module learn: turn knobs in the plugin window - they join this block (saved per plugin); in learn x removes, J K move, < > columns, R resets to automatic, E / Esc done' },
+    { k = 'colours', d = 'parameter strip colour = category: green gain, cyan filter, amber time, purple pitch, grey mix, red dynamics, teal stereo, orange modulation' },
     { k = 'am', d = 'container: map the selected child parameter to a native container macro (M ...); modulate the macro natively (right-click: LFO / ACS / link)' },
     { k = 'af /', d = 'add fx (fzf)', t = { 'af', '/' } },
     { k = 'v', d = 'select a range of fx (h l extend), Esc clears' },

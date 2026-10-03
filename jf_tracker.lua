@@ -48,6 +48,7 @@ local LG = dofile(DIR .. '/jf_tracker_lfogen.lua')        -- генератор 
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
+model.fxclass = dofile(DIR .. '/jf_tracker_fxclass.lua')   -- классификатор параметров, автомодуль (3 окт)
 local HELP = DIR .. '/jf_tracker_help.html'
 
 -- ── состояние ─────────────────────────────────────────────────────────────
@@ -247,6 +248,46 @@ local env_rows_cache = nil                                  -- строки с �
 local reselect_item = nil                                   -- после правки слайса: выбрать инструмент этого item
 local sp_on_fx = false                                      -- строка take fx свойств выбрана (прошлый кадр)
 local dsp_sel = { fx = 1, param = 1 }                     -- выбор в DSP-панели (фокус dsp)
+-- ── пользовательские модули DSP (3 окт): learn касанием ─────────────────
+-- Файл Data/jf_tracker/dspmods_user.txt: строка на эффект —
+-- «имя<TAB>заголовок<TAB>колонки<TAB>i:подпись,i:подпись…». Приоритет:
+-- пользовательский > кураторский реестр > автомодуль.
+local UMOD_DIR = reaper.GetResourcePath() .. '/Data/jf_tracker'
+local UMOD_FILE = UMOD_DIR .. '/dspmods_user.txt'
+local function umod_load()
+  local t = {}
+  local f = io.open(UMOD_FILE, 'r')
+  if not f then return t end
+  for line in f:lines() do
+    local name, title, cols, list = line:match('^([^\t]+)\t([^\t]*)\t(%d+)\t(.*)$')
+    if name then
+      local m = { title = title ~= '' and title or nil, cols = tonumber(cols) or 2, params = {} }
+      for i, lab in list:gmatch('(%d+):([^,]*)') do m.params[#m.params + 1] = { i = tonumber(i), label = lab ~= '' and lab or nil } end
+      t[name] = m
+    end
+  end
+  f:close()
+  return t
+end
+local function umod_save(t)
+  reaper.RecursiveCreateDirectory(UMOD_DIR, 0)
+  local f = io.open(UMOD_FILE, 'w')
+  if not f then return false end
+  local names = {}
+  for k in pairs(t) do names[#names + 1] = k end
+  table.sort(names)
+  for _, k in ipairs(names) do
+    local m = t[k]
+    local parts = {}
+    for _, p in ipairs(m.params) do parts[#parts + 1] = p.i .. ':' .. (p.label or ''):gsub('[,:\t\n]', ' ') end
+    f:write(('%s\t%s\t%d\t%s\n'):format(k, (m.title or ''):gsub('[\t\n]', ' '), m.cols or 2, table.concat(parts, ',')))
+  end
+  f:close()
+  return true
+end
+model.user_mods = umod_load()
+local dsp_learn = nil         -- { k = блок, name = имя FX, last = ключ последнего касания }
+local learn_poll            -- объявлен заранее: определение ниже, вызов из кадра
 local fxv_cache = {}
 
 -- ── окно ──────────────────────────────────────────────────────────────────
@@ -685,6 +726,50 @@ ctx = {
     model.invalidate()
     vim.msg = idx and ('macro %d of %s = %s - right-click it: native LFO / ACS / link'):format(idx + 1, f.name, p.name)
       or 'am: REAPER refused the mapping (needs REAPER 7.06+)'
+  end,
+  -- ── learn касанием (3 окт): E на блоке DSP; ручки, тронутые в окне
+  -- самого плагина (GetLastTouchedFX), добавляются в пользовательский модуль
+  dsp_fxshort = function(t, f)
+    local _, nm = model.fxapi(t.track).GetFXName(t.track, f.i, '')
+    return ((nm or ''):gsub('^[^:]*: ', ''))
+  end,
+  dsp_learn_toggle = function()
+    if dsp_learn then dsp_learn = nil; vim.msg = 'module learn: off (saved)'; return end
+    local t = dsp_target()
+    local f = t and t.fx[dsp_sel.fx]
+    if not f then vim.msg = 'learn: no fx selected'; return end
+    if f.container then vim.msg = 'learn: containers show their macros (am maps a child parameter)'; return end
+    if t.take then vim.msg = 'learn: track fx only for now (t switches the DSP to the track)'; return end
+    local short = ctx.dsp_fxshort(t, f)
+    if not model.user_mods[short] then
+      -- старт — то, что сейчас показано (автомодуль / кураторский)
+      local m = { title = f.name ~= short and f.name or nil, cols = f.cols or 2, params = {} }
+      for _, p in ipairs(f.params) do if not p.fx then m.params[#m.params + 1] = { i = p.i, label = p.name } end end
+      model.user_mods[short] = m
+      umod_save(model.user_mods)
+    end
+    local _, tn, fxn, pn = reaper.GetLastTouchedFX()
+    dsp_learn = { k = dsp_sel.fx, name = short, fx = f.i, track = t.track, last = ('%s|%s|%s'):format(tn, fxn, pn) }
+    model.invalidate()
+    vim.msg = 'module learn: turn knobs in the plugin window - they join this block; x remove, J K move, < > columns, R reset, E / Esc done'
+  end,
+  -- ключи правки модуля в learn: x J K < > R; true — съедено
+  dsp_learn_key = function(ch)
+    local m = dsp_learn and model.user_mods[dsp_learn.name]
+    if not m then return false end
+    local i = dsp_sel.param
+    if ch == 'x' then
+      if m.params[i] then table.remove(m.params, i); dsp_sel.param = math.max(1, math.min(#m.params, i)) end
+    elseif ch == 'J' and m.params[i + 1] then m.params[i], m.params[i + 1] = m.params[i + 1], m.params[i]; dsp_sel.param = i + 1
+    elseif ch == 'K' and i > 1 and m.params[i - 1] then m.params[i], m.params[i - 1] = m.params[i - 1], m.params[i]; dsp_sel.param = i - 1
+    elseif ch == '<' or ch == ',' then m.cols = math.max(1, (m.cols or 2) - 1)
+    elseif ch == '>' or ch == '.' then m.cols = math.min(4, (m.cols or 2) + 1)
+    elseif ch == 'R' then
+      model.user_mods[dsp_learn.name] = nil; umod_save(model.user_mods); model.auto_reset(dsp_learn.name); model.invalidate()
+      vim.msg = 'module reset: back to the automatic / curated layout'; dsp_learn = nil; return true
+    else return false end
+    umod_save(model.user_mods); model.invalidate()
+    return true
   end,
   dsp_autoitem = function(k, pi)
     local t = dsp_target()
@@ -2929,6 +3014,26 @@ local function mm_apply(a)
   elseif id == 'slicer' then state.top = true; state.toptab = 'sample'; mm_entry(true)
   elseif id == 'play' then edit.play_stop() end
 end
+-- learn касанием: новое касание параметра этого FX в окне плагина → в модуль
+function learn_poll()
+  if not dsp_learn then return end
+  local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+  if not ok then return end
+  local key = ('%s|%s|%s'):format(tn, fxn, pn)
+  if key == dsp_learn.last then return end
+  dsp_learn.last = key
+  if not reaper.ValidatePtr(dsp_learn.track, 'MediaTrack*') then dsp_learn = nil; return end
+  local mytn = math.floor(reaper.GetMediaTrackInfo_Value(dsp_learn.track, 'IP_TRACKNUMBER'))
+  if tn ~= mytn or fxn ~= dsp_learn.fx then return end
+  local m = model.user_mods[dsp_learn.name]
+  if not m then return end
+  for _, p in ipairs(m.params) do if p.i == pn then vim.msg = 'learn: already in the module'; return end end
+  local _, pname = reaper.TrackFX_GetParamName(dsp_learn.track, fxn, pn, '')
+  m.params[#m.params + 1] = { i = pn, label = model.fxclass and model.fxclass.label(pname or '') or pname }
+  umod_save(model.user_mods); model.invalidate()
+  vim.msg = ('learn: + %s (%d in the module)'):format(pname or ('p' .. pn), #m.params)
+end
+
 -- отложенные правки ручек: через 0.5 с тишины — одна правка в проект
 local function mm_settle(now)
   if not mm_pend.t or now - mm_pend.t < 0.5 then return end
@@ -3763,7 +3868,7 @@ local function frame()
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
-  publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise()); mm_settle(reaper.time_precise())
+  publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise()); mm_settle(reaper.time_precise()); learn_poll()
 
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
   -- в REAPER → курсор трекера прыгает туда (вид — следом); курсор трекера
@@ -3920,6 +4025,7 @@ local function frame()
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
     retro = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad))) or nil,
     dsp_sel = state.focus == 'dsp' and dsp_sel or nil,
+    dsp_learn = dsp_learn and dsp_learn.k or nil,
     dsp_range = (state.focus == 'dsp' and DK.anchor) and { DK.range(dsp_sel) } or nil,
     fx_values = function(f) local col = dsp_target(); if not col then return {} end
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
@@ -5360,6 +5466,11 @@ local function frame()
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
+        if ch == 'E' and not DK.pending then ctx.dsp_learn_toggle(); return end
+        if dsp_learn and not DK.pending then
+          if c == 27 then ctx.dsp_learn_toggle(); return end
+          if ctx.dsp_learn_key(ch) then return end
+        end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
         if r == 'leave' then ctx.set_focus('tracker') end
       elseif state.focus == 'top' and state.top and (vim.mode == 'cmd' or vim.mode == 'search') then

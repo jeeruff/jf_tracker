@@ -787,6 +787,68 @@ local function container_children(tr, fx)
   return kids
 end
 
+-- ── автомодуль (3 окт) ─────────────────────────────────────────────────────
+-- Классификация один раз на тип плагина (имя + число параметров): имена,
+-- шаги и текст значения (единицы) первых 512 параметров → FC.auto. Пользовательский
+-- модуль (M.user_mods, learn касанием) — приоритетнее; кураторский реестр — тоже.
+M.fxclass = nil            -- jf_tracker_fxclass.lua (ставит main)
+M.user_mods = nil          -- пользовательские модули: имя FX → { title, cols, params = { {i, label} } }
+local auto_cache = {}
+local function param_kind(A, tr, fx, pi)
+  local kind, nsteps = 'slider', nil
+  if A.GetParameterStepSizes then
+    local ok, step, small, large, istoggle = A.GetParameterStepSizes(tr, fx, pi)
+    if ok then
+      if istoggle then kind = 'toggle'
+      elseif step and step > 0 then
+        local _, mn, mx = A.GetParamEx(tr, fx, pi)
+        local n = (mx and mn) and math.floor((mx - mn) / step + 0.5) or 0
+        if n >= 1 and n <= 16 then kind, nsteps = 'steps', n + 1 end
+      end
+    end
+  end
+  return kind, nsteps
+end
+M.param_kind = param_kind
+-- категория параметра (для цвета) — по имени и единицам, кэш по имени FX
+local cat_cache = {}
+function M.param_cat(tr, fx, short, pi, pname, kind)
+  local key = short .. '|' .. pi
+  local c = cat_cache[key]
+  if c then return c end
+  local A = M.fxapi(tr)
+  local ok, units = A.GetFormattedParamValue(tr, fx, pi, '')
+  c = M.fxclass and M.fxclass.class(pname or '', ok and units or '', kind) or nil
+  cat_cache[key] = c or false
+  return c
+end
+function M.auto_module(tr, fx, short, np)
+  local key = short .. '|' .. np
+  if auto_cache[key] then return auto_cache[key] end
+  local A = M.fxapi(tr)
+  local FC = M.fxclass
+  local list = {}
+  for pi = 0, math.min(np, 512) - 1 do
+    local _, pname = A.GetParamName(tr, fx, pi, '')
+    local kind, nsteps = param_kind(A, tr, fx, pi)
+    local ok, units = A.GetFormattedParamValue(tr, fx, pi, '')
+    list[#list + 1] = { i = pi, name = pname or ('p' .. pi), units = ok and units or '', kind = kind, nsteps = nsteps }
+  end
+  local out
+  if FC then
+    out = FC.auto(list, 24)
+    local byi = {}
+    for _, p in ipairs(list) do byi[p.i] = p end
+    for _, a in ipairs(out) do a.nsteps = byi[a.i] and byi[a.i].nsteps end
+  else
+    out = {}
+    for k = 1, math.min(M.DSP_MAXP, #list) do local p = list[k]; out[k] = { i = p.i, name = p.name, kind = p.kind, nsteps = p.nsteps } end
+  end
+  auto_cache[key] = out
+  return out
+end
+function M.auto_reset(short) for k in pairs(auto_cache) do if not short or k:sub(1, #short + 1) == short .. '|' then auto_cache[k] = nil end end end
+
 function M.track_fx(tr)
   local out = {}
   local A = M.fxapi(tr)
@@ -796,7 +858,8 @@ function M.track_fx(tr)
     local np = A.GetNumParams(tr, fx)
     local params = {}
     local short = (name or ''):gsub('^[^:]*: ', '')
-    local lay = M.dspmods and M.dspmods.match(short)
+    local um = M.user_mods and M.user_mods[short]
+    local lay = (not um) and M.dspmods and M.dspmods.match(short)
     local kids = A.GetNamedConfigParm and container_children(tr, fx)
     if kids then
       -- контейнер: сначала его макросы (нативные container_map — параметры
@@ -821,6 +884,16 @@ function M.track_fx(tr)
       end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
                         cols = 2, container = true, kids = kids }
+    elseif um then
+      -- пользовательский модуль (learn касанием): параметры по номерам
+      for _, sp in ipairs(um.params or {}) do
+        if sp.i < np then
+          local e = param_entry(tr, fx, sp.i, sp.label)
+          e.cat = M.param_cat(tr, fx, short, sp.i, e.name, e.kind)
+          params[#params + 1] = e
+        end
+      end
+      out[#out + 1] = { i = fx, name = um.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = um.cols or 2, user = true, fxname = short }
     elseif lay then
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       local names = {}
@@ -831,6 +904,7 @@ function M.track_fx(tr)
         for pi = 0, np - 1 do
           if names[pi]:find(want, 1, true) then
             params[#params + 1] = param_entry(tr, fx, pi, spec[2])
+            params[#params].cat = M.param_cat(tr, fx, short, pi, names[pi], params[#params].kind)
             if lay.wave and want == lay.wave.start then wa = #params end
             if lay.wave and want == lay.wave.stop then wb = #params end
             if lay.view_param and spec[2] == lay.view_param then e_view_p = #params end
@@ -852,24 +926,14 @@ function M.track_fx(tr)
       end
       out[#out + 1] = e
     else
-    for pi = 0, math.min(M.DSP_MAXP, np) - 1 do
-      local _, pname = A.GetParamName(tr, fx, pi, '')
-      -- тип виджета: тоггл / ступени (≤ 16) / непрерывный — по шагам параметра
-      local kind, nsteps = 'slider', nil
-      if A.GetParameterStepSizes then
-        local ok, step, small, large, istoggle = A.GetParameterStepSizes(tr, fx, pi)
-        if ok then
-          if istoggle then kind = 'toggle'
-          elseif step and step > 0 then
-            local _, mn, mx = A.GetParamEx(tr, fx, pi)
-            local n = (mx and mn) and math.floor((mx - mn) / step + 0.5) or 0
-            if n >= 1 and n <= 16 then kind, nsteps = 'steps', n + 1 end
-          end
-        end
+      -- автомодуль (3 окт): любой эффект — параметры по категориям и
+      -- подгруппам (jf_tracker_fxclass.lua), кэш на тип плагина
+      local am = M.auto_module(tr, fx, short, np)
+      for _, a in ipairs(am) do
+        params[#params + 1] = { i = a.i, name = a.name, kind = a.kind, nsteps = a.nsteps, cat = a.cat, group = a.group }
       end
-      params[#params + 1] = { i = pi, name = pname or ('p' .. pi), kind = kind, nsteps = nsteps }
-    end
-    out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = 1 }
+      local cols = math.max(1, math.min(3, math.ceil(#params / 8)))
+      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true }
     end
   end
   return out

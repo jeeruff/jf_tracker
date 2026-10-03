@@ -790,6 +790,13 @@ local function draw_analyzer(x, y, w, h, slot, mode, info)
 end
 D.draw_analyzer = draw_analyzer
 
+-- цвета категорий параметров DSP (3 окт): от палитры темы, читаемые на фоне
+function D.cat_colour(cat)
+  local c = ({ gain = U.GREEN, filter = U.CYAN, time = U.AMBER, mix = U.GREY, dyn = U.RED,
+               pitch = U.mix(U.RED, U.CYAN, 0.5), stereo = U.mix(U.GREEN, U.CYAN, 0.5), mod = U.mix(U.AMBER, U.RED, 0.5) })[cat]
+  return c and U.readable(c, U.BG, 2.5) or nil
+end
+
 -- «призрак» перетаскивания (DSP-блок и т.п.): янтарная бирка у курсора
 function D.ghost(label)
   if not label then return end
@@ -2051,7 +2058,8 @@ function D.frame(L, snap, rows, state, info)
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
       set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
-      set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, by, bw, bh, 0)
+      set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
+      if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
       local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'O', 'open', bx + bw - 3 * kb - 5 } }
@@ -2211,6 +2219,12 @@ function D.frame(L, snap, rows, state, info)
         else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
           set(acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
+        end
+        -- цвет категории (3 окт): громкость / фильтр / время / высота / микс /
+        -- динамика / стерео / модуляция — полоска слева от имени
+        if p.cat and p.cat ~= 'other' and p.cat ~= 'mode' then
+          local cc = D.cat_colour(p.cat)
+          if cc then set(cc); gfx.rect(bxc + 2, py + 2, 2, L.rh - 4, 1) end
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
         if vw > 4 then text(vx, py, fit(v.s, vw), U.GREY) end

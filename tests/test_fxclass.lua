@@ -1,0 +1,62 @@
+-- test_fxclass.lua — классификатор параметров без REAPER: lua tests/test_fxclass.lua
+package.path = './?.lua;' .. package.path
+local FC = dofile('jf_tracker_fxclass.lua')
+local n, bad = 0, 0
+local function eq(name, got, want)
+  n = n + 1
+  if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
+end
+local function split(s) local g, b = FC.split(s); return g .. '|' .. b end
+
+-- подгруппы
+eq('amp1attack', split('amp1attack'), 'amp1|attack')
+eq('f1cutoff', split('f1cutoff'), 'f1|cutoff')
+eq('Osc 2 Pitch', split('Osc 2 Pitch'), 'osc 2|Pitch')
+eq('LFO1 Rate', split('LFO1 Rate'), 'lfo1|Rate')
+eq('Filter Cutoff', split('Filter Cutoff'), 'filter|Cutoff')
+eq('ampAttack', split('ampAttack'), 'amp|Attack')
+eq('plain Cutoff', split('Cutoff'), '|Cutoff')
+eq('unknown first word kept', split('Room Size'), '|Room Size')
+
+-- категории: единицы важнее имени
+eq('dB -> gain', FC.class('Output', '-6.0 dB', 'slider'), 'gain')
+eq('Hz -> filter', FC.class('Freq', '1200 Hz', 'slider'), 'filter')
+eq('LFO Hz -> mod', FC.class('LFO Rate', '2.5 Hz', 'slider'), 'mod')
+eq('ms -> time', FC.class('Thing', '35 ms', 'slider'), 'time')
+eq('toggle -> mode', FC.class('Cutoff', '', 'toggle'), 'mode')
+eq('name cutoff', FC.class('f1cutoff', '0.5', 'slider'), 'filter')
+eq('name attack', FC.class('amp1attack', '0.2', 'slider'), 'time')
+eq('name ratio', FC.class('Ratio', '4.0:1', 'slider'), 'dyn')
+eq('name pan', FC.class('Pan', 'C', 'slider'), 'stereo')
+eq('name mix', FC.class('Dry/Wet', '50', 'slider'), 'mix')
+eq('percent fallback mix', FC.class('Blorp', '50%', 'slider'), 'mix')
+eq('other', FC.class('Blorp', '0.3', 'slider'), 'other')
+
+-- служебное
+eq('bypass junk', FC.junk('Bypass'), true); eq('wet junk', FC.junk('Wet'), true)
+eq('midi cc junk', FC.junk('MIDI CC 7'), true); eq('param N junk', FC.junk('Param 12'), true)
+eq('hidden jsfx junk', FC.junk('-Hidden'), true); eq('real param not junk', FC.junk('Cutoff'), false)
+
+-- автомодуль: служебное выброшено, группы вместе, важное раньше
+local list = {
+  { i = 0, name = 'amp1attack', units = '5 ms', kind = 'slider' },
+  { i = 1, name = 'f1cutoff', units = '800 Hz', kind = 'slider' },
+  { i = 2, name = 'f1reso', units = '0.3', kind = 'slider' },
+  { i = 3, name = 'Bypass', units = '', kind = 'toggle' },
+  { i = 4, name = 'amp1release', units = '200 ms', kind = 'slider' },
+  { i = 5, name = 'Master Volume', units = '-3 dB', kind = 'slider' },
+  { i = 6, name = 'Param 7', units = '', kind = 'slider' },
+}
+local a = FC.auto(list, 10)
+eq('auto drops junk', #a, 5)
+local pos = {}
+for k, it in ipairs(a) do pos[it.i] = k end
+eq('f1 params together', math.abs(pos[1] - pos[2]), 1)
+eq('amp1 params together', math.abs(pos[0] - pos[4]), 1)
+eq('labels readable', a[pos[1]].name, 'f1 cutoff')
+eq('category carried', a[pos[5]].cat, 'gain')
+-- предел
+eq('auto max', #FC.auto(list, 2), 2)
+
+print(('%d checks, %d failed'):format(n, bad))
+os.exit(bad == 0 and 0 or 1)
