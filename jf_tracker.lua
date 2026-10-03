@@ -27,6 +27,7 @@ local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
 local vim = dofile(DIR .. '/jf_tracker_vim.lua')
 local OPT = dofile(DIR .. '/jf_tracker_options.lua')   -- окно Options (1 окт)
+OPT.ask = dofile(DIR .. '/jf_tracker_ask.lua')           -- вопрос посреди окна (3 окт); полем OPT: главный чанк у предела локальных
 local VER = dofile(DIR .. '/jf_tracker_version.lua')    -- версия и изменения (Options → about)
 local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель свойств сэмпла (вкладка Sample)
 local MX = dofile(DIR .. '/jf_tracker_matrix.lua')
@@ -2586,11 +2587,11 @@ ctx = {
     local c = cur_col()
     local len = 0
     do local src = reaper.PCM_Source_CreateFromFile(path); if src then len = reaper.GetMediaSourceLength(src) or 0; reaper.PCM_Source_Destroy(src) end end
-    PV.file(ctx.preview_track(), path, nil, frac * len)
+    PV.sync = B.sync; PV.file(ctx.preview_track(), path, nil, frac * len)
   end,
   preview_file = function(path, sec)
     local c = cur_col()
-    PV.file(ctx.preview_track(), path, sec)               -- без лимита: файл целиком, следующий выбор останавливает
+    PV.sync = B.sync; PV.file(ctx.preview_track(), path, sec)   -- без лимита: файл целиком, следующий выбор останавливает
     -- проигрываемый файл сразу открывается в сэмпл-модуле
     if state.top and SL.open_file then
       if state.toptab ~= 'sample' then state.toptab = 'sample' end
@@ -2865,6 +2866,7 @@ local function theme_check()
   vim.msg = 'theme colours updated'
 end
 OPT.init(U, ctx)
+OPT.ask.init(U, ctx)
 draw.hint = HN.add
 ctx.hint = function(...) return draw.hint(...) end   -- через draw.hint: сдвиг верхнего модуля (mid / bottom)
 ctx.env_colour = draw.env_colour
@@ -4010,23 +4012,25 @@ local function native_rgb(c)
   local r, g, b = reaper.ColorFromNative(c & 0xFFFFFF)
   return { r / 255, g / 255, b / 255 }
 end
--- цвет региона: свой, иначе цвет регионов из темы REAPER (как на таймлайне, 2 окт)
-local theme_region_rgb
-local function region_rgb(c)
+-- цвет региона / маркера: свой, иначе цвет из темы REAPER — как на таймлайне
+-- (2 окт регионы; 3 окт маркеры: =START был янтарным, а на таймлайне — цвета темы)
+local theme_rgb = {}
+local function region_rgb(c, key)
   local own = native_rgb(c)
   if own then return own end
-  if theme_region_rgb == nil then
-    local tc = reaper.GetThemeColor and reaper.GetThemeColor('region', 0) or -1
-    theme_region_rgb = (tc and tc >= 0) and native_rgb(tc | 0x1000000) or false
+  key = key or 'region'
+  if theme_rgb[key] == nil then
+    local tc = reaper.GetThemeColor and reaper.GetThemeColor(key, 0) or -1
+    theme_rgb[key] = (tc and tc >= 0) and native_rgb(tc | 0x1000000) or false
   end
-  return theme_region_rgb or nil
+  return theme_rgb[key] or nil
 end
 ctx.region_rgb = region_rgb
 ruler_info = function()
   if ruler_cache.src == regions then return ruler_cache.v end
   local v = { regions = {}, markers = {} }
   for _, rg in ipairs(regions or {}) do v.regions[#v.regions + 1] = { r0 = rg.r0, r1 = rg.r1, name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) } end
-  for _, mk in ipairs((regions and regions.markers) or {}) do v.markers[#v.markers + 1] = { row_f = mk.row_f, name = mk.name, idx = mk.idx, rgb = native_rgb(mk.color) } end
+  for _, mk in ipairs((regions and regions.markers) or {}) do v.markers[#v.markers + 1] = { row_f = mk.row_f, name = mk.name, idx = mk.idx, rgb = region_rgb(mk.color, 'marker') } end
   ruler_cache.src, ruler_cache.v = regions, v
   return v
 end
@@ -4177,6 +4181,17 @@ local function frame()
   local t_0 = reaper.time_precise()
   U.begin_frame()
   PV.tick()
+  -- видоизменённые копии (3 окт): правка уже сделала их уникальными —
+  -- спросить, не применить ли то же ко всем связанным
+  if not OPT.ask.active and #edit.modified > 0 then
+    local mods = edit.take_modified()
+    local others = 0
+    for _, m in ipairs(mods) do others = others + #edit.items_with_iid(m.old) end
+    OPT.ask.open(('%d note(s) changed (stretch / offset)'):format(#mods), ('linked to %d other note(s) of the same item'):format(others), {
+      { key = 'u', label = 'only this one - it becomes unique', fn = function() vim.msg = ('%d note(s) made unique'):format(#mods) end },
+      { key = 'a', label = ('apply to all %d linked'):format(others), fn = function() vim.msg = ('applied to %d linked note(s)'):format(edit.propagate(mods)) end },
+    })
+  end
   if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
   env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
   local is_playing = playing()
@@ -4548,6 +4563,7 @@ local function frame()
   end
   draw.popup(L, vim.popup(), anchor)
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
+  if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if bpm_menu then
     local r = draw.ctrl_rect and draw.ctrl_rect.bpm
     if r then
@@ -4718,7 +4734,7 @@ local function frame()
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
     state.status = 'go to ' .. (c and c.path or '?')
   elseif type(hover.browser) == 'string' then
-    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
+    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', sync = 'sync: while the project plays, a file starts on the next bar (native measure align); stopped - at once', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
@@ -4790,6 +4806,7 @@ local function frame()
       end
     end
   end
+  if U.click and OPT.ask.active then OPT.ask.click(); U.click = false end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and bpm_menu then
     if bpm_menu.hover then
@@ -5284,6 +5301,8 @@ local function frame()
         model.invalidate()
       end
     else
+      -- растяжка или подрезка начала меняют звук копии → уникальная (3 окт)
+      if item_drag.active and (item_drag.stretch or item_drag.edge == 'start') then edit.note_modified(item_drag.item) end
       if item_drag.active then edit.item_drag_end() end
       item_drag = nil
     end
@@ -5829,6 +5848,7 @@ local function frame()
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
   if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)
+  if OPT.ask.active and c ~= 0 then OPT.ask.key(c); c = 0 end
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
   if state.bpm_edit and c ~= 0 then
     local ch = c < 256 and string.char(c) or ''

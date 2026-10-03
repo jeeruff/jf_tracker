@@ -41,6 +41,51 @@ function E.make_unique(it)
   E.set_iid(it, u)
   return v, u
 end
+-- видоизменённые копии (3 окт): растяжка / offset одной ноты делают её
+-- уникальной (по умолчанию); main после правки спрашивает, применить ли то
+-- же ко всем связанным (E.propagate). E.modified — { { it =, old = } }.
+E.modified = {}
+function E.note_modified(it)
+  local v = E.get_iid(it)
+  if v == '' then return end
+  for _, m in ipairs(E.modified) do if m.it == it then return end end
+  if #E.items_with_iid(v) < 2 then return end          -- связанных нет — не о чем спрашивать
+  E.make_unique(it)
+  E.modified[#E.modified + 1] = { it = it, old = v }
+end
+function E.take_modified() local m = E.modified; E.modified = {}; return m end
+-- применить к связанным: offset, rate, сохранение питча и алгоритм — как у
+-- изменённой копии; длина каждой — по отношению rate; метка возвращается общая
+function E.propagate(mods)
+  local n = 0
+  E.run('apply to all linked', function()            -- E.run: run объявлен ниже
+    for _, m in ipairs(mods) do
+      local tk = R.ValidatePtr(m.it, 'MediaItem*') and R.GetActiveTake(m.it)
+      if tk then
+        local offs = R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+        local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+        local pp = R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH')
+        local pm = R.GetMediaItemTakeInfo_Value(tk, 'I_PITCHMODE')
+        for _, o in ipairs(E.items_with_iid(m.old)) do
+          local ot = R.GetActiveTake(o)
+          if ot then
+            local r0 = R.GetMediaItemTakeInfo_Value(ot, 'D_PLAYRATE')
+            R.SetMediaItemTakeInfo_Value(ot, 'D_STARTOFFS', offs)
+            R.SetMediaItemTakeInfo_Value(ot, 'D_PLAYRATE', rate)
+            R.SetMediaItemTakeInfo_Value(ot, 'B_PPITCH', pp)
+            R.SetMediaItemTakeInfo_Value(ot, 'I_PITCHMODE', pm)
+            if r0 > 0 and rate > 0 then R.SetMediaItemInfo_Value(o, 'D_LENGTH', R.GetMediaItemInfo_Value(o, 'D_LENGTH') * r0 / rate) end
+            R.UpdateItemInProject(o)
+            n = n + 1
+          end
+        end
+        E.set_iid(m.it, m.old)
+      end
+    end
+  end)
+  return n
+end
+
 -- все items проекта с меткой v (для «применить ко всем связанным»)
 function E.items_with_iid(v)
   local out = {}
@@ -379,7 +424,7 @@ local function apply_fx(h, lpb, cmd, xx)
   local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
   local qn0 = R.TimeMap2_timeToQN(0, pos)
-  if cmd == '9' then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 255 * src_len(h))
+  if cmd == '9' then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 255 * src_len(h)); E.note_modified(it)
   elseif cmd == '8' then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', xx / 255 * 2 - 1)
   elseif cmd == 'C' then R.SetMediaItemInfo_Value(it, 'D_VOL', xx / 128)
   elseif cmd == 'I' then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', R.TimeMap2_QNToTime(0, qn0 + xx / 16 / lpb) - pos)
@@ -417,6 +462,7 @@ local function apply_fx(h, lpb, cmd, xx)
         R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', avail / target)
         R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', target)
+        E.note_modified(it)
       end
     else
       R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', 1)
@@ -1444,6 +1490,7 @@ function E.beatsync(heads, lpb, unit)
             R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate * cur / len_t)
             R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
             R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', len_t)
+            E.note_modified(h.item)
             n = n + 1
           end
         else

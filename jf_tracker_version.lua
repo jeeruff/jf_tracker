@@ -11,6 +11,9 @@ V.CHANGES = {
     'preview: the select button is now preview - click on / off, rclick: mode full (to the end of the item, Esc stops) / hold (while the mouse button is held on the row) / first second; the instrument plays as its note sounds (offset, rate, pitch, volume) and the item wave shows a playhead',
     'track headers take the REAPER TCP colour (col_tr1_bg, selected: col_seltrack) with the track colour mixed like REAPER does; header text contrast follows',
     'items header: sort was drawn over find (only its d showed) - sort, find and bsync now each have their place',
+    'a stretched (=, Txx, Option+edge) or offset (9xx, start trim) note becomes unique at once; a question offers u: keep it unique (Enter) or a: apply the same offset / rate to all linked notes',
+    'browser: sync button - while the project plays, a file starts on the next bar (native measure align)',
+    'ruler markers without their own colour take the REAPER theme marker colour, as on the timeline (=START was amber)',
     'matrix | tracker border visible: region and marker lanes start 2 px after it; the green edit-cursor mark moved next to the row number (it sat on the border and looked like it reached into the matrix); option cursor line: top / bottom / off',
   } },
   { v = '0.5.66', d = '2026-10-03', items = {

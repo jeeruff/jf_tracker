@@ -138,6 +138,9 @@ function P.file(track, path, max_sec, from)
   if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
   R.CF_Preview_SetValue(pv, 'D_VOLUME', P.vol)
   if from and from > 0 then R.CF_Preview_SetValue(pv, 'D_POSITION', from) end
+  -- sync браузера (3 окт): нативное ожидание начала такта — только пока
+  -- проект играет (на паузе SWS иначе молча продолжает превью)
+  if P.sync and R.GetPlayState() & 1 == 1 then R.CF_Preview_SetValue(pv, 'D_MEASUREALIGN', 1) end
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_path, P.cur_len = path, len
