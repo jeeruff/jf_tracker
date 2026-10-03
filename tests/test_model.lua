@@ -271,5 +271,30 @@ do
   eq('env key fx 5 wraps', M.env_key('Gain / ReaEQ', 4), 'col_env13')
   eq('env key fx pan param is fx', M.env_key('Pan / ReaSurround', 1), 'col_env14')
 end
+-- ── связь копий инструмента (3 окт): метка jf_iid, обрезка — не новый инструмент
+do
+  local function au(pos, len, offs, ext, rate) local tk = { name = 'amen', offs = offs or 0, rate = rate or 1 }; local it = { pos = pos, len = len, take = tk, ext = ext }; tk.item = it; return it end
+  local items = {
+    au(0, 4, 0, { ['P_EXT:jf_iid'] = 'A' }),                -- инструмент
+    au(4, 1, 0, { ['P_EXT:jf_iid'] = 'A' }),                -- его нота, обрезана следующей
+    au(5, 0.5, 0, { ['P_EXT:jf_iid'] = 'A' }, 1.5),         -- нота в resample (другой rate) — тот же
+    au(6, 0.25, 1, { ['P_EXT:jf_iid'] = 'A#2' }),           -- слайс 2
+    au(7, 0.1, 1, { ['P_EXT:jf_iid'] = 'A#2' }),            -- слайс 2, обрезан
+    au(8, 0.25, 1, { ['P_EXT:jf_iid'] = 'A#2~u1' }),        -- уникальная копия слайса
+    au(9, 2, 3),                                            -- без метки
+    au(11, 1, 3),                                           -- без метки, тот же offset, обрезан — тот же
+    au(12, 1, 3.5),                                         -- без метки, другой offset — другой
+  }
+  local pool = M.track_pool({ items = items }, nil, nil, nil)
+  eq('linked: 5 instruments, not 9', #pool, 5)
+  local by = {}
+  for _, e in ipairs(pool) do by[e.iid ~= '' and e.iid or ('offs' .. e.offs)] = e end
+  eq('A: representative = longest', by.A and by.A.len, 4)
+  eq('A: counts its notes', by.A and by.A.n, 3)
+  eq('slice 2: one instrument, full length', by['A#2'] and by['A#2'].len, 0.25)
+  eq('unique copy separate', by['A#2~u1'] ~= nil, true)
+  eq('untagged cut merged, longest kept', by.offs3 and by.offs3.len, 2)
+  eq('untagged other offset separate', by['offs3.5'] ~= nil, true)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -93,7 +93,11 @@ local state = {
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
   pool = flag('pool', true),                    -- (устар.) = top
-  poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (1 с)
+  poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (кнопка preview)
+  -- режим превью инструмента (3 окт): full — до конца item / Esc, hold — пока
+  -- держишь кнопку мыши на строке, sec — первая секунда
+  curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
+  prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
   scopes = false,                               -- скопы убраны (2 окт): JSFX-мост больше не ставится
@@ -335,7 +339,7 @@ local function save_win()
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
-  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
+  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
   S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
@@ -401,6 +405,17 @@ local function open_help()
 end
 
 -- выбрать слот пула трека курсора (+ прослушать 1 с)
+-- превью инструмента (3 окт): как прозвучит нота, до конца item; режим
+-- state.prevmode; hold — только мышью (кнопка отпущена → стоп), с
+-- клавиатуры hold играет целиком; Esc останавливает любое превью.
+-- Полем PV, не local: главный чанк упёрся в 200 локальных, а pool_select
+-- стоит раньше ctx
+function PV.inst_preview(e, track, by_mouse)
+  if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then return end
+  local mode = state.prevmode or 'full'
+  PV.inst(track, e.item, mode == 'sec' and 1 or nil)
+  state.prev_hold = (mode == 'hold' and by_mouse) or nil
+end
 local function pool_select(n)
   local col = cur_col()
   local pool = col and col.pool or {}
@@ -415,7 +430,7 @@ local function pool_select(n)
   -- выбор инструмента возвращает сэмпл-модуль к нему (если там был файл браузера)
   if SL.entry and SL.entry.file then SL.close(); SL.entry = nil end
   vim.msg = ('inst %d: %s%s'):format(n, e.name, (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '')
-  if state.poolprev and PV.available() then PV.audio(col.track, e.item, 0, 1.0) end
+  if state.poolprev and PV.available() then PV.inst_preview(e, col.track, state.prev_by_mouse) end
 end
 
 -- ── контекст для Vim-слоя, матрицы, браузера ──────────────────────────────
@@ -1827,26 +1842,53 @@ ctx = {
     local ok, name = reaper.EnumPitchShiftModes(m >> 16)
     return (ok and name and name ~= '') and name or ('mode ' .. (m >> 16))
   end,
+  -- beatsync инструмента (3 окт): edit.bsync_* — метка на всех его копиях
+  bsync_set = function(e, n)
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then vim.msg = 'no item selected'; return end
+    local items = ctx.inst_group(e)
+    edit.bsync_set(items, e.item, n)
+    model.invalidate()
+    vim.msg = n and ('beatsync %s: %d beats, %d note(s) fitted to the tempo where they sit'):format(e.name, n, #items) or ('beatsync off: %s, %d note(s) back to rate %.3f'):format(e.name, #items, reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(e.item), 'D_PLAYRATE'))
+  end,
+  bsync_toggle = function(e)
+    if not e then local col = cur_col(); e = col and col.pool[vim.inst] end
+    if not e then vim.msg = 'no item selected'; return end
+    if e.bsync then ctx.bsync_set(e, nil); return end
+    local span = e.len * (e.rate or 1)
+    ctx.bsync_set(e, edit.bsync_guess(span, reaper.GetCursorPosition()))
+  end,
+  bsync_adjust = function(e, d)
+    if not e.bsync then if d > 0 then ctx.bsync_toggle(e) end return end
+    local n = e.bsync + d
+    if n < 1 then ctx.bsync_set(e, nil) else ctx.bsync_set(e, n) end
+  end,
+  -- items инструмента записи e (все связанные копии; без них — сам item)
+  inst_group = function(e)
+    local col = cur_col()
+    local idx
+    for i, pe in ipairs(col and col.pool or {}) do if pe == e or pe.item == e.item then idx = i end end
+    local items = idx and ctx.inst_items(idx) or {}
+    if #items == 0 then items = { e.item } end
+    return items
+  end,
+  -- панель item (2 окт) правит ИНСТРУМЕНТ (3 окт): все его копии, см. edit.inst_prop
   sp_adjust = function(e, k, d)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
     local fine = ctx.mods().shift
+    local items = ctx.inst_group(e)
+    local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     if k == 'vol' then
       local v = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
       local db = v > 1e-6 and 20 * math.log(v, 10) or -60
-      edit.item_set(it, 'D_VOL', 10 ^ (math.max(-60, math.min(24, db + d * 0.5)) / 20), 'sample volume')
-    elseif k == 'pan' then edit.take_set(tk, 'D_PAN', math.max(-1, math.min(1, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + d * 0.02)), 'sample pan')
-    elseif k == 'st' then edit.take_set(tk, 'D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d, 'sample transpose')
-    elseif k == 'cent' then edit.take_set(tk, 'D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d * 0.01, 'sample finetune')
+      P('D_VOL', 10 ^ (math.max(-60, math.min(24, db + d * 0.5)) / 20), 'mul', 'sample volume')
+    elseif k == 'pan' then P('take:D_PAN', math.max(-1, math.min(1, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + d * 0.02)), 'add', 'sample pan')
+    elseif k == 'st' then P('take:D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d, 'add', 'sample transpose')
+    elseif k == 'cent' then P('take:D_PITCH', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + d * 0.01, 'add', 'sample finetune')
     elseif k == 'rate' then
       local r = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
-      local nr = math.max(0.1, math.min(10, r + d * 0.01))
-      local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      edit.run('sample rate', function()
-        reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', nr)
-        reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', len * r / nr)
-      end)
-    elseif k == 'ppitch' then edit.take_set(tk, 'B_PPITCH', e.ppitch and 0 or 1, 'sample keep pitch')
+      P('take:D_PLAYRATE', math.max(0.1, math.min(10, r + d * 0.01)), 'mul', 'sample rate')
+    elseif k == 'ppitch' then P('take:B_PPITCH', e.ppitch and 0 or 1, 'abs', 'sample keep pitch')
     elseif k == 'mode' then
       -- цикл алгоритмов растяжения: project → 0 → 1 … (EnumPitchShiftModes)
       local modes = { -1 }
@@ -1854,24 +1896,38 @@ ctx = {
       local cur = reaper.GetMediaItemTakeInfo_Value(tk, 'I_PITCHMODE')
       local k0 = 1
       for i, m in ipairs(modes) do if m == cur or (m >= 0 and cur >= 0 and (m >> 16) == (math.floor(cur) >> 16)) then k0 = i end end
-      edit.take_set(tk, 'I_PITCHMODE', modes[(k0 - 1 + d) % #modes + 1], 'sample stretch mode')
-    elseif k == 'loop' then edit.item_set(it, 'B_LOOPSRC', e.loop and 0 or 1, 'sample loop')
+      P('take:I_PITCHMODE', modes[(k0 - 1 + d) % #modes + 1], 'abs', 'sample stretch mode')
+    elseif k == 'loop' then P('B_LOOPSRC', e.loop and 0 or 1, 'abs', 'sample loop')
     elseif k == 'fin' or k == 'fout' then
       local key = k == 'fin' and 'D_FADEINLEN' or 'D_FADEOUTLEN'
-      edit.item_set(it, key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'sample fade')
+      P(key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'abs', 'sample fade')
+    elseif k == 'bsync' then ctx.bsync_adjust(e, d)
     elseif k == 'fx' then ctx.take_fx_focus(e)                          -- DSP показывает take FX (2 окт)
-    elseif k == 'norm' then edit.normalize(it); vim.msg = 'normalized (peak 0 dB)' end
+    elseif k == 'norm' then
+      -- нормализация по представителю, остальным — то же отношение громкости
+      local v0 = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
+      edit.run('normalize instrument', function()
+        edit.normalize(it)
+        local v1 = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
+        reaper.SetMediaItemInfo_Value(it, 'D_VOL', v0)
+        edit.inst_prop(items, it, 'D_VOL', v1, 'mul', 'normalize')
+      end)
+      vim.msg = ('normalized (peak 0 dB), %d note(s) of the instrument'):format(#items)
+    end
     model.invalidate()
   end,
   sp_reset = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
-    if k == 'vol' then edit.item_set(it, 'D_VOL', 1, 'sample volume reset')
-    elseif k == 'pan' then edit.take_set(tk, 'D_PAN', 0, 'sample pan reset')
-    elseif k == 'st' or k == 'cent' then edit.take_set(tk, 'D_PITCH', 0, 'sample pitch reset')
-    elseif k == 'mode' then edit.take_set(tk, 'I_PITCHMODE', -1, 'sample stretch reset')
-    elseif k == 'fin' then edit.item_set(it, 'D_FADEINLEN', 0, 'sample fade reset')
-    elseif k == 'fout' then edit.item_set(it, 'D_FADEOUTLEN', 0, 'sample fade reset')
+    local items = ctx.inst_group(e)
+    local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
+    if k == 'vol' then P('D_VOL', 1, 'mul', 'sample volume reset')
+    elseif k == 'pan' then P('take:D_PAN', 0, 'add', 'sample pan reset')
+    elseif k == 'st' or k == 'cent' then P('take:D_PITCH', 0, 'add', 'sample pitch reset')
+    elseif k == 'mode' then P('take:I_PITCHMODE', -1, 'abs', 'sample stretch reset')
+    elseif k == 'fin' then P('D_FADEINLEN', 0, 'abs', 'sample fade reset')
+    elseif k == 'fout' then P('D_FADEOUTLEN', 0, 'abs', 'sample fade reset')
+    elseif k == 'bsync' then ctx.bsync_set(e, nil)
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
   end,
@@ -1883,7 +1939,9 @@ ctx = {
   -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
   -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
   inst_select = function(n) pool_select(n) end,
-  inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then PV.audio(col.track, e.item, 0, 1.0) end end,
+  inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
+  inst_preview = function(...) return PV.inst_preview(...) end,
+  inst_preview_pos = function(item) return PV.inst_position(item) end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
   inst_track = function(d) vim.key((d < 0 and 'H' or 'L'):byte()) end,
   inst_items = function(i)
@@ -1991,6 +2049,7 @@ ctx = {
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
+      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'line', 'header', 'full' }, desc = 'line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name)', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
     }
@@ -2852,6 +2911,7 @@ local function hint_go(t)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
+  elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
@@ -3027,10 +3087,17 @@ local function context_menu(hover)
   elseif hover.matrix and hover.matrix.ri then
     MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci or MX.cur.ci)
     for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key) end
+  elseif hover.prevbtn then
+    -- кнопка preview (3 окт): режим прослушивания
+    local function radio(m, label) add((state.prevmode == m and '!' or '') .. label, function() state.prevmode = m; vim.msg = 'preview: ' .. label end) end
+    add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end)
+    radio('full', 'full - to the end of the item (Esc stops)')
+    radio('hold', 'hold - while the mouse button is held on the row')
+    radio('sec', 'first second')
   elseif hover.pool then
     local col = cur_col()
     add('Select instrument', function() pool_select(hover.pool.i) end)
-    add('Preview', function() local e = col and col.pool[hover.pool.i]; if e then PV.audio(col.track, e.item, 0, 1.0) end end)
+    add('Preview', function() local e = col and col.pool[hover.pool.i]; if e then ctx.inst_preview(e, col.track) end end)
     add('Slice … (virtual)', function() ctx.open_slicer(hover.pool.i) end)
     add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end)
     add('Hide top bar (:top)', function() state.top = false end)
@@ -3262,7 +3329,7 @@ local function mm_apply(a)
     local sa, sb = SL.span()
     if z and e and z.e.item == e.item then PV.slice(col.track, p, z.a, z.b)
     elseif sa and SL.entry then ctx.preview_slice(SL.track, SL.entry, sa, sb)
-    elseif e and e.item and col then PV.audio(col.track, e.item, 0, 1.0) end
+    elseif e and e.item and col then PV.inst_preview(e, col.track) end
   elseif id == 'insert' then local sa, sb = SL.span(); if sa and SL.entry then ctx.drop_span_cursor(SL.entry, sa, sb) else vim.msg = 'insert: no selection' end
   elseif id == 'depot' then local sa, sb = SL.span(); if sa and SL.entry then ctx.depot_span(SL.entry, sa, sb) else vim.msg = 'to library: no selection' end
   elseif id == 'norm' then local e = mm_entry(false); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized' end
@@ -4110,6 +4177,7 @@ local function frame()
   local t_0 = reaper.time_precise()
   U.begin_frame()
   PV.tick()
+  if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
   env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
   local is_playing = playing()
   local playpos = is_playing and reaper.GetPlayPosition() or nil
@@ -4242,7 +4310,7 @@ local function frame()
     local now_t = reaper.time_precise()
     local mkey = gfx.mouse_x .. ',' .. gfx.mouse_y .. ',' .. gfx.mouse_cap .. ',' .. gfx.w .. ',' .. gfx.h
     if mkey ~= idle.mkey or is_playing or changed or gfx.mouse_wheel ~= 0 or (now_t - idle.input_t) < 1.5
-       or PV.position() or vim.picker or vim.hydra or state.bpm_edit then
+       or PV.playing() or vim.picker or vim.hydra or state.bpm_edit then
       idle.active_t, idle.mkey = now_t, mkey
     end
     idle.n = idle.n + 1
@@ -4551,8 +4619,9 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
-  elseif hover.prevbtn then state.status = 'select: play the sample when an instrument is selected - ' .. (state.poolprev and 'on' or 'off') .. ' (:poolprev)'
+  elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
   elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the items have focus'
+  elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
   elseif hover.poolmark then
@@ -4741,6 +4810,9 @@ local function frame()
     elseif hover.poolfind then
       ctx.set_focus('inst'); ctx.inst_find()
       click = { t = now2, zone = 'poolfind' }
+    elseif hover.poolbsync then
+      ctx.set_focus('inst'); ctx.bsync_toggle()
+      click = { t = now2, zone = 'poolbsync' }
     elseif hover.insprevbtn then
       ctx.set_focus('inst')
       state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
@@ -5052,7 +5124,9 @@ local function frame()
       click = { t = now2, zone = 'scope' }
     elseif hover.pool then
       ctx.set_focus('inst')
+      state.prev_by_mouse = true
       pool_select(hover.pool.i)
+      state.prev_by_mouse = nil
       if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.open_slicer(hover.pool.i) end
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
@@ -5754,6 +5828,7 @@ local function frame()
   end
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
+  if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
   if state.bpm_edit and c ~= 0 then
     local ch = c < 256 and string.char(c) or ''

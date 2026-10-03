@@ -3,7 +3,7 @@
 -- item и take REAPER). Правит выбранный в списке инструментов элемент:
 -- исходный сэмпл или конкретный слайс / кусок (ребёнок в дереве).
 --
--- Строки: volume, pan, transpose, finetune, rate, keep pitch, stretch
+-- Строки: volume, pan, transpose, finetune, rate, beatsync, keep pitch, stretch
 -- (алгоритм I_PITCHMODE), loop, fade in, fade out, take fx, normalize.
 -- Клавиши (вкладка Sample в фокусе): J / K строка, H / L значение − / +
 -- (тоггл, цикл алгоритмов, открыть take FX, нормализовать), R сброс.
@@ -16,7 +16,7 @@ local U, ctx
 SP.ROWS = {
   { k = 'vol', label = 'volume' }, { k = 'pan', label = 'pan' },
   { k = 'st', label = 'transpose' }, { k = 'cent', label = 'finetune' },
-  { k = 'rate', label = 'rate' }, { k = 'ppitch', label = 'keep pitch' },
+  { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'ppitch', label = 'keep pitch' },
   { k = 'mode', label = 'stretch' }, { k = 'loop', label = 'loop' },
   { k = 'fin', label = 'fade in' }, { k = 'fout', label = 'fade out' },
   { k = 'fx', label = 'take fx' }, { k = 'norm', label = 'normalize' },
@@ -33,7 +33,8 @@ function SP.value(e, k)
   local st = math.floor(p + 0.5)
   if k == 'st' then return ('%+d st'):format(st) end
   if k == 'cent' then return ('%+d ct'):format(math.floor((p - st) * 100 + 0.5)) end
-  if k == 'rate' then return ('%.3f'):format(e.rate or 1) end
+  if k == 'rate' then return ('%.3f'):format(e.rate or 1) .. (e.bsync and ' (bsync)' or '') end
+  if k == 'bsync' then return e.bsync and ('%d beats (wheel, R: off)'):format(e.bsync) or 'off (L: on)' end
   if k == 'ppitch' then return e.ppitch and 'on' or 'off' end
   if k == 'mode' then return ctx.pitch_mode_name(e.pmode or -1) end
   if k == 'loop' then return e.loop and 'on' or 'off' end

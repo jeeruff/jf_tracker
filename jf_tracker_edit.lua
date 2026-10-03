@@ -19,6 +19,43 @@ local model
 
 function E.init(m) model = m end
 
+-- ── связь копий с инструментом (3 окт): метка P_EXT:jf_iid ─────────────
+-- Все вставки трекера — копии item-инструмента с его меткой: модель считает
+-- их одним инструментом (обрезка следующей нотой, питч, громкость — свойства
+-- ноты). Слайс k — метка id#k, кусок — id@offs+len. Видоизменение копии
+-- (растяжка, offset) даёт новую метку — копия уникальна (E.make_unique).
+local IID = 'P_EXT:jf_iid'
+function E.new_iid() return (R.genGuid(''):gsub('[{}%-]', ''):sub(1, 10)) end
+function E.get_iid(it) local _, v = R.GetSetMediaItemInfo_String(it, IID, '', false); return v or '' end
+function E.set_iid(it, v) R.GetSetMediaItemInfo_String(it, IID, v or '', true) end
+-- метка инструмента item (ставит новую, если её нет) — без undo-блока: зовётся внутри run
+function E.ensure_iid(it)
+  local v = E.get_iid(it)
+  if v == '' then v = E.new_iid(); E.set_iid(it, v) end
+  return v
+end
+local function iid_base(v) return (v or ''):match('^([^#@~]*)') end
+function E.make_unique(it)
+  local v = E.get_iid(it)
+  local u = (v ~= '' and v or E.new_iid()) .. '~' .. E.new_iid():sub(1, 6)
+  E.set_iid(it, u)
+  return v, u
+end
+-- все items проекта с меткой v (для «применить ко всем связанным»)
+function E.items_with_iid(v)
+  local out = {}
+  if not v or v == '' then return out end
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      if E.get_iid(it) == v then out[#out + 1] = it end
+    end
+  end
+  return out
+end
+
+
 -- ── undo-обёртка ──────────────────────────────────────────────────────────
 -- E.after — хук после каждой правки, ВНУТРИ того же undo-блока (синхронизация
 -- алиасов паттернов, jf_tracker_alias.lua). Защита от рекурсии — E.in_after.
@@ -358,12 +395,16 @@ local function apply_fx(h, lpb, cmd, xx)
     local slices, base = E.item_slices(it)
     if #slices > 0 then
       local k = math.max(1, math.min(#slices, xx))
+      local bs = E.bsync_of(it)
+      if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
       local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
       local t0 = slices[k]
       local t1 = slices[k + 1] or (base.len or len)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + t0 * rate)
       R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
       R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
+      E.set_iid(it, iid_base(E.ensure_iid(it)) .. '#' .. k)
+      if bs then E.bsync_fit(it, bs) end
     else
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
     end
@@ -697,6 +738,72 @@ function E.xfade_heads(heads, len)
   return n
 end
 
+-- ── beatsync инструмента (3 окт; как в Renoise, но по темпу в месте ноты) ──
+-- P_EXT:jf_bsync = "N;span;rate0;pp0": инструмент длиной span секунд
+-- источника звучит ровно N долей — в каждой копии по темпу там, где она
+-- стоит (TimeMap: смена BPM в проекте учтена). rate0 / pp0 — что вернуть
+-- при выключении. Копии несут метку в чанке, слайсы корня — тоже: они идут
+-- тем же темпом, что весь сэмпл. Растяжка — с сохранением питча (B_PPITCH).
+local BSYNC = 'P_EXT:jf_bsync'
+function E.bsync_of(it)
+  local _, v = R.GetSetMediaItemInfo_String(it, BSYNC, '', false)
+  local n, span, r0, pp0 = (v or ''):match('^([%d%.]+);([%d%.]+);([%d%.]+);(%d)')
+  if not n then return nil end
+  return { n = tonumber(n), span = tonumber(span), rate0 = tonumber(r0), pp0 = tonumber(pp0) }
+end
+-- подогнать копию под её место (без undo-блока: внутри run)
+function E.bsync_fit(it, b)
+  b = b or E.bsync_of(it)
+  local tk = it and R.GetActiveTake(it)
+  if not (b and tk) or b.n <= 0 or b.span <= 0 then return end
+  local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local dur = R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, pos) + b.n) - pos
+  if dur <= 0 then return end
+  local rate = b.span / dur
+  local cur = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+  local own = R.GetMediaItemInfo_Value(it, 'D_LENGTH') * cur        -- секунды источника этой копии (обрезка сохраняется)
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate)
+  R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
+  R.SetMediaItemInfo_Value(it, 'D_LENGTH', own / rate)
+end
+-- предложение N по длине: ближайшая степень двойки долей при темпе в pos
+function E.bsync_guess(span, pos)
+  local qn0 = R.TimeMap2_timeToQN(0, pos)
+  local beats = R.TimeMap2_timeToQN(0, pos + span) - qn0
+  if beats <= 0 then return 1 end
+  return math.max(1, math.floor(2 ^ math.floor(math.log(beats, 2) + 0.5) + 0.5))
+end
+-- включить (n > 0) / выключить (n = nil) beatsync у items инструмента;
+-- rep — представитель (по нему span и исходный rate)
+function E.bsync_set(items, rep, n)
+  local tk = rep and R.GetActiveTake(rep)
+  if not tk then return end
+  run(n and ('beatsync %d beats'):format(n) or 'beatsync off', function()
+    local old = E.bsync_of(rep)
+    local r0 = old and old.rate0 or R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    local pp0 = old and old.pp0 or math.floor(R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH'))
+    local span = old and old.span or R.GetMediaItemInfo_Value(rep, 'D_LENGTH') * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    for _, it in ipairs(items) do
+      local t = R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
+      if t then
+        if n then
+          local b = { n = n, span = span, rate0 = r0, pp0 = pp0 }
+          R.GetSetMediaItemInfo_String(it, BSYNC, ('%g;%.6f;%.6f;%d'):format(n, span, r0, pp0), true)
+          E.bsync_fit(it, b)
+        else
+          local cur = R.GetMediaItemTakeInfo_Value(t, 'D_PLAYRATE')
+          local own = R.GetMediaItemInfo_Value(it, 'D_LENGTH') * cur
+          R.SetMediaItemTakeInfo_Value(t, 'D_PLAYRATE', r0)
+          R.SetMediaItemTakeInfo_Value(t, 'B_PPITCH', pp0)
+          R.SetMediaItemInfo_Value(it, 'D_LENGTH', own / r0)
+          R.GetSetMediaItemInfo_String(it, BSYNC, '', true)
+        end
+        R.UpdateItemInProject(it)
+      end
+    end
+  end)
+end
+
 local function insert_chunk(track, lane_idx, t, chunk)
   local it = R.AddMediaItemToTrack(track)
   R.SetItemStateChunk(it, chunk, false)
@@ -727,6 +834,7 @@ end
 -- вставка ноты/слайса/куска: после того как длина и offset выставлены
 local function finish_insert(track, lane_idx, it)
   if not it then return end
+  E.bsync_fit(it)                                     -- beatsync инструмента: под темп в этом месте
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
 end
@@ -738,12 +846,16 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k)
   k = math.max(1, math.min(#slices, k))
   local t0 = row_time(row, lpb, 0)
   run('insert slice ' .. k, function()
+    local root = iid_base(E.ensure_iid(inst_item))
     local ok, chunk = R.GetItemStateChunk(inst_item, '', false)
     if not ok then return end
     local it = insert_chunk(track, lane_idx, t0, strip_guids(chunk))
     R.SetMediaItemInfo_Value(it, 'B_MUTE', 0)
     local tk = R.GetActiveTake(it)
     if tk then
+      -- таблица слайсов — в секундах item при исходном rate (beatsync корня его меняет)
+      local bs = E.bsync_of(it)
+      if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
       local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
       local a = slices[k]
       local b = slices[k + 1] or base.len or R.GetMediaItemInfo_Value(inst_item, 'D_LENGTH')
@@ -752,6 +864,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k)
       R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0)
     end
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
+    E.set_iid(it, root .. '#' .. k)                      -- все ноты слайса k — один инструмент
     finish_insert(track, lane_idx, it)
   end)
 end
@@ -765,6 +878,7 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
   local it
   run(('insert span %.2fs'):format(t1 - t0), function()
     if entry.item then
+      local root = iid_base(E.ensure_iid(entry.item))
       local ok, chunk = R.GetItemStateChunk(entry.item, '', false)
       if not ok then return end
       it = insert_chunk(track, lane_idx, t, strip_guids(chunk))
@@ -772,8 +886,11 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
       local tk = R.GetActiveTake(it)
       if tk then
         local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
-        R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (entry.offs or 0) + t0 * rate)
+        local offs = (entry.offs or 0) + t0 * rate
+        R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', offs)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
+        -- тот же кусок, вставленный ещё раз, — тот же инструмент
+        E.set_iid(it, ('%s@%.3f+%.3f'):format(root, offs, (t1 - t0) * rate))
       end
     elseif entry.path then
       local src = R.PCM_Source_CreateFromFile(E.media_copy(entry.path))
@@ -842,6 +959,7 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
     if mit or (not has_audio and not depot_item) then
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
     elseif depot_item then
+      E.ensure_iid(depot_item)                          -- копия унесёт метку в чанке
       local ok, chunk = R.GetItemStateChunk(depot_item, '', false)
       if ok then
         local it = insert_chunk(track, lane_idx, t0, strip_guids(chunk))
@@ -1806,6 +1924,43 @@ end
 -- Во время протяжки — без undo (каждый кадр), точка undo — на отпускании.
 function E.track_value(tr, key, v) R.SetMediaTrackInfo_Value(tr, key, v) end
 -- свойства сэмпла из панели (undo на каждое изменение)
+-- свойство инструмента (3 окт): правка в панели item идёт во ВСЕ его копии.
+-- rep — представитель (по нему считается новое значение v); остальные:
+-- how = 'abs' — то же значение (фейды, луп, режим растяжки), 'add' — та же
+-- разница (питч, панорама: у нот свои), 'mul' — то же отношение (громкость:
+-- у нот своя). key 'take:X' — свойство take, иначе item. D_PLAYRATE —
+-- отношением, длина каждой копии пересчитывается (выше rate — короче).
+function E.inst_prop(items, rep, key, v, how, desc)
+  local tkey = key:match('^take:(.+)')
+  local function get(it)
+    if tkey then local tk = R.GetActiveTake(it); return tk and R.GetMediaItemTakeInfo_Value(tk, tkey) end
+    return R.GetMediaItemInfo_Value(it, key)
+  end
+  local old = get(rep)
+  if not old then return end
+  run(desc or ('instrument ' .. key), function()
+    for _, it in ipairs(items) do
+      if R.ValidatePtr(it, 'MediaItem*') then
+        local cur = get(it)
+        if cur then
+          local nv = v
+          if it ~= rep then
+            if how == 'add' then nv = cur + (v - old)
+            elseif how == 'mul' then nv = old ~= 0 and cur * v / old or v end
+          end
+          if tkey then
+            local tk = R.GetActiveTake(it)
+            R.SetMediaItemTakeInfo_Value(tk, tkey, nv)
+            if tkey == 'D_PLAYRATE' and nv > 0 and cur > 0 then
+              R.SetMediaItemInfo_Value(it, 'D_LENGTH', R.GetMediaItemInfo_Value(it, 'D_LENGTH') * cur / nv)
+            end
+          else R.SetMediaItemInfo_Value(it, key, nv) end
+          R.UpdateItemInProject(it)
+        end
+      end
+    end
+  end)
+end
 function E.item_set(it, key, v, desc) run(desc or ('item ' .. key), function() R.SetMediaItemInfo_Value(it, key, v); R.UpdateItemInProject(it) end) end
 function E.take_set(take, key, v, desc) run(desc or ('take ' .. key), function() R.SetMediaItemTakeInfo_Value(take, key, v); R.UpdateItemInProject(R.GetMediaItemTake_Item(take)) end) end
 function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end

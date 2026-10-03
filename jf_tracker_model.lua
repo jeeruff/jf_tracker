@@ -572,18 +572,34 @@ function M.item_rgb(it)
 end
 
 -- ── пул трека ─────────────────────────────────────────────────────────────
--- «Инструменты» для вставки на трек: уникальные аудио-источники items трека
--- (по файлу + имени + offset + длине + rate) и затем items депо. Записи
--- годятся для M.peaks (src/offs/len/rate/guid) — превью в полоске над
--- заголовком. Цифры 1..0 в INSERT выбирают слот.
+-- «Инструменты» для вставки на трек: items трека и депо, сгруппированные
+-- в инструменты. Записи годятся для M.peaks (src/offs/len/rate/guid) —
+-- превью в полоске над заголовком. Цифры 1..0 в INSERT выбирают слот.
+--
+-- Связь (3 окт): инструмент = метка P_EXT:jf_iid (её ставит каждая вставка
+-- трекера: нота — id инструмента, слайс — id#k). Все items с одной меткой —
+-- ОДИН инструмент, как бы их ни обрезали следующие ноты, какой бы питч или
+-- громкость ни дали. Видоизменённая копия (растяжка, offset) получает новую
+-- метку — становится уникальной (edit.make_unique). Items без метки (свои
+-- или старые) — по файлу + имени + offset + rate, БЕЗ длины: обрезанный
+-- кусок — тот же инструмент, а не новая «итерация».
+-- Представитель инструмента — item из библиотеки, иначе самый длинный.
+M.IID = 'P_EXT:jf_iid'
+function M.iid(it)
+  local _, v = R.GetSetMediaItemInfo_String(it, M.IID, '', false)
+  return v or ''
+end
+local pool_add_entry                                   -- определена ниже pool_add
 local function pool_key(it, take, name)
+  local iid = M.iid(it)
+  if iid ~= '' then return 'iid:' .. iid end
   local src = R.GetMediaItemTake_Source(take)
   local fn = src and R.GetMediaSourceFileName and R.GetMediaSourceFileName(src, '') or ''
-  return string.format('%s|%s|%.3f|%.3f|%.3f', tostring(fn), name,
+  return string.format('%s|%s|%.3f|%.3f', tostring(fn), name,
     R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS'),
-    R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
     R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE'))
 end
+M.pool_key = pool_key
 
 local function pool_add(pool, seen, it, from_depot)
   local take = R.GetActiveTake(it)
@@ -591,10 +607,27 @@ local function pool_add(pool, seen, it, from_depot)
   local name = R.GetTakeName(take)
   local key = pool_key(it, take, name)
   pool_by_item[it] = key
-  if seen[key] then return end
-  seen[key] = true
+  local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local at = seen[key]
+  if at then
+    local cur = pool[at]
+    cur.n = (cur.n or 1) + 1
+    -- представитель: библиотека, затем самый длинный (не обрезанная копия)
+    local better = (from_depot and not cur.depot) or ((not from_depot) == (not cur.depot) and len > cur.len + 1e-6)
+    if not better then return end
+    local n = cur.n
+    pool[at] = nil
+    pool_add_entry(pool, at, it, take, name, key, from_depot)
+    pool[at].n = n
+    return
+  end
+  seen[key] = #pool + 1
+  pool_add_entry(pool, #pool + 1, it, take, name, key, from_depot)
+end
+
+pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   local gkey = key
-  pool[#pool + 1] = {
+  pool[at] = {
     item = it, take = take, name = name, src = R.GetMediaItemTake_Source(take),
     offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS'),
     len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
@@ -626,8 +659,11 @@ local function pool_add(pool, seen, it, from_depot)
   if sl and sl ~= '' then
     local t = {}
     for v in sl:gmatch('[^,]+') do t[#t + 1] = tonumber(v) end
-    pool[#pool].slices = t
+    pool[at].slices = t
   end
+  local _, bs = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)
+  pool[at].bsync = tonumber(bs)                          -- beatsync инструмента: долей (3 окт)
+  pool[at].iid = M.iid(it)
 end
 
 -- lib_pos — позиция маркера =LIB: items трека после него — его депо

@@ -21,6 +21,7 @@ P.cur_path, P.cur_len = nil, 0  -- что играет из браузера (м
 local function stop_audio()
   if cur then pcall(R.CF_Preview_Stop, cur); cur = nil end
   P.cur_path = nil
+  P.cur_item = nil
 end
 
 function P.set_vol(v)
@@ -56,6 +57,44 @@ function P.audio(track, depot_item, semis, max_sec)
   cur = pv
   return true
 end
+
+-- инструмент целиком (3 окт): как прозвучит его нота — offset, rate, питч,
+-- громкость take; до конца item (max_sec — лимит раньше). Позиция для
+-- плейхеда в модуле item — P.inst_position()
+function P.inst(track, item, max_sec)
+  if not P.available() or not item then return false end
+  local take = R.GetActiveTake(item)
+  local src = take and R.GetMediaItemTake_Source(take)
+  if not src then return false end
+  stop_audio()
+  local rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+  if rate <= 0 then rate = 1 end
+  local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
+  local dur = max_sec and math.min(max_sec, len) or len
+  audio_stop_at = R.time_precise() + math.max(0.05, dur)
+  local pv = R.CF_CreatePreview(src)
+  if not pv then return false end
+  local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+  R.CF_Preview_SetValue(pv, 'D_POSITION', offs)
+  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
+  R.CF_Preview_SetValue(pv, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH'))
+  R.CF_Preview_SetValue(pv, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH'))
+  local pm = R.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE'); if pm >= 0 then R.CF_Preview_SetValue(pv, 'I_PITCHMODE', pm) end
+  R.CF_Preview_SetValue(pv, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * R.GetMediaItemInfo_Value(item, 'D_VOL'))
+  if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  R.CF_Preview_Play(pv)
+  cur = pv
+  P.cur_item, P.cur_offs, P.cur_rate = item, offs, rate
+  return true
+end
+-- секунды от начала item, который играет (nil — не играет инструмент)
+function P.inst_position(item)
+  if not (cur and P.cur_item) or (item and item ~= P.cur_item) then return nil end
+  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ok then return nil end
+  return (pos - P.cur_offs) / P.cur_rate
+end
+function P.playing() return cur ~= nil or stop_at ~= nil end
 
 -- слайс инструмента: от t0 до t1 секунд item (через трек)
 function P.slice(track, entry, t0, t1)

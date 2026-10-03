@@ -1,9 +1,18 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.66'
+V.VERSION = '0.5.67'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.67', d = '2026-10-03', items = {
+    'items no longer multiply: every insert carries the instrument mark P_EXT:jf_iid (slice k: id#k, a cut: id@offs+len); notes cut by the next note, pitched or with their own volume stay ONE instrument; unmarked items group by file + offset + rate without the length (a cut is not a new item); the library item or the longest copy represents the instrument',
+    'item panel edits the whole instrument: all its notes follow - volume by ratio, pitch and pan by difference (the notes keep their own), fades / loop / stretch mode / keep pitch set to all, rate scales every copy',
+    'beatsync is a property of the item (items header button bsync, row beatsync in the item panel; wheel: beats): the item lasts N beats at the tempo where each note sits, tempo changes followed; slices of a beatsynced sample go at the same tempo',
+    'preview: the select button is now preview - click on / off, rclick: mode full (to the end of the item, Esc stops) / hold (while the mouse button is held on the row) / first second; the instrument plays as its note sounds (offset, rate, pitch, volume) and the item wave shows a playhead',
+    'track headers take the REAPER TCP colour (col_tr1_bg, selected: col_seltrack) with the track colour mixed like REAPER does; header text contrast follows',
+    'items header: sort was drawn over find (only its d showed) - sort, find and bsync now each have their place',
+    'matrix | tracker border visible: region and marker lanes start 2 px after it; the green edit-cursor mark moved next to the row number (it sat on the border and looked like it reached into the matrix); option cursor line: top / bottom / off',
+  } },
   { v = '0.5.66', d = '2026-10-03', items = {
     'tracks selected in REAPER are shown: their column (header and body) is slightly lighter; polled every frame, so it follows clicks in the TCP at once',
     'track header colour, three modes (options, main module cell hdr, click / wheel): line - a colour strip under the name (as before), header - the name row filled, full - the whole header filled, dimmer below the name; toned to the panel like REAPER tints the TCP, the name turns dark on light colours',

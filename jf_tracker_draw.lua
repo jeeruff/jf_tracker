@@ -55,6 +55,10 @@ function D.init(u, peaks_fn, matrix)
   D.FOCUS = U.mix(U.TEXT, { 1, 1, 1 }, 0.55)    -- светлый ободок модуля с фокусом (просьба 1 окт: без розового)
   D.FOCUS_INS = { 1.0, 0.15, 0.1 }              -- та же рамка в INSERT (красная, толще)
   D.ENVLINE = U.readable(U.CYAN, U.BG, 4.5)
+  -- фон шапки трека (3 окт): как TCP REAPER — col_tr1_bg темы, выделенный —
+  -- col_seltrack; цвет трека подмешивается так же (~30 %, сверено по TCP)
+  D.HDR = U.theme('col_tr1_bg', U.mix(U.PANEL, U.TEXT, 0.12))
+  D.HDRSEL = U.theme('col_seltrack', U.mix(D.HDR, U.TEXT, 0.10))
 end
 
 -- шрифт: 0 — битмап REAPER (масштаб ×N пиксель-в-пиксель через кеш строк и
@@ -239,7 +243,7 @@ function D.layout(snap, state, nregions)
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
   -- две узкие дорожки с вертикальным текстом: регионы (полоса цвета) и маркеры
-  L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad)
+  L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
   L.label_w = L.ruler_w + ms('0000') + 2 * L.pad
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
@@ -1300,30 +1304,33 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local cur = pool[inst]
   local head = ('items %d'):format(#pool)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
-  -- справа — кнопки find (fzf, 2 окт) и сортировки (track / len / mark)
+  -- справа налево: sort (track / len / mark), find (fzf, 2 окт), bsync (3 окт);
+  -- у каждой своя x (раньше sort рисовалась поверх find — от неё торчало «d»)
   local sort = info.poolsort or 'track'
+  local by0 = iy + 2
+  local function hbtn(x, bw, lbl, on, onc, key)
+    local hot = mx >= x and mx < x + bw and my >= by0 and my < by0 + L.rh
+    set(on and U.tint(onc, 0.25) or (hot and D.CURROW or U.BG)); gfx.rect(x, by0, bw, L.rh, 1)
+    set(on and onc or U.LINE); gfx.rect(x, by0, bw, L.rh, 0)
+    text(x + L.pad, iy + 3, lbl, on and onc or (hot and U.TEXT or U.GREY))
+    if hot then hover[key] = true end
+    hint(key, x, by0, bw, L.rh, true)
+  end
   local sb = 'sort ' .. sort
   local sbw = ms(sb) + 2 * L.pad
   local sbx = ix + w - sbw - L.pad
-  do
-    local fw = ms('find') + 2 * L.pad
-    local fx = sbx - fw - L.pad
-    local hot = mx >= fx and mx < fx + fw and my >= iy + 2 and my < iy + 2 + L.rh
-    set(hot and D.CURROW or U.BG); gfx.rect(fx, iy + 2, fw, L.rh, 1)
-    set(U.LINE); gfx.rect(fx, iy + 2, fw, L.rh, 0)
-    text(fx + L.pad, iy + 3, 'find', hot and U.AMBER or U.GREY)
-    if hot then hover.poolfind = true end
-    hint('poolfind', fx, iy + 2, fw, L.rh, true)
-    sbx = fx                                 -- заголовок обрезается до кнопок
-  end
-  do
-    local hot = mx >= sbx and mx < sbx + sbw and my >= iy + 2 and my < iy + 2 + L.rh
-    set(hot and D.CURROW or U.BG); gfx.rect(sbx, iy + 2, sbw, L.rh, 1)
-    set(U.LINE); gfx.rect(sbx, iy + 2, sbw, L.rh, 0)
-    text(sbx + L.pad, iy + 3, sb, U.GREY)
-    if hot then hover.poolsort = true end
-    hint('poolsort', sbx, iy + 2, sbw, L.rh, true)
-  end
+  hbtn(sbx, sbw, sb, false, U.GREY, 'poolsort')
+  local fw = ms('find') + 2 * L.pad
+  local fx = sbx - fw - L.pad
+  hbtn(fx, fw, 'find', false, U.GREY, 'poolfind')
+  -- bsync: beatsync выбранного инструмента — длина под N долей темпа в месте
+  -- каждой ноты; горит, когда включён
+  local on = cur and cur.bsync
+  local blbl = on and ('bsync %d'):format(on) or 'bsync'
+  local bw2 = ms(blbl) + 2 * L.pad
+  local bx2 = fx - bw2 - L.pad
+  hbtn(bx2, bw2, blbl, on and true or false, U.CYAN, 'poolbsync')
+  sbx = bx2                                  -- заголовок обрезается до кнопок
   text(ix + L.pad, iy + 3, fit(head, sbx - ix - 2 * L.pad), U.GREY)
   -- внизу — два буквенных тоггла (2 окт): звук при выборе / звук при вставке
   do
@@ -1339,7 +1346,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       hint(key, bx, by, bw, L.rh, true)
       bx = bx + bw + L.pad
     end
-    tbtn('select', info.poolprev, 'prevbtn')
+    tbtn('preview', info.poolprev, 'prevbtn')
     tbtn('insert', info.inspreview, 'insprevbtn')
     -- легенда меток
     local lg = '@ on cursor track  $ sliced  sN slice'
@@ -1492,19 +1499,22 @@ function D.frame(L, snap, rows, state, info)
     -- читаются); выделенный в REAPER трек — чуть светлее
     local mode = state.hdrfill or 'line'
     local fill = col.rgb and mode ~= 'line'
-    local nbg = fill and U.mix(U.PANEL, col.rgb, 0.45) or U.PANEL
-    local rbg = (fill and mode == 'full') and U.mix(U.PANEL, col.rgb, 0.25) or U.PANEL
-    if trsel[col.guid] then nbg, rbg = U.mix(nbg, U.TEXT, 0.10), U.mix(rbg, U.TEXT, 0.10) end
+    local base = trsel[col.guid] and D.HDRSEL or D.HDR    -- фон TCP REAPER (выделенный — его цвет)
+    local nbg = fill and U.mix(base, col.rgb, 0.30) or base
+    local rbg = (fill and mode == 'full') and U.mix(base, col.rgb, 0.18) or base
     local nh = L.rh + 1                                    -- строка имени (кнопки — с hy + rh + 1)
-    if rbg ~= U.PANEL then set(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1) end
-    if nbg ~= U.PANEL then set(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1) end
+    set(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
+    set(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+    -- фон светлее панели: текст шапки подтянуть по контрасту (на колонку)
+    local T0, G0 = U.TEXT, U.GREY
+    U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
     -- папки: вложенные треки сдвинуты и приглушены, папка помечена «+»
     local indent = (col.depth or 0) * L.cw
     local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or '- ') or '') .. (col.name ~= '' and col.name or '-')
     -- имя трека — на всю ширину колонки (кнопки переехали строкой ниже);
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
-    if fill and (0.299 * nbg[1] + 0.587 * nbg[2] + 0.114 * nbg[3]) > 0.55 then ncol = U.BG end
+    ncol = U.readable(ncol, nbg, 4.5)
     text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     if col.rgb and not fill then set(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
@@ -1639,6 +1649,7 @@ function D.frame(L, snap, rows, state, info)
       end
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
     end
+    U.TEXT, U.GREY = T0, G0
     set(U.LINE); gfx.rect(c.x, hy, 1, L.header_h, 1)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
   end
@@ -1730,9 +1741,17 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
-    -- кромки: строка курсора — яркая янтарная сверху, edit-курсор — зелёная
-    if is_cur_row then set(D.CURTOP); gfx.rect(tx0, y, W - tx0, 1, 1) end
-    if r.row == cur then set(D.EDITTOP); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.rect(tx0, y, 3, L.rh, 1) end
+    -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
+    -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
+    -- метка edit-курсора — у номера строки (раньше стояла на границе с
+    -- матрицей и казалась вылезшей на неё), видна и при off
+    local cl = state.curline or 'top'
+    if cl ~= 'off' then
+      local ly = cl == 'bottom' and (y + L.rh - 1) or y
+      if is_cur_row then set(D.CURTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1) end
+      if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + 1, ly, W - tx0 - 1, 1, 1) end
+    end
+    if r.row == cur then set(D.EDITTOP); gfx.rect(tx0 + L.label_w - 4, y, 3, L.rh, 1) end
     text(tx0 + L.ruler_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
     local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
@@ -1969,7 +1988,7 @@ function D.frame(L, snap, rows, state, info)
     local row0, nr = rows[1].row, #rows
     local function ry(row) return L.body_y + (row - row0) * L.rh end
     local bot = L.body_y + nr * L.rh
-    local laneR, laneM = tx0 + 1, tx0 + 1 + L.th + 6
+    local laneR, laneM = tx0 + 3, tx0 + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт)
     local c0 = info.view_clip and info.view_clip[1] or -math.huge
     local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
@@ -1994,7 +2013,7 @@ function D.frame(L, snap, rows, state, info)
       local y = ry(m.row)
       local ynext = mks[k + 1] and ry(mks[k + 1].row) or bot
       local c = m.mk.rgb or U.AMBER
-      set(c); gfx.rect(laneR, y, L.ruler_w - 3, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
+      set(c); gfx.rect(laneR, y, L.ruler_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
       if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
     if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
