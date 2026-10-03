@@ -100,7 +100,7 @@ local state = {
   -- держишь кнопку мыши на строке, sec — первая секунда
   theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
   tlruler = (function() local v = reaper.GetExtState(EXT, 'tlruler'); return (v == 'beats' or v == 'time' or v == 'both') and v or 'off' end)(),   -- линейка у номеров (3 окт)
-  curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
+  curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off' or v == 'scope') and v or 'top' end)(),   -- линия курсора (3 окт); scope — curscope
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
@@ -1962,6 +1962,14 @@ ctx = {
       end
     end
   end,
+  -- линия курсора (3 окт): scope (curscope) — курсор фиксирован в центре; выход
+  -- из scope возвращает прежний fixed
+  set_curline = function(v)
+    if v == 'scope' and state.curline ~= 'scope' then state.fixed_prev = state.fixed; state.fixed = true
+    elseif v ~= 'scope' and state.curline == 'scope' then state.fixed = state.fixed_prev or false end
+    state.curline = v
+    if v == 'scope' and not state.scopes then vim.msg = 'curscope: turn track scopes on (options) to see the signal' end
+  end,
   -- имя входа записи трека (шапка, блок трека DSP)
   input_name = function(tr)
     local v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
@@ -2237,7 +2245,7 @@ ctx = {
       flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
-      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
+      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'scope', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / scope (curscope: the cursor line itself is the oscilloscope of each track, the cursor fixed in the centre; :curscope) / off', get = function() return state.curline or 'top' end, set = function(v) ctx.set_curline(v) end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'colour of the track in its header (and in the DSP track block): off - none; line - a colour strip under the name; header - the name row filled; full - the whole header filled, dimmer below the name; toned to the panel like REAPER tints the TCP, the name turns dark on light colours; kept in the mono theme', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
     }
     OPT.open(items)
@@ -4511,6 +4519,7 @@ local function frame()
   end
 
   -- fixed cursor: вид всегда ставит строку курсора в середину тела
+  if state.curline == 'scope' then state.fixed = true end     -- curscope: курсор всегда в центре (3 окт)
   if state.fixed and L and L.nrows then
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
   end

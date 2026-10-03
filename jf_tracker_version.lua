@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.77'
+V.VERSION = '0.5.78'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.78', d = '2026-10-03', items = {
+    'curscope: cursor line = scope - the amber cursor line itself becomes the oscilloscope, through the middle of the cursor row: inside each track column its signal, between columns a straight line; the cursor is fixed in the centre while it is on (fixed comes back as it was when you leave); options -> cursor line: scope, or :curscope',
+  } },
   { v = '0.5.77', d = '2026-10-03', items = {
     'options window: no dropdowns - every choice shows all its values as buttons in a row (the current one lit), click a button to set it; descriptions moved to the bottom line and follow the mouse',
   } },

@@ -2128,7 +2128,7 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     -- скопы на полоске курсора (3 окт, scopeat = cursor): осциллограмма каждого
     -- трека по ширине его колонки, под текстом ячеек, приглушённо — ноты читаются
-    if is_cur_row and state.scopes and state.scopeat ~= 'header' and info.scope then
+    if is_cur_row and state.scopes and state.scopeat ~= 'header' and info.scope and state.curline ~= 'scope' then
       local sc_col = U.mix(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW, U.GREEN, 0.55)
       for _, c in ipairs(L.cols) do
         if c.x and not c.folded and c.col.scope_slot then draw_analyzer(c.x + 2, y, c.w - 4, L.rh, c.col.scope_slot, 'scope', info, sc_col) end
@@ -2145,7 +2145,31 @@ function D.frame(L, snap, rows, state, info)
       -- от края полос регионов / маркеров вправо (через линейку, если она
       -- включена): на сами полосы не заходит (3 окт)
       local lx = tx0 + L.ruler_w
-      if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+      if is_cur_row and cl == 'scope' then
+        -- curscope (3 окт): сама линия курсора — осциллограф: по середине
+        -- строки, в колонке трека — его сигнал, между колонками — прямая
+        local cyl = y + math.floor(L.rh / 2)
+        local hh = L.rh / 2 - 1
+        set(D.CURTOP)
+        local x = lx
+        for _, c in ipairs(L.cols) do
+          if c.x and c.x > x then gfx.rect(x, cyl, c.x - x, 1, 1) end
+          local sc = (c.x and not c.folded and state.scopes and info.scope and c.col.scope_slot) and info.scope(c.col.scope_slot)
+          local x0, w = c.x or x, c.w or 0
+          if sc and #sc > 0 and w > 4 then
+            local px0, py0
+            for px = 0, w - 1 do
+              local v = sc[math.floor(px / w * #sc) + 1] or 0
+              if v > 1 then v = 1 elseif v < -1 then v = -1 end
+              local yy = cyl - v * hh
+              if px0 then gfx.line(px0, py0, x0 + px, yy) end
+              px0, py0 = x0 + px, yy
+            end
+          elseif w > 0 then gfx.rect(x0, cyl, w, 1, 1) end
+          x = math.max(x, x0 + w)
+        end
+        if x < W then gfx.rect(x, cyl, W - x, 1, 1) end
+      elseif is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
       if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
     end
     text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
