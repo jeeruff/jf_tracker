@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.65'
+V.VERSION = '0.5.66'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.66', d = '2026-10-03', items = {
+    'tracks selected in REAPER are shown: their column (header and body) is slightly lighter; polled every frame, so it follows clicks in the TCP at once',
+    'option fat header (options, main module cell fat, off by default): the whole track header filled with the track colour, toned to the panel like REAPER tints the TCP; the name turns dark on light colours',
+    'main module: cells caps (column captions on / off) and fat (fat header)',
+    'the instruments module is now called items (header, help page, status texts)',
+  } },
   { v = '0.5.65', d = '2026-10-03', items = {
     'module borders: the file browser drew its own 2 px edge next to the sidebar line (double line) - removed; the top panel in mid / bottom position draws its border on top, so it is separated from the DSP panel and the fx list (was merged), and no longer doubles the DSP line',
     'about moved to the main module (cell next to help / hints, :about) and opens on its own; Esc closes it',

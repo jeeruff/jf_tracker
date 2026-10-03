@@ -139,6 +139,7 @@ state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
 state.captions = tostring(ext('captions', '0')) == '1'     -- строка подписей колонок (по умолчанию выкл, 2 окт)
+state.fathdr = tostring(ext('fathdr', '0')) == '1'         -- fat header: шапка трека залита его цветом (3 окт)
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
 PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
@@ -321,7 +322,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'fathdr', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -1974,7 +1975,7 @@ ctx = {
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'len', 'mark' }, desc = 'track groups / by length / by marks @ $ *', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       { sep = true },
       flag('meters', 'peak meters', 'meters over the columns'),
-      flag('top', 'top panel', 'control / sample / instruments'),
+      flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
@@ -1983,6 +1984,7 @@ ctx = {
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
+      flag('fathdr', 'fat header', 'the whole track header filled with the track colour (as REAPER tints the TCP); off: a colour strip under the name'),
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
     }
     OPT.open(items)
@@ -3778,6 +3780,8 @@ function ctrl_action(name, delta)
     ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale) + (delta ~= 0 and delta or 1))))
   elseif name == 'fx' then state.fxcols = math.max(0, math.min(4, state.fxcols + (delta ~= 0 and delta or 1)))
   elseif name == 'meters' then state.meters = not state.meters
+  elseif name == 'caps' then state.captions = not state.captions; vim.msg = 'column captions ' .. (state.captions and 'on' or 'off')
+  elseif name == 'fat' then state.fathdr = not state.fathdr; vim.msg = 'fat header ' .. (state.fathdr and 'on' or 'off')
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
   elseif name == 'sig' or name == 'beats' then
     vim.msg = ('time signature %d/%d at the cursor: %d rows per bar at LPB %d (change it with a REAPER tempo marker)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
@@ -4320,6 +4324,7 @@ local function frame()
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
+      captions = state.captions, fathdr = state.fathdr,
       xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
       metro = reaper.GetToggleCommandState(40364) == 1,
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -4328,6 +4333,15 @@ local function frame()
     tabs = ctx.top_tabs(),
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
     inspreview = state.preview,
+    -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
+    -- каждый кадр — смена выделения не всегда пересобирает снимок
+    trsel = (function()
+      local t = {}
+      for _, c in ipairs(snap.cols or {}) do
+        if c.track and reaper.ValidatePtr(c.track, 'MediaTrack*') and reaper.IsTrackSelected(c.track) then t[c.guid] = true end
+      end
+      return t
+    end)(),
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
@@ -4528,7 +4542,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'select: play the sample when an instrument is selected - ' .. (state.poolprev and 'on' or 'off') .. ' (:poolprev)'
-  elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the instruments have focus'
+  elseif hover.poolfind then state.status = 'find instrument (fzf) - also / when the items have focus'
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
   elseif hover.poolmark then
@@ -4561,6 +4575,8 @@ local function frame()
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
+  elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
+  elseif hover.ctrl == 'fat' then state.status = 'fat header: the whole track header filled with the track colour (off: a colour strip under the name)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
   elseif hover.ruler then
@@ -4569,7 +4585,7 @@ local function frame()
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
     state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
-    state.status = ({ open = 'open the sidebar (instruments + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: instruments / browser height, dblclick: auto' })[hover.sidectl]
+    state.status = ({ open = 'open the sidebar (items + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: items / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
@@ -4681,10 +4697,10 @@ local function frame()
           local want = ((L.top_y or 0) == 0) and gfx.mouse_y or ((L.top_y + L.top_h) - gfx.mouse_y)
           state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
         end
-        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
+        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('items %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
-      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: instruments / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
+      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: items / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
       if U.click then
         local now2 = reaper.time_precise()
         if (now2 - click.t) < 0.4 and click.zone == 'resize' then
@@ -4867,7 +4883,7 @@ local function frame()
       elseif hover.sidectl == 'grip' then
         if dbl and click.zone == 'sidegrip' then state.side_px = nil; vim.msg = 'sidebar width: auto' else resize_drag = 'side' end
       elseif hover.sidectl == 'instgrip' then
-        if dbl and click.zone == 'instgrip' then state.inst_px = nil; vim.msg = 'instruments height: auto' else resize_drag = 'inst' end
+        if dbl and click.zone == 'instgrip' then state.inst_px = nil; vim.msg = 'items height: auto' else resize_drag = 'inst' end
       end
       click = { t = now2, zone = (hover.sidectl == 'grip' and 'sidegrip') or (hover.sidectl == 'instgrip' and 'instgrip') or 'sidectl' }
     elseif hover.mxctl then

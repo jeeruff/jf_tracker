@@ -113,7 +113,7 @@ KH.PAGES = {
     { k = 'R', d = 'ruler of bars on the left on / off (button ruler)' },
     { k = 'Esc Tab', d = 'next module' },
   } },
-  inst = { title = 'instruments', e = {
+  inst = { title = 'items', e = {
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'g G', d = 'first / last' },
@@ -275,7 +275,7 @@ KH.PAGES = {
     { k = 'arrows ^hjkl', d = 'move cursor', t = { 'Left', 'Right', 'Up', 'Down' } },
     { k = 'A-Z a-z 0-9', d = 'place operator / value' },
     { k = '!', d = 'bang *' },
-    { k = 'drag', d = 'drop an instrument (instruments panel) on a cell: $ track inst 1 (sliced) or : track inst 4C; a region (matrix name): ; slot; a browser file: into the track library, then as an instrument - add a bang (D4)' },
+    { k = 'drag', d = 'drop an instrument (items panel) on a cell: $ track inst 1 (sliced) or : track inst 4C; a region (matrix name): ; slot; a browser file: into the track library, then as an instrument - add a bang (D4)' },
     { k = '. BS Del', d = 'erase' },
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },

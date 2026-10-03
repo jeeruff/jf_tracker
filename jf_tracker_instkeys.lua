@@ -51,7 +51,7 @@ function IK.key(c, cur, n, nslots)
     elseif op == 'y' and (ch == 'p' or ch == 'P') then
       if r0 <= r1 then ctx.inst_yank(r0, r1, true); ctx.inst_put(ch == 'P') end
       IK.anchor = nil
-    else ctx.msg(op .. ch .. ': not an instruments command (? - help)') end
+    else ctx.msg(op .. ch .. ': not an items command (? - help)') end
     return true
   end
   -- в диапазоне (v) d / x / y действуют сразу

@@ -932,6 +932,8 @@ local function draw_topbar(L, info)
       { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) }, { 'fx', ('fx %d'):format(c.fx or 0) },
       { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
       { 'wave', 'wv ' .. ((c.wave and c.wave ~= 'off') and 'on' or 'off'), (c.wave and c.wave ~= 'off') and U.CYAN or U.GREY },
+      { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
+      { 'fat', 'fat ' .. (c.fathdr and 'on' or 'off'), c.fathdr and U.CYAN or U.GREY },
       { 'notes', 'notes', c.notes and U.AMBER or U.GREY }, { 'options', 'options', U.AMBER },
     } },
     { name = 'help', items = {
@@ -1296,7 +1298,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local pool = col and col.pool or {}
   local inst = info.inst or 1
   local cur = pool[inst]
-  local head = ('instruments %d'):format(#pool)
+  local head = ('items %d'):format(#pool)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
   -- справа — кнопки find (fzf, 2 окт) и сортировки (track / len / mark)
   local sort = info.poolsort or 'track'
@@ -1481,15 +1483,25 @@ function D.frame(L, snap, rows, state, info)
   -- заголовок
   local hy = L.header_y
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
+  local trsel = info.trsel or {}
   for _, c in ipairs(L.cols) do
     local col = c.col
+    -- фон шапки (3 окт): fat header — цвет трека, приглушённый к панели (как
+    -- REAPER тонирует TCP: кнопки и слайдеры читаются); выделенный в REAPER
+    -- трек — чуть светлее
+    local fat = state.fathdr and col.rgb
+    local hbg = fat and U.mix(U.PANEL, col.rgb, 0.45) or U.PANEL
+    if trsel[col.guid] then hbg = U.mix(hbg, U.TEXT, 0.10) end
+    if hbg ~= U.PANEL then set(hbg); gfx.rect(c.x + 1, hy, c.w - 1, L.header_h - 2, 1) end
     -- папки: вложенные треки сдвинуты и приглушены, папка помечена «+»
     local indent = (col.depth or 0) * L.cw
     local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or '- ') or '') .. (col.name ~= '' and col.name or '-')
-    -- имя трека — на всю ширину колонки (кнопки переехали строкой ниже)
-    text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent),
-         col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT))
-    if col.rgb then set(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
+    -- имя трека — на всю ширину колонки (кнопки переехали строкой ниже);
+    -- на светлой заливке — тёмным (контраст по яркости фона)
+    local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
+    if fat and (0.299 * hbg[1] + 0.587 * hbg[2] + 0.114 * hbg[3]) > 0.55 then ncol = U.BG end
+    text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
+    if col.rgb and not fat then set(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
     hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
@@ -1699,6 +1711,11 @@ function D.frame(L, snap, rows, state, info)
   local env_vals = {}
   for _, c in ipairs(L.cols) do
     for _, ev in ipairs(c.envs) do env_vals[ev] = info.env_values and info.env_values(ev.e) or {} end
+  end
+  -- выделенные в REAPER треки: тело колонки чуть светлее (строки курсора и
+  -- плейхеда ложатся поверх)
+  for _, c in ipairs(L.cols) do
+    if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
   end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
