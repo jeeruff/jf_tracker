@@ -112,7 +112,8 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   mxruler = flag('mxruler', true),
-  mxfold = flag('mxfold', false),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
+  mxfold = flag('mxfold', false),
+  fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -175,6 +176,7 @@ local dspwave_drag = nil      -- ручка start / end на волне RS5K (2 
 local dspxy_drag = nil        -- XY-пэд модуля DSP (TG33 vector, 2 окт)
 local dspview_drag = nil      -- протяжка по живому виду модуля (гранулятор)
 local idle = { n = 0, active_t = 0, input_t = 0, mkey = '' }   -- простой: реже рисуем (3 окт)
+local fps_buf = { w = 0, h = 0, last = 0 }  -- буфер кадров для опции fps (1021)
 local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
 local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
@@ -321,7 +323,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('toppos', state.toppos or 'top'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1966,6 +1968,7 @@ ctx = {
       { sep = true },
       flag('meters', 'peak meters', 'meters over the columns'),
       flag('top', 'top panel', 'control / sample / instruments'),
+      { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'max: every REAPER defer tick (~33 / s, the ceiling for scripts - 60 / 120 are not possible); 30 / 25 / 24: drawn into a buffer at that rate, shown every tick (no flicker)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
@@ -4219,8 +4222,18 @@ local function frame()
       idle.active_t, idle.mkey = now_t, mkey
     end
     idle.n = idle.n + 1
-    -- ОТКЛЮЧЕНО (3 окт): пропущенный кадр не держит прошлую картинку — окно мигало
-    idle_skip = false
+    -- пропуск кадров напрямую ОТКЛЮЧЁН (3 окт: окно мигало — пропущенный кадр
+    -- не держит картинку). Частота кадров (опция fps 30 / 25 / 24) — через
+    -- буфер 1021: весь интерфейс рисуется в него с выбранной частотой, а на
+    -- каждом тике defer буфер выводится на экран; max — прямо, без буфера.
+    -- Выше ~33 fps скрипт не может: defer REAPER тикает около 30 раз в секунду.
+    local fps_t = tonumber(state.fps)
+    if fps_t then
+      if fps_buf.w ~= gfx.w or fps_buf.h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); fps_buf.w, fps_buf.h = gfx.w, gfx.h; fps_buf.last = 0 end
+      gfx.dest = 1021
+      if now_t - fps_buf.last >= 1 / fps_t - 0.004 or not idle.hover then fps_buf.last = now_t
+      else idle_skip = true end
+    end
   end
   if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
@@ -5659,6 +5672,11 @@ local function frame()
     gfx.mouse_wheel = 0
   end
 
+  if tonumber(state.fps) then
+    -- буфер кадров — на экран (каждый тик, даже без перерисовки)
+    gfx.dest = -1
+    gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
+  end
   U.end_frame()
   gfx.update()
   local t_4 = reaper.time_precise()

@@ -2366,18 +2366,28 @@ function D.frame(L, snap, rows, state, info)
     if state.side then knob(kb - 2 * L.rh - 4, '=', 'grip') end
   end
 
+  -- рамки модулей (3 окт): каждый видимый модуль — тонкая тусклая рамка для
+  -- разделения; рамка фокуса ниже — яркая, поверх
+  do
+    local rects = {
+      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h - hy },
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h - hy } or nil,
+      browser = L.side_w > 0 and { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
+      top = L.top_h > 0 and L.top_rect or nil,
+      ctrl = L.top_h > 0 and L.ctrl_area or nil,
+      inst = (L.inst_w > 0 or L.side_w > 0) and L.inst_rect or nil,
+      dsp = L.dsp_h > 0 and L.dsp_rect or nil,
+      fxb = L.dsp_h > 0 and L.fxb_rect or nil,
+    }
+    D.module_rects = rects
+    set(U.mix(U.LINE, U.BG, 0.45))
+    for _, r in pairs(rects) do gfx.rect(r[1], r[2], r[3], r[4], 0) end
+  end
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши
   do
     local f = info.focus
-    local r
-    if f == 'tracker' then r = { tx0, hy, W - tx0, L.body_y + L.body_h - hy }
-    elseif f == 'matrix' and L.matrix_w > 0 then r = { 0, hy, L.matrix_w, L.body_y + L.body_h - hy }
-    elseif f == 'browser' and L.side_w > 0 then r = { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }
-    elseif f == 'top' and L.top_rect then r = L.top_rect
-    elseif f == 'ctrl' and L.ctrl_area then r = L.ctrl_area
-    elseif f == 'inst' and L.inst_rect then r = L.inst_rect
-    elseif f == 'dsp' and L.dsp_rect then r = L.dsp_rect
-    elseif (f == 'fxb' or f == 'notes') and L.fxb_rect then r = L.fxb_rect end
+    local rects = D.module_rects or {}
+    local r = rects[(f == 'notes') and 'fxb' or f]
     if r then
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'

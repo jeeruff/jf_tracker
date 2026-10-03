@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.60'
+V.VERSION = '0.5.61'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.61', d = '2026-10-03', items = {
+    'every visible module has a thin dim frame (main module, fx list, tabs, tracker, matrix, instruments, browser, DSP) - the focus frame stays bright on top',
+    'options: frame rate max / 30 / 25 / 24 - the lower rates draw into a buffer that is shown on every tick, so nothing flickers; 60 / 120 are not possible for a script (REAPER runs defer ~30 times a second)',
+  } },
   { v = '0.5.60', d = '2026-10-03', items = {
     'fix: the window flickered when idle - skipping frames is switched off (a skipped gfx frame does not keep the previous picture); the tracker draws every frame again',
   } },
