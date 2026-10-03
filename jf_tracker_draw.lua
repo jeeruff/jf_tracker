@@ -235,6 +235,7 @@ function D.layout(snap, state, nregions)
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
   if state.mx_hidden then L.matrix_w = L.mx_strip_w
+  elseif MX and MX.fold and state.mx_fold_px then L.matrix_w = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), state.mx_fold_px))   -- fold: своя ширина мышью
   elseif state.mx_px and MX and not MX.fold then L.matrix_w = math.max((MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER

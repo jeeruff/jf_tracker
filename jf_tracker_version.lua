@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.51'
+V.VERSION = '0.5.52'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.52', d = '2026-10-03', items = {
+    'fix: the folded matrix could not be resized (it ignored the dragged width) - fold has its own width now: drag the = grip, double-click = compact again; the unfolded width is kept separately',
+  } },
   { v = '0.5.51', d = '2026-10-03', items = {
     'bitmap font scale goes up to x3 (control cell, Ctrl +/-, :scale, options); x4 is kept for the future PT-mode, a saved x4 becomes x3',
   } },

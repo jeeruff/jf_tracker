@@ -105,6 +105,7 @@ local state = {
   top_px = tonumber(reaper.GetExtState(EXT, 'top_px')),     -- высота верхней панели мышью
   inst_px = tonumber(reaper.GetExtState(EXT, 'inst_px')),   -- высота инструментов в сайдбаре
   mx_px = tonumber(reaper.GetExtState(EXT, 'mx_px')),       -- ширина матрицы мышью (nil = авто)
+  mx_fold_px = tonumber(reaper.GetExtState(EXT, 'mx_fold_px')),   -- ширина свёрнутой матрицы (fold)
   mx_hidden = reaper.GetExtState(EXT, 'mx_hidden') == '1',  -- матрица свёрнута в полосу
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
   dsp = flag('dsp', false),
@@ -321,7 +322,7 @@ local function save_win()
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
-  S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
+  S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
   S('glyphface', state.glyphface or ''); S('fontface', state.fontface or '')
   local pm = {}
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
@@ -4483,7 +4484,8 @@ local function frame()
     elseif state.top and math.abs(gfx.mouse_y - (((L.top_y or 0) == 0) and L.top_h or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
-        if resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
+        if resize_drag == 'mx' and MX.fold then state.mx_fold_px = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('folded matrix width %d px'):format(state.mx_fold_px)
+        elseif resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
         else
@@ -4684,7 +4686,10 @@ local function frame()
       if hover.mxctl == 'open' then state.mx_hidden = false; vim.msg = 'matrix shown'
       elseif hover.mxctl == 'close' then state.mx_hidden = true; if state.focus == 'matrix' then ctx.set_focus('tracker') end; vim.msg = 'matrix folded (> to open)'
       elseif hover.mxctl == 'grip' then
-        if dbl and click.zone == 'mxgrip' then state.mx_px = nil; vim.msg = 'matrix width: auto' else resize_drag = 'mx' end
+        if dbl and click.zone == 'mxgrip' then
+          if MX.fold then state.mx_fold_px = nil else state.mx_px = nil end
+          vim.msg = 'matrix width: auto'
+        else resize_drag = 'mx' end
       end
       click = { t = now2, zone = hover.mxctl == 'grip' and 'mxgrip' or 'mxctl' }
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
