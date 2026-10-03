@@ -1990,26 +1990,8 @@ ctx = {
   -- about (3 окт): ячейка в главном модуле, :about; логотип каждый раз другой
   about = function()
     OPT.open_about(function()
-      -- картинки ANSI: все PNG из logos/ (кинул файл — он в ротации)
-      local imgs, i = {}, 0
-      while true do
-        local f = reaper.EnumerateFiles(DIR .. '/logos', i)
-        if not f then break end
-        if f:lower():match('%.png$') then imgs[#imgs + 1] = f end
-        i = i + 1
-      end
-      table.sort(imgs)
-      LOGO.last = LOGO.pick(LOGO.last, nil, #LOGO.LOGOS + #imgs)   -- не тот же, что в прошлый раз
-      local logo = LOGO.LOGOS[LOGO.last]
-      if not logo then
-        local f = imgs[LOGO.last - #LOGO.LOGOS]
-        if gfx.loadimg(1022, DIR .. '/logos/' .. f) >= 0 then       -- 1022: картинка about
-          local w, h = gfx.getimgdim(1022)
-          if w > 0 then logo = { name = f, image = 1022, w = w, h = h } end
-        end
-        logo = logo or LOGO.LOGOS[1]
-      end
-      return { logo = logo, text = VER.lines() }
+      LOGO.last = LOGO.pick(LOGO.last)                       -- не тот же, что в прошлый раз
+      return { logo = LOGO.LOGOS[LOGO.last], text = VER.lines() }
     end)
   end,
   -- ── лупы в регионе (F1): > item до конца региона, N> период N шагов, < регион до конца item
