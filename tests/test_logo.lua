@@ -6,17 +6,17 @@ local function eq(name, got, want)
   n = n + 1
   if got ~= want then bad = bad + 1; print(('FAIL %s: got %s, want %s'):format(name, tostring(got), tostring(want))) end
 end
-eq('six logos', #LG.LOGOS, 6)
+eq('seven logos', #LG.LOGOS, 7)
 local KNOWN = { [' '] = 1, ['#'] = 1, ['+'] = 1, ['-'] = 1, [':'] = 1, ['_'] = 1, ['╱'] = 1, ['╲'] = 1, ['▀'] = 1, ['▄'] = 1, ['█'] = 1, ['░'] = 1, ['▌'] = 1, ['▐'] = 1, ['▒'] = 1, ['▓'] = 1 }
-local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 } }
+local SIZES = { alligator = { 101, 7 }, drip = { 63, 10 }, slant = { 91, 5 }, shade = { 90, 5 }, bloody = { 75, 10 }, rubble = { 98, 12 }, ansi_rust = { 90, 7 } }
 for _, lg in ipairs(LG.LOGOS) do
   local w, h = LG.size(lg)
   eq(lg.name .. ' size', w .. 'x' .. h, SIZES[lg.name][1] .. 'x' .. SIZES[lg.name][2])
   local ok, trail = true, false
-  for _, l in ipairs(lg.lines) do
-    for _, c in ipairs(LG.chars(l)) do if not KNOWN[c] then ok = false end end
-    if l:find('%s$') then trail = true end
+  for _, row in ipairs(LG.cells(lg)) do
+    for _, cell in ipairs(row) do if not (KNOWN[cell.c] or LG.BOX[cell.c]) then ok = false end end
   end
+  for _, l in ipairs(lg.lines) do if l:find('%s$') then trail = true end end
   eq(lg.name .. ' glyphs drawable', ok, true)
   eq(lg.name .. ' no trailing spaces', trail, false)
 end
@@ -32,7 +32,7 @@ for i = 1, 40 do
   seen[k] = true; prev = k
 end
 local cnt = 0; for _ in pairs(seen) do cnt = cnt + 1 end
-eq('pick never repeats', same, false); eq('pick covers all', cnt, 6)
+eq('pick never repeats', same, false); eq('pick covers all', cnt, 7)
 -- ячейка: ужимается под ширину, сохраняет пропорцию; слишком узко — nil
 local cw, ch = LG.cell(LG.LOGOS[1], 1000, 8, 16)
 eq('cell fits wide', cw, 8); eq('cell aspect', ch, 16)
@@ -42,7 +42,7 @@ eq('cell too narrow', LG.cell(LG.LOGOS[1], 150, 8, 16), nil)
 -- раскраска: у каждого логотипа схема, все цвета из палитры
 for _, lg in ipairs(LG.LOGOS) do
   local sc, ok = LG.SCHEME[lg.name], true
-  if not sc then ok = false else for _, st in ipairs(sc) do if not LG.PAL[st[2]] or (st[3] and not LG.PAL[st[3]]) then ok = false end end end
+  if lg.ansi then sc = sc or {} elseif not sc then ok = false else for _, st in ipairs(sc) do if not LG.PAL[st[2]] or (st[3] and not LG.PAL[st[3]]) then ok = false end end end
   eq(lg.name .. ' scheme', ok, true)
 end
 local rub = LG.LOGOS[6]
@@ -55,6 +55,12 @@ for c, want in pairs({ ['░'] = 1, ['▒'] = 2, ['▓'] = 3 }) do
   for x = 0, 1 do for y = 0, 1 do if LG.DITHER[c](x, y) then on = on + 1 end end end
   eq('dither ' .. c, on, want)
 end
+-- ANSI: коды разобраны, цвета клеток из палитры, фон клетки
+local an = LG.cells(LG.LOGOS[7])
+eq('ansi first ink cell', an[1][6].c .. an[1][6].fg, '█lightred')
+local bgc
+for _, cell in ipairs(an[1]) do if cell.bg then bgc = cell.bg; break end end
+eq('ansi background parsed', bgc, 'red')
 -- отрисовка со стабом gfx не падает
 local rects = 0
 gfx = { set = function() end, rect = function() rects = rects + 1 end, line = function() end }

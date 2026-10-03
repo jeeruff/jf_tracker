@@ -1,6 +1,6 @@
 -- jf_tracker_logo.lua — логотип JFTRACKER для about (главный модуль, 3 окт).
 --
--- Шесть текстовых логотипов, присланных пользователем (картинки ANSI убраны
+-- Семь текстовых логотипов, присланных пользователем (картинки ANSI убраны
 -- по просьбе — только настоящий текст); каждый показ about — другой.
 -- Блочные символы (░ ▒ ▓ █ ▀ ▄ ╱ ╲) битмап-шрифт REAPER не знает, а запасной
 -- системный шрифт сбил бы колонки — поэтому логотип рисуется сам, по сетке
@@ -75,6 +75,16 @@ LG.LOGOS = {
     [[▄▓▒ █▄▀█░  ▄▀▀▄░        ▄▀▀▄░     ░▄▀▀▄ ▄▀▄  ▒░░▒  ▀▓█  ░█▀▄█ ▒▓▄  ▒░░▒  ▀▓█  ░█▀▄█ ▒▓▄  ░▄▀▀▄ ▄▀▄]],
     [[ ▀░▄█░ ▄▄  ░█ ░▓        ░█ ░▓     ▒░ █░ ░▒   ░ ▀▄░ ░▄▀  ▄▄ ░█▄░▀   ░ ▀▄░ ░▄▀  ▄▄ ░█▄░▀   ▒░ █░ ░▒]],
   } },
+  -- настоящий ANSI: коды цвета ␛[..m прямо в тексте (разбираются, LG.cells)
+  { name = 'ansi_rust', ansi = true, lines = {
+    [[␛[0;37m     ␛[0;91m█▓▒␛[0;33m▌␛[0;37m ␛[0;31m▄␛[0;91m▄␛[0;91;41m▄␛[0;91;43m▓▒░␛[0;90;43m▀␛[0;33m▄␛[0;37m  ␛[0;90m▄␛[0;31m▓␛[0;91;41m░▒▓█␛[0;91;43m▓░␛[0;31m▓␛[0;90m▄␛[0;37m ␛[0;91;43m█▓▒░␛[0;33m█▄▄␛[0;37m      ␛[0;91m▄␛[0;91;43m▓␛[0;91m▄␛[0;37m    ␛[0;31m▄␛[0;91m▄␛[0;91;41m▄␛[0;91;43m▓▒░␛[0;90;43m▀␛[0;33m▄␛[0;37m  ␛[0;33m▒▓█␛[0;90m┐␛[0;37m ␛[0;90m┌␛[0;91m█␛[0;91;43m▓░␛[0;37m ␛[0;31m▄␛[0;91m▄␛[0;91;41m▄␛[0;91;43m▓▒░␛[0;90;43m▀␛[0;33m▄␛[0;37m  ␛[0;91;43m█▓▒░␛[0;33m█▄▄␛[0;37m  ␛[0m]],
+    [[␛[0;37m     ␛[0;91;41m▒▒▒␛[0;33m▌␛[0;37m ␛[0;91;41m▒▒▒␛[0;31m▀␛[0;37m  ␛[0;33m▓▓▓␛[0;37m ␛[0;31m▓▓␛[0;37m ␛[0;91;41m▒▒▒␛[0;90m▓␛[0;37m ␛[0;33m▓▓␛[0;37m ␛[0;31m███␛[0;90m┤␛[0;37m ␛[0;33m▀␛[0;90;43m░␛[0;31m▌␛[0;37m   ␛[0;33m▄␛[0;91;41m▒␛[0;91m▀␛[0;37m ␛[0;31m▀␛[0;91;43m▒␛[0;31m▄␛[0;37m  ␛[0;91;41m▒▒▒␛[0;31m▀␛[0;37m  ␛[0;33m▓▓▓␛[0;37m ␛[0;33m▒▒▓␛[0;90m┤␛[0;37m ␛[0;90m├␛[0;91;43m▒▒░␛[0;37m ␛[0;91;41m▒▒▒␛[0;31m▀␛[0;37m  ␛[0;33m▓▓▓␛[0;37m ␛[0;31m███␛[0;90m┤␛[0;37m ␛[0;33m▀␛[0;90;43m░␛[0;31m▌␛[0;37m ␛[0m]],
+    [[␛[0;37m     ␛[0;91;41m░░░␛[0;31m┤␛[0;37m ␛[0;91;41m░░░␛[0;33m┼␛[0;91m┬␛[0;31m┐␛[0;33m░░░␛[0;37m ␛[0;31m░░␛[0;37m ␛[0;91;41m░░░␛[0;31m┤␛[0;37m ␛[0;33m░░␛[0;37m ␛[0;31m▓▓▓┤␛[0;37m ␛[0;31m▄␛[0;90;43m▒␛[0;31m▀␛[0;37m  ␛[0;31m███┤␛[0;37m ␛[0;31m├␛[0;91;43m░␛[0;31m█▌␛[0;37m ␛[0;91;41m░░░␛[0;33m┘␛[0;37m  ␛[0;33m░░░␛[0;37m ␛[0;33m▒␛[0;31m██┤␛[0;37m ␛[0;90;41m▀␛[0;91;43m░░␛[0;90;41m▄␛[0;37m ␛[0;91;41m░░░␛[0;33m┼␛[0;91m┬␛[0;31m┐␛[0;33m░░░␛[0;37m ␛[0;31m▓▓▓┤␛[0;37m ␛[0;31m▄␛[0;90;43m▒␛[0;31m▀␛[0;37m ␛[0m]],
+    [[␛[0;37m     ␛[0;91m┌┬␛[0;31m┬┤␛[0;37m ␛[0;31m█␛[0;33m┬┬␛[0;91m┼␛[0;31m┴␛[0;90m┘␛[0;37m       ␛[0;31m█␛[0;33m┬┬␛[0;31m┤␛[0;37m    ␛[0;31m▒▒▒▀␛[0;33m▀␛[0;91m├┬␛[0;31m┬␛[0;91m┐␛[0;37m ␛[0;31m▓▓▓␛[0;90m▄␛[0;31m▄␛[0;33m▄␛[0;33;45m▓▓␛[0;31m█␛[0;37m ␛[0;31m█␛[0;33m┬┬┐␛[0;37m      ␛[0;31m▓▓▓␛[0;90m▄␛[0;90;41m▀␛[0;31m█␛[0;33;45m▓␛[0;90m▀␛[0;37m  ␛[0;31m█␛[0;33m┬┬␛[0;91m┼␛[0;31m┴␛[0;90m┘␛[0;37m    ␛[0;31m▒▒▒▀␛[0;33m▀␛[0;91m├┬␛[0;31m┬␛[0;91m┐␛[0m]],
+    [[␛[0;31m┌┬␛[0;91m┬┐␛[0;37m ␛[0;91m├␛[0;31m┼┼┤␛[0;37m ␛[0;31m├┼┼␛[0;91m┤␛[0;37m         ␛[0;31m├┼┼␛[0;91m┤␛[0;37m    ␛[0;31m├┼␛[0;91m┼┤␛[0;37m ␛[0;91m├␛[0;31m┼┼┤␛[0;37m ␛[0;31m▒␛[0;33m┬┬┐␛[0;37m ␛[0;33m┌┬␛[0;31m┼▒␛[0;37m ␛[0;31m├┼┼␛[0;91m┤␛[0;37m ␛[0;91m┌┬␛[0;31m┬┐␛[0;37m ␛[0;31m▒┬┬┐␛[0;90m▀␛[0;31m▓␛[0;91m┼␛[0;31m┬␛[0;90m▄␛[0;37m ␛[0;31m├┼┼␛[0;91m┤␛[0;37m ␛[0;91m┌┬␛[0;31m┬┐␛[0;37m ␛[0;31m├┼␛[0;91m┼┤␛[0;37m ␛[0;91m├␛[0;31m┼┼┤␛[0m]],
+    [[␛[0;90m├␛[0;31m┼┼␛[0;91m┼␛[0;31m┬┼┼␛[0;90m┼┘␛[0;37m ␛[0;90m├┼␛[0;31m┼┤␛[0;37m         ␛[0;90m├┼␛[0;31m┼┤␛[0;37m    ␛[0;90m├␛[0;31m┼┼␛[0;91m┤␛[0;37m ␛[0;31m├┼┼␛[0;90m┤␛[0;37m ␛[0;90m├␛[0;31m┼┼␛[0;91m┤␛[0;37m ␛[0;91m├␛[0;31m┼┼␛[0;90m┤␛[0;37m ␛[0;90m└┼␛[0;31m┼┼┬␛[0;91m┼␛[0;31m┼┼␛[0;90m┤␛[0;37m ␛[0;90m├␛[0;31m┼┼␛[0;91m┤␛[0;37m ␛[0;91m├␛[0;31m┼┼␛[0;90m┤␛[0;37m ␛[0;90m└┼␛[0;31m┼┼┬␛[0;91m┼␛[0;31m┼┼␛[0;90m┤␛[0;37m ␛[0;90m├␛[0;31m┼┼␛[0;91m┤␛[0;37m ␛[0;31m├┼┼␛[0;90m┤␛[0m]],
+    [[␛[0;90m└┴␛[0;31m┴┴┴┴┴␛[0;90m┘␛[0;37m  ␛[0;90m└┴␛[0;31m┴┘␛[0;37m         ␛[0;90m└┴␛[0;31m┴┘␛[0;37m    ␛[0;90m└┴␛[0;31m┴␛[0;91m┘␛[0;37m ␛[0;31m└┴␛[0;90m┴┘␛[0;37m ␛[0;90m└┴␛[0;31m┴┘␛[0;37m ␛[0;31m└┴␛[0;90m┴┘␛[0;37m  ␛[0;90m└␛[0;31m┴┴┴┴┴␛[0;90m┴┘␛[0;37m ␛[0;90m└┴␛[0;31m┴┘␛[0;37m ␛[0;31m└┴␛[0;90m┴┘␛[0;37m  ␛[0;90m└␛[0;31m┴┴┴┴┴␛[0;90m┴┘␛[0;37m ␛[0;90m└┴␛[0;31m┴␛[0;91m┘␛[0;37m ␛[0;31m└┴␛[0;90m┴┘␛[0m]],
+  } },
 }
 LG.SHORT = 'J F T R A C K E R'
 
@@ -87,9 +97,45 @@ end
 LG.chars = chars
 
 -- размер логотипа в символах: ширина, высота
+-- ANSI SGR (␛[0;91;43m): 30..37 / 90..97 — цвет символа, 40..47 — фона, 0 — сброс
+local ANSI = { [0] = 'black', 'red', 'green', 'brown', 'blue', 'magenta', 'cyan', 'lightgrey' }
+local ANSI_HI = { [0] = 'darkgrey', 'lightred', 'lightgreen', 'yellow', 'lightblue', 'lightmagenta', 'lightcyan', 'white' }
+-- клетки логотипа: rows[li] = { { c =, fg = имя|nil, bg = имя|nil } … }; кэш в logo
+function LG.cells(logo)
+  if logo._cells then return logo._cells end
+  local rows = {}
+  for li, l in ipairs(logo.lines) do
+    local row, fg, bg = {}, nil, nil
+    local t = chars(l)
+    local i = 1
+    while i <= #t do
+      local c = t[i]
+      if (c == '␛' or c == '\27') and t[i + 1] == '[' then
+        local j, code = i + 2, ''
+        while t[j] and t[j] ~= 'm' do code = code .. t[j]; j = j + 1 end
+        for ns in (code == '' and '0' or code):gmatch('%d+') do
+          local n = tonumber(ns)
+          if n == 0 then fg, bg = nil, nil
+          elseif n >= 30 and n <= 37 then fg = ANSI[n - 30]
+          elseif n >= 90 and n <= 97 then fg = ANSI_HI[n - 90]
+          elseif n >= 40 and n <= 47 then bg = ANSI[n - 40] end
+        end
+        i = j + 1
+      else
+        row[#row + 1] = { c = c, fg = fg, bg = bg }
+        i = i + 1
+      end
+    end
+    while #row > 0 and row[#row].c == ' ' and not row[#row].bg do row[#row] = nil end
+    rows[li] = row
+  end
+  logo._cells = rows
+  return rows
+end
+
 function LG.size(logo)
   local w = 0
-  for _, l in ipairs(logo.lines) do w = math.max(w, utf8.len(l)) end
+  for _, row in ipairs(LG.cells(logo)) do w = math.max(w, #row) end
   return w, #logo.lines
 end
 
@@ -149,6 +195,13 @@ local DITHER = {
   ['▓'] = function(x, y) return not (x % 2 == 1 and y % 2 == 1) end,
 }
 LG.DITHER = DITHER
+-- псевдографика: { вверх, вниз, влево, вправо }
+local BOX = {
+  ['┌'] = { 0, 1, 0, 1 }, ['┐'] = { 0, 1, 1, 0 }, ['└'] = { 1, 0, 0, 1 }, ['┘'] = { 1, 0, 1, 0 },
+  ['├'] = { 1, 1, 0, 1 }, ['┤'] = { 1, 1, 1, 0 }, ['┬'] = { 0, 1, 1, 1 }, ['┴'] = { 1, 0, 1, 1 },
+  ['┼'] = { 1, 1, 1, 1 }, ['─'] = { 0, 0, 1, 1 }, ['│'] = { 1, 1, 0, 0 },
+}
+LG.BOX = BOX
 
 -- нарисовать на чёрном (фон — забота вызывающего: about рисует логотип
 -- один раз в отдельную картинку, дизеринг попиксельный и дорогой):
@@ -158,12 +211,17 @@ function LG.draw(logo, x, y, cw, ch, ink)
   local d = math.max(1, math.floor(cw / 5))                 -- размер точки дизеринга
   local function set(c) gfx.set(c[1], c[2], c[3], 1) end
   local function r(x0, y0, w, h) gfx.rect(x0, y0, math.max(1, w), math.max(1, h), 1) end
-  for li, l in ipairs(logo.lines) do
+  for li, row in ipairs(LG.cells(logo)) do
     local cy = y + (li - 1) * ch
-    local fg, shc = LG.row_colour(logo, li)
-    fg = fg or ink; shc = shc or fg
-    for k, c in ipairs(chars(l)) do
+    local rfg, rsh = LG.row_colour(logo, li)
+    rfg = rfg or ink; rsh = rsh or rfg
+    for k, cell in ipairs(row) do
+      local c = cell.c
       local cx = x + (k - 1) * cw
+      -- свой цвет клетки (ANSI) важнее раскраски по строкам; фон — заливка клетки
+      local fg = cell.fg and LG.PAL[cell.fg] or rfg
+      local shc = cell.fg and fg or rsh
+      if cell.bg then set(LG.PAL[cell.bg]); r(cx, cy, cw, ch) end
       if c ~= ' ' then
         local dz = DITHER[c]
         if dz then
@@ -186,6 +244,14 @@ function LG.draw(logo, x, y, cw, ch, ink)
               if c == '╱' then gfx.line(cx + dd, cy + ch - 1, cx + cw - 1 + dd, cy)
               else gfx.line(cx + dd, cy, cx + cw - 1 + dd, cy + ch - 1) end
             end
+          elseif BOX[c] then
+            -- псевдографика: плечи из центра клетки (вверх, вниз, влево, вправо)
+            local b = BOX[c]
+            local mx0, my0 = cx + math.floor((cw - t) / 2), cy + math.floor((ch - t) / 2)
+            if b[1] == 1 then r(mx0, cy, t, my0 - cy + t) end
+            if b[2] == 1 then r(mx0, my0, t, cy + ch - my0) end
+            if b[3] == 1 then r(cx, my0, mx0 - cx + t, t) end
+            if b[4] == 1 then r(mx0, my0, cx + cw - mx0, t) end
           elseif c == '_' then r(cx, cy + ch - t, cw, t)
           elseif c == '-' then r(cx, cy + hm, cw, t)
           -- : + # — плотность «аллигатора» (светлый → тёмный): штрихи толще и во
