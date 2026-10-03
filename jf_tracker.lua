@@ -128,6 +128,7 @@ local state = {
 -- ext() отдаёт число для числовых строк: сравнивать через tostring (иначе 3 ~= '3'
 -- и шрифт сбрасывался в битмап при каждом старте)
 if tostring(ext('font_v', '')) ~= '3' then state.font = 0; state.fontscale = 2 end
+if (tonumber(state.fontscale) or 2) > 3 then state.fontscale = 3 end   -- x4 — только PT-mode (3 окт)
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
@@ -1892,7 +1893,7 @@ ctx = {
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
-      { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = 4, desc = 'x1..x4 (Ctrl +/-)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
+      { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
       { key = 'font', label = 'ttf font size', kind = 'num', min = 0, max = 40, desc = '0 = bitmap font; N = Nerd font size', get = function() return state.font or 0 end, set = function(v) ctx.set_font(math.floor(v)) end },
       { sep = true },
       { key = 'about', label = 'about  v' .. VER.VERSION, kind = 'about', desc = 'version and changes (' .. VER.DATE .. ')', get = function() return VER.VERSION end, set = function() end },
@@ -3625,7 +3626,7 @@ function ctrl_action(name, delta)
   elseif name == 'pitch' then
     if col then ctx.set_pitchmode(col, state.pitchmodes[col.guid] == 'resample' and 'shift' or 'resample') end
   elseif name == 'font' then
-    if (state.font or 0) == 0 then ctx.set_scale(math.max(1, math.min(4, math.floor(state.fontscale) + (delta ~= 0 and delta or 1))))
+    if (state.font or 0) == 0 then ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale) + (delta ~= 0 and delta or 1))))
     else ctx.set_font(math.max(0, state.font + (delta ~= 0 and delta or 1))) end
   elseif name == 'fx' then state.fxcols = math.max(0, math.min(4, state.fxcols + (delta ~= 0 and delta or 1)))
   elseif name == 'meters' then state.meters = not state.meters
@@ -5551,7 +5552,7 @@ local function frame()
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
     if (state.font or 0) == 0 then
-      ctx.set_scale(math.max(1, math.min(4, math.floor(state.fontscale or 2) + d)))
+      ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale or 2) + d)))
       vim.msg = ('bitmap x%d'):format(state.fontscale)
     else ctx.set_font(math.max(6, state.font + d)); vim.msg = 'font ' .. state.font end
     c = 0

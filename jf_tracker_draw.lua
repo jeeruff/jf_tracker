@@ -17,6 +17,8 @@
 -- fi = индекс в L.flat, row = строка. Огибающие в L.flat не входят.
 
 local D = {}
+-- масштаб битмап-шрифта: x1..x3 (3 окт: x4 — только для будущего PT-mode)
+D.SCALE_MAX = 3
 local U, get_peaks, MX
 D.font_id = 0
 D.hint = nil   -- функция сбора целей подсказок (kind, x, y, w, h, data); ставит main
@@ -74,7 +76,7 @@ function D.set_font(state)
   else
     D.font_id = 0
     -- только целые x1..x4 (дробный пробовали 1 окт — кривой; Ctrl +/- шаг 1)
-    D.SCALE = math.max(1, math.min(4, math.floor(tonumber(state.fontscale) or 2)))
+    D.SCALE = math.max(1, math.min(D.SCALE_MAX, math.floor(tonumber(state.fontscale) or 2)))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
   if state.glyphface and state.glyphface ~= '' then D.glyph_face = state.glyphface end

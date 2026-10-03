@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.50'
+V.VERSION = '0.5.51'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.51', d = '2026-10-03', items = {
+    'bitmap font scale goes up to x3 (control cell, Ctrl +/-, :scale, options); x4 is kept for the future PT-mode, a saved x4 becomes x3',
+  } },
   { v = '0.5.50', d = '2026-10-03', items = {
     'matrix fold (button fold, F): only slot numbers, track names and cells - no region names, lengths or ruler, the matrix gets narrow; the state is remembered',
   } },
