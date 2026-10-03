@@ -928,17 +928,30 @@ function V.key_impl(c)
       end
       local lane = f0.lane or f0.col.lanes[1]
       E.beside = how == 'beside'
+      -- шаг auto (3 окт): следующий слайс — ровно в конец предыдущего (строка +
+      -- задержка xx/256), амен сшивается без щелей; курсор там, где кончился слайс
+      local sx = V.stitch
+      local tx = (V.step_auto and sx and sx.fi == V.cur.fi and sx.row == V.cur.row) and sx.t or nil
       -- слайс поверх события в строке — ПЕРЕЗАПИСЬ, как нота (3 окт: второй q
-      -- ставил новый лейн); Option — рядом
+      -- ставил новый лейн); Option — рядом; на стыке хвост предыдущего не режем
       if how ~= 'beside' then
         local cell = f0.sub and f0.sub[V.cur.row]
-        if cell and cell.kind == 'cont' and cell.of then E.note_off({ cell.of }, lpb(), V.cur.row)
+        if cell and cell.kind == 'cont' and cell.of and not tx then E.note_off({ cell.of }, lpb(), V.cur.row)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
       end
-      E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k)
+      local it = E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
-      V.cur.row = V.cur.row + adv_rows(inst0, k); ensure_visible(); return
+      if V.step_auto and it and E.item_end and E.row_of_time then
+        local t_end = E.item_end(it)
+        local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
+        V.stitch = { fi = V.cur.fi, row = r, t = t_end }
+        V.cur.row = r
+      else
+        V.stitch = nil
+        V.cur.row = V.cur.row + adv_rows(inst0, k)
+      end
+      ensure_visible(); return
     end
     local pitch = piano_pitch(c)
     if pitch then

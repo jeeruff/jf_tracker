@@ -208,6 +208,15 @@ local function row_time(row, lpb, delay)
   return R.TimeMap2_QNToTime(0, (row + (delay or 0) / 256) / lpb)
 end
 E.row_time = row_time
+-- время → строка и задержка xx/256 (3 окт: точный стык слайсов при шаге auto)
+function E.row_of_time(t, lpb)
+  local rf = R.TimeMap2_timeToQN(0, t) * lpb
+  local row = math.floor(rf + 1e-6)
+  local d = math.floor((rf - row) * 256 + 0.5)
+  if d >= 256 then row, d = row + 1, 0 end
+  return row, d
+end
+function E.item_end(it) return R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH') end
 
 -- ── поиск MIDI-ноты по голове ─────────────────────────────────────────────
 -- индекс ноты take по (ppq старта ±2, pitch, ch)
@@ -887,11 +896,11 @@ local function finish_insert(track, lane_idx, it)
 end
 
 -- вставить слайс k инструмента inst_item на трек: копия chunk, offs/len по таблице
-function E.insert_slice(track, lane_idx, lpb, row, inst_item, k)
+function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local slices, base = E.item_slices(inst_item)
   if #slices == 0 then return end
   k = math.max(1, math.min(#slices, k))
-  local t0 = row_time(row, lpb, 0)
+  local t0 = t_exact or row_time(row, lpb, 0)            -- t_exact: стык с концом предыдущего слайса
   local made
   run('insert slice ' .. k, function()
     local root = iid_base(E.ensure_iid(inst_item))
