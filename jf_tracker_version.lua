@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.67'
+V.VERSION = '0.5.68'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.68', d = '2026-10-03', items = {
+    'themes (options, :theme): reaper - native colours of the REAPER theme (default); modus vivendi, modus operandi, gruvbox, catppuccin - full-screen palettes; mono - everything grey except the cursor cell',
+    'about: 20 logos, real ANSI text with colour codes, box drawing, dots; native logos take the palette roles (text / accent / line) and follow the theme',
+  } },
   { v = '0.5.67', d = '2026-10-03', items = {
     'items no longer multiply: every insert carries the instrument mark P_EXT:jf_iid (slice k: id#k, a cut: id@offs+len); notes cut by the next note, pitched or with their own volume stay ONE instrument; unmarked items group by file + offset + rate without the length (a cut is not a new item); the library item or the longest copy represents the instrument',
     'item panel edits the whole instrument: all its notes follow - volume by ratio, pitch and pan by difference (the notes keep their own), fades / loop / stretch mode / keep pitch set to all, rate scales every copy',

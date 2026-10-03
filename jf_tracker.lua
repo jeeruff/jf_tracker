@@ -97,6 +97,7 @@ local state = {
   poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (кнопка preview)
   -- режим превью инструмента (3 окт): full — до конца item / Esc, hold — пока
   -- держишь кнопку мыши на строке, sec — первая секунда
+  theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
   curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
@@ -340,7 +341,7 @@ local function save_win()
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
-  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top')
+  S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
   S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
@@ -2050,6 +2051,7 @@ ctx = {
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
+      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'edge line of the cursor row (amber) and the REAPER edit cursor (green): top / bottom / off - the green mark next to the row number stays', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'line', 'header', 'full' }, desc = 'line: a colour strip under the name, header: the name row filled, full: the whole header filled (dimmer below the name)', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'scale', label = 'bitmap scale', kind = 'num', min = 1, max = draw.SCALE_MAX, desc = 'x1..x3 (Ctrl +/-); x4 is kept for PT-mode', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(math.floor(v)) end },
@@ -2837,6 +2839,9 @@ edit.after = function(desc)
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   alias.trim(regions)
 end
+draw.themes = dofile(DIR .. '/jf_tracker_themes.lua')   -- темы трекера (3 окт); полем draw: у главного чанка предел локальных
+if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
+draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
 -- Theme Adjuster / смена темы (2 окт): раз в секунду подпись темы; изменилась —
 -- палитра перечитывается (jf_looper_ui не трогаем: свежая копия, поля в U),
@@ -2857,13 +2862,22 @@ local function theme_check()
   if theme_watch.sig == nil then theme_watch.sig = sig; return end
   if sig == theme_watch.sig then return end
   theme_watch.sig = sig
+  if ctx.apply_theme(state.theme) then vim.msg = 'theme colours updated' end
+end
+-- тема трекера (3 окт): родная палитра заново (jf_looper_ui — свежая копия),
+-- поверх — тема из jf_tracker_themes; draw пересчитывает свои цвета, кэши
+-- картинок текста и цветов сброшены. reaper — родная палитра как есть
+function ctx.apply_theme(name)
   local ok, fresh = pcall(dofile, RES .. '/Scripts/jf_looper/jf_looper_ui.lua')
-  if not ok or type(fresh) ~= 'table' then return end
+  if not ok or type(fresh) ~= 'table' then return false end
   for k, v in pairs(fresh) do if type(v) == 'table' then U[k] = v end end
+  if not draw.themes.valid(name) then name = 'reaper' end
+  state.theme = name
+  draw.themes.apply(U, name)
   draw.init(U, model.peaks, MX)
   if draw.reset_colours then draw.reset_colours() end
   draw.set_font(state)                          -- сброс кэша картинок текста (цвета в ключе)
-  vim.msg = 'theme colours updated'
+  return true
 end
 OPT.init(U, ctx)
 OPT.ask.init(U, ctx)

@@ -58,8 +58,12 @@ function D.init(u, peaks_fn, matrix)
   D.ENVLINE = U.readable(U.CYAN, U.BG, 4.5)
   -- фон шапки трека (3 окт): как TCP REAPER — col_tr1_bg темы, выделенный —
   -- col_seltrack; цвет трека подмешивается так же (~30 %, сверено по TCP)
-  D.HDR = U.theme('col_tr1_bg', U.mix(U.PANEL, U.TEXT, 0.12))
-  D.HDRSEL = U.theme('col_seltrack', U.mix(D.HDR, U.TEXT, 0.10))
+  D.HDR = U.HDR or U.theme('col_tr1_bg', U.mix(U.PANEL, U.TEXT, 0.12))
+  D.HDRSEL = U.HDRSEL or U.theme('col_seltrack', U.mix(D.HDR, U.TEXT, 0.10))
+  -- темы (3 окт, jf_tracker_themes.lua): mono — всё серым, кроме ячейки курсора
+  D.mono = U.MONO and true or false
+  D.CURCELL = U.MONO_CURSOR or U.TEXT
+  U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
 
 -- шрифт: 0 — битмап REAPER (масштаб ×N пиксель-в-пиксель через кеш строк и
@@ -340,11 +344,20 @@ function D.layout(snap, state, nregions)
 end
 
 -- ── примитивы ─────────────────────────────────────────────────────────────
-local function set(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
+-- mono: серый по яркости, кроме ячейки курсора (D.CURCELL)
+local function mono(c)
+  if not D.mono or c == D.CURCELL then return c end
+  local l = 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]
+  return { l, l, l }
+end
+D.mono_col = mono
+local function set(c, a) c = mono(c); gfx.set(c[1], c[2], c[3], a or 1) end
+D.set = set
 -- bg — непрозрачная подложка (для инверсного курсора); без bg при масштабе
 -- >1 текст блитится аддитивно (чёрный фон картинки не виден)
 local function text(x, y, s, col, bg)
   if s == nil or s == '' then return end
+  col = mono(col); if bg then bg = mono(bg) end
   y = y + D.SPACE
   if D.SCALE == 1 then
     -- ×1: прямой drawstr; в гибриде глифы — через сегменты (иначе битмап
@@ -1776,7 +1789,7 @@ function D.frame(L, snap, rows, state, info)
             end
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv then
-              D.inv_bg = info.focus == 'tracker' and U.TEXT or U.LINE
+              D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
               set(D.inv_bg)
               if c.folded then gfx.rect(x, y, f.w, L.rh, 1)
               else local fx, fw = D.field_rect(f.G or L, inv); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
