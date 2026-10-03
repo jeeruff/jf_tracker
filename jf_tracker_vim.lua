@@ -715,6 +715,14 @@ local OPTCH = { [339] = 'q', [8721] = 'w', [180] = 'e', [174] = 'r', [8224] = 't
                 [182] = '7', [170] = '9', [186] = '0' }
 function V.note_key(c, mods)
   mods = mods or {}
+  -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
+  -- Cmd+Shift — то же, но сэмпл растягивается на эту длину
+  if mods.cmd then
+    local base = (c >= 1 and c <= 26) and (c + 96) or c
+    local cb = (base < 256) and string.char(base) or ''
+    if SHIFTED[cb] then base = SHIFTED[cb]:byte() elseif cb:match('^[QWERTYUIOP]$') then base = cb:lower():byte() end
+    return base, mods.shift and 'hold_stretch' or 'hold'
+  end
   local ch = (c < 256) and string.char(c) or ''
   if OPTCH[c] then return OPTCH[c]:byte(), 'beside' end
   if mods.ctrl and c >= 1 and c <= 26 then return c + 96, 'capture' end
@@ -779,7 +787,8 @@ function V.key_impl(c)
   local HJKL = { [104] = 'h', [106] = 'j', [107] = 'k', [108] = 'l', [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l',
                  [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l' }
   -- ⌘+цифра — слот пула (1..9, 0 = 10) в любом режиме
-  if mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then
+  if mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
+     and not ((V.mode == 'insert' or V.piano) and ctx.piano[c]) then      -- в INSERT / слое пианино ⌘+цифра — нота с удержанием
     local k = c - ('0'):byte(); if k == 0 then k = 10 end
     if ctx.pool_select then ctx.pool_select(k) end
     V.count = nil; return
@@ -906,6 +915,12 @@ function V.key_impl(c)
     if inst0 and inst0.slices and #inst0.slices > 0 and UP[chq] then
       local k = UP[chq]
       local t0s = inst0.slices[k]
+      if how == 'hold' or how == 'hold_stretch' then
+        local lane = f0.lane or f0.col.lanes[1]
+        if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, slice = k,
+          item = inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
+        return
+      end
       if how == 'audition' or how == 'capture' then
         if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
         if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
@@ -924,6 +939,12 @@ function V.key_impl(c)
       if f then
         local lane = f.lane or f.col.lanes[1]
         local inst = (f.col.pool or {})[V.inst]
+        if how == 'hold' or how == 'hold_stretch' then
+          local chh = (c < 256) and string.char(c) or ''
+          if ctx.hold_start then ctx.hold_start({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,
+            item = inst and inst.item, vel = V.vel, stretch = how == 'hold_stretch', key = chh }) end
+          return
+        end
         -- Shift+нота — только звук; Ctrl+нота — захват (F5, пока звук)
         if how == 'audition' or how == 'capture' then
           if ctx.preview then ctx.preview(f.col.track, pitch, inst and inst.item, V.cur.row, V.step_auto and 1 or V.step) end
@@ -952,6 +973,38 @@ function V.key_impl(c)
       end
     end
     return
+  end
+
+  -- слой пианино в NORMAL (3 окт, как M в Ableton): M — вкл / выкл; клавиши
+  -- пианино (верхний ряд + цифры) звучат, Cmd+клавиша — нота с удержанием
+  -- (Cmd+Shift — с растяжкой), остальное — обычные Vim-команды
+  if V.mode == 'normal' and not V.pending and not V.op then
+    if c == ('M'):byte() then
+      V.piano = not V.piano
+      V.msg = V.piano and 'piano on (M): top row plays, Cmd+note inserts with the held length, Cmd+Shift stretches' or 'piano off'
+      return
+    end
+    if V.piano then
+      if c == ESC then V.piano = false; V.msg = 'piano off'; return end
+      local mods = ctx.mods and ctx.mods() or {}
+      local base, how = V.note_key(c, mods)
+      local f0 = flat()[V.cur.fi]
+      local inst0 = f0 and (f0.col.pool or {})[V.inst]
+      local chq = (base < 256) and string.char(base) or ''
+      local UPK = { q = 1, w = 2, e = 3, r = 4, t = 5, y = 6, u = 7, i = 8, o = 9, p = 10 }
+      local k = (inst0 and inst0.slices and #inst0.slices > 0) and UPK[chq] or nil
+      local pitch = (not k) and piano_pitch(base) or nil
+      if f0 and (k or pitch) then
+        local lane = f0.lane or f0.col.lanes[1]
+        if how == 'hold' or how == 'hold_stretch' then
+          if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch, slice = k,
+            item = inst0 and inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
+        elseif k then
+          if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], inst0.slices[k + 1] or inst0.len) end
+        elseif ctx.preview then ctx.preview(f0.col.track, pitch, inst0 and inst0.item, V.cur.row, 1) end
+        return
+      end
+    end
   end
 
   -- ожидание второй клавиши

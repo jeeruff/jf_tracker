@@ -1946,6 +1946,28 @@ ctx = {
   inst_select = function(n) pool_select(n) end,
   inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
   inst_preview = function(...) return PV.inst_preview(...) end,
+  -- нота с удержанием (3 окт, Cmd+нота в INSERT / слое пианино): звук сразу,
+  -- длина растёт в темпе, пока клавиша держится (JS_VKeys_GetState), j / ↓
+  -- добавляют шаг; отпустили — запись (edit.hold_insert). Без js_ReaScriptAPI —
+  -- обычная вставка на шаг
+  hold_start = function(spec)
+    if state.hold then return end
+    spec.lpb = state.lpb
+    spec.rows = math.max(1, vim.step_auto and 1 or vim.step)
+    if not reaper.JS_VKeys_GetState then
+      edit.hold_insert(spec); model.invalidate()
+      vim.msg = 'hold needs js_ReaScriptAPI - inserted with the step length'
+      return
+    end
+    spec.vk = (spec.key or ''):upper():byte() or 0
+    spec.t0 = reaper.time_precise()
+    spec.extra = 0
+    spec.row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0))
+    if spec.slice and spec.entry then PV.slice(spec.track, spec.entry, spec.entry.slices[spec.slice], spec.entry.slices[spec.slice + 1] or spec.entry.len)
+    elseif spec.pitch then ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 64) end
+    state.hold = spec
+    vim.msg = 'hold: release to insert' .. (spec.stretch and ' (stretched)' or '') .. ' - j / down add a step, Esc cancels'
+  end,
   inst_preview_pos = function(item) return PV.inst_position(item) end,
   preview_src_pos = function() return PV.src_position() end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
@@ -4215,6 +4237,26 @@ local function frame()
   local t_0 = reaper.time_precise()
   U.begin_frame()
   PV.tick()
+  -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
+  if state.hold then
+    local h = state.hold
+    local now = reaper.time_precise()
+    local rows = math.max(1, math.floor((now - h.t0) / h.row_dur) + 1) + h.extra
+    vim.cur.row = h.row + rows - 1
+    local ks = reaper.JS_VKeys_GetState(h.t0 - 0.5)        -- KEYDOWN после нажатия без KEYUP = держится
+    local down = h.vk > 0 and ks and ks:byte(h.vk) ~= 0
+    if not down and now - h.t0 > 0.08 then
+      h.rows = rows
+      state.hold = nil
+      local ok, err = pcall(edit.hold_insert, h)
+      PV.stop()
+      vim.cur.row = h.row + rows
+      model.invalidate()
+      vim.msg = ok and ('inserted %d row(s)%s'):format(rows, h.stretch and ', stretched' or '') or ('hold: ' .. tostring(err):match('[^\n]*$'))
+    else
+      vim.msg = ('hold: %d row(s)%s - release to insert, j / down: +1, Esc: cancel'):format(rows, h.stretch and ' stretch' or '')
+    end
+  end
   -- видоизменённые копии (3 окт): правка уже сделала их уникальными —
   -- спросить, не применить ли то же ко всем связанным
   if not OPT.ask.active and #edit.modified > 0 then
@@ -5900,6 +5942,13 @@ local function frame()
   c = keys.translate(c)
   -- окно Options — модальное: все клавиши ему
   if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)
+  -- пока держится нота (Cmd+нота): j / ↓ — +1 шаг, Esc — отмена, прочее (автоповтор клавиши) — глотаем
+  if state.hold and c ~= 0 then
+    if c == 27 then
+      vim.cur.row = state.hold.row; state.hold = nil; PV.stop(); vim.msg = 'hold cancelled'
+    elseif c == ('j'):byte() or c == 10 or c == 1685026670 then state.hold.extra = state.hold.extra + 1 end
+    c = 0
+  end
   if OPT.ask.active and c ~= 0 then OPT.ask.key(c); c = 0 end
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
   if state.bpm_edit and c ~= 0 then

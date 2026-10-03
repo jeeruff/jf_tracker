@@ -115,6 +115,7 @@ local function reset()
     hydra_keys = function() return { title = 'keys', items = { { key = 'h', label = 'move' } } } end,
     ctrl_held = function() return ctrl_down end,
     mods = function() return { ctrl = ctrl_down, alt = alt_down, cmd = cmd_down, shift = shift_down } end,
+    hold_start = function(sp) calls[#calls + 1] = 'hold:' .. tostring(sp.pitch or ('s' .. tostring(sp.slice))) .. (sp.stretch and ':stretch' or '') end,
     preview = function(tr, p) calls[#calls + 1] = 'prev:' .. tostring(p) end,
     toggle_envs = function() calls[#calls + 1] = 'envs' end,
     loop = function(w, n) calls[#calls + 1] = 'loop:' .. tostring(w) .. ':' .. tostring(n) end,
@@ -235,9 +236,15 @@ keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
 keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
-cmd_down = true; V.key(51); eq('⌘3 → pool slot 3', last(), 'pool:3'); V.key(48); eq('⌘0 → slot 10', last(), 'pool:10'); cmd_down = false
+cmd_down = true; V.key(51); eq('INSERT: ⌘3 = black key held (hold note D#5)', last(), 'hold:75'); V.key(17); eq('⌘q = hold C-4', last(), 'hold:72')
+shift_down = true; V.key(17); eq('⌘⇧q = hold with stretch', last(), 'hold:72:stretch'); shift_down = false; cmd_down = false
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
+cmd_down = true; V.key(51); eq('NORMAL: ⌘3 → pool slot 3', last(), 'pool:3'); V.key(48); eq('⌘0 → slot 10', last(), 'pool:10'); cmd_down = false
+keysin('M'); eq('M → piano layer', V.piano, true)
+local np = #calls; keysin('q'); eq('piano layer: q only sounds', last(), 'prev:72'); eq('piano layer: nothing inserted', #calls, np + 1)
+cmd_down = true; V.key(17); eq('piano layer: ⌘q holds', last(), 'hold:72'); cmd_down = false
+keysin('M'); eq('M again → piano off', V.piano, false)
 keysin('iq');      eq('len = step', last(), 'ins:trA@5:72:2'); eq('advance by step', V.cur.row, 7)
 V.key(27)
 keysin(':lpb 8'); V.key(13); eq('lpb cmd', lpb_calls[#lpb_calls], 8)

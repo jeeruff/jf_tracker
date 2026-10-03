@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.68'
+V.VERSION = '0.5.69'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.69', d = '2026-10-03', items = {
+    'M in NORMAL: piano layer (like M in Ableton) - the top row and digits play notes, other keys stay Vim commands; M or Esc turns it off',
+    'Cmd+note (INSERT and the piano layer): the note lasts as long as the key is held, growing at the project tempo; j / down add a step while holding, Esc cancels; Cmd+Shift+note stretches the sample to that length (keeps pitch, becomes unique); slices too',
+    'Cmd+digit in INSERT / piano layer is now a held black key; slot selection stays on Cmd+digit in NORMAL, Cmd+HJKL and , . everywhere',
+    'about: logos that move - marquee, shimmering lines, dripping blood (:about name opens one)',
+  } },
   { v = '0.5.68', d = '2026-10-03', items = {
     'themes (options, :theme): reaper - native colours of the REAPER theme (default); modus vivendi, modus operandi, gruvbox, catppuccin - full-screen palettes; mono - everything grey except the cursor cell',
     'timeline ruler moved left of the row numbers (between the region lanes and the numbers); the cursor line starts at the lanes edge and runs through the ruler; the green mark right of the row number is gone',

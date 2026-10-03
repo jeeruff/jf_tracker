@@ -891,6 +891,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k)
   if #slices == 0 then return end
   k = math.max(1, math.min(#slices, k))
   local t0 = row_time(row, lpb, 0)
+  local made
   run('insert slice ' .. k, function()
     local root = iid_base(E.ensure_iid(inst_item))
     local ok, chunk = R.GetItemStateChunk(inst_item, '', false)
@@ -912,7 +913,9 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k)
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
     E.set_iid(it, root .. '#' .. k)                      -- все ноты слайса k — один инструмент
     finish_insert(track, lane_idx, it)
+    made = it
   end)
+  return made
 end
 
 -- Выделение сэмпл-модуля [t0, t1) (секунды item) → item на track в строке
@@ -993,6 +996,7 @@ end
 function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_item)
   local t0 = row_time(row, lpb, 0)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
+  local made
   run('insert note', function()
     local mit = midi_item_at(track, lane_idx, t0)
     local has_audio = false
@@ -1013,9 +1017,40 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         local tk = R.GetActiveTake(it)
         if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', pitch - model.BASE_NOTE) end
         finish_insert(track, lane_idx, it)
+        made = it
       end
     end
   end)
+  return made
+end
+
+-- ── нота с удержанием (3 окт, Cmd+нота): длина = сколько держали ──────────
+-- rows — строк; аудио: без stretch — item обрезается до этой длины (длиннее
+-- сэмпла не тянется), stretch (Cmd+Shift) — сэмпл растягивается ровно на неё
+-- с сохранением питча и становится уникальным (своя метка). MIDI — нота rows.
+function E.hold_insert(spec)
+  local made
+  run(spec.stretch and 'hold note (stretch)' or 'hold note', function()
+    local it
+    if spec.slice then it = E.insert_slice(spec.track, spec.lane_idx, spec.lpb, spec.row, spec.item, spec.slice)
+    else it = E.insert_note(spec.track, spec.lane_idx, spec.lpb, spec.row, spec.pitch, spec.vel, spec.rows, spec.item) end
+    if it then
+      local dur = row_time(spec.row + spec.rows, spec.lpb, 0) - row_time(spec.row, spec.lpb, 0)
+      local tk = R.GetActiveTake(it)
+      local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if tk and spec.stretch and dur > 0 and len > 0 then
+        local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+        R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate * len / dur)
+        R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
+        R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur)
+        E.make_unique(it)
+      elseif dur > 0 and dur < len then
+        R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur)
+      end
+      made = it
+    end
+  end)
+  return made
 end
 
 -- ── запись с MIDI-входа (INSERT + R на треке) ───────────────────────────
