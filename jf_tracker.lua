@@ -288,6 +288,8 @@ end
 model.user_mods = umod_load()
 local dsp_learn = nil         -- { k = блок, name = имя FX, last = ключ последнего касания }
 local learn_poll            -- объявлен заранее: определение ниже, вызов из кадра
+local tok_drag = nil          -- перетаскивание инструмента / региона на поле Orca (3 окт)
+local orca_pending = nil      -- файл из браузера на Orca: ждём номер инструмента после снимка
 local fxv_cache = {}
 
 -- ── окно ──────────────────────────────────────────────────────────────────
@@ -1926,6 +1928,34 @@ ctx = {
   orca_targets = function(f) return ORCA.targets(f) end,
   orca_doc = function(ch) return ORCA.DOC[ch] or ORCA.DOC[(ch or ''):upper()] end,
   orca_set = function(x, y, ch) if garden.f then ORCA.set(garden.f, x, y, ch); garden_save() end end,
+  -- бросок на клетку Orca (3 окт): готовый оператор с аргументами — инструмент
+  -- ($ слайс 1 нарезанного / : нота C4 целого), регион (; слот). Банг — свой.
+  orca_drop = function(kind, v, ox, oy)
+    local f = garden.f
+    if not f then return end
+    local snip
+    if kind == 'inst' then
+      local col = cur_col()
+      local e = col and (col.pool or {})[v]
+      if not e then vim.msg = 'orca: no instrument ' .. tostring(v); return end
+      if v > 35 then vim.msg = ('orca: instrument %d does not fit one base-36 digit (1..z = 1..35)'):format(v); return end
+      local t = 0
+      for i, c in ipairs(snap.cols) do if c.name == e.home then t = i; break end end
+      if t == 0 then for i, c in ipairs(snap.cols) do if c == col then t = i end end end
+      if t > 35 then t = 0 end
+      local sliced = e.slices or (e.parent and e.parent.slices)
+      snip = (sliced and '$' or ':') .. ORCA.chr(t) .. ORCA.chr(v) .. (sliced and '1' or '4C')
+      vim.msg = ('orca: %s - %s %02d %s on track %s; put a bang next to it (e.g. D4)'):format(snip, sliced and 'slice 1 of' or 'C4 of', v, e.name, t == 0 and 'cursor' or snap.cols[t].name)
+    elseif kind == 'region' then
+      if v > 36 * 36 - 1 then return end
+      snip = ';' .. ORCA.chr(math.floor(v / 36)) .. ORCA.chr(v % 36)
+      vim.msg = ('orca: %s - queues slot %d (%s) when banged'):format(snip, v, seq[v] and seq[v].name or '?')
+    end
+    if not snip then return end
+    for k = 1, #snip do if ox + k - 1 < f.w then ORCA.set(f, ox + k - 1, oy, snip:sub(k, k)) end end
+    garden_save()
+    GD.ocur = { x = ox, y = oy }
+  end,
   play_stop = function() edit.play_stop() end,
   garden_loop = function(ri, ci, n)
     local rg, col = seq[ri], snap and snap.cols[ci]
@@ -4348,6 +4378,29 @@ local function frame()
 
   -- мышь
   local t_3 = reaper.time_precise()
+  -- перетаскивание токена на Orca: нажатие на инструмент / имя региона
+  if U.click and not tok_drag then
+    if hover.pool and not hover.pool.empty and hover.pool.i then tok_drag = { kind = 'inst', v = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y }
+    elseif hover.matrix and hover.matrix.name then tok_drag = { kind = 'region', v = hover.matrix.name, x0 = gfx.mouse_x, y0 = gfx.mouse_y } end
+  end
+  if tok_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not tok_drag.active and (math.abs(gfx.mouse_x - tok_drag.x0) > 6 or math.abs(gfx.mouse_y - tok_drag.y0) > 6) then tok_drag.active = true end
+      if tok_drag.active then
+        state.status = (hover.garden and hover.garden.ox) and ('drop %s %d on orca (%d,%d)'):format(tok_drag.kind, tok_drag.v, hover.garden.ox, hover.garden.oy)
+          or ('drag %s %d - drop on an Orca cell (orca tab)'):format(tok_drag.kind, tok_drag.v)
+      end
+    else
+      if tok_drag.active and hover.garden and hover.garden.ox then ctx.orca_drop(tok_drag.kind, tok_drag.v, hover.garden.ox, hover.garden.oy) end
+      tok_drag = nil
+    end
+  end
+  -- файл из браузера на Orca: номер инструмента появится после снимка
+  if orca_pending and snap and snap.inst_of then
+    local i = snap.inst_of[orca_pending.item]
+    if i then ctx.orca_drop('inst', i, orca_pending.ox, orca_pending.oy); orca_pending = nil
+    elseif reaper.time_precise() - orca_pending.t > 3 then orca_pending = nil end
+  end
   -- ресайз мышью: левый край браузера (ширина), нижний край верхней панели (высота)
   do
     local edge
@@ -5093,7 +5146,12 @@ local function frame()
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column' end
       end
     else
-      if B.drag.active and hover.dspwave and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
+      if B.drag.active and hover.garden and hover.garden.ox and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
+        -- файл на клетку Orca: в библиотеку трека курсора, затем — инструментом в поле
+        local c = cur_col()
+        local it = c and edit.depot_add(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e), c.track)
+        if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
+      elseif B.drag.active and hover.dspwave and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
         ctx.rs5k_file(hover.dspwave.f, B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))   -- файл на волну RS5K — его сэмпл
       elseif B.drag.active and hover.pool and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark then
         ctx.add_to_depot(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))       -- бросок на инструменты — в библиотеку трека

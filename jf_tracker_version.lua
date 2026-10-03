@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.41'
+V.VERSION = '0.5.42'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.42', d = '2026-10-03', items = {
+    'Orca: drag and drop onto field cells - an instrument from the instruments panel writes $ track inst 1 (sliced) or : track inst 4C, a region dragged by its matrix name writes ; slot, a browser file goes into the track library first and then lands as an instrument; the bang is yours (D4 next to it)',
+  } },
   { v = '0.5.41', d = '2026-10-03', items = {
     'any effect becomes a DSP module: parameters are classified by units and name (gain, filter, time, pitch, mix, dynamics, stereo, modulation, switches) with a colour strip, sub-groups are read from names (amp1attack, f1cutoff, Osc 2 Pitch, ampAttack), service parameters dropped, the most important first, up to 24 in up to 3 columns; computed once per plugin type',
     'module learn (E in the DSP panel): knobs touched in the plugin window join the block; x / J K / < > / R edit it; saved per plugin in Data/jf_tracker/dspmods_user.txt; user module > curated registry > automatic',

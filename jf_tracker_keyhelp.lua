@@ -271,6 +271,7 @@ KH.PAGES = {
     { k = 'arrows ^hjkl', d = 'move cursor', t = { 'Left', 'Right', 'Up', 'Down' } },
     { k = 'A-Z a-z 0-9', d = 'place operator / value' },
     { k = '!', d = 'bang *' },
+    { k = 'drag', d = 'drop an instrument (instruments panel) on a cell: $ track inst 1 (sliced) or : track inst 4C; a region (matrix name): ; slot; a browser file: into the track library, then as an instrument - add a bang (D4)' },
     { k = '. BS Del', d = 'erase' },
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },
