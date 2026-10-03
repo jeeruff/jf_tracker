@@ -123,7 +123,7 @@ local state = {
   -- ноты на строках item (бывший «off»), off — без волны совсем
   wavemode = (function()
     local v = reaper.GetExtState(EXT, 'wavemode')
-    if v == 'column' or v == 'note' or v == 'off' then return v end
+    if v == 'column' or v == 'note' or v == 'back' or v == 'off' then return v end
     return reaper.GetExtState(EXT, 'wave') == 'off' and 'note' or 'column'
   end)(),
   itemcol = flag('itemcol', true),               -- заливка и кайма item его цветом (3 окт)
@@ -1350,12 +1350,12 @@ ctx = {
   wave_mode = function(m, delta)
     -- колонка волны: только on/off — спектральные пики REAPER + stretch-маркеры
     -- три режима (3 окт): column → note → off; :wave column|note|off (on = column)
-    local nxt = { column = 'note', note = 'off', off = 'column' }
+    local nxt = { column = 'note', note = 'back', back = 'off', off = 'column' }
     if m == 'on' or m == 'spec' or m == 'column' then state.wavemode = 'column'
-    elseif m == 'note' or m == 'off' then state.wavemode = m
+    elseif m == 'note' or m == 'off' or m == 'back' then state.wavemode = m
     else state.wavemode = nxt[state.wavemode or 'column'] end
     state.wave = state.wavemode == 'column' and 'spec' or 'off'
-    vim.msg = 'wave: ' .. ({ column = 'own column - spectral peaks (colour = frequency), amber = stretch markers', note = 'in the note field on the item rows', off = 'off' })[state.wavemode]
+    vim.msg = 'wave: ' .. ({ column = 'own column - spectral peaks (colour = frequency), amber = stretch markers', note = 'in the note field on the item rows', back = 'background - the whole item width, dim, under the text', off = 'off' })[state.wavemode]
   end,
   -- анализатор: scope → spec → sgram (кнопки у вкладок, :scopemode)
   scopemode = function(m)
@@ -2231,7 +2231,7 @@ ctx = {
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: list by click + smart input', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
-      { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'wave: own column (colour = frequency) / inside the note field / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
+      { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),

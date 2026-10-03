@@ -38,6 +38,7 @@ function D.init(u, peaks_fn, matrix)
   U.CYAN = U.readable(U.CYAN, U.BG, 4.5)
   D.PEAK  = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
   D.PEAKM = U.mix(D.PEAK, U.BG, 0.55)
+  D.PEAKB, D.PEAKMB = U.mix(D.PEAK, U.BG, 0.62), U.mix(D.PEAK, U.BG, 0.8)   -- волна фоном (3 окт)
   D.BAR   = U.mix(U.BG, U.TEXT, 0.62)
   D.BEAT  = U.DIM
   D.PLAY  = U.tint(U.AMBER, 0.22)
@@ -208,6 +209,7 @@ function D.layout(snap, state, nregions)
   -- stretch-маркеры; только on/off (просьба 1 окт, режимы peaks/rect убраны)
   L.wave = (state.wavemode == 'column') and 'spec' or 'off'
   D.wave_none = state.wavemode == 'off'                -- без волны совсем (3 окт)
+  D.wave_back = state.wavemode == 'back'               -- волна фоном во всю ширину item, под текстом (3 окт)
   L.w_wave = L.wave == 'off' and 0 or L.cw * 3
   L.x_wave = L.pad
   L.x_note = L.pad + (L.w_wave > 0 and (L.w_wave + L.pad) or 0)
@@ -682,11 +684,23 @@ local function draw_cell(L, cell, x, y, ty, inv)
     return
   end
   local k = cell.kind
-  if L.w_wave > 0 then
+  if D.wave_back and (k == 'audio' or (k == 'cont' and cell.of.kind == 'audio')) then
+    -- фон (3 окт): волна во всю ширину подколонки, тусклая, текст поверх
+    local head = k == 'audio' and cell or cell.of
+    local G = D.wave_back_geo
+    if not G or G.base ~= L then
+      G = setmetatable({ base = L, w_wave = 0, wave = 'off', x_note = L.pad, w_note = math.max(4, (L.sub_w or 40) - 2 * L.pad) }, { __index = L })
+      D.wave_back_geo = G
+    end
+    local p0, pm0 = D.PEAK, D.PEAKM
+    D.PEAK, D.PEAKM = D.PEAKB, D.PEAKMB
+    draw_wave(G, head, k == 'audio' and 0 or cell.i, x, y, head.muted, false)
+    D.PEAK, D.PEAKM = p0, pm0
+  elseif L.w_wave > 0 then
     -- колонка волны: голова и все cont-строки аудио-item
     if k == 'audio' then draw_wave(L, cell, 0, x, y, cell.muted, inv == 1)
     elseif k == 'cont' and cell.of.kind == 'audio' then draw_wave(L, cell.of, cell.i, x, y, cell.of.muted, inv == 1) end
-  elseif k == 'cont' and cell.of.kind == 'audio' and not D.wave_none then
+  elseif k == 'cont' and cell.of.kind == 'audio' and not D.wave_none and not D.wave_back then
     local head = cell.of
     local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end

@@ -48,7 +48,7 @@
 - [ ] Вкладка item: метки слайсов не вылезают за волну на свойства
 
 ## Волна и item
-- [ ] options → wave: column / note / off (off — волны нет совсем); `:wave column|note|off`
+- [ ] options → wave: column / note / back (фоном во всю ширину item) / off; `:wave column|note|back|off`
 - [ ] options → item colours вкл / выкл; item fill opacity — слайдер (h l, колесо)
 - [ ] mono: кайма item светлее, видна
 

@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.89'
+V.VERSION = '0.5.90'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.90', d = '2026-10-03', items = {
+    'wave: new mode back - the wave across the whole item width as a dim background under the text of the rows (options -> wave, :wave back)',
+  } },
   { v = '0.5.89', d = '2026-10-03', items = {
     'lib: no @ / $ marks and legend; the mini wave of a sliced sample shows its slice boundaries and lights the zone of the slice in play (selected or under the cursor)',
     'item tab: with the cursor on a slice note it shows the parent sample with that slice zone and the slice properties',
