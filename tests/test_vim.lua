@@ -309,7 +309,7 @@ eq('latin passthrough', keys.translate(104), 104)
 
 -- ── : подсказка и Tab, / поиск, hydra ─────────────────────────────────────
 reset()
-keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); eq('cmd matches l* (lpb, lanes, lock, len, loop, loops)', #pp.lines, 6)
+keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato)', #pp.lines, 7)
 V.key(9);      eq('tab completes lpb', V.cmdline, 'lpb ')
 V.key(27)
 keysin(':');   pp = V.popup(); eq('all commands listed (max 14)', #pp.lines, 14)
