@@ -136,5 +136,17 @@ local ch = A.unlink_chunk('<ITEM\nGROUP 5\n<SOURCE MIDI\nPOOLEDEVTS {G1}\n>\n>')
 eq('clone: group removed', ch:find('GROUP') == nil, true)
 eq('clone: new pool guid', ch:find('{G1}', 1, true) == nil and ch:find('POOLEDEVTS') ~= nil, true)
 
+-- make unique (3 окт): повтор отвязан — новое имя, свой пул, без группы
+local renamed
+reaper.EnumProjectMarkers3 = function(_, i) if i == 0 then return 1, true, 12, 16, 'A', 3, 0 end return 0 end
+reaper.SetProjectMarkerByIndex = function(_, i, isr, a, b, idx, name) renamed = name end
+reaper.GetItemStateChunk = (function(orig) return orig end)(reaper.GetItemStateChunk)
+local nm, cnt = A.make_unique({ regs[1], regs[2], regs[3] }, regs[3])
+eq('unique: new name', nm, 'A 2'); eq('unique: marker renamed', renamed, 'A 2')
+local after
+for _, it in ipairs(P.tracks[1].items) do if it.pos >= 12 and it.pos < 16 then after = it end end
+eq('unique: group removed', after and after.gid, 0)
+eq('unique: own pool', after and after.pool ~= src.pool, true)
+
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

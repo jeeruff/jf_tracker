@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.58'
+V.VERSION = '0.5.59'
 V.DATE = '2026-10-02'
 V.CHANGES = {
+  { v = '0.5.59', d = '2026-10-03', items = {
+    'matrix naming like Renoise: alias (als next to the region name, A) is the linked repeat - same pattern, MIDI pooled, items grouped; clone (cln, C, D, ^D) is a free copy with a new name; make unique (U, region menu) unlinks a repeat - new name, own MIDI pool, no group',
+  } },
   { v = '0.5.58', d = '2026-10-03', items = {
     'speed: the FX chains are cached by a cheap signature (count, GUIDs, bypass, container contents) - a project snapshot rebuild after an edit went from 5.8 to 0.6 ms on the test project; parameter values are still read live',
     'heartbeat shows the last snapshot rebuild and its parts (env / pool / mod / fx)',

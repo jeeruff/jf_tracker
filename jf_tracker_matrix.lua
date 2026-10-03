@@ -392,7 +392,8 @@ end
 -- Vim-раскладка слотов (2 окт): слот = строка матрицы (регион или свободный такт).
 --   o O       новый пустой такт после / перед      dd   удалить слот (в регистр)
 --   yy Y      взять слот в регистр                  p P  вставить после / перед
---   D ^D      dup — копия без связи, новое имя   C  clone — связанный повтор (пул MIDI + группа)
+--   A         alias — связанный повтор (пул MIDI + группа)   C D ^D  clone — копия без связи, новое имя
+--   U         make unique — отвязать повтор (новое имя, свой пул, без группы)
 --   x         вырезать ячейку / блок
 --   n cc cw r i  имя    =  длина    [ ] ± такт   { } ± шаг    < > паттерн слота
 --   m Enter mute   Space очередь / play   + регион в конце (N+ — N штук)   u ^R undo / redo
@@ -440,7 +441,7 @@ function MX.key(c, regions, snap)
   if c == 24 or (c == 8 and mods.cmd) then ctx.mx_block('cut'); return true end
   if c == 3 then ctx.mx_block('copy'); return true end
   if c == 22 then ctx.mx_block('paste'); return true end
-  if c == 4 then ctx.slot_new('dup'); return true end
+  if c == 4 then ctx.slot_new('clone'); return true end
   if c == 18 then ctx.edit.redo(); ctx.mx_refresh(); return true end
   -- Ctrl+hjkl приходят кодами 8/10/11/12 — те же движения
   if mods.ctrl and (c == 8 or c == 10 or c == 11 or c == 12) then
@@ -473,8 +474,9 @@ function MX.key(c, regions, snap)
   elseif ch == 'O' then ctx.slot_new('empty', true)
   elseif ch == 'p' then ctx.slot_new('put', false)
   elseif ch == 'P' then ctx.slot_new('put', true)
-  elseif ch == 'D' then ctx.slot_new('dup')
-  elseif ch == 'C' then ctx.slot_new('clone')
+  elseif ch == 'D' or ch == 'C' then ctx.slot_new('clone')         -- clone: независимая копия (как Duplicate / Clone в Renoise)
+  elseif ch == 'A' then ctx.slot_new('alias')                       -- alias: связанный повтор
+  elseif ch == 'U' then if ctx.slot_unique then ctx.slot_unique() end   -- make unique
   elseif ch == 'Y' then ctx.slot_yank()
   elseif ch == 'x' then ctx.mx_block('cut')
   elseif ch == 'n' or ch == 'r' or ch == 'i' then ctx.mx_name_prompt()

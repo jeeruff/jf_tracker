@@ -1651,10 +1651,11 @@ function D.frame(L, snap, rows, state, info)
       set(c); gfx.rect(bx, ny, 3, L.rh, 1)
       -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»;
       -- справа cln — независимая копия паттерна (3 окт), имя — до неё
-      local cw1 = ms('cln') + 2
+      -- справа als — связанный повтор (alias, как в Renoise), имя — до неё
+      local cw1 = ms('als') + 2
       local cx = bx + bw - cw1
       text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), cx - bx - 7), U.TEXT)
-      small(cx, ny, 'cln', 'clone', false, 'rgbtn')
+      small(cx, ny, 'als', 'alias', false, 'rgbtn')
     else
       text(bx + 5, ny, fit('no region', bw - 7), U.DIM)
     end
@@ -1663,7 +1664,7 @@ function D.frame(L, snap, rows, state, info)
       local by2 = ny + L.rh
       if by2 + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
         local x = bx
-        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' }, { 'dup', 'dup' } }) do
+        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' }, { 'clone', 'cln' } }) do
           if x + ms(bt[2]) + 2 > bx + bw then break end
           x = small(x, by2, bt[2], bt[1], false, 'rgbtn')
         end

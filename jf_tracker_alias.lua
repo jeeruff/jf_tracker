@@ -557,6 +557,24 @@ function A.put_alias(src, t)
   return n
 end
 
+-- make unique (3 окт, как в Renoise): повтор отвязывается — новое имя
+-- (свой паттерн), MIDI — свой пул, items — без группы. Без своего undo.
+function A.make_unique(regions, rg)
+  local name = A.free_name(regions, rg.name)
+  A.rename(rg, name)
+  local n = 0
+  for _, tr in ipairs(tracks()) do
+    for _, it in ipairs(items_in(tr, rg.pos, rg.rgnend)) do
+      local ok, chunk = R.GetItemStateChunk(it, '', false)
+      if ok and chunk:find('POOLEDEVTS') then R.SetItemStateChunk(it, unlink_chunk(chunk), false) end
+      R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_pattern', name, true)
+      n = n + 1
+    end
+  end
+  return name, n
+end
+
 -- удалить слот: регион, время слота во всех треках, простые маркеры внутри;
 -- всё после конца слота едет назад
 function A.delete_slot(rg)
