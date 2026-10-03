@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.74'
+V.VERSION = '0.5.75'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.75', d = '2026-10-03', items = {
+    'track scopes moved onto the cursor row strip: each track oscilloscope runs right along the cursor row in its column, muted, under the notes; the header lost its scope row; options -> scopes at: cursor / header (the old row)',
+  } },
   { v = '0.5.74', d = '2026-10-03', items = {
     'track scrollbar under the tracker body: the thumb is the visible tracks out of all; drag it, click beside it for a page; the trackpad sideways scrolls tracks too',
     'Cmd + trackpad sideways: width zoom - as set per track / all compact (note + wave) / all strips; Cmd + wheel: LPB zoom (up - more rows per beat)',

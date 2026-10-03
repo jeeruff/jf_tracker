@@ -136,7 +136,8 @@ local state = {
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
-  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
+  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,
+  scopeat = reaper.GetExtState(EXT, 'scopeat') == 'header' and 'header' or 'cursor',   -- скопы: полоска курсора / строка шапки (3 окт)      -- зум ширины треков (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -356,7 +357,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('scopeat', state.scopeat or 'cursor'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2156,6 +2157,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'an oscilloscope row in every track header and the master analyzer; puts the small jf_tracker_scope JSFX on every track (off removes it)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      { key = 'scopeat', label = 'scopes at', kind = 'cycle', values = { 'cursor', 'header' }, desc = 'cursor: each track oscilloscope right on the cursor row strip, under the notes; header: an own row in the track header', get = function() return state.scopeat or 'cursor' end, set = function(v) state.scopeat = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'off' }, desc = 'column: an own column with spectral peaks (colour = frequency) and stretch markers; note: the wave inside the note field on the item rows; off: no wave (faster)', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only); h l / wheel, Shift x10', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
