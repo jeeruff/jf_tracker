@@ -5,6 +5,7 @@ V.VERSION = '0.5.65'
 V.DATE = '2026-10-03'
 V.CHANGES = {
   { v = '0.5.65', d = '2026-10-03', items = {
+    'module borders: the file browser drew its own 2 px edge next to the sidebar line (double line) - removed; the top panel in mid / bottom position draws its border on top, so it is separated from the DSP panel and the fx list (was merged), and no longer doubles the DSP line',
     'about moved to the main module (cell next to help / hints, :about) and opens on its own; Esc closes it',
     'about logo: the generated graffiti styles are gone - five hand-made JFTRACKER logos instead, a different one each time; drawn on a character grid by the tracker itself (blocks, shades, diagonals), so the block art stays aligned in the bitmap-only UI and shrinks to the window width',
     'about logos in ANSI / CGA colours on a black plate, stepped by rows; the shades are real pixel dithering, drawn once into a picture; a sixth text logo (rubble) coloured after the user reference - grey top, brown bottom, yellow dither',

@@ -626,8 +626,7 @@ function B.draw_marks(btn, bx, by, U)
 end
 
 function B.draw(U, L, x, y, w, h)
-  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  U.set(U.LINE); gfx.rect(x, y, 2, h, 1)
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
   -- кнопки текстом: сверху — куда идти (files db pm proj), снизу — вид

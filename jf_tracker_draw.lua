@@ -902,7 +902,10 @@ local function draw_topbar(L, info)
   local hover = {}
   local H = L.top_h
   set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
-  set(D.SEP); gfx.rect(0, H - 2, gfx.w, 1, 1)
+  -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
+  -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
+  -- иначе стык без линии или две линии рядом
+  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local c = info.ctrl or {}
 
