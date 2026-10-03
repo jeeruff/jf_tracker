@@ -246,20 +246,31 @@ function D.layout(snap, state, nregions)
   L.pool_h = L.top_h
   L.ctrl_w = L.cw * 30 + 2 * L.pad
   L.inst_w = state.side and 0 or (L.cw * 32 + 2 * L.pad)
-  L.header_y = L.top_h
+  -- положение верхнего модуля (3 окт): top — над трекером, mid — над DSP,
+  -- bottom — под DSP; статус-бар: bottom — низ окна, tracker — строка в модуле трекера
+  L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom') and state.toppos or 'top'
+  L.statpos = state.statpos == 'tracker' and 'tracker' or 'bottom'
+  L.header_y = L.toppos == 'top' and L.top_h or 0
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
   L.header_rows = 5 + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
-  L.status_h = L.rh + 4
+  L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
+  L.status_in = L.statpos == 'tracker' and (L.rh + 4) or 0   -- статус в модуле трекера
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
   L.body_y = L.header_y + L.header_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.dsp_h - L.hint_h)
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - (L.toppos ~= 'top' and L.top_h or 0))
+  L.stat_y = L.body_y + L.body_h                    -- статус в трекере (status_in)
+  L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
+  local after = L.under_y + L.hint_h
+  if L.toppos == 'mid' then L.top_y = after; L.dsp_y = after + L.top_h
+  elseif L.toppos == 'bottom' then L.dsp_y = after; L.top_y = after + L.dsp_h
+  else L.top_y = 0; L.dsp_y = after end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   local cx = L.matrix_w + L.label_w
@@ -1417,7 +1428,27 @@ function D.frame(L, snap, rows, state, info)
   local tx0 = L.matrix_w
 
   if L.top_h > 0 then
-    local th = draw_topbar(L, info)
+    local th
+    if (L.top_y or 0) == 0 then th = draw_topbar(L, info)
+    else
+      -- не наверху (mid / bottom): рисуется в буфер 1020 в своих координатах и
+      -- выводится на top_y; мышь и метки f на время отрисовки — со сдвигом
+      local ty = L.top_y
+      if D.top_buf_w ~= gfx.w or D.top_buf_h ~= L.top_h then gfx.setimgdim(1020, gfx.w, L.top_h); D.top_buf_w, D.top_buf_h = gfx.w, L.top_h end
+      local dest0, my0, hint0 = gfx.dest, gfx.mouse_y, D.hint
+      gfx.dest = 1020
+      gfx.mouse_y = my0 - ty
+      if hint0 then D.hint = function(kind, x, y, w, h, data) return hint0(kind, x, y + ty, w, h, data) end end
+      local ok, res = pcall(draw_topbar, L, info)
+      gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
+      if not ok then error(res, 0) end
+      th = res
+      gfx.blit(1020, 1, 0, 0, 0, gfx.w, L.top_h, 0, ty, gfx.w, L.top_h)
+      -- прямоугольники для фокуса и меню — в координаты окна
+      if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
+      if L.inst_w > 0 and L.inst_rect then L.inst_rect[2] = L.inst_rect[2] + ty end
+      for _, r in pairs(D.ctrl_rect or {}) do r[2] = r[2] + ty; r.shifted = true end
+    end
     hover.ctrl, hover.scope, hover.pool, hover.tab, hover.mod, hover.sample, hover.prevbtn = th.ctrl, th.scope, th.pool, th.tab, th.mod, th.sample, th.prevbtn
     hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
@@ -2020,19 +2051,19 @@ function D.frame(L, snap, rows, state, info)
   -- нижняя DSP-панель: FX трека курсора блоками, параметры мини-слайдерами
   -- строки подсказок трекера и матрицы — в резерве под телом (опция hints)
   if (L.hint_h or 0) > 0 then
-    local hy2 = L.body_y + L.body_h
+    local hy2 = L.under_y
     if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
     D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
   end
   -- режим справки (?): то же место внизу занимает контекстная справка
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
-    local dy = L.body_y + L.body_h + (L.hint_h or 0)     -- под строкой подсказок тела
+    local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     hover.khelp = info.khelp_draw(L, 0, dy, L.win_w, L.dsp_h) or true
     L.dsp_rect = { 0, dy, L.win_w, L.dsp_h }
   elseif L.dsp_h > 0 then
-    local dy = L.body_y + L.body_h + (L.hint_h or 0)     -- под строкой подсказок тела
+    local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
     set(D.SEP); gfx.rect(0, dy, L.win_w, 2, 1)
     local col = info.pool_col
@@ -2331,20 +2362,25 @@ function D.frame(L, snap, rows, state, info)
 
   -- статус — в самом низу окна, под DSP-панелью (раньше делил y с ней и
   -- перекрывал её шапку)
-  local sy = gfx.h - L.status_h
-  set(U.PANEL); gfx.rect(0, sy, gfx.w, L.status_h, 1)
-  set(D.SEP); gfx.rect(0, sy, gfx.w, 2, 1)
-  if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, 2, sy, 1) end   -- линия сайдбара до статус-бара
-  -- слева режим/сообщение (не шире трети окна), дальше — описание того, на
-  -- что наведена мышь, во всю оставшуюся ширину
-  local left = fit(info.status_left or '', gfx.w / 3)
-  text(L.pad, sy + 2, left, U.AMBER)
-  local hx = L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
-  local desc = info.status_right or ''
-  if desc ~= '' then
-    if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 2, L.status_h - 2, 1) end
-    text(hx, sy + 2, fit(desc, gfx.w - hx - L.pad), U.TEXT)
+  -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
+  -- по ширине матрица + трекер (tracker)
+  local sy, sw, sh = gfx.h - L.status_h, gfx.w, L.status_h
+  if L.status_in > 0 then sy, sw, sh = L.stat_y, L.win_w, L.status_in end
+  if sh > 0 then
+    set(U.PANEL); gfx.rect(0, sy, sw, sh, 1)
+    set(D.SEP); gfx.rect(0, sy, sw, 2, 1)
+    -- слева режим/сообщение (не шире трети), дальше — описание того, на что
+    -- наведена мышь, во всю оставшуюся ширину
+    local left = fit(info.status_left or '', sw / 3)
+    text(L.pad, sy + 2, left, U.AMBER)
+    local hx = L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
+    local desc = info.status_right or ''
+    if desc ~= '' then
+      if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 2, sh - 2, 1) end
+      text(hx, sy + 2, fit(desc, sw - hx - L.pad), U.TEXT)
+    end
   end
+  if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, 2, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
   return hover
 end
 

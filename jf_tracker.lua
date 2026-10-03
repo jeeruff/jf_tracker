@@ -110,6 +110,8 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   mxruler = flag('mxruler', true),
+  toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
+  statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
   gridtab = flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')),
@@ -313,6 +315,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
+  S('toppos', state.toppos or 'top'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track')
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1879,6 +1882,8 @@ ctx = {
       { sep = true },
       flag('meters', 'peak meters', 'meters over the columns'),
       flag('top', 'top panel', 'control / sample / instruments'),
+      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'top: above the tracker, mid: above the DSP panel, bottom: below the DSP panel', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
+      { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'bottom: along the window bottom, tracker: a line in the tracker module (the sidebar reaches the bottom)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('side', 'browser sidebar', 'files / db / pm / proj'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('icons', 'nerd icons', 'icons on buttons (TTF font only)'),
@@ -2671,7 +2676,7 @@ local function theme_check()
 end
 OPT.init(U, ctx)
 draw.hint = HN.add
-ctx.hint = HN.add
+ctx.hint = function(...) return draw.hint(...) end   -- через draw.hint: сдвиг верхнего модуля (mid / bottom)
 ctx.env_colour = draw.env_colour
 ctx.ic = function(name, text) return draw.ic(name, text) end
 ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font or 0) > 0 end
@@ -2679,7 +2684,7 @@ vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
 IK.init(ctx)
-MM.hint = HN.add
+MM.hint = function(...) return draw.hint(...) end
 MX.ruler = state.mxruler
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
@@ -4470,13 +4475,17 @@ local function frame()
     local W0 = gfx.w - L.side_w - (L.rstrip_w or 0)
     if state.side and math.abs(gfx.mouse_x - W0) <= 3 and gfx.mouse_y < gfx.h - L.status_h then edge = 'side'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
-    elseif state.top and math.abs(gfx.mouse_y - L.top_h) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
+    elseif state.top and math.abs(gfx.mouse_y - (((L.top_y or 0) == 0) and L.top_h or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
         if resize_drag == 'mx' then state.mx_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('matrix width %d px'):format(state.mx_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
-        else state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), gfx.mouse_y)) end
+        else
+          -- наверху — тянется нижний край; mid / bottom — верхний (растёт вверх)
+          local want = ((L.top_y or 0) == 0) and gfx.mouse_y or ((L.top_y + L.top_h) - gfx.mouse_y)
+          state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
+        end
         if resize_drag ~= 'mx' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('instruments %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
