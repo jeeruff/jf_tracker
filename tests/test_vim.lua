@@ -116,6 +116,7 @@ local function reset()
     hydra_keys = function() return { title = 'keys', items = { { key = 'h', label = 'move' } } } end,
     ctrl_held = function() return ctrl_down end,
     mods = function() return { ctrl = ctrl_down, alt = alt_down, cmd = cmd_down, shift = shift_down } end,
+    arp_live_key = function(sp) calls[#calls + 1] = 'arplive:' .. tostring(sp.pitch) .. '@' .. sp.row end,
     hold_start = function(sp) calls[#calls + 1] = 'hold:' .. tostring(sp.pitch or ('s' .. tostring(sp.slice))) .. (sp.stretch and ':stretch' or '') end,
     preview = function(tr, p) calls[#calls + 1] = 'prev:' .. tostring(p) end,
     toggle_envs = function() calls[#calls + 1] = 'envs' end,
@@ -508,5 +509,15 @@ V.cur = { fi = 1, row = 2, field = 1 }
 keysin(':arp'); V.key(13)
 eq(':arp repeats last options, other subcolumn note', last(), 'arp:ov@2:down:2:3:0.50')
 V.arp_opt = nil
+-- :arp live (3 окт): нота в INSERT — в держимый аккорд, не вставка
+reset()
+keysin(':arp live'); V.key(13)
+eq(':arp live on', V.arp_live, true)
+V.cur = { fi = 1, row = 20, field = 1 }
+keysin('i'); keysin('q')
+eq('note goes to the live arp', last(), 'arplive:60@20')
+V.key(27)
+keysin(':arp live'); V.key(13)
+eq(':arp live off', V.arp_live, false)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

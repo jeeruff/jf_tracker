@@ -512,7 +512,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', '', 'PT-mode: tracker + scopes of the visible tracks, panels hidden (again - back)' }, { 'arp', '[up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', '', 'PT-mode: tracker + scopes of the visible tracks, panels hidden (again - back)' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -658,6 +658,9 @@ local function run_cmd(line)
   elseif cmd == 'side' then st.side = not st.side
   elseif cmd == 'pt' or cmd == 'ptmode' then ctx.pt_toggle()
   elseif cmd == 'macro' then st.macro = not st.macro; V.msg = st.macro and 'macro: a row is a bar - j k bars, h l tracks, Enter back' or 'macro off'
+  elseif cmd == 'arp' and (arg or ''):match('^%s*live') then
+    V.arp_live = not V.arp_live
+    V.msg = V.arp_live and 'arp live: hold notes in INSERT (or the piano layer) - an arpeggio is written at the tempo, step = :step; :arp up/down/... sets the order' or 'arp live off'
   elseif cmd == 'arp' then
     -- :arp [up|down|updown|random|played] [шаг] [октав] [gate %] (3 окт): аккорд
     -- строки курсора (все подколонки трека) → арпеджио на его длину
@@ -1005,6 +1008,12 @@ function V.key_impl(c)
       if f then
         local lane = f.lane or f.col.lanes[1]
         local inst = (f.col.pool or {})[V.inst]
+        -- живой арпеджиатор (3 окт, :arp live): нота — в держимый аккорд
+        if V.arp_live and how == 'insert' and ctx.arp_live_key then
+          ctx.arp_live_key({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,
+            item = inst and inst.item, vel = V.vel, key = (c < 256) and string.char(c) or '' })
+          return
+        end
         if how == 'hold' or how == 'hold_stretch' then
           local chh = (c < 256) and string.char(c) or ''
           if ctx.hold_start then ctx.hold_start({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,

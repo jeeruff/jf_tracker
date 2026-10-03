@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.96'
+V.VERSION = '0.5.97'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.97', d = '2026-10-03', items = {
+    'live arpeggiator (:arp live): in INSERT or the piano layer hold notes - the tracker writes the arpeggio of the held chord at the tempo, one note per step (:step), order and octaves from the last :arp (played = in the order pressed); press more keys to add them, release all to stop; :arp live again turns it off',
+  } },
   { v = '0.5.96', d = '2026-10-03', items = {
     'macro view (:macro): bird view over the tracker body - a row is a bar, per track the event density as blocks and the first note of the bar, region names at their bars; j k bars, J K by 4, g G, h l tracks, Enter / Esc back to the tracker on that bar',
   } },

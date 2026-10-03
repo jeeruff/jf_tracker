@@ -2217,6 +2217,25 @@ ctx = {
     state.hold = spec
     vim.msg = 'hold: release to insert' .. (spec.stretch and ' (stretched)' or '') .. ' - j / down add a step, Esc cancels'
   end,
+  -- живой арпеджиатор (3 окт): первая нота открывает сессию (state.arpl), каждая
+  -- следующая — в аккорд (порядок нажатия для played); кадр пишет шаги
+  arp_live_key = function(spec)
+    if not reaper.JS_VKeys_GetState then vim.msg = 'arp live needs js_ReaScriptAPI'; return end
+    local vk = (spec.key or ''):upper():byte() or 0
+    local a = state.arpl
+    if not a then
+      local o = vim.arp_opt or { order = 'up', oct = 1, gate = 100 }
+      a = { track = spec.track, lane_idx = spec.lane_idx, item = spec.item, vel = spec.vel, row0 = spec.row,
+            step = math.max(1, vim.step or 1), keys = {}, done = -1, t0 = reaper.time_precise(), last = reaper.time_precise(),
+            order = o.order or 'up', oct = o.oct or 1,
+            row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0)) }
+      state.arpl = a
+    end
+    for _, k in ipairs(a.keys) do if k.vk == vk then return end end
+    a.keys[#a.keys + 1] = { vk = vk, pitch = spec.pitch }
+    a.last = reaper.time_precise()
+    ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 1)
+  end,
   preview_src_pos = function() return PV.src_position() end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
   inst_track = function(d) vim.key((d < 0 and 'H' or 'L'):byte()) end,
@@ -4516,6 +4535,38 @@ local function frame()
       vim.msg = ok and ('inserted %d row(s)%s'):format(rows, h.stretch and ', stretched' or '') or ('hold: ' .. tostring(err):match('[^\n]*$'))
     else
       vim.msg = ('hold: %d row(s)%s - release to insert, j / down: +1, Esc: cancel'):format(rows, h.stretch and ' stretch' or '')
+    end
+  end
+  -- живой арпеджиатор: держатся клавиши — шаги арпеджио в темпе; отпущены все —
+  -- конец, курсор после последней ноты
+  if state.arpl then
+    local a = state.arpl
+    local now = reaper.time_precise()
+    local ks = reaper.JS_VKeys_GetState(a.t0 - 0.5)
+    local held = {}
+    for _, k in ipairs(a.keys) do if (k.vk > 0 and ks and ks:byte(k.vk) ~= 0) or now - a.last < 0.08 then held[#held + 1] = k.pitch end end
+    if #held == 0 then
+      state.arpl = nil
+      vim.cur.row = a.row0 + (a.done + 1) * a.step
+      model.invalidate()
+      vim.msg = ('arp live: %d note(s) written'):format(a.done + 1)
+    else
+      local k = math.floor((now - a.t0) / (a.row_dur * a.step))
+      while a.done < k do
+        a.done = a.done + 1
+        local seq = edit.arp_order(held, a.order, a.oct, a.done * 7919 + 1)
+        local p = seq[a.done % #seq + 1]
+        local row = a.row0 + a.done * a.step
+        local ok, it = pcall(edit.insert_note, a.track, a.lane_idx, state.lpb, row, p, a.vel, a.step, a.item)
+        -- аудио-копия — длиной в шаг (иначе следующая нота уйдёт в новую подколонку)
+        if ok and it and reaper.ValidatePtr(it, 'MediaItem*') then
+          local dur = edit.row_time(row + a.step, state.lpb, 0) - edit.row_time(row, state.lpb, 0)
+          if reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > dur then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', dur) end
+        end
+        ctx.preview(a.track, p, a.item, row, a.step)
+      end
+      vim.cur.row = a.row0 + a.done * a.step
+      vim.msg = ('arp live %s: %d notes held, step %d - release all to stop'):format(a.order, #held, a.step)
     end
   end
   -- видоизменённые копии (3 окт): правка уже сделала их уникальными —
