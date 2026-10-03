@@ -2372,20 +2372,24 @@ function D.frame(L, snap, rows, state, info)
   -- перекрывал её шапку)
   -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
   -- по ширине матрица + трекер (tracker)
-  local sy, sw, sh = gfx.h - L.status_h, gfx.w, L.status_h
-  if L.status_in > 0 then sy, sw, sh = L.stat_y, L.win_w, L.status_in end
+  local sx, sy, sw, sh = 0, gfx.h - L.status_h, gfx.w, L.status_h
+  if L.status_in > 0 then
+    -- в модуле трекера: под треками (от границы матрицы), под матрицей — её фон
+    sx, sy, sw, sh = L.matrix_w, L.stat_y, L.win_w - L.matrix_w, L.status_in
+    if L.matrix_w > 0 then set(U.PANEL); gfx.rect(0, sy, L.matrix_w, sh, 1) end
+  end
   if sh > 0 then
-    set(U.PANEL); gfx.rect(0, sy, sw, sh, 1)
-    set(D.SEP); gfx.rect(0, sy, sw, 2, 1)
+    set(U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
+    set(D.SEP); gfx.rect(sx, sy, sw, 2, 1)
     -- слева режим/сообщение (не шире трети), дальше — описание того, на что
     -- наведена мышь, во всю оставшуюся ширину
     local left = fit(info.status_left or '', sw / 3)
-    text(L.pad, sy + 2, left, U.AMBER)
-    local hx = L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
+    text(sx + L.pad, sy + 2, left, U.AMBER)
+    local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc ~= '' then
       if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 2, sh - 2, 1) end
-      text(hx, sy + 2, fit(desc, sw - hx - L.pad), U.TEXT)
+      text(hx, sy + 2, fit(desc, sx + sw - hx - L.pad), U.TEXT)
     end
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, 2, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
