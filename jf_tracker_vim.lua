@@ -696,7 +696,7 @@ local function keys_control(c)
   elseif ch == 'd' then
     -- d — оператор Vim (d3w, dd, dG…): ждёт счётчик и движение, потом обратно в INSERT (2 окт)
     V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true; V.hexbuf = nil; return true
-  elseif ch == 'm' then local hs = heads(); if #hs > 0 then ctx.edit.mute(hs, lpb()); finish_edit() end; return true
+  elseif ch == 'M' then local hs = heads(); if #hs > 0 then ctx.edit.mute(hs, lpb()); finish_edit() end; return true   -- mute — Shift+m (3 окт)
   elseif ch == 'f' then
     local nf = nfields()
     local fld = V.cur.field or 1
@@ -982,13 +982,13 @@ function V.key_impl(c)
     return
   end
 
-  -- слой пианино в NORMAL (3 окт, как M в Ableton): M — вкл / выкл; клавиши
+  -- слой пианино в NORMAL (3 окт, как M в Ableton): m — вкл / выкл (mute — Shift+M); клавиши
   -- пианино (верхний ряд + цифры) звучат, Cmd+клавиша — нота с удержанием
   -- (Cmd+Shift — с растяжкой), остальное — обычные Vim-команды
   if V.mode == 'normal' and not V.pending and not V.op then
-    if c == ('M'):byte() then
+    if c == ('m'):byte() then
       V.piano = not V.piano
-      V.msg = V.piano and 'piano on (M): top row plays, Cmd+note inserts with the held length, Cmd+Shift stretches' or 'piano off'
+      V.msg = V.piano and 'piano on (m): top row plays, Cmd+note inserts with the held length, Cmd+Shift stretches' or 'piano off'
       return
     end
     if V.piano then
@@ -1124,8 +1124,8 @@ function V.key_impl(c)
     if c == ESC then V.mode = 'normal'; done = true; finish_move()
     elseif c == ('o'):byte() then V.cur, V.anchor = V.anchor, V.cur; done = true
     elseif c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
-        or c == ('m'):byte() or c == ('s'):byte() then
-      local e = apply(string.char(c), f0, f1, r0, r1)
+        or c == ('M'):byte() or c == ('s'):byte() then
+      local e = apply(c == ('M'):byte() and 'm' or string.char(c), f0, f1, r0, r1)
       V.cur.fi, V.cur.row = f0, r0
       if V.mode ~= 'insert' then V.mode = 'normal' end
       if e then finish_edit() else finish_move() end
@@ -1211,7 +1211,7 @@ function V.key_impl(c)
     finish_edit()
   elseif ch == 'x' then
     apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
-  elseif ch == 'm' then
+  elseif ch == 'M' then                                  -- mute — Shift+m; m — слой пианино (3 окт)
     apply('m', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
   elseif ch == 's' then
     apply('s', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()

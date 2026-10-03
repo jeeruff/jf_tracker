@@ -8,6 +8,7 @@ V.CHANGES = {
     'M in NORMAL: piano layer (like M in Ableton) - the top row and digits play notes, other keys stay Vim commands; M or Esc turns it off',
     'Cmd+note (INSERT and the piano layer): the note lasts as long as the key is held, growing at the project tempo; j / down add a step while holding, Esc cancels; Cmd+Shift+note stretches the sample to that length (keeps pitch, becomes unique); slices too',
     'Cmd+digit in INSERT / piano layer is now a held black key; slot selection stays on Cmd+digit in NORMAL, Cmd+HJKL and , . everywhere',
+    'keys: m is the piano layer (NORMAL), mute moved to M (Shift+m) - tracker NORMAL / VISUAL / INSERT and the matrix, help and menus follow',
     'the item offset shows as Sxx, as in Renoise (offset or slice, one command to learn); 9xx is still accepted; an Sxx offset on a linked note makes it unique like a stretch',
     'cursor on the item name row: the highlight is the note field wide, not the whole name',
     'rec is its own tab again, the first one, in the record button colour (purple); the [rec] buttons in the item tab are gone',

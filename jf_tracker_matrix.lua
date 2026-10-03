@@ -435,7 +435,7 @@ function MX.key(c, regions, snap)
   -- в блоке y / d / x действуют на ячейки блока
   if MX.anchor and ch == 'y' then ctx.mx_block('copy'); return true end
   if MX.anchor and (ch == 'd' or ch == 'x') then ctx.mx_block('cut'); return true end
-  if MX.anchor and ch == 'm' then ctx.mx_block('mute'); return true end
+  if MX.anchor and ch == 'M' then ctx.mx_block('mute'); return true end
   -- Ctrl+N mute блока, Ctrl+X / Cmd+Backspace вырезать, Ctrl+C копия, Ctrl+V вставка, Ctrl+D дубль
   if c == 14 then ctx.mx_block('mute'); return true end
   if c == 24 or (c == 8 and mods.cmd) then ctx.mx_block('cut'); return true end
@@ -463,7 +463,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'h' or c == 1818584692 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci - 1)
   elseif ch == 'l' or c == 1919379572 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci + 1)
   elseif ch == 'G' then MX.goto_cell(regions, snap, #regions, MX.cur.ci)
-  elseif ch == 'm' or c == 13 then MX.toggle_mute(regions, snap)
+  elseif ch == 'M' or c == 13 then MX.toggle_mute(regions, snap)                -- mute — Shift+m, как в трекере (3 окт)
   elseif ch == 'z' then MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail'
   elseif ch == 'f' then MX.fill = not MX.fill
   elseif ch == 'F' then if ctx.mx_fold_toggle then ctx.mx_fold_toggle() else MX.fold = not MX.fold end

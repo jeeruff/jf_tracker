@@ -3056,7 +3056,7 @@ function region_actions(rg)
   return {
     { 'Queue / play region (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
     { 'Jump now', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },
-    { 'Mute cell (m)', key = 'm', fn = function() MX.toggle_mute(seq, snap) end },
+    { 'Mute cell (M)', key = 'm', fn = function() MX.toggle_mute(seq, snap) end },
     { 'Next pattern in slot (>)', key = 'n', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
     { 'Previous pattern in slot (<)', key = 'b', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
     { 'Yank pattern (y)', key = 'y', fn = function() ctx.alias_yank(rg) end },
@@ -3091,7 +3091,7 @@ function event_actions(hover)
   if #heads > 0 or sel then
     add('Delete ' .. what .. ' (x)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0); edit.delete(heads, lpb) end, 'x')
     add('Copy ' .. what .. ' (y)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0) end, 'y')
-    add('Mute ' .. what .. ' (m)', function() edit.mute(heads, lpb) end, 'm')
+    add('Mute ' .. what .. ' (M)', function() edit.mute(heads, lpb) end, 'm')
     add('Transpose +1 (^A)', function() edit.transpose(heads, lpb, 1) end, 't')
     add('Transpose -1 (^X)', function() edit.transpose(heads, lpb, -1) end, 'T')
     add('Transpose +12', function() edit.transpose(heads, lpb, 12) end, 'o')
