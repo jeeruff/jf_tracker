@@ -1269,7 +1269,8 @@ local function draw_topbar(L, info)
 
   -- инструменты: в верхней панели, только если сайдбар скрыт
   if (L.hint_h or 0) > 0 then
-    D.hint_bar(L, sx0 - L.pad, H - 2, sx1 - sx0 + 2 * L.pad, (info.hint_bars or function() end)(info.top_page or tab), info.focus == 'top')
+    -- за границей главного модуля (+2): строка не заливает его вертикаль (3 окт: уголок)
+    D.hint_bar(L, sx0 - L.pad + D.SEPW, H - 2, sx1 - sx0 + 2 * L.pad - D.SEPW, (info.hint_bars or function() end)(info.top_page or tab), info.focus == 'top')
     if L.inst_w > 0 then D.hint_bar(L, gfx.w - L.inst_w, H - 2, L.inst_w, (info.hint_bars or function() end)('inst'), info.focus == 'inst') end
   end
   if L.inst_w > 0 then D.draw_instruments(L, info, gfx.w - L.inst_w, 0, L.inst_w, H, hover) end

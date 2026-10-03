@@ -120,6 +120,7 @@ local state = {
   wave = (function() local v = reaper.GetExtState(EXT, 'wave'); return (v == 'peaks' or v == 'rect' or v == 'spec' or v == 'off') and v or 'peaks' end)(),
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
+  endstop = flag('endstop', true),               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
   mxfold = flag('mxfold', false),
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
@@ -336,7 +337,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -2052,6 +2053,7 @@ ctx = {
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('hints', 'module hints', 'one line of the main keys under every module (full help: ?)'),
       flag('gridtab', 'grid tab (monome)', 'top panel tab for the monome grid / arc (jf_grid daemon); off if you have no monome'),
+      flag('endstop', 'stop at =END', 'playback started before =END stops at it (the song ends there, not at the library after =LIB); recording is never stopped'),
       flag('captions', 'column captions', 'row under the header naming the fields: wv nt vl fx dl'),
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'reaper: native colours of the REAPER theme (default); modus vivendi / operandi, gruvbox, catppuccin - full-screen palettes; mono - all grey except the cursor cell', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'column right of the row numbers: the REAPER timeline ruler on every beat - bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
@@ -4213,6 +4215,18 @@ local function frame()
   env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
   local is_playing = playing()
   local playpos = is_playing and reaper.GetPlayPosition() or nil
+  -- стоп на =END (3 окт): песня кончается маркером, а не концом проекта
+  -- (библиотека за =LIB отодвигает конец проекта). Только если играть начали
+  -- до =END — прослушивание библиотеки за ним не мешаем; запись не трогаем
+  if is_playing then
+    if state.play_from == nil then state.play_from = playpos end
+    local endp = snap and snap.end_pos
+    if state.endstop and endp and state.play_from < endp - 1e-6 and playpos >= endp and reaper.GetPlayState() & 4 == 0 then
+      reaper.OnStopButton()
+      is_playing, playpos = false, nil
+      vim.msg = 'stopped at =END'
+    end
+  else state.play_from = nil end
   local curpos = reaper.GetCursorPosition()
   do
     local t = playpos or curpos
