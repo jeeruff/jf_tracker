@@ -1739,7 +1739,37 @@ function D.frame(L, snap, rows, state, info)
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live
-      local function slider(sx, sy, sw, frac, centered, label, val, what)
+      local function slider(sx, sy, sw, frac, centered, label, val, what, in_pop)
+        -- узко (3 окт): дорожке меньше трёх символов — слайдер сворачивается в
+        -- кнопку-букву; клик — всплывающий слайдер под ней (D.trspop), повтор — закрыть
+        if not in_pop and sw - ms(label) - 2 * L.pad < ms('000') then
+          local bw = math.min(sw, math.max(L.btn_w, ms(label) + 4))
+          local open = D.trspop and D.trspop.guid == col.guid and D.trspop.what == what
+          local off_default = centered and math.abs(frac - 0.5) > 0.003 or (not centered and math.abs(frac - 60 / 72) > 0.003)
+          local hot = mx >= sx and mx < sx + bw and my >= sy and my < sy + L.rh
+          set(open and U.tint(U.AMBER, 0.3) or (hot and D.CURROW or U.PANEL)); gfx.rect(sx, sy + 1, bw, L.rh - 2, 1)
+          set(open and U.AMBER or U.DIM); gfx.rect(sx, sy + 1, bw, L.rh - 2, 0)
+          text(sx + 2, sy, label, (open or hot) and U.AMBER or (off_default and U.TEXT or U.GREY))
+          if hot then hover.trsbtn = { col = col, what = what } end
+          hint('trsbtn', sx, sy, bw, L.rh, { col = col, what = what })
+          if open then
+            -- сам слайдер — в конце кадра поверх всего (D.late_pop)
+            D.late_pop = function()
+              local pw = math.min(W - 2 * L.pad, L.cw * 22 + 2 * L.pad)
+              local ph = L.rh + 2 * L.pad
+              local px = math.max(L.pad, math.min(W - pw - L.pad, sx))
+              local py = sy + L.rh
+              local inside = mx >= px and mx < px + pw and my >= py and my < py + ph
+              if inside then for k in pairs(hover) do hover[k] = nil end end
+              set(U.PANEL); gfx.rect(px, py, pw, ph, 1)
+              set(U.AMBER); gfx.rect(px, py, pw, ph, 0)
+              slider(px + L.pad, py + L.pad, pw - 2 * L.pad, frac, centered, label, val, what, true)
+              if hover.trs then hover.trs.pop = true end
+              if inside then hover.trspop_in = true end
+            end
+          end
+          return
+        end
         -- место под значение постоянное (3 окт): центр панорамы не съезжает,
         -- когда C становится L37 / R100; значение прижато вправо
         local vres = math.max(ms('-00.0'), ms(val))
@@ -2729,6 +2759,8 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.fxb = hv or true end
     set(U.AMBER); gfx.rect(0, py, pw, pb - py, 0)
   else D.fxb_popup = nil end
+  -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
+  if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   return hover
 end
 

@@ -3018,6 +3018,9 @@ local function hint_go(t)
     ctx.set_focus('tracker')
     for i, f in ipairs(L.flat) do if f.col == d then vim.cur.fi = i; break end end
   elseif t.kind == 'btn' and d.what == 'auto' then ctx.automation_picker(d.col)
+  elseif t.kind == 'trsbtn' then
+    local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
+    draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -4908,6 +4911,8 @@ local function frame()
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
+  elseif hover.trsbtn then
+    state.status = hover.trsbtn.col.name .. ' ' .. hover.trsbtn.what .. ' - narrow track: click opens the slider, click again closes'
   elseif hover.trs then
     local names = { vol = 'volume', pan = 'pan', width = 'width (stereo pan)', panl = 'left pan (dual pan)', panr = 'right pan (dual pan)' }
     state.status = ('%s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what)
@@ -5040,6 +5045,8 @@ local function frame()
       bpm_menu = nil; U.click = false
     elseif not (hover.ctrl == 'bpm') then bpm_menu = nil; U.click = false end
   end
+  -- всплывающий слайдер свёрнутой кнопки: клик мимо него и мимо кнопок — закрыть
+  if U.click and draw.trspop and not hover.trspop_in and not hover.trsbtn then draw.trspop = nil end
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()
@@ -5239,6 +5246,11 @@ local function frame()
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
       click = { t = now2, zone = 'trkio' }
+    elseif hover.trsbtn then
+      local t = hover.trsbtn
+      local open = draw.trspop and draw.trspop.guid == t.col.guid and draw.trspop.what == t.what
+      draw.trspop = (not open) and { guid = t.col.guid, what = t.what } or nil
+      click = { t = now2, zone = 'trsbtn' }
     elseif hover.trs then
       local t = hover.trs
       if dbl and click.zone == 'trs' and click.row == t.what then

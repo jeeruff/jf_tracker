@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.5.71'
+V.VERSION = '0.5.72'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.5.72', d = '2026-10-03', items = {
+    'narrow track header: a slider with no room left (track under three characters) folds into its letter button - v, p, w, L, R; click opens the slider in a popup under it (drag, dblclick resets), click again or anywhere else closes; the letter is brighter when the value is not the default',
+    'options: the browser sidebar row is gone (the > knob at the tracker edge and :side fold it)',
+  } },
   { v = '0.5.71', d = '2026-10-03', items = {
     'item preview is the same every time: it loops like the item (an item longer than its file plays the start again), the edit view draws the same peaks as the plain view, one title and footer - a double click no longer changes the picture or the sound',
     'trim menu opens right under the button; a second click on trim closes it',
