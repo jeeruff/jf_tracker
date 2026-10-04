@@ -141,6 +141,7 @@ local state = {
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
+  textonly = reaper.GetExtState(EXT, 'textonly') == '1',          -- text only (4 окт)
   keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',
   kc_scale = tonumber(reaper.GetExtState(EXT, 'kcscale')) or 0,            -- keycaster (4 окт)
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
@@ -369,7 +370,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2748,39 +2749,44 @@ ctx = {
     local items = {
       -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
-      { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel in waves: higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },
-      flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
-      flag('preview', 'preview on insert', 'audition the note when inserting'),
-      flag('poolprev', 'preview on select', 'audition the instrument when selected'),
-      flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
-      flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
-      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark' }, desc = 'lib order: by track / name / length / marks (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
-      { sep = true },
-      flag('top', 'top panel', 'control / item / modulate / midi'),
+      { sep = true, title = 'look' },
+      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
+      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
+      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
+      { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
+      { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
+      { sep = true, title = 'layout' },
+      flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'status line at the window bottom or inside the tracker module', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
-      { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
-      { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
-      { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
-      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
+      flag('hints', 'module hints', 'a line of key hints under every module'),
+      { sep = true, title = 'track' },
+      { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
+      { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: the input list by click (smart input: DSP module)', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
+      flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('meters', 'meters', 'peak meters over the track columns'),
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
-      flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
-      flag('hints', 'module hints', 'a line of key hints under every module'),
-      { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: the input list by click (smart input: DSP module)', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
+      { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
+      { sep = true, title = 'notes and items' },
+      flag('textonly', 'text only', 'cells show only the text: no wave behind the notes, no item fill, no item frame'),
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
+      { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel in waves: higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },
+      { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
+      { sep = true, title = 'sound and samples' },
+      flag('preview', 'preview on insert', 'audition the note when inserting'),
+      flag('poolprev', 'preview on select', 'audition the instrument when selected'),
+      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark' }, desc = 'lib order: by track / name / length / marks (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
+      flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
+      flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
+      flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
-      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
-      { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
-      { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
-      { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
     }
     return items
   end,

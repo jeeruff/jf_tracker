@@ -298,7 +298,10 @@ function O.draw(L, W, H)
     local it = O.items[i]
     if not it then break end
     local y = by + rh + 4 + (r - 1) * rh
-    if it.sep then U.set(U.DIM); gfx.rect(bx + L.pad, y + math.floor(rh / 2), bw - 2 * L.pad, 1, 1)
+    if it.sep then
+      -- раздел (4 окт): заголовок темы, иначе — тонкая линия
+      if it.title then U.text(bx + L.pad, y + 1, it.title, U.CYAN); U.set(U.DIM); gfx.rect(bx + L.pad + U.measure(it.title) + L.pad, y + math.floor(rh / 2), bw - 3 * L.pad - U.measure(it.title), 1, 1)
+      else U.set(U.DIM); gfx.rect(bx + L.pad, y + math.floor(rh / 2), bw - 2 * L.pad, 1, 1) end
     else
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + rh
       if hot then O.hover = i end

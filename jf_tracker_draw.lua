@@ -237,6 +237,8 @@ function D.layout(snap, state, nregions)
   L.wave = (state.wavemode == 'column') and 'spec' or 'off'
   D.wave_none = state.wavemode == 'off'                -- без волны совсем (3 окт)
   D.wave_back = state.wavemode == 'back'               -- волна фоном во всю ширину item, под текстом (3 окт)
+  -- text only (4 окт): в ячейках только текст — без волны, заливки и рамки item
+  if state.textonly then L.wave = 'off'; D.wave_none = true; D.wave_back = false end
   L.w_wave = L.wave == 'off' and 0 or L.cw * 3
   L.x_wave = L.pad
   L.x_note = L.pad + (L.w_wave > 0 and (L.w_wave + L.pad) or 0)
@@ -2516,13 +2518,13 @@ function D.frame(L, snap, rows, state, info)
               local col = it.sel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
               if D.mono then col = U.mix(col, U.TEXT, 0.35) end   -- mono: кайма светлее (была слишком тёмной)
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
-              local fa = (state.itemalpha or 5) / 100
+              local fa = state.textonly and 0 or (state.itemalpha or 5) / 100
               set(rgb); gfx.a = it.sel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
               gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
               gfx.a = 1
               -- рамка (опция item frame, 3 окт): item — вокруг всего item, wave —
               -- только вокруг колонки волны (нет колонки — вокруг item), off — без
-              local fr = state.itemframe or 'item'
+              local fr = state.textonly and 'off' or (state.itemframe or 'item')
               local fx0, fw0 = x0, w0
               if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
               if fr ~= 'off' then
