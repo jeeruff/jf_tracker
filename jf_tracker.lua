@@ -5033,6 +5033,7 @@ local function frame()
   if state.khelp and state.focus ~= 'dsp' then KH.pinned = false; KH.page = ctx.help_page() end
   local t_0 = reaper.time_precise()
   U.begin_frame()
+  prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
   if state.hold then
@@ -5108,6 +5109,13 @@ local function frame()
   -- стоп на =END (3 окт): песня кончается маркером, а не концом проекта
   -- (библиотека за =LIB отодвигает конец проекта). Только если играть начали
   -- до =END — прослушивание библиотеки за ним не мешаем; запись не трогаем
+  -- замер старта (4 окт): от первого кадра с play до сдвига позиции (сколько
+  -- REAPER готовит воспроизведение) — в пульс hb как start
+  if is_playing then
+    local ps = prof.ps
+    if not ps then prof.ps = { t = reaper.time_precise(), pos = playpos }
+    elseif not ps.done and math.abs(playpos - ps.pos) > 1e-4 then ps.done = true; prof.start_ms = (reaper.time_precise() - ps.t) * 1000 end
+  else prof.ps = nil end
   if is_playing then
     if state.play_from == nil then state.play_from = playpos end
     local endp = snap and snap.end_pos
@@ -5222,7 +5230,7 @@ local function frame()
     reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or ''), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d'):format(prof.start_ms or -1, prof.reruns or 0), false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
@@ -7259,7 +7267,17 @@ local function frame()
   local owner = reaper.GetExtState(EXT, 'owner')
   local taken = owner ~= '' and owner ~= MY_ID
   if c ~= -1 and not quit and not taken and reaper.GetExtState(EXT, 'quit') ~= '1' then
-    reaper.defer(frame)
+    -- отклик (4 окт): клавиши и клики разбираются ПОСЛЕ отрисовки, и их
+    -- результат попадал на экран только в следующем тике defer (~30 мс).
+    -- Был ввод — кадр сразу ещё раз, в этом же тике (4 мс); повтор один,
+    -- defer ставит уже он
+    if (c > 0 or prof.input) and not prof.rerun then
+      prof.rerun = true; prof.reruns = (prof.reruns or 0) + 1
+      frame()
+      prof.rerun = false
+    else
+      reaper.defer(frame)
+    end
   else
     reaper.SetExtState(EXT, 'exit', ('c=%d quit=%s taken=%s flag=%s at %s'):format(c, tostring(quit), tostring(taken), reaper.GetExtState(EXT, 'quit'), os.date('%H:%M:%S')), false)
     if not taken then reaper.DeleteExtState(EXT, 'quit', false); reaper.DeleteExtState(EXT, 'owner', false) end
