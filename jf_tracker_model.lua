@@ -210,7 +210,9 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     note = (function()
       local _, k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
       k = tonumber(k)
-      return k and M.note_name(M.BASE_NOTE + k - 1) or M.note_name(M.BASE_NOTE + semis)
+      -- регистр (4 окт, идея пользователя): слайс — строчной (c-4, c#4), целый
+      -- item — заглавной (C-4): одна нота, а видно, что звучит
+      return k and M.note_name(M.BASE_NOTE + k - 1):lower() or M.note_name(M.BASE_NOTE + semis)
     end)(),
     frac = math.abs(semis - math.floor(semis + 0.5)) > 0.01,   -- дробный питч
     semis = semis,
