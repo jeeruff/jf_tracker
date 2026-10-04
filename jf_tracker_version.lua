@@ -1,9 +1,10 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.9'
+V.VERSION = '0.6.10'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.10', d = '2026-10-04', items = { 'theme screamtracker removed' } },
   { v = '0.6.9', d = '2026-10-04', items = {
     'themes impulse (Impulse Tracker: black field, blue-grey DOS panels, yellow highlight) and screamtracker (Scream Tracker 3: dark blue panels, light text, yellow accent); \\ v a opens about',
   } },

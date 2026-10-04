@@ -14,7 +14,7 @@
 
 local TH = {}
 
-TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'gruvbox', 'catppuccin', 'mono', 'protracker', 'impulse', 'screamtracker' }
+TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'gruvbox', 'catppuccin', 'mono', 'protracker', 'impulse' }
 
 local function hex(s)
   local r, g, b = s:match('#?(%x%x)(%x%x)(%x%x)')
@@ -41,9 +41,6 @@ TH.PAL = {
   -- Impulse Tracker (4 окт): чёрное поле, сине-серые панели DOS, жёлтая подсветка
   impulse = { bg = '#000000', panel = '#2c3a48', text = '#e0e4e8', grey = '#a8b4c0', dim = '#1a222c', line = '#7c8c9c',
     amber = '#ffd040', cyan = '#70c0e0', green = '#60d060', red = '#e04848', hdr = '#3a4a5a', hdrsel = '#56687a' },
-  -- Scream Tracker 3 (4 окт): тёмно-синие панели, светлый текст, жёлтый акцент
-  screamtracker = { bg = '#00000e', panel = '#1e2752', text = '#dcdcf4', grey = '#a4aad0', dim = '#151b3a', line = '#5a68a8',
-    amber = '#f0e060', cyan = '#60c8f0', green = '#70e070', red = '#f05050', hdr = '#28336a', hdrsel = '#3c4a90' },
 }
 
 -- цвет ячейки курсора в mono — единственное цветное (просьба 3 окт)
