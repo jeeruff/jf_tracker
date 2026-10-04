@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.3'
+V.VERSION = '0.6.4'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.4', d = '2026-10-04', items = {
+    'thin scrollbars in the matrix, the lib and the browser (thinnest): drag the thumb, click beside it - a page; the lists follow the cursor only when it moves, so scrolling by the bar stays',
+  } },
   { v = '0.6.3', d = '2026-10-04', items = {
     'keys: dt deletes the cursor track (with its FX, one undo); dr clears the track in the cursor region (the old dt); daw deletes all items of the track in the song (the lib after =LIB stays)',
   } },

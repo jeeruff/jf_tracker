@@ -1602,6 +1602,23 @@ function D.pool_rows(pool, sort, col, cols)
   return add_empty(rows, pool)
 end
 
+-- тонкий вертикальный скролл-бар списка (4 окт): матрица, lib, браузер.
+-- key — чей; scroll / nvis / total — строки; рисуется, только если не всё
+-- влезло. D.vbars[key] — прямоугольник для мыши (main: клик / протяжка)
+D.vbars = {}
+function D.vbar(key, x, y, w, h, scroll, nvis, total)
+  D.vbars[key] = nil
+  if total <= nvis or h < 8 then return end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local th = math.max(6, math.floor(h * nvis / total))
+  local ty = y + math.floor((h - th) * math.min(1, scroll / math.max(1, total - nvis)))
+  local hot = mx >= x - 3 and mx < x + w + 3 and my >= y and my < y + h
+  local drag = D.vbar_drag and D.vbar_drag.key == key
+  set(U.DIM); gfx.rect(x + math.floor(w / 2), y, 1, h, 1)
+  set((hot or drag) and U.AMBER or U.LINE); gfx.rect(x, ty, w, th, 1)
+  D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th }
+end
+
 D.pool_scroll = 0
 D.pool_dbg = ''
 function D.draw_instruments(L, info, ix, iy, w, H, hover)
@@ -1670,8 +1687,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   for r, row in ipairs(rows) do if row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent) then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
-  if sel_r > D.pool_scroll + nvis then D.pool_scroll = sel_r - nvis end
-  if hdr_r <= D.pool_scroll then D.pool_scroll = hdr_r - 1 end
+  -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом можно листать
+  if D.pool_last_sel ~= sel_r then
+    D.pool_last_sel = sel_r
+    if sel_r > D.pool_scroll + nvis then D.pool_scroll = sel_r - nvis end
+    if hdr_r <= D.pool_scroll then D.pool_scroll = hdr_r - 1 end
+  end
   if D.pool_scroll > math.max(0, #rows - nvis) then D.pool_scroll = math.max(0, #rows - nvis) end
   if D.pool_scroll < 0 then D.pool_scroll = 0 end
   local label_w = math.min(L.cw * 18, math.floor(w * 0.55))
@@ -1803,6 +1824,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
   end
   if drop_y then set(U.AMBER); gfx.rect(ix + 2, drop_y - 1, w - 4, 2, 1) end
+  D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   D.pool_dbg = table.concat(dbg, ' | ')
 end
 

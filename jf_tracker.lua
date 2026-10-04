@@ -512,6 +512,7 @@ ctx = {
   relayout = relayout,
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
+  vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
   set_lpb = set_lpb,
   fold = function(col, v) state.folds[col.guid] = v or nil end,
   fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil end end,
@@ -2081,6 +2082,17 @@ ctx = {
     local out = {}
     for _, c in ipairs(L and L.cols or {}) do if c.x and not c.hidden then out[#out + 1] = c.col end end
     return out
+  end,
+  -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
+  vbar_get = function(key)
+    if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 end
+    return 0
+  end,
+  vbar_scroll = function(key, v)
+    local r = draw.vbars[key]
+    local mx = r and math.max(0, r.total - r.nvis) or v
+    v = math.max(0, math.min(mx, v))
+    if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v end
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -4717,6 +4729,7 @@ local function frame()
   draw.inst_of = snap and snap.inst_of
   draw.inst_num = snap and snap.inst_num
   draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
+  draw.vbars = {}                         -- скролл-бары списков: заполняет отрисовка кадра (4 окт)
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
@@ -5388,6 +5401,24 @@ local function frame()
     end
   end
   if U.click and OPT.ask.active then OPT.ask.click(); U.click = false end
+  -- скролл-бары списков (4 окт): ползунок тянется, клик мимо — страница
+  if U.click and not OPT.active then
+    for key, r in pairs(draw.vbars) do
+      if r.hot then
+        if gfx.mouse_y >= r.ty and gfx.mouse_y < r.ty + r.th then draw.vbar_drag = { key = key, dy = gfx.mouse_y - r.ty }
+        else ctx.vbar_scroll(key, ctx.vbar_get(key) + (gfx.mouse_y < r.ty and -r.nvis or r.nvis)) end
+        U.click = false
+        break
+      end
+    end
+  end
+  if draw.vbar_drag then
+    local d, r = draw.vbar_drag, draw.vbars[draw.vbar_drag.key]
+    if gfx.mouse_cap & 1 == 1 and r then
+      local f = (gfx.mouse_y - d.dy - r.y) / math.max(1, r.h - r.th)
+      ctx.vbar_scroll(d.key, math.floor(math.max(0, math.min(1, f)) * (r.total - r.nvis) + 0.5))
+    else draw.vbar_drag = nil end
+  end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and bpm_menu then
     if bpm_menu.hover then

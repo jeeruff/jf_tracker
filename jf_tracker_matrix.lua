@@ -196,8 +196,13 @@ function MX.draw(L, snap, regions, info)
   local bottom = ybot - (marks.stop and L.rh or 0)
   local nvis = math.max(1, math.floor((bottom - top) / rh))
   MX.scroll = MX.scroll or 0
-  if MX.cur.ri - 1 < MX.scroll then MX.scroll = MX.cur.ri - 1 end
-  if MX.cur.ri - 1 >= MX.scroll + nvis then MX.scroll = MX.cur.ri - nvis end
+  -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
+  if MX.last_ri ~= MX.cur.ri then
+    MX.last_ri = MX.cur.ri
+    if MX.cur.ri - 1 < MX.scroll then MX.scroll = MX.cur.ri - 1 end
+    if MX.cur.ri - 1 >= MX.scroll + nvis then MX.scroll = MX.cur.ri - nvis end
+  end
+  MX.scroll = math.max(0, math.min(MX.scroll, math.max(0, #regions - nvis)))
   local aw = U.measure('<')
   for i = 1, nvis do
     local ri = MX.scroll + i
@@ -357,6 +362,7 @@ function MX.draw(L, snap, regions, info)
     local ye = top + (last - MX.scroll) * rh
     if last == #regions and ye + L.rh <= ybot then mark_row(marks.stop, ye) end
   end
+  if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
   return hover
 end
 

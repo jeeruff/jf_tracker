@@ -831,8 +831,14 @@ function B.draw(U, L, x, y, w, h)
     y = y + L.rh; h = h - L.rh
   end
   local nvis = math.floor(h / L.rh)
-  if B.cur - 1 < B.scroll then B.scroll = B.cur - 1 end
-  if B.cur - 1 >= B.scroll + nvis then B.scroll = B.cur - nvis end
+  -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
+  if B.last_cur ~= B.cur then
+    B.last_cur = B.cur
+    if B.cur - 1 < B.scroll then B.scroll = B.cur - 1 end
+    if B.cur - 1 >= B.scroll + nvis then B.scroll = B.cur - nvis end
+  end
+  B.scroll = math.max(0, math.min(B.scroll, math.max(0, #B.entries - nvis)))
+  local vb = { x + w - 2, y, nvis }           -- тоненький скролл-бар — после строк (волны его не закрывают)
   for i = 1, nvis do
     local idx = B.scroll + i
     local e = B.entries[idx]
@@ -872,6 +878,7 @@ function B.draw(U, L, x, y, w, h)
     if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then hover = idx end
     if ctx.hint then ctx.hint('browser', x + 2, ry, w - 4, L.rh, idx) end
   end
+  if ctx.vbar then ctx.vbar('browser', vb[1], vb[2], 2, vb[3] * L.rh, B.scroll, vb[3], #B.entries) end
   return hover
 end
 
