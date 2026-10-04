@@ -3147,6 +3147,38 @@ ctx = {
     return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt }
   end,
   preset_cache = {},
+  -- A / B с морфингом (4 окт): снимки всех параметров эффекта (нормированные),
+  -- ключ — GUID эффекта; ползунок внизу блока ведёт от A к B
+  ab = {},
+  ab_key = function(t, fx) local A = model.fxapi(t.track); return A.GetFXGUID and A.GetFXGUID(t.track, fx) or tostring(fx) end,
+  ab_store = function(which, k)
+    local t, f = ctx.dsp_fx(k or dsp_sel.fx); if not f then vim.msg = 'A / B: select an fx in the DSP panel'; return end
+    local A = model.fxapi(t.track)
+    local snap = {}
+    for pi = 0, A.GetNumParams(t.track, f.i) - 1 do snap[pi] = A.GetParamNormalized(t.track, f.i, pi) end
+    local key = ctx.ab_key(t, f.i)
+    ctx.ab[key] = ctx.ab[key] or { t = which == 'a' and 0 or 1 }
+    ctx.ab[key][which] = snap
+    vim.msg = ('%s: %s stored (%d params)%s'):format(f.name, which:upper(), #snap + 1, (ctx.ab[key].a and ctx.ab[key].b) and ' - drag A..B at the bottom of the block or :morph N' or '')
+  end,
+  ab_morph_sel = function(x)
+    local _, f = ctx.dsp_fx(dsp_sel.fx); if not f then vim.msg = 'morph: select an fx in the DSP panel'; return end
+    if not ctx.ab_get(f) then vim.msg = 'morph: store A and B first (:fxa, :fxb)'; return end
+    ctx.ab_morph(f, x); vim.msg = ('%s: morph %d%%'):format(f.name, math.floor(x * 100 + 0.5))
+  end,
+  ab_get = function(f) local t = dsp_target(); if not (t and f) then return nil end; local e = ctx.ab[ctx.ab_key(t, f.i)]; return (e and e.a and e.b) and e or nil end,
+  ab_morph = function(f, x)
+    local t = dsp_target(); if not (t and f) then return end
+    local e = ctx.ab[ctx.ab_key(t, f.i)]; if not (e and e.a and e.b) then return end
+    x = math.max(0, math.min(1, x))
+    if math.abs((e.t or 0) - x) < 1e-4 then return end
+    e.t = x
+    local A = model.fxapi(t.track)
+    for pi, va in pairs(e.a) do
+      local vb = e.b[pi]
+      if vb and math.abs(va - vb) > 1e-6 then A.SetParamNormalized(t.track, f.i, pi, va + (vb - va) * x) end
+    end
+  end,
   -- подписи шагов параметра (4 окт, «шаговые значения выбором»): текст плагина
   -- для каждого положения — FormatParamValueNormalized (параметр не трогается)
   steplab = {},
@@ -5454,6 +5486,7 @@ local function frame()
     dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
     fx_delta = ctx.fx_delta,
     fx_preset = ctx.fx_preset,
+    fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
@@ -5798,6 +5831,7 @@ local function frame()
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
+  elseif hover.dspab then state.status = hover.dspab.f.name .. ': A / B morph - drag between the two snapshots (:fxa, :fxb store them, :morph N)'
   elseif hover.dspmeter then state.status = hover.dspmeter == 'out' and 'out: the track after all fx and the fader (peak)' or 'in: the record input when the track is armed (in), else the items before the fx (pre)'
   elseif hover.dspcomp then state.status = 'gain comp: click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
@@ -6398,6 +6432,12 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspxy.fx
       dspxy_drag = { f = hover.dspxy.f, x = hover.dspxy.x, y = hover.dspxy.y, s = hover.dspxy.s }
       click = { t = now2, zone = 'dspxy' }
+    elseif hover.dspab then
+      -- ползунок A / B: тянуть (4 окт)
+      ctx.set_focus('dsp')
+      ctx.ab_drag = hover.dspab
+      ctx.ab_morph(hover.dspab.f, (gfx.mouse_x - hover.dspab.x) / math.max(1, hover.dspab.w))
+      click = { t = now2, zone = 'dspab' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
@@ -6827,6 +6867,10 @@ local function frame()
     else dspxy_drag = nil end
   end
   -- ручки start / end на волне сэмплера (RS5K)
+  if ctx.ab_drag then
+    if gfx.mouse_cap & 1 == 1 then ctx.ab_morph(ctx.ab_drag.f, (gfx.mouse_x - ctx.ab_drag.x) / math.max(1, ctx.ab_drag.w))
+    else ctx.ab_drag = nil end
+  end
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspwave_drag

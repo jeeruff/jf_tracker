@@ -3100,6 +3100,22 @@ function D.frame(L, snap, rows, state, info)
           hover.dspwave = { fx = k, f = f, frac = fr, x = wx, w = ww, edge = math.abs(fr - na) <= math.abs(fr - nb) and 'a' or 'b' }
         end
       end
+      -- A / B (4 окт): есть оба снимка — нижняя строка блока: «A ━━●━━ B», тянуть
+      local ab = info.fx_ab and info.fx_ab(f)
+      if ab and nfit > 2 then
+        nfit = nfit - 1
+        local ry = by + bh - L.rh - 2
+        local ax, aw2 = bx + L.pad, bw - 2 * L.pad
+        local lw = ms('A') + L.pad
+        local tx0, tw0 = ax + lw, aw2 - 2 * lw
+        local hot = not drag and mx >= ax and mx < ax + aw2 and my >= ry and my < ry + L.rh
+        text(ax, ry, 'A', (ab.t or 0) < 0.5 and U.CYAN or U.GREY)
+        text(ax + aw2 - ms('B'), ry, 'B', (ab.t or 0) >= 0.5 and U.CYAN or U.GREY)
+        set(U.DIM); gfx.rect(tx0, ry + math.floor(L.rh / 2) - 1, tw0, 2, 1)
+        local hx = tx0 + math.floor((ab.t or 0) * (tw0 - 1) + 0.5)
+        set(hot and U.AMBER or U.CYAN); gfx.rect(hx - 1, ry + 3, 3, L.rh - 6, 1)
+        if hot then hover.dspab = { f = f, x = tx0, w = tw0 } end
+      end
       for pi, p in ipairs(f.params) do
         if pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)
