@@ -296,23 +296,17 @@ function S.key(c)
   elseif ch == ' ' and a then ctx.preview_slice(S.track, S.entry, a, b)
   elseif ch == '[' and a then S.sel.a = math.max(0, a - S.entry.len * 0.01); S.sel.b = b
   elseif ch == ']' and a then S.sel.a = a; S.sel.b = math.min(S.entry.len, b + S.entry.len * 0.01)
-  elseif S.entry and S.entry.file and (ch == '8' or ch == '1' or ch == '4' or ch == '@' or ch == '#' or ch == '^' or ch == 'x' or ch == 's') then
+  elseif S.entry and S.entry.file and (ch == 'x' or ch == 's') then
     S.msg = 'file: slices live on items - drag selection to a track or D: to lib, then slice'
-  -- равные части (4 окт): 1 4 8 — не клавиши нот; 2 32 64 — Shift+2 3 6
-  -- (сами 2 3 6 — чёрные клавиши раскладки, слушают слайсы)
-  elseif ch == '8' then S.equal(8)
-  elseif ch == '1' then S.equal(16)
-  elseif ch == '#' then S.equal(32)
-  elseif ch == '^' then S.equal(64)
-  elseif ch == '4' then S.equal(4)
-  elseif ch == '@' then S.equal(2)
+  -- нарезка (4 окт): префикс s — всплывашка: t транзиенты, 2 4 8 1 3 6 —
+  -- равные части 2 4 8 16 32 64 (цифры без s — клавиши нот, слушают слайсы)
+  elseif ch == 's' and ctx.slice_hydra then ctx.slice_hydra()
   elseif ch == 'd' then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
   elseif ch == 'z' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
-  elseif ch == 's' then S.use_transients()                             -- s: нарезать по транзиентам (t — клавиша ноты)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
   elseif ch == 'n' and S.entry and S.entry.item then ctx.edit.normalize(S.entry.item); S.msg = 'normalized (peak 0 dB)'

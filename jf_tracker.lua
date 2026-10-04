@@ -1206,6 +1206,18 @@ ctx = {
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
   -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
   scramble = function() vim.run_cmd('scramble') end,
+  -- нарезка во вкладке item (4 окт): s — меню, вторая клавиша — как резать
+  slice_hydra = function()
+    local function eq(n) return function() SL.equal(n); vim.msg = SL.msg or ('%d equal slices'):format(n) end end
+    vim.open_hydra({ title = 'slice', items = {
+      { key = 't', label = 'at transients', fn = function() SL.use_transients(); vim.msg = SL.msg or 'sliced at transients' end },
+      { key = '2', label = '2 equal', fn = eq(2) }, { key = '4', label = '4 equal', fn = eq(4) }, { key = '8', label = '8 equal', fn = eq(8) },
+      { key = '1', label = '16 equal', fn = eq(16) }, { key = '3', label = '32 equal', fn = eq(32) }, { key = '6', label = '64 equal', fn = eq(64) },
+      { key = 'x', label = 'clear the slices', fn = function() SL.clear() end },
+      { key = 'q', label = 'smart quantize', fn = function() SL.smart_quantize() end },
+      { key = 'z', label = 'autotrim the silence', fn = function() SL.autotrim() end },
+    } })
+  end,
   octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)
   slice_base = function() return model.SLICE_BASE or model.BASE_NOTE or 60 end,     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
