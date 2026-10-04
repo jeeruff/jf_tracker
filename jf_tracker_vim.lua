@@ -915,6 +915,12 @@ function V.key_impl(c)
     V.count = nil; return
   end
   local hk = HJKL[c]
+  -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора,
+  -- Shift+Opt+J — все треки
+  if mods.alt and (mods.ctrl or mods.shift) and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if ctx.repeat_pattern then ctx.repeat_pattern(mods.shift and not mods.ctrl) end
+    V.count = nil; return
+  end
   if hk and (mods.ctrl or mods.alt or mods.cmd) and V.mode ~= 'cmd' and V.mode ~= 'search' then
     if mods.ctrl then
       local dx, dy = 0, 0

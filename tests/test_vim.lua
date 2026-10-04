@@ -130,6 +130,7 @@ local function reset()
     clear_track = function(all) calls[#calls + 1] = all and 'cleartrack:all' or 'cleartrack'; return true end,
     delete_track = function() calls[#calls + 1] = 'deltrack'; return true end,
     delete_time = function() calls[#calls + 1] = 'deltime'; return true end,
+    repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     env_points = function(e, r0, r1) calls[#calls + 1] = ('envpts:%s@%d-%d'):format(e.name, r0, r1); return { { dq = 0, v = 0.5 } } end,
@@ -549,5 +550,11 @@ V.cur = { fi = 2, row = 4, field = 1 }
 V.key(729)
 eq('Option+h on the first track stays', V.cur.fi, 1)
 alt_down = false
+-- повтор паттерна (4 окт): Ctrl+Opt+J / ↓ — трек, Shift+Opt+J — все треки
+reset()
+ctrl_down, alt_down = true, true; V.key(10); eq('Ctrl+Opt+J repeats on the track', last(), 'repeat:track')
+V.key(1685026670); eq('Ctrl+Opt+Down too', last(), 'repeat:track')
+ctrl_down, shift_down = false, true; V.key(8710); eq('Shift+Opt+J repeats on all tracks', last(), 'repeat:all')
+alt_down, shift_down = false, false
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

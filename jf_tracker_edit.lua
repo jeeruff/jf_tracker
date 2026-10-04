@@ -904,6 +904,92 @@ local function cut_covering(track, lane_idx, t, keep)
   end
 end
 -- вставка ноты/слайса/куска: после того как длина и offset выставлены
+-- ── повтор паттерна над курсором (4 окт, из Paketti — Esa Ruoho) ───────────
+-- Ctrl+Opt+J / ↓: то, что на треке стоит в строках [r0, rc) (от начала региона
+-- до курсора), повторяется от курсора rc вниз до r1 (конец региона), последний
+-- повтор — обрезан по r1. Что было в [rc, r1), заменяется. Аудио — копии item
+-- (строки → время через темп в каждом месте), MIDI — ноты в MIDI-item.
+-- В одном undo-блоке со всеми треками (вызывающий). Возвращает копий.
+local function qn_time(rf, lpb) return R.TimeMap2_QNToTime(0, rf / lpb) end
+local function time_row(t, lpb) return R.TimeMap2_timeToQN(0, t) * lpb end
+function E.repeat_above(track, lpb, r0, rc, r1)
+  local L = rc - r0
+  if L <= 0 or r1 <= rc then return 0 end
+  local tc, t1 = qn_time(rc, lpb), qn_time(r1, lpb)
+  local t0 = qn_time(r0, lpb)
+  local n = 0
+  local lanes_on = R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2
+  -- исходник: аудио-item с началом в [t0, tc) и MIDI-ноты там же
+  local audio, notes = {}, {}
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local it = R.GetTrackMediaItem(track, i)
+    local tk = R.GetActiveTake(it)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local lane = lanes_on and math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) or nil
+    if tk and R.TakeIsMIDI(tk) then
+      local _, nn = R.MIDI_CountEvts(tk)
+      for k = 0, nn - 1 do
+        local _, sel, mu, sp, ep, ch, pitch, vel = R.MIDI_GetNote(tk, k)
+        local ns, ne = R.MIDI_GetProjTimeFromPPQPos(tk, sp), R.MIDI_GetProjTimeFromPPQPos(tk, ep)
+        if ns >= t0 - 1e-6 and ns < tc - 1e-6 then
+          notes[#notes + 1] = { rs = time_row(ns, lpb), rl = time_row(ne, lpb) - time_row(ns, lpb), pitch = pitch, vel = vel, ch = ch, mu = mu, lane = lane }
+        end
+      end
+    elseif tk and pos >= t0 - 1e-6 and pos < tc - 1e-6 then
+      local ok, ch = R.GetItemStateChunk(it, '', false)
+      if ok then audio[#audio + 1] = { chunk = strip_guids(ch), rs = time_row(pos, lpb), rl = time_row(pos + len, lpb) - time_row(pos, lpb), lane = lane } end
+    end
+  end
+  -- чистка [tc, t1): аудио — удалить начинающиеся там, накрывающие — обрезать
+  -- по tc; MIDI-ноты с началом там — удалить
+  for i = R.CountTrackMediaItems(track) - 1, 0, -1 do
+    local it = R.GetTrackMediaItem(track, i)
+    local tk = R.GetActiveTake(it)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if tk and R.TakeIsMIDI(tk) then
+      local _, nn = R.MIDI_CountEvts(tk)
+      for k = nn - 1, 0, -1 do
+        local _, _, _, sp = R.MIDI_GetNote(tk, k)
+        local ns = R.MIDI_GetProjTimeFromPPQPos(tk, sp)
+        if ns >= tc - 1e-6 and ns < t1 - 1e-6 then R.MIDI_DeleteNote(tk, k) end
+      end
+    elseif tk then
+      if pos >= tc - 1e-6 and pos < t1 - 1e-6 then R.DeleteTrackMediaItem(track, it)
+      elseif pos < tc - 1e-6 and pos + len > tc + 1e-6 then R.SetMediaItemInfo_Value(it, 'D_LENGTH', tc - pos) end
+    end
+  end
+  -- копии: k-й повтор сдвинут на k·L строк; длина — не дальше r1
+  local k = 1
+  while rc + (k - 1) * L < r1 and k < 4096 do
+    local sh = k * L
+    for _, a in ipairs(audio) do
+      local rs = a.rs + sh
+      if rs < r1 - 1e-6 then
+        local re = math.min(rs + a.rl, r1)
+        local t = qn_time(rs, lpb)
+        local it = insert_chunk(track, a.lane, t, a.chunk)
+        if it then R.SetMediaItemInfo_Value(it, 'D_LENGTH', qn_time(re, lpb) - t); n = n + 1 end
+      end
+    end
+    for _, m in ipairs(notes) do
+      local rs = m.rs + sh
+      if rs < r1 - 1e-6 then
+        local re = math.min(rs + m.rl, r1)
+        insert_midi(track, m.lane, qn_time(rs, lpb), qn_time(re, lpb), m.pitch, m.vel, m.ch, m.mu)
+        n = n + 1
+      end
+    end
+    k = k + 1
+  end
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local tk = R.GetActiveTake(R.GetTrackMediaItem(track, i))
+    if tk and R.TakeIsMIDI(tk) then R.MIDI_Sort(tk) end
+  end
+  return n
+end
+
 -- ── легато (3 окт, :legato) ───────────────────────────────────────────────
 -- Аудио-нота тянется до начала следующей ноты своей лейн (без зазора):
 -- длина = следующий старт − позиция, скорость — чтобы её кусок источника

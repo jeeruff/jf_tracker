@@ -516,6 +516,31 @@ ctx = {
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
   -- tutorial (4 окт): первые шаги — окном about без логотипа
+  -- повтор паттерна над курсором (4 окт, Paketti): регион под курсором (вне —
+  -- =START..=END); all — все треки, иначе трек курсора. Один undo
+  repeat_pattern = function(all)
+    local rc = vim.cur.row
+    local rg = alias.region_at(regions, edit.row_time(rc, state.lpb, 0))
+    local r0, r1
+    if rg then r0, r1 = rg.r0, rg.r1
+    else
+      r0 = model.row_of_time(model.marker_pos(model.START_MARKER) or 0, state.lpb)
+      local te = model.marker_pos(model.END_MARKER)
+      r1 = te and model.row_of_time(te, state.lpb) or (snap and snap.last_row or rc) + 1
+    end
+    r0, r1 = math.floor(r0 + 0.5), math.floor(r1 + 0.5)
+    if rc <= r0 then vim.msg = 'repeat: put the cursor below the part to repeat (the region starts here)'; return end
+    if rc >= r1 then vim.msg = 'repeat: the cursor is at the end of the region'; return end
+    local tracks = {}
+    if all then for _, c in ipairs(snap.cols) do tracks[#tracks + 1] = c.track end
+    else local c = cur_col(); if c then tracks[1] = c.track end end
+    local n = 0
+    edit.run(all and 'repeat pattern (all tracks)' or 'repeat pattern', function()
+      for _, tr in ipairs(tracks) do n = n + edit.repeat_above(tr, state.lpb, r0, rc, r1) end
+    end)
+    model.invalidate()
+    vim.msg = ('repeat rows %d-%d down to %d%s: %d copies'):format(r0, rc - 1, r1 - 1, all and ' on all tracks' or '', n)
+  end,
   -- tutorial (4 окт): интерактивный тур — шаги в активной зоне главного модуля,
   -- всплывашки на модулях; повтор — выключить. :tutorial text — текстом
   tutorial = function(text)

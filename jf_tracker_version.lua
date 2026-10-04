@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.15'
+V.VERSION = '0.6.16'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.16', d = '2026-10-04', items = {
+    'repeat above the cursor (from Paketti by Esa Ruoho): Ctrl+Opt+J or Ctrl+Opt+Down - what the cursor track has from the region start to the cursor is repeated from the cursor down to the region end (the last copy cut at the end, what was there replaced); Shift+Opt+J - on all tracks; audio items and MIDI notes, one undo step; outside a region =START..=END',
+  } },
   { v = '0.6.15', d = '2026-10-04', items = {
     'tutorial is an interactive tour: 10 steps, each bubble sits on the module it explains and the step counts when you do it (move with hjkl, enter INSERT and Esc, pick a sound, open the item tab, edit, select, :, \\, Space, ?); < > x in the main module; :tutorial text - the old text page',
     'main module: the bitmap / meters / caps / hints row moved to the options window; its place is the active zone (the tour now, later the monome grid)',

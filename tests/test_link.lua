@@ -45,7 +45,11 @@ _G.reaper = {
   GetMediaSourceFileName = function(src) return src and src.file or '' end,
   Main_OnCommand = function() end,
   TakeIsMIDI = function() return false end,
-  GetItemStateChunk = function(it) return it.chunk ~= nil, it.chunk end,
+  GetItemStateChunk = function(it) return true, it.chunk or ('<ITEM\nPOSITION ' .. it.pos .. '\n>') end,
+  AddMediaItemToTrack = function(tr) local it = { pos = 0, len = 1, take = { offs = 0, rate = 1, pp = 0, pm = -1 }, ext = {} }; table.insert(tr.items, it); return it end,
+  SetItemStateChunk = function(it, ch) it.chunk = ch; return true end,
+  DeleteTrackMediaItem = function(tr, it) for i, x in ipairs(tr.items) do if x == it then table.remove(tr.items, i); break end end end,
+  GetMediaTrackInfo_Value = function() return 0 end,
   RecursiveCreateDirectory = function(d) os.execute("mkdir -p '" .. d .. "'") end,
   GetResourcePath = function() return os.getenv('TMPDIR') or '/tmp' end,
   GetSetMediaTrackInfo_String = function(tr, k, v, set) tr.ext = tr.ext or {}; if set then tr.ext[k] = v end; return true, tr.ext[k] or '' end,
@@ -188,5 +192,17 @@ eq('positions packed from 0', blocks[1]:match('POSITION ([%d%.]+)'), '0.00000000
 eq('second after the first + 1 s', tonumber(blocks[2]:match('POSITION ([%d%.]+)')), 3)
 eq('guids stripped', blocks[1]:find('IGUID', 1, true), nil)
 os.remove(kpath)
+-- повтор паттерна над курсором (4 окт, Paketti): строки [0, 4) → с 4 до 16
+tracks[1].items = {}
+local p1 = item(qn2t(0 / 4), qn2t(1 / 4), 0, 1)     -- строка 0, длина 1 строка (LPB 4, 120 BPM)
+local p2 = item(qn2t(2 / 4), qn2t(1 / 4), 0, 1)     -- строка 2
+local old = item(qn2t(9 / 4), qn2t(1 / 4), 0, 1)    -- строка 9 — заменится
+local made = E.repeat_above(tracks[1], 4, 0, 4, 16)
+eq('repeat: 2 items x 3 repeats', made, 6)
+eq('old content below the cursor removed', (function() for _, x in ipairs(tracks[1].items) do if x == old then return false end end return true end)(), true)
+local rows = {}
+for _, x in ipairs(tracks[1].items) do rows[#rows + 1] = math.floor(t2qn(x.pos) * 4 + 0.5) end
+table.sort(rows)
+eq('rows of the repeats', table.concat(rows, ','), '0,2,4,6,8,10,12,14')
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
