@@ -147,6 +147,8 @@ end
 
 -- MIDI: транспорт от t0 до t1
 function P.midi(t0, t1)
+  -- своё превью через транспорт (step listen, 4 окт) — оборвать и начать новое
+  if stop_at then stop_at = nil; R.OnStopButton(); if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end end
   if R.GetPlayState() & 1 == 1 then return false end
   restore_cur = R.GetCursorPosition()
   R.SetEditCurPos(t0, false, false)

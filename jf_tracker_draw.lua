@@ -1310,7 +1310,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY }, { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY },
       { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY },
       { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY }, { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY },
-      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY, sizer = true },
+      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY, sizer = true }, { 'q_listen', 'listen', c.q_listen and U.CYAN or U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)

@@ -142,6 +142,7 @@ local state = {
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
   textonly = reaper.GetExtState(EXT, 'textonly') == '1',
+  steplisten = reaper.GetExtState(EXT, 'steplisten') == '1',      -- step listen (4 окт)
   propspos = (reaper.GetExtState(EXT, 'propspos2') == 'left') and 'left' or 'right',   -- перенос влево отменён (4 окт): по умолчанию справа          -- text only (4 окт)
   keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',
   kc_scale = tonumber(reaper.GetExtState(EXT, 'kcscale')) or 0,            -- keycaster (4 окт)
@@ -371,7 +372,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2789,6 +2790,7 @@ ctx = {
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
       { sep = true, title = 'sound and samples' },
+      flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark' }, desc = 'lib order: by track / name / length / marks (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
@@ -4892,6 +4894,7 @@ function ctrl_action(name, delta)
   elseif name == 'q_scopes' then if delta == 0 then ctx.toggle_scopes() end
   elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
   elseif name == 'q_keys' then if delta == 0 then state.keycast = not state.keycast; ctx.kc = {} end
+  elseif name == 'q_listen' then if delta == 0 then state.steplisten = not state.steplisten; vim.msg = 'step listen ' .. (state.steplisten and 'on: moving the cursor plays the row' or 'off') end
   elseif name == 'q_kcm' or name == 'q_kcp' then
     if delta == 0 then
       local cur = (state.kc_scale or 0) > 0 and state.kc_scale or draw.SCALE
@@ -5424,6 +5427,21 @@ local function frame()
     end
   end
 
+  -- step listen (4 окт): транспорт стоит, курсор трекера сменил строку — эта
+  -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
+  if state.steplisten and state.focus == 'tracker' and not vim.picker and not vim.hydra then
+    local r = vim.cur.row
+    if ctx.sl_row ~= r then
+      local prev = ctx.sl_row
+      ctx.sl_row = r
+      if prev and (not is_playing or ctx.sl_own) and (vim.mode == 'normal' or vim.mode == 'insert' or vim.mode == 'visual' or vim.mode == 'vline') then
+        local t0 = edit.row_time(r, state.lpb, 0)
+        PV.midi(t0, edit.row_time(r + 1, state.lpb, 0))
+        ctx.sl_own = true
+      end
+    end
+    if not PV.playing() then ctx.sl_own = false end
+  end
   -- fixed cursor: вид всегда ставит строку курсора в середину тела
   if state.fixed and L and L.nrows then
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
@@ -5646,7 +5664,7 @@ local function frame()
       about_open = OPT.active and OPT.page == 'about', options_open = OPT.active and OPT.page ~= 'about',
       q_wave = (state.wavemode or 'back') ~= 'off', q_meters = state.meters, q_ruler = (state.tlruler or 'off') ~= 'off',
       q_names = state.itemnames, q_colors = state.itemcol, q_input = state.hdrin ~= false, q_preview = state.preview, q_endstop = state.endstop, q_captions = state.captions,
-      q_keys = state.keycast,
+      q_keys = state.keycast, q_listen = state.steplisten,
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
@@ -6037,7 +6055,7 @@ local function frame()
   elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
-  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_kcp = 'keycaster text bigger' })[hover.ctrl]
+  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}

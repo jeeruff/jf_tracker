@@ -339,6 +339,9 @@
 - [ ] Tab: … трекер → слайсы → lib …; в модуле j k — слайс (звучит), J K — по 8, g G, Esc — в трекер; клик — выбрать
 - [ ] Вкладка item: свойства семпла справа, как раньше; опция sample settings (notes and items): right / left
 
+## step listen
+- [ ] Кнопка `listen` (главный модуль) или опция step listen: транспорт стоит, j / k — строка под курсором звучит (все треки, с FX) на длину строки; быстрое движение — каждая новая строка обрывает прошлую; edit-курсор не уезжает
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
