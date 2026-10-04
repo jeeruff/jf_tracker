@@ -5,7 +5,7 @@ V.VERSION = '0.6.28'
 V.DATE = '2026-10-04'
 V.CHANGES = {
   { v = '0.6.28', d = '2026-10-04', items = {
-    'item tab keys: q 2 w 3 e r 5 t ... play slices like the labels over the wave (the old q..p and the slicing digits fought); slicing is the s menu: s t - transients, s 2 4 8 1 3 6 - equal 2 4 8 16 32 64, s x clear, s q quantize, s z autotrim',
+    'item tab keys: q 2 w 3 e r 5 t ... play slices like the labels over the wave (the old q..p and the slicing digits fought); slicing is the s menu: s t - transients, s 2 4 8 1 3 6 - equal 2 4 8 16 32 64, s d delete slices, s q quantize, s z autotrim',
     'no ghost notes: a note key that comes again without being released (macOS key repeat) is dropped in INSERT, the piano layer and the item tab',
     'the slice labels over the wave follow the chromatic keyboard; the DSP track block is compact (no name row, out and sends in one row)',
   } },

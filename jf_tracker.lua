@@ -1213,7 +1213,7 @@ ctx = {
       { key = 't', label = 'at transients', fn = function() SL.use_transients(); vim.msg = SL.msg or 'sliced at transients' end },
       { key = '2', label = '2 equal', fn = eq(2) }, { key = '4', label = '4 equal', fn = eq(4) }, { key = '8', label = '8 equal', fn = eq(8) },
       { key = '1', label = '16 equal', fn = eq(16) }, { key = '3', label = '32 equal', fn = eq(32) }, { key = '6', label = '64 equal', fn = eq(64) },
-      { key = 'x', label = 'clear the slices', fn = function() SL.clear() end },
+      { key = 'd', label = 'delete the slices', fn = function() SL.clear() end },        -- s d (4 окт): d = delete, как в Vim
       { key = 'q', label = 'smart quantize', fn = function() SL.smart_quantize() end },
       { key = 'z', label = 'autotrim the silence', fn = function() SL.autotrim() end },
     } })
@@ -2763,12 +2763,17 @@ ctx = {
   options_hydra = function()
     local used, items = { ['?'] = true }, {}
     local FIXED = { theme = 't', wavemode = 'w', curline = 'c', hdrfill = 'h', tlruler = 'r', statpos = 's', fps = 'f',
-                    toppos = 'p', ctrlpos = 'm', itemframe = 'i', itemalpha = 'a', curlead = 'l' }
+                    toppos = 'p', ctrlpos = 'm', itemframe = 'i', itemalpha = 'a', curlead = 'l',
+                    wave_os = 'd', fontscale = 'b' }
+    -- мнемоника (4 окт: theme сидел на 2 — t забирал top panel раньше по
+    -- порядку): закреплённые буквы занимаются заранее, остальные — после
+    local reserved = {}
+    for _, it in ipairs(ctx.option_items()) do if it.key and FIXED[it.key] then reserved[FIXED[it.key]] = it.key end end
     local function pick_key(it)
       local k = FIXED[it.key]
       if k and not used[k] then return k end
-      for ch in (it.label or ''):lower():gmatch('%a') do if not used[ch] then return ch end end
-      for ch in ('abcdefghijklmnopqrstuvwxyz0123456789'):gmatch('.') do if not used[ch] then return ch end end
+      for ch in (it.label or ''):lower():gmatch('%a') do if not used[ch] and not reserved[ch] then return ch end end
+      for ch in ('abcdefghijklmnopqrstuvwxyz0123456789'):gmatch('.') do if not used[ch] and not reserved[ch] then return ch end end
     end
     for _, it in ipairs(ctx.option_items()) do
       if not it.sep and it.get then
