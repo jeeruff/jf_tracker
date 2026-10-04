@@ -1855,31 +1855,36 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local cy, hh = y + L.rh / 2, L.rh / 2 - 1
         local wc = U.readable(U.mix(rgb, U.TEXT, 0.35), U.BG, 4.0)
         if e.muted then wc = U.mix(wc, U.BG, 0.45) end
+        -- зона слайса (4 окт): инверсия волны — фон цвета волны, волна цвета
+        -- фона, без рамок и полос
+        local z, za, zb = D.lib_zone
+        if z and z.root == e and (e.len or 0) > 0 then
+          za = math.floor(math.max(0, z.a) / e.len * npix)
+          zb = math.max(za + 1, math.floor(math.min(e.len, z.b) / e.len * npix))
+          set(wc); gfx.rect(wx + za, y, zb - za, L.rh, 1)
+        end
+        local inv = U.BG
         set(wc)
         if pk and pk.n > 0 then
           for px = 0, npix - 1 do
             local idx = math.floor(px / npix * pk.n) + 1
             local a, b = pk.min[idx] or 0, pk.max[idx] or 0
             if b - a < 0.03 then a, b = -0.015, 0.015 end
+            local inz = za and px >= za and px < zb
+            if inz then set(inv) end
             gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
+            if inz then set(wc) end
           end
         else gfx.line(wx, cy, wx + npix, cy) end
         -- слайсы вложены (3 окт): границы слайсов исходника тонкими чёрточками,
-        -- зона слайса под курсором / выбранного — подсвечена
+        -- (внутри инвертированной зоны не рисуются)
         if e.slices and (e.len or 0) > 0 then
           set(U.mix(wc, U.BG, 0.35))
           for _, t in ipairs(e.slices) do
             local px = wx + math.floor(t / e.len * npix)
-            if px > wx and px < wx + npix then gfx.rect(px, y + 1, 1, L.rh - 2, 1) end
+            local inz = za and px - wx >= za and px - wx <= zb
+            if px > wx and px < wx + npix and not inz then gfx.rect(px, y + 1, 1, L.rh - 2, 1) end
           end
-        end
-        local z = D.lib_zone
-        if z and z.root == e and (e.len or 0) > 0 then
-          local za = wx + math.floor(math.max(0, z.a) / e.len * npix)
-          local zb = wx + math.floor(math.min(e.len, z.b) / e.len * npix)
-          -- зона — полосой под волной и рамкой (4 окт: заливка прятала волну строки 01)
-          set(U.AMBER); gfx.rect(za, y + L.rh - 2, math.max(1, zb - za), 2, 1)
-          gfx.a = 0.6; gfx.rect(za, y, math.max(1, zb - za), L.rh, 0); gfx.a = 1
         end
         dbg[#dbg + 1] = ('%02d wx%d n%d pk%s wc%.2f,%.2f,%.2f'):format(i, wx, npix, pk and pk.n or '-', wc[1], wc[2], wc[3])
       end
