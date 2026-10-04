@@ -1475,7 +1475,7 @@ ctx = {
             local t = buf.table()
             local prev, last = 0, -1e9
             for k = 1, spl do
-              local a = math.max(math.abs(t[k] or 0), math.abs(t[spl + k] or 0))
+              local a = math.max(math.abs(t[k] or 0), math.abs(t[n + k] or 0))   -- min — после n запрошенных
               local tm = pos + (k - 1) / 200 / (rate ~= 0 and rate or 1)
               if a - prev > thr and a > 0.05 and tm - last > 0.06 then
                 local h = model.row_of_time(tm, state.lpb)
@@ -1521,7 +1521,7 @@ ctx = {
         local spl = rv & 0xfffff
         if spl > 0 then
           local t, a = buf.table(), {}
-          for k = 1, spl do a[k] = math.max(math.abs(t[k] or 0), math.abs(t[spl + k] or 0)); if a[k] > peak then peak = a[k] end end
+          for k = 1, spl do a[k] = math.max(math.abs(t[k] or 0), math.abs(t[n + k] or 0)); if a[k] > peak then peak = a[k] end end   -- min — после n запрошенных
           segs[#segs + 1] = { pos = pos, len = len, rate = (rate ~= 0 and rate or 1), a = a }
         end
       end

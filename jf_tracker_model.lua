@@ -1446,7 +1446,11 @@ function M.peaks(head, npix, want_spec)
     local r = R.PCM_Source_GetPeaks(src, n / span, head.offs, 1, n, et, b)
     return r, r & 0xfffff, b
   end
-  local rv, spl, buf = fetch(math.min(npix * os, 16384), 0)
+  -- блоки буфера (4 окт): max — n запрошенных точек, за ним min — тоже со
+  -- сдвигом n ЗАПРОШЕННЫХ, а не полученных (spl < n у края источника — min
+  -- читались из max, нижняя половина волны пропадала)
+  local nreq = math.min(npix * os, 16384)
+  local rv, spl, buf = fetch(nreq, 0)
   if spl == 0 then
     -- пиков нет: запускаем достройку, результат — на следующих кадрах
     local b = building[key]
@@ -1456,7 +1460,7 @@ function M.peaks(head, npix, want_spec)
         -- пики уже есть на диске, но свежий источник их ещё не подхватил:
         -- финализировать и сразу перечитать (как build_env слайсера)
         R.PCM_Source_BuildPeaks(src, 2)
-        rv, spl, buf = fetch(math.min(npix * os, 16384), 0)
+        rv, spl, buf = fetch(nreq, 0)
         if spl == 0 then peaks[key] = { retry = R.time_precise() + 2.0 }; return nil end
       end
       if spl == 0 then return nil end
@@ -1482,7 +1486,7 @@ function M.peaks(head, npix, want_spec)
     n = n // 2
     local r2, s2, b2 = fetch(n, 0)
     if s2 == 0 then break end
-    rv, spl, buf = r2, s2, b2
+    rv, spl, buf, nreq = r2, s2, b2, n
   end
   local t = buf.table()
   local raw = (rv >> 20) & 0xF ~= 0
@@ -1495,7 +1499,7 @@ function M.peaks(head, npix, want_spec)
     local mx, mn = -2, 2
     for j = j0, j1 do
       local a, b
-      if raw then a = t[j]; b = a else a = t[j]; b = t[spl + j] end
+      if raw then a = t[j]; b = a else a = t[j]; b = t[nreq + j] end
       if a and a > mx then mx = a end
       if b and b < mn then mn = b end
     end
@@ -1510,7 +1514,7 @@ function M.peaks(head, npix, want_spec)
     if s2 > 0 and (r2 >> 20) & 0xF == 0 and r2 & 0x1000000 ~= 0 then
       local t2 = b2.table()
       out.spec = {}
-      for i = 1, npix do out.spec[i] = t2[2 * s2 + math.floor((i - 1) / npix * s2) + 1] end
+      for i = 1, npix do out.spec[i] = t2[2 * n2 + math.floor((i - 1) / npix * s2) + 1] end   -- блок spec — после 2 × n2 запрошенных
     end
   end
   -- сплошной ноль = пики ещё не подхвачены (свежий источник офлайн-файла

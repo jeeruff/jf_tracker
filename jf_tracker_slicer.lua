@@ -58,7 +58,7 @@ local function build_env(e)
   local env = { n = spl, rate = rate, span = span, v = {} }
   local raw = (rv >> 20) & 0xF ~= 0
   for i = 1, spl do
-    local a, b = t[i], raw and t[i] or t[spl + i]
+    local a, b = t[i], raw and t[i] or t[n + i]     -- блок min — со сдвигом n запрошенных (4 окт)
     env.v[i] = math.max(math.abs(a or 0), math.abs(b or 0))
   end
   return env
