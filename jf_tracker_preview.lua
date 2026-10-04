@@ -39,6 +39,15 @@ end
 
 local audio_stop_at
 
+-- трек для превью (4 окт): превью входит в трек как вход — армированный трек
+-- с выключенным мониторингом его глушит (с jf_rec «звучала тишина»). Такой
+-- трек — мимо: превью сразу в мастер (без FX трека, зато слышно)
+function P.out_track(track)
+  if not (track and R.ValidatePtr(track, 'MediaTrack*')) then return nil end
+  if R.GetMediaTrackInfo_Value(track, 'I_RECARM') == 1 and R.GetMediaTrackInfo_Value(track, 'I_RECMON') == 0 then return nil end
+  return track
+end
+
 -- аудио: source образца через трек с питчем (полутоны); max_sec — лимит
 function P.audio(track, depot_item, semis, max_sec)
   if not P.available() or not depot_item then return false end
@@ -57,7 +66,7 @@ function P.audio(track, depot_item, semis, max_sec)
   R.CF_Preview_SetValue(pv, 'D_POSITION', offs)
   R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)              -- как прозвучит нота (3 окт)
   if take then R.CF_Preview_SetValue(pv, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH')) end
-  if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
@@ -90,7 +99,7 @@ function P.inst(track, item, max_sec)
   -- луп источника как у item (3 окт): item длиннее файла играет начало заново —
   -- превью звучит так же, как нота на таймлайне и как нарисована волна
   R.CF_Preview_SetValue(pv, 'B_LOOP', R.GetMediaItemInfo_Value(item, 'B_LOOPSRC'))
-  if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = item, offs, rate
@@ -127,7 +136,7 @@ function P.slice(track, entry, t0, t1)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
   R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
-  if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   cur = pv
   -- плейхед слайса на волне инструмента (3 окт: Shift+нота / MIDI-клавиатура)
@@ -156,7 +165,7 @@ function P.file(track, path, max_sec, from)
   local pv = R.CF_CreatePreview(src)
   R.PCM_Source_Destroy(src)          -- превью держит свою ссылку
   if not pv then return false end
-  if track then R.CF_Preview_SetOutputTrack(pv, 0, track) end
+  local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_SetValue(pv, 'D_VOLUME', P.vol)
   if from and from > 0 then R.CF_Preview_SetValue(pv, 'D_POSITION', from) end
   -- sync браузера (3 окт): нативное ожидание начала такта — только пока
