@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.33'
+V.VERSION = '0.6.34'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.34', d = '2026-10-04', items = {
+    'arp from slices: :arp live on a sliced sample - hold several slice keys, they take turns at the step (up / down / updown / random / played), each a step long',
+    'step listen: the row under the moving cursor plays while the transport is stopped (quick toggle listen); option slices - its own module or the lower half of the lib',
+  } },
   { v = '0.6.33', d = '2026-10-04', items = {
     'slices module: a full-height column between the tracker and the lib while the instrument is sliced - the slice list with a scrollbar, in the Tab cycle before the lib, j k / J K / g G, click selects',
     'item tab: the sample settings left of the wave (option sample settings: left / right); Esc toggles INSERT; text only greys the options it overrides',

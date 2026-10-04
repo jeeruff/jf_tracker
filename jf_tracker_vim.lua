@@ -1146,6 +1146,13 @@ function V.key_impl(c)
       if k < 1 or k > #inst0.slices then V.msg = ('no slice %d (the sample has %d) - z / x shift by an octave'):format(k, #inst0.slices); return end
       V.last_slice = k
       if ctx.select_slice then ctx.select_slice(inst0, k) end
+      -- живой арп из слайсов (4 окт): держатся клавиши-слайсы — чередуются по шагу
+      if V.arp_live and how == 'insert' and ctx.arp_live_key then
+        local lane = f0.lane or f0.col.lanes[1]
+        ctx.arp_live_key({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = SB + k - 1,
+          slice = k, entry = inst0, item = inst0.item, vel = V.vel, key = chq })
+        return
+      end
       local t0s = inst0.slices[k]
       if how == 'hold' or how == 'hold_stretch' then
         local lane = f0.lane or f0.col.lanes[1]

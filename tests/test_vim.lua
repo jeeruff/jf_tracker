@@ -596,6 +596,9 @@ do
   alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑)
   eq('Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
   keysin(';'); eq('; inserts the whole sample', last(), 'whole')
+  -- арп из слайсов (4 окт): :arp live, клавиша-слайс уходит в живой арп
+  V.arp_live = true; keysin('w'); V.arp_live = false
+  eq('arp live on a sliced sample takes slice 3 (pitch 62)', last(), 'arplive:62@' .. V.cur.row)
   -- 4 окт: Cmd+нота — весь айтем с питчем, Ctrl+нота — удержание
   cmd_down = true; keysin('w'); cmd_down = false
   eq('Cmd+w on a sliced sample = the whole item at D', last():match('^ins:trA@%d+:62:') ~= nil, true)

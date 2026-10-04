@@ -2666,14 +2666,17 @@ ctx = {
       local o = vim.arp_opt or { order = 'up', oct = 1, gate = 100 }
       a = { track = spec.track, lane_idx = spec.lane_idx, item = spec.item, vel = spec.vel, row0 = spec.row,
             step = math.max(1, vim.step or 1), keys = {}, done = -1, t0 = reaper.time_precise(), last = reaper.time_precise(),
-            order = o.order or 'up', oct = o.oct or 1,
+            order = o.order or 'up', oct = o.oct or 1, entry = spec.entry,   -- entry — нарезанный сэмпл: арп из слайсов (4 окт)
             row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0)) }
       state.arpl = a
     end
     for _, k in ipairs(a.keys) do if k.vk == vk then return end end
     a.keys[#a.keys + 1] = { vk = vk, pitch = spec.pitch }
     a.last = reaper.time_precise()
-    ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 1)
+    if a.entry and spec.slice then
+      local e = a.entry
+      ctx.preview_slice(spec.track, e, e.slices[spec.slice], e.slices[spec.slice + 1] or e.len)
+    else ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 1) end
   end,
   preview_src_pos = function() return PV.src_position() end,
   inst_listen_toggle = function() state.poolprev = not state.poolprev; vim.msg = 'listen on select: ' .. (state.poolprev and 'on' or 'off') end,
@@ -5310,16 +5313,26 @@ local function frame()
       local k = math.floor((now - a.t0) / (a.row_dur * a.step))
       while a.done < k do
         a.done = a.done + 1
-        local seq = edit.arp_order(held, a.order, a.oct, a.done * 7919 + 1)
+        -- арп из слайсов (4 окт): держатся клавиши-слайсы — без октав, по номерам
+        local seq = edit.arp_order(held, a.order, a.entry and 1 or a.oct, a.done * 7919 + 1)
         local p = seq[a.done % #seq + 1]
         local row = a.row0 + a.done * a.step
-        local ok, it = pcall(edit.insert_note, a.track, a.lane_idx, state.lpb, row, p, a.vel, a.step, a.item)
+        local ok, it
+        if a.entry then
+          local k = p - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1
+          if k >= 1 and k <= #(a.entry.slices or {}) then
+            ok, it = pcall(edit.insert_slice, a.track, a.lane_idx, state.lpb, row, a.entry.item, k)
+            ctx.preview_slice(a.track, a.entry, a.entry.slices[k], a.entry.slices[k + 1] or a.entry.len)
+          end
+        else
+          ok, it = pcall(edit.insert_note, a.track, a.lane_idx, state.lpb, row, p, a.vel, a.step, a.item)
+        end
         -- аудио-копия — длиной в шаг (иначе следующая нота уйдёт в новую подколонку)
         if ok and it and reaper.ValidatePtr(it, 'MediaItem*') then
           local dur = edit.row_time(row + a.step, state.lpb, 0) - edit.row_time(row, state.lpb, 0)
           if reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > dur then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', dur) end
         end
-        ctx.preview(a.track, p, a.item, row, a.step)
+        if not a.entry then ctx.preview(a.track, p, a.item, row, a.step) end
       end
       vim.cur.row = a.row0 + a.done * a.step
       vim.msg = ('arp live %s: %d notes held, step %d - release all to stop'):format(a.order, #held, a.step)

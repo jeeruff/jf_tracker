@@ -345,6 +345,9 @@
 ## Слайсы: модуль или половина lib
 - [ ] Опция slices (notes and items): module — колонка в верхней панели; split — нижняя половина модуля инструментов, пока у айтема есть слайсы (фокус, Tab, j k, скролл — так же)
 
+## Арп из слайсов
+- [ ] `:arp live`, INSERT + m, нарезанный amen: зажать q + w + e — слайсы S01 S03 S05 чередуются по шагу (`:arp up/down/random` — порядок), каждый длиной в шаг, звучат; отпустить — конец
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
