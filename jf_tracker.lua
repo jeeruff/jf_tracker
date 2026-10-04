@@ -1205,7 +1205,9 @@ ctx = {
   -- dr — трек курсора в регионе (вне региона — =START..=END); daw (all = true) —
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
   -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
-  scramble = function() vim.run_cmd('scramble') end,     -- кнопка scramble вкладки item (4 окт)
+  scramble = function() vim.run_cmd('scramble') end,
+  octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)
+  slice_base = function() return model.SLICE_BASE or model.BASE_NOTE or 60 end,     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then return nil end

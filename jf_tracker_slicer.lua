@@ -607,6 +607,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   local slices = editing and S.slices or (e.slices or {})
   local hover_slice
+  -- подписи слайсов (4 окт): клавиша хроматической раскладки q 2 w 3 e r 5 t …,
+  -- которая вставит этот слайс на текущей октаве (слайс k = нота C-4 + k - 1);
+  -- клавиши нет — номер
+  local key_of = {}
+  do
+    local oct = (ctx and ctx.octave and ctx.octave()) or 4
+    local base = (ctx and ctx.slice_base and ctx.slice_base()) or 60
+    for code, off in pairs((ctx and ctx.piano) or {}) do
+      local k = (oct + 1) * 12 + off - base + 1
+      key_of[k] = string.char(code)
+    end
+  end
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
   for k, t in ipairs(slices) do
     local px = tx(t)
@@ -614,10 +626,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if t < va - 1e-6 or px > x + w - 1 then goto next_slice end
     local hot = (in_wave and math.abs(gfx.mouse_x - px) <= 4) or (S.drag and S.drag.kind == 'slice' and S.drag.k == k)
     if hot then hover_slice = k end
-    U.set(hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
-    local lbl = k <= 10 and ('qwertyuiop'):sub(k, k) or tostring(k)
+    local onkey = key_of[k] ~= nil
+    U.set(hot and U.TEXT or (onkey and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
+    local lbl = key_of[k] or tostring(k)
     if zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3 then lbl = '' end   -- там подпись ноты зоны
-    if lbl ~= '' and px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)) end
+    if lbl ~= '' and px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (onkey and U.AMBER or U.CYAN)) end
     ::next_slice::
   end
   -- выделение (общее для правки и просмотра: S.entry совпадает с e)
