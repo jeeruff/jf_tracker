@@ -69,6 +69,7 @@ function O.key(c)
   local shift = ctx.mods and ctx.mods().shift
   local n = #O.items
   local it = O.items[O.sel]
+  if it and it.masked and it.masked() and (c == 13 or ch == ' ' or ch == 'l' or ch == 'h' or ch == '+' or ch == '-') then it.unmask(); return true end
   if c == 27 or ch == 'q' then O.close()
   elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1)
   elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1)
@@ -84,7 +85,9 @@ end
 
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
-  O.adjust(O.items[O.hover or O.sel], d)
+  local it = O.items[O.hover or O.sel]
+  if it and it.masked and it.masked() then return end
+  O.adjust(it, d)
 end
 
 -- мышь (3 окт): toggle — клик; num — слайдер как в DSP (клик / протяжка);
@@ -104,6 +107,7 @@ function O.click(mx, my)
     O.sel = O.hover
     local it = O.items[O.sel]
     local r = O.vrect and O.vrect[O.sel]
+    if it.masked and it.masked() then it.unmask(); return end
     -- cycle (3 окт): значения кнопками в ряд — клик по кнопке ставит его;
     -- кнопки не влезли — клик по строке шагает по кругу, как раньше
     if it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
@@ -307,12 +311,16 @@ function O.draw(L, W, H)
       if hot then O.hover = i end
       if i == O.sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(bx + 1, y, bw - 2, rh, 1)
       elseif hot then U.set(U.PANEL); gfx.rect(bx + 1, y, bw - 2, rh, 1) end
-      U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), i == O.sel and U.AMBER or U.TEXT)
+      local masked = it.masked and it.masked()
+      U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), masked and U.DIM or (i == O.sel and U.AMBER or U.TEXT))
       local vt = val_text(it)
       local on = it.kind == 'toggle' and it.get()
       local vx = bx + L.pad + lw
       O.vrect[i] = { vx, y, vw - L.pad, rh }
-      if it.kind == 'num' and it.min and it.max then
+      if masked then
+        -- перекрыто text only (4 окт): вместо значения — предупреждение
+        U.text(vx, y + 1, ctx.fit('text only is on - click turns it off', bx + bw - L.pad - vx), hot and U.AMBER or U.DIM)
+      elseif it.kind == 'num' and it.min and it.max then
         -- слайдер как в DSP: тонкая дорожка, заливка до значения, число справа
         local tw = math.max(8, vw - L.pad - U.measure(vt) - L.pad)
         O.vrect[i] = { vx, y, tw, rh }

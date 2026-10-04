@@ -2792,6 +2792,13 @@ ctx = {
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
     }
+    -- text only (4 окт) перекрывает эти опции — серые, клик по ним выключает text only
+    for _, it in ipairs(items) do
+      if it.key == 'wavemode' or it.key == 'wave_os' or it.key == 'itemframe' or it.key == 'itemalpha' then
+        it.masked = function() return state.textonly end
+        it.unmask = function() state.textonly = false; vim.msg = 'text only off' end
+      end
+    end
     return items
   end,
   options = function() OPT.open(ctx.option_items()) end,
