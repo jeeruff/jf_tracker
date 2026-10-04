@@ -58,5 +58,21 @@ eq('category carried', a[pos[5]].cat, 'gain')
 -- предел
 eq('auto max', #FC.auto(list, 2), 2)
 
+-- макро первыми (4 окт)
+do
+  local list = {
+    { i = 0, name = 'Main Vol', units = '%', kind = 'slider' },
+    { i = 1, name = 'Filter Cutoff', units = 'Hz', kind = 'slider' },
+    { i = 2, name = 'Macro 2', units = '%', kind = 'slider' },
+    { i = 3, name = 'Macro 1', units = '%', kind = 'slider' },
+    { i = 4, name = 'Env 1 Attack', units = 'ms', kind = 'slider' },
+  }
+  local out = FC.auto(list, 4)
+  eq('macro 1 first', out[1].i, 3)
+  eq('macro 2 second', out[2].i, 2)
+  eq('macros count in max', #out, 4)
+  eq('macro8', FC.is_macro('macro8'), true)
+  eq('not a numbered macro', FC.is_macro('Macro Depth'), false)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

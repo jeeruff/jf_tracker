@@ -924,7 +924,7 @@ function M.auto_module(tr, fx, short, np)
   end
   local out
   if FC then
-    out = FC.auto(list, 24)
+    out = FC.auto(list, 42)            -- до 3 колонок по 14 строк; лишние колонки срежет отрисовка
     local byi = {}
     for _, p in ipairs(list) do byi[p.i] = p end
     for _, a in ipairs(out) do a.nsteps = byi[a.i] and byi[a.i].nsteps end

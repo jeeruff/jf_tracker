@@ -2843,10 +2843,16 @@ function D.frame(L, snap, rows, state, info)
     for k, f in ipairs(fxs) do
       local ncol = f.cols or 1
       local bw1 = L.cw * 22
-      local bw = bw1 * ncol
-      if bx + bw > L.win_w - (lvl and (mw + L.pad) or 0) then break end
       local by = dy + 3 + L.rh
       local bh = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+      -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
+      -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
+      if f.auto then
+        local rows_fit = math.max(1, math.floor((bh - L.rh - 2) / L.rh))
+        ncol = math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
+      end
+      local bw = bw1 * ncol
+      if bx + bw > L.win_w - (lvl and (mw + L.pad) or 0) then break end
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]

@@ -102,6 +102,9 @@ function FC.class(name, units, kind)
   return 'other'
 end
 
+-- макро-параметр: «Macro 1», «macro 8», «Macro1»
+function FC.is_macro(name) return (name or ''):lower():match('^%s*macro%s*%d') ~= nil end
+
 function FC.rank(name, cat)
   local r = RANK[cat] or 0
   local _, base = FC.split(name)
@@ -131,10 +134,19 @@ function FC.auto(list, max)
       groups[g] = math.max(groups[g] or 0, it.rank)
     end
   end
+  -- макро (4 окт): «Macro N» плагина — всегда первыми, по порядку, вне
+  -- сортировки по важности (это главные ручки синтов вроде Serum)
+  local macros, rest = {}, {}
+  for _, it in ipairs(items) do
+    if FC.is_macro(it.name) then macros[#macros + 1] = it else rest[#rest + 1] = it end
+  end
+  local function mnum(it) return tonumber((it.name or ''):match('(%d+)')) or 0 end
+  table.sort(macros, function(a, b) local x, y = mnum(a), mnum(b); if x ~= y then return x < y end return a.i < b.i end)
+  items = rest
   -- лучшие max по важности, потом — сгруппировать
   table.sort(items, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return a.i < b.i end)
   local top = {}
-  for k = 1, math.min(max or 24, #items) do top[k] = items[k] end
+  for k = 1, math.min((max or 24) - #macros, #items) do top[k] = items[k] end
   local CI = {}
   for k, c in ipairs(FC.CATS) do CI[c] = k end
   table.sort(top, function(a, b)
@@ -145,6 +157,7 @@ function FC.auto(list, max)
     if CI[a.cat] ~= CI[b.cat] then return CI[a.cat] < CI[b.cat] end
     return a.i < b.i
   end)
+  for k = #macros, 1, -1 do table.insert(top, 1, macros[k]) end
   return top
 end
 
