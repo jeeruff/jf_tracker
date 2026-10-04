@@ -1232,14 +1232,16 @@ ctx = {
   end,
   -- нарезка во вкладке item (4 окт): s — меню, вторая клавиша — как резать
   slice_hydra = function()
-    local function eq(n) return function() SL.equal(n); vim.msg = SL.msg or ('%d equal slices'):format(n) end end
+    -- слайсер на выбранном сэмпле должен быть открыт — иначе резать нечего
+    local function ready() if not SL.active and ctx.open_slicer then ctx.open_slicer() end; return SL.active and SL.entry and not SL.entry.file end
+    local function eq(n) return function() if not ready() then vim.msg = 'slice: pick a sample of the track first'; return end; SL.equal(n); vim.msg = ('%d equal slices'):format(n) end end
     vim.open_hydra({ title = 'slice', items = {
-      { key = 't', label = 'at transients', fn = function() SL.use_transients(); vim.msg = SL.msg or 'sliced at transients' end },
+      { key = 't', label = 'at transients', fn = function() if not ready() then vim.msg = 'slice: pick a sample of the track first'; return end; SL.use_transients(); vim.msg = ('sliced at transients: %d slices'):format(#(SL.slices or {})) end },
       { key = '2', label = '2 equal', fn = eq(2) }, { key = '4', label = '4 equal', fn = eq(4) }, { key = '8', label = '8 equal', fn = eq(8) },
       { key = '1', label = '16 equal', fn = eq(16) }, { key = '3', label = '32 equal', fn = eq(32) }, { key = '6', label = '64 equal', fn = eq(64) },
-      { key = 'd', label = 'delete the slices', fn = function() SL.clear() end },        -- s d (4 окт): d = delete, как в Vim
-      { key = 'q', label = 'smart quantize', fn = function() SL.smart_quantize() end },
-      { key = 'z', label = 'autotrim the silence', fn = function() SL.autotrim() end },
+      { key = 'd', label = 'delete the slices', fn = function() if not ready() then return end; SL.clear() end },        -- s d (4 окт): d = delete, как в Vim
+      { key = 'q', label = 'smart quantize', fn = function() if not ready() then return end; SL.smart_quantize() end },
+      { key = 'z', label = 'autotrim the silence', fn = function() if not ready() then return end; SL.autotrim() end },
     } })
   end,
   octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)

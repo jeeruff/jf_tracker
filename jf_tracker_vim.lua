@@ -927,12 +927,12 @@ function V.key_impl(c)
   local st = ctx.state
   local n = V.count or 1
 
-  -- слайсер (оверлей) перехватывает всё
-  if ctx.slicer_active and ctx.slicer_active() then ctx.slicer_key(c); return end
-  -- fzf-пикер перехватывает всё
+  -- открытые fzf-пикер и hydra — первыми (4 окт: меню нарезки s открывалось
+  -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)
   if V.picker then V.picker_key(c); return end
-  -- hydra перехватывает всё
   if V.hydra then V.hydra_key(c); return end
+  -- слайсер (оверлей) перехватывает всё остальное
+  if ctx.slicer_active and ctx.slicer_active() then ctx.slicer_key(c); return end
 
   -- командная строка (+ подсказка и Tab-дополнение)
   if V.mode == 'cmd' then
