@@ -536,5 +536,18 @@ do
   keysin('v16j:interp vol'); V.key(13)
   eq(':interp vol: snare in the middle', last(), 'vol:snare:128')
 end
+-- Option+h / Option+l (4 окт): трек слева / справа, с любой подколонки
+reset()
+alt_down = true
+V.cur = { fi = 3, row = 4, field = 1 }        -- трек M
+V.key(729)
+eq('Option+h -> previous track (A)', flat_col_name and flat_col_name(V.cur.fi) or V.cur.fi, 1)
+V.cur = { fi = 2, row = 4, field = 1 }        -- вторая подколонка трека A
+V.key(172)
+eq('Option+l from a subcolumn -> next track (M)', V.cur.fi, 3)
+V.cur = { fi = 2, row = 4, field = 1 }
+V.key(729)
+eq('Option+h on the first track stays', V.cur.fi, 1)
+alt_down = false
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

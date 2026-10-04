@@ -1,9 +1,10 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.13'
+V.VERSION = '0.6.14'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.14', d = '2026-10-04', items = { 'Option+h / Option+l jump to the track on the left / right in any keyboard layout (the physical key is read; in the Russian layout Option+h gave another character)' } },
   { v = '0.6.13', d = '2026-10-04', items = {
     'tutorial: a cell in the main module (next to help / about / options) and :tutorial - jf_tracker in ten steps (move, write notes, pick a sound, slice, edit, select, commands, leader menu, play, help)',
     'about: a link to jeeruff.com right under the logo (clickable); the description says Vim is the foundation of the tracker',

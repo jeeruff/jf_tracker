@@ -6672,6 +6672,20 @@ local function frame()
     end
   end
   c = keys.translate(c)
+  -- Option+H / J / K / L (4 окт): символ зависит от раскладки (в русской Option+р —
+  -- не «˙»), поэтому смотрим физическую клавишу; код — как от Option+h в US
+  if c > 0 and reaper.JS_VKeys_GetState then
+    local m = ctx.mods()
+    if m.alt and not m.cmd and not m.ctrl then
+      local OPT_HJKL = { [729] = true, [8710] = true, [730] = true, [172] = true }
+      if not OPT_HJKL[c] then
+        local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
+        for vk, code in pairs({ [72] = 729, [74] = 8710, [75] = 730, [76] = 172 }) do
+          if ks and ks:byte(vk) ~= 0 then c = code; break end
+        end
+      end
+    end
+  end
   -- окно Options — модальное: все клавиши ему
   if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)
   -- пока держится нота (Cmd+нота): j / ↓ — +1 шаг, Esc — отмена, прочее (автоповтор клавиши) — глотаем
