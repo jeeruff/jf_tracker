@@ -1012,11 +1012,10 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local rbg = tint and U.mix(base, col.rgb, 0.18) or base
   local fill = tint and rawc or set
   fill(rbg); gfx.rect(x, y, w, h, 1)
-  fill(nbg); gfx.rect(x, y, w, L.rh + 1, 1)
   local T0, G0 = U.TEXT, U.GREY
   U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
-  text(x + L.pad, y + 1, fit(col.name ~= '' and col.name or 'track', w - 2 * L.pad), U.readable(T0, nbg, 4.5))
-  local yy = y + L.rh + 2
+  -- 4 окт (компактнее): имени нет — оно на вкладке трека в шапке DSP; кнопки — первой строкой
+  local yy = y + 2
   -- кнопки
   local bx = x + L.pad
   local mon = col.recmon or 0
@@ -1078,7 +1077,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local sy0 = yy
   local sbw = ms('smart') + 2 * L.pad
   local show_smart = w > ms('in ') + 6 * L.cw + sbw + 3 * L.pad
-  row('in', io.input .. ' v', 'input')
+  row('in', (io.input:gsub(' / in ', '/'):gsub(' / ', '/')) .. ' v', 'input')
   if show_smart and yy > sy0 then
     local sx = x + w - L.pad - sbw
     set(U.PANEL); gfx.rect(sx - L.pad, sy0, sbw + L.pad, L.rh, 1)        -- текст входа не залезает под кнопку
@@ -1088,14 +1087,27 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     text(sx + L.pad, sy0, 'smart', hot and U.AMBER or U.GREY)
     if hot then hover.trkio = { col = col, what = 'smart' } end
   end
-  row('out', (io.mainsend and 'master' or 'no master') .. (io.hw > 0 and ('  + hw ' .. io.hw) or ''), 'mainsend', io.mainsend)
+  -- out и сенды одной строкой (4 окт): слева master (клик — вкл / выкл),
+  -- справа «sN rN v» — панель сендов
+  local ry0 = yy
+  if yy + L.rh <= y + h then
+    local stxt = ('s%d r%d %s'):format(#io.sends, io.recv, D.sendpop == col.guid and '^' or 'v')
+    local sw = ms(stxt) + 2 * L.pad
+    local sx = x + w - L.pad - sw
+    local hot1 = mx >= x and mx < sx and my >= yy and my < yy + L.rh
+    local hot2 = mx >= sx and mx < x + w and my >= yy and my < yy + L.rh
+    if hot1 then set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, yy, sx - x - 1, L.rh, 1); hover.trkio = { col = col, what = 'mainsend' } end
+    if hot2 then set(U.tint(U.AMBER, 0.2)); gfx.rect(sx, yy, x + w - sx - 1, L.rh, 1); hover.trkio = { col = col, what = 'sends' } end
+    text(x + L.pad, yy, 'out', U.GREY)
+    local lx = x + L.pad + ms('send ') + L.pad
+    text(lx, yy, fit((io.mainsend and 'master' or 'no master') .. (io.hw > 0 and (' +hw' .. io.hw) or ''), sx - lx - L.pad), io.mainsend and U.TEXT or U.GREY)
+    text(sx + L.pad, yy, stxt, (#io.sends > 0 or io.recv > 0) and U.TEXT or U.GREY)
+    yy = yy + L.rh
+  end
   for _, sd in ipairs(io.sends) do
     local sdb = sd.vol > 1e-6 and 20 * math.log(sd.vol, 10) or -150
     row('send', ('%s  %s'):format(sd.name, sdb <= -60 and '-inf' or ('%+.1f'):format(sdb)), 'routing', not sd.mute)
   end
-  -- раскрывашка сендов (3 окт): клик по строке — панель сендов над блоком
-  local ry0 = yy
-  row('', ('sends %d  rcv %d  %s'):format(#io.sends, io.recv, D.sendpop == col.guid and '^' or 'v'), 'sends')
   if D.sendpop == col.guid then
     D.late_send = function() D.draw_sendpop(L, info, col, io, x, ry0, hover) end
   end
@@ -2861,7 +2873,7 @@ function D.frame(L, snap, rows, state, info)
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io then
-      local tw = L.cw * 24
+      local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
       local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, L.dsp_h - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
     end
