@@ -107,7 +107,15 @@ end
 -- строка режется на ASCII-куски (битмап, слот 0) и глифы (TTF, слот 2,
 -- размер = высота битмапа). D.hybrid ставит main (:font 0 + :icons).
 D.hybrid = false
-D.glyph_face = 'Menlo'          -- не-ASCII (кириллица) в битмап-режиме — системный моно (3 окт: TTF / Nerd убраны)
+-- не-ASCII (кириллица, Δ, ø) в битмап-режиме: пиксельный Monocraft, если он
+-- установлен (4 окт: Menlo был мелким и гладким рядом с битмапом), иначе Menlo
+D.glyph_face = (function()
+  local home = os.getenv('HOME') or ''
+  for _, f in ipairs({ home .. '/Library/Fonts/Monocraft-nerd-fonts-patched.ttc', home .. '/Library/Fonts/Monocraft.ttc', home .. '/Library/Fonts/Monocraft.otf', '/Library/Fonts/Monocraft.otf' }) do
+    local h = io.open(f, 'rb'); if h then h:close(); return 'Monocraft' end
+  end
+  return 'Menlo'
+end)()
 -- Разбор без исключений: utf8.codes бросает ошибку на битой UTF-8 (имя,
 -- обрезанное посреди символа, cp1251 из чужих проектов) — так скрипт и падал.
 -- gmatch по utf8.charpattern не бросает; одиночный «хвостовой» байт — пропуск.
@@ -127,14 +135,24 @@ end
 -- переключение слота gfx.setfont(2)
 local glyph_sig
 local function glyph_font()
-  -- кегль Menlo крупнее высоты строки битмапа (4 окт): при равном кегле
-  -- заглавные Menlo ниже битмапных — Δ и ø выходили крошечными
-  local sz = math.max(10, math.floor((D.bitmap_th or 11) * 1.35 + 0.5))
+  -- кегль (4 окт, проба): Monocraft на 15 при высоте битмапа 8 — заглавные
+  -- вровень с битмапными и пиксели ровные (×1.875, нечётный кегль чётче);
+  -- Menlo — прежние ×1.35
+  local th = D.bitmap_th or 8
+  local sz
+  if D.glyph_face == 'Monocraft' then sz = math.floor(th * 1.875 + 0.5); if sz % 2 == 0 then sz = sz - 1 end
+  else sz = math.max(10, math.floor(th * 1.35 + 0.5)) end
   local sig = D.glyph_face .. '|' .. sz
-  -- жирный (флаг 'b'): битмап REAPER толстый, обычный Menlo рядом бледный
-  if glyph_sig ~= sig then gfx.setfont(2, D.glyph_face, sz, string.byte('b')); glyph_sig = sig else gfx.setfont(2) end
+  -- Menlo — жирный (битмап толстый, обычный рядом бледный); пиксельный — как есть
+  if glyph_sig ~= sig then
+    if D.glyph_face == 'Monocraft' then gfx.setfont(2, D.glyph_face, sz) else gfx.setfont(2, D.glyph_face, sz, string.byte('b')) end
+    glyph_sig = sig
+  else gfx.setfont(2) end
 end
 D.reset_glyph = function() glyph_sig = nil end
+-- ширина куска битмапом: measurestr не считает хвостовые пробелы (' ' = 0) —
+-- между русскими словами пропадали пробелы (4 окт); меряем с меткой
+local function ascii_w(t) return gfx.measurestr(t .. '.') - gfx.measurestr('.') end
 local mcache, mcount = {}, 0
 local function measure_raw(str)
   if D.hybrid and str:find('[\128-\255]') then
@@ -143,7 +161,7 @@ local function measure_raw(str)
     w = 0
     for _, sg in ipairs(segments(str)) do
       if sg.glyph then glyph_font(); w = w + gfx.measurestr(sg.t); gfx.setfont(D.font_id)
-      else w = w + gfx.measurestr(sg.t) end
+      else w = w + ascii_w(sg.t) end
     end
     mcount = mcount + 1
     if mcount > 4000 then mcache, mcount = {}, 0 end
@@ -167,18 +185,20 @@ local function txt_img(str, col, bg)
   gfx.setfont(D.font_id)
   local w, h = measure_raw(str) + 1, gfx.texth
   local id = next_img; next_img = next_img + 1
-  gfx.setimgdim(id, w, h)
+  -- строка с глифами: картинка на 2 px ниже — хвосты р у щ не срезаются
+  local hi = (D.hybrid and str:find('[\128-\255]')) and (h + 2) or h
+  gfx.setimgdim(id, w, hi)
   local old = gfx.dest
   gfx.dest = id
   if bg then gfx.set(bg[1], bg[2], bg[3], 1) else gfx.set(0, 0, 0, 1) end
-  gfx.rect(0, 0, w, h, 1)
+  gfx.rect(0, 0, w, hi, 1)
   gfx.set(col[1], col[2], col[3], 1)
   gfx.setfont(D.font_id)
   if D.hybrid and str:find('[\128-\255]') then
     local x = 0
     for _, sg in ipairs(segments(str)) do
       if sg.glyph then glyph_font() else gfx.setfont(D.font_id) end
-      local sw = gfx.measurestr(sg.t)
+      local sw = sg.glyph and gfx.measurestr(sg.t) or ascii_w(sg.t)
       local gy = sg.glyph and math.floor((h - gfx.texth) / 2) or 0
       gfx.x, gfx.y = x, gy; gfx.drawstr(sg.t)
       x = x + sw
@@ -188,7 +208,7 @@ local function txt_img(str, col, bg)
     gfx.x, gfx.y = 0, 0; gfx.drawstr(str)
   end
   gfx.dest = old
-  e = { id = id, w = w, h = h }
+  e = { id = id, w = w, h = hi }
   tcache[key] = e
   return e
 end
@@ -456,7 +476,7 @@ local function text(x, y, s, col, bg)
         if sg.glyph then glyph_font() else gfx.setfont(D.font_id) end
         set(col); gfx.x, gfx.y = cx, math.floor(y) + (sg.glyph and math.floor((h - gfx.texth) / 2) or 0)
         gfx.drawstr(sg.t)
-        cx = cx + gfx.measurestr(sg.t)
+        cx = cx + (sg.glyph and gfx.measurestr(sg.t) or ascii_w(sg.t))
       end
       gfx.setfont(D.font_id)
       return
