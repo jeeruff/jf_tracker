@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.34'
+V.VERSION = '0.6.35'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.35', d = '2026-10-04', items = {
+    'DSP blocks for the REAPER fx: ReaEQ curve, ReaComp transfer curve, ReaXcomp bands, ReaDelay repeats, ReaVerbate room, ReaGate / ReaLimit level scale, ReaPitch shift - a picture in the first column, the parameters next to it',
+    'Airwindows plugins: the category (coloured) and a one-line description from the Airwindopedia under the name - every block tells what it is at a glance',
+  } },
   { v = '0.6.34', d = '2026-10-04', items = {
     'arp from slices: :arp live on a sliced sample - hold several slice keys, they take turns at the step (up / down / updown / random / played), each a step long',
     'step listen: the row under the moving cursor plays while the transport is stopped (quick toggle listen); option slices - its own module or the lower half of the lib',

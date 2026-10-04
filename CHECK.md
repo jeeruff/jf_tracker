@@ -348,6 +348,14 @@
 ## Арп из слайсов
 - [ ] `:arp live`, INSERT + m, нарезанный amen: зажать q + w + e — слайсы S01 S03 S05 чередуются по шагу (`:arp up/down/random` — порядок), каждый длиной в шаг, звучат; отпустить — конец
 
+## Встроенные эффекты REAPER и Airwindows в DSP (0.6.35)
+- [ ] ReaEQ: первая колонка — кривая АЧХ с точками полос 1–4; параметры f g q полос рядом, кривая следует
+- [ ] ReaComp: кривая компрессии (порог — точка, ratio подписан); ReaXcomp: 4 полосы по частоте с порогом и ratio
+- [ ] ReaDelay: повторы на шкале, затухают по feedback; ReaVerbate: «комната» по размеру / ширине / затуханию
+- [ ] ReaGate / ReaLimit: шкала уровня с порогом (и потолком у ReaLimit); ReaPitch: полутоны, центы, октавы, форманта
+- [ ] Любой Airwindows (например Acceleration, Density, Pressure6): под именем `[категория]` цветом и одна фраза описания из Airwindopedia
+- [ ] Список слайсов: подсказка opt+j k — только с hints и внизу
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue

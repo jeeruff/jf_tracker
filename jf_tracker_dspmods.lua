@@ -160,14 +160,95 @@ DM.modules = {
     },
   },
   {
+    -- ReaEQ (4 окт): кривая АЧХ по полосам (вид eq), параметры — f g q полос
     match = 'reaeq',
     title = 'ReaEQ',
+    cols = 3,
+    view = 'eq',
+    params = {
+      { 'Freq-Low Shelf', '1 lo f' }, { 'Gain-Low Shelf', '1 lo g' }, { 'BW-Low Shelf', '1 lo q' },
+      { 'Freq-Band 2', '2 f' }, { 'Gain-Band 2', '2 g' }, { 'BW-Band 2', '2 q' },
+      { 'Freq-Band 3', '3 f' }, { 'Gain-Band 3', '3 g' }, { 'BW-Band 3', '3 q' },
+      { 'Freq-High Shelf', '4 hi f' }, { 'Gain-High Shelf', '4 hi g' }, { 'BW-High Shelf', '4 hi q' },
+      { 'Global Gain', 'gain' },
+    },
+  },
+  {
+    -- ReaXcomp (4 окт): полосы по частоте, порог и ratio каждой (вид xcomp)
+    match = 'reaxcomp',
+    title = 'ReaXcomp',
+    cols = 3,
+    view = 'xcomp',
+    params = {
+      { '1-Band top frequency', '1 top' }, { '1-Threshold', '1 thr' }, { '1-Ratio', '1 ratio' }, { '1-Gain', '1 gain' },
+      { '2-Band top frequency', '2 top' }, { '2-Threshold', '2 thr' }, { '2-Ratio', '2 ratio' }, { '2-Gain', '2 gain' },
+      { '3-Band top frequency', '3 top' }, { '3-Threshold', '3 thr' }, { '3-Ratio', '3 ratio' }, { '3-Gain', '3 gain' },
+      { '4-Band top frequency', '4 top' }, { '4-Threshold', '4 thr' }, { '4-Ratio', '4 ratio' }, { '4-Gain', '4 gain' },
+    },
+  },
+  {
+    -- ReaComp (4 окт): кривая компрессии (вид comp)
+    match = 'reacomp',
+    title = 'ReaComp',
+    cols = 3,
+    view = 'comp',
+    params = {
+      { 'Threshold', 'thresh' }, { 'Ratio', 'ratio' }, { 'Knee', 'knee' },
+      { 'Attack', 'attack' }, { 'Release', 'release' }, { 'Pre-comp', 'pre-comp' },
+      { 'RMS size', 'rms' }, { 'Auto Make Up', 'auto gain' }, { 'Auto Release', 'auto rel' },
+      { 'Lowpass', 'det lp' }, { 'Hipass', 'det hp' }, { 'Dry', 'dry' }, { 'Wet', 'wet' },
+    },
+  },
+  {
+    -- ReaDelay (4 окт): повторы на шкале времени (вид delay)
+    match = 'readelay',
+    title = 'ReaDelay',
+    cols = 2,
+    view = 'delay',
+    params = {
+      { '1: Length (musical)', 'length' }, { '1: Feedback', 'feedback' }, { '1: Length (time)', 'ms' },
+      { '1: Lowpass', 'lowpass' }, { '1: Hipass', 'hipass' }, { '1: Stereo width', 'width' },
+      { '1: Pan', 'pan' }, { 'Wet', 'wet' }, { 'Dry', 'dry' },
+    },
+  },
+  {
+    -- ReaVerbate (4 окт): комната — размер, затухание, ширина (вид verb)
+    match = 'reaverbate',
+    title = 'ReaVerbate',
+    cols = 2,
+    view = 'verb',
+    params = {
+      { 'Room size', 'room' }, { 'Dampening', 'damp' }, { 'Width', 'width' }, { 'Delay', 'pre-delay' },
+      { 'Lowpass', 'lowpass' }, { 'Hipass', 'hipass' }, { 'Wet', 'wet' }, { 'Dry', 'dry' },
+    },
+  },
+  {
+    -- ReaGate (4 окт): шкала уровня с порогом (вид gate)
+    match = 'reagate',
+    title = 'ReaGate',
+    cols = 2,
+    view = 'gate',
+    params = {
+      { 'Threshold', 'thresh' }, { 'Hysteresis', 'hyst' }, { 'Attack', 'attack' }, { 'Hold', 'hold' },
+      { 'Release', 'release' }, { 'Pre-open', 'pre-open' }, { 'Lowpass', 'det lp' }, { 'Hipass', 'det hp' }, { 'Wet', 'wet' }, { 'Dry', 'dry' },
+    },
+  },
+  {
+    -- ReaLimit (4 окт): порог и потолок на шкале (вид limit)
+    match = 'realimit',
+    title = 'ReaLimit',
+    cols = 2,
+    view = 'limit',
+    params = { { 'Threshold', 'thresh' }, { 'Ceiling', 'ceiling' }, { 'Release', 'release' } },
+  },
+  {
+    -- ReaPitch (4 окт): сдвиг — полутоны, центы, октавы, форманта
+    match = 'reapitch',
+    title = 'ReaPitch',
     cols = 2,
     params = {
-      { 'Freq-Low Shelf', 'lo freq' }, { 'Gain-Low Shelf', 'lo gain' },
-      { 'Freq-Band 2', 'b2 freq' }, { 'Gain-Band 2', 'b2 gain' },
-      { 'Freq-Band 3', 'b3 freq' }, { 'Gain-Band 3', 'b3 gain' },
-      { 'Freq-High Shelf', 'hi freq' }, { 'Gain-High Shelf', 'hi gain' },
+      { '1: Shift (semitones)', 'semis' }, { '1: Shift (cents)', 'cents' }, { '1: Shift (oct)', 'oct' },
+      { '1: Formant adjust (semitones)', 'formant' }, { '1: Volume', 'volume' }, { '1: Pan', 'pan' }, { 'Wet', 'wet' }, { 'Dry', 'dry' },
     },
   },
 }

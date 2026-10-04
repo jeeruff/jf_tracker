@@ -1004,6 +1004,158 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
 end
 
+-- ── виды встроенных эффектов REAPER (4 окт): картинка состояния в первой
+-- колонке блока — АЧХ ReaEQ, кривая ReaComp, полосы ReaXcomp, повторы
+-- ReaDelay, комната ReaVerbate, шкалы ReaGate / ReaLimit. Значения — из
+-- отформатированных строк параметров (v.s) по подписям из реестра
+-- цвет категории Airwindows: стабильный по имени, читаемый на фоне
+function D.aw_colour(cat)
+  local h = 0
+  for i = 1, #(cat or '') do h = (h * 31 + cat:byte(i)) % 360 end
+  local c = U.hsv and U.hsv(h, 0.55, 0.95) or nil
+  if not c then
+    local pal = { U.CYAN, U.GREEN, U.AMBER, U.RED, U.mix(U.CYAN, U.RED, 0.5), U.mix(U.GREEN, U.AMBER, 0.5) }
+    c = pal[h % #pal + 1]
+  end
+  return U.readable(c, U.BG, 4.0)
+end
+D.FX_VIEWS = { eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true }
+local VRH = 8
+local function pnum(f, vals, label)
+  for i, p in ipairs(f.params or {}) do
+    if p.name == label then
+      local s = vals[i] and vals[i].s or ''
+      if s:find('inf') then return s:find('%-') and -150 or 150 end
+      local mult = s:lower():find('%dk') and 1000 or 1
+      local v = tonumber((s:gsub(',', '.')):match('[-+]?%d*%.?%d+'))
+      return v and v * mult or nil
+    end
+  end
+end
+local function lx(fq) return math.log(math.max(20, math.min(20000, fq)) / 20) / math.log(1000) end   -- 20 Гц..20 кГц → 0..1
+function D.fx_view(kind, f, vals, x, y, w, h)
+  set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  if w < 20 or h < 12 then return end
+  local function hline(v, col) set(col); gfx.rect(x + 1, math.floor(v), w - 2, 1, 1) end
+  local function freq_grid()
+    set(U.mix(U.PANEL, U.LINE, 0.6))
+    for _, fq in ipairs({ 100, 1000, 10000 }) do gfx.rect(x + math.floor(lx(fq) * (w - 1)), y + 1, 1, h - 2, 1) end
+  end
+  if kind == 'eq' then
+    freq_grid()
+    local cy = y + h / 2
+    hline(cy, U.LINE)
+    local bands = {
+      { t = 'ls', f = pnum(f, vals, '1 lo f'), g = pnum(f, vals, '1 lo g'), q = pnum(f, vals, '1 lo q') },
+      { t = 'pk', f = pnum(f, vals, '2 f'), g = pnum(f, vals, '2 g'), q = pnum(f, vals, '2 q') },
+      { t = 'pk', f = pnum(f, vals, '3 f'), g = pnum(f, vals, '3 g'), q = pnum(f, vals, '3 q') },
+      { t = 'hs', f = pnum(f, vals, '4 hi f'), g = pnum(f, vals, '4 hi g'), q = pnum(f, vals, '4 hi q') },
+    }
+    local gg = pnum(f, vals, 'gain') or 0
+    local function resp(fq)
+      local db = gg
+      for _, b in ipairs(bands) do
+        if b.f and b.g and b.f > 0 then
+          local o = math.log(fq / b.f, 2)
+          if b.t == 'pk' then local sg = math.max(0.05, (b.q or 2) / 2); db = db + b.g * math.exp(-0.5 * (o / sg) ^ 2)
+          elseif b.t == 'ls' then db = db + b.g / (1 + math.exp(o * 4))
+          else db = db + b.g / (1 + math.exp(-o * 4)) end
+        end
+      end
+      return db
+    end
+    local sc = (h / 2 - 2) / 18
+    set(U.AMBER)
+    local py
+    for px = 0, w - 3 do
+      local fq = 20 * 1000 ^ (px / (w - 3))
+      local yy = math.floor(cy - math.max(-18, math.min(18, resp(fq))) * sc + 0.5)
+      if py then gfx.line(x + px, py, x + 1 + px, yy) end
+      py = yy
+    end
+    for i, b in ipairs(bands) do
+      if b.f and b.g and b.f > 0 then
+        local bx2 = x + 1 + math.floor(lx(b.f) * (w - 3))
+        local by2 = math.floor(cy - math.max(-18, math.min(18, b.g)) * sc + 0.5)
+        set(U.CYAN); gfx.rect(bx2 - 2, by2 - 2, 5, 5, 1)
+        if h > 3 * VRH then text(bx2 + 3, by2 - VRH, tostring(i), U.GREY) end
+      end
+    end
+  elseif kind == 'comp' then
+    local thr = pnum(f, vals, 'thresh') or 0
+    local ratio = math.max(1, pnum(f, vals, 'ratio') or 1)
+    local side = math.min(w, h) - 4
+    local ox, oy = x + math.floor((w - side) / 2), y + 2
+    set(U.LINE); gfx.line(ox, oy + side, ox + side, oy)
+    local function out(i) return i < thr and i or thr + (i - thr) / ratio end
+    local function pt(i, o) return ox + (i + 60) / 60 * side, oy + side - (o + 60) / 60 * side end
+    set(U.AMBER)
+    local px0, py0 = pt(-60, out(-60))
+    for k = 1, 30 do local i = -60 + k * 2; local px1, py1 = pt(i, out(i)); gfx.line(px0, py0, px1, py1); px0, py0 = px1, py1 end
+    local tx, ty = pt(math.max(-60, math.min(0, thr)), math.max(-60, math.min(0, thr)))
+    set(U.CYAN); gfx.rect(math.floor(tx) - 2, math.floor(ty) - 2, 5, 5, 1)
+    text(ox + 2, oy + side - VRH - 2, ('%g:1'):format(math.floor(ratio * 10 + 0.5) / 10), U.GREY)
+  elseif kind == 'gate' or kind == 'limit' then
+    local thr = pnum(f, vals, 'thresh') or 0
+    local function ly(db) return y + 2 + (1 - (math.max(-60, math.min(0, db)) + 60) / 60) * (h - 4) end
+    set(U.mix(U.PANEL, U.GREEN, 0.25)); gfx.rect(x + 2, math.floor(ly(thr)), w - 4, math.max(1, math.floor(y + h - 2 - ly(thr))), 1)
+    hline(ly(thr), U.AMBER)
+    text(x + 3, math.max(y + 1, math.floor(ly(thr)) - VRH - 1), ('thr %.0f'):format(math.max(-99, thr)), U.AMBER)
+    if kind == 'gate' then
+      local hy = pnum(f, vals, 'hyst') or 0
+      if hy < 0 then hline(ly(thr + hy), U.GREY) end
+    else
+      local ce = pnum(f, vals, 'ceiling') or 0
+      hline(ly(ce), U.RED)
+      text(x + w - ms('ceil') - 3, math.floor(ly(ce)) + 1, 'ceil', U.RED)
+    end
+  elseif kind == 'xcomp' then
+    freq_grid()
+    local lo = 20
+    local cols = { U.CYAN, U.GREEN, U.AMBER, U.RED }
+    for b = 1, 4 do
+      local top = (b < 4) and (pnum(f, vals, b .. ' top') or 20000) or 20000
+      local x0 = x + 1 + math.floor(lx(lo) * (w - 3))
+      local x1 = x + 1 + math.floor(lx(top) * (w - 3))
+      local thr = pnum(f, vals, b .. ' thr') or 0
+      local rt = pnum(f, vals, b .. ' ratio') or 1
+      local hh = math.floor((1 - (math.max(-60, math.min(0, thr)) + 60) / 60) * (h - 4))
+      set(U.mix(U.PANEL, cols[b], 0.35)); gfx.rect(x0 + 1, y + 2, math.max(1, x1 - x0 - 2), math.max(1, hh), 1)
+      set(cols[b]); gfx.rect(x0 + 1, y + 2 + hh, math.max(1, x1 - x0 - 2), 1, 1)
+      if x1 - x0 > ms('9:1') + 2 then text(x0 + 2, y + h - VRH - 2, ('%g:1'):format(math.floor(rt * 10 + 0.5) / 10), U.GREY) end
+      if b < 4 then set(U.LINE); gfx.rect(x1, y + 1, 1, h - 2, 1) end
+      lo = top
+    end
+  elseif kind == 'delay' then
+    local len = math.max(0.05, pnum(f, vals, 'length') or 1)
+    local fb = pnum(f, vals, 'feedback') or -150
+    local g = fb <= -100 and 0 or 10 ^ (fb / 20)
+    local span = len * 8
+    local a = 1
+    set(U.TEXT); gfx.rect(x + 2, y + 2, 2, h - 4, 1)
+    for k = 1, 32 do
+      local px = x + 2 + math.floor(k * len / span * (w - 6))
+      if px > x + w - 3 then break end
+      local hh = math.floor(a * (h - 4))
+      if hh < 1 then break end
+      set(U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
+      a = a * g
+    end
+  elseif kind == 'verb' then
+    local room = (pnum(f, vals, 'room') or 50) / 100
+    local damp = (pnum(f, vals, 'damp') or 50) / 100
+    local wd = math.max(0.1, math.min(1, (pnum(f, vals, 'width') or 1)))
+    local cx, cy = x + w / 2, y + h / 2
+    for r = 1, 5 do
+      local sz = (0.25 + 0.75 * room) * (1 - (r - 1) * 0.17)
+      local hw, hh = sz * (w / 2 - 2) * wd, sz * (h / 2 - 2)
+      set(U.mix(U.PANEL, U.CYAN, math.max(0.08, (1 - damp * 0.8) * (1 - (r - 1) / 5))))
+      gfx.rect(math.floor(cx - hw), math.floor(cy - hh), math.floor(2 * hw), math.floor(2 * hh), 0)
+    end
+  end
+end
+
 -- ── блок трека слева в DSP (3 окт): полноценное управление выбранным треком ──
 -- имя, R I M S A + фаза / FX, громкость, панорама, вход (меню), master send,
 -- отправки (клик — окно маршрутизации REAPER). Фон — цвет трека, как шапка
@@ -2977,6 +3129,18 @@ function D.frame(L, snap, rows, state, info)
       local vals = info.fx_values and info.fx_values(f) or {}
       local pw = bw1 - 2 * L.pad
       local nfit = math.floor((bh - L.rh - 2) / L.rh)
+      -- Airwindows (4 окт): строка под именем — категория цветом и описание
+      local awi = f.airwin and info.airwin_info and info.airwin_info(f.airwin)
+      local aw_off = 0
+      if awi and nfit > 2 then
+        nfit = nfit - 1; aw_off = L.rh
+        local ay = by + L.rh + 1
+        local tag = awi.cat ~= '' and ('[' .. awi.cat .. '] ') or ''
+        local ccol = D.aw_colour(awi.cat)
+        text(bx + L.pad, ay, fit(tag, bw - 2 * L.pad), ccol)
+        local tx2 = bx + L.pad + ms(tag)
+        text(tx2, ay, fit(awi.desc or '', bx + bw - L.pad - tx2), U.GREY)
+      end
       local pcol0 = 0
       if f.container and f.kids then
         -- контейнер: левая колонка — дети и маршрутизация (| за предыдущим,
@@ -3024,6 +3188,12 @@ function D.frame(L, snap, rows, state, info)
         if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
+      end
+      if f.view and D.FX_VIEWS[f.view] then
+        -- вид встроенного эффекта REAPER (4 окт) — первая колонка
+        pcol0 = 1
+        VRH = L.rh
+        D.fx_view(f.view, f, vals, bx + L.pad, by + L.rh + 1, pw, bh - L.rh - 4)
       end
       if f.view == 'rec' then
         -- jf_rec (4 окт): волна кольца, выделение a..b, голова превью;
@@ -3152,7 +3322,7 @@ function D.frame(L, snap, rows, state, info)
         if pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)
         local bxc = bx + colk * bw1
-        local py = by + L.rh + 1 + ((pi - 1) % nfit) * L.rh
+        local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh
         -- rec (4 окт): параметры — снизу справа, под волной, последней строкой вверх
         if f.view == 'rec' then bxc = bx + bw - bw1; py = by + bh - (#f.params - pi + 2) * L.rh - 3 end   -- строка статуса, справа
         local v = vals[pi] or { n = 0, s = '' }

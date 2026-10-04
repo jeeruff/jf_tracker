@@ -3202,6 +3202,33 @@ ctx = {
     return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt }
   end,
   preset_cache = {},
+  -- Airwindopedia (4 окт): категория и первая фраза описания плагина Airwindows
+  aw_db = nil,
+  airwin_info = function(name)
+    if ctx.aw_db == nil then
+      ctx.aw_db = {}
+      local f
+      for _, p in ipairs({ '/Library/Audio/Plug-Ins/VST/Airwindopedia.txt', '/Library/Audio/Plug-Ins/Components/Airwindopedia.txt', '/Library/Audio/Plug-Ins/VST3/Airwindopedia.txt' }) do
+        f = io.open(p, 'r'); if f then break end
+      end
+      if f then
+        local in_cats = false
+        for ln in f:lines() do
+          if ln:match('^# Categories') then in_cats = true
+          elseif in_cats and ln:match('^#') then in_cats = false end
+          local cat, list = in_cats and ln:match('^([%w%s%-]+):%s*(.+)$')
+          if cat then for nm in list:gmatch('[^,]+') do local k = nm:gsub('^%s+', ''):gsub('%s+$', ''):lower(); ctx.aw_db[k] = ctx.aw_db[k] or {}; ctx.aw_db[k].cat = cat end end
+          local nm, desc = ln:match('^############ (%S+) is (.-)%.?%s*$')
+          if not nm then nm, desc = ln:match('^############ (%S+) (.-)%.?%s*$') end
+          if nm then local k = nm:lower(); ctx.aw_db[k] = ctx.aw_db[k] or {}; ctx.aw_db[k].desc = ctx.aw_db[k].desc or desc end
+        end
+        f:close()
+      end
+    end
+    local e = ctx.aw_db[(name or ''):lower()]
+    if not e then return nil end
+    return { cat = e.cat or '', desc = e.desc or '' }
+  end,
   -- A / B с морфингом (4 окт): снимки всех параметров эффекта (нормированные),
   -- ключ — GUID эффекта; ползунок внизу блока ведёт от A к B
   ab = {},
@@ -5577,6 +5604,7 @@ local function frame()
     dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
     fx_delta = ctx.fx_delta,
     fx_preset = ctx.fx_preset,
+    airwin_info = ctx.airwin_info,
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
     trk_io = (state.dsp and not state.khelp) and function(col)

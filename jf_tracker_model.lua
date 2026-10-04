@@ -1055,7 +1055,9 @@ function build_track_fx(tr)
         params[#params + 1] = { i = a.i, name = a.name, kind = a.kind, nsteps = a.nsteps, cat = a.cat, group = a.group }
       end
       local cols = math.max(1, math.min(3, math.ceil(#params / 8)))
-      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true }
+      -- Airwindows (4 окт): имя без «(airwindows)» — по нему категория и описание (Airwindopedia)
+      local aw = short:match('^(.-)%s*%([Aa]irwindows%)')
+      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw }
     end
   end
   return out

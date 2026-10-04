@@ -83,8 +83,11 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
   SP.slice_hover = nil
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
-  U.text(x + L.pad, y, ctx.fit(('slices %d   opt+j k'):format(math.max(0, #rows - 1)), w - L.pad), U.AMBER)
-  local n = math.max(1, math.floor((h - L.rh) / L.rh))
+  U.text(x + L.pad, y, ctx.fit(('slices %d'):format(math.max(0, #rows - 1)), w - L.pad), U.AMBER)
+  -- подсказка клавиш (4 окт): только с опцией hints, нижней строкой
+  local hints = ctx.state and ctx.state.hints
+  local n = math.max(1, math.floor((h - L.rh) / L.rh) - (hints and 1 or 0))
+  if hints then U.text(x + L.pad, y + (n + 1) * L.rh, ctx.fit('opt+j k: step', w - L.pad), U.DIM) end
   SP.slice_scroll = SP.slice_scroll or 0
   local si = 1
   for i, r in ipairs(rows) do if r.k == sel then si = i end end
