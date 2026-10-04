@@ -74,7 +74,8 @@ function E.transpose(heads, lpb, s) calls[#calls + 1] = ('transpose:%s:%+d'):for
 function E.set_pitch(heads, lpb, p) calls[#calls + 1] = ('pitch:%s:%d'):format(names(heads), p) end
 function E.note_off(heads, lpb, row) calls[#calls + 1] = ('off:%s@%d'):format(names(heads), row) end
 function E.insert_note(track, lane, lpb, row, pitch, vel, len, depot) calls[#calls + 1] = ('ins:%s@%d:%d:%d'):format(track, row, pitch, len) end
-function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), v) end
+function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
+function E.run(_, fn) fn() end
 function E.set_delay(heads, lpb, d) calls[#calls + 1] = ('delay:%s:%d'):format(names(heads), d) end
 function E.set_fx(heads, lpb, cmd, xx) calls[#calls + 1] = ('fx:%s:%s%02X'):format(names(heads), cmd, xx) end
 function E.clear_fx(heads, lpb, cmd) calls[#calls + 1] = ('clearfx:%s:%s'):format(names(heads), cmd) end
@@ -526,5 +527,14 @@ reset()
 keysin('dt'); eq('dt removes the time selection', last(), 'deltime')
 keysin('dr'); eq('dr clears the track in the region', last(), 'cleartrack')
 keysin('daw'); eq('daw clears all items of the track', last(), 'cleartrack:all')
+-- :interp (4 окт, Paketti): vol от первого к последнему по строкам
+reset()
+do
+  local sub = snap.cols[1].lanes[1].subs[1]
+  sub[0].vol, sub[8].vol, sub[16].vol = '00', '40', 'FF'
+  V.cur = { fi = 1, row = 0, field = 2 }
+  keysin('v16j:interp vol'); V.key(13)
+  eq(':interp vol: snare in the middle', last(), 'vol:snare:128')
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

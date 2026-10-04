@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.6'
+V.VERSION = '0.6.7'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.7', d = '2026-10-04', items = {
+    ':interp (from Paketti by Esa Ruoho) - in VISUAL each column gets the values between its first and last event filled in linearly by rows: vol, delay, note or a command (the field under the cursor or :interp vol|delay|note|S); one undo step',
+  } },
   { v = '0.6.6', d = '2026-10-04', items = {
     'kits: the save button in the lib header (:kitsave name) writes all lib samples - with slicing, marks, take FX - as a native REAPER track template TrackTemplates/jf_kits/<name>.RTrackTemplate (REAPER itself opens it with Insert track from template); the browser tab kits lists them, Enter puts a kit into the lib of the cursor track',
     'about: a short description under the logo and thanks to friends and teachers - Esa Ruoho (Lackluster), parts based on his Paketti, with a link to his Patreon',

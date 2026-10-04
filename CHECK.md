@@ -206,7 +206,10 @@
 - [ ] REAPER: Insert track from template → jf_kits/имя — трек с этими item открывается без ошибок
 - [ ] about: под логотипом описание и благодарность Esa Ruoho со ссылкой на Patreon
 
+## Paketti: интерполяция (0.6.7)
+- [ ] `v` по колонке с 3+ нотами, курсор на vol, `:interp` — громкости ровно от первой к последней; на ноте — высоты; `:interp S` — команды Sxx
+
 ## В работе (ещё не готово)
-- Paketti: переносить функции постепенно (с благодарностью в about)
+- Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
 - легато: само подстраиваться при смене темпа (сейчас — повторить :legato)
 - jf_pm: сабпроекты и депо (README)
