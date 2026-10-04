@@ -126,7 +126,8 @@ local function reset()
         function(it) calls[#calls + 1] = 'pick:' .. it.label end)
     end,
     delete_item_at_cursor = function() calls[#calls + 1] = 'delitem'; return true end,
-    clear_track = function() calls[#calls + 1] = 'cleartrack'; return true end,
+    clear_track = function(all) calls[#calls + 1] = all and 'cleartrack:all' or 'cleartrack'; return true end,
+    delete_track = function() calls[#calls + 1] = 'deltrack'; return true end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     env_points = function(e, r0, r1) calls[#calls + 1] = ('envpts:%s@%d-%d'):format(e.name, r0, r1); return { { dq = 0, v = 0.5 } } end,
@@ -451,7 +452,7 @@ keysin(':beatsync bar'); V.key(13); eq(':beatsync bar', last(), 'beatsync:kick:b
 -- dW / dt и подсказка продолжений (2 окт)
 reset(); keysin('d'); eq('d pending hint', (V.pending_hint() or ''):match('W whole item') ~= nil, true)
 keysin('W'); eq('dW → delete item', last(), 'delitem'); eq('hint gone', V.pending_hint(), nil)
-reset(); keysin('dt'); eq('dt → clear track', last(), 'cleartrack')
+reset(); keysin('dr'); eq('dr → clear track in region', last(), 'cleartrack')
 reset(); keysin('3d'); eq('count in hint', (V.pending_hint() or ''):sub(1, 2), '3 ')
 V.key(27)
 reset(); keysin('z'); eq('z hint', (V.pending_hint() or ''):match('^z:') ~= nil, true); V.key(27)
@@ -519,5 +520,10 @@ eq('note goes to the live arp', last(), 'arplive:60@20')
 V.key(27)
 keysin(':arp live'); V.key(13)
 eq(':arp live off', V.arp_live, false)
+-- dt / dr / daw (4 окт)
+reset()
+keysin('dt'); eq('dt deletes the track', last(), 'deltrack')
+keysin('dr'); eq('dr clears the track in the region', last(), 'cleartrack')
+keysin('daw'); eq('daw clears all items of the track', last(), 'cleartrack:all')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

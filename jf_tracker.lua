@@ -971,11 +971,13 @@ ctx = {
   end,
   -- dt: очистить трек курсора в его регионе; вне региона — от =START до =END
   -- (библиотека за =LIB не трогается)
-  clear_track = function()
+  -- dr — трек курсора в регионе (вне региона — =START..=END); daw (all = true) —
+  -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
+  clear_track = function(all)
     local f = L.flat[vim.cur.fi]
     if not (f and f.col) then return false end
     local tr = f.col.track
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = (not all) and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
     local t0 = rg and rg.pos or (model.marker_pos(model.START_MARKER) or 0)
     local t1 = rg and rg.rgnend or model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
     local n = 0
@@ -986,8 +988,18 @@ ctx = {
         if pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
       end
     end)
-    vim.msg = ('dt: %d item(s) of %s cleared in %s'):format(n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (=START..=END)')
+    vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'daw' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
+  end,
+  -- dt (4 окт) — удалить трек курсора целиком (с FX), один undo
+  delete_track = function()
+    local f = L.flat[vim.cur.fi]
+    if not (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) then return false end
+    local name = f.col.name
+    edit.run('delete track', function() reaper.DeleteTrack(f.col.track) end)
+    model.invalidate()
+    vim.msg = 'dt: track ' .. (name or '') .. ' deleted (ctrl+z - back)'
+    return true
   end,
   -- страница справки для модуля в фокусе
   help_page = function()

@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.2'
+V.VERSION = '0.6.3'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.3', d = '2026-10-04', items = {
+    'keys: dt deletes the cursor track (with its FX, one undo); dr clears the track in the cursor region (the old dt); daw deletes all items of the track in the song (the lib after =LIB stays)',
+  } },
   { v = '0.6.2', d = '2026-10-03', items = {
     'legato (:legato): every audio note of the cursor track (or the VISUAL rows) stretches to the start of the next note - no gaps between slices; stretched by rate with the pitch kept, so it follows the tempo (slower - longer, faster - shorter); the note keeps its own length (P_EXT:jf_nat): repeating does not pile up, :legato off restores; :legato auto - the track stays legato while you insert',
   } },

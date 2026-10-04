@@ -1173,6 +1173,10 @@ function V.key_impl(c)
       local keys = name and V.regs['@' .. name]
       if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
       V.count = nil; return
+    elseif p == 'da' then
+      -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)
+      if c == ('w'):byte() and ctx.clear_track(true) then finish_edit() else finish_move() end
+      V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
       if c == p:byte() then      -- dd yy cc: n строк
         local f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1
@@ -1190,10 +1194,16 @@ function V.key_impl(c)
         if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
         V.count = nil; return
       end
+      -- dt — удалить трек, dr — очистить трек в регионе, daw — все item трека (4 окт)
       if p == 'd' and c == ('t'):byte() then
+        if ctx.delete_track() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
+      if p == 'd' and c == ('r'):byte() then
         if ctx.clear_track() then finish_edit() else finish_move() end
         V.count = nil; return
       end
+      if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
       local t = motion(c, n)
       if t then
         local f0, f1, r0, r1 = range_or_event(p, t)
@@ -1502,13 +1512,14 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d rows | w event | W whole item | t track in region | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d rows | w event | W whole item | t delete track | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | Esc',
   z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom',
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
+  da = 'da: w all items of the track (the lib after =LIB stays) | Esc',
   ['@'] = '@: a..z play macro | @ repeat last',
 }
 function V.pending_hint()
