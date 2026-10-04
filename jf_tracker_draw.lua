@@ -127,9 +127,12 @@ end
 -- переключение слота gfx.setfont(2)
 local glyph_sig
 local function glyph_font()
-  local sz = math.max(8, math.floor(D.bitmap_th or 11))
+  -- кегль Menlo крупнее высоты строки битмапа (4 окт): при равном кегле
+  -- заглавные Menlo ниже битмапных — Δ и ø выходили крошечными
+  local sz = math.max(10, math.floor((D.bitmap_th or 11) * 1.35 + 0.5))
   local sig = D.glyph_face .. '|' .. sz
-  if glyph_sig ~= sig then gfx.setfont(2, D.glyph_face, sz); glyph_sig = sig else gfx.setfont(2) end
+  -- жирный (флаг 'b'): битмап REAPER толстый, обычный Menlo рядом бледный
+  if glyph_sig ~= sig then gfx.setfont(2, D.glyph_face, sz, string.byte('b')); glyph_sig = sig else gfx.setfont(2) end
 end
 D.reset_glyph = function() glyph_sig = nil end
 local mcache, mcount = {}, 0
@@ -993,19 +996,13 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
                  { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
                  { 'ø', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
   for _, b in ipairs(btns) do
-    local glyph = b[1] == 'ø'                    -- ø фазы: битмап-шрифт его не знает — рисуем кругом и чертой
-    local bw = glyph and L.btn_w or math.max(L.btn_w, ms(b[1]) + 4)
+    -- ø фазы — буква (4 окт: был круг с чертой); не-ASCII рисует системный моно
+    local bw = math.max(L.btn_w, ms(b[1]) + 4)
     if bx + bw > x + w - L.pad then break end
     local on = b[2]
     set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
     set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
-    if glyph then
-      local cx, cy = bx + bw / 2, yy + (L.rh - 2) / 2
-      local r = math.max(2, math.floor(math.min(bw, L.rh - 2) / 2) - 2)
-      set(on and b[3] or U.GREY)
-      gfx.circle(cx, cy, r, false, true)
-      gfx.line(cx - r - 1, cy + r + 1, cx + r + 1, cy - r - 1)
-    else text(bx + 2, yy, b[1], on and b[3] or U.GREY) end
+    text(bx + math.floor((bw - ms(b[1])) / 2), yy, b[1], on and b[3] or U.GREY)
     if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
       if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
     end
@@ -2844,8 +2841,8 @@ function D.frame(L, snap, rows, state, info)
       if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
-      -- D (4 окт) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'D', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
+      -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 4 * kb - 9
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)

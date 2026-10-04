@@ -1,9 +1,16 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.21'
+V.VERSION = '0.6.22'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.22', d = '2026-10-04', items = {
+    'no icons, only letters: the delta solo button of an fx is the real letter Δ, the phase button is the letter ø (was a drawn circle); the rule is in about and in the help',
+  } },
+  { v = '0.6.21', d = '2026-10-04', items = {
+    'DSP: an input meter on the left (in - the record input of an armed track, pre - the items before the fx while playing) and the output after all fx on the right (out); under it comp - gain compensation (JS Volume Adjustment "gain comp" last in the chain follows the level before the fx; click again freezes, right click removes); every fx block has delta solo (native REAPER :delta); smart input moved from the track header into the DSP track block',
+    'lib: the slice zone on the mini wave is inverted (wave-coloured background, the wave in the background colour), no frame',
+  } },
   { v = '0.6.20', d = '2026-10-04', items = {
     'a slice is a note, as in Renoise: slice k shows as the note C-4 + k - 1 (C-4, C#4, D-4 ...) and the command column is free (no more S01 / T06); the normal MIDI keyboard q 2 w 3 e r 5 t ... writes slices 1 2 3 4 5 6 7 8 (17 per octave, z / x by 12); MIDI keys and the item tab label use the same mapping',
     'Option + key on a sliced sample: the last used slice at that pitch (q = original, shown as Pxx); ; in INSERT - the whole sample (mother item); r + note on a slice note picks another slice',
@@ -572,6 +579,7 @@ V.INTRO = {
   'drive every module - the mouse is optional.',
   'The tracker is only a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes and FX stay native,',
   'nothing to export or lose - close the window and the project plays on; every edit is one REAPER undo step.',
+  'No icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
 }
 V.THANKS = {
   'Thanks to my friends and teachers - in particular Esa Ruoho (Lackluster):',
