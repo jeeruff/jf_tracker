@@ -514,6 +514,8 @@ ctx = {
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
+  -- tutorial (4 окт): первые шаги — окном about без логотипа
+  tutorial = function() OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end) end,
   -- ссылка из about (4 окт): в браузере системы
   open_url = function(url)
     if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url)
@@ -4361,6 +4363,7 @@ function ctrl_action(name, delta)
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'about' then if delta == 0 then ctx.about() end
+  elseif name == 'tutorial' then if delta == 0 then ctx.tutorial() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end

@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.12'
+V.VERSION = '0.6.13'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.13', d = '2026-10-04', items = {
+    'tutorial: a cell in the main module (next to help / about / options) and :tutorial - jf_tracker in ten steps (move, write notes, pick a sound, slice, edit, select, commands, leader menu, play, help)',
+    'about: a link to jeeruff.com right under the logo (clickable); the description says Vim is the foundation of the tracker',
+  } },
   { v = '0.6.12', d = '2026-10-04', items = { ':kitsave is now :libsave (the save button in the lib asks it)' } },
   { v = '0.6.11', d = '2026-10-04', items = { 'about: the Patreon link is clickable (underlined, lit under the mouse) - opens in the system browser' } },
   { v = '0.6.10', d = '2026-10-04', items = { 'theme screamtracker removed' } },
@@ -541,6 +545,8 @@ V.CHANGES = {
 -- благодарности; дальше — изменения
 V.INTRO = {
   'A tracker view of REAPER: write a whole track from the keyboard in one window - patterns, their order, sounds.',
+  'Vim is the foundation: modes, operators + motions, counts, registers, the dot repeat and the : command line',
+  'drive every module - the mouse is optional.',
   'The tracker is only a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes and FX stay native,',
   'nothing to export or lose - close the window and the project plays on; every edit is one REAPER undo step.',
 }
@@ -549,8 +555,26 @@ V.THANKS = {
   'parts of jf_tracker are based on his Paketti for Renoise, used with his permission.',
   'Support his work: https://www.patreon.com/esaruoho',
 }
+-- tutorial (4 окт): первые шаги, ячейка tutorial главного модуля / :tutorial
+V.TUTORIAL = {
+  'jf_tracker in ten steps - every key here is a Vim habit',
+  '',
+  '1. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
+  '2. Write notes. i - INSERT. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
+  '3. Pick a sound. The lib on the right: Tab to it, j k - select; in INSERT , . switch sounds. Shift+note only plays.',
+  '4. Slice a break. Select a sample, the item tab on top: 8 = eight equal slices, t = by transients. In INSERT q..p write slices; Sxx in the command column is the slice.',
+  '5. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
+  '6. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
+  '7. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
+  '8. Leader. \\ opens the menu: \\ o - options as quick switches, \\ v - view, \\ v a - about.',
+  '9. Play. Space - play / stop, F - follow the playhead; =START and =END markers bound the song.',
+  '10. Help. ? shows the keys of the focused module; Tab in the help searches all pages.',
+  '',
+  'Everything you write is plain REAPER: tracks, items, MIDI, regions - close the window and keep working in REAPER.',
+}
+
 function V.lines()
-  local out = { ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
+  local out = { 'https://jeeruff.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
   out[#out + 1] = ''
   for _, l in ipairs(V.THANKS) do out[#out + 1] = l end

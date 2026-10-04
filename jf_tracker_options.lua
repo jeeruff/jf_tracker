@@ -24,7 +24,7 @@ end
 -- Esc закрывает окно целиком, не возвращает в список опций
 function O.open_about(fn)
   local a = fn()
-  O.logo, O.about = a.logo, a.text or {}
+  O.logo, O.about, O.title = a.logo, a.text or {}, a.title
   O.page, O.ascroll, O.active = 'about', 0, true
 end
 function O.close() O.active = false; O.drag = nil end
@@ -128,7 +128,7 @@ local function draw_about(L, W, H)
   O.hover = nil                       -- клик по about не должен переключать опции под ним
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
-  U.text(bx + L.pad, by + 2, ctx.fit('about   j k / wheel: scroll   Esc: close', bw - 2 * L.pad), U.AMBER)
+  U.text(bx + L.pad, by + 2, ctx.fit((O.title or 'about') .. '   j k / wheel: scroll   Esc: close', bw - 2 * L.pad), U.AMBER)
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local y = by + rh + 2 + L.pad
   if O.logo and LGO then
@@ -202,7 +202,7 @@ local function draw_about(L, W, H)
       end
       y = y + ih + drip_h + L.pad
     else
-      U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad
+      if not O.title then U.text(bx + L.pad, y, ctx.fit(LGO.SHORT, bw - 2 * L.pad), U.AMBER); y = y + rh + L.pad end   -- tutorial — без логотипа
     end
   end
   -- перенос по словам под ширину окна (продолжение — с отступом пункта);

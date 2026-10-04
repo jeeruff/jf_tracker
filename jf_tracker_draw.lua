@@ -1193,6 +1193,7 @@ local function draw_ctrl(L, info, H, hover)
     { name = 'help', items = {
       { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'about', 'about', U.GREY },
       { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
+      { 'tutorial', 'tutorial', U.CYAN },
     } },
     { name = 'options', items = {
       { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) },
