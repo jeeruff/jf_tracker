@@ -130,7 +130,18 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
     if hot then hover = t end
     bx = bx + bw + L.pad
   end
-  U.text(bx, y + 3, fit((title or '') .. (NT.dirty and ' *' or ''), x + w - L.pad - bx), U.GREY)
+  -- − + (4 окт): размер текста заметок — справа в шапке
+  local zw = U.measure('+') + 2 * L.pad
+  local zx = x + w - L.pad - 2 * zw - 2
+  for i, z in ipairs({ { '-', 'zoom-' }, { '+', 'zoom+' } }) do
+    local kx = zx + (i - 1) * (zw + 2)
+    local hot = mx >= kx and mx < kx + zw and my >= y + 2 and my < y + 2 + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(kx, y + 2, zw, L.rh, 1)
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(kx, y + 2, zw, L.rh, 0)
+    U.text(kx + L.pad, y + 3, z[1], hot and U.AMBER or U.GREY)
+    if hot then hover = z[2] end
+  end
+  U.text(bx, y + 3, fit((title or '') .. (NT.dirty and ' *' or ''), zx - L.pad - bx), U.GREY)
   -- текст с переносом по ширине
   local top = y + L.rh + 6
   local cw = U.measure('W')

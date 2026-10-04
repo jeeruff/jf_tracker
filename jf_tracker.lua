@@ -140,7 +140,7 @@ local state = {
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
-  glyphfont = (function() local v = reaper.GetExtState(EXT, 'glyphfont'); return v ~= '' and v or 'bigblue' end)(),   -- шрифт букв вне битмапа (4 окт)
+  notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,   -- масштаб текста заметок (4 окт), 0 — как везде
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
@@ -365,7 +365,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('glyphfont', state.glyphfont or 'bigblue'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -692,9 +692,26 @@ ctx = {
     local _, order = ctx.ss_read()
     local keysq = '1234567890'
     local items = { { key = 's', label = 'save the current view as …', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ssave ' end } }
-    for i, name in ipairs(order) do
-      if i > #keysq then break end
-      items[#items + 1] = { key = keysq:sub(i, i), label = name, fn = function() ctx.ss_load(name) end }
+    -- готовые виды и свои слоты (4 окт): pt-mode, большой сэмпл, макро;
+    -- user1..3 — загрузить, пустой — сохранить в него текущий вид
+    items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
+    items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
+    items[#items + 1] = { key = 'm', label = 'macro - bird view, a row is a bar', fn = function() vim.run_cmd('macro') end }
+    local have = {}
+    for _, name in ipairs(order) do have[name] = true end
+    for i, k in ipairs({ 'z', 'x', 'c' }) do
+      local nm = 'user' .. i
+      items[#items + 1] = { key = k, label = have[nm] and nm or (nm .. ' (empty - saves the current view)'), fn = function()
+        if have[nm] then ctx.ss_load(nm) else vim.run_cmd('ssave ' .. nm) end
+      end }
+    end
+    local n = 0
+    for _, name in ipairs(order) do
+      if not name:match('^user[123]$') then
+        n = n + 1
+        if n > #keysq then break end
+        items[#items + 1] = { key = keysq:sub(n, n), label = name, fn = function() ctx.ss_load(name) end }
+      end
     end
     if #order > 0 then
       items[#items + 1] = { key = 'd', label = 'delete …', sub = function()
@@ -2708,7 +2725,6 @@ ctx = {
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
       flag('meters', 'meters', 'peak meters over the track columns'),
-      { key = 'glyphfont', label = 'letters font', kind = 'cycle', values = (function() local t = {}; for _, g in ipairs(draw.GLYPH_FACES) do t[#t + 1] = g.key end; return t end)(), desc = 'TTF font for letters the bitmap lacks (cyrillic, Δ, ø)', get = function() return state.glyphfont or 'bigblue' end, set = function(v) state.glyphfont = v; draw.glyph_key = v; draw.reset_glyph(); draw.reset_measure(); draw.set_font(state) end },
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
@@ -5287,7 +5303,6 @@ local function frame()
   if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
-  draw.glyph_key = state.glyphfont or 'bigblue'          -- опция letters font
   draw.hybrid = true                                     -- не-ASCII (кириллица) — системным моно-шрифтом высотой с битмап
   local hover
   if idle_skip then hover = idle.hover else
@@ -5414,6 +5429,9 @@ local function frame()
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
       captions = state.captions, hdrfill = state.hdrfill,
       xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
+      -- открытые окна (4 окт): их кнопки в главном модуле — оранжевым фоном
+      about_open = OPT.active and OPT.page == 'about', options_open = OPT.active and OPT.page ~= 'about',
+      tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
@@ -5435,7 +5453,16 @@ local function frame()
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
-      return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
+      -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
+      local sc = state.notes_scale or 0
+      if sc <= 0 or sc == draw.SCALE then return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title) end
+      local s0, extra = draw.SCALE, Lx.rh - draw.texth()
+      draw.SCALE = sc
+      local L2 = setmetatable({ rh = draw.texth() + extra, cw = draw.measure('W') }, { __index = Lx })
+      local ok, r = pcall(NT.draw, U, L2, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title)
+      draw.SCALE = s0
+      if not ok then error(r, 0) end
+      return r
     end or nil,
     -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
     fxb_expand = state.focus == 'fxb',                          -- фокус (клик / Tab) — раскрыт
@@ -6187,6 +6214,11 @@ local function frame()
       -- коробка задачи (4 окт): переключить и сразу записать
       local tl = tonumber(tostring(hover.notes):match('^todo:(%d+)$'))
       if tl and NT.toggle(tl) then ctx.notes_save(); vim.msg = 'todo ' .. (NT.lines[tl]:match('%[x%]') and 'done' or 'open') end
+      if hover.notes == 'zoom-' or hover.notes == 'zoom+' then
+        local cur = (state.notes_scale or 0) > 0 and state.notes_scale or draw.SCALE
+        state.notes_scale = math.max(1, math.min(4, cur + (hover.notes == 'zoom+' and 1 or -1)))
+        vim.msg = 'notes text x' .. state.notes_scale
+      end
       click = { t = now2, zone = 'notes' }
     elseif hover.fxb then
       ctx.set_focus('fxb')
@@ -7336,4 +7368,6 @@ frame = (function(inner)
 end)(frame)
 
 reaper.atexit(save_win)
+-- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
+if state.notes_open then pcall(ctx.notes_load) end
 frame()

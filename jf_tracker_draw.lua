@@ -112,7 +112,7 @@ D.hybrid = false
 -- по пробе), bold — жирный рядом с толстым битмапом, odd — нечётный кегль
 -- (пиксельные чётче). По умолчанию BigBlueTermPlus — DOS-шрифт, ближе всех к битмапу
 D.GLYPH_FACES = {
-  { key = 'bigblue',   face = 'BigBlueTermPlus Nerd Font Mono', k = 1.25 },
+  { key = 'bigblue',   face = 'BigBlueTermPlus Nerd Font Mono', k = 1.5 },   -- 4 окт: крупнее, единственный
   { key = 'departure', face = 'DepartureMono Nerd Font Mono',   k = 1.4 },
   { key = 'terminess', face = 'Terminess Nerd Font Mono',       k = 1.5, bold = true },
   { key = '3270',      face = '3270 Nerd Font Mono',            k = 1.5, bold = true },
@@ -1264,9 +1264,10 @@ local function draw_ctrl(L, info, H, hover)
   -- опции вида; тонкая линия; внизу модуля, прижато ко дну — транспорт и ввод
   local groups = {
     { name = 'help', items = {
-      { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'about', 'about', U.GREY },
-      { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
-      { 'tutorial', 'tutorial', U.CYAN }, { 'screensets', 'screensets', U.CYAN },
+      -- кнопки с рамкой (4 окт): открытое окно — оранжевый фон, иначе серый текст
+      { 'help', 'help', btn = true, on = c.khelp }, { 'about', 'about', btn = true, on = c.about_open },
+      { 'options', 'options', btn = true, on = c.options_open }, { 'notes', 'notes', btn = true, on = c.notes },
+      { 'tutorial', 'tutorial', btn = true, on = c.tour }, { 'screensets', 'screensets', btn = true, on = c.ss_open },
     } },
     { name = 'control', bottom = true, items = {
       { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
@@ -1292,6 +1293,17 @@ local function draw_ctrl(L, info, H, hover)
     if y + L.rh > H - 2 then return end
     local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
     local kbd = info.focus == 'ctrl' and info.ctrl_sel == it[1]       -- курсор клавиатуры (3 окт)
+    if it.btn then
+      -- кнопка окна: рамка; открыто — оранжевый фон и тёмный текст
+      local on = it.on
+      set(on and U.AMBER or ((hot or kbd) and D.CURROW or U.PANEL)); gfx.rect(x, y, colw - 2, L.rh, 1)
+      set(on and U.AMBER or ((hot or kbd) and U.AMBER or U.LINE)); gfx.rect(x, y, colw - 2, L.rh, 0)
+      if hot then hover.ctrl = it[1] end
+      D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
+      text(x + 3, y + 1, fit(it[2], colw - 6), on and U.BG or ((hot or kbd) and U.AMBER or U.GREY))
+      hint('ctrl', x, y, colw, L.rh, it[1])
+      return
+    end
     if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(x, y, colw - 2, L.rh, 1)
     elseif hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1) end
     if hot then hover.ctrl = it[1] end

@@ -1,9 +1,16 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.25'
+V.VERSION = '0.6.26'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.26', d = '2026-10-04', items = {
+    'letters the bitmap lacks (cyrillic, Δ, ø) - BigBlueTermPlus, bigger; spaces between such words no longer vanish',
+    'main module: help / about / options / notes / tutorial / screensets are framed buttons - the open window has an orange background, the rest grey text; no ? before help',
+    'notes: - + in the header set the text size of the notes',
+    'screensets menu: p pt-mode, b big sample editor, m macro view; z x c - user1..3 (empty slot saves the current view)',
+    'auto modules: Macro N first, more parameters, no empty column; DSP rec: wave across the block',
+  } },
   { v = '0.6.25', d = '2026-10-04', items = {
     'DSP module rec for jf_rec: the ring buffer of the track right in its fx block - wave (old left, head right), drag selects, all / play / stop / put / lib, status (length, rec / paused, selection); the same selection and actions as the rec tab',
     'the depot button of the rec tab works again (it sent lib, the handler waited for depot)',
