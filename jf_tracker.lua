@@ -542,6 +542,74 @@ ctx = {
     model.invalidate()
     vim.msg = ('repeat rows %d-%d down to %d%s: %d copies'):format(r0, rc - 1, r1 - 1, all and ' on all tracks' or '', n)
   end,
+  -- скринсеты (4 окт): вид целиком под именем — все опции окна options и
+  -- положения / размеры модулей; файл Data/jf_tracker_screensets.txt (вне репо)
+  ss_file = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_screensets.txt' end,
+  SS_LAYOUT = { 'top', 'toptab', 'dsp', 'side', 'sidenarrow', 'mx_hidden', 'fxb', 'notes_open', 'khelp',
+                'top_px', 'side_px', 'inst_px', 'mx_px', 'fxb_px', 'mx_fold_px', 'hscroll', 'fxcols', 'lpb', 'envs', 'follow', 'fixed', 'lock' },
+  ss_read = function()
+    local f = io.open(ctx.ss_file(), 'r')
+    if not f then return {}, {} end
+    local text = f:read('*a'); f:close()
+    return draw.screensets.decode(text)
+  end,
+  ss_write = function(sets, order)
+    reaper.RecursiveCreateDirectory(reaper.GetResourcePath() .. '/Data', 0)
+    local f = io.open(ctx.ss_file(), 'w'); if not f then return false end
+    f:write(draw.screensets.encode(sets, order)); f:close()
+    return true
+  end,
+  ss_save = function(name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('\t', ' ')
+    if name == '' then vim.msg = 'ssave: a name please'; return end
+    local t = {}
+    for _, it in ipairs(ctx.option_items()) do
+      if it.get and it.key then local v = it.get(); if type(v) ~= 'table' and v ~= nil then t['o_' .. it.key] = v end end
+    end
+    for _, k in ipairs(ctx.SS_LAYOUT) do local v = state[k]; if v ~= nil and type(v) ~= 'table' then t[k] = v end end
+    local sets, order = ctx.ss_read()
+    if not sets[name] then order[#order + 1] = name end
+    sets[name] = t
+    vim.msg = ctx.ss_write(sets, order) and ('screenset saved: ' .. name) or 'ssave: cannot write the file'
+  end,
+  ss_load = function(name)
+    local sets = ctx.ss_read()
+    local t = sets[name or '']
+    if not t then vim.msg = 'no screenset ' .. tostring(name); return end
+    for _, it in ipairs(ctx.option_items()) do
+      local v = t['o_' .. (it.key or '')]
+      if v ~= nil and it.set and it.get and it.get() ~= v then pcall(it.set, v) end
+    end
+    for _, k in ipairs(ctx.SS_LAYOUT) do if t[k] ~= nil then state[k] = t[k] end end
+    if MX then MX.fold = state.mxfold end
+    draw.set_font(state); model.invalidate()
+    vim.msg = 'screenset: ' .. name
+  end,
+  ss_delete = function(name)
+    local sets, order = ctx.ss_read()
+    if not sets[name] then return end
+    sets[name] = nil
+    for i, n in ipairs(order) do if n == name then table.remove(order, i); break end end
+    ctx.ss_write(sets, order)
+    vim.msg = 'screenset deleted: ' .. name
+  end,
+  screensets_hydra = function()
+    local _, order = ctx.ss_read()
+    local keysq = '1234567890'
+    local items = { { key = 's', label = 'save the current view as …', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ssave ' end } }
+    for i, name in ipairs(order) do
+      if i > #keysq then break end
+      items[#items + 1] = { key = keysq:sub(i, i), label = name, fn = function() ctx.ss_load(name) end }
+    end
+    if #order > 0 then
+      items[#items + 1] = { key = 'd', label = 'delete …', sub = function()
+        local del = {}
+        for i, name in ipairs(order) do if i <= #keysq then del[#del + 1] = { key = keysq:sub(i, i), label = name, fn = function() ctx.ss_delete(name) end } end end
+        return { title = 'delete screenset', items = del }
+      end }
+    end
+    return { title = 'screensets', items = items }
+  end,
   -- tutorial (4 окт): интерактивный тур — шаги в активной зоне главного модуля,
   -- всплывашки на модулях; повтор — выключить. :tutorial text — текстом
   tutorial = function(text)
@@ -3381,6 +3449,7 @@ edit.after = function(desc)
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   alias.trim(regions)
 end
+draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
 draw.themes = dofile(DIR .. '/jf_tracker_themes.lua')   -- темы трекера (3 окт); полем draw: у главного чанка предел локальных
 if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
@@ -4410,6 +4479,7 @@ function ctrl_action(name, delta)
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'about' then if delta == 0 then ctx.about() end
   elseif name == 'tutorial' then if delta == 0 then ctx.tutorial() end
+  elseif name == 'screensets' then if delta == 0 then vim.open_hydra(ctx.screensets_hydra()) end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end

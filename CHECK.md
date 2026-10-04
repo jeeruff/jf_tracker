@@ -237,6 +237,11 @@
 - [ ] lib: волна выбранной строки видна, зона — полоской снизу
 - [ ] options → meter style: blocks / pt; `:pt` включает pt
 
+## Скринсеты (0.6.19)
+- [ ] Главный модуль: под options ячейка screensets → s → `:ssave work` → набор сохранён
+- [ ] Поменять тему, спрятать DSP, сдвинуть ширины → screensets → 1 — вид вернулся целиком
+- [ ] d — удалить набор; `:sload work` — то же, что цифра
+
 ## В работе (ещё не готово)
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
 - легато: само подстраиваться при смене темпа (сейчас — повторить :legato)

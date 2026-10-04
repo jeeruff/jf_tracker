@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.18'
+V.VERSION = '0.6.19'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.19', d = '2026-10-04', items = {
+    'screensets: the screensets cell under options in the main module - s saves the whole view under a name (every option of the options window + module layout: top panel and tab, DSP, browser, matrix, widths, font, theme ...), 1..0 load a saved one, d deletes; also :ssave name / :sload name; kept in REAPER Data/jf_tracker_screensets.txt',
+  } },
   { v = '0.6.18', d = '2026-10-04', items = {
     'item tab: the slice zone triangles sit at the top edge of the wave, and the MIDI note of that slice is shown next to them (C4, C#4 ... - the learned pads note + slice, else from C4)',
     'lib: the zone of the playing slice is an underline and a frame on the mini wave - the wave of row 01 was hidden under the fill',

@@ -1193,7 +1193,7 @@ local function draw_ctrl(L, info, H, hover)
     { name = 'help', items = {
       { 'help', '? help', c.khelp and U.AMBER or U.GREY }, { 'about', 'about', U.GREY },
       { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
-      { 'tutorial', 'tutorial', U.CYAN },
+      { 'tutorial', 'tutorial', U.CYAN }, { 'screensets', 'screensets', U.CYAN },
     } },
     { name = 'control', bottom = true, items = {
       { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
