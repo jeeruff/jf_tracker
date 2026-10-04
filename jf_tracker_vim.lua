@@ -1092,6 +1092,7 @@ function V.key_impl(c)
       local inst0 = f0 and (f0.col.pool or {})[V.inst]
       local chq = (base < 256) and string.char(base) or ''
       local UPK = { q = 1, w = 2, e = 3, r = 4, t = 5, y = 6, u = 7, i = 8, o = 9, p = 10 }
+      if ctx.piano and ctx.piano[base] then V.piano_last = ctx.piano[base] end   -- пианинка: последняя сыгранная клавиша
       local k = (inst0 and inst0.slices and #inst0.slices > 0) and UPK[chq] or nil
       local pitch = (not k) and piano_pitch(base) or nil
       if f0 and (k or pitch) then
@@ -1178,6 +1179,11 @@ function V.key_impl(c)
       if c == ('w'):byte() and ctx.clear_track(true) then finish_edit() else finish_move() end
       V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
+      -- dd в NORMAL (4 окт) — удалить трек курсора; в INSERT dd — событие строки
+      if p == 'd' and c == ('d'):byte() and not V.back_insert then
+        if ctx.delete_track() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
       if c == p:byte() then      -- dd yy cc: n строк
         local f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1
         local e = apply(p, f0, f1, r0, r1); V.count = nil
@@ -1194,9 +1200,10 @@ function V.key_impl(c)
         if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
         V.count = nil; return
       end
-      -- dt — удалить трек, dr — очистить трек в регионе, daw — все item трека (4 окт)
+      -- dt — вырезать выделенное время (весь проект, дальше сдвигается),
+      -- dr — очистить трек в регионе, daw — все item трека (4 окт)
       if p == 'd' and c == ('t'):byte() then
-        if ctx.delete_track() then finish_edit() else finish_move() end
+        if ctx.delete_time() then finish_edit() else finish_move() end
         V.count = nil; return
       end
       if p == 'd' and c == ('r'):byte() then
@@ -1512,7 +1519,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d rows | w event | W whole item | t delete track | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d delete track | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | Esc',

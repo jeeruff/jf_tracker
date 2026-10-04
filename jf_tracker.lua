@@ -382,6 +382,7 @@ end
 
 -- ── помощники ─────────────────────────────────────────────────────────────
 local function relayout()
+  state.piano_strip = vim.piano or nil                 -- пианинка над статусом в слое пианино (4 окт)
   L = draw.layout(snap, state, #regions)
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
@@ -992,14 +993,25 @@ ctx = {
     vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'daw' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
   end,
-  -- dt (4 окт) — удалить трек курсора целиком (с FX), один undo
+  -- dt (4 окт) — вырезать выделенное время во всём проекте: нативное «Remove
+  -- contents of time selection (moving later items)», всё после — сдвигается
+  delete_time = function()
+    local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    if t1 <= t0 + 1e-6 then vim.msg = 'dt: no time selection (drag the row numbers or V + :sel)'; return false end
+    local cmd = ctx.cmd_by_text('Time selection: Remove contents of time selection (moving later items)') or 40201
+    reaper.Main_OnCommand(cmd, 0)
+    model.invalidate()
+    vim.msg = ('dt: %.3f s removed from the project (%.3f-%.3f), later items moved'):format(t1 - t0, t0, t1)
+    return true
+  end,
+  -- dd (4 окт) — удалить трек курсора целиком (с FX), один undo
   delete_track = function()
     local f = L.flat[vim.cur.fi]
     if not (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) then return false end
     local name = f.col.name
     edit.run('delete track', function() reaper.DeleteTrack(f.col.track) end)
     model.invalidate()
-    vim.msg = 'dt: track ' .. (name or '') .. ' deleted (ctrl+z - back)'
+    vim.msg = 'dd: track ' .. (name or '') .. ' deleted (ctrl+z - back)'
     return true
   end,
   -- страница справки для модуля в фокусе
@@ -4882,6 +4894,18 @@ local function frame()
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
     swap_state = function() return (ctx.swap_info()) end,
+    -- пианинка (4 окт): октава, держимые клавиши (JS_VKeys), последняя сыгранная
+    piano = vim.piano and (function()
+      local held = {}
+      if reaper.JS_VKeys_GetState then
+        local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
+        for code, off in pairs(keys.piano) do
+          local vk = string.char(code):upper():byte()
+          if ks and ks:byte(vk) ~= 0 then held[off] = true end
+        end
+      end
+      return { octave = vim.octave, held = held, last = vim.piano_last }
+    end)() or nil,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
     trk_io = (state.dsp and not state.khelp) and function(col)

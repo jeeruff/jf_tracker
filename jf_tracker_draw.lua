@@ -303,9 +303,13 @@ function D.layout(snap, state, nregions)
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
   -- чтобы тело не прыгало, когда треки перестают помещаться
   L.hsb_h = 8
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.hsb_h - (L.toppos ~= 'top' and L.top_h or 0))
+  -- пианинка (4 окт): слой пианино (m) — полоса клавиш под скролл-баром, над статусом
+  L.piano_h = state.piano_strip and (2 * L.rh + 6) or 0
+  L.low_h = L.hsb_h + L.piano_h                     -- всё, что под телом в модуле трекера
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0))
   L.hsb_y = L.body_y + L.body_h
-  L.stat_y = L.body_y + L.body_h + L.hsb_h          -- статус в трекере (status_in)
+  L.piano_y = L.hsb_y + L.hsb_h
+  L.stat_y = L.body_y + L.body_h + L.low_h          -- статус в трекере (status_in)
   L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
   local after = L.under_y + L.hint_h
   L.trk_bot = after                                 -- низ модуля трекера (тело, статус в нём, подсказки)
@@ -1602,6 +1606,57 @@ function D.pool_rows(pool, sort, col, cols)
   return add_empty(rows, pool)
 end
 
+-- пианинка (4 окт, слой пианино m): полторы октавы верхнего ряда клавиатуры —
+-- белые q w e r t y u i o p (C..E), чёрные 2 3 5 6 7 9 0; на клавишах буквы,
+-- держимые — янтарём, последняя сыгранная — тускло; слева октава.
+-- p = { octave, held = { [смещение] = true }, last = смещение }
+D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
+D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }   -- [3] — после какой белой
+function D.piano_strip(L, x, y, w, h, p)
+  local out = { white = 0, black = 0, letters = 0 }
+  set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  set(D.SEP); gfx.rect(x, y, w, 1, 1)
+  local lbl = ('oct %d'):format(p.octave or 4)
+  local lw = ms(lbl) + 2 * L.pad
+  text(x + L.pad, y + math.floor((h - L.rh) / 2), lbl, U.AMBER)
+  local kx = x + lw
+  local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 10))
+  if kw < 4 then return out end
+  local ky, kh = y + 2, h - 3
+  local letters = kw >= ms('W') + 4
+  local held, last = p.held or {}, p.last
+  local white_c = U.mix(U.BG, U.TEXT, 0.85)
+  local function key_fill(off, base)
+    if held[off] then return U.tint(U.AMBER, 0.75) end
+    if off == last then return U.mix(base, U.AMBER, 0.35) end
+    return base
+  end
+  for i, k in ipairs(D.PIANO_WHITE) do
+    local bx = kx + (i - 1) * kw
+    set(key_fill(k[1], white_c)); gfx.rect(bx, ky, kw - 1, kh, 1)
+    set(U.LINE); gfx.rect(bx, ky, kw - 1, kh, 0)
+    out.white = out.white + 1
+    if letters then
+      local fg = U.readable(U.BG, key_fill(k[1], white_c), 4.5)
+      text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], fg)
+      out.letters = out.letters + 1
+    end
+  end
+  local bw, bh = math.max(3, math.floor(kw * 0.6)), math.floor(kh * 0.6)
+  for _, k in ipairs(D.PIANO_BLACK) do
+    local bx = kx + k[3] * kw - math.floor(bw / 2) - 1
+    local fill = key_fill(k[1], U.PANEL)
+    set(fill); gfx.rect(bx, ky, bw, bh, 1)
+    set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
+    out.black = out.black + 1
+    if letters and bw >= ms('W') + 2 then
+      text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], U.readable(U.TEXT, fill, 4.5))
+      out.letters = out.letters + 1
+    end
+  end
+  return out
+end
+
 -- тонкий вертикальный скролл-бар списка (4 окт): матрица, lib, браузер.
 -- key — чей; scroll / nvis / total — строки; рисуется, только если не всё
 -- влезло. D.vbars[key] — прямоугольник для мыши (main: клик / протяжка)
@@ -2542,7 +2597,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии
-  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.hsb_h - hy, 1) end
+  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   if MX and L.matrix_w > 0 and not state.mx_hidden then
@@ -2926,8 +2981,8 @@ function D.frame(L, snap, rows, state, info)
   -- разделители D.SEP: 1 px, тусклые (одна линия, без наложений)
   do
     local rects = {
-      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h + L.hsb_h - hy },
-      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h + L.hsb_h - hy } or nil,
+      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h + L.low_h - hy },
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h + L.low_h - hy } or nil,
       browser = L.side_w > 0 and { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,
@@ -3020,6 +3075,10 @@ function D.frame(L, snap, rows, state, info)
       set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.LINE or U.DIM)); gfx.rect(tx, y, tw, h, 1)
       if inbar then hover.hsb = { thumb = onthumb, x0 = x0, w = w, n = n, page = math.max(1, L.hs_full), dir = mx < tx and -1 or 1 } end
     end
+  end
+  -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
+  if L.piano_h > 0 and info.piano then
+    D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, info.piano)
   end
   -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
   -- место; мышь, метки f и прямоугольники — со сдвигом, как у верхней панели

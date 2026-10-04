@@ -148,7 +148,7 @@ function MX.draw(L, snap, regions, info)
   local hover = {}
   -- верх / низ матрицы: главный модуль может стоять в левой колонке (3 окт)
   local hy = L.mx_top or L.header_y
-  local ybot = L.mx_bot or (L.body_y + L.body_h + (L.hsb_h or 0))
+  local ybot = L.mx_bot or (L.body_y + L.body_h + (L.low_h or L.hsb_h or 0))
   U.set(U.PANEL); gfx.rect(0, hy, W, ybot - hy, 1)
   -- кнопки
   local bx = L.pad

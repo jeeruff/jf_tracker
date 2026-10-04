@@ -48,12 +48,13 @@ KH.PAGES = {
     { k = 'gg G', d = 'first row / last row' },
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
-    { k = 'dd', d = 'delete rows; d + motion: d3w dG', t = { 'dd', 'd' } },
-    { k = 'dW dt', d = 'delete whole item under cursor / delete the track', t = { 'dW', 'dt' } },
+    { k = 'd', d = 'd + motion deletes events: dw d3j dG d}; dd (NORMAL) deletes the track, in INSERT the event of the row', t = { 'd' } },
+    { k = 'dd dt', d = 'delete the track / remove the time selection from the project (later items move)', t = { 'dd', 'dt' } },
+    { k = 'dW', d = 'delete the whole item under the cursor' },
     { k = 'dr daw', d = 'clear the track in the cursor region / all items of the track (the lib after =LIB stays)', t = { 'dr', 'daw' } },
     { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s M', d = 'replace / split / mute event (M = Shift+m)', t = { 'c', 's', 'M' } },
-    { k = 'm', d = 'piano layer on / off: the top row plays, Cmd+note inserts with the held length' },
+    { k = 'm', d = 'piano layer on / off: the top row plays, Cmd+note inserts with the held length - a keyboard strip above the status shows the keys' },
     { k = '^A ^X', d = 'field value +1 / -1' },
     { k = 'r', d = 'set value of field' },
     { k = 'u ^R .', d = 'undo / redo / repeat last edit' },
@@ -325,7 +326,7 @@ KH.PAGES = {
 -- строка подсказок под модулем (опция hints, 2 окт): самое нужное в одну
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
-  tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
+  tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'track' }, { 'yy p', 'copy' }, { 'v', 'select' },
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'help' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },

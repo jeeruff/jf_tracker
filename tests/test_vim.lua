@@ -128,6 +128,7 @@ local function reset()
     delete_item_at_cursor = function() calls[#calls + 1] = 'delitem'; return true end,
     clear_track = function(all) calls[#calls + 1] = all and 'cleartrack:all' or 'cleartrack'; return true end,
     delete_track = function() calls[#calls + 1] = 'deltrack'; return true end,
+    delete_time = function() calls[#calls + 1] = 'deltime'; return true end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     env_points = function(e, r0, r1) calls[#calls + 1] = ('envpts:%s@%d-%d'):format(e.name, r0, r1); return { { dq = 0, v = 0.5 } } end,
@@ -185,7 +186,7 @@ reset()
 keysin('x');       eq('x deletes kick', last(), 'delete:kick')
 eq('x yanks first', calls[1], 'yank:kick')
 reset()
-keysin('8jdd');    eq('dd at 8 → snare', last(), 'delete:snare')
+keysin('8jdw');    eq('dw at 8 → snare', last(), 'delete:snare')
 reset()
 keysin('dw');      eq('dw: kick only (exclusive)', last(), 'delete:kick')
 V.cur.row = 6; keysin('dw'); eq('dw from empty space before snare → snare', last(), 'delete:snare')
@@ -304,7 +305,7 @@ ru('цци'); eq('цци = wwb → snare', V.cur.row, 8)
 ru('пп');  eq('пп = gg', V.cur.row, 0)
 ru('ч');   eq('ч = x deletes', last(), 'delete:kick')
 ru('шй');  eq('шй = iq inserts C-4', last(), 'ins:trA@0:60:1'); V.key(27)
-ru('ввв'); eq('ввв = ddd → pending count ignored, dd deletes row 1', last(), 'delete:')
+ru('ввв'); eq('ввв = ddd → dd deletes the track (NORMAL)', last(), 'deltrack')
 eq('Ж = :', keys.translate(utf8.codepoint('Ж')), (':'):byte())
 eq('latin passthrough', keys.translate(104), 104)
 
@@ -484,7 +485,7 @@ keysin('w'); eq('w → env point 3', V.cur.row, 3)
 keysin('w'); eq('w → env point 9', V.cur.row, 9)
 keysin('b'); eq('b → env point 3', V.cur.row, 3)
 keysin('e'); eq('e → next point', V.cur.row, 9)
-keysin('dd'); eq('dd on env → delete points of row', last(), 'envdelr:Vol@9-9')
+keysin('dd'); eq('dd in NORMAL deletes the track', last(), 'deltrack')
 V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')
 V.cur.row = 15; keysin('p'); eq('p on env → paste points', last(), 'envpaste:Vol@15:1')
 V.cur = { fi = 1, row = 18, field = 1 }; keysin('p'); eq('env register on note column → message, no paste', last(), 'envpaste:Vol@15:1')
@@ -522,7 +523,7 @@ keysin(':arp live'); V.key(13)
 eq(':arp live off', V.arp_live, false)
 -- dt / dr / daw (4 окт)
 reset()
-keysin('dt'); eq('dt deletes the track', last(), 'deltrack')
+keysin('dt'); eq('dt removes the time selection', last(), 'deltime')
 keysin('dr'); eq('dr clears the track in the region', last(), 'cleartrack')
 keysin('daw'); eq('daw clears all items of the track', last(), 'cleartrack:all')
 print(('%d checks, %d failed'):format(checks, fails))

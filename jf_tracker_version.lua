@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.4'
+V.VERSION = '0.6.5'
 V.DATE = '2026-10-03'
 V.CHANGES = {
+  { v = '0.6.5', d = '2026-10-04', items = {
+    'keys: dd (NORMAL) deletes the cursor track (in INSERT dd still deletes the event of the row); dt removes the time selection from the whole project (native Remove contents of time selection, later items move); dr / daw as before',
+    'piano strip: with the piano layer (m) a keyboard strip appears above the status - one and a half octaves of the top row (white q..p, black 2 3 5 6 7 9 0) with the letters on the keys, held keys lit amber, the last played dimly, the octave on the left; no letters when the keys are too narrow',
+  } },
   { v = '0.6.4', d = '2026-10-04', items = {
     'thin scrollbars in the matrix, the lib and the browser (thinnest): drag the thumb, click beside it - a page; the lists follow the cursor only when it moves, so scrolling by the bar stays',
   } },
