@@ -704,7 +704,7 @@ local function run_cmd(line)
     V.mode = 'normal'
     V.msg = n > 0 and ('interp %s: %d event(s) in between'):format(what, n) or 'interp: each column needs 3+ events with that value in the selection'
   elseif cmd == 'big' then ctx.sample_big()
-  elseif cmd == 'tutorial' or cmd == 'tutor' then if ctx.tutorial then ctx.tutorial() end
+  elseif cmd == 'tutorial' or cmd == 'tutor' then if ctx.tutorial then ctx.tutorial(arg == 'text') end
   elseif cmd == 'libsave' then if ctx.kit_save then ctx.kit_save(arg) end
   elseif cmd == 'legato' then
     -- :legato [off|auto] (3 окт): ноты трека курсора встык со следующими, под темп;

@@ -1195,12 +1195,6 @@ local function draw_ctrl(L, info, H, hover)
       { 'options', 'options', U.AMBER }, { 'notes', 'notes', c.notes and U.AMBER or U.GREY },
       { 'tutorial', 'tutorial', U.CYAN },
     } },
-    { name = 'options', items = {
-      { 'font', (c.font or 0) > 0 and ('font %d'):format(c.font) or ('bitmap x%d'):format(math.floor(c.scale or 1)) },
-      { 'meters', 'meters ' .. (c.meters and 'on' or 'off'), c.meters and U.CYAN or U.GREY },
-      { 'caps', 'caps ' .. (c.captions and 'on' or 'off'), c.captions and U.CYAN or U.GREY },
-      { 'hints', 'hints ' .. (c.hints and 'on' or 'off'), c.hints and U.CYAN or U.GREY },
-    } },
     { name = 'control', bottom = true, items = {
       { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
       { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
@@ -1279,6 +1273,7 @@ local function draw_ctrl(L, info, H, hover)
         local yb = H - 3 - grows(g) * L.rh
         -- notes (3 окт): редактор заметок — в свободном месте над транспортом
         L.notes_rect = nil
+        L.zone_rect = nil
         if info.notes_draw and yb - y - 2 * gap >= 3 * L.rh then
           local nx, ny, nw, nh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
           thin(y + 1)
@@ -1286,6 +1281,17 @@ local function draw_ctrl(L, info, H, hover)
           if ok then hover.notes = hn end
           L.notes_rect = { nx, ny, nw, nh }
           y = y + gap + nh
+        elseif yb - y - 2 * gap >= 2 * L.rh then
+          -- активная зона (4 окт): место между help и транспортом — тур
+          -- tutorial, позже описание грида monome; опции вида — в окне options
+          local zx, zy, zw, zh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
+          thin(y + 1)
+          L.zone_rect = { zx, zy, zw, zh }
+          if info.zone_draw then
+            local ok, hz = pcall(info.zone_draw, L, zx, zy, zw, zh)
+            if ok then hover.zone = hz end
+          end
+          y = y + gap + zh
         end
         if yb > y + gap then y = yb - gap end
       end
@@ -1934,6 +1940,7 @@ function D.frame(L, snap, rows, state, info)
     hover.mm = th.mm
     hover.midimap = th.midimap
     hover.notes = th.notes or hover.notes
+    hover.zone = th.zone or hover.zone
     hover.garden = th.garden
   end
 
@@ -3107,7 +3114,7 @@ function D.frame(L, snap, rows, state, info)
     if L.notes_rect then L.notes_rect[2] = L.notes_rect[2] + by end
     for _, r in pairs(D.ctrl_rect or {}) do if not r.shifted then r[2] = r[2] + by; r.shifted = true end end
     local inside = mx >= bx and mx < bx + bw and my >= by and my < by + bh
-    if inside then hover.ctrl, hover.notes = hv.ctrl, hv.notes end
+    if inside then hover.ctrl, hover.notes, hover.zone = hv.ctrl, hv.notes, hv.zone end
   end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end

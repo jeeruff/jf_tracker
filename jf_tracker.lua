@@ -27,6 +27,7 @@ local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
 local vim = dofile(DIR .. '/jf_tracker_vim.lua')
 local OPT = dofile(DIR .. '/jf_tracker_options.lua')   -- окно Options (1 окт)
+OPT.tour = dofile(DIR .. '/jf_tracker_tour.lua')         -- интерактивный тур tutorial (4 окт); полем OPT: предел локальных
 OPT.ask = dofile(DIR .. '/jf_tracker_ask.lua')           -- вопрос посреди окна (3 окт); полем OPT: главный чанк у предела локальных
 local VER = dofile(DIR .. '/jf_tracker_version.lua')    -- версия и изменения (Options → about)
 local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель свойств сэмпла (вкладка Sample)
@@ -515,7 +516,12 @@ ctx = {
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
   -- tutorial (4 окт): первые шаги — окном about без логотипа
-  tutorial = function() OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end) end,
+  -- tutorial (4 окт): интерактивный тур — шаги в активной зоне главного модуля,
+  -- всплывашки на модулях; повтор — выключить. :tutorial text — текстом
+  tutorial = function(text)
+    if text then OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end); return end
+    if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off' else OPT.tour.start(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward' end
+  end,
   -- ссылка из about (4 окт): в браузере системы
   open_url = function(url)
     if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url)
@@ -2496,6 +2502,10 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
+      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
+      flag('meters', 'meters', 'pseudographic L R meters over the track columns'),
+      flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
+      flag('hints', 'module hints', 'a line of key hints under every module'),
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: list by click + smart input', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
@@ -4984,6 +4994,7 @@ local function frame()
       end
       return { octave = vim.octave, held = held, last = vim.piano_last }
     end)() or nil,
+    zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
     trk_io = (state.dsp and not state.khelp) and function(col)
@@ -5251,6 +5262,12 @@ local function frame()
     end
   end
   draw.popup(L, vim.popup(), anchor)
+  -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
+  if OPT.tour.active then
+    OPT.tour.tick({ fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil,
+      hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
+    OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
+  end
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if bpm_menu then
@@ -5548,6 +5565,9 @@ local function frame()
     elseif hover.poolbsync then
       ctx.set_focus('inst'); ctx.bsync_toggle()
       click = { t = now2, zone = 'poolbsync' }
+    elseif hover.zone then
+      if hover.zone == 'prev' then OPT.tour.go(-1) elseif hover.zone == 'next' then OPT.tour.go(1) elseif hover.zone == 'stop' then OPT.tour.stop() end
+      click = { t = now2, zone = 'tourzone' }
     elseif hover.poolsave then
       ctx.set_focus('inst'); ctx.kit_save_prompt(); click = { t = now2, zone = 'poolsave' }
     elseif hover.swapbtn then

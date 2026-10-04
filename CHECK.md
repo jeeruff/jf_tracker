@@ -220,6 +220,11 @@
 ## Option+h (0.6.14)
 - [ ] Option+h — на трек слева, Option+l — справа; в русской раскладке тоже
 
+## Тур tutorial (0.6.15)
+- [ ] Ячейка tutorial — в главном модуле `tour 1/10 Move` и `< > x`; всплывашка на трекере
+- [ ] Подвигать hjkl — «ok», через секунду шаг 2; i … Esc — шаг 3 (всплывашка на lib) и так далее
+- [ ] bitmap / meters / caps / hints — теперь в окне options
+
 ## В работе (ещё не готово)
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
 - легато: само подстраиваться при смене темпа (сейчас — повторить :legato)
