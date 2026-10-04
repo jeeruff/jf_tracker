@@ -3549,6 +3549,7 @@ function view_actions()
     { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
     { 'Options window', key = 'o', fn = function() ctx.options() end },
+    { 'About', key = 'a', fn = function() ctx.about() end },
     { 'Remove old scope bridges (:scopes)', key = 'R', fn = ctx.toggle_scopes },
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
