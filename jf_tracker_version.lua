@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.29'
+V.VERSION = '0.6.30'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.30', d = '2026-10-04', items = {
+    'DSP presets: < name > in the fx block header - < > previous / next, click - a list of factory and own presets (REAPER presets files), loaded by name',
+    'stepped parameters by choice: the plugin value names in a row (sine tri saw ...), the current one lit, click picks it',
+    'slice notes are lowercase (c-4 c#4), the whole item uppercase (C-4); keycaster; module lines are dragged directly (no < > = knobs); helper fx open no windows',
+  } },
   { v = '0.6.29', d = '2026-10-04', items = {
     'm is the keyboard (Vim + Ableton), in NORMAL and INSERT: NORMAL + m - the top row plays; INSERT + m - writes notes; INSERT without m - only controls (hjkl, d, z x ...), note keys do nothing; NORMAL + m: Enter goes to INSERT (i is a note there); the mode shows -- KEYS -- / -- INSERT KEYS --',
     'preview on an armed track with input monitoring off goes to the master (it was silent); key log in ExtState keylog',

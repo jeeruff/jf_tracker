@@ -3147,6 +3147,24 @@ ctx = {
     return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt }
   end,
   preset_cache = {},
+  -- подписи шагов параметра (4 окт, «шаговые значения выбором»): текст плагина
+  -- для каждого положения — FormatParamValueNormalized (параметр не трогается)
+  steplab = {},
+  step_labels = function(f, p)
+    local t = dsp_target(); if not (t and f and p and p.nsteps) then return nil end
+    local fx = p.fx or f.i
+    local key = tostring(t.track) .. '|' .. fx .. '|' .. p.i .. '|' .. p.nsteps
+    local c = ctx.steplab[key]
+    if c ~= nil then return c or nil end
+    local fmt = model.is_take(t.track) and reaper.TakeFX_FormatParamValueNormalized or reaper.TrackFX_FormatParamValueNormalized
+    local out = {}
+    for k = 0, p.nsteps - 1 do
+      local ok, s = fmt(t.track, fx, p.i, k / math.max(1, p.nsteps - 1), '')
+      out[#out + 1] = (ok and s ~= '') and s or tostring(k)
+    end
+    ctx.steplab[key] = out
+    return out
+  end,
   preset_names = function(tr, fx)
     local _, ident = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'fx_ident')
     ident = ident or ''
@@ -5436,6 +5454,7 @@ local function frame()
     dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
     fx_delta = ctx.fx_delta,
     fx_preset = ctx.fx_preset,
+    step_labels = ctx.step_labels,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end

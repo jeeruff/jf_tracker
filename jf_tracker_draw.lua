@@ -3118,16 +3118,35 @@ function D.frame(L, snap, rows, state, info)
         local vx = wx0 + ww + L.pad
         local vw = bxc + L.pad + pw - vx
         local cy = py + math.floor(L.rh / 2)
+        local step_sv, steps_inline
         if p.kind == 'toggle' then
           local on = v.n >= 0.5
           local sz = L.rh - 6
           set(on and acc or U.BG); gfx.rect(wx0, py + 3, sz, sz, 1)
           set(on and acc or U.LINE); gfx.rect(wx0, py + 3, sz, sz, 0)
         elseif p.kind == 'steps' and p.nsteps then
-          local segw = math.max(2, math.floor((ww - (p.nsteps - 1)) / p.nsteps))
           local cur = math.floor(v.n * (p.nsteps - 1) + 0.5)
-          for kk = 0, p.nsteps - 1 do
-            set(kk == cur and acc or U.DIM); gfx.rect(wx0 + kk * (segw + 1), py + 4, segw, L.rh - 8, kk == cur and 1 or 0)
+          -- выбором (4 окт): подписи положений в ряд — текущее голубым, под
+          -- мышью янтарным, клик выбирает; не влезают — квадраты, как раньше
+          local labs = info.step_labels and info.step_labels(f, p)
+          local avail = bxc + L.pad + pw - wx0
+          local tot = 0
+          if labs then for _, lb in ipairs(labs) do tot = tot + ms(lb) + L.pad end end
+          if labs and tot - L.pad <= avail then
+            local lx = wx0
+            for kk, lb in ipairs(labs) do
+              local lw = ms(lb)
+              local hot = not drag and mx >= lx - 1 and mx < lx + lw + L.pad and my >= py and my < py + L.rh
+              if hot then step_sv = (kk - 1) / math.max(1, p.nsteps - 1) end
+              text(lx, py, lb, hot and U.AMBER or ((kk - 1) == cur and U.CYAN or U.GREY))
+              lx = lx + lw + L.pad
+            end
+            steps_inline = true
+          else
+            local segw = math.max(2, math.floor((ww - (p.nsteps - 1)) / p.nsteps))
+            for kk = 0, p.nsteps - 1 do
+              set(kk == cur and acc or U.DIM); gfx.rect(wx0 + kk * (segw + 1), py + 4, segw, L.rh - 8, kk == cur and 1 or 0)
+            end
           end
         else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
@@ -3137,10 +3156,11 @@ function D.frame(L, snap, rows, state, info)
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
-        if vw > 4 then text(vx, py, fit(v.s, vw), U.GREY) end
+        if vw > 4 and not steps_inline then text(vx, py, fit(v.s, vw), U.GREY) end
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
+          if steps_inline then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv end
         end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
       end
