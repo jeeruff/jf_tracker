@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.22'
+V.VERSION = '0.6.23'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.23', d = '2026-10-04', items = {
+    'faster response: after a key or a click the frame is drawn again in the same tick (the result was on screen one tick later, ~30 ms)',
+    'scramble (after Paketti): :scramble and the scramble button in the item tab - slice notes keep their places and swap their slices randomly, within each sample; VISUAL - the selection, else the cursor track in the cursor region; a note never gets longer',
+    'swap: gw swaps the event under the cursor with the next one below, 3gw - with the third (:sw 3); the cursor follows',
+  } },
   { v = '0.6.22', d = '2026-10-04', items = {
     'no icons, only letters: the delta solo button of an fx is the real letter Δ, the phase button is the letter ø (was a drawn circle); the rule is in about and in the help',
   } },

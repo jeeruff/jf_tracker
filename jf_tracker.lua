@@ -1184,6 +1184,13 @@ ctx = {
   -- (библиотека за =LIB не трогается)
   -- dr — трек курсора в регионе (вне региона — =START..=END); daw (all = true) —
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
+  -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
+  scramble = function() vim.run_cmd('scramble') end,     -- кнопка scramble вкладки item (4 окт)
+  region_rows = function()
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if not rg then return nil end
+    return math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6) - 1, rg
+  end,
   clear_track = function(all)
     local f = L.flat[vim.cur.fi]
     if not (f and f.col) then return false end
@@ -5745,7 +5752,7 @@ local function frame()
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
-  elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)' })[hover.sample.sbtn] or hover.sample.sbtn
+  elseif hover.sample and hover.sample.sbtn then state.status = ({ quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)', scram = 'scramble: the slice notes of this track in the cursor region (or the VISUAL selection) swap their slices randomly - positions stay, one undo (:scramble)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move'):format(hover.sample.slice)

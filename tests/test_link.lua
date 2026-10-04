@@ -204,5 +204,27 @@ local rows = {}
 for _, x in ipairs(tracks[1].items) do rows[#rows + 1] = math.floor(t2qn(x.pos) * 4 + 0.5) end
 table.sort(rows)
 eq('rows of the repeats', table.concat(rows, ','), '0,2,4,6,8,10,12,14')
+-- скрэмбл (4 окт): слайсы перемешаны между нотами, места и длины не растут
+do
+  local root = item(300, 4, 0, 1, { ['P_EXT:jf_iid'] = 'SCR', ['P_EXT:jf_slices'] = '0,1,2,3', ['P_EXT:jf_slice_base'] = '0;4' })
+  local function sl(pos, len, k) return item(pos, len, k - 1, 1, { ['P_EXT:jf_iid'] = 'SCR#' .. k, ['P_EXT:jf_slice'] = tostring(k) }) end
+  local s1, s2, s3 = sl(0, 1, 1), sl(1, 1, 2), sl(2, 0.5, 3)
+  local hs = {}
+  for _, it in ipairs({ s1, s2, s3 }) do hs[#hs + 1] = { kind = 'audio', item = it, take = it.take } end
+  local changed = E.scramble(hs, 4, function() return 1 end)     -- [1,2,3] -> [2,3,1]
+  eq('scramble: 3 notes changed', changed, 3)
+  eq('scramble: s1 -> slice 2', s1.ext['P_EXT:jf_slice'], '2')
+  eq('scramble: s2 -> slice 3', s2.ext['P_EXT:jf_slice'], '3')
+  eq('scramble: s3 -> slice 1', s3.ext['P_EXT:jf_slice'], '1')
+  near('scramble: s1 plays from slice 2', s1.take.offs, 1)
+  near('scramble: positions stay', s2.pos, 1)
+  near('scramble: s3 not longer than before', s3.len, 0.5)
+  eq('scramble: root untouched', root.ext['P_EXT:jf_slice'], nil)
+  local a1, b1 = { kind = 'audio', item = s1 }, { kind = 'audio', item = s3 }
+  eq('swap_events', E.swap_events(a1, b1), true)
+  near('swap: s1 at s3 place', s1.pos, 2)
+  near('swap: s3 at s1 place', s3.pos, 0)
+  eq('swap: midi refused', E.swap_events({ kind = 'midi', item = s1 }, b1), false)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

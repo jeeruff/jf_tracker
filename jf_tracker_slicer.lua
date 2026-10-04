@@ -337,7 +337,8 @@ function S.button(id)
     S.use_transients()
   elseif id == 'clear' then S.clear()
   elseif id == 'quant' then S.smart_quantize()
-  elseif id == 'autotrim' then S.autotrim() end
+  elseif id == 'autotrim' then S.autotrim()
+  elseif id == 'scram' and ctx.scramble then ctx.scramble() end
 end
 
 -- smart quantize (2 окт): транзиенты сэмпла → stretch-маркеры, сильные к
@@ -456,7 +457,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local bx = x
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' } }
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' }, { 'scramble', 'scram' } }
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end

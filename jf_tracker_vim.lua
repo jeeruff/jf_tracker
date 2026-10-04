@@ -242,6 +242,21 @@ function V.covering(fi, row)
   return out
 end
 
+-- swap (4 окт): событие под курсором ↔ k-е событие ниже в той же колонке
+function V.swap_forward(k)
+  local fi, row = V.cur.fi, V.cur.row
+  local a = V.covering(fi, row)[1]
+  if not a then V.msg = 'gw: no event under the cursor'; return false end
+  local hs = V.heads_in(fi, fi, a.row0 + 1, a.row0 + 100000)
+  table.sort(hs, function(x, y) return x.row0 < y.row0 end)
+  local b = hs[k]
+  if not b then V.msg = ('gw: no event %d ahead (%d below)'):format(k, #hs); return false end
+  if not ctx.edit.swap_events(a, b) then V.msg = 'gw: audio events only'; return false end
+  V.cur.row = b.row0
+  V.msg = ('swapped with the event %d ahead (row %d)'):format(k, b.row0)
+  return true
+end
+
 -- ── движения ──────────────────────────────────────────────────────────────
 -- строка с точкой огибающей после / до row (dir = 1 / -1) — точки как события
 local function env_next(f, row, dir)
@@ -522,7 +537,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'tutorial', '', 'first steps in ten points' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in ten points' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -713,6 +728,28 @@ local function run_cmd(line)
     end)
     V.mode = 'normal'
     V.msg = n > 0 and ('interp %s: %d event(s) in between'):format(what, n) or 'interp: each column needs 3+ events with that value in the selection'
+  elseif cmd == 'sw' then
+    -- :sw N — то же, что Ngw
+    if V.swap_forward(math.max(1, tonumber(arg or '') or 1)) and ctx.model then ctx.model.invalidate() end
+  elseif cmd == 'scramble' then
+    -- :scramble (4 окт, Paketti) — VISUAL: слайсы в выделении; иначе — все
+    -- ноты-слайсы трека курсора в регионе курсора (без региона — весь трек)
+    local hs
+    if V.cmd_from == 'visual' or V.cmd_from == 'vline' then
+      local f0, f1, r0, r1 = V.visual_range(); hs = V.heads_in(f0, f1, r0, r1)
+    else
+      local F = flat(); local col = F[V.cur.fi] and F[V.cur.fi].col
+      local r0, r1
+      if ctx.region_rows then r0, r1 = ctx.region_rows() end
+      r0, r1 = r0 or 0, r1 or 1000000
+      hs = {}
+      for fi, f in ipairs(F) do
+        if f.col == col then for _, h in ipairs(V.heads_in(fi, fi, r0, r1)) do hs[#hs + 1] = h end end
+      end
+    end
+    local n = ctx.edit.scramble(hs, lpb())
+    V.mode = 'normal'
+    V.msg = n > 0 and ('scramble: %d slice note(s) got another slice'):format(n) or 'scramble: needs 2+ slice notes of one sample (select them or put the cursor in the region)'
   elseif cmd == 'big' then ctx.sample_big()
   elseif cmd == 'note' then
     -- :note C-4 [строк] (4 окт): нота инструмента в строку курсора
@@ -1210,6 +1247,14 @@ function V.key_impl(c)
         else V.cur.row = t.row; finish_move() end
         V.count = nil; ensure_visible(); return
       end
+      if c == ('w'):byte() then
+        -- gw (4 окт): событие под курсором меняется местами с N-м вперёд в
+        -- этой колонке (3gw — с третьим)
+        local k = V.count or 1
+        V.count = nil
+        if V.swap_forward(k) then finish_edit() else finish_move() end
+        return
+      end
       V.count = nil; finish_move(); return
     elseif p == 'z' then
       local L = ctx.layout()
@@ -1647,6 +1692,14 @@ function V.key(c)
     if V.mode == 'normal' then V.mode = 'insert' end
     V.back_insert = nil
   end
+  return r
+end
+
+-- команда из кнопки (4 окт): как набранная после : в текущем режиме
+function V.run_cmd(line)
+  V.cmd_from = V.mode
+  local r = run_cmd(line)
+  if V.mode == 'visual' or V.mode == 'vline' then V.mode = 'normal' end
   return r
 end
 

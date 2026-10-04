@@ -46,6 +46,8 @@ KH.PAGES = {
     { k = 'W B', d = 'next / previous event in any column (cursor jumps there)' },
     { k = 'env: w b e dd y p', d = 'envelope points are events: motions, delete / yank / paste points (value + shape)', t = {} },
     { k = 'gg G', d = 'first row / last row' },
+    { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
+    { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
     { k = 'd', d = 'd + motion deletes events: dw d3j dG d}; dd (NORMAL) deletes the track, in INSERT the event of the row', t = { 'd' } },

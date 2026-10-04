@@ -87,6 +87,8 @@ function E.cursor_to(t) calls[#calls + 1] = 'cursor:' .. t end
 function E.arpeggiate(track, lane, lpb, row, heads, opt) calls[#calls + 1] = ('arp:%s@%d:%s:%d:%d:%.2f'):format(names(heads), row, opt.order, opt.step, opt.oct, opt.gate); return 4 end
 function E.insert_slice(track, lane, lpb, row, item, k) calls[#calls + 1] = ('slice:%s@%d:%d'):format(track, row, k); return { slice = k } end
 function E.slice_pitch(it, semis) calls[#calls + 1] = ('slicepitch:%d:%+d'):format(it.slice, semis) end
+function E.swap_events(a, b) calls[#calls + 1] = ('swap:%s:%s'):format(a.name, b.name); return true end
+function E.scramble(heads) calls[#calls + 1] = 'scramble:' .. names(heads); return #heads end
 function E.beatsync(heads, lpb, unit) calls[#calls + 1] = ('beatsync:%s:%s'):format(names(heads), unit); return #heads end
 
 local lpb_calls = {}
@@ -587,5 +589,20 @@ do
 end
 keysin(':note D#3 4'); V.key(13); eq(':note', last(), 'notecmd:51:4')
 keysin(':sl 3 2 +5'); V.key(13); eq(':sl', last(), 'slcmd:3:2:5')
+-- gw / :sw / :scramble (4 окт)
+reset()
+keysin('gw'); eq('gw swaps with the next event', last(), 'swap:kick:snare')
+eq('gw: cursor follows to the other row', V.cur.row, 8)
+reset()
+keysin('2gw'); eq('2gw swaps with the second event ahead', last(), 'swap:kick:hat')
+reset()
+keysin(':sw 2'); V.key(13); eq(':sw 2', last(), 'swap:kick:hat')
+reset()
+V.cur = { fi = 1, row = 16, field = 1 }
+keysin('gw'); eq('gw on the last event: nothing', #calls, 0)
+reset()
+keysin(':scramble'); V.key(13); eq(':scramble without a region: the whole cursor track', last(), 'scramble:hat,kick,ov,snare')
+reset()
+keysin('v8j:scramble'); V.key(13); eq(':scramble in VISUAL: the selection', last(), 'scramble:kick,snare')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

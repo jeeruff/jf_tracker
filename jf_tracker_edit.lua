@@ -546,6 +546,61 @@ end
 E.cmds = nil
 E.prev_semis = function(head) return nil end   -- переопределяет main (для Gxx)
 
+-- скрэмбл (4 окт, по мотивам Paketti): ноты-слайсы остаются на местах, а
+-- номера слайсов перемешиваются между ними — внутри каждого сэмпла (метка
+-- jf_iid до #). Длина ноты — не длиннее прежней (иначе налезет на следующую
+-- и уйдёт в новую подколонку). rnd(n) → 1..n (тесты подставляют свой)
+function E.scramble(heads, lpb, rnd)
+  rnd = rnd or math.random
+  local groups, order = {}, {}
+  for _, h in ipairs(heads) do
+    if h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then
+      local _, k = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
+      k = tonumber(k)
+      if k then
+        local g = iid_base(E.get_iid(h.item))
+        if not groups[g] then groups[g] = {}; order[#order + 1] = g end
+        local t = groups[g]
+        t[#t + 1] = { h = h, k = k, len = R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') }
+      end
+    end
+  end
+  local n = 0
+  run('scramble slices', function()
+    for _, g in ipairs(order) do
+      local t = groups[g]
+      if #t >= 2 then
+        local ks = {}
+        for i, e in ipairs(t) do ks[i] = e.k end
+        for i = #ks, 2, -1 do local j = rnd(i); ks[i], ks[j] = ks[j], ks[i] end
+        for i, e in ipairs(t) do
+          if ks[i] ~= e.k then
+            apply_fx(e.h, lpb, 'S', ks[i])
+            if R.GetMediaItemInfo_Value(e.h.item, 'D_LENGTH') > e.len then R.SetMediaItemInfo_Value(e.h.item, 'D_LENGTH', e.len) end
+            n = n + 1
+          end
+        end
+      end
+    end
+  end)
+  return n
+end
+
+-- поменять местами два события (4 окт, gw / :sw): позиции меняются, каждое
+-- событие уносит свою длину и звук; только аудио (MIDI-нота — не свой item)
+function E.swap_events(a, b)
+  if not (a and b and a.item and b.item) or a.item == b.item then return false end
+  if a.kind ~= 'audio' or b.kind ~= 'audio' then return false end
+  if not (R.ValidatePtr(a.item, 'MediaItem*') and R.ValidatePtr(b.item, 'MediaItem*')) then return false end
+  run('swap events', function()
+    local pa = R.GetMediaItemInfo_Value(a.item, 'D_POSITION')
+    local pb = R.GetMediaItemInfo_Value(b.item, 'D_POSITION')
+    R.SetMediaItemInfo_Value(a.item, 'D_POSITION', pb)
+    R.SetMediaItemInfo_Value(b.item, 'D_POSITION', pa)
+  end)
+  return true
+end
+
 function E.set_fx(heads, lpb, cmd, xx)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
