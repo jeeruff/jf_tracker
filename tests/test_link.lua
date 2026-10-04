@@ -45,6 +45,9 @@ _G.reaper = {
   GetMediaSourceFileName = function(src) return src and src.file or '' end,
   Main_OnCommand = function() end,
   TakeIsMIDI = function() return false end,
+  GetItemStateChunk = function(it) return it.chunk ~= nil, it.chunk end,
+  RecursiveCreateDirectory = function(d) os.execute("mkdir -p '" .. d .. "'") end,
+  GetResourcePath = function() return os.getenv('TMPDIR') or '/tmp' end,
   GetSetMediaTrackInfo_String = function(tr, k, v, set) tr.ext = tr.ext or {}; if set then tr.ext[k] = v end; return true, tr.ext[k] or '' end,
 }
 local E = dofile('jf_tracker_edit.lua')
@@ -171,5 +174,19 @@ E.legato(tracks[1], nil, nil, nil, true)
 near('off: length back', l1.len, 0.25); near('off: rate back', l1.take.rate, 1.5); eq('off: pitch flag back', l1.take.pp, 0)
 E.legato_auto(tracks[1], true); eq('auto flag', E.legato_auto(tracks[1]), true)
 E.legato_auto(tracks[1], false); eq('auto off', E.legato_auto(tracks[1]), false)
+-- наборы lib (4 окт): шаблон трека с item, разбор блоков <ITEM>
+local k1 = item(0, 2, 0, 1); k1.chunk = '<ITEM\nPOSITION 5\nLENGTH 2\nIGUID {AAA}\n<SOURCE WAVE\nFILE "/a/amen (v2).wav"\n>\n<EXT\njf_iid X\n>\n>\n'
+local k2 = item(0, 1, 0, 1); k2.chunk = '<ITEM\nPOSITION 9\nLENGTH 1\n<SOURCE WAVE\nFILE "/a/b.wav"\n>\n>\n'
+local kpath, kn = E.kit_save({ k1, k2 }, 'test kit')
+eq('kit saved', kpath ~= nil and kn, 2)
+local kf = io.open(kpath); local ktxt = kf:read('*a'); kf:close()
+eq('track template', ktxt:match('^<TRACK') ~= nil, true)
+local blocks = E.kit_items(ktxt)
+eq('two items parsed', #blocks, 2)
+eq('nested source kept', blocks[1]:find('amen (v2).wav', 1, true) ~= nil and blocks[1]:find('jf_iid X', 1, true) ~= nil, true)
+eq('positions packed from 0', blocks[1]:match('POSITION ([%d%.]+)'), '0.0000000000')
+eq('second after the first + 1 s', tonumber(blocks[2]:match('POSITION ([%d%.]+)')), 3)
+eq('guids stripped', blocks[1]:find('IGUID', 1, true), nil)
+os.remove(kpath)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

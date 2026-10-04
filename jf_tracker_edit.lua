@@ -1985,6 +1985,72 @@ end
 
 -- файл → депо трека: item после маркера =LIB (конец зоны библиотеки трека);
 -- трек не задан — наследие: трек DEPOT (создаётся)
+-- ── наборы lib (4 окт): шаблон трека REAPER ───────────────────────────────
+-- Набор = сэмплы lib (item с нарезкой, метками, take FX) в родном формате
+-- REAPER — шаблоне трека TrackTemplates/jf_kits/<имя>.RTrackTemplate: его
+-- открывает и сам REAPER (Insert track from template). items — item сэмплов.
+function E.kit_dir() return R.GetResourcePath() .. '/TrackTemplates/jf_kits' end
+local function set_chunk_pos(chunk, pos)
+  return (chunk:gsub('\nPOSITION [^\n]*', '\nPOSITION ' .. ('%.10f'):format(pos), 1))
+end
+function E.kit_save(items, name)
+  local dir = E.kit_dir()
+  R.RecursiveCreateDirectory(dir, 0)
+  local parts, pos = { '<TRACK', '  NAME "' .. name:gsub('"', "'") .. '"' }, 0
+  for _, it in ipairs(items) do
+    if R.ValidatePtr(it, 'MediaItem*') then
+      local ok, ch = R.GetItemStateChunk(it, '', false)
+      if ok then
+        parts[#parts + 1] = set_chunk_pos(strip_guids(ch), pos):gsub('\n$', '')
+        pos = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') + 1
+      end
+    end
+  end
+  parts[#parts + 1] = '>'
+  local path = dir .. '/' .. name:gsub('[/\\:]', '_') .. '.RTrackTemplate'
+  local f = io.open(path, 'w')
+  if not f then return nil end
+  f:write(table.concat(parts, '\n'), '\n'); f:close()
+  return path, #parts - 3
+end
+-- блоки <ITEM …> шаблона (по глубине строк: в именах файлов бывают скобки)
+function E.kit_items(text)
+  local out, cur, depth = {}, nil, 0
+  for line in (text .. '\n'):gmatch('([^\n]*)\n') do
+    local t = line:match('^%s*(.-)%s*$')
+    if not cur and t:match('^<ITEM') then cur, depth = { line }, 1
+    elseif cur then
+      cur[#cur + 1] = line
+      if t:sub(1, 1) == '<' then depth = depth + 1 elseif t == '>' then depth = depth - 1 end
+      if depth == 0 then out[#out + 1] = table.concat(cur, '\n'); cur = nil end
+    end
+  end
+  return out
+end
+-- набор → lib трека track (за =LIB, после последнего item); число сэмплов
+function E.kit_load(path, track)
+  local f = io.open(path, 'r'); if not f then return 0 end
+  local text = f:read('*a'); f:close()
+  local chunks = E.kit_items(text)
+  local n = 0
+  run('kit load', function()
+    local pos = E.ensure_lib()
+    for i = 0, R.CountTrackMediaItems(track) - 1 do
+      local it = R.GetTrackMediaItem(track, i)
+      local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if e > pos then pos = e end
+    end
+    for _, ch in ipairs(chunks) do
+      local it = R.AddMediaItemToTrack(track)
+      if R.SetItemStateChunk(it, set_chunk_pos(ch, pos), false) then
+        pos = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') + 1
+        n = n + 1
+      else R.DeleteTrackMediaItem(track, it) end
+    end
+  end)
+  return n
+end
+
 function E.depot_add(path, track)
   local item
   path = E.media_copy(path)

@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.5'
+V.VERSION = '0.6.6'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.6', d = '2026-10-04', items = {
+    'kits: the save button in the lib header (:kitsave name) writes all lib samples - with slicing, marks, take FX - as a native REAPER track template TrackTemplates/jf_kits/<name>.RTrackTemplate (REAPER itself opens it with Insert track from template); the browser tab kits lists them, Enter puts a kit into the lib of the cursor track',
+    'about: a short description under the logo and thanks to friends and teachers - Esa Ruoho (Lackluster), parts based on his Paketti, with a link to his Patreon',
+  } },
   { v = '0.6.5', d = '2026-10-04', items = {
     'keys: dd (NORMAL) deletes the cursor track (in INSERT dd still deletes the event of the row); dt removes the time selection from the whole project (native Remove contents of time selection, later items move); dr / daw as before',
     'piano strip: with the piano layer (m) a keyboard strip appears above the status - one and a half octaves of the top row (white q..p, black 2 3 5 6 7 9 0) with the letters on the keys, held keys lit amber, the last played dimly, the octave on the left; no letters when the keys are too narrow',

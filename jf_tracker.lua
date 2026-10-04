@@ -1987,6 +1987,29 @@ ctx = {
       end
     end
   end,
+  -- наборы lib (4 окт): save — все сэмплы lib (исходники) в шаблон трека REAPER
+  -- TrackTemplates/jf_kits/<имя>.RTrackTemplate; браузер kits — Enter в lib трека
+  kit_save_prompt = function()
+    local _, pname = reaper.EnumProjects(-1, '')
+    local nm = (pname and pname ~= '' and pname:match('([^/]+)%.[Rr][Pp][Pp]$')) or 'kit'
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'kitsave ' .. nm
+  end,
+  kit_save = function(name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if name == '' then vim.msg = 'kitsave: a name please'; return end
+    local col = cur_col(); local items = {}
+    for _, e in ipairs(col and col.pool or {}) do if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then items[#items + 1] = e.item end end
+    if #items == 0 then vim.msg = 'kitsave: the lib is empty'; return end
+    local path, n = edit.kit_save(items, name)
+    vim.msg = path and ('kit saved: %s (%d samples) - TrackTemplates/jf_kits, browser tab kits'):format(name, n) or 'kitsave: cannot write the file'
+    if B.mode == 'kits' then B.set_all(B.read_kits()) end
+  end,
+  kit_load = function(path, name)
+    local col = cur_col(); if not col then vim.msg = 'kit: no track under the cursor'; return end
+    local n = edit.kit_load(path, col.track)
+    model.invalidate()
+    vim.msg = ('kit %s: %d sample(s) into the lib of %s'):format(name or '', n, col.name or '')
+  end,
   -- jf_pm (3 окт): открыть проект из вкладки pm (o). Уже открыт — переключить
   -- вкладку; иначе — вопрос: REAPER останавливает скрипты при открытии проекта,
   -- поэтому трекер перезапускает себя в новой вкладке (-nonewinst run_tracker)
@@ -5253,6 +5276,7 @@ local function frame()
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
+  elseif hover.poolsave then state.status = 'save the lib as a kit: a REAPER track template (TrackTemplates/jf_kits) - load it in the browser tab kits or with Insert track from template'
   elseif hover.swapbtn then
     local st, file = ctx.swap_info()
     state.status = st == 'on' and ('swap: the sample plays ' .. (file or '?') .. ' - click: back to the original file')
@@ -5469,6 +5493,8 @@ local function frame()
     elseif hover.poolbsync then
       ctx.set_focus('inst'); ctx.bsync_toggle()
       click = { t = now2, zone = 'poolbsync' }
+    elseif hover.poolsave then
+      ctx.set_focus('inst'); ctx.kit_save_prompt(); click = { t = now2, zone = 'poolsave' }
     elseif hover.swapbtn then
       ctx.set_focus('inst'); ctx.swap_click()
       click = { t = now2, zone = 'swapbtn' }

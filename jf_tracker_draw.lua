@@ -1706,6 +1706,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local fw = ms('find') + 2 * L.pad
   local fx = sbx - fw - L.pad
   hbtn(fx, fw, 'find', false, U.GREY, 'poolfind')
+  -- save (4 окт): набор lib — шаблон трека REAPER (jf_kits)
+  local svw = ms('save') + 2 * L.pad
+  fx = fx - svw - L.pad
+  hbtn(fx, svw, 'save', false, U.GREY, 'poolsave')
   -- bsync: beatsync выбранного инструмента — длина под N долей темпа в месте
   -- каждой ноты; горит, когда включён
   local on = cur and cur.bsync
@@ -1922,6 +1926,7 @@ function D.frame(L, snap, rows, state, info)
     hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
     hover.poolfind = th.poolfind
+    hover.poolsave = th.poolsave or hover.poolsave
     hover.poolsortcol = th.poolsortcol
     hover.poolbsync = th.poolbsync or hover.poolbsync
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro

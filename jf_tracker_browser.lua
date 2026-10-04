@@ -490,6 +490,22 @@ end
 -- ── proj: все аудио-источники текущего проекта (как Project Bay: у Bay нет
 -- ReaScript API, а то, что реально используется, — это items проекта, в том
 -- числе библиотека после =LIB). Уникальные по файлу; трек и число items.
+-- наборы lib (4 окт): шаблоны треков TrackTemplates/jf_kits; Enter — в lib трека
+function B.read_kits()
+  local out = {}
+  local dir = res_path() .. '/TrackTemplates/jf_kits'
+  local i = 0
+  while true do
+    local fn = R.EnumerateFiles and R.EnumerateFiles(dir, i)
+    if not fn then break end
+    if fn:lower():match('%.rtracktemplate$') then out[#out + 1] = { name = fn:gsub('%.[Rr][Tt]rack[Tt]emplate$', ''), path = dir .. '/' .. fn, kit = true } end
+    i = i + 1
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  if #out == 0 then out[1] = { name = '(no kits yet - save button in the lib)', kit = false, dir = false, empty = true } end
+  return out
+end
+
 function B.read_proj()
   local seen, out = {}, {}
   for i = 0, R.CountMediaItems(0) - 1 do
@@ -515,15 +531,15 @@ function B.read_proj()
 end
 
 function B.set_mode(m)
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'kits' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) else B.set_all(B.read_pm()) end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'kits' then B.set_all(B.read_kits()) else B.set_all(B.read_pm()) end
 end
 
 -- кнопки шапки: files | db | size | hide
 function B.click(what)
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'pvvol' then B.vol_drag = true
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
@@ -571,6 +587,8 @@ function B.enter()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
   elseif e.dir then B.go(B.full(e))
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
+  elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
+  elseif e.empty then return
   elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
   elseif e.rgn then if ctx.drop_region_at_cursor then ctx.drop_region_at_cursor(B.pmproj.e.path, e) end
   elseif e.mark then return
@@ -616,6 +634,7 @@ function B.describe(idx)
     return ('project %s%s - Enter: inside, o: open in REAPER, T: tags, s: status, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
   end
   if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
+  if e.kit then return ('kit %s (REAPER track template) - Enter: its samples into the lib of the cursor track'):format(e.name) end
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
   if e.rgn then return ('region %s [%.2f - %.2f] - Enter: subproject trimmed to region @cursor, drag: to track/row'):format(e.name, e.pos, e.fin) end
   if e.mark then return 'marker ' .. e.name end
@@ -650,7 +669,7 @@ function B.key(c)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'files' })[B.mode])
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'kits', kits = 'files' })[B.mode])
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -702,7 +721,7 @@ function B.draw(U, L, x, y, w, h)
   local wrap_marks = false
   do
     local bx = x + L.pad + 2
-    for _, t in ipairs({ 'files', 'db', 'pm', 'proj' }) do
+    for _, t in ipairs({ 'files', 'db', 'pm', 'proj', 'kits' }) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -848,7 +867,7 @@ function B.draw(U, L, x, y, w, h)
       U.set(B.focus and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 2, L.rh, 1)
     end
     local col = (idx == B.cur and B.focus) and U.BG or ((e.dir or e.db) and U.CYAN or ((e.pm or e.trk or e.rgn) and U.AMBER or U.TEXT))
-    local glyph = e.db and '#' or (e.pm and '@' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or (e.dir and '/' or ' ')))))
+    local glyph = e.db and '#' or (e.pm and '@' or (e.kit and '*' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or (e.dir and '/' or ' '))))))
     local is_file = not (e.dir or e.db or e.pm or e.trk or e.rgn or e.mark)
     local tw = w - 2 * L.pad
     if B.wave and is_file then tw = math.floor(tw * 0.55) end
