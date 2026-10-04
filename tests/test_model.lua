@@ -325,10 +325,10 @@ do
   local snap = M.build(4)
   local head
   for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do for _, c in pairs(sub) do if c.kind == 'audio' then head = c end end end end
-  eq('slice 2 shows c#4 (lowercase = slice)', head and head.note, 'c#4')
-  local hasS, hasT = false, false
-  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 1) == 'S' then hasS = true elseif f:sub(1, 1) == 'T' then hasT = true end end
-  eq('no S on a slice note', hasS, false); eq('no T on a slice note', hasT, false)
+  eq('slice note shows its pitch C-4', head and head.note, 'C-4')
+  local hasS, hasT = nil, false
+  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 1) == 'S' then hasS = f elseif f:sub(1, 1) == 'T' then hasT = true end end
+  eq('slice number as S02', hasS, 'S02'); eq('no T on a slice note', hasT, false)
 end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

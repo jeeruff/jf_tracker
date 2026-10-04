@@ -736,7 +736,7 @@ ctx = {
     local col = cur_col(); local e = col and col.pool and col.pool[zone[3]]
     local k = e and e.slice_k
     if not k or k < 1 then return nil end
-    return (model.note_name(model.BASE_NOTE + k - 1):gsub('-', ''))   -- как в ячейке: C-4 = слайс 1
+    return ('S%02X'):format(k)                         -- как в ячейке: Sxx = слайс (4 окт, вечер)
   end,
   -- ссылка из about (4 окт): в браузере системы
   open_url = function(url)

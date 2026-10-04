@@ -356,8 +356,8 @@ function E.set_pitch(heads, lpb, pitch)
     for _, h in ipairs(heads) do
       local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
       if h.kind == 'audio' and h.take and tonumber(slk) then
-        -- нота-слайс (4 окт): новая нота — другой слайс того же сэмпла (C-4 = 1)
-        E.set_fx({ h }, lpb, 'S', math.max(1, pitch - model.BASE_NOTE + 1))
+        -- слайс (4 окт, вечер): нота — его высота (слайс — Sxx)
+        E.slice_pitch(h.item, pitch - model.BASE_NOTE)
       elseif h.kind == 'audio' and h.take then
         audio_set_semis(h, pitch - model.BASE_NOTE)
       elseif h.kind == 'midi' then
