@@ -88,8 +88,13 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
   SP.slice_scroll = SP.slice_scroll or 0
   local si = 1
   for i, r in ipairs(rows) do if r.k == sel then si = i end end
-  if si - 1 < SP.slice_scroll then SP.slice_scroll = si - 1 end
-  if si > SP.slice_scroll + n then SP.slice_scroll = si - n end
+  -- за выбором — только когда он сменился (полосой / колесом можно листать)
+  if SP.slice_last ~= sel then
+    SP.slice_last = sel
+    if si - 1 < SP.slice_scroll then SP.slice_scroll = si - 1 end
+    if si > SP.slice_scroll + n then SP.slice_scroll = si - n end
+  end
+  SP.slice_scroll = math.max(0, math.min(math.max(0, #rows - n), SP.slice_scroll))
   for i = 1, n do
     local r = rows[SP.slice_scroll + i]
     if not r then break end

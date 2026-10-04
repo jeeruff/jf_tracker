@@ -334,6 +334,11 @@
 - [ ] Esc в NORMAL — INSERT, ещё Esc — NORMAL (как Edit mode в Renoise); m не меняется
 - [ ] text only вкл: wave / wave detail / item frame / item fill opacity — серые с надписью; клик по любой — text only выкл
 
+## Модуль слайсов и свойства слева (0.6.33)
+- [ ] Нарезанный инструмент: справа между трекером и lib колонка на всю высоту — список слайсов (whole, клавиша + Sxx + длина), скролл-бар, колесо
+- [ ] Tab: … трекер → слайсы → lib …; в модуле j k — слайс (звучит), J K — по 8, g G, Esc — в трекер; клик — выбрать
+- [ ] Вкладка item: свойства семпла слева от волны; опция sample settings (notes and items): left / right
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue

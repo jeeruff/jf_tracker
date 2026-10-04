@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.32'
+V.VERSION = '0.6.33'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.33', d = '2026-10-04', items = {
+    'slices module: a full-height column between the tracker and the lib while the instrument is sliced - the slice list with a scrollbar, in the Tab cycle before the lib, j k / J K / g G, click selects',
+    'item tab: the sample settings left of the wave (option sample settings: left / right); Esc toggles INSERT; text only greys the options it overrides',
+  } },
   { v = '0.6.32', d = '2026-10-04', items = {
     'notes and slices: a key = the slice of a sliced sample (else the sample at that pitch); Option+key - the selected slice (or the whole item) at that pitch; Cmd+key - the whole item at that pitch; Ctrl+key - held note; r + note follows the same rules; the selection is the slice list / Option+J K / the last played',
     'keyboard note input only with m (INSERT + m); without m only MIDI writes (; too)',

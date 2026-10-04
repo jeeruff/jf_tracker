@@ -280,7 +280,11 @@ function D.layout(snap, state, nregions)
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
   L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
-  L.win_w = gfx.w - L.side_w - L.rstrip_w
+  -- модуль слайсов (4 окт): колонка на всю высоту между трекером и сайдбаром,
+  -- пока у выбранного инструмента есть слайсы
+  L.slices_w = state.slices_on and math.max(L.cw * 16, math.min(L.cw * 20, math.floor(gfx.w * 0.12))) or 0
+  L.win_w = gfx.w - L.side_w - L.rstrip_w - L.slices_w
+  L.side_x = L.win_w + L.slices_w                  -- левый край сайдбара / полосы
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
@@ -2788,6 +2792,7 @@ function D.frame(L, snap, rows, state, info)
     -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу)
     local sy0 = 0
     local total = gfx.h - L.status_h - sy0
+    local W = L.side_x                                -- сайдбар правее модуля слайсов (4 окт)
     set(U.PANEL); gfx.rect(W, sy0, L.side_w, total, 1)
     local ih = math.max(4 * L.rh, math.min(total - 6 * L.rh, state.inst_px or math.floor(total * 0.40)))
     L.inst_side_h = ih
@@ -2797,8 +2802,8 @@ function D.frame(L, snap, rows, state, info)
     -- подсказок (она короче на ширину ручки), без подсказок — в нижнем ряду инструментов
     local gw = ms('=') + 2 * L.pad
     L.inst_knob_w = hh > 0 and 0 or (gw + L.pad)
-    D.draw_instruments(L, info, W, sy0, L.side_w, ih - hh, hover)
-    hover.browser = info.browser_draw(L, W, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
+    D.draw_instruments(L, info, L.side_x, sy0, L.side_w, ih - hh, hover)
+    hover.browser = info.browser_draw(L, L.side_x, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
     if hh > 0 then
       D.hint_bar(L, W, sy0 + ih - hh, L.side_w - gw - 2 * L.pad, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
       D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)('browser'), info.focus == 'browser')
@@ -3239,7 +3244,7 @@ function D.frame(L, snap, rows, state, info)
   do
     local bw = ms('<') + 2 * L.pad
     local bot = gfx.h - L.status_h
-    local lx = L.win_w                               -- левый край правой панели / полосы
+    local lx = L.side_x or L.win_w                   -- левый край правой панели / полосы
     if not state.side then
       set(U.PANEL); gfx.rect(lx, L.header_y, L.rstrip_w, bot - L.header_y, 1)
       set(D.SEP); gfx.rect(lx, L.header_y, D.SEPW, bot - L.header_y, 1)
@@ -3272,13 +3277,14 @@ function D.frame(L, snap, rows, state, info)
     local rects = {
       tracker = { tx0, hy, W - tx0, L.body_y + L.body_h + L.low_h - hy },
       matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h + L.low_h - hy } or nil,
-      browser = L.side_w > 0 and { W, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
+      browser = L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,
       inst = (L.inst_w > 0 or L.side_w > 0) and L.inst_rect or nil,
       dsp = L.dsp_h > 0 and L.dsp_rect or nil,
       fxb = L.dsp_h > 0 and L.fxb_rect or nil,
       notes = L.notes_rect,
+      slices = L.slices_rect,
     }
     D.module_rects = rects          -- только для рамки фокуса: границы модулей — разделители D.SEP (1 px)
   end
@@ -3322,7 +3328,16 @@ function D.frame(L, snap, rows, state, info)
       text(hx, sy + 2, fit(desc, sx + sw - hx - L.pad), U.TEXT)
     end
   end
-  if L.side_w > 0 then set(D.SEP); gfx.rect(L.win_w - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end   -- линия сайдбара до статус-бара
+  if L.side_w > 0 then set(D.SEP); gfx.rect((L.side_x or L.win_w) - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end
+  -- модуль слайсов (4 окт): своя колонка, линия слева
+  if (L.slices_w or 0) > 0 and info.slices_draw then
+    local sx, sh = L.win_w, gfx.h - L.status_h
+    set(U.PANEL); gfx.rect(sx, 0, L.slices_w, sh, 1)
+    local hs = info.slices_draw(L, sx + 2, 2, L.slices_w - 4, sh - 4)
+    if hs ~= nil then hover.slices = hs end
+    set(D.SEP); gfx.rect(sx, 0, D.SEPW, sh, 1)
+    L.slices_rect = { sx, 0, L.slices_w, sh }
+  else L.slices_rect = nil end   -- линия сайдбара до статус-бара
   -- нижняя граница окна (4 окт): статус не внизу — модули внизу (DSP, сайдбар)
   -- закрываются общей линией во всю ширину; у сайдбара она была, у DSP — нет
   if L.status_h == 0 then set(D.SEP); gfx.rect(0, gfx.h - D.SEPW, gfx.w, D.SEPW, 1) end

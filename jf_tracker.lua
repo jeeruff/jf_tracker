@@ -141,7 +141,8 @@ local state = {
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
-  textonly = reaper.GetExtState(EXT, 'textonly') == '1',          -- text only (4 окт)
+  textonly = reaper.GetExtState(EXT, 'textonly') == '1',
+  propspos = (reaper.GetExtState(EXT, 'propspos') == 'right') and 'right' or 'left',          -- text only (4 окт)
   keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',
   kc_scale = tonumber(reaper.GetExtState(EXT, 'kcscale')) or 0,            -- keycaster (4 окт)
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
@@ -370,7 +371,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('propspos', state.propspos or 'left'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2403,14 +2404,16 @@ ctx = {
   end,
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
-    if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 end
+    if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0
+    elseif key == 'slices' then return SPROP.slice_scroll or 0 end
     return 0
   end,
   vbar_scroll = function(key, v)
     local r = draw.vbars[key]
     local mx = r and math.max(0, r.total - r.nvis) or v
     v = math.max(0, math.min(mx, v))
-    if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v end
+    if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v
+    elseif key == 'slices' then SPROP.slice_scroll = v end
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -2736,7 +2739,8 @@ ctx = {
     local function inr(r) return r and x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
     local f
     if inr(L.inst_rect) then f = 'inst'
-    elseif state.side and x >= L.win_w and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
+    elseif inr(L.slices_rect) then f = 'slices'
+    elseif state.side and x >= (L.side_x or L.win_w) and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
     elseif inr(L.notes_rect) then f = 'notes'
     elseif inr(L.ctrl_area) then f = 'ctrl'
     elseif inr(L.fxb_rect) then f = 'fxb'
@@ -2777,6 +2781,7 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
       flag('textonly', 'text only', 'cells show only the text: no wave behind the notes, no item fill, no item frame'),
+      { key = 'propspos', label = 'sample settings', kind = 'cycle', values = { 'left', 'right' }, desc = 'the sample properties in the item tab: left or right of the wave', get = function() return state.propspos or 'left' end, set = function(v) state.propspos = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel in waves: higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
@@ -3623,6 +3628,7 @@ ctx = {
     dir = dir or 1
     -- по часовой (2 окт): трекер → инструменты → браузер → DSP → матрица → верхний док → трекер
     local order = { 'tracker' }
+    if state.slices_on then order[#order + 1] = 'slices' end          -- модуль слайсов перед lib (4 окт)
     if state.top or state.side then order[#order + 1] = 'inst' end
     if state.side then order[#order + 1] = 'browser' end
     if state.dsp or state.khelp then order[#order + 1] = 'dsp' end
@@ -5375,6 +5381,8 @@ local function frame()
     local b = model.bprof or {}
     prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000)
   end
+  -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
+  do local sr = ctx.slice_root(); state.slices_on = (sr and not sr.file and sr.slices and #sr.slices > 0) and true or false end
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
@@ -5795,19 +5803,12 @@ local function frame()
           zone = { root.slices[k], root.slices[k + 1] or root.len, ci }
           draw.lib_zone = { root = root, a = zone[1], b = zone[2] }
         else sel_e = root; zone = nil end
-        lw = math.min(L.cw * 18, math.floor(w * 0.2))
-        if lw > L.cw * 10 then
-          local rows = { { k = 0, len = root.len or 0, has = true } }
-          local key_of = {}
-          for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1] = string.char(code) end
-          for kk, t0 in ipairs(root.slices) do
-            rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
-          end
-          SPROP.draw_slices(L, x + w - lw, y, lw, h, rows, k)
-        else lw = 0; SPROP.slice_hover = nil end
-      else SPROP.slice_hover = nil end
+        lw = 0                                       -- список — отдельный модуль справа (4 окт)
+      end
       local pw = sel_e and math.min(L.cw * 30, math.floor((w - lw) * 0.34)) or 0
-      local px = x + w - lw - (lw > 0 and L.pad or 0) - pw
+      -- свойства семпла слева от волны (4 окт, опция props position)
+      local pleft = (state.propspos or 'left') == 'left'
+      local px = pleft and x or (x + w - lw - (lw > 0 and L.pad or 0) - pw)
       if pw > L.cw * 12 then
         if sel_e.file then
           -- файл браузера: информация о файле (> — играет сейчас)
@@ -5817,9 +5818,29 @@ local function frame()
           SPROP.draw(L, px, y, pw, h, sel_e, state.focus == 'top')
         end
       else pw = 0; SPROP.hover = nil end
+      if pleft then
+        local wx = x + (pw > 0 and (pw + 2 * L.pad) or 0)
+        return SL.draw_in(U, L, wx, y, x + w - wx, h, e, col and col.track, zone)
+      end
       return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
     browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
+    -- модуль слайсов (4 окт): список слайсов выбранного инструмента + скролл-бар
+    slices_draw = state.slices_on and function(Lx, x, y, w, h)
+      local root, col = ctx.slice_root()
+      if not (root and root.slices) then return nil end
+      local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
+      local rows = { { k = 0, len = root.len or 0, has = true } }
+      local key_of = {}
+      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1] = string.char(code) end
+      for kk, t0 in ipairs(root.slices) do
+        rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
+      end
+      local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k)
+      local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+      draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh, SPROP.slice_scroll or 0, nvis, #rows)
+      return hv
+    end or nil,
   })
   idle.hover = hover
   end
@@ -5860,7 +5881,7 @@ local function frame()
       local r = draw.ctrl_rect and draw.ctrl_rect[pa.name]
       if r then anchor = { x = r[1], y = r[2] + r[4] + 1 } end
     elseif pa and pa.kind == 'inst' then
-      anchor = { x = L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
+      anchor = { x = L.side_x or L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
     end
     if not anchor and (state.focus == 'tracker') then
       local f = L.flat[vim.cur.fi]
@@ -6002,7 +6023,7 @@ local function frame()
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
-  elseif SPROP.slice_hover ~= nil and state.top and state.toptab == 'sample' then
+  elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
@@ -6358,10 +6379,11 @@ local function frame()
         else resize_drag = 'mx' end
       end
       click = { t = now2, zone = hover.mxctl == 'grip' and 'mxgrip' or 'mxctl' }
-    elseif SPROP.slice_hover ~= nil and state.top and state.toptab == 'sample' then
-      -- список слайсов (4 окт): клик — выбрать и прослушать
+    elseif hover.slices ~= nil then
+      -- модуль слайсов (4 окт): клик — выбрать и прослушать
+      ctx.set_focus('slices')
       local root = ctx.slice_root()
-      if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(SPROP.slice_hover) end
+      if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
       click = { t = now2, zone = 'slicelist' }
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
@@ -7217,6 +7239,11 @@ local function frame()
     end
   end
 
+  if gfx.mouse_wheel ~= 0 and hover and hover.slices ~= nil then
+    -- колесо над модулем слайсов (4 окт): листать список
+    SPROP.slice_scroll = math.max(0, (SPROP.slice_scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
+    gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
     local e = cur_col() and (cur_col().pool or {})[vim.inst]
     SPROP.sel = SPROP.hover.row
@@ -7534,6 +7561,20 @@ local function frame()
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and state.side then
         if not B.key(c) then return vim.key(c) end
+      elseif state.focus == 'slices' and state.slices_on then
+        -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер
+        local ch = c < 256 and string.char(c) or ''
+        local root = ctx.slice_root()
+        local cur = (root and ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
+        local n = root and root.slices and #root.slices or 0
+        if c == 27 then ctx.set_focus('tracker')
+        elseif ch == 'j' or c == keys.down then ctx.slice_step(1)
+        elseif ch == 'k' or c == keys.up then ctx.slice_step(-1)
+        elseif ch == 'J' then ctx.slice_step(8)
+        elseif ch == 'K' then ctx.slice_step(-8)
+        elseif ch == 'g' then ctx.slice_step(-cur)
+        elseif ch == 'G' then ctx.slice_step(n - cur)
+        else return vim.key(c) end
       elseif state.focus == 'inst' and (state.top or state.side) then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local col = cur_col()
