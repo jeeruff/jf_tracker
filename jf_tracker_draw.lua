@@ -1304,7 +1304,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY }, { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY },
       { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY },
       { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY }, { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY },
-      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY }, { 'q_kcm', 'keys -', U.GREY }, { 'q_kcp', 'keys +', U.GREY },
+      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY, sizer = true },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
@@ -1332,6 +1332,17 @@ local function draw_ctrl(L, info, H, hover)
     if hot then hover.ctrl = it[1] end
     D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
     text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
+    if it.sizer then
+      -- keys - + (4 окт): та же клетка — слово вкл / выкл, - + размер
+      local sx = x + 2 + ms(it[2] .. ' ')
+      for _, z in ipairs({ { '-', 'q_kcm' }, { '+', 'q_kcp' } }) do
+        local zw = ms(z[1]) + L.pad
+        local zh = mx >= sx - 1 and mx < sx + zw and my >= y and my < y + L.rh
+        if zh then hover.ctrl = z[2] end
+        text(sx, y + 1, z[1], zh and U.AMBER or U.GREY)
+        sx = sx + zw
+      end
+    end
     hint('ctrl', x, y, colw, L.rh, it[1])
   end
   -- доли: размер, такт, квадраты долей (текущая горит), строк на долю / такт
