@@ -140,6 +140,7 @@ local state = {
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
+  glyphfont = (function() local v = reaper.GetExtState(EXT, 'glyphfont'); return v ~= '' and v or 'bigblue' end)(),   -- шрифт букв вне битмапа (4 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
@@ -364,7 +365,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('glyphfont', state.glyphfont or 'bigblue'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2707,6 +2708,7 @@ ctx = {
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
       flag('meters', 'meters', 'peak meters over the track columns'),
+      { key = 'glyphfont', label = 'letters font', kind = 'cycle', values = (function() local t = {}; for _, g in ipairs(draw.GLYPH_FACES) do t[#t + 1] = g.key end; return t end)(), desc = 'TTF font for letters the bitmap lacks (cyrillic, Δ, ø)', get = function() return state.glyphfont or 'bigblue' end, set = function(v) state.glyphfont = v; draw.glyph_key = v; draw.reset_glyph(); draw.reset_measure(); draw.set_font(state) end },
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
@@ -5285,6 +5287,7 @@ local function frame()
   if not idle_skip then HN.reset() end
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
+  draw.glyph_key = state.glyphfont or 'bigblue'          -- опция letters font
   draw.hybrid = true                                     -- не-ASCII (кириллица) — системным моно-шрифтом высотой с битмап
   local hover
   if idle_skip then hover = idle.hover else

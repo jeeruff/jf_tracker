@@ -107,15 +107,24 @@ end
 -- строка режется на ASCII-куски (битмап, слот 0) и глифы (TTF, слот 2,
 -- размер = высота битмапа). D.hybrid ставит main (:font 0 + :icons).
 D.hybrid = false
--- не-ASCII (кириллица, Δ, ø) в битмап-режиме: пиксельный Monocraft, если он
--- установлен (4 окт: Menlo был мелким и гладким рядом с битмапом), иначе Menlo
-D.glyph_face = (function()
-  local home = os.getenv('HOME') or ''
-  for _, f in ipairs({ home .. '/Library/Fonts/Monocraft-nerd-fonts-patched.ttc', home .. '/Library/Fonts/Monocraft.ttc', home .. '/Library/Fonts/Monocraft.otf', '/Library/Fonts/Monocraft.otf' }) do
-    local h = io.open(f, 'rb'); if h then h:close(); return 'Monocraft' end
-  end
-  return 'Menlo'
-end)()
+-- не-ASCII (кириллица, Δ, ø) в битмап-режиме — TTF-шрифт на выбор (4 окт,
+-- опция letters font): k — кегль к высоте строки битмапа (заглавные вровень,
+-- по пробе), bold — жирный рядом с толстым битмапом, odd — нечётный кегль
+-- (пиксельные чётче). По умолчанию BigBlueTermPlus — DOS-шрифт, ближе всех к битмапу
+D.GLYPH_FACES = {
+  { key = 'bigblue',   face = 'BigBlueTermPlus Nerd Font Mono', k = 1.25 },
+  { key = 'departure', face = 'DepartureMono Nerd Font Mono',   k = 1.4 },
+  { key = 'terminess', face = 'Terminess Nerd Font Mono',       k = 1.5, bold = true },
+  { key = '3270',      face = '3270 Nerd Font Mono',            k = 1.5, bold = true },
+  { key = 'jetbrains', face = 'JetBrainsMono Nerd Font Mono',   k = 1.35, bold = true },
+  { key = 'monocraft', face = 'Monocraft',                      k = 1.875, odd = true },
+  { key = 'menlo',     face = 'Menlo',                          k = 1.35, bold = true },
+}
+D.glyph_key = 'bigblue'
+local function glyph_spec()
+  for _, g in ipairs(D.GLYPH_FACES) do if g.key == D.glyph_key then return g end end
+  return D.GLYPH_FACES[1]
+end
 -- Разбор без исключений: utf8.codes бросает ошибку на битой UTF-8 (имя,
 -- обрезанное посреди символа, cp1251 из чужих проектов) — так скрипт и падал.
 -- gmatch по utf8.charpattern не бросает; одиночный «хвостовой» байт — пропуск.
@@ -135,17 +144,12 @@ end
 -- переключение слота gfx.setfont(2)
 local glyph_sig
 local function glyph_font()
-  -- кегль (4 окт, проба): Monocraft на 15 при высоте битмапа 8 — заглавные
-  -- вровень с битмапными и пиксели ровные (×1.875, нечётный кегль чётче);
-  -- Menlo — прежние ×1.35
-  local th = D.bitmap_th or 8
-  local sz
-  if D.glyph_face == 'Monocraft' then sz = math.floor(th * 1.875 + 0.5); if sz % 2 == 0 then sz = sz - 1 end
-  else sz = math.max(10, math.floor(th * 1.35 + 0.5)) end
-  local sig = D.glyph_face .. '|' .. sz
-  -- Menlo — жирный (битмап толстый, обычный рядом бледный); пиксельный — как есть
+  local g = glyph_spec()
+  local sz = math.max(8, math.floor((D.bitmap_th or 8) * g.k + 0.5))
+  if g.odd and sz % 2 == 0 then sz = sz - 1 end
+  local sig = g.face .. '|' .. sz
   if glyph_sig ~= sig then
-    if D.glyph_face == 'Monocraft' then gfx.setfont(2, D.glyph_face, sz) else gfx.setfont(2, D.glyph_face, sz, string.byte('b')) end
+    if g.bold then gfx.setfont(2, g.face, sz, string.byte('b')) else gfx.setfont(2, g.face, sz) end
     glyph_sig = sig
   else gfx.setfont(2) end
 end
