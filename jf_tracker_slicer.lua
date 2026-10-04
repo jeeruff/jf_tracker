@@ -572,7 +572,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     -- ручки (2 окт, правка): треугольники начала и конца — вверху, под строкой
     -- подписей маркеров (сами подписи не перекрываются); полоса внизу зоны —
     -- тянет всю зону целиком. Маркеры исходника тянутся вне этих полос.
-    local TY = wy + L.rh                  -- верх треугольников: под подписями маркеров
+    local TY = wy + 1                     -- треугольники — у верхнего края волны (4 окт)
     local TH = 8
     local BY = wy + wh - 6                -- полоса переноса
     if not S.drag and inw then
@@ -593,6 +593,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         gfx.rect(d > 0 and ed[2] or (ed[2] - wdt + 1), TY + k, wdt, 1, 1)
       end
     end
+    -- MIDI-нота слайса (4 окт) — справа от треугольника начала (C4, C#4 …)
+    if ctx.slice_note and zone[3] then
+      local nn = ctx.slice_note(zone)
+      if nn and px0 + 10 + U.measure(nn) < px1 then U.text(px0 + 10, TY - 1, nn, U.AMBER) end
+    end
+    S.zone_px0 = px0
     -- полоса переноса всей зоны
     local mhot = S.zone_hot == 'move' or dragging == 'move'
     U.set(mhot and U.AMBER or U.mix(U.AMBER, U.BG, 0.45))
@@ -609,7 +615,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if hot then hover_slice = k end
     U.set(hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
     local lbl = k <= 10 and ('qwertyuiop'):sub(k, k) or tostring(k)
-    if px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)) end
+    if zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3 then lbl = '' end   -- там подпись ноты зоны
+    if lbl ~= '' and px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (k <= 10 and U.AMBER or U.CYAN)) end
     ::next_slice::
   end
   -- выделение (общее для правки и просмотра: S.entry совпадает с e)

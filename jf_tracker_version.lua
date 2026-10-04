@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.17'
+V.VERSION = '0.6.18'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.18', d = '2026-10-04', items = {
+    'item tab: the slice zone triangles sit at the top edge of the wave, and the MIDI note of that slice is shown next to them (C4, C#4 ... - the learned pads note + slice, else from C4)',
+    'lib: the zone of the playing slice is an underline and a frame on the mini wave - the wave of row 01 was hidden under the fill',
+    'meters: options -> meter style blocks (pseudographic) / pt (the earlier see-through ProTracker bars); PT-mode switches to pt',
+  } },
   { v = '0.6.17', d = '2026-10-04', items = { 'a track folded to a one-character strip shows its name vertically down the header' } },
   { v = '0.6.16', d = '2026-10-04', items = {
     'repeat above the cursor (from Paketti by Esa Ruoho): Ctrl+Opt+J or Ctrl+Opt+Down - what the cursor track has from the region start to the cursor is repeated from the cursor down to the region end (the last copy cut at the end, what was there replaced); Shift+Opt+J - on all tracks; audio items and MIDI notes, one undo step; outside a region =START..=END',

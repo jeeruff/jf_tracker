@@ -139,7 +139,8 @@ local state = {
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
-  curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,     -- упреждение курсора при игре, мс (3 окт)
+  curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
+  meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
@@ -363,7 +364,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -546,6 +547,15 @@ ctx = {
   tutorial = function(text)
     if text then OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end); return end
     if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off' else OPT.tour.start(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward' end
+  end,
+  -- MIDI-нота слайса зоны (4 окт): выученные пэды — их нота + (k - 1), иначе от C4
+  slice_note = function(zone)
+    local col = cur_col(); local e = col and col.pool and col.pool[zone[3]]
+    local k = e and e.slice_k
+    if not k or k < 1 then return nil end
+    local b = MM.binds and MM.binds.pads
+    local base = b and b.num or model.BASE_NOTE
+    return (model.note_name(base + k - 1):gsub('-', ''))
   end,
   -- ссылка из about (4 окт): в браузере системы
   open_url = function(url)
@@ -2115,7 +2125,7 @@ ctx = {
   -- треков сверху; матрица, lib / браузер, DSP спрятаны, курсор в центре, метры.
   -- Повтор — всё как было (state.pt_saved)
   pt_toggle = function()
-    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'wzoom', 'captions' }
+    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'wzoom', 'captions' }
     if state.ptmode then
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
       state.ptmode, state.pt_saved = false, nil
@@ -2126,7 +2136,7 @@ ctx = {
       state.pt_saved = {}
       for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
       state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
-      state.fixed, state.meters, state.khelp = true, true, false
+      state.fixed, state.meters, state.meterstyle, state.khelp = true, true, 'pt', false
       -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
       -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
       state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.wzoom, state.captions = 1, 'off', 'off', false, 4, 0, false
@@ -2528,7 +2538,8 @@ ctx = {
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'itemframe', label = 'item frame', kind = 'cycle', values = { 'item', 'wave', 'off' }, desc = 'border around the whole item / only the wave column / none', get = function() return state.itemframe or 'item' end, set = function(v) state.itemframe = v end },
       { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
-      flag('meters', 'meters', 'pseudographic L R meters over the track columns'),
+      flag('meters', 'meters', 'peak meters over the track columns'),
+      { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: list by click + smart input', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },

@@ -1873,7 +1873,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         if z and z.root == e and (e.len or 0) > 0 then
           local za = wx + math.floor(math.max(0, z.a) / e.len * npix)
           local zb = wx + math.floor(math.min(e.len, z.b) / e.len * npix)
-          set(U.AMBER); gfx.a = 0.35; gfx.rect(za, y, math.max(1, zb - za), L.rh, 1); gfx.a = 1
+          -- зона — полосой под волной и рамкой (4 окт: заливка прятала волну строки 01)
+          set(U.AMBER); gfx.rect(za, y + L.rh - 2, math.max(1, zb - za), 2, 1)
+          gfx.a = 0.6; gfx.rect(za, y, math.max(1, zb - za), L.rh, 0); gfx.a = 1
         end
         dbg[#dbg + 1] = ('%02d wx%d n%d pk%s wc%.2f,%.2f,%.2f'):format(i, wx, npix, pk and pk.n or '-', wc[1], wc[2], wc[3])
       end
@@ -2510,7 +2512,26 @@ function D.frame(L, snap, rows, state, info)
   -- шириной в символ у левого края колонки, из клеток строк трекера (зазор 1 px,
   -- как текстовые блоки ▁▂▃▄▅▆▇█): полные клетки снизу, верхняя — восьмыми
   -- долями; зелёный / янтарный / красный по высоте, полупрозрачно — текст виден
-  if state.meters and info.peaks then
+  -- стиль pt (4 окт, как было): полупрозрачный столбик в треть колонки от
+  -- низа тела до середины, сегменты зелёный / янтарный / красный
+  if state.meters and info.peaks and state.meterstyle == 'pt' then
+    local by = L.body_y + L.body_h
+    local maxh = math.floor(L.body_h * 0.5)
+    for _, c in ipairs(L.cols) do
+      if c.x then
+        local pl, pr = info.peaks(c.col)
+        local v = math.min(1, math.max(pl or 0, pr or 0))
+        if v > 0 then
+          local x0, w0 = c.x + 2, math.max(2, math.floor(c.w * 0.3))
+          for _, sg in ipairs({ { 0, 0.6, U.GREEN }, { 0.6, 0.85, U.AMBER }, { 0.85, 1, U.RED } }) do
+            local s0, s1 = math.floor(sg[1] * maxh), math.floor(math.min(v, sg[2]) * maxh)
+            if s1 > s0 then gfx.set(sg[3][1], sg[3][2], sg[3][3], 0.45); gfx.rect(x0, math.max(L.body_y, by - s1), w0, s1 - s0, 1) end
+          end
+        end
+      end
+    end
+    gfx.a = 1
+  elseif state.meters and info.peaks then
     local rh = L.rh
     local ncell = math.max(1, math.floor(L.nrows * 0.5))       -- до середины тела
     local by = L.body_y + L.nrows * rh
