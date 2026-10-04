@@ -2463,8 +2463,9 @@ ctx = {
     elseif x >= L.matrix_w and x < L.win_w and y >= L.header_y and y < L.body_y + L.body_h then f = 'tracker' end
     if f and f ~= state.focus then ctx.set_focus(f) end
   end,
-  -- окно Options: список строит здесь (знает state / vim); модуль — только показ и клавиши
-  options = function()
+  -- окно Options: список строит здесь (знает state / vim); модуль — только показ и клавиши.
+  -- Тот же список — гидра \ o (4 окт): быстрые переключатели без окна
+  option_items = function()
     local function flag(k, label, desc) return { key = k, label = label, kind = 'toggle', desc = desc, get = function() return state[k] end, set = function(v) state[k] = v end } end
     local items = {
       -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
@@ -2498,7 +2499,49 @@ ctx = {
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
     }
-    OPT.open(items)
+    return items
+  end,
+  options = function() OPT.open(ctx.option_items()) end,
+  -- \ o (4 окт): опции гидрой — буква у каждой (первая свободная буква подписи,
+  -- тема — t); переключатель — сразу, выбор — список значений, число — + / -
+  options_hydra = function()
+    local used, items = { ['?'] = true }, {}
+    local FIXED = { theme = 't', wavemode = 'w', curline = 'c', hdrfill = 'h', tlruler = 'r', statpos = 's', fps = 'f',
+                    toppos = 'p', ctrlpos = 'm', itemframe = 'i', itemalpha = 'a', curlead = 'l' }
+    local function pick_key(it)
+      local k = FIXED[it.key]
+      if k and not used[k] then return k end
+      for ch in (it.label or ''):lower():gmatch('%a') do if not used[ch] then return ch end end
+      for ch in ('abcdefghijklmnopqrstuvwxyz0123456789'):gmatch('.') do if not used[ch] then return ch end end
+    end
+    for _, it in ipairs(ctx.option_items()) do
+      if not it.sep and it.get then
+        local k = pick_key(it)
+        if k then
+          used[k] = true
+          local cur = it.get()
+          if it.kind == 'toggle' then
+            items[#items + 1] = { key = k, label = it.label .. ': ' .. (cur and 'on' or 'off'), fn = function() it.set(not it.get()); vim.msg = it.label .. ': ' .. (it.get() and 'on' or 'off') end }
+          elseif it.kind == 'cycle' then
+            items[#items + 1] = { key = k, label = it.label .. ': ' .. tostring(cur), sub = function()
+              local vs, keysq = {}, '1234567890abcdefghijklmnopqrstuvwxyz'
+              for n, v in ipairs(it.values) do
+                vs[#vs + 1] = { key = keysq:sub(n, n), label = tostring(v) .. (v == it.get() and '  *' or ''), fn = function() it.set(v); vim.msg = it.label .. ': ' .. tostring(v) end }
+              end
+              return { title = it.label, items = vs }
+            end }
+          elseif it.kind == 'num' then
+            items[#items + 1] = { key = k, label = it.label .. ': ' .. (it.fmt and it.fmt:format(cur) or tostring(cur)), sub = function()
+              local function step(d) local v = math.max(it.min or -math.huge, math.min(it.max or math.huge, (it.get() or 0) + d * (it.step or 1))); it.set(v); vim.msg = it.label .. ': ' .. (it.fmt and it.fmt:format(v) or tostring(v)) end
+              return { title = it.label, items = { { key = '+', label = 'more', fn = function() step(1) end }, { key = '-', label = 'less', fn = function() step(-1) end },
+                { key = '=', label = 'more x10', fn = function() step(10) end }, { key = '_', label = 'less x10', fn = function() step(-10) end } } }
+            end }
+          end
+        end
+      end
+    end
+    items[#items + 1] = { key = 'O', label = 'options window …', fn = function() ctx.options() end }
+    return { title = 'options', items = items }
   end,
   -- about (3 окт): ячейка в главном модуле, :about; логотип каждый раз другой
   about = function(name)
@@ -3177,6 +3220,7 @@ ctx = {
           { key = '-', label = 'length -1 ms', fn = function() ctx.xfade_len(-1) end },
         } } end },
       { key = 'd', label = (state.dsp and 'hide' or 'show') .. ' DSP panel (:dsp)', fn = ctx.toggle_dsp },
+      { key = 'o', label = 'options (quick toggles) …', sub = function() return ctx.options_hydra() end },
       -- \P — проект (2 окт): s сохранить (как :w), S сохранить как…
       { key = 'P', label = 'project …', sub = function() return { title = 'project', items = {
           { key = 's', label = 'save project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
@@ -3504,7 +3548,8 @@ function view_actions()
   return {
     { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
-    { 'Remove old scope bridges (:scopes)', key = 'o', fn = ctx.toggle_scopes },
+    { 'Options window', key = 'o', fn = function() ctx.options() end },
+    { 'Remove old scope bridges (:scopes)', key = 'R', fn = ctx.toggle_scopes },
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
     { 'Loop region under cursor', key = 'l', fn = function()

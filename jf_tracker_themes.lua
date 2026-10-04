@@ -4,7 +4,7 @@
 -- подменяется. Остальные — для полноэкранной работы, где единство с REAPER
 -- не так важно, а эстетика — очень: modus vivendi / operandi (Протесилаос
 -- Ставру), gruvbox dark, catppuccin mocha, mono — всё в оттенках серого,
--- кроме ячейки курсора.
+-- кроме ячейки курсора; protracker — палитра ProTracker 2.
 --
 -- TH.apply(U, name) переписывает базовые цвета U (BG PANEL TEXT GREY DIM LINE
 -- AMBER CYAN GREEN RED) и фон шапок (U.HDR / U.HDRSEL); производные цвета
@@ -14,7 +14,7 @@
 
 local TH = {}
 
-TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'gruvbox', 'catppuccin', 'mono' }
+TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'gruvbox', 'catppuccin', 'mono', 'protracker' }
 
 local function hex(s)
   local r, g, b = s:match('#?(%x%x)(%x%x)(%x%x)')
@@ -34,6 +34,10 @@ TH.PAL = {
     amber = '#fab387', cyan = '#94e2d5', green = '#a6e3a1', red = '#f38ba8', hdr = '#313244', hdrsel = '#45475a' },
   mono = { bg = '#101010', panel = '#181818', text = '#d8d8d8', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true },
+  -- ProTracker 2 (4 окт): чёрное поле паттерна, серые панели в духе Amiga,
+  -- светло-серый текст, жёлтый акцент (скопы), синий, малиновый курсор PT
+  protracker = { bg = '#000000', panel = '#3a3a3a', text = '#cccccc', grey = '#a0a0a0', dim = '#2a2a2a', line = '#888888',
+    amber = '#ffdd88', cyan = '#7799ff', green = '#77cc77', red = '#dd0044', hdr = '#555555', hdrsel = '#888888' },
 }
 
 -- цвет ячейки курсора в mono — единственное цветное (просьба 3 окт)
