@@ -36,7 +36,7 @@ KH.PAGES = {
     { k = 'macro', t = {}, d = ':macro - bird view: a row is a bar; density and first note per track, region names; j k bars (J K by 4), h l tracks, Enter / Esc back on that bar' },
     { k = 'pt', t = {}, d = ':pt - PT-mode, a dumbed-down ProTracker view: exactly 4 channels from the scroll, note / sample / vol / one command, no waves or envelopes, LPB 4, bitmap x4 (smaller if 4 do not fit), scopes on top; :pt new creates CH1..CH4 in the project; :pt again restores everything' },
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
-    { k = 'slices', t = {}, d = 'a slice is not its own instrument: the note keeps the number of its sample, Sxx in the command column is the slice; Shift+Enter tells what is under the cursor' },
+    { k = 'slices', t = {}, d = 'a slice is a note, as in Renoise: C-4 = slice 1, C#4 = 2 ... on the normal keyboard q 2 w 3 e (z / x - by 12); Option+key - the last slice at that pitch (Pxx); ; - the whole sample; \\ i - insert menu (s a - all slices in a row); Shift+Enter tells what is under the cursor' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {

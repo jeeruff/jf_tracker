@@ -497,6 +497,16 @@ local function replay(keys)
 end
 
 -- ── пианино ───────────────────────────────────────────────────────────────
+-- имя ноты → MIDI (4 окт, :note): C-4 / C#4 / c4 / Db3 → 60 / 61 / 60 / 49
+function V.parse_note(nm)
+  local l, acc, oct = (nm or ''):upper():match('^([A-G])([#B%-]?)(%-?%d)$')
+  if not l then return nil end
+  local SEMI = { C = 0, D = 2, E = 4, F = 5, G = 7, A = 9, B = 11 }
+  local p = SEMI[l] + (acc == '#' and 1 or (acc == 'B' and -1 or 0))
+  return (tonumber(oct) + 1) * 12 + p
+end
+-- нота слайса 1 (4 окт): C-4 = слайс 1, дальше хроматически
+function V.slice_base() return (ctx.model and ctx.model.BASE_NOTE) or 60 end
 local function piano_pitch(c)
   local off = ctx.piano[c]
   if off == nil then return nil end
@@ -512,7 +522,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Ctrl +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '', 'bottom DSP panel (track fx)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'tutorial', '', 'first steps in ten points' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'tutorial', '', 'first steps in ten points' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -704,6 +714,16 @@ local function run_cmd(line)
     V.mode = 'normal'
     V.msg = n > 0 and ('interp %s: %d event(s) in between'):format(what, n) or 'interp: each column needs 3+ events with that value in the selection'
   elseif cmd == 'big' then ctx.sample_big()
+  elseif cmd == 'note' then
+    -- :note C-4 [строк] (4 окт): нота инструмента в строку курсора
+    local nm, r = (arg or ''):match('^%s*(%S+)%s*(%d*)')
+    local p = nm and V.parse_note and V.parse_note(nm)
+    if p and ctx.insert_note_cmd then ctx.insert_note_cmd(p, tonumber(r)) else V.msg = 'note: like :note C-4 4' end
+  elseif cmd == 'sl' then
+    -- :sl N [строк] [+полутонов]
+    local k, r, sm = (arg or ''):match('^%s*(%d+)%s*(%d*)%s*([%+%-]?%d*)')
+    if k and ctx.insert_slice_cmd then ctx.insert_slice_cmd(tonumber(k), tonumber(r), tonumber(sm)) else V.msg = 'sl: like :sl 3 [rows] [+semis]' end
+  elseif cmd == 'whole' then if ctx.insert_whole then ctx.insert_whole(tonumber(arg)) end
   elseif cmd == 'ssave' then if ctx.ss_save then ctx.ss_save(arg) end
   elseif cmd == 'sload' then if ctx.ss_load then ctx.ss_load((arg or ''):gsub('^%s+', '')) end
   elseif cmd == 'tutorial' or cmd == 'tutor' then if ctx.tutorial then ctx.tutorial(arg == 'text') end
@@ -814,6 +834,7 @@ local function keys_control(c)
   elseif ch == 'C' then V.vel = math.min(127, (V.vel or 100) + 8); V.msg = 'velocity ' .. V.vel; return true
   elseif ch == ',' then ctx.pool_select(V.inst - 1); return true
   elseif ch == '.' then ctx.pool_select(V.inst + 1); return true
+  elseif ch == ';' then if ctx.insert_whole then ctx.insert_whole() end; return true   -- целый сэмпл (материнский item), 4 окт
   elseif ch == 'a' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto' or tostring(V.step)); return true
   elseif ch == 's' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = 'step '; return true
   elseif ch == 'd' then
@@ -1036,13 +1057,21 @@ function V.key_impl(c)
     -- рядом (новая подколонка), Ctrl — захват звука канала (F5, пока прослушка)
     local how, mods = 'insert', (ctx.mods and ctx.mods() or {})
     c, how = V.note_key(c, mods)
-    -- нарезанный инструмент: верхний ряд q..p = слайсы 1..10
+    -- нарезанный инструмент (4 окт, как Renoise): обычная MIDI-клавиатура
+    -- q 2 w 3 e r 5 t …, слайс = нота: C-4 = 1, C#4 = 2 …; z / x — по 12.
+    -- Option + клавиша — последний слайс с питчем этой ноты (q = исходный)
     local f0 = flat()[V.cur.fi]
     local inst0 = f0 and (f0.col.pool or {})[V.inst]
-    local UP = { q = 1, w = 2, e = 3, r = 4, t = 5, y = 6, u = 7, i = 8, o = 9, p = 10 }
     local chq = (c < 256) and string.char(c) or ''
-    if inst0 and inst0.slices and #inst0.slices > 0 and UP[chq] then
-      local k = UP[chq]
+    local kp = piano_pitch(c)
+    local SB = V.slice_base()
+    local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
+    local semis = 0
+    if sliced and how == 'beside' then semis = kp - SB; kp = SB + (V.last_slice or 1) - 1; how = 'insert' end
+    if sliced then
+      local k = kp - SB + 1
+      if k < 1 or k > #inst0.slices then V.msg = ('no slice %d (the sample has %d) - z / x shift by an octave'):format(k, #inst0.slices); return end
+      V.last_slice = k
       local t0s = inst0.slices[k]
       if how == 'hold' or how == 'hold_stretch' then
         local lane = f0.lane or f0.col.lanes[1]
@@ -1069,6 +1098,7 @@ function V.key_impl(c)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
       end
       local it = E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
+      if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
       if V.step_auto and it and E.item_end and E.row_of_time then
@@ -1146,9 +1176,12 @@ function V.key_impl(c)
       local f0 = flat()[V.cur.fi]
       local inst0 = f0 and (f0.col.pool or {})[V.inst]
       local chq = (base < 256) and string.char(base) or ''
-      local UPK = { q = 1, w = 2, e = 3, r = 4, t = 5, y = 6, u = 7, i = 8, o = 9, p = 10 }
       if ctx.piano and ctx.piano[base] then V.piano_last = ctx.piano[base] end   -- пианинка: последняя сыгранная клавиша
-      local k = (inst0 and inst0.slices and #inst0.slices > 0) and UPK[chq] or nil
+      -- нарезанный: слайс = нота хроматически (4 окт), C-4 = 1
+      local kp0 = piano_pitch(base)
+      local k = (inst0 and inst0.slices and #inst0.slices > 0 and kp0) and (kp0 - V.slice_base() + 1) or nil
+      if k and (k < 1 or k > #inst0.slices) then V.msg = ('no slice %d'):format(k); return end
+      if k then V.last_slice = k end
       local pitch = (not k) and piano_pitch(base) or nil
       if f0 and (k or pitch) then
         local lane = f0.lane or f0.col.lanes[1]

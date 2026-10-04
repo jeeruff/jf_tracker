@@ -85,6 +85,8 @@ function E.save() calls[#calls + 1] = 'save' end
 function E.play_stop() calls[#calls + 1] = 'play' end
 function E.cursor_to(t) calls[#calls + 1] = 'cursor:' .. t end
 function E.arpeggiate(track, lane, lpb, row, heads, opt) calls[#calls + 1] = ('arp:%s@%d:%s:%d:%d:%.2f'):format(names(heads), row, opt.order, opt.step, opt.oct, opt.gate); return 4 end
+function E.insert_slice(track, lane, lpb, row, item, k) calls[#calls + 1] = ('slice:%s@%d:%d'):format(track, row, k); return { slice = k } end
+function E.slice_pitch(it, semis) calls[#calls + 1] = ('slicepitch:%d:%+d'):format(it.slice, semis) end
 function E.beatsync(heads, lpb, unit) calls[#calls + 1] = ('beatsync:%s:%s'):format(names(heads), unit); return #heads end
 
 local lpb_calls = {}
@@ -130,6 +132,9 @@ local function reset()
     clear_track = function(all) calls[#calls + 1] = all and 'cleartrack:all' or 'cleartrack'; return true end,
     delete_track = function() calls[#calls + 1] = 'deltrack'; return true end,
     delete_time = function() calls[#calls + 1] = 'deltime'; return true end,
+    insert_whole = function() calls[#calls + 1] = 'whole' end,
+    insert_note_cmd = function(p, r) calls[#calls + 1] = ('notecmd:%d:%s'):format(p, tostring(r)) end,
+    insert_slice_cmd = function(k, r, sm) calls[#calls + 1] = ('slcmd:%d:%s:%s'):format(k, tostring(r), tostring(sm)) end,
     repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
@@ -556,5 +561,31 @@ ctrl_down, alt_down = true, true; V.key(10); eq('Ctrl+Opt+J repeats on the track
 V.key(1685026670); eq('Ctrl+Opt+Down too', last(), 'repeat:track')
 ctrl_down, shift_down = false, true; V.key(8710); eq('Shift+Opt+J repeats on all tracks', last(), 'repeat:all')
 alt_down, shift_down = false, false
+-- слайс = нота (4 окт): обычная MIDI-клавиатура, C-4 = слайс 1
+reset()
+do
+  local pool = snap.cols[1].pool
+  pool[1].slices = {}; for k = 1, 20 do pool[1].slices[k] = (k - 1) * 0.1 end
+  pool[1].len = 2
+  V.inst = 1; V.octave = 4; V.step = 0
+  V.cur = { fi = 1, row = 30, field = 1 }
+  keysin('i')
+  keysin('q'); eq('q = slice 1', last(), 'slice:trA@30:1')
+  keysin('2'); eq('2 = slice 2 (black key)', last(), 'slice:trA@30:2')
+  keysin('w'); eq('w = slice 3', last(), 'slice:trA@30:3')
+  keysin('p'); eq('p = slice 17', last(), 'slice:trA@30:17')
+  local n0 = #calls
+  keysin('x'); keysin('q'); eq('x then q = slice 13', last(), 'slice:trA@30:13')
+  keysin('p'); eq('past the last slice (29 of 20): nothing', last(), 'slice:trA@30:13')
+  keysin('z')
+  V.last_slice = 5
+  alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑)
+  eq('Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
+  keysin(';'); eq('; inserts the whole sample', last(), 'whole')
+  V.key(27)
+  pool[1].slices = nil
+end
+keysin(':note D#3 4'); V.key(13); eq(':note', last(), 'notecmd:51:4')
+keysin(':sl 3 2 +5'); V.key(13); eq(':sl', last(), 'slcmd:3:2:5')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

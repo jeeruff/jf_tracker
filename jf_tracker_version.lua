@@ -1,9 +1,15 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.19'
+V.VERSION = '0.6.20'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.20', d = '2026-10-04', items = {
+    'a slice is a note, as in Renoise: slice k shows as the note C-4 + k - 1 (C-4, C#4, D-4 ...) and the command column is free (no more S01 / T06); the normal MIDI keyboard q 2 w 3 e r 5 t ... writes slices 1 2 3 4 5 6 7 8 (17 per octave, z / x by 12); MIDI keys and the item tab label use the same mapping',
+    'Option + key on a sliced sample: the last used slice at that pitch (q = original, shown as Pxx); ; in INSERT - the whole sample (mother item); r + note on a slice note picks another slice',
+    'insert by command and menu: :note C-4 [rows], :sl N [rows] [+semis], :whole [rows]; \\ i - insert menu: n note, w whole, s slices (each with its note, length in rows and a mini wave; a - all slices in a row, stitched), e automation (ramp, fade, curves, pick a parameter); the instrument list moved to \\ I',
+    'the wave is always drawn under the text (the background wave covered the green instrument number)',
+  } },
   { v = '0.6.19', d = '2026-10-04', items = {
     'screensets: the screensets cell under options in the main module - s saves the whole view under a name (every option of the options window + module layout: top panel and tab, DSP, browser, matrix, widths, font, theme ...), 1..0 load a saved one, d deletes; also :ssave name / :sload name; kept in REAPER Data/jf_tracker_screensets.txt',
   } },
@@ -579,7 +585,7 @@ V.TUTORIAL = {
   '1. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
   '2. Write notes. i - INSERT. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
   '3. Pick a sound. The lib on the right: Tab to it, j k - select; in INSERT , . switch sounds. Shift+note only plays.',
-  '4. Slice a break. Select a sample, the item tab on top: 8 = eight equal slices, t = by transients. In INSERT q..p write slices; Sxx in the command column is the slice.',
+  '4. Slice a break. Select a sample, the item tab on top: 8 = eight equal slices, t = by transients. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (a slice is a note: C-4, C#4 ...).',
   '5. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '6. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '7. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',

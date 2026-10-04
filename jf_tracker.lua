@@ -542,6 +542,100 @@ ctx = {
     model.invalidate()
     vim.msg = ('repeat rows %d-%d down to %d%s: %d copies'):format(r0, rc - 1, r1 - 1, all and ' on all tracks' or '', n)
   end,
+  -- ── вставка командами и меню \ i (4 окт) ─────────────────────────────
+  -- цель: трек / лейн курсора, инструмент vim.inst; после вставки — шаг
+  ins_target = function()
+    local f = L and L.flat[vim.cur.fi]
+    if not (f and f.col) then vim.msg = 'no track under the cursor'; return nil end
+    local lane = f.lane or f.col.lanes[1]
+    local inst = f.col.pool and f.col.pool[vim.inst]
+    if inst and inst.parent then inst = inst.parent end
+    return f.col.track, f.col.fixed and lane and lane.idx or nil, inst
+  end,
+  ins_advance = function(rows) vim.cur.row = vim.cur.row + math.max(1, rows or (vim.step_auto and 1 or vim.step)) end,
+  insert_note_cmd = function(pitch, rows)
+    local tr, lane, inst = ctx.ins_target(); if not tr then return end
+    edit.insert_note(tr, lane, state.lpb, vim.cur.row, pitch, vim.vel, rows or math.max(1, vim.step), inst and inst.item)
+    model.invalidate(); vim.msg = 'note ' .. model.note_name(pitch); ctx.ins_advance(rows)
+  end,
+  insert_slice_cmd = function(k, rows, semis)
+    local tr, lane, inst = ctx.ins_target(); if not tr then return end
+    if not (inst and inst.slices and inst.slices[k]) then vim.msg = 'no slice ' .. tostring(k); return end
+    local it
+    edit.run('insert slice ' .. k, function()
+      it = edit.insert_slice(tr, lane, state.lpb, vim.cur.row, inst.item, k)
+      if it and semis and semis ~= 0 then edit.slice_pitch(it, semis) end
+      if it and rows then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', edit.row_time(vim.cur.row + rows, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)) end
+    end)
+    vim.last_slice = k
+    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name(model.BASE_NOTE + k - 1), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
+    ctx.ins_advance(rows)
+  end,
+  insert_whole = function(rows)
+    local tr, lane, inst = ctx.ins_target(); if not (tr and inst and inst.item) then vim.msg = 'no sample selected in the lib'; return end
+    edit.insert_note(tr, lane, state.lpb, vim.cur.row, model.BASE_NOTE, vim.vel, rows or 1, inst.item)
+    model.invalidate(); vim.msg = 'whole sample: ' .. (inst.name or '')
+    ctx.ins_advance(rows)
+  end,
+  -- все слайсы подряд встык (\ i s a): каждый — в конец предыдущего, один undo
+  insert_all_slices = function()
+    local tr, lane, inst = ctx.ins_target(); if not tr then return end
+    if not (inst and inst.slices and #inst.slices > 0) then vim.msg = 'the selected sample has no slices'; return end
+    local t = edit.row_time(vim.cur.row, state.lpb, 0)
+    edit.run('insert all slices', function()
+      for k = 1, #inst.slices do
+        local row = math.floor(edit.row_of_time(t, state.lpb))
+        local it = edit.insert_slice(tr, lane, state.lpb, row, inst.item, k, t)
+        if it then t = edit.item_end(it) end
+      end
+    end)
+    vim.cur.row = math.max(vim.cur.row + 1, edit.row_of_time(t, state.lpb))
+    model.invalidate(); vim.msg = ('%d slices in a row from %s'):format(#inst.slices, inst.name or '')
+  end,
+  -- слайс в меню: нота, длина в строках, мини-волна символами
+  slice_label = function(inst, k)
+    local a, b = inst.slices[k], inst.slices[k + 1] or inst.len
+    local rate = (inst.rate and inst.rate ~= 0) and inst.rate or 1
+    local rows = (edit.row_of_time(edit.row_time(vim.cur.row, state.lpb, 0) + (b - a), state.lpb) - vim.cur.row)
+    local spark = ''
+    local pk = model.peaks(inst, 96)
+    if pk and pk.n > 0 and (inst.len or 0) > 0 then
+      local BL = { '_', '.', ':', '|', 'I' }
+      for j = 0, 5 do
+        local t0, t1 = a + (b - a) * j / 6, a + (b - a) * (j + 1) / 6
+        local m = 0
+        for i = math.max(1, math.floor(t0 / inst.len * pk.n) + 1), math.min(pk.n, math.floor(t1 / inst.len * pk.n) + 1) do
+          m = math.max(m, math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0))
+        end
+        spark = spark .. BL[math.max(1, math.min(5, math.floor(m * 5) + 1))]
+      end
+    end
+    return ('slice %-2d %-4s %5.2f rows  %s'):format(k, model.note_name(model.BASE_NOTE + k - 1), rows, spark), rate
+  end,
+  insert_hydra = function()
+    local _, _, inst = ctx.ins_target()
+    local items = {
+      { key = 'n', label = 'note … (:note C-4 [rows])', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'note ' end },
+      { key = 'w', label = 'whole sample' .. (inst and (': ' .. (inst.name or '')) or '') .. ' (;  :whole)', fn = function() ctx.insert_whole() end },
+    }
+    if inst and inst.slices and #inst.slices > 0 then
+      items[#items + 1] = { key = 's', label = ('slice of %s (%d) …'):format(inst.name or '', #inst.slices), sub = function()
+        local keysq = '1234567890bcdefghijklmnopqrtuvxyz'
+        local sl = { { key = 'a', label = 'all slices in a row, stitched', fn = function() ctx.insert_all_slices() end } }
+        for k = 1, math.min(#inst.slices, #keysq) do
+          sl[#sl + 1] = { key = keysq:sub(k, k), label = (ctx.slice_label(inst, k)), fn = function() ctx.insert_slice_cmd(k) end }
+        end
+        return { title = 'insert slice - key: note - length - wave', items = sl }
+      end }
+    end
+    items[#items + 1] = { key = 'e', label = 'automation …', sub = function() return { title = 'automation (cursor on an envelope column)', items = {
+      { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ramp ' end },
+      { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fade ' end },
+      { key = 'c', label = 'curve (LFO / podkat / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'modulation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
+      { key = 'p', label = 'pick a parameter to automate (fzf)', fn = function() ctx.automation_picker() end },
+    } } end }
+    return { title = 'insert', items = items }
+  end,
   -- скринсеты (4 окт): вид целиком под именем — все опции окна options и
   -- положения / размеры модулей; файл Data/jf_tracker_screensets.txt (вне репо)
   ss_file = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_screensets.txt' end,
@@ -621,9 +715,7 @@ ctx = {
     local col = cur_col(); local e = col and col.pool and col.pool[zone[3]]
     local k = e and e.slice_k
     if not k or k < 1 then return nil end
-    local b = MM.binds and MM.binds.pads
-    local base = b and b.num or model.BASE_NOTE
-    return (model.note_name(base + k - 1):gsub('-', ''))
+    return (model.note_name(model.BASE_NOTE + k - 1):gsub('-', ''))   -- как в ячейке: C-4 = слайс 1
   end,
   -- ссылка из about (4 окт): в браузере системы
   open_url = function(url)
@@ -3307,7 +3399,8 @@ ctx = {
           { key = 'o', label = 'record mode …', sub = function() return ctx.hydra_recmode() end },
           { key = 'l', label = 'fixed lanes on/off (:lanes)', fn = ctx.toggle_lanes },
         } } end },
-      { key = 'i', label = 'instrument (pool)', sub = function()
+      { key = 'i', label = 'insert: note / slice / whole sample / automation …', sub = function() return ctx.insert_hydra() end },
+      { key = 'I', label = 'instrument (pool)', sub = function()
           local it = {}
           for i, e in ipairs(col and col.pool or {}) do
             if i <= 10 then it[#it + 1] = { key = tostring(i % 10), label = e.name .. (e.slices and (' [' .. #e.slices .. ' sl]') or ''), fn = function() pool_select(i) end } end
@@ -4094,8 +4187,17 @@ local function poll_midi_in()
           end
         end
         if not midiin.held[d1] then midiin.held[d1] = true; midiin.nheld = midiin.nheld + 1 end
-        edit.rec_note(col.track, lane_idx, state.lpb, midiin.row, d1, d2, math.max(1, vim.step))
-        vim.msg = ('rec %s vel %d'):format(model.note_name(d1), d2)
+        -- нарезанный инструмент (4 окт): нота = слайс (C-4 = 1, хроматически)
+        local inst = col.pool and col.pool[vim.inst]
+        local k = inst and inst.slices and #inst.slices > 0 and (d1 - model.BASE_NOTE + 1) or nil
+        if k and k >= 1 and k <= #inst.slices then
+          edit.insert_slice(col.track, lane_idx, state.lpb, midiin.row, inst.item, k)
+          vim.last_slice = k
+          vim.msg = ('rec %s = slice %d'):format(model.note_name(d1), k)
+        else
+          edit.rec_note(col.track, lane_idx, state.lpb, midiin.row, d1, d2, math.max(1, vim.step))
+          vim.msg = ('rec %s vel %d'):format(model.note_name(d1), d2)
+        end
       elseif kind == 0x80 or (kind == 0x90 and d2 == 0) then
         if midiin.held[d1] then midiin.held[d1] = nil; midiin.nheld = math.max(0, midiin.nheld - 1) end
         if midiin.nheld == 0 and midiin.row then
@@ -5467,7 +5569,7 @@ local function frame()
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
     vol = 'vl: volume / velocity, hex 00..FF (80 = unity)',
     delay = 'dl: delay inside the row, hex xx/256 of a row',
-    fx = 'fx: effect command, letter + hex hex (Sxx slice of the sample / offset, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
+    fx = 'fx: effect command, letter + hex hex (slices are notes: C-4 = slice 1; Sxx offset, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'

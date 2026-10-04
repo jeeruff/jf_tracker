@@ -325,6 +325,13 @@ local function audio_set_semis(h, semis)
   end
 end
 
+-- питч ноты-слайса (4 окт, Option + нота): D_PITCH, скорость не трогается —
+-- длина и кусок слайса те же
+function E.slice_pitch(it, semis)
+  local tk = R.GetActiveTake(it)
+  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', semis) end
+end
+
 function E.transpose(heads, lpb, semis)
   if #heads == 0 or semis == 0 then return end
   run(('transpose %+d'):format(semis), function()
@@ -347,7 +354,11 @@ function E.set_pitch(heads, lpb, pitch)
   if #heads == 0 then return end
   run('pitch', function()
     for _, h in ipairs(heads) do
-      if h.kind == 'audio' and h.take then
+      local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
+      if h.kind == 'audio' and h.take and tonumber(slk) then
+        -- нота-слайс (4 окт): новая нота — другой слайс того же сэмпла (C-4 = 1)
+        E.set_fx({ h }, lpb, 'S', math.max(1, pitch - model.BASE_NOTE + 1))
+      elseif h.kind == 'audio' and h.take then
         audio_set_semis(h, pitch - model.BASE_NOTE)
       elseif h.kind == 'midi' then
         local i, n = midi_note(h, lpb)

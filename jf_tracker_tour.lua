@@ -21,7 +21,7 @@ T.STEPS = {
     text = 'The lib: every sample of the project. Tab to it and j / k, or , . in INSERT. Pick another sound.',
     check = function(e, b) return e.inst ~= b.inst end },
   { mod = 'top', title = 'Slice a break',
-    text = 'The item tab shows the selected sample: 8 = eight slices, t = transients; q..p in INSERT write slices. Open the item tab (F2).',
+    text = 'The item tab shows the selected sample: 8 = eight slices, t = transients; in INSERT every key of the keyboard is a slice: q = slice 1 (C-4), 2 = slice 2, w = 3 ... Open the item tab (F2).',
     check = function(e) return e.toptab == 'sample' end },
   { mod = 'tracker', title = 'Edit like text',
     text = 'x deletes, dw / d3j / dG delete with a motion, yy p copy, u undo, . repeats. Make any edit.',

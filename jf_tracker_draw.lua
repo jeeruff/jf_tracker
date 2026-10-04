@@ -684,13 +684,16 @@ local function draw_cell(L, cell, x, y, ty, inv)
   end
   local nf = L.notes_only and 1 or (L.narrow and 2 or (3 + L.nfx))
   local name_row = cell and cell.kind == 'cont' and cell.i == 1 and cell.of.kind == 'audio' and D.itemnames and cell.of.name ~= ''
-  if L.x_inst and not name_row then
-    -- поле инструмента: номер на строке ноты; пустое — точки
+  -- поле инструмента: номер на строке ноты; пустое — точки. Рисуется ПОСЛЕ
+  -- волны (4 окт: волна фоном закрашивала зелёный номер)
+  local function draw_inst()
+    if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), cell.muted and U.GREY or U.GREEN)
     else text(x + L.x_inst, ty, '..', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY) end
   end
   if not cell then
+    draw_inst()
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
       text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
@@ -719,6 +722,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
   end
+  draw_inst()
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     text(x + L.x_note, ty, cell.note, c(1, muted and U.GREY or U.TEXT))

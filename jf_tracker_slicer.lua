@@ -422,7 +422,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local hint = editing
     and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  [ ]: edges'
          or '2/4/8 1(16) 3(32) 6(64) equal  t transients (+ - sens)  x clear  v view')
-    or 'dblclick / :slice / \\is — edit slices;  q..p insert slices (INSERT)  drag: select → drop on track'
+    or 'dblclick / :slice / \\is — edit slices;  q 2 w 3 e ... insert slices 1 2 3 4 5 (INSERT)  drag: select → drop on track'
   -- громкость item и нормализация — справа в строке подсказки (1 окт)
   local hover_vol, hover_norm
   local hint_w = w
@@ -629,7 +629,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
   local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
-    or (#slices > 0 and ('%d slices; Sxx in fx column = slice'):format(#slices) or '')
+    or (#slices > 0 and ('%d slices; a slice is a note: C-4 = 1, C#4 = 2 ...'):format(#slices) or '')
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag out: to track   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
   U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)

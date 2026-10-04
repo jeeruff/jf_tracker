@@ -314,5 +314,21 @@ do
   eq('order by jf_ord, unmarked last', table.concat(names, ' '), 'snare1 clap2 kick3 hat4')
   eq('roots counted', snap.nroots, 4)
 end
+-- слайс = нота (4 окт): слайс 2 — C#4, без S и T
+do
+  for k in pairs(tracks) do tracks[k] = nil end
+  local tk = { name = 'amen', src = { len = 4, qn = false }, rate = 1.5, ppitch = true }
+  local it = { pos = 0, len = 0.5, take = tk, ext = { ['P_EXT:jf_slice'] = '2', ['P_EXT:jf_iid'] = 'R#2' } }
+  tk.item = it
+  tracks[1] = { name = 'S', items = { it } }
+  state_count = state_count + 1
+  local snap = M.build(4)
+  local head
+  for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do for _, c in pairs(sub) do if c.kind == 'audio' then head = c end end end end
+  eq('slice 2 shows C#4', head and head.note, 'C#4')
+  local hasS, hasT = false, false
+  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 1) == 'S' then hasS = true elseif f:sub(1, 1) == 'T' then hasT = true end end
+  eq('no S on a slice note', hasS, false); eq('no T on a slice note', hasT, false)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

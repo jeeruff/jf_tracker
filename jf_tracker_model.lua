@@ -150,7 +150,9 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   -- один, номер у ноты общий, а какой кусок — эта команда
   local _, slk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
   slk = tonumber(slk)
-  if slk then fx[#fx + 1] = 'S' .. M.hex2(slk); offs = 0 end
+  -- слайс = нота (4 окт, как Renoise): номер слайса — в ноте, команд S / T нет;
+  -- питч слайса (Option + нота) — Pxx
+  if slk then offs = 0 end
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
@@ -171,8 +173,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   if cm and cm ~= 0 then fx[#fx + 1] = 'M0' .. tostring(math.floor(cm)) end
   -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
   -- ячейка — нота и номер инструмента, а у каждого слайса свой номер в пуле
-  if ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'T' .. M.hex2((qn1 - qn0) * lpb) end
-  if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.01 then fx[#fx + 1] = 'P' .. M.hex2(128 + pitch) end
+  if not slk and ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'T' .. M.hex2((qn1 - qn0) * lpb) end
+  if pitch and ((slk and math.abs(pitch) > 0.01) or math.abs(pitch - math.floor(pitch + 0.5)) > 0.01) then fx[#fx + 1] = 'P' .. M.hex2(128 + pitch) end
   -- команды-огибающие и генераторы (P_EXT:jf_cmds) — как записаны
   local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
   if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do fx[#fx + 1] = tok end end
@@ -204,7 +206,12 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
   local head = {
     kind = 'audio', item = it, take = take, src = src,
     name = take and R.GetTakeName(take) or '',
-    note = M.note_name(M.BASE_NOTE + semis),
+    -- слайс = нота (4 окт): слайс k — нота C-4 + k - 1, питч — командой Pxx
+    note = (function()
+      local _, k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+      k = tonumber(k)
+      return k and M.note_name(M.BASE_NOTE + k - 1) or M.note_name(M.BASE_NOTE + semis)
+    end)(),
     frac = math.abs(semis - math.floor(semis + 0.5)) > 0.01,   -- дробный питч
     semis = semis,
     vol = M.vol_hex(vol),
