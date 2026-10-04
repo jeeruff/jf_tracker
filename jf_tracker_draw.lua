@@ -282,7 +282,8 @@ function D.layout(snap, state, nregions)
   L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
   -- модуль слайсов (4 окт): колонка в верхней панели справа (у lib), по её
   -- высоте — не на всё окно; пока у выбранного инструмента есть слайсы
-  L.slices_w = (state.slices_on and state.top) and math.max(L.cw * 16, math.min(L.cw * 20, math.floor(gfx.w * 0.12))) or 0
+  L.slices_split = state.slices_on and state.slicespos == 'split' and state.side   -- половина модуля инструментов (опция slices)
+  L.slices_w = (state.slices_on and state.top and not L.slices_split) and math.max(L.cw * 16, math.min(L.cw * 20, math.floor(gfx.w * 0.12))) or 0
   L.win_w = gfx.w - L.side_w - L.rstrip_w
   L.side_x = L.win_w                               -- левый край сайдбара / полосы
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
@@ -2802,7 +2803,20 @@ function D.frame(L, snap, rows, state, info)
     -- подсказок (она короче на ширину ручки), без подсказок — в нижнем ряду инструментов
     local gw = ms('=') + 2 * L.pad
     L.inst_knob_w = hh > 0 and 0 or (gw + L.pad)
-    D.draw_instruments(L, info, L.side_x, sy0, L.side_w, ih - hh, hover)
+    -- slices = split (4 окт): нарезанный айтем — нижняя половина модуля
+    -- инструментов отдаётся списку слайсов
+    local ihl = ih - hh
+    L.slices_split_rect = nil
+    if L.slices_split and info.slices_draw and ihl > 8 * L.rh then
+      local top_h = math.floor(ihl / 2)
+      D.draw_instruments(L, info, L.side_x, sy0, L.side_w, top_h, hover)
+      set(D.SEP); gfx.rect(L.side_x, sy0 + top_h, L.side_w, D.SEPW, 1)
+      local hs = info.slices_draw(L, L.side_x + 3, sy0 + top_h + 3, L.side_w - 5, ihl - top_h - 4)
+      if hs ~= nil then hover.slices = hs end
+      L.slices_split_rect = { L.side_x, sy0 + top_h + 1, L.side_w, ihl - top_h - 1 }
+    else
+      D.draw_instruments(L, info, L.side_x, sy0, L.side_w, ih - hh, hover)
+    end
     hover.browser = info.browser_draw(L, L.side_x, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
     if hh > 0 then
       D.hint_bar(L, W, sy0 + ih - hh, L.side_w - gw - 2 * L.pad, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
@@ -3337,7 +3351,7 @@ function D.frame(L, snap, rows, state, info)
     if hs ~= nil then hover.slices = hs end
     set(D.SEP); gfx.rect(sx, sy, D.SEPW, sh, 1)
     L.slices_rect = { sx, sy, L.slices_w, sh }
-  else L.slices_rect = nil end   -- линия сайдбара до статус-бара
+  else L.slices_rect = L.slices_split_rect end   -- линия сайдбара до статус-бара
   -- нижняя граница окна (4 окт): статус не внизу — модули внизу (DSP, сайдбар)
   -- закрываются общей линией во всю ширину; у сайдбара она была, у DSP — нет
   if L.status_h == 0 then set(D.SEP); gfx.rect(0, gfx.h - D.SEPW, gfx.w, D.SEPW, 1) end
