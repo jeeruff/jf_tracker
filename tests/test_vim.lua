@@ -489,7 +489,7 @@ local efi2 = #L.flat
 V.cur = { fi = efi2, row = 4, field = 2 }
 keysin('ib');     eq('INSERT b on shape → bez', last(), 'envshape:Volume@4:5'); eq('shape steps down', V.cur.row, 5)
 keysin('fa');     eq('fa still ambiguous', last(), 'envshape:Volume@4:5'); keysin('s'); eq('fas → fast start', last(), 'envshape:Volume@5:3')
-V.key(27); V.key(27)
+V.key(27); V.mode = 'normal'; V.shapebuf = nil      -- Esc в NORMAL теперь — снова INSERT (4 окт)
 V.cur = { fi = efi2, row = 4, field = 2 }
 V.key(1);         eq('NORMAL ^A on shape cycles', last(), 'envshapestep:Volume@4:+1')
 keysin(':shape slo'); V.key(13); eq(':shape slo', last(), 'envshape:Volume@4:2')
@@ -635,5 +635,8 @@ keysin('i'); eq('NORMAL + m: i is a note, not INSERT', V.mode, 'normal')
 V.key(13); eq('NORMAL + m: Enter -> INSERT', V.mode, 'insert')
 keysin('q'); eq('then q writes', last(), 'ins:trA@0:60:1')
 AUTO_KBD = true
+-- Esc переключает INSERT (4 окт, как Renoise)
+reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
+keysin('3'); V.key(27); eq('Esc with a count only clears it', V.mode, 'normal')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

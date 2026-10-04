@@ -330,6 +330,10 @@
 - [ ] `r` + клавиша на ноте-слайсе: выбирает слайс; `r` + Option+клавиша — питч слайса
 - [ ] INSERT без m: ни q 2 w …, ни `;` не пишут; MIDI-клавиатура пишет
 
+## Esc и text only
+- [ ] Esc в NORMAL — INSERT, ещё Esc — NORMAL (как Edit mode в Renoise); m не меняется
+- [ ] text only вкл: wave / wave detail / item frame / item fill opacity — серые с надписью; клик по любой — text only выкл
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue

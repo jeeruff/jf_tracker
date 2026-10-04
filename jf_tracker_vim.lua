@@ -1244,7 +1244,7 @@ function V.key_impl(c)
       return
     end
     if V.piano then
-      if c == ESC then V.piano = false; V.msg = 'piano off'; return end
+      if c == ESC then V.mode = 'insert'; return end          -- Esc — INSERT (4 окт), клавиатура остаётся
       -- Enter — запись (INSERT), клавиатура остаётся: i здесь — нота (4 окт)
       if c == 13 then V.mode = 'insert'; V.msg = 'INSERT with the keyboard: the top row writes notes'; return end
       local mods = ctx.mods and ctx.mods() or {}
@@ -1548,7 +1548,10 @@ function V.key_impl(c)
     V.msg = ctx.describe_cell(cell)
   elseif c == ENTER then E.cursor_to(ctx.row_time(V.cur.row))
   elseif c == TAB then ctx.toggle_focus()
-  elseif c == ESC then V.count = nil; finish_move()
+  elseif c == ESC then
+    -- Esc (4 окт, как Edit mode в Renoise): из NORMAL — в INSERT; набранный
+    -- счётчик Esc сначала только сбрасывает (как в Vim)
+    if V.count then V.count = nil; finish_move() else V.mode = 'insert'; V.msg = V.piano and '' or 'INSERT - m turns the keyboard on' end
   elseif ch == '+' or ch == '=' then ctx.set_lpb(nil, 1)
   elseif ch == '-' then ctx.set_lpb(nil, -1)
   end
