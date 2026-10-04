@@ -1015,6 +1015,13 @@ function V.key_impl(c)
     if chk == ':' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = ''; V.hexbuf = nil; return end
     if chk == '/' and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) then V.cmd_from = 'insert'; V.mode = 'search'; V.searchline = ''; V.hexbuf = nil; return end
     if chk == '?' then V.open_hydra(ctx.hydra_keys()); return end
+    -- m (4 окт, Vim + Ableton): клавиатура вкл / выкл и в INSERT — с ней
+    -- нотные клавиши пишут ноты, без неё — только управление
+    if chk == 'm' and not V.hexbuf and not V.shapebuf then
+      V.piano = not V.piano
+      V.msg = V.piano and 'keyboard on (m): the top row writes notes' or 'keyboard off (m): keys are controls, notes are not written'
+      return
+    end
     local m = motion(c, 1)
     if m and (c == UP or c == DOWN or c == LEFT or c == RIGHT or c == PGUP or c == PGDN or c == HOME or c == END) then
       V.cur.fi, V.cur.row = m.fi, m.row
@@ -1090,6 +1097,12 @@ function V.key_impl(c)
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
     if c == (']'):byte() then V.octave = math.min(8, V.octave + 1); return end
+    -- клавиатура выключена (m): нотные клавиши не пишут (4 окт)
+    if not V.piano then
+      local base = V.note_key(c, ctx.mods and ctx.mods() or {})
+      if ctx.piano and ctx.piano[base] then V.msg = 'keyboard off - m turns the note keys on' end
+      return
+    end
     -- модификатор ноты (2 окт): Shift — только прослушать, Option — вставить
     -- рядом (новая подколонка), Ctrl — захват звука канала (F5, пока прослушка)
     local how, mods = 'insert', (ctx.mods and ctx.mods() or {})
@@ -1208,6 +1221,8 @@ function V.key_impl(c)
     end
     if V.piano then
       if c == ESC then V.piano = false; V.msg = 'piano off'; return end
+      -- Enter — запись (INSERT), клавиатура остаётся: i здесь — нота (4 окт)
+      if c == 13 then V.mode = 'insert'; V.msg = 'INSERT with the keyboard: the top row writes notes'; return end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
       local f0 = flat()[V.cur.fi]
@@ -1671,7 +1686,7 @@ function V.pending_hint()
 end
 
 function V.status()
-  local m = ({ normal = '', insert = '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
+  local m = ({ normal = V.piano and '-- KEYS --' or '', insert = V.piano and '-- INSERT KEYS --' or '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
                cmd = ':' .. (V.cmdline or ''), search = '/' .. (V.searchline or '') })[V.mode] or ''
   local extra = ''
   if V.macro then extra = ' rec@' .. V.macro.name end

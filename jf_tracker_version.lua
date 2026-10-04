@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.28'
+V.VERSION = '0.6.29'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.29', d = '2026-10-04', items = {
+    'm is the keyboard (Vim + Ableton), in NORMAL and INSERT: NORMAL + m - the top row plays; INSERT + m - writes notes; INSERT without m - only controls (hjkl, d, z x ...), note keys do nothing; NORMAL + m: Enter goes to INSERT (i is a note there); the mode shows -- KEYS -- / -- INSERT KEYS --',
+    'preview on an armed track with input monitoring off goes to the master (it was silent); key log in ExtState keylog',
+  } },
   { v = '0.6.28', d = '2026-10-04', items = {
     'item tab keys: q 2 w 3 e r 5 t ... play slices like the labels over the wave (the old q..p and the slicing digits fought); slicing is the s menu: s t - transients, s 2 4 8 1 3 6 - equal 2 4 8 16 32 64, s d delete slices, s q quantize, s z autotrim',
     'no ghost notes: a note key that comes again without being released (macOS key repeat) is dropped in INSERT, the piano layer and the item tab',
@@ -619,7 +623,7 @@ V.TUTORIAL = {
   'jf_tracker in ten steps - every key here is a Vim habit',
   '',
   '1. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
-  '2. Write notes. i - INSERT. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
+  '2. Write notes. i - INSERT, m - the keyboard on. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
   '3. Pick a sound. The lib on the right: Tab to it, j k - select; in INSERT , . switch sounds. Shift+note only plays.',
   '4. Slice a break. Select a sample, the item tab on top: 8 = eight equal slices, t = by transients. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (a slice is a note: C-4, C#4 ...).',
   '5. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',

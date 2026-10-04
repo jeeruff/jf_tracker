@@ -57,7 +57,7 @@ KH.PAGES = {
     { k = 'dr daw', d = 'clear the track in the cursor region / all items of the track (the lib after =LIB stays)', t = { 'dr', 'daw' } },
     { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s M', d = 'replace / split / mute event (M = Shift+m)', t = { 'c', 's', 'M' } },
-    { k = 'm', d = 'piano layer on / off: the top row plays, Cmd+note inserts with the held length - a keyboard strip above the status shows the keys' },
+    { k = 'm', d = 'keyboard on / off (as in Ableton), in NORMAL and INSERT: NORMAL + m - the top row plays, INSERT + m - writes notes, INSERT without m - only controls; NORMAL + m: Enter - INSERT (i is a note there)' },
     { k = '^A ^X', d = 'field value +1 / -1' },
     { k = 'r', d = 'set value of field' },
     { k = 'u ^R .', d = 'undo / redo / repeat last edit' },
