@@ -2922,6 +2922,53 @@ function D.frame(L, snap, rows, state, info)
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
       end
+      if f.view == 'rec' then
+        -- jf_rec (4 окт): волна кольца, выделение a..b, голова превью;
+        -- статус и буквы-кнопки внизу; протяжка и кнопки — hover.retro /
+        -- hover.retrobtn, как во вкладке rec
+        pcol0 = 1
+        local wx, wy, ww = bx + L.pad, by + L.rh + 1, pw
+        local wh = bh - 3 * L.rh - 6
+        local r = info.dsp_view and info.dsp_view('rec', ww)
+        local c = r and r.cur
+        set(U.PANEL); gfx.rect(wx, wy, ww, math.max(4, wh), 1)
+        set(U.LINE); gfx.rect(wx, wy, ww, math.max(4, wh), 0)
+        if c and wh > 6 then
+          local a, b = r.sel.a, r.sel.b
+          if b < a then a, b = b, a end
+          set(U.tint(U.AMBER, 0.25)); gfx.rect(wx + math.floor(a * ww), wy, math.max(1, math.floor((b - a) * ww)), wh, 1)
+          local pk = c.peaks
+          local cy, hh = wy + wh / 2, wh / 2 - 1
+          if pk and pk.n > 0 then
+            set(U.readable(U.mix(c.col.rgb or U.TEXT, U.TEXT, 0.3), U.BG, 4.0))
+            for px = 0, ww - 1 do
+              local i = math.floor(px / ww * pk.n) + 1
+              local mxv, mnv = pk.max[i] or 0, pk.min[i] or 0
+              if mxv - mnv < 0.01 then mxv, mnv = 0.005, -0.005 end
+              gfx.line(wx + px, cy - mxv * hh, wx + px, cy - mnv * hh)
+            end
+          end
+          set(U.AMBER); gfx.rect(wx + math.floor(a * ww), wy, 1, wh, 1); gfx.rect(wx + math.floor(b * ww) - 1, wy, 1, wh, 1)
+          if c.pb and c.pb > 0 then set(U.GREEN); gfx.rect(wx + math.floor(c.pb * ww), wy, 1, wh, 1) end
+          if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then hover.retro = (mx - wx) / ww; hover.retro_src = 'dsp' end
+          local st = c.alive and ('%ds %s  sel %.2fs'):format(c.len, c.writing and 'rec' or 'paused', c.len * (b - a)) or 'silent: enable jf_rec'
+          text(wx, wy + wh + 2, fit(st, ww), c.alive and (c.writing and U.RED or U.GREY) or U.GREY)
+          local kx, ky = wx, wy + wh + 2 + L.rh
+          for _, k in ipairs({ { 'all', 'all' }, { 'play', 'play' }, { 'stop', 'stop' }, { 'put', 'put' }, { 'lib', 'lib' } }) do
+            local kw = ms(k[1]) + L.pad + 2
+            if kx + kw > wx + ww then break end
+            local hot = not drag and mx >= kx and mx < kx + kw and my >= ky and my < ky + L.rh
+            local on = k[2] == 'play' and c.playing
+            set(on and U.tint(U.AMBER, 0.3) or (hot and D.CURROW or U.BG)); gfx.rect(kx, ky, kw, L.rh, 1)
+            set((hot or on) and U.AMBER or U.LINE); gfx.rect(kx, ky, kw, L.rh, 0)
+            text(kx + math.floor((kw - ms(k[1])) / 2), ky, k[1], (hot or on) and U.AMBER or U.GREY)
+            if hot then hover.retrobtn = k[2]; hover.retro_src = 'dsp' end
+            kx = kx + kw + 1
+          end
+        else
+          text(wx + 2, wy + 1, fit('jf_rec: no buffer yet (open the rec tab once / enable)', ww - 4), U.DIM)
+        end
+      end
       if f.xy then
         -- XY-пэд (TG33 vector): квадрат в первой колонке, точка — X / Y, Y вверх
         pcol0 = 1

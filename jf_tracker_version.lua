@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.24'
+V.VERSION = '0.6.25'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.25', d = '2026-10-04', items = {
+    'DSP module rec for jf_rec: the ring buffer of the track right in its fx block - wave (old left, head right), drag selects, all / play / stop / put / lib, status (length, rec / paused, selection); the same selection and actions as the rec tab',
+    'the depot button of the rec tab works again (it sent lib, the handler waited for depot)',
+  } },
   { v = '0.6.24', d = '2026-10-04', items = {
     'notes understand markdown: # / ## headings, - [ ] / - [x] todos, - and 1. lists, > quotes, `code`, **bold** - coloured, the text stays plain; a todo box is clickable ([ ] <-> [x], saved at once)',
     'the cursor cell is drawn on top of the background wave',

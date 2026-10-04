@@ -5352,7 +5352,19 @@ local function frame()
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
-    dsp_view = function(kind)
+    dsp_view = function(kind, width)
+      -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
+      -- данные (иначе две ширины слоя пиков спорят в gmem)
+      if kind == 'rec' then
+        if view_cache.rec ~= nil then return view_cache.rec or nil end
+        local col = cur_col()
+        if retro.cur and col and retro.cur.col.guid ~= col.guid then retro.cur = nil end
+        local r = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad)))
+          or retro_read(math.max(16, math.floor(width or 200)))
+        if not (r and r.cur and col and r.cur.col.guid == col.guid) then r = false end
+        view_cache.rec = r
+        return r or nil
+      end
       if kind ~= 'grain' then return nil end
       if view_cache.grain ~= nil then return view_cache.grain or nil end
       local g = with_ns('jf_grgrain', function()
@@ -5649,7 +5661,7 @@ local function frame()
     state.status = (c and c.head or '') .. ': ' .. (c and hints[c.kind] or '') .. '   a: add parameter, x: remove'
   elseif hover.scopemode then state.status = ({ scope = 'oscilloscope (ring 256 samples, 8 kHz)', spec = 'spectrum analyzer: 48 log bands 30 Hz..Nyquist, -60..0 dB', sgram = 'spectrogram: time → right, 48 bands, heat = level' })[hover.scopemode] .. ' (:scopemode)'
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
-  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
+  elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', lib = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
@@ -5962,10 +5974,10 @@ local function frame()
     elseif hover.monobtn then ctx.mono_take(hover.monobtn == 'take'); click = { t = now2, zone = 'monobtn' }
     elseif hover.retrobtn then
       local b = hover.retrobtn
-      ctx.set_focus('top')
+      ctx.set_focus(hover.retro_src or 'top')          -- блок rec в DSP — фокус остаётся в DSP
       if b == 'prev' then ctx.retro_cycle(-1) elseif b == 'next' then ctx.retro_cycle(1)
       elseif b == 'all' then ctx.retro_all() elseif b == 'play' then retro_preview(true) elseif b == 'stop' then retro_preview(false)
-      elseif b == 'put' then retro_put('cursor') elseif b == 'depot' then retro_put('depot') elseif b == 'add' then ctx.retro_add()
+      elseif b == 'put' then retro_put('cursor') elseif b == 'depot' or b == 'lib' then retro_put('depot')   -- кнопка depot шлёт 'lib' (4 окт: не работала) elseif b == 'add' then ctx.retro_add()
       elseif b == 'loop' then
         -- во время игры — подхватить и лупить; в стопе — следующая длина 1 / 2 / 4 / 8
         if playing() then retro_loop()
@@ -5973,7 +5985,7 @@ local function frame()
       end
       click = { t = now2, zone = 'retrobtn' }
     elseif hover.retro then
-      ctx.set_focus('top')
+      ctx.set_focus(hover.retro_src or 'top')
       local a, b = math.min(retro.sel.a, retro.sel.b), math.max(retro.sel.a, retro.sel.b)
       if b - a > 0.002 and hover.retro > a and hover.retro < b then
         -- нажатие внутри выделения — вынос: бросить на слот инструментов или колонку трека
