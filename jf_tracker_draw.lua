@@ -2911,8 +2911,24 @@ function D.frame(L, snap, rows, state, info)
       local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 4 * kb - 9
-      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
+      -- список, < > — предыдущий / следующий
+      local pre = info.fx_preset and not f.container and info.fx_preset(f)
+      local ptw = 0
       local on_btn = false
+      if pre and tw > L.cw * 14 then
+        ptw = math.min(math.floor(tw * 0.6), ms('< ' .. pre.name .. ' >') + L.pad)
+        local px = bx + L.pad + tw - ptw
+        local aw = ms('<') + 2
+        local parts = { { '<', 'pprev', px, aw }, { pre.name, 'preset', px + aw, ptw - 2 * aw }, { '>', 'pnext', px + ptw - aw, aw } }
+        for _, pp in ipairs(parts) do
+          local hot = not drag and mx >= pp[3] and mx < pp[3] + pp[4] and my >= by + 1 and my < by + L.rh
+          if hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(pp[3], by + 1, pp[4], L.rh - 1, 1); hover.dspbtn = { fx = k, f = f, what = pp[2] }; on_btn = true end
+          text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and U.CYAN or U.GREY))
+        end
+        tw = tw - ptw - L.pad
+      end
+      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
       if tw > 0 then
         for _, b in ipairs(bxs) do
           local kx = b[3]

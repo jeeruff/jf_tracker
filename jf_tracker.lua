@@ -3136,6 +3136,69 @@ ctx = {
     vim.msg = on and 'gain comp: follows - play the track, the end of the chain matches the level before the fx (right click removes)'
       or 'gain comp: frozen at its value (click - follow again, right click - remove)'
   end,
+  -- пресеты эффекта (4 окт): текущее имя и номер — REAPER (GetPreset /
+  -- GetPresetIndex); список имён — из файлов REAPER presets/: заводские
+  -- [factory] в *-builtin.ini и свои [PresetN] Name= в *.ini; выбор — по имени
+  fx_preset = function(f)
+    local t = dsp_target(); if not (t and f) or model.is_take(t.track) then return nil end
+    local idx, cnt = reaper.TrackFX_GetPresetIndex(t.track, f.i)
+    local ok, nm = reaper.TrackFX_GetPreset(t.track, f.i, '')
+    if (cnt or 0) <= 0 and not (ok and nm ~= '') then return nil end
+    return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt }
+  end,
+  preset_cache = {},
+  preset_names = function(tr, fx)
+    local _, ident = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'fx_ident')
+    ident = ident or ''
+    if ctx.preset_cache[ident] then return ctx.preset_cache[ident] end
+    local base = (ident:match('([^/\\]+)$') or ident):gsub('<.*$', ''):gsub('%.[%w]+$', '')
+    local key = base:lower():gsub('[^%w]', '')
+    local dir = reaper.GetResourcePath() .. '/presets'
+    local names, seen = {}, {}
+    local i = 0
+    while key ~= '' do
+      local fn = reaper.EnumerateFiles(dir, i)
+      if not fn then break end
+      i = i + 1
+      local flat = fn:lower():gsub('[^%w]', '')
+      if fn:match('%.ini$') and flat:find(key, 1, true) then
+        local h = io.open(dir .. '/' .. fn, 'r')
+        if h then
+          local sect
+          for ln in h:lines() do
+            local s = ln:match('^%[(.-)%]')
+            if s then sect = s:lower()
+            elseif sect == 'factory' or sect == 'aufactory' then
+              local v = ln:match('^%d+=(.*)$'); if v and v ~= '' and not seen[v] then seen[v] = true; names[#names + 1] = v end
+            elseif sect and sect:match('^preset%d+') then
+              local v = ln:match('^Name=(.*)$'); if v and v ~= '' and not seen[v] then seen[v] = true; names[#names + 1] = v end
+            end
+          end
+          h:close()
+        end
+      end
+    end
+    ctx.preset_cache[ident] = names
+    return names
+  end,
+  dsp_preset = function(k, what)
+    local t, f = ctx.dsp_fx(k); if not f or model.is_take(t.track) then return end
+    if what == 'prev' or what == 'next' then
+      reaper.TrackFX_NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
+      local _, nm = reaper.TrackFX_GetPreset(t.track, f.i, '')
+      vim.msg = f.name .. ': ' .. (nm or '')
+      return
+    end
+    local names = ctx.preset_names(t.track, f.i)
+    if #names == 0 then vim.msg = f.name .. ': no preset names (REAPER lists none; < > step through what the plugin has)'; return end
+    local items = {}
+    for _, nm in ipairs(names) do items[#items + 1] = { label = nm, data = nm } end
+    vim.open_picker('preset of ' .. f.name, items, function(it)
+      local ok = reaper.TrackFX_SetPreset(t.track, f.i, it.data)
+      vim.msg = ok and (f.name .. ': ' .. it.data) or (f.name .. ': could not load ' .. it.data)
+    end)
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   dsp_delta = function(k)
     local col, f = ctx.dsp_fx(k); if not f then return end
     local on = edit.fx_delta(col.track, f.i)
@@ -5372,6 +5435,7 @@ local function frame()
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
     dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
     fx_delta = ctx.fx_delta,
+    fx_preset = ctx.fx_preset,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
@@ -5717,7 +5781,7 @@ local function frame()
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspmeter then state.status = hover.dspmeter == 'out' and 'out: the track after all fx and the fader (peak)' or 'in: the record input when the track is armed (in), else the items before the fx (pre)'
   elseif hover.dspcomp then state.status = 'gain comp: click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
-  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
+  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -6297,6 +6361,9 @@ local function frame()
       if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
+      elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
+      elseif hover.dspbtn.what == 'preset' then ctx.dsp_preset(hover.dspbtn.fx, 'pick')
       elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx) end   -- двойной клик не удаляет второй
       click = { t = now2, zone = 'dspbtn' }
     elseif hover.dsptarget then
