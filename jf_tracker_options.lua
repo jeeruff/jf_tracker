@@ -98,6 +98,7 @@ local function num_from_x(it, r, mx)
 end
 
 function O.click(mx, my)
+  if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.hover then
     O.sel = O.hover
@@ -225,11 +226,25 @@ local function draw_about(L, W, H)
   end
   local lines = O.wrapped
   O.about_n = #lines
+  O.link_hot = nil
   local nv = math.floor((by + bh - y) / rh)
   for r = 1, nv do
     local l = lines[O.ascroll + r]
     if not l then break end
-    U.text(bx + L.pad, y + (r - 1) * rh, ctx.fit(l[1], tw), l[2])
+    local ly = y + (r - 1) * rh
+    -- ссылка (4 окт): https://… — кликабельна, под мышью подчёркнута
+    local url = l[1]:match('(https?://%S+)')
+    if url then
+      local pre = l[1]:sub(1, l[1]:find(url, 1, true) - 1)
+      local ux, uw = bx + L.pad + U.measure(pre), U.measure(url)
+      local hot = gfx.mouse_x >= ux and gfx.mouse_x < ux + uw and gfx.mouse_y >= ly and gfx.mouse_y < ly + rh
+      U.text(bx + L.pad, ly, pre, l[2])
+      U.text(ux, ly, url, hot and U.AMBER or U.CYAN)
+      U.set(hot and U.AMBER or U.CYAN); gfx.rect(ux, ly + rh - 2, uw, 1, 1)
+      if hot then O.link_hot = url end
+    else
+      U.text(bx + L.pad, ly, ctx.fit(l[1], tw), l[2])
+    end
   end
 end
 

@@ -514,6 +514,12 @@ ctx = {
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
+  -- ссылка из about (4 окт): в браузере системы
+  open_url = function(url)
+    if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url)
+    else reaper.ExecProcess("/usr/bin/open '" .. url:gsub("'", "") .. "'", -1) end
+    vim.msg = 'opened ' .. url
+  end,
   set_lpb = set_lpb,
   fold = function(col, v) state.folds[col.guid] = v or nil end,
   fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil end end,
