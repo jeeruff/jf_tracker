@@ -2929,8 +2929,9 @@ function D.frame(L, snap, rows, state, info)
         -- jf_rec (4 окт): волна кольца, выделение a..b, голова превью;
         -- статус и буквы-кнопки внизу; протяжка и кнопки — hover.retro /
         -- hover.retrobtn, как во вкладке rec
-        pcol0 = 1
-        local wx, wy, ww = bx + L.pad, by + L.rh + 1, pw
+        -- волна — во всю ширину блока (4 окт), параметры — строкой внизу справа
+        pcol0 = 0
+        local wx, wy, ww = bx + L.pad, by + L.rh + 1, bw - 2 * L.pad
         local wh = bh - 3 * L.rh - 6
         local r = info.dsp_view and info.dsp_view('rec', ww)
         local c = r and r.cur
@@ -2955,7 +2956,7 @@ function D.frame(L, snap, rows, state, info)
           if c.pb and c.pb > 0 then set(U.GREEN); gfx.rect(wx + math.floor(c.pb * ww), wy, 1, wh, 1) end
           if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then hover.retro = (mx - wx) / ww; hover.retro_src = 'dsp' end
           local st = c.alive and ('%ds %s  sel %.2fs'):format(c.len, c.writing and 'rec' or 'paused', c.len * (b - a)) or 'silent: enable jf_rec'
-          text(wx, wy + wh + 2, fit(st, ww), c.alive and (c.writing and U.RED or U.GREY) or U.GREY)
+          text(wx, wy + wh + 2, fit(st, ww - bw1), c.alive and (c.writing and U.RED or U.GREY) or U.GREY)
           local kx, ky = wx, wy + wh + 2 + L.rh
           for _, k in ipairs({ { 'all', 'all' }, { 'play', 'play' }, { 'stop', 'stop' }, { 'put', 'put' }, { 'lib', 'lib' } }) do
             local kw = ms(k[1]) + L.pad + 2
@@ -3036,6 +3037,8 @@ function D.frame(L, snap, rows, state, info)
         local colk = pcol0 + math.floor((pi - 1) / nfit)
         local bxc = bx + colk * bw1
         local py = by + L.rh + 1 + ((pi - 1) % nfit) * L.rh
+        -- rec (4 окт): параметры — снизу справа, под волной, последней строкой вверх
+        if f.view == 'rec' then bxc = bx + bw - bw1; py = by + bh - (#f.params - pi + 2) * L.rh - 3 end   -- строка статуса, справа
         local v = vals[pi] or { n = 0, s = '' }
         local psel = is_sel and sel.param == pi
         -- строка параметра: имя | виджет | значение — без подложки, белым;
