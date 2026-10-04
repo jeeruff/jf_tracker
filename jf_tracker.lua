@@ -2174,6 +2174,7 @@ ctx = {
       reaper.Main_OnCommand(40293, 0)              -- Track: view routing and I/O
     elseif what == 'input' then
       ctx.input_picker(col, { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 })
+    elseif what == 'smart' then ctx.smart_input(col)
     elseif what == 'sends' then
       draw.sendpop = draw.sendpop ~= col.guid and col.guid or nil
     elseif what == 'input_menu' then
@@ -2702,7 +2703,7 @@ ctx = {
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
-      { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: list by click + smart input', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
+      { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: the input list by click (smart input: DSP module)', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
@@ -3006,6 +3007,98 @@ ctx = {
     local path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua'
     local ok, e = pcall(dofile, path)
     vim.msg = ok and 'smart input set' or ('smart input: ' .. tostring(e):match('[^\n]*$'))
+  end,
+  -- уровни DSP-модуля (4 окт): вход — входа записи (трек армирован) или
+  -- до эффектов (аудио-аксессор трека в позиции воспроизведения: items до
+  -- FX, без ресивов); выход — пик-метр трека (после FX и фейдера). Пики
+  -- спадают плавно; заодно ведёт компенсацию громкости (gain_comp_tick)
+  dl = { acc = nil, tr = nil, inp = { 0, 0 }, out = { 0, 0 }, ain = 0, aout = 0 },
+  dsp_levels = function(col)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
+    local D = ctx.dl
+    if D.tr ~= tr then
+      if D.acc then reaper.DestroyAudioAccessor(D.acc) end
+      D.acc, D.tr, D.inp, D.out, D.ain, D.aout = nil, tr, { 0, 0 }, { 0, 0 }, 0, 0
+    end
+    local armed = reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1
+    local il, ir = 0, 0
+    if armed then
+      local ri = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
+      if ri >= 0 and ri < 4096 then
+        local ch = ri & 1023
+        il = reaper.GetInputActivityLevel(ch) or 0
+        ir = (ri & 1024 ~= 0) and (reaper.GetInputActivityLevel(ch + 1) or 0) or il
+      end
+    elseif reaper.GetPlayState() & 1 == 1 then
+      if not D.acc then D.acc = reaper.CreateTrackAudioAccessor(tr) end
+      if reaper.AudioAccessorStateChanged(D.acc) then reaper.AudioAccessorUpdate(D.acc) end
+      local N, sr = 512, 44100
+      D.buf = D.buf or reaper.new_array(N * 2)
+      local t = reaper.GetPlayPosition()
+      D.buf.clear()
+      if reaper.GetAudioAccessorSamples(D.acc, sr, 2, t, N, D.buf) == 1 then
+        local b = D.buf.table()
+        for i = 1, N * 2, 2 do
+          local a, c = math.abs(b[i]), math.abs(b[i + 1])
+          if a > il then il = a end
+          if c > ir then ir = c end
+        end
+      end
+    end
+    local ol, or_ = reaper.Track_GetPeakInfo(tr, 0), reaper.Track_GetPeakInfo(tr, 1)
+    local function fall(o, v) return math.max(v, o * 0.85) end
+    D.inp = { fall(D.inp[1], il), fall(D.inp[2], ir) }
+    D.out = { fall(D.out[1], ol), fall(D.out[2], or_) }
+    local comp_db = edit.comp_db(tr)
+    local _, cf = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_gaincomp', '', false)
+    local on = cf == '1' and comp_db ~= nil
+    if on then ctx.gain_comp_tick(tr, math.max(il, ir), math.max(ol, or_), comp_db) end
+    return { src = armed and 'in' or 'pre', inp = D.inp, out = D.out, comp_on = on, comp_db = comp_db }
+  end,
+  -- подстройка: средние пиков входа и выхода (выход до фейдера) за время
+  -- игры, где оба громче −50 дБ; шаг не больше 0.2 дБ за кадр, −24..+24
+  gain_comp_tick = function(tr, inp, out, cur)
+    local D = ctx.dl
+    if reaper.GetPlayState() & 1 ~= 1 then return end
+    local vol = reaper.GetMediaTrackInfo_Value(tr, 'D_VOL')
+    if vol < 1e-3 then return end
+    out = out / vol
+    if inp < 0.003 or out < 0.003 then return end
+    D.ain = D.ain > 0 and (D.ain + (inp - D.ain) * 0.05) or inp
+    D.aout = D.aout > 0 and (D.aout + (out - D.aout) * 0.05) or out
+    local diff = 20 * math.log(D.ain / D.aout, 10)
+    if math.abs(diff) < 0.3 then return end
+    edit.comp_set(tr, cur + math.max(-0.2, math.min(0.2, diff)))
+  end,
+  -- кнопка comp: клик — следить вкл / выкл (выкл — значение замирает),
+  -- правый клик — снять gain comp с цепи
+  gain_comp = function(col, op)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local _, cf = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_gaincomp', '', false)
+    if op == 'remove' then
+      reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_gaincomp', '', true)
+      vim.msg = edit.comp_remove(tr) and 'gain comp removed' or 'no gain comp on this track'
+      return
+    end
+    local on = not (cf == '1' and edit.comp_find(tr))
+    if on then edit.comp_add(tr) end
+    reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_gaincomp', on and '1' or '', true)
+    ctx.dl.ain, ctx.dl.aout = 0, 0
+    vim.msg = on and 'gain comp: follows - play the track, the end of the chain matches the level before the fx (right click removes)'
+      or 'gain comp: frozen at its value (click - follow again, right click - remove)'
+  end,
+  dsp_delta = function(k)
+    local col, f = ctx.dsp_fx(k); if not f then return end
+    local on = edit.fx_delta(col.track, f.i)
+    vim.msg = on == nil and (f.name .. ': no delta solo') or (f.name .. (on and ': delta solo - you hear only what the fx adds / removes' or ': delta off'))
+  end,
+  fx_delta = function(f)
+    local t = dsp_target(); if not (t and f) then return nil end
+    local i = edit.fx_delta_idx(t.track, f.i)
+    if not i then return nil end
+    return model.fxapi(t.track).GetParamNormalized(t.track, f.i, i) >= 0.5
   end,
   hydra_inputs = function()
     local col = cur_col()
@@ -5205,6 +5298,8 @@ local function frame()
     zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
+    dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
+    fx_delta = ctx.fx_delta,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
@@ -5514,7 +5609,9 @@ local function frame()
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
-  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
+  elseif hover.dspmeter then state.status = hover.dspmeter == 'out' and 'out: the track after all fx and the fader (peak)' or 'in: the record input when the track is armed (in), else the items before the fx (pre)'
+  elseif hover.dspcomp then state.status = 'gain comp: click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
+  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -5554,7 +5651,7 @@ local function frame()
   elseif hover.sendpop then state.status = ({ add = '+ send: pick a track (fzf)', routing = 'REAPER routing window', mute = 'mute this send', del = 'remove this send' })[hover.sendpop.what] or ''
   elseif hover.sendvol then state.status = 'send volume - drag'
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
-  elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
+  elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.poolsave then state.status = 'save the lib as a kit: a REAPER track template (TrackTemplates/jf_kits) - load it in the browser tab kits or with Insert track from template'
   elseif hover.swapbtn then
@@ -5964,6 +6061,8 @@ local function frame()
       elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
+    elseif hover.dspcomp then
+      ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
       click = { t = now2, zone = 'trkio' }
@@ -6077,6 +6176,7 @@ local function frame()
       dsp_sel.fx = hover.dspbtn.fx
       if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx) end   -- двойной клик не удаляет второй
       click = { t = now2, zone = 'dspbtn' }
     elseif hover.dsptarget then
@@ -6567,6 +6667,8 @@ local function frame()
       end
     else env_drag.key = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
+  elseif U.rclick and hover.dspcomp then
+    ctx.gain_comp(hover.dspcomp, 'remove')
   elseif U.rclick and hover.btn and hover.btn.what == 'auto' then
     ctx.open_params(hover.btn.col)
   elseif U.rclick then

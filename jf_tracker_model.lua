@@ -819,7 +819,7 @@ M.dspmods = nil      -- реестр кураторских модулей (jf_t
 -- только AddByName, огибающая и копирование — их разбирает edit.
 local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
   'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
-  'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen' }
+  'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent' }
 local function fx_table(prefix)
   local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
   for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end

@@ -1777,6 +1777,69 @@ function E.fx_bypass(track, fx)
   run('fx bypass', function() A.SetEnabled(track, fx, not A.GetEnabled(track, fx)) end)
 end
 function E.fx_show(track, fx) FA(track).Show(track, fx, 3) end
+-- delta solo (4 окт): нативный параметр :delta эффекта (REAPER 7) — слышна
+-- разница сухого и обработанного; nil — у эффекта нет :delta
+function E.fx_delta_idx(obj, fx)
+  local A = FA(obj)
+  if not A.GetParamFromIdent then return nil end
+  local i = A.GetParamFromIdent(obj, fx, ':delta')
+  return (i and i >= 0) and i or nil
+end
+function E.fx_delta(obj, fx)
+  local i = E.fx_delta_idx(obj, fx)
+  if not i then return nil end
+  local A = FA(obj)
+  local on = A.GetParamNormalized(obj, fx, i) >= 0.5
+  run('fx delta solo', function() A.SetParamNormalized(obj, fx, i, on and 0 or 1) end)
+  if model then model.invalidate() end
+  return not on
+end
+
+-- компенсация громкости цепочки (4 окт): нативной у REAPER нет — стоковый
+-- JS: Volume Adjustment последним в цепи, переименован в «gain comp»;
+-- трекер подводит его так, чтобы выход цепи (до фейдера) = вход до эффектов
+E.COMP_NAME = 'gain comp'
+function E.comp_find(tr)
+  for i = 0, R.TrackFX_GetCount(tr) - 1 do
+    local ok, nm = R.TrackFX_GetNamedConfigParm(tr, i, 'renamed_name')
+    if ok and nm == E.COMP_NAME then return i end
+  end
+end
+function E.comp_db(tr)
+  local i = E.comp_find(tr)
+  return i and R.TrackFX_GetParam(tr, i, 0) or nil, i
+end
+-- без undo на каждый шаг подстройки (идёт за кадрами); undo — на вкл / выкл
+function E.comp_set(tr, db)
+  local i = E.comp_find(tr)
+  if i then R.TrackFX_SetParam(tr, i, 0, math.max(-24, math.min(24, db))) end
+end
+function E.comp_add(tr)
+  local i = E.comp_find(tr)
+  if i then
+    -- держать последним в цепи: после него добавили эффекты — перенести в конец
+    local n = R.TrackFX_GetCount(tr)
+    if i ~= n - 1 then R.TrackFX_CopyToTrack(tr, i, tr, n - 1, true); i = n - 1 end
+    return i
+  end
+  run('gain comp on', function()
+    i = R.TrackFX_AddByName(tr, 'JS: Volume Adjustment', false, -1)
+    if i and i >= 0 then
+      R.TrackFX_SetNamedConfigParm(tr, i, 'renamed_name', E.COMP_NAME)
+      R.TrackFX_SetParam(tr, i, 0, 0)
+      R.TrackFX_SetParam(tr, i, 1, 150)     -- потолок клипа выключен
+    end
+  end)
+  if model then model.invalidate() end
+  return i
+end
+function E.comp_remove(tr)
+  local i = E.comp_find(tr)
+  if not i then return false end
+  run('gain comp off', function() R.TrackFX_Delete(tr, i) end)
+  if model then model.invalidate() end
+  return true
+end
 -- окно цепочки take (и пустой): выделить item и «show FX chain for item take»
 function E.take_chain_window(take)
   local it = R.GetMediaItemTake_Item(take)

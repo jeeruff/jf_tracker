@@ -935,6 +935,37 @@ function D.cat_colour(cat)
   return c and U.readable(c, U.BG, 2.5) or nil
 end
 
+-- ── метр DSP-модуля (4 окт): вход слева (in — вход записи, pre — до
+-- эффектов), выход справа (out — после всех эффектов и фейдера); две
+-- полосы L / R, −60..0 дБ, сверху подпись, снизу пик в дБ
+function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  text(x + math.floor((w - ms(label)) / 2), y + 1, label, U.GREY)
+  local pk = math.max(lv and lv[1] or 0, lv and lv[2] or 0)
+  local db = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+  local vt = db <= -60 and '-inf' or ('%.1f'):format(db)
+  text(x + math.floor((w - ms(vt)) / 2), y + h - L.rh, vt, db > -0.1 and U.RED or U.GREY)
+  local my0, mh = y + L.rh + 1, h - 2 * L.rh - 2
+  if mh > 4 then
+    local bw = math.max(2, math.floor((w - 3 * L.pad) / 2))
+    for ch = 1, 2 do
+      local v = lv and lv[ch] or 0
+      local d = v > 1e-6 and 20 * math.log(v, 10) or -150
+      local fr = math.max(0, math.min(1, (d + 60) / 60))
+      local bxx = x + L.pad + (ch - 1) * (bw + L.pad)
+      set(U.DIM); gfx.rect(bxx, my0, bw, mh, 0)
+      local hh = math.floor(fr * (mh - 2) + 0.5)
+      if hh > 0 then
+        set(d > -0.1 and U.RED or (d > -9 and U.AMBER or U.GREEN))
+        gfx.rect(bxx + 1, my0 + mh - 1 - hh, bw - 2, hh, 1)
+      end
+    end
+  end
+  if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
+end
+
 -- ── блок трека слева в DSP (3 окт): полноценное управление выбранным треком ──
 -- имя, R I M S A + фаза / FX, громкость, панорама, вход (меню), master send,
 -- отправки (клик — окно маршрутизации REAPER). Фон — цвет трека, как шапка
@@ -1018,7 +1049,20 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     text(lx, yy, fit(val, x + w - L.pad - lx), on == false and U.GREY or U.TEXT)
     yy = yy + L.rh
   end
+  -- smart (4 окт: из шапки трека сюда) — кнопкой справа в строке in
+  local sy0 = yy
+  local sbw = ms('smart') + 2 * L.pad
+  local show_smart = w > ms('in ') + 6 * L.cw + sbw + 3 * L.pad
   row('in', io.input .. ' v', 'input')
+  if show_smart and yy > sy0 then
+    local sx = x + w - L.pad - sbw
+    set(U.PANEL); gfx.rect(sx - L.pad, sy0, sbw + L.pad, L.rh, 1)        -- текст входа не залезает под кнопку
+    local hot = mx >= sx and mx < sx + sbw and my >= sy0 and my < sy0 + L.rh
+    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(sx, sy0 + 1, sbw, L.rh - 2, 1)
+    set(hot and U.AMBER or U.DIM); gfx.rect(sx, sy0 + 1, sbw, L.rh - 2, 0)
+    text(sx + L.pad, sy0, 'smart', hot and U.AMBER or U.GREY)
+    if hot then hover.trkio = { col = col, what = 'smart' } end
+  end
   row('out', (io.mainsend and 'master' or 'no master') .. (io.hw > 0 and ('  + hw ' .. io.hw) or ''), 'mainsend', io.mainsend)
   for _, sd in ipairs(io.sends) do
     local sdb = sd.vol > 1e-6 and 20 * math.log(sd.vol, 10) or -150
@@ -2111,12 +2155,10 @@ function D.frame(L, snap, rows, state, info)
         slider(px, py, pw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
       end
       -- строка входа (3 окт): in <вход> — клик: список входов (fzf) под ней,
-      -- повторный клик закрывает; справа кнопка smart (jf_smart_set_input)
+      -- повторный клик закрывает; smart — в DSP-модуле трека (4 окт)
       if L.hr_in > 0 and info.input_name then
         local iy = hy + 4 * L.rh + 1
-        local sbw = ms('smart') + 4
-        local show_smart = sw >= ms('in ') + 4 * L.cw + sbw + L.pad
-        local iw = show_smart and (sw - sbw - L.pad) or sw
+        local iw = sw
         local hot = mx >= sx and mx < sx + iw and my >= iy and my < iy + L.rh
         local open = info.in_open and info.in_open(col)
         if hot or open then set(open and U.tint(U.AMBER, 0.3) or D.CURROW); gfx.rect(sx, iy, iw, L.rh - 1, 1) end
@@ -2127,15 +2169,6 @@ function D.frame(L, snap, rows, state, info)
         D.in_at[col.guid] = { sx, iy + L.rh, sx + iw }
         if hot then hover.hdrin = { col = col, what = 'list' } end
         hint('hdrin', sx, iy, iw, L.rh, { col = col, what = 'list' })
-        if show_smart then
-          local bx2 = sx + sw - sbw
-          local hot2 = mx >= bx2 and mx < bx2 + sbw and my >= iy and my < iy + L.rh
-          set(hot2 and D.CURROW or U.PANEL); gfx.rect(bx2, iy + 1, sbw, L.rh - 2, 1)
-          set(U.DIM); gfx.rect(bx2, iy + 1, sbw, L.rh - 2, 0)
-          text(bx2 + 2, iy, 'smart', hot2 and U.AMBER or U.GREY)
-          if hot2 then hover.hdrin = { col = col, what = 'smart' } end
-          hint('hdrin', bx2, iy, sbw, L.rh, { col = col, what = 'smart' })
-        end
       end
     end
     for li, ln in ipairs(c.lanes) do
@@ -2779,6 +2812,13 @@ function D.frame(L, snap, rows, state, info)
       text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
+    local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
+    local mw = ms('-00.0') + 2 * L.pad
+    local mby, mbh = dy + L.rh + 4, L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+    if lvl then
+      D.dsp_meter(L, bx, mby, mw, mbh, lvl.src, lvl.inp, 'in', hover)
+      bx = bx + mw + L.pad
+    end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io then
       local tw = L.cw * 24
@@ -2793,7 +2833,7 @@ function D.frame(L, snap, rows, state, info)
       local ncol = f.cols or 1
       local bw1 = L.cw * 22
       local bw = bw1 * ncol
-      if bx + bw > L.win_w then break end
+      if bx + bw > L.win_w - (lvl and (mw + L.pad) or 0) then break end
       local by = dy + 3 + L.rh
       local bh = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
       local is_sel = sel.fx == k
@@ -2804,15 +2844,17 @@ function D.frame(L, snap, rows, state, info)
       if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'O', 'open', bx + bw - 3 * kb - 5 } }
-      local tw = bw - 2 * L.pad - 3 * kb - 6
+      -- D (4 окт) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'D', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
+      local dlt = info.fx_delta and info.fx_delta(f)
+      local tw = bw - 2 * L.pad - 4 * kb - 9
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
       local on_btn = false
       if tw > 0 then
         for _, b in ipairs(bxs) do
           local kx = b[3]
           local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
-          local lit = (b[2] == 'bypass' and not f.enabled)
+          local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
           set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
           set(hot and (b[2] == 'del' and U.RED or U.AMBER) or U.LINE); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
           text(kx + L.pad, by + 1, b[1], hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
@@ -2974,6 +3016,20 @@ function D.frame(L, snap, rows, state, info)
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
       end
       bx = bx + bw + L.pad
+    end
+    -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
+    if lvl then
+      local cbh = L.rh
+      D.dsp_meter(L, bx, mby, mw, mbh - cbh - 2, 'out', lvl.out, 'out', hover)
+      local cy = mby + mbh - cbh
+      local hot = mx >= bx and mx < bx + mw and my >= cy and my < cy + cbh
+      local on = lvl.comp_on
+      local lbl = lvl.comp_db and ('%+.1f'):format(lvl.comp_db) or 'comp'
+      if hot and not lvl.comp_db then lbl = 'comp' end
+      set(on and U.tint(U.CYAN, 0.35) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(bx, cy, mw, cbh, 1)
+      set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(bx, cy, mw, cbh, 0)
+      text(bx + math.floor((mw - ms(lbl)) / 2), cy, fit(lbl, mw - 2), on and U.CYAN or (hot and U.AMBER or U.GREY))
+      if hot then hover.dspcomp = info.pool_col end
     end
     -- перетаскивание (блок или FX из списка): куда встанет — янтарная черта
     -- между блоками; половина блока под мышью решает «до» или «после»

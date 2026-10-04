@@ -1,7 +1,7 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.20'
+V.VERSION = '0.6.21'
 V.DATE = '2026-10-04'
 V.CHANGES = {
   { v = '0.6.20', d = '2026-10-04', items = {
