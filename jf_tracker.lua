@@ -5800,9 +5800,9 @@ local function frame()
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
     state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
-    state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag: sidebar width, dblclick: auto', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
+    state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
-    state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag: matrix width, dblclick: auto' })[hover.mxctl]
+    state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.hsb then
@@ -6140,7 +6140,7 @@ local function frame()
       click = { t = now2, zone = 'ruler' }
     elseif hover.sidectl then
       if hover.sidectl == 'open' then state.side = true; vim.msg = 'sidebar shown'
-      elseif hover.sidectl == 'close' then ctx.side_hide(); vim.msg = 'sidebar folded (< to open)'
+      elseif hover.sidectl == 'close' then ctx.side_hide(); vim.msg = 'sidebar folded (click the strip to open)'
       elseif hover.sidectl == 'grip' then
         if dbl and click.zone == 'sidegrip' then state.side_px = nil; vim.msg = 'sidebar width: auto' else resize_drag = 'side' end
       elseif hover.sidectl == 'instgrip' then

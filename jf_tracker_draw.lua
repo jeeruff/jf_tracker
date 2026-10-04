@@ -2760,8 +2760,15 @@ function D.frame(L, snap, rows, state, info)
       if hot then hover.mxctl = what end
       hint('mxctl', bx, y, bw, L.rh, what)
     end
-    knob(bot - L.rh - 2, state.mx_hidden and '>' or '<', state.mx_hidden and 'open' or 'close')
-    if not state.mx_hidden then knob(bot - 2 * L.rh - 4, '=', 'grip') end
+    -- 4 окт: кнопок нет — тянется сама линия (подсветка под мышью),
+    -- свёрнутая полоска разворачивается кликом; свернуть — быстрая кнопка matrix
+    local _ = knob
+    if mx >= lx - 3 and mx <= lx + 3 and my >= hy and my < bot then
+      for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.mxctl = state.mx_hidden and 'open' or 'grip'
+      set(U.AMBER); gfx.rect(lx - 1, hy, 2, bot - hy, 1)
+    elseif state.mx_hidden and mx >= 0 and mx < lx and my >= hy and my < bot then
+      hover.mxctl = 'open'
+    end
   end
 
   if L.side_w > 0 and info.browser_draw then
@@ -2785,15 +2792,10 @@ function D.frame(L, snap, rows, state, info)
     end
     -- линия раздела инструменты | браузер — той же толщины, что между модулями
     set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, D.SEPW, 1)
-    do
-      local gx = W + L.side_w - gw - L.pad
-      local gy = sy0 + ih - math.floor(L.rh / 2)       -- на линии инструменты | браузер (4 окт)
-      local hot = mx >= gx and mx < gx + gw and my >= gy and my < gy + L.rh
-      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(gx, gy, gw, L.rh, 1)
-      set(hot and U.AMBER or U.LINE); gfx.rect(gx, gy, gw, L.rh, 0)
-      text(gx + L.pad, gy, '=', hot and U.AMBER or U.TEXT)
-      if hot then hover.sidectl = 'instgrip' end
-      hint('sidectl', gx, gy, gw, L.rh, 'instgrip')
+    -- высота инструментов (4 окт): тянется сама линия раздела, без кнопки =
+    if mx >= W and mx < W + L.side_w and my >= sy0 + ih - 3 and my <= sy0 + ih + 3 then
+      for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = 'instgrip'
+      set(U.AMBER); gfx.rect(W, sy0 + ih - 1, L.side_w, 2, 1)
     end
   end
 
@@ -3188,9 +3190,15 @@ function D.frame(L, snap, rows, state, info)
     end
     -- панель открыта: кнопки в трекере у низа его тела, над нижней панелью
     -- (DSP / справка), иначе они ложились на текст справки (2 окт)
-    -- 4 окт: внизу окна на линии раздела (у кнопок браузера find …)
-    knob(bot - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
-    if state.side then knob(bot - 2 * L.rh - 4, '=', 'grip') end
+    -- 4 окт: кнопок нет — тянется сама линия, свёрнутая полоса — клик
+    -- разворачивает; свернуть — быстрая кнопка browser
+    local _ = knob
+    if mx >= lx - 3 and mx <= lx + 3 and my >= L.header_y and my < bot then
+      for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = state.side and 'grip' or 'open'
+      set(U.AMBER); gfx.rect(lx - 1, L.header_y, 2, bot - L.header_y, 1)
+    elseif not state.side and mx > lx + 3 and mx < lx + L.rstrip_w and my >= L.header_y and my < bot then
+      hover.sidectl = 'open'
+    end
   end
 
   -- прямоугольники модулей (3 окт) — для рамки фокуса; границы модулей рисуют
