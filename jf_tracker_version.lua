@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.8'
+V.VERSION = '0.6.9'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.9', d = '2026-10-04', items = {
+    'themes impulse (Impulse Tracker: black field, blue-grey DOS panels, yellow highlight) and screamtracker (Scream Tracker 3: dark blue panels, light text, yellow accent); \\ v a opens about',
+  } },
   { v = '0.6.8', d = '2026-10-04', items = {
     'options in the leader menu: \\ v o opens the options window; \\ o - every option as a quick switch with its own key (\\ o t - theme list, w wave, c cursor line, h header colour, r ruler ...): toggles flip at once, choices open their values, numbers + / -; the window and the menu are built from one list',
     'theme protracker: the ProTracker 2 look - black pattern field, grey panels, light grey text, yellow accent, blue, crimson',
