@@ -2752,7 +2752,7 @@ function D.frame(L, snap, rows, state, info)
       set(D.SEP); gfx.rect(lx - 1, hy, D.SEPW, bot - hy, 1)
     end
     local function knob(y, lbl, what)
-      local bx = math.max(1, lx - bw - 1)          -- целиком слева от линии: не налезает на номера строк
+      local bx = math.max(1, lx - math.floor(bw / 2))   -- на линии модуля (4 окт), по центру
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
       set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
       set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
@@ -2787,7 +2787,7 @@ function D.frame(L, snap, rows, state, info)
     set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, D.SEPW, 1)
     do
       local gx = W + L.side_w - gw - L.pad
-      local gy = hh > 0 and (sy0 + ih - hh + math.max(0, math.floor((hh - L.rh) / 2))) or (sy0 + ih - L.rh - 3)
+      local gy = sy0 + ih - math.floor(L.rh / 2)       -- на линии инструменты | браузер (4 окт)
       local hot = mx >= gx and mx < gx + gw and my >= gy and my < gy + L.rh
       set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(gx, gy, gw, L.rh, 1)
       set(hot and U.AMBER or U.LINE); gfx.rect(gx, gy, gw, L.rh, 0)
@@ -3178,7 +3178,7 @@ function D.frame(L, snap, rows, state, info)
       set(D.SEP); gfx.rect(lx, L.header_y, D.SEPW, bot - L.header_y, 1)
     end
     local function knob(y, lbl, what)
-      local bx = state.side and (lx - bw - 2) or (lx + 3)
+      local bx = lx - math.floor(bw / 2)               -- на линии модуля (4 окт), по центру
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
       set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
       set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
@@ -3188,9 +3188,9 @@ function D.frame(L, snap, rows, state, info)
     end
     -- панель открыта: кнопки в трекере у низа его тела, над нижней панелью
     -- (DSP / справка), иначе они ложились на текст справки (2 окт)
-    local kb = state.side and (L.body_y + L.body_h) or bot
-    knob(kb - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
-    if state.side then knob(kb - 2 * L.rh - 4, '=', 'grip') end
+    -- 4 окт: внизу окна на линии раздела (у кнопок браузера find …)
+    knob(bot - L.rh - 2, state.side and '>' or '<', state.side and 'close' or 'open')
+    if state.side then knob(bot - 2 * L.rh - 4, '=', 'grip') end
   end
 
   -- прямоугольники модулей (3 окт) — для рамки фокуса; границы модулей рисуют
