@@ -7101,6 +7101,7 @@ local function frame()
 
   local c = gfx.getchar()
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
+  local c_raw = c                                                  -- журнал клавиш (4 окт)
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')
@@ -7158,6 +7159,14 @@ local function frame()
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
     else ctx.note_key_last = { c = c, t = now } end
+  end
+  -- журнал клавиш (4 окт): сырой код → после раскладки и фильтров, режим, фокус;
+  -- ExtState jf_tracker/keylog — последние 24 нажатия (диагностика «не работает»)
+  if c_raw > 0 then
+    ctx.keylog = ctx.keylog or {}
+    table.insert(ctx.keylog, ('%s %d>%d %s/%s%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or '')))
+    if #ctx.keylog > 24 then table.remove(ctx.keylog, 1) end
+    reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
   -- окно Options — модальное: все клавиши ему
   if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)
@@ -7397,6 +7406,10 @@ local function frame()
       end
     end)
     if not ok then vim.msg = tostring(r):match('[^\n]*$') or tostring(r) elseif r == 'quit' then quit = true end
+  end
+  if c_raw > 0 and ctx.keylog and #ctx.keylog > 0 then
+    ctx.keylog[#ctx.keylog] = ctx.keylog[#ctx.keylog] .. ' -> ' .. tostring(vim.msg or ''):sub(1, 50)
+    reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
   inject_cap = nil
   local owner = reaper.GetExtState(EXT, 'owner')
