@@ -201,7 +201,7 @@
 - [ ] Узкое окно — буквы не налезают друг на друга
 
 ## Наборы lib (0.6.6)
-- [ ] lib: кнопка `save` → `:kitsave имя` → файл в TrackTemplates/jf_kits
+- [ ] lib: кнопка `save` → `:libsave имя` → файл в TrackTemplates/jf_kits
 - [ ] Браузер, вкладка `kits` (t по кругу): набор → Enter → сэмплы в lib трека курсора, нарезка на месте
 - [ ] REAPER: Insert track from template → jf_kits/имя — трек с этими item открывается без ошибок
 - [ ] about: под логотипом описание и благодарность Esa Ruoho со ссылкой на Patreon

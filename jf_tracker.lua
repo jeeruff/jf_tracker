@@ -1998,16 +1998,16 @@ ctx = {
   kit_save_prompt = function()
     local _, pname = reaper.EnumProjects(-1, '')
     local nm = (pname and pname ~= '' and pname:match('([^/]+)%.[Rr][Pp][Pp]$')) or 'kit'
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'kitsave ' .. nm
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'libsave ' .. nm
   end,
   kit_save = function(name)
     name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
-    if name == '' then vim.msg = 'kitsave: a name please'; return end
+    if name == '' then vim.msg = 'libsave: a name please'; return end
     local col = cur_col(); local items = {}
     for _, e in ipairs(col and col.pool or {}) do if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then items[#items + 1] = e.item end end
-    if #items == 0 then vim.msg = 'kitsave: the lib is empty'; return end
+    if #items == 0 then vim.msg = 'libsave: the lib is empty'; return end
     local path, n = edit.kit_save(items, name)
-    vim.msg = path and ('kit saved: %s (%d samples) - TrackTemplates/jf_kits, browser tab kits'):format(name, n) or 'kitsave: cannot write the file'
+    vim.msg = path and ('kit saved: %s (%d samples) - TrackTemplates/jf_kits, browser tab kits'):format(name, n) or 'libsave: cannot write the file'
     if B.mode == 'kits' then B.set_all(B.read_kits()) end
   end,
   kit_load = function(path, name)

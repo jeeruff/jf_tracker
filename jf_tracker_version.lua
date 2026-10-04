@@ -1,9 +1,10 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.11'
+V.VERSION = '0.6.12'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.12', d = '2026-10-04', items = { ':kitsave is now :libsave (the save button in the lib asks it)' } },
   { v = '0.6.11', d = '2026-10-04', items = { 'about: the Patreon link is clickable (underlined, lit under the mouse) - opens in the system browser' } },
   { v = '0.6.10', d = '2026-10-04', items = { 'theme screamtracker removed' } },
   { v = '0.6.9', d = '2026-10-04', items = {
