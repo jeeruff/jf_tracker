@@ -3313,17 +3313,35 @@ function D.frame(L, snap, rows, state, info)
   if D.notes_popup and info.notes_draw then
     local p = D.notes_popup
     D.notes_popup = nil
-    local pw = math.min(math.max(L.ctrl_w or 0, L.matrix_w or 0), math.floor(L.win_w * 0.6))
-    local py = p.y
-    local pb = (L.dsp_h > 0 and (L.dsp_y or 0) > py) and L.dsp_y or (gfx.h - L.status_h)
-    if pb - py >= 3 * L.rh then
-      local inside = mx >= 0 and mx < pw and my >= py and my < pb
+    -- плавающее окошко (4 окт): место и размер — info.notes_win (тянется за
+    -- шапку, размер — за правый нижний угол); нет — левая колонка, как раньше
+    local px, py, pw, ph
+    local nw = info.notes_win
+    if nw then px, py, pw, ph = nw[1], nw[2], nw[3], nw[4]
+    else
+      px, py = 0, p.y
+      pw = math.min(math.max(L.ctrl_w or 0, L.matrix_w or 0), math.floor(L.win_w * 0.6))
+      ph = ((L.dsp_h > 0 and (L.dsp_y or 0) > py) and L.dsp_y or (gfx.h - L.status_h)) - py
+    end
+    pw = math.max(L.cw * 20, math.min(gfx.w, pw)); ph = math.max(4 * L.rh, math.min(gfx.h, ph))
+    px = math.max(0, math.min(gfx.w - pw, px)); py = math.max(0, math.min(gfx.h - ph, py))
+    local pb = py + ph
+    do
+      local inside = mx >= px and mx < px + pw and my >= py and my < pb
       if inside then for k in pairs(hover) do hover[k] = nil end end
-      set(U.PANEL); gfx.rect(0, py, pw, pb - py, 1)
-      local ok, hn = pcall(info.notes_draw, L, L.pad, py, pw - 2 * L.pad, pb - py - 2)
-      if ok and inside then hover.notes = hn or 'text' end
-      set(info.focus == 'notes' and U.AMBER or D.SEP); gfx.rect(0, py, pw, pb - py, 0)
-      L.notes_rect = { 0, py, pw, pb - py }
+      set(U.PANEL); gfx.rect(px, py, pw, ph, 1)
+      local ok, hn = pcall(info.notes_draw, L, px + L.pad, py, pw - 2 * L.pad, ph - 2)
+      if ok and inside then
+        hover.notes = hn or 'text'
+        local grip = math.max(8, L.cw)
+        if mx >= px + pw - grip and my >= pb - grip then hover.notes = 'resize'
+        elseif my < py + L.rh + 4 and (hn == nil or hn == 'text') then hover.notes = 'drag' end
+      end
+      set(info.focus == 'notes' and U.AMBER or D.SEP); gfx.rect(px, py, pw, ph, 0)
+      -- угол размера: двойная кромка снизу справа (без значков)
+      set(hover.notes == 'resize' and U.AMBER or U.LINE)
+      gfx.rect(px + pw - L.cw, pb - 2, L.cw, 1, 1); gfx.rect(px + pw - 2, pb - L.cw, 1, L.cw, 1)
+      L.notes_rect = { px, py, pw, ph }
     end
   else D.notes_popup = nil end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего

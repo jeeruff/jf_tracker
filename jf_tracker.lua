@@ -140,7 +140,9 @@ local state = {
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
-  notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,   -- масштаб текста заметок (4 окт), 0 — как везде
+  notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
+  -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
+  notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
@@ -5471,6 +5473,7 @@ local function frame()
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
+    notes_win = state.notes_win,
     notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -5759,7 +5762,7 @@ local function frame()
   elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
-  elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
+  elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes == 'drag' and 'notes: drag the header to move the window' or hover.notes == 'resize' and 'notes: drag the corner to resize' or hover.notes:match('^zoom') and 'notes text size' or hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
@@ -6235,6 +6238,11 @@ local function frame()
     elseif hover.notes then
       ctx.set_focus('notes')
       if hover.notes == 'project' or hover.notes == 'context' then ctx.notes_target(hover.notes) end
+      -- плавающее окошко: шапка — перенос, угол — размер (4 окт)
+      if (hover.notes == 'drag' or hover.notes == 'resize') and L.notes_rect then
+        local r = L.notes_rect
+        ctx.nt_drag = { mode = hover.notes, mx = gfx.mouse_x, my = gfx.mouse_y, r = { r[1], r[2], r[3], r[4] } }
+      end
       -- коробка задачи (4 окт): переключить и сразу записать
       local tl = tonumber(tostring(hover.notes):match('^todo:(%d+)$'))
       if tl and NT.toggle(tl) then ctx.notes_save(); vim.msg = 'todo ' .. (NT.lines[tl]:match('%[x%]') and 'done' or 'open') end
@@ -6931,6 +6939,19 @@ local function frame()
         retro.sel.a = retro.out.at; retro.sel.b = math.min(1, retro.out.at + 0.05)
       end
       retro.out = nil
+    end
+  end
+  -- заметки: перенос / размер окошка мышью; отпустили — запомнить
+  if ctx.nt_drag then
+    local d = ctx.nt_drag
+    if gfx.mouse_cap & 1 == 1 then
+      local dx, dy = gfx.mouse_x - d.mx, gfx.mouse_y - d.my
+      if d.mode == 'drag' then state.notes_win = { d.r[1] + dx, d.r[2] + dy, d.r[3], d.r[4] }
+      else state.notes_win = { d.r[1], d.r[2], math.max(L.cw * 20, d.r[3] + dx), math.max(4 * L.rh, d.r[4] + dy) } end
+    else
+      ctx.nt_drag = nil
+      local w = state.notes_win
+      if w then reaper.SetExtState(EXT, 'noteswin', ('%d %d %d %d'):format(w[1], w[2], w[3], w[4]), true) end
     end
   end
   -- ретро: протяжка выделения по волне
