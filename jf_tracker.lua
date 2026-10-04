@@ -1207,6 +1207,29 @@ ctx = {
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
   -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
   scramble = function() vim.run_cmd('scramble') end,
+  -- выбранный слайс инструмента (4 окт): { item = корень, k = 0 весь / 1.. }
+  ssel = {},
+  slice_root = function()
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if e and e.parent then e = e.parent end
+    return e, col
+  end,
+  slice_child = function(col, root, k)
+    for _, c in ipairs(col and col.pool or {}) do if c.parent == root and c.slice_k == k then return c end end
+  end,
+  slice_step = function(d)
+    local root, col = ctx.slice_root()
+    if not (root and root.slices and #root.slices > 0) then return false end
+    local cur = (ctx.ssel.item == root.item) and ctx.ssel.k or 0
+    local k = math.max(0, math.min(#root.slices, cur + d))
+    ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell }
+    if k > 0 then
+      vim.last_slice = k
+      ctx.preview_slice(col.track, root, root.slices[k], root.slices[k + 1] or root.len)
+      vim.msg = ('slice S%02X%s'):format(k, ctx.slice_child(col, root, k) and '' or ' (no notes yet - its properties work once it is inserted)')
+    else vim.msg = 'whole sample' end
+    return true
+  end,
   -- нарезка во вкладке item (4 окт): s — меню, вторая клавиша — как резать
   slice_hydra = function()
     local function eq(n) return function() SL.equal(n); vim.msg = SL.msg or ('%d equal slices'):format(n) end end
@@ -5724,18 +5747,50 @@ local function frame()
         draw.lib_zone = { root = p, a = zone[1], b = zone[2] }
         e = p
       end
-      -- справа — панель свойств выбранного в списке (исходник или слайс), как в Renoise
-      local pw = sel_e and math.min(L.cw * 30, math.floor(w * 0.34)) or 0
+      -- список слайсов (4 окт, как семплы внутри инструмента Renoise): справа,
+      -- у lib; выбор — Option+J / K, клик, курсор на ноте-слайсе. Свойства —
+      -- левее, правят выбранный слайс (или весь сэмпл)
+      local lw = 0
+      local root = e
+      if root and not root.file and root.slices and #root.slices > 0 then
+        -- курсор перешёл на другую ячейку — выбор следует за ним
+        local ck = tostring(vim.cur.fi) .. ':' .. tostring(vim.cur.row)
+        if ctx.ssel.item ~= root.item or ctx.ssel.cell ~= ck then
+          local k0 = (sel_e and sel_e.parent == root and sel_e.slice_k) or ((ctx.ssel.item == root.item) and ctx.ssel.k) or 0
+          ctx.ssel = { item = root.item, k = k0, cell = ck }
+        end
+        local k = ctx.ssel.k or 0
+        if k > 0 then
+          local child = ctx.slice_child(col, root, k)
+          sel_e = child or root
+          local ci = vim.inst
+          for i, c in ipairs(col.pool) do if c == child then ci = i end end
+          zone = { root.slices[k], root.slices[k + 1] or root.len, ci }
+          draw.lib_zone = { root = root, a = zone[1], b = zone[2] }
+        else sel_e = root; zone = nil end
+        lw = math.min(L.cw * 18, math.floor(w * 0.2))
+        if lw > L.cw * 10 then
+          local rows = { { k = 0, len = root.len or 0, has = true } }
+          local key_of = {}
+          for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1] = string.char(code) end
+          for kk, t0 in ipairs(root.slices) do
+            rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
+          end
+          SPROP.draw_slices(L, x + w - lw, y, lw, h, rows, k)
+        else lw = 0; SPROP.slice_hover = nil end
+      else SPROP.slice_hover = nil end
+      local pw = sel_e and math.min(L.cw * 30, math.floor((w - lw) * 0.34)) or 0
+      local px = x + w - lw - (lw > 0 and L.pad or 0) - pw
       if pw > L.cw * 12 then
         if sel_e.file then
           -- файл браузера: информация о файле (> — играет сейчас)
           local _, _, ppath = PV.position()
-          SPROP.draw_info(L, x + w - pw, y, pw, h, ctx.file_info(sel_e.path), ppath == sel_e.path)
+          SPROP.draw_info(L, px, y, pw, h, ctx.file_info(sel_e.path), ppath == sel_e.path)
         else
-          SPROP.draw(L, x + w - pw, y, pw, h, sel_e, state.focus == 'top')
+          SPROP.draw(L, px, y, pw, h, sel_e, state.focus == 'top')
         end
       else pw = 0; SPROP.hover = nil end
-      return SL.draw_in(U, L, x, y, w - (pw > 0 and pw + L.pad or 0), h, e, col and col.track, zone)
+      return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
     browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
   })
@@ -5920,6 +5975,8 @@ local function frame()
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
+  elseif SPROP.slice_hover ~= nil and state.top and state.toptab == 'sample' then
+    state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.hsb then
@@ -6274,6 +6331,11 @@ local function frame()
         else resize_drag = 'mx' end
       end
       click = { t = now2, zone = hover.mxctl == 'grip' and 'mxgrip' or 'mxctl' }
+    elseif SPROP.slice_hover ~= nil and state.top and state.toptab == 'sample' then
+      -- список слайсов (4 окт): клик — выбрать и прослушать
+      local root = ctx.slice_root()
+      if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(SPROP.slice_hover) end
+      click = { t = now2, zone = 'slicelist' }
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]

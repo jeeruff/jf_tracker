@@ -75,6 +75,37 @@ function SP.draw(L, x, y, w, h, e, focused)
   end
 end
 
+-- список слайсов инструмента (4 окт, как семплы внутри инструмента Renoise):
+-- строка 0 — весь сэмпл, дальше слайсы: клавиша, Sxx, длина; выбранный —
+-- подсветка, без нот — тусклый. rows = { { k, len, key, has } }, sel = k.
+-- Возвращает k под мышью (SP.slice_hover)
+function SP.draw_slices(L, x, y, w, h, rows, sel)
+  SP.slice_hover = nil
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
+  U.text(x + L.pad, y, ctx.fit(('slices %d   opt+j k'):format(math.max(0, #rows - 1)), w - L.pad), U.AMBER)
+  local n = math.max(1, math.floor((h - L.rh) / L.rh))
+  SP.slice_scroll = SP.slice_scroll or 0
+  local si = 1
+  for i, r in ipairs(rows) do if r.k == sel then si = i end end
+  if si - 1 < SP.slice_scroll then SP.slice_scroll = si - 1 end
+  if si > SP.slice_scroll + n then SP.slice_scroll = si - n end
+  for i = 1, n do
+    local r = rows[SP.slice_scroll + i]
+    if not r then break end
+    local ry = y + i * L.rh
+    local on = r.k == sel
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    local lbl = r.k == 0 and 'whole' or (('%s S%02X'):format(r.key or ' ', r.k))
+    local lt = r.len < 10 and ('%.2fs'):format(r.len) or ('%.1fs'):format(r.len)
+    U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
+    U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
+    if hot then SP.slice_hover = r.k end
+  end
+  return SP.slice_hover
+end
+
 -- информация о файле браузера (2 окт): вместо свойств, когда в модуле файл
 -- info = { name, dir, rows = { {label, value} … } } — собирает main (ctx.file_info)
 function SP.draw_info(L, x, y, w, h, info, playing)

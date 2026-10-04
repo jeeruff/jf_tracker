@@ -995,6 +995,9 @@ function V.key_impl(c)
     elseif mods.cmd then
       if ctx.pool_select then ctx.pool_select(V.inst + ((hk == 'j' or hk == 'l') and n or -n)) end
     else
+      -- Option+J / K (4 окт): слайс внутри инструмента (Cmd+J / K — инструмент);
+      -- у инструмента без слайсов — прыжок по событиям, как раньше
+      if (hk == 'j' or hk == 'k') and ctx.slice_step and ctx.slice_step(hk == 'j' and n or -n) then V.count = nil; return end
       local t
       if hk == 'h' then t = motion(('H'):byte(), n) elseif hk == 'l' then t = motion(('L'):byte(), n)
       elseif hk == 'j' then t = motion(('W'):byte(), n) else t = motion(('B'):byte(), n) end

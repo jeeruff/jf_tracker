@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.30'
+V.VERSION = '0.6.31'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.31', d = '2026-10-04', items = {
+    'slices are Sxx again: the note shows the pitch (C-4, D-4 with Option + key), the Sxx command - which slice; keys q 2 w 3 ... still pick slices, Option + key - the pitch of the last slice; r + note sets the pitch',
+    'item tab: the slices of the instrument as a list on the right next to the lib (whole, key + Sxx + length), the properties moved left and edit the selected slice; Option+J / K step through the slices (and play them), click selects',
+  } },
   { v = '0.6.30', d = '2026-10-04', items = {
     'DSP presets: < name > in the fx block header - < > previous / next, click - a list of factory and own presets (REAPER presets files), loaded by name',
     'stepped parameters by choice: the plugin value names in a row (sine tri saw ...), the current one lit, click picks it',
