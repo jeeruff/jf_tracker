@@ -1883,6 +1883,7 @@ function E.comp_add(tr)
       R.TrackFX_SetNamedConfigParm(tr, i, 'renamed_name', E.COMP_NAME)
       R.TrackFX_SetParam(tr, i, 0, 0)
       R.TrackFX_SetParam(tr, i, 1, 150)     -- потолок клипа выключен
+      R.TrackFX_Show(tr, i, 2)
     end
   end)
   if model then model.invalidate() end
@@ -1924,7 +1925,9 @@ function E.scopes(cols, on)
       local fx = R.TrackFX_GetByName(tr, 'jf_tracker_scope', false)
       if on then
         if fx < 0 then fx = R.TrackFX_AddByName(tr, 'jf_tracker_scope', false, -1) end
-        if fx >= 0 then R.TrackFX_SetParam(tr, fx, 0, slot) end
+        -- окно мост открывать не должен (4 окт): REAPER показывает FX при
+        -- добавлении — сразу закрыть (и у уже стоящих)
+        if fx >= 0 then R.TrackFX_SetParam(tr, fx, 0, slot); R.TrackFX_Show(tr, fx, 2) end
       else
         while fx >= 0 do R.TrackFX_Delete(tr, fx); fx = R.TrackFX_GetByName(tr, 'jf_tracker_scope', false) end
       end
@@ -1944,7 +1947,7 @@ function E.retro_add(track, cols)
   run('retro: add jf_rec', function()
     fx = R.TrackFX_GetByName(track, 'jf_rec', false)
     if fx < 0 then fx = R.TrackFX_AddByName(track, 'jf_rec', false, -1) end
-    if fx >= 0 then R.TrackFX_SetParam(track, fx, 1, slot) end
+    if fx >= 0 then R.TrackFX_SetParam(track, fx, 1, slot); R.TrackFX_Show(track, fx, 2) end   -- без плавающего окна
   end)
   return fx and fx >= 0, slot
 end
