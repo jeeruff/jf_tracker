@@ -1326,8 +1326,10 @@ local function draw_ctrl(L, info, H, hover)
         if info.notes_draw and yb - y - 2 * gap >= 3 * L.rh then
           local nx, ny, nw, nh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
           thin(y + 1)
-          local ok, hn = pcall(info.notes_draw, L, nx, ny, nw, nh)
-          if ok then hover.notes = hn end
+          -- раскрыты вниз (4 окт): рисуются в конце кадра во всю левую колонку
+          -- от этого места до DSP, поверх матрицы (D.notes_popup)
+          D.notes_popup = { y = ny }
+          set(U.PANEL); gfx.rect(nx, ny, nw, nh, 1)
           L.notes_rect = { nx, ny, nw, nh }
           y = y + gap + nh
         elseif yb - y - 2 * gap >= 2 * L.rh then
@@ -1981,6 +1983,7 @@ function D.frame(L, snap, rows, state, info)
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
       if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + ty end
       if L.notes_rect then L.notes_rect[2] = L.notes_rect[2] + ty end
+      if D.notes_popup and not D.notes_popup.shifted then D.notes_popup.y = D.notes_popup.y + ty; D.notes_popup.shifted = true end
       if L.inst_w > 0 and L.inst_rect then L.inst_rect[2] = L.inst_rect[2] + ty end
       for _, r in pairs(D.ctrl_rect or {}) do r[2] = r[2] + ty; r.shifted = true end
     end
@@ -3262,10 +3265,29 @@ function D.frame(L, snap, rows, state, info)
     gfx.blit(99, 1, 0, 0, 0, bw + D.SEPW, bh, bx, by, bw + D.SEPW, bh)
     if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + by end
     if L.notes_rect then L.notes_rect[2] = L.notes_rect[2] + by end
+    if D.notes_popup and not D.notes_popup.shifted then D.notes_popup.y = D.notes_popup.y + by; D.notes_popup.shifted = true end
     for _, r in pairs(D.ctrl_rect or {}) do if not r.shifted then r[2] = r[2] + by; r.shifted = true end end
     local inside = mx >= bx and mx < bx + bw and my >= by and my < by + bh
     if inside then hover.ctrl, hover.notes, hover.zone = hv.ctrl, hv.notes, hv.zone end
   end
+  -- заметки (4 окт): раскрыты вниз во всю левую колонку — от своего места в
+  -- главном модуле до DSP (или низа окна), поверх матрицы
+  if D.notes_popup and info.notes_draw then
+    local p = D.notes_popup
+    D.notes_popup = nil
+    local pw = math.min(math.max(L.ctrl_w or 0, L.matrix_w or 0), math.floor(L.win_w * 0.6))
+    local py = p.y
+    local pb = (L.dsp_h > 0 and (L.dsp_y or 0) > py) and L.dsp_y or (gfx.h - L.status_h)
+    if pb - py >= 3 * L.rh then
+      local inside = mx >= 0 and mx < pw and my >= py and my < pb
+      if inside then for k in pairs(hover) do hover[k] = nil end end
+      set(U.PANEL); gfx.rect(0, py, pw, pb - py, 1)
+      local ok, hn = pcall(info.notes_draw, L, L.pad, py, pw - 2 * L.pad, pb - py - 2)
+      if ok and inside then hover.notes = hn or 'text' end
+      set(info.focus == 'notes' and U.AMBER or D.SEP); gfx.rect(0, py, pw, pb - py, 0)
+      L.notes_rect = { 0, py, pw, pb - py }
+    end
+  else D.notes_popup = nil end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
