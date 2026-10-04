@@ -280,11 +280,11 @@ function D.layout(snap, state, nregions)
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
   L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
-  -- модуль слайсов (4 окт): колонка на всю высоту между трекером и сайдбаром,
-  -- пока у выбранного инструмента есть слайсы
-  L.slices_w = state.slices_on and math.max(L.cw * 16, math.min(L.cw * 20, math.floor(gfx.w * 0.12))) or 0
-  L.win_w = gfx.w - L.side_w - L.rstrip_w - L.slices_w
-  L.side_x = L.win_w + L.slices_w                  -- левый край сайдбара / полосы
+  -- модуль слайсов (4 окт): колонка в верхней панели справа (у lib), по её
+  -- высоте — не на всё окно; пока у выбранного инструмента есть слайсы
+  L.slices_w = (state.slices_on and state.top) and math.max(L.cw * 16, math.min(L.cw * 20, math.floor(gfx.w * 0.12))) or 0
+  L.win_w = gfx.w - L.side_w - L.rstrip_w
+  L.side_x = L.win_w                               -- левый край сайдбара / полосы
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
@@ -1438,7 +1438,7 @@ local function draw_topbar(L, info)
 
   -- центр: вкладки scope | sample | mod | retro | master
   local sx0 = L.ctrl_alone and L.pad or (L.ctrl_w + L.pad)
-  local sx1 = L.win_w - L.inst_w - L.pad
+  local sx1 = L.win_w - L.inst_w - L.pad - (L.slices_w or 0)   -- справа — модуль слайсов
   local tab = info.toptab or 'scope'
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
@@ -3330,13 +3330,13 @@ function D.frame(L, snap, rows, state, info)
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect((L.side_x or L.win_w) - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end
   -- модуль слайсов (4 окт): своя колонка, линия слева
-  if (L.slices_w or 0) > 0 and info.slices_draw then
-    local sx, sh = L.win_w, gfx.h - L.status_h
-    set(U.PANEL); gfx.rect(sx, 0, L.slices_w, sh, 1)
-    local hs = info.slices_draw(L, sx + 2, 2, L.slices_w - 4, sh - 4)
+  if (L.slices_w or 0) > 0 and L.top_h > 0 and info.slices_draw then
+    local sx, sy, sh = L.win_w - L.slices_w, L.top_y or 0, L.top_h - 2
+    set(U.PANEL); gfx.rect(sx, sy, L.slices_w, sh, 1)
+    local hs = info.slices_draw(L, sx + 3, sy + 2, L.slices_w - 5, sh - 4)
     if hs ~= nil then hover.slices = hs end
-    set(D.SEP); gfx.rect(sx, 0, D.SEPW, sh, 1)
-    L.slices_rect = { sx, 0, L.slices_w, sh }
+    set(D.SEP); gfx.rect(sx, sy, D.SEPW, sh, 1)
+    L.slices_rect = { sx, sy, L.slices_w, sh }
   else L.slices_rect = nil end   -- линия сайдбара до статус-бара
   -- нижняя граница окна (4 окт): статус не внизу — модули внизу (DSP, сайдбар)
   -- закрываются общей линией во всю ширину; у сайдбара она была, у DSP — нет
