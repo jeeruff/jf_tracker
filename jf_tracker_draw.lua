@@ -1269,7 +1269,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'options', 'options', btn = true, on = c.options_open }, { 'notes', 'notes', btn = true, on = c.notes },
       { 'tutorial', 'tutorial', btn = true, on = c.tour }, { 'screensets', 'screensets', btn = true, on = c.ss_open },
     } },
-    { name = 'control', bottom = true, items = {
+    { name = 'control', items = {
       { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
       { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
       { 'sig', 'sig ' .. sig }, { 'metro', D.ic('metro', 'metro ' .. (c.metro and 'on' or 'off')), c.metro and U.CYAN or U.GREY },
@@ -1282,6 +1282,14 @@ local function draw_ctrl(L, info, H, hover)
       { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
       { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
       { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
+    } },
+    -- быстрые вкл / выкл (4 окт): самое частое из вида — кнопками в рамке
+    { name = 'quick', items = {
+      { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_side', 'browser', c.q_side and U.CYAN or U.GREY }, { 'q_mx', 'matrix', c.q_mx and U.CYAN or U.GREY },
+      { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY }, { 'q_scopes', 'scopes', c.q_scopes and U.CYAN or U.GREY }, { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY },
+      { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_meters', 'meters', c.q_meters and U.CYAN or U.GREY }, { 'q_ruler', 'ruler', c.q_ruler and U.CYAN or U.GREY },
+      { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_input', 'input', c.q_input and U.CYAN or U.GREY },
+      { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY }, { 'q_captions', 'captions', c.q_captions and U.CYAN or U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
@@ -1353,35 +1361,8 @@ local function draw_ctrl(L, info, H, hover)
     local ci = 0
     if gi > 1 then
       local gap = 3
-      if g.bottom then
-        -- транспорт прижат ко дну модуля (если места хватает)
-        local yb = H - 3 - grows(g) * L.rh
-        -- notes (3 окт): редактор заметок — в свободном месте над транспортом
-        L.notes_rect = nil
-        L.zone_rect = nil
-        if info.notes_draw and yb - y - 2 * gap >= 3 * L.rh then
-          local nx, ny, nw, nh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
-          thin(y + 1)
-          -- раскрыты вниз (4 окт): рисуются в конце кадра во всю левую колонку
-          -- от этого места до DSP, поверх матрицы (D.notes_popup)
-          D.notes_popup = { y = ny }
-          set(U.PANEL); gfx.rect(nx, ny, nw, nh, 1)
-          L.notes_rect = { nx, ny, nw, nh }
-          y = y + gap + nh
-        elseif yb - y - 2 * gap >= 2 * L.rh then
-          -- активная зона (4 окт): место между help и транспортом — тур
-          -- tutorial, позже описание грида monome; опции вида — в окне options
-          local zx, zy, zw, zh = L.pad, y + gap, L.ctrl_w - 2 * L.pad, yb - y - 3 * gap
-          thin(y + 1)
-          L.zone_rect = { zx, zy, zw, zh }
-          if info.zone_draw then
-            local ok, hz = pcall(info.zone_draw, L, zx, zy, zw, zh)
-            if ok then hover.zone = hz end
-          end
-          y = y + gap + zh
-        end
-        if yb > y + gap then y = yb - gap end
-      end
+      -- 4 окт: пустого места нет — транспорт сразу под кнопками окон, под ним
+      -- быстрые вкл / выкл; заметки и скринсеты — всплывашками у кнопок
       thin(y + 1); y = y + gap
     end
     for _, it in ipairs(g.items) do
@@ -1395,6 +1376,18 @@ local function draw_ctrl(L, info, H, hover)
       end
     end
     if ci > 0 then y = y + L.rh end
+    if g.name == 'help' then D.ctrl_help_bottom = y + 1 end
+  end
+  -- заметки — всплывашкой от низа кнопок окон (D.notes_popup), тур — в
+  -- оставшемся месте под быстрыми кнопками
+  if info.notes_draw then D.notes_popup = { y = D.ctrl_help_bottom or 2 } end
+  L.zone_rect = nil
+  if info.zone_draw and info.ctrl and info.ctrl.tour and H - 3 - (y + 3) >= 2 * L.rh then
+    local zx, zy, zw, zh = L.pad, y + 3, L.ctrl_w - 2 * L.pad, H - 3 - (y + 3)
+    thin(y + 1)
+    L.zone_rect = { zx, zy, zw, zh }
+    local ok, hz = pcall(info.zone_draw, L, zx, zy, zw, zh)
+    if ok then hover.zone = hz end
   end
   set(D.SEP); gfx.rect(L.ctrl_w, 0, D.SEPW, H, 1)
 end

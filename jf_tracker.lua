@@ -4699,7 +4699,23 @@ function ctrl_action(name, delta)
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'about' then if delta == 0 then ctx.about() end
   elseif name == 'tutorial' then if delta == 0 then ctx.tutorial() end
-  elseif name == 'screensets' then if delta == 0 then vim.open_hydra(ctx.screensets_hydra()) end
+  elseif name == 'screensets' then if delta == 0 then vim.open_hydra(ctx.screensets_hydra()); state.popup_at = { kind = 'ctrlbtn', name = 'screensets' } end
+  -- быстрые вкл / выкл главного модуля (4 окт)
+  elseif name == 'q_dsp' then if delta == 0 then ctx.toggle_dsp() end
+  elseif name == 'q_side' then if delta == 0 then state.side = not state.side end
+  elseif name == 'q_mx' then if delta == 0 then state.mx_hidden = not state.mx_hidden end
+  elseif name == 'q_envs' then if delta == 0 then ctx.toggle_envs() end
+  elseif name == 'q_scopes' then if delta == 0 then ctx.toggle_scopes() end
+  elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
+  elseif name == 'q_wave' then if delta == 0 then state.wave_last = (state.wavemode ~= 'off') and state.wavemode or state.wave_last; ctx.wave_mode((state.wavemode ~= 'off') and 'off' or (state.wave_last or 'back')) end
+  elseif name == 'q_meters' then if delta == 0 then state.meters = not state.meters end
+  elseif name == 'q_ruler' then if delta == 0 then state.tlruler = (state.tlruler or 'off') ~= 'off' and 'off' or 'beats' end
+  elseif name == 'q_names' then if delta == 0 then state.itemnames = not state.itemnames end
+  elseif name == 'q_colors' then if delta == 0 then state.itemcol = not state.itemcol end
+  elseif name == 'q_input' then if delta == 0 then state.hdrin = state.hdrin == false; relayout() end
+  elseif name == 'q_preview' then if delta == 0 then state.preview = not state.preview end
+  elseif name == 'q_endstop' then if delta == 0 then state.endstop = not state.endstop end
+  elseif name == 'q_captions' then if delta == 0 then state.captions = not state.captions; relayout() end
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
@@ -5431,6 +5447,9 @@ local function frame()
       xfade = state.xfade, xfade_ms = state.xfade_ms, khelp = state.khelp, hints = state.hints, notes = state.notes_open,
       -- открытые окна (4 окт): их кнопки в главном модуле — оранжевым фоном
       about_open = OPT.active and OPT.page == 'about', options_open = OPT.active and OPT.page ~= 'about',
+      q_wave = (state.wavemode or 'back') ~= 'off', q_meters = state.meters, q_ruler = (state.tlruler or 'off') ~= 'off',
+      q_names = state.itemnames, q_colors = state.itemcol, q_input = state.hdrin ~= false, q_preview = state.preview, q_endstop = state.endstop, q_captions = state.captions,
+      q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -5595,7 +5614,7 @@ local function frame()
   end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
-  if vim.mode ~= 'cmd' and not vim.picker then state.popup_at = nil end
+  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and state.popup_at.kind == 'ctrlbtn') then state.popup_at = nil end
   local anchor
   do
     local pa = state.popup_at
@@ -5612,6 +5631,10 @@ local function frame()
     elseif pa and pa.kind == 'mxrow' then
       local y = MX.row_y and MX.row_y[pa.ri]
       if y then anchor = { x = 2, y = y + L.rh } end
+    elseif pa and pa.kind == 'ctrlbtn' then
+      -- меню у своей кнопки главного модуля (скринсеты, 4 окт)
+      local r = draw.ctrl_rect and draw.ctrl_rect[pa.name]
+      if r then anchor = { x = r[1], y = r[2] + r[4] + 1 } end
     elseif pa and pa.kind == 'inst' then
       anchor = { x = L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
     end
@@ -5766,6 +5789,7 @@ local function frame()
   elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
+  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off' })[hover.ctrl]
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}

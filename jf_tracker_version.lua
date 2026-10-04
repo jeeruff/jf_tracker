@@ -1,9 +1,12 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.26'
+V.VERSION = '0.6.27'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.27', d = '2026-10-04', items = {
+    'main module without empty space: the transport right under the window buttons, below it 15 quick on / off toggles (dsp, browser, matrix, envs, scopes, hints, wave, meters, ruler, names, colours, input, preview, =END stop, captions); notes and screensets are popups at their buttons',
+  } },
   { v = '0.6.26', d = '2026-10-04', items = {
     'letters the bitmap lacks (cyrillic, Δ, ø) - BigBlueTermPlus, bigger; spaces between such words no longer vanish',
     'main module: help / about / options / notes / tutorial / screensets are framed buttons - the open window has an orange background, the rest grey text; no ? before help',
