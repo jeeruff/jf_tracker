@@ -696,6 +696,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     else text(x + L.x_inst, ty, '..', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY) end
   end
   if not cell then
+    if D.cur_box then D.cur_box(); D.cur_box = nil end
     draw_inst()
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
@@ -723,8 +724,11 @@ local function draw_cell(L, cell, x, y, ty, inv)
   elseif k == 'cont' and cell.of.kind == 'audio' and not D.wave_none and not D.wave_back then
     local head = cell.of
     local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
+    -- режим note: волна под подсвеченным полем рисуется инверсией — подложка раньше
+    if D.cur_box then D.cur_box(); D.cur_box = nil end
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
   end
+  if D.cur_box then D.cur_box(); D.cur_box = nil end
   draw_inst()
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
@@ -2364,16 +2368,23 @@ function D.frame(L, snap, rows, state, info)
               set(D.VIS); gfx.rect(x, y, f.w, L.rh, 1)
             end
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
+            -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
+            -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
               D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
-              set(D.inv_bg)
-              if c.folded then gfx.rect(x, y, f.w, L.rh, 1)
-              else local fx, fw = D.field_rect(f.G or L, inv); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
+              local G, folded, inv_f, fw0 = f.G or L, c.folded, inv, f.w
+              D.cur_box = function()
+                set(D.inv_bg)
+                if folded then gfx.rect(x, y, fw0, L.rh, 1)
+                else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
+              end
+              if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
             end
             local cell
             if r.row < 0 or r.clip then
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
+            D.cur_box = nil
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
               for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
