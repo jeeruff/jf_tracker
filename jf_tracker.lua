@@ -5694,7 +5694,7 @@ local function frame()
   elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
-  elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type; Esc / Tab: leave (saved)' or ('show ' .. hover.notes .. ' notes')
+  elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
   elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
@@ -6169,6 +6169,9 @@ local function frame()
     elseif hover.notes then
       ctx.set_focus('notes')
       if hover.notes == 'project' or hover.notes == 'context' then ctx.notes_target(hover.notes) end
+      -- коробка задачи (4 окт): переключить и сразу записать
+      local tl = tonumber(tostring(hover.notes):match('^todo:(%d+)$'))
+      if tl and NT.toggle(tl) then ctx.notes_save(); vim.msg = 'todo ' .. (NT.lines[tl]:match('%[x%]') and 'done' or 'open') end
       click = { t = now2, zone = 'notes' }
     elseif hover.fxb then
       ctx.set_focus('fxb')

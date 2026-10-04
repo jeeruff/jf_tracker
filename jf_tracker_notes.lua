@@ -8,6 +8,11 @@
 -- Del — стереть, стрелки — курсор, Home / End — начало / конец строки,
 -- Esc / Tab — выйти (main записывает текст). Строки переносятся по ширине.
 --
+-- Markdown (4 окт): текст остаётся как есть (курсор по символам), а
+-- раскраска — по разметке: # заголовки, - [ ] / - [x] задачи (клик по
+-- коробке переключает), - списки, > цитаты, `код`, **жирный**. Коробки
+-- задач — интерактивные: hover 'todo:<строка>', NT.toggle(l).
+--
 -- Без reaper.*: тестируется стабами.
 
 local NT = {}
@@ -27,6 +32,44 @@ function NT.set(text)
 end
 
 function NT.text() return table.concat(NT.lines, '\n') end
+
+-- задача в строке: позиция «[» коробки и отмечена ли; nil — не задача
+function NT.todo(s)
+  local pre, mark = s:match('^(%s*[-*+]%s+)%[([ xX])%]')
+  if not pre then return nil end
+  return #pre + 1, mark ~= ' '
+end
+-- переключить коробку строки l: [ ] ↔ [x]
+function NT.toggle(l)
+  local s = NT.lines[l]
+  if not s then return false end
+  local at, done = NT.todo(s)          -- не «s and NT.todo(s)»: and режет второе значение
+  if not at then return false end
+  NT.lines[l] = s:sub(1, at) .. (done and ' ' or 'x') .. s:sub(at + 2)
+  NT.dirty = true
+  return true
+end
+-- раскраска строки: массив ключей цвета на каждый байт (TEXT, HEAD1, HEAD2,
+-- DONE, MARK, CODE, BOLD, QUOTE) — отрисовка режет по визуальным строкам
+function NT.style(s)
+  local st = {}
+  local function fill(a, b, k) for i = a, b do st[i] = k end end
+  fill(1, #s, 'TEXT')
+  local h = s:match('^(#+)%s')
+  if h then fill(1, #s, #h == 1 and 'HEAD1' or 'HEAD2'); return st end
+  if s:match('^%s*>') then fill(1, #s, 'QUOTE'); return st end
+  local at, done = NT.todo(s)
+  if at then
+    if done then fill(at + 3, #s, 'DONE') end
+    fill(1, at + 2, 'MARK')
+  else
+    local b = s:match('^(%s*[-*+]%s)') or s:match('^(%s*%d+[.)]%s)')
+    if b then fill(1, #b, 'MARK') end
+  end
+  for a, b in s:gmatch('()`[^`]+`()') do fill(a, b - 1, 'CODE') end
+  for a, b in s:gmatch('()%*%*[^*]+%*%*()') do fill(a, b - 1, 'BOLD') end
+  return st
+end
 
 local function clamp()
   if NT.l < 1 then NT.l = 1 elseif NT.l > #NT.lines then NT.l = #NT.lines end
@@ -109,8 +152,34 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
     local v = vis[NT.scroll + i]
     if not v then break end
     local ry = top + (i - 1) * L.rh
-    local s = NT.lines[v.l]:sub(v.c0 + 1, v.c0 + cols)
-    U.text(x + L.pad, ry + 1, s, U.TEXT)
+    local line = NT.lines[v.l]
+    local s = line:sub(v.c0 + 1, v.c0 + cols)
+    -- раскраска Markdown: куски одного цвета подряд
+    local st = NT.style(line)
+    local COL = { TEXT = U.TEXT, HEAD1 = U.AMBER, HEAD2 = U.CYAN, DONE = U.DIM, MARK = U.GREY,
+                  CODE = U.CYAN, BOLD = U.AMBER, QUOTE = U.GREY }
+    local i0, px = 1, x + L.pad
+    while i0 <= #s do
+      local k = st[v.c0 + i0] or 'TEXT'
+      local i1 = i0
+      while i1 < #s and (st[v.c0 + i1 + 1] or 'TEXT') == k do i1 = i1 + 1 end
+      local part = s:sub(i0, i1)
+      U.text(px, ry + 1, part, COL[k] or U.TEXT)
+      px = px + U.measure(part)
+      i0 = i1 + 1
+    end
+    -- коробка задачи — буквами «[ ]» / «[x]» (никаких значков): отмеченная
+    -- зелёная, под мышью — янтарная подложка; клик — переключить
+    local at, done = NT.todo(line)
+    if at and at > v.c0 and at + 2 <= v.c0 + cols then
+      local bx0 = x + L.pad + U.measure(s:sub(1, at - v.c0 - 1))
+      local box = line:sub(at, at + 2)
+      local bw0 = U.measure(box)
+      local hot = mx >= bx0 - 2 and mx < bx0 + bw0 + 2 and my >= ry and my < ry + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(bx0 - 1, ry, bw0 + 2, L.rh, 1)
+      U.text(bx0, ry + 1, box, done and U.GREEN or (hot and U.AMBER or U.TEXT))
+      if hot then hover = 'todo:' .. v.l end
+    end
     if focused and NT.scroll + i == cur_v then
       local cx = x + L.pad + U.measure(NT.lines[v.l]:sub(v.c0 + 1, NT.c))
       U.set(U.AMBER); gfx.rect(cx, ry + 1, 2, L.rh - 2, 1)

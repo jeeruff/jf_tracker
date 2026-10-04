@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.23'
+V.VERSION = '0.6.24'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.24', d = '2026-10-04', items = {
+    'notes understand markdown: # / ## headings, - [ ] / - [x] todos, - and 1. lists, > quotes, `code`, **bold** - coloured, the text stays plain; a todo box is clickable ([ ] <-> [x], saved at once)',
+    'the cursor cell is drawn on top of the background wave',
+  } },
   { v = '0.6.23', d = '2026-10-04', items = {
     'faster response: after a key or a click the frame is drawn again in the same tick (the result was on screen one tick later, ~30 ms)',
     'scramble (after Paketti): :scramble and the scramble button in the item tab - slice notes keep their places and swap their slices randomly, within each sample; VISUAL - the selection, else the cursor track in the cursor region; a note never gets longer',
