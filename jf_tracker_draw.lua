@@ -1304,7 +1304,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY }, { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY },
       { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY },
       { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY }, { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY },
-      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY },
+      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY }, { 'q_kcm', 'keys -', U.GREY }, { 'q_kcp', 'keys +', U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
@@ -3341,14 +3341,18 @@ function D.frame(L, snap, rows, state, info)
     local kx0 = (lc.x or 0) + (lc.w or 0) + 2 * L.pad
     local kx1 = W - L.pad
     local now = info.now or 0
+    -- свой масштаб (4 окт: keys - / keys + в главном модуле)
+    local s0 = D.SCALE
+    if (info.keycast_scale or 0) > 0 then D.SCALE = info.keycast_scale end
+    local krh = TH() + 2
     if kx1 - kx0 >= L.cw * 6 then
-      local yb = L.body_y + L.body_h - L.rh - 2
+      local yb = L.body_y + L.body_h - krh - 2
       local i = 0
       for k = #info.keycast, 1, -1 do
         local e = info.keycast[k]
         local age = now - e.t
         if age < 4 then
-          local y = yb - i * (L.rh + 2)
+          local y = yb - i * (krh + 2)
           if y < L.body_y then break end
           local lbl = e.label .. (e.n > 1 and (' x' .. e.n) or '')
           local col = i == 0 and U.AMBER or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
@@ -3357,6 +3361,7 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
+    D.SCALE = s0
   end
   -- скролл-бар треков (3 окт): дорожка под телом от номеров строк до края,
   -- ползунок = видимые треки из всех; клик мимо — страница, протяжка — скролл
