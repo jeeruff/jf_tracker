@@ -141,6 +141,7 @@ local state = {
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
+  keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',            -- keycaster (4 окт)
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
@@ -367,7 +368,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -4728,6 +4729,7 @@ function ctrl_action(name, delta)
   elseif name == 'q_envs' then if delta == 0 then ctx.toggle_envs() end
   elseif name == 'q_scopes' then if delta == 0 then ctx.toggle_scopes() end
   elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
+  elseif name == 'q_keys' then if delta == 0 then state.keycast = not state.keycast; ctx.kc = {} end
   elseif name == 'q_wave' then if delta == 0 then state.wave_last = (state.wavemode ~= 'off') and state.wavemode or state.wave_last; ctx.wave_mode((state.wavemode ~= 'off') and 'off' or (state.wave_last or 'back')) end
   elseif name == 'q_meters' then if delta == 0 then state.meters = not state.meters end
   elseif name == 'q_ruler' then if delta == 0 then state.tlruler = (state.tlruler or 'off') ~= 'off' and 'off' or 'beats' end
@@ -5470,6 +5472,7 @@ local function frame()
       about_open = OPT.active and OPT.page == 'about', options_open = OPT.active and OPT.page ~= 'about',
       q_wave = (state.wavemode or 'back') ~= 'off', q_meters = state.meters, q_ruler = (state.tlruler or 'off') ~= 'off',
       q_names = state.itemnames, q_colors = state.itemcol, q_input = state.hdrin ~= false, q_preview = state.preview, q_endstop = state.endstop, q_captions = state.captions,
+      q_keys = state.keycast,
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
@@ -5493,6 +5496,7 @@ local function frame()
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
+    keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(),
     notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -5811,7 +5815,7 @@ local function frame()
   elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
-  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off' })[hover.ctrl]
+  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker' })[hover.ctrl]
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
@@ -7162,6 +7166,27 @@ local function frame()
   end
   -- журнал клавиш (4 окт): сырой код → после раскладки и фильтров, режим, фокус;
   -- ExtState jf_tracker/keylog — последние 24 нажатия (диагностика «не работает»)
+  -- keycaster (4 окт): имя клавиши словами (без значков), повтор той же — счётчик
+  if c_raw > 0 and state.keycast then
+    local m = ctx.mods()
+    local NAMES = { [27] = 'esc', [13] = 'enter', [32] = 'space', [8] = 'bs', [9] = 'tab', [keys.up] = 'up', [keys.down] = 'down',
+                    [keys.left] = 'left', [keys.right] = 'right', [6579564] = 'del', [1752132965] = 'home', [6647396] = 'end' }
+    local nm = NAMES[c_raw]
+    if not nm then
+      if c_raw >= 1 and c_raw <= 26 then nm = 'ctrl+' .. string.char(c_raw + 96)
+      elseif c_raw < 127 then nm = string.char(c_raw)
+      elseif c_raw >= 26161 and c_raw <= 26169 then nm = 'f' .. (c_raw - 26160)
+      elseif c_raw < 0x110000 and utf8 then nm = utf8.char(c_raw)
+      else nm = '#' .. c_raw end
+    end
+    if m.cmd then nm = 'cmd+' .. nm end
+    if m.alt and c_raw < 127 then nm = 'alt+' .. nm end
+    ctx.kc = ctx.kc or {}
+    local lastk = ctx.kc[#ctx.kc]
+    local tnow = reaper.time_precise()
+    if lastk and lastk.label == nm and tnow - lastk.t < 1.5 then lastk.n = lastk.n + 1; lastk.t = tnow
+    else ctx.kc[#ctx.kc + 1] = { label = nm, t = tnow, n = 1 }; if #ctx.kc > 16 then table.remove(ctx.kc, 1) end end
+  end
   if c_raw > 0 then
     ctx.keylog = ctx.keylog or {}
     table.insert(ctx.keylog, ('%s %d>%d %s/%s%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or '')))

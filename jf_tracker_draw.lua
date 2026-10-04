@@ -1297,11 +1297,14 @@ local function draw_ctrl(L, info, H, hover)
     } },
     -- быстрые вкл / выкл (4 окт): самое частое из вида — кнопками в рамке
     { name = 'quick', items = {
-      { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_side', 'browser', c.q_side and U.CYAN or U.GREY }, { 'q_mx', 'matrix', c.q_mx and U.CYAN or U.GREY },
-      { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY }, { 'q_scopes', 'scopes', c.q_scopes and U.CYAN or U.GREY }, { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY },
-      { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_meters', 'meters', c.q_meters and U.CYAN or U.GREY }, { 'q_ruler', 'ruler', c.q_ruler and U.CYAN or U.GREY },
-      { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_input', 'input', c.q_input and U.CYAN or U.GREY },
-      { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY }, { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY },
+      -- по месту модулей (4 окт): левая колонка — то, что слева (матрица,
+      -- линейка, …), середина — тело трекера и низ (DSP), правая — справа (браузер, …)
+      { 'q_mx', 'matrix', c.q_mx and U.CYAN or U.GREY }, { 'q_scopes', 'scopes', c.q_scopes and U.CYAN or U.GREY }, { 'q_side', 'browser', c.q_side and U.CYAN or U.GREY },
+      { 'q_ruler', 'ruler', c.q_ruler and U.CYAN or U.GREY }, { 'q_meters', 'meters', c.q_meters and U.CYAN or U.GREY }, { 'q_input', 'input', c.q_input and U.CYAN or U.GREY },
+      { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY }, { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY },
+      { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY },
+      { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY }, { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY }, { 'q_endstop', '=END stop', c.q_endstop and U.CYAN or U.GREY },
+      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY },
     } },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
@@ -3271,6 +3274,30 @@ function D.frame(L, snap, rows, state, info)
     if inside then hover.fxb = hv or true end
     set(U.AMBER); gfx.rect(0, py, pw, pb - py, 0)
   else D.fxb_popup = nil end
+  -- keycaster (4 окт): последние нажатия в пустой правой части тела трекера —
+  -- новое снизу, старое поднимается и гаснет (info.keycast: { label, t, n })
+  if info.keycast and #info.keycast > 0 and L.cols and #L.cols > 0 then
+    local lc = L.cols[#L.cols]
+    local kx0 = (lc.x or 0) + (lc.w or 0) + 2 * L.pad
+    local kx1 = W - L.pad
+    local now = info.now or 0
+    if kx1 - kx0 >= L.cw * 6 then
+      local yb = L.body_y + L.body_h - L.rh - 2
+      local i = 0
+      for k = #info.keycast, 1, -1 do
+        local e = info.keycast[k]
+        local age = now - e.t
+        if age < 4 then
+          local y = yb - i * (L.rh + 2)
+          if y < L.body_y then break end
+          local lbl = e.label .. (e.n > 1 and (' x' .. e.n) or '')
+          local col = i == 0 and U.AMBER or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
+          text(kx1 - ms(lbl), y, fit(lbl, kx1 - kx0), col)
+          i = i + 1
+        end
+      end
+    end
+  end
   -- скролл-бар треков (3 окт): дорожка под телом от номеров строк до края,
   -- ползунок = видимые треки из всех; клик мимо — страница, протяжка — скролл
   do
