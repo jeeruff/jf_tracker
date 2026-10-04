@@ -266,12 +266,26 @@ function S.preview(k)
   ctx.preview_slice(S.track, S.entry, t0, t1)
 end
 
-local UPPER = { q = 1, w = 2, e = 3, r = 4, t = 5, y = 6, u = 7, i = 8, o = 9, p = 10 }
+-- прослушивание слайса (4 окт): хроматическая раскладка q 2 w 3 e r 5 t …, как
+-- вставка в трекере и подписи над волной (слайс k = нота C-4 + k - 1 на
+-- текущей октаве); прежняя q..p = 1..10 и цифры-нарезки с ней спорили
+local function piano_slice(c)
+  local off = ctx and ctx.piano and ctx.piano[c]
+  if off == nil then return nil end
+  local oct = (ctx.octave and ctx.octave()) or 4
+  local base = (ctx.slice_base and ctx.slice_base()) or 60
+  return (oct + 1) * 12 + off - base + 1
+end
 
 -- клавиши; true — съедена
 function S.key(c)
   local ch = c < 256 and string.char(c) or ''
   local a, b = S.span()
+  local pk = S.entry and not S.entry.file and piano_slice(c)
+  if pk then
+    if pk >= 1 and pk <= #(S.slices or {}) then S.preview(pk) else S.msg = ('no slice %d (%d slices)'):format(pk, #(S.slices or {})) end
+    return true
+  end
   if c == 27 then if S.sel then S.sel = nil else S.close() end
   elseif c == 13 then
     -- Enter: есть выделение — вставить в строку курсора; иначе применить нарезку
@@ -282,25 +296,26 @@ function S.key(c)
   elseif ch == ' ' and a then ctx.preview_slice(S.track, S.entry, a, b)
   elseif ch == '[' and a then S.sel.a = math.max(0, a - S.entry.len * 0.01); S.sel.b = b
   elseif ch == ']' and a then S.sel.a = a; S.sel.b = math.min(S.entry.len, b + S.entry.len * 0.01)
-  elseif S.entry and S.entry.file and (ch == '8' or ch == '1' or ch == '3' or ch == '6' or ch == '4' or ch == '2' or ch == 'x' or ch == 't') then
+  elseif S.entry and S.entry.file and (ch == '8' or ch == '1' or ch == '4' or ch == '@' or ch == '#' or ch == '^' or ch == 'x' or ch == 's') then
     S.msg = 'file: slices live on items - drag selection to a track or D: to lib, then slice'
+  -- равные части (4 окт): 1 4 8 — не клавиши нот; 2 32 64 — Shift+2 3 6
+  -- (сами 2 3 6 — чёрные клавиши раскладки, слушают слайсы)
   elseif ch == '8' then S.equal(8)
   elseif ch == '1' then S.equal(16)
-  elseif ch == '3' then S.equal(32)
-  elseif ch == '6' then S.equal(64)
+  elseif ch == '#' then S.equal(32)
+  elseif ch == '^' then S.equal(64)
   elseif ch == '4' then S.equal(4)
-  elseif ch == '2' then S.equal(2)
+  elseif ch == '@' then S.equal(2)
   elseif ch == 'd' then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
   elseif ch == 'z' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
-  elseif ch == 't' or ch == 's' then S.use_transients()                -- s: нарезать по транзиентам (2 окт)
+  elseif ch == 's' then S.use_transients()                             -- s: нарезать по транзиентам (t — клавиша ноты)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
   elseif ch == 'n' and S.entry and S.entry.item then ctx.edit.normalize(S.entry.item); S.msg = 'normalized (peak 0 dB)'
-  elseif UPPER[ch] then S.preview(UPPER[ch])
   elseif ch == ' ' then ctx.edit.play_stop()
   else return true end     -- всё остальное тоже съедаем: оверлей модальный
   return true

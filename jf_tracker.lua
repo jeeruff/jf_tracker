@@ -5275,7 +5275,7 @@ local function frame()
     reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d'):format(prof.start_ms or -1, prof.reruns or 0), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0), false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
@@ -7127,6 +7127,20 @@ local function frame()
         end
       end
     end
+  end
+  -- автоповтор (4 окт, «гост-нажатия»): нотная клавиша пришла снова, а
+  -- отпускания с прошлого нажатия не было — это повтор macOS, не нота.
+  -- Только там, где клавиши — ноты (INSERT, слой пианино, вкладка item);
+  -- в NORMAL повтор w / u … нужен
+  if c > 0 and keys.piano[c] and reaper.JS_VKeys_GetUp and not ctx.mods().cmd
+     and (vim.mode == 'insert' or vim.piano or (state.focus == 'top' and state.toptab == 'sample')) then
+    local nk, now = ctx.note_key_last, reaper.time_precise()
+    local vk = string.char(c):upper():byte()
+    local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - 0.005)
+    if up and up:byte(vk) == 0 and now - nk.t < 3 then
+      c = 0
+      ctx.key_repeats = (ctx.key_repeats or 0) + 1
+    else ctx.note_key_last = { c = c, t = now } end
   end
   -- окно Options — модальное: все клавиши ему
   if c == 27 and PV.playing() then PV.stop() end              -- Esc глушит превью (и делает своё дальше)

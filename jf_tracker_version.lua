@@ -1,9 +1,14 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.27'
+V.VERSION = '0.6.28'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.28', d = '2026-10-04', items = {
+    'item tab keys: q 2 w 3 e r 5 t ... play slices like the labels over the wave (the old q..p and the slicing digits fought); equal slices 4 8 1 (16), Shift+2 3 6 = 2 32 64; transients - s',
+    'no ghost notes: a note key that comes again without being released (macOS key repeat) is dropped in INSERT, the piano layer and the item tab',
+    'the slice labels over the wave follow the chromatic keyboard; the DSP track block is compact (no name row, out and sends in one row)',
+  } },
   { v = '0.6.27', d = '2026-10-04', items = {
     'main module without empty space: the transport right under the window buttons, below it 15 quick on / off toggles (dsp, browser, matrix, envs, scopes, hints, wave, meters, ruler, names, colours, input, preview, =END stop, captions); notes and screensets are popups at their buttons',
   } },
