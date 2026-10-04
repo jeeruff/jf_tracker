@@ -1973,8 +1973,14 @@ function D.frame(L, snap, rows, state, info)
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
     ncol = U.readable(ncol, nbg, 4.5)
-    text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
-    if col.rgb and mode == 'line' then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
+    if c.folded then
+      -- свёрнут в полоску (4 окт): имя вертикально во всю высоту шапки
+      hset(rbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+      D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, L.header_h - 5, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
+    else
+      text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
+    end
+    if col.rgb and mode == 'line' and not c.folded then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
     hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)

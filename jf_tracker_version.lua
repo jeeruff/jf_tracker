@@ -1,9 +1,10 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.16'
+V.VERSION = '0.6.17'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.17', d = '2026-10-04', items = { 'a track folded to a one-character strip shows its name vertically down the header' } },
   { v = '0.6.16', d = '2026-10-04', items = {
     'repeat above the cursor (from Paketti by Esa Ruoho): Ctrl+Opt+J or Ctrl+Opt+Down - what the cursor track has from the region start to the cursor is repeated from the cursor down to the region end (the last copy cut at the end, what was there replaced); Shift+Opt+J - on all tracks; audio items and MIDI notes, one undo step; outside a region =START..=END',
   } },
