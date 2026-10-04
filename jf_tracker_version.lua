@@ -2,7 +2,7 @@
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
 V.VERSION = '0.6.5'
-V.DATE = '2026-10-03'
+V.DATE = '2026-10-04'
 V.CHANGES = {
   { v = '0.6.5', d = '2026-10-04', items = {
     'keys: dd (NORMAL) deletes the cursor track (in INSERT dd still deletes the event of the row); dt removes the time selection from the whole project (native Remove contents of time selection, later items move); dr / daw as before',
@@ -520,8 +520,25 @@ V.CHANGES = {
   } },
 }
 -- строки для окна about
+-- about (4 окт): под логотипом — короткое описание (введение автора допишем),
+-- благодарности; дальше — изменения
+V.INTRO = {
+  'A tracker view of REAPER: write a whole track from the keyboard in one window - patterns, their order, sounds.',
+  'The tracker is only a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes and FX stay native,',
+  'nothing to export or lose - close the window and the project plays on; every edit is one REAPER undo step.',
+}
+V.THANKS = {
+  'Thanks to my friends and teachers - in particular Esa Ruoho (Lackluster):',
+  'parts of jf_tracker are based on his Paketti for Renoise, used with his permission.',
+  'Support his work: https://www.patreon.com/esaruoho',
+}
 function V.lines()
   local out = { ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
+  for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
+  out[#out + 1] = ''
+  for _, l in ipairs(V.THANKS) do out[#out + 1] = l end
+  out[#out + 1] = ''
+  out[#out + 1] = 'changes'
   for _, c in ipairs(V.CHANGES) do
     out[#out + 1] = ('%s  %s'):format(c.v, c.d)
     for _, it in ipairs(c.items) do out[#out + 1] = '  - ' .. it end
