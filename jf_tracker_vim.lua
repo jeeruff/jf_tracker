@@ -877,7 +877,10 @@ local function keys_control(c)
   elseif ch == 'C' then V.vel = math.min(127, (V.vel or 100) + 8); V.msg = 'velocity ' .. V.vel; return true
   elseif ch == ',' then ctx.pool_select(V.inst - 1); return true
   elseif ch == '.' then ctx.pool_select(V.inst + 1); return true
-  elseif ch == ';' then if ctx.insert_whole then ctx.insert_whole() end; return true   -- целый сэмпл (материнский item), 4 окт
+  elseif ch == ';' then                                       -- целый сэмпл (материнский item), 4 окт
+    -- ввод с клавиатуры — только с m (без него в INSERT пишет лишь MIDI)
+    if V.piano then if ctx.insert_whole then ctx.insert_whole() end else V.msg = 'keyboard off - m turns the note keys on' end
+    return true
   elseif ch == 'a' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto' or tostring(V.step)); return true
   elseif ch == 's' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = 'step '; return true
   elseif ch == 'd' then
@@ -904,18 +907,23 @@ function V.note_key(c, mods)
   mods = mods or {}
   -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
   -- Cmd+Shift — то же, но сэмпл растягивается на эту длину
+  -- Cmd (4 окт): нота — питч ВСЕГО айтема (у нарезанного тоже)
   if mods.cmd then
-    local base = (c >= 1 and c <= 26) and (c + 96) or c
+    local base = c
     local cb = (base < 256) and string.char(base) or ''
     if SHIFTED[cb] then base = SHIFTED[cb]:byte() elseif cb:match('^[QWERTYUIOP]$') then base = cb:lower():byte() end
-    return base, mods.shift and 'hold_stretch' or 'hold'
+    return base, 'whole'
+  end
+  -- Ctrl (4 окт): нота с удержанием — длина = сколько держали (+ j / ↓)
+  if mods.ctrl then
+    local base = (c >= 1 and c <= 26) and (c + 96) or c
+    return base, 'hold'
   end
   local ch = (c < 256) and string.char(c) or ''
   if OPTCH[c] then return OPTCH[c]:byte(), 'beside' end
-  if mods.ctrl and c >= 1 and c <= 26 then return c + 96, 'capture' end
+
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end
-  if mods.ctrl then return c, 'capture' end
   if mods.alt then return c, 'beside' end
   if mods.shift then return c, 'audition' end
   return c, 'insert'
@@ -1126,11 +1134,18 @@ function V.key_impl(c)
     local SB = V.slice_base()
     local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
     local semis = 0
-    if sliced and how == 'beside' then semis = kp - SB; kp = SB + (V.last_slice or 1) - 1; how = 'insert' end
+    -- 4 окт: Option — питч выбранного (слайс или весь айтем), Cmd — питч всего айтема
+    if how == 'whole' then sliced = false; how = 'insert' end
+    if sliced and how == 'beside' then
+      local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
+      if selk == 0 then sliced = false; how = 'insert'
+      else semis = kp - SB; kp = SB + selk - 1; how = 'insert' end
+    end
     if sliced then
       local k = kp - SB + 1
       if k < 1 or k > #inst0.slices then V.msg = ('no slice %d (the sample has %d) - z / x shift by an octave'):format(k, #inst0.slices); return end
       V.last_slice = k
+      if ctx.select_slice then ctx.select_slice(inst0, k) end
       local t0s = inst0.slices[k]
       if how == 'hold' or how == 'hold_stretch' then
         local lane = f0.lane or f0.col.lanes[1]
@@ -1139,7 +1154,7 @@ function V.key_impl(c)
         return
       end
       if how == 'audition' or how == 'capture' then
-        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
+        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len, semis) end
         if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
         return
       end
@@ -1159,7 +1174,7 @@ function V.key_impl(c)
       local it = E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
-      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len) end
+      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len, semis) end
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
@@ -1238,11 +1253,21 @@ function V.key_impl(c)
       local inst0 = f0 and (f0.col.pool or {})[V.inst]
       local chq = (base < 256) and string.char(base) or ''
       if ctx.piano and ctx.piano[base] then V.piano_last = ctx.piano[base] end   -- пианинка: последняя сыгранная клавиша
-      -- нарезанный: слайс = нота хроматически (4 окт), C-4 = 1
+      -- нарезанный (4 окт): нота — слайс по клавише; Option — выбранный (слайс
+      -- или весь айтем) с питчем; Cmd — весь айтем с питчем
       local kp0 = piano_pitch(base)
-      local k = (inst0 and inst0.slices and #inst0.slices > 0 and kp0) and (kp0 - V.slice_base() + 1) or nil
+      local SB0 = V.slice_base()
+      local sliced0 = inst0 and inst0.slices and #inst0.slices > 0 and kp0
+      local psemis = 0
+      local k
+      if sliced0 and how ~= 'whole' then
+        if how == 'beside' then
+          local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
+          if selk > 0 then k = selk; psemis = kp0 - SB0 end
+        else k = kp0 - SB0 + 1 end
+      end
       if k and (k < 1 or k > #inst0.slices) then V.msg = ('no slice %d'):format(k); return end
-      if k then V.last_slice = k end
+      if k then V.last_slice = k; if how ~= 'beside' and ctx.select_slice then ctx.select_slice(inst0, k) end end
       local pitch = (not k) and piano_pitch(base) or nil
       if f0 and (k or pitch) then
         local lane = f0.lane or f0.col.lanes[1]
@@ -1250,7 +1275,7 @@ function V.key_impl(c)
           if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch, slice = k,
             item = inst0 and inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
         elseif k then
-          if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], inst0.slices[k + 1] or inst0.len) end
+          if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], inst0.slices[k + 1] or inst0.len, psemis) end
         elseif ctx.preview then ctx.preview(f0.col.track, pitch, inst0 and inst0.item, V.cur.row, 1) end
         return
       end
@@ -1315,11 +1340,21 @@ function V.key_impl(c)
         else finish_move() end
         V.count = nil; return
       end
-      local pitch = piano_pitch(c)
+      -- r + нота (4 окт): по тем же правилам, что ввод — на ноте-слайсе
+      -- клавиша выбирает слайс, Option+клавиша — его питч; иначе — питч
+      local rbase, rhow = V.note_key(c, ctx.mods and ctx.mods() or {})
+      local pitch = piano_pitch(rbase)
       if pitch then
         local f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row
         if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range() end
-        E.set_pitch(V.heads_in(f0, f1, r0, r1), lpb(), pitch)
+        local heads = V.heads_in(f0, f1, r0, r1)
+        local slc, rest = {}, {}
+        for _, h in ipairs(heads) do if h.kind == 'audio' and (h.fx or {})[1] and tostring(h.fx[1]):match('^S%x%x$') then slc[#slc + 1] = h else rest[#rest + 1] = h end end
+        if #slc > 0 and rhow ~= 'whole' then
+          if rhow == 'beside' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
+          else E.set_fx(slc, lpb(), 'S', math.max(1, pitch - V.slice_base() + 1)) end
+        else for _, h in ipairs(slc) do rest[#rest + 1] = h end end
+        if #rest > 0 then E.set_pitch(rest, lpb(), pitch) end
         V.mode = 'normal'; finish_edit()
       else finish_move() end
       V.count = nil; return

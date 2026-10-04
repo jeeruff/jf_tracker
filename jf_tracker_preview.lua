@@ -125,7 +125,7 @@ function P.src_position()
 end
 
 -- слайс инструмента: от t0 до t1 секунд item (через трек)
-function P.slice(track, entry, t0, t1)
+function P.slice(track, entry, t0, t1, semis)
   if not P.available() or not entry then return false end
   local src = entry.take and R.GetMediaItemTake_Source(entry.take) or entry.src
   if not src then return false end
@@ -136,6 +136,7 @@ function P.slice(track, entry, t0, t1)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
   R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
+  if semis and semis ~= 0 then R.CF_Preview_SetValue(pv, 'B_PPITCH', 1); R.CF_Preview_SetValue(pv, 'D_PITCH', semis) end   -- Option+нота: слайс с питчем (4 окт)
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   cur = pv

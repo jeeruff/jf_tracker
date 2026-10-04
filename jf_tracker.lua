@@ -1824,7 +1824,11 @@ ctx = {
     end)
     if from_btn then vim.picker.trim = col.guid; state.popup_at = { kind = 'trim', guid = col.guid } end
   end,
-  preview_slice = function(track, entry, t0, t1) PV.slice(track, entry, t0, t1) end,
+  preview_slice = function(track, entry, t0, t1, semis) PV.slice(track, entry, t0, t1, semis) end,
+  -- выбранный слайс (4 окт): последний выделенный мышкой / Option+J K / сыгранный;
+  -- 0 — весь айтем. Option+нота играет и пишет его с питчем
+  selected_slice = function(root) if root and ctx.ssel.item == root.item then return ctx.ssel.k or 0 end return nil end,
+  select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell } end end,
   mx_zoom = function() MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail' end,
   mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,

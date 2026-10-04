@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.31'
+V.VERSION = '0.6.32'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.32', d = '2026-10-04', items = {
+    'notes and slices: a key = the slice of a sliced sample (else the sample at that pitch); Option+key - the selected slice (or the whole item) at that pitch; Cmd+key - the whole item at that pitch; Ctrl+key - held note; r + note follows the same rules; the selection is the slice list / Option+J K / the last played',
+    'keyboard note input only with m (INSERT + m); without m only MIDI writes (; too)',
+  } },
   { v = '0.6.31', d = '2026-10-04', items = {
     'slices are Sxx again: the note shows the pitch (C-4, D-4 with Option + key), the Sxx command - which slice; keys q 2 w 3 ... still pick slices, Option + key - the pitch of the last slice; r + note sets the pitch',
     'item tab: the slices of the instrument as a list on the right next to the lib (whole, key + Sxx + length), the properties moved left and edit the selected slice; Option+J / K step through the slices (and play them), click selects',
