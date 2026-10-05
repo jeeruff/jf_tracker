@@ -2042,7 +2042,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     for i, b in ipairs(btns) do tws[i] = D.big_measure(b[2], 2); maxw = math.max(maxw, tws[i]) end
     local bw, bh, by = maxw + 2 * L.pad, 2 * L.rh, ly - 1
     local th = D.ttf and (D.ttf_px or L.th) * 2 or 2 * (L.th or gfx.texth)
-    local ty = by + math.max(1, math.floor((bh - th) / 2) + 1) - (D.SPACE or 0)
+    -- центр по чернилам (5 окт, по скриншоту): у крупного битмапа над буквой
+    -- пустая полоса шрифта — символы сидели на 0.3 строки ниже центра кнопки
+    local ty = by + math.max(1, math.floor((bh - th) / 2) + 1) - (D.SPACE or 0) - math.floor(0.3 * L.rh + 0.5)
     for i, b in ipairs(btns) do
       local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
