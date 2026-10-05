@@ -1984,6 +1984,7 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 -- транспорт блоками (5 окт): сетка | шаг | переключатели; в блоке — две
 -- строки ячеек { id, текст, цвет }; id — те же, что у главного модуля
 -- (клик / колесо — ctrl_action). Время и BPM — свой крупный блок слева
+-- луп: в TTF-шрифте — символ ∞ (в нём он есть), в битмапе — слово loop (5 окт)
 function D.transport_buttons(c)
   -- маленькие кнопки символами ASCII (5 окт): единственное исключение из
   -- правила «словами» — << > || o >> loop; play — и stop (зелёная, пока играет)
@@ -1991,11 +1992,11 @@ function D.transport_buttons(c)
   local playing = ps & 1 == 1
   -- 5 окт: без опции «I really want to have transport buttons» — только [rec] и [loop]
   if not c.tpbuttons then
-    return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
+    return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
   end
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', playing and U.GREEN or nil },
            { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'o', c.recording and U.RED or nil, U.RED },
-           { 'tp_fwd', '>>' }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
+           { 'tp_fwd', '>>' }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
 end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
