@@ -843,12 +843,15 @@ local function draw_cell(L, cell, x, y, ty, inv)
       local named = D.itemnames and cell.i == 1 and head.name ~= ''
       local fxv = head.fx or {}
       for fld = named and (nf + 1) or 1, nf do      -- строка имени: без точек под текстом
-        local skip = fld > 3 and L.nfx > 0 and cell.i >= 1 and fxv[cell.i * L.nfx + (fld - 3)] ~= nil
+        local skip = (fld > 3 and L.nfx > 0 and cell.i >= 1 and fxv[cell.i * L.nfx + (fld - 3)] ~= nil)
+                     or (fld == 2 and cell.vol ~= nil)
         if not skip then
           local fx = D.field_rect(L, fld)
           text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
         end
       end
+      -- точка огибающей громкости take на этой строке (5 окт)
+      if cell.vol and not L.notes_only and not (named and nf < 2) then text(x + L.x_vol, ty, cell.vol, c(2, U.CYAN)) end
       if named then
         -- вторая строка: имя item (опция item names, 3 окт); номер — на строке ноты
         -- курсор на этой строке: подложка — шириной поля ноты, не всего имени (3 окт)

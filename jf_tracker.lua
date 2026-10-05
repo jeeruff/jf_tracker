@@ -117,6 +117,7 @@ local state = {
   fontface = (function() local v = reaper.GetExtState(EXT, 'fontface'); return v ~= '' and v or 'JetBrainsMono Nerd Font Mono' end)(),
   xfade = flag('xfade', false),                   -- x-fade вставленных нот (\x, контрол xf)
   xfade_ms = tonumber(reaper.GetExtState(EXT, 'xfade_ms')) or 10,
+  xfademode = reaper.GetExtState(EXT, 'xfademode') ~= '' and reaper.GetExtState(EXT, 'xfademode') or 'vol',   -- x-fade: vol (огибающая take, числа в колонке vol) | fades (5 окт)
   side_px = tonumber(reaper.GetExtState(EXT, 'side_px')),   -- ширина браузера мышью (nil = авто)
   top_px = tonumber(reaper.GetExtState(EXT, 'top_px')),     -- высота верхней панели мышью
   inst_px = tonumber(reaper.GetExtState(EXT, 'inst_px')),   -- высота инструментов в сайдбаре
@@ -390,7 +391,7 @@ local function save_win()
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm', 'bigstatus', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
-  S('xfade_ms', tostring(state.xfade_ms))
+  S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
@@ -3497,7 +3498,8 @@ ctx = {
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
-      flag('bigstatus', 'big status', 'the left third of the transport bar shows the mode big (INSERT, KEYS, MATRIX ...); the keyboard and the transport move right, the small info goes under them'),
+      flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
+      { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
@@ -4608,6 +4610,7 @@ ctx = {
       { key = 'x', label = 'x-fade (' .. (state.xfade and 'on' or 'off') .. ', ' .. state.xfade_ms .. ' ms) …', sub = function() return { title = 'x-fade', items = {
           { key = 'x', label = (state.xfade and 'turn OFF' or 'turn ON') .. ' x-fade on insert', fn = ctx.xfade_toggle },
           { key = 'c', label = 'crossfade now (selection / column in region)', fn = ctx.xfade_now },
+          { key = 'm', label = 'by: ' .. (state.xfademode == 'fades' and 'item fades -> switch to vol values' or 'vol values (take envelope) -> switch to item fades'), fn = function() state.xfademode = state.xfademode == 'fades' and 'vol' or 'fades'; vim.msg = 'x-fade by ' .. state.xfademode end },
           { key = 'd', label = 'remove crossfades (track of cursor)', fn = ctx.xfade_clear },
           { key = '1', label = '5 ms', fn = function() ctx.xfade_len(0, 5) end },
           { key = '2', label = '10 ms', fn = function() ctx.xfade_len(0, 10) end },
@@ -6528,7 +6531,7 @@ local function frame()
   end
   if not idle_skip then HN.reset() end
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
-  edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
+  edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
   local hover

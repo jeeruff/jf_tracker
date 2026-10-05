@@ -249,6 +249,25 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
   local _, si = place(lane, r0, r1, head)
+  -- огибающая громкости take (5 окт): точки — значениями в колонке vol на
+  -- строках продолжения (кроссфейд и ручные рампы видны числами, как в Renoise)
+  local env = take and R.GetTakeEnvelopeByName(take, 'Volume')
+  local npt = env and R.CountEnvelopePoints(env) or 0
+  if npt > 0 then
+    local sub = lane.subs[si]
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local mode = R.GetEnvelopeScalingMode(env)
+    local base = R.GetMediaItemInfo_Value(it, 'D_VOL') * R.GetMediaItemTakeInfo_Value(take, 'D_VOL')
+    local r = rate > 0 and rate or 1
+    for i = 0, npt - 1 do
+      local _, t, v = R.GetEnvelopePoint(env, i)
+      local row = M.row_of_qn(R.TimeMap2_timeToQN(0, pos + t / r), lpb)
+      local cell = sub and sub[row]
+      if cell and cell.kind == 'cont' and cell.of == head then
+        cell.vol = M.vol_hex(base * R.ScaleFromEnvelopeMode(mode, v))
+      end
+    end
+  end
   return si, head
 end
 

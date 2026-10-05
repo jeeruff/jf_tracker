@@ -749,7 +749,58 @@ end
 -- fade-in новой = len: равномощный кроссфейд REAPER. Выключено — авто-фейды
 -- (D_FADE*_AUTO) обоих обнуляются: внахлёст без кроссфейда, как просил
 -- пользователь («либо free item positioning, либо без кроссфейда»).
-E.xfade = { on = false, len = 0.010 }
+E.xfade = { on = false, len = 0.010, mode = 'vol' }
+
+-- огибающая громкости take (5 окт): нет — включается действием REAPER
+-- «Take: Toggle take volume envelope» на одном выделенном item (выделение
+-- возвращается). Время точки = (время проекта − позиция) × playrate
+local TAKE_VOLENV_CMD
+function E.take_vol_env(it)
+  local tk = R.GetActiveTake(it)
+  if not tk or R.TakeIsMIDI(tk) then return nil end
+  local env = R.GetTakeEnvelopeByName(tk, 'Volume')
+  if env then return env, tk end
+  if not TAKE_VOLENV_CMD then
+    for id = 40600, 40800 do
+      local t = (R.kbd_getTextFromCmd(id, 0) or ''):lower()
+      if t:find('toggle take volume envelope', 1, true) then TAKE_VOLENV_CMD = id; break end
+    end
+  end
+  if not TAKE_VOLENV_CMD then return nil end
+  local sel = {}
+  for i = 0, R.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = R.GetSelectedMediaItem(0, i) end
+  R.SelectAllMediaItems(0, false); R.SetMediaItemSelected(it, true)
+  R.Main_OnCommand(TAKE_VOLENV_CMD, 0)
+  R.SetMediaItemSelected(it, false)
+  for _, s in ipairs(sel) do if R.ValidatePtr(s, 'MediaItem*') then R.SetMediaItemSelected(s, true) end end
+  return R.GetTakeEnvelopeByName(tk, 'Volume'), tk
+end
+
+-- точка громкости (амплитуда item-уровня amp: 1 = как сам item) в момент t
+-- проекта; точки той же строки [t, t1) заменяются
+local function env_vol_point(it, t, amp, t1)
+  local env, tk = E.take_vol_env(it)
+  if not env then return false end
+  local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+  local et = (t - pos) * rate
+  if t1 then R.DeleteEnvelopePointRange(env, et - 1e-6, (t1 - pos) * rate - 1e-6) end
+  local mode = R.GetEnvelopeScalingMode(env)
+  R.InsertEnvelopePoint(env, et, R.ScaleToEnvelopeMode(mode, math.max(0, math.min(4, amp))), 0, 0, false, true)
+  R.Envelope_SortPoints(env)
+  return true
+end
+E.env_vol_point = env_vol_point
+
+-- vol xx на строке продолжения: точка огибающей, значение — в тех же
+-- единицах, что громкость ноты (80 = 1.0 всего item)
+function E.cont_vol(it, t, v, t1)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return end
+  local tk = R.GetActiveTake(it); if not tk then return end
+  local base = R.GetMediaItemInfo_Value(it, 'D_VOL') * R.GetMediaItemTakeInfo_Value(tk, 'D_VOL')
+  local amp = (math.max(0, math.min(255, v)) / 128) / (base > 1e-9 and base or 1)
+  run('vol point', function() env_vol_point(it, t, amp, t1 or (t + 0.001)); R.UpdateItemInProject(it) end)
+end
 
 local function same_lane(track, it, lane_idx)
   if R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') ~= 2 then return true end
@@ -795,6 +846,16 @@ local function join_pair(prev, nxt, x, trim)
     local ext = math.min(x, avail)
     R.SetMediaItemInfo_Value(prev, 'D_LENGTH', base + ext)
     local fx = math.max(ext, math.min(x, 0.002))
+    if E.xfade.mode == 'vol' then
+      -- кроссфейд значениями громкости (5 окт): рампы огибающих take —
+      -- уходящий 1 → 0, входящий 0 → 1; фейды item обнуляются
+      R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN', 0); R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN_AUTO', 0)
+      R.SetMediaItemInfo_Value(nxt, 'D_FADEINLEN', 0); R.SetMediaItemInfo_Value(nxt, 'D_FADEINLEN_AUTO', 0)
+      env_vol_point(prev, p, 1, p + fx); env_vol_point(prev, p + fx, 0)
+      env_vol_point(nxt, p, 0, p + fx); env_vol_point(nxt, p + fx, 1)
+      R.GetSetMediaItemInfo_String(prev, 'P_EXT:jf_xfade', ('%.6f'):format(ext), true)
+      return
+    end
     R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN', fx)
     R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN_AUTO', -1)
     R.SetMediaItemInfo_Value(nxt, 'D_FADEINLEN', fx)
@@ -807,7 +868,18 @@ local function join_pair(prev, nxt, x, trim)
       local len = R.GetMediaItemInfo_Value(prev, 'D_LENGTH')
       R.SetMediaItemInfo_Value(prev, 'D_LENGTH', math.max(0.001, math.min(len, (p - pp) + 0) ))
     end
-    if old_ext > 0 then R.GetSetMediaItemInfo_String(prev, 'P_EXT:jf_xfade', '', true) end
+    if old_ext > 0 then
+      R.GetSetMediaItemInfo_String(prev, 'P_EXT:jf_xfade', '', true)
+      -- рампы громкости этого стыка — тоже долой
+      for _, pr in ipairs({ { prev, p }, { nxt, p } }) do
+        local tk = R.GetActiveTake(pr[1]); local env = tk and R.GetTakeEnvelopeByName(tk, 'Volume')
+        if env then
+          local ip = R.GetMediaItemInfo_Value(pr[1], 'D_POSITION')
+          local rt = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rt <= 0 then rt = 1 end
+          R.DeleteEnvelopePointRange(env, (pr[2] - ip) * rt - 1e-6, (pr[2] + old_ext - ip) * rt + 1e-6)
+        end
+      end
+    end
     R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN', 0)
     R.SetMediaItemInfo_Value(prev, 'D_FADEOUTLEN_AUTO', 0)
     R.SetMediaItemInfo_Value(nxt, 'D_FADEINLEN', 0)

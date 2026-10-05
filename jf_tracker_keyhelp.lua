@@ -89,6 +89,7 @@ KH.PAGES = {
     { k = 'Tab S-Tab', d = 'focus next / previous module; Option-Tab: dock tabs' },
     { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
     { k = 'Opt-Enter', d = 'select the instrument of the note under the cursor in the lib' },
+    { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
     { k = 'F2', d = 'tracker <-> item tab (from any tab - back to the tracker)' },

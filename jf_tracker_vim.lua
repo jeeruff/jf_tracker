@@ -499,6 +499,11 @@ local function hex_entry(c, fld, heads)
   local need = fld >= 4 and 3 or 2
   if #buf < need then V.hexbuf = buf; return false end
   V.hexbuf = nil
+  -- vol на строке продолжения аудио (5 окт): точка огибающей громкости take
+  if fld == 2 and #heads == 0 then
+    local h = V.covering(V.cur.fi, V.cur.row)[1]
+    if h and h.kind == 'audio' and h.item then ctx.edit.cont_vol(h.item, ctx.row_time(V.cur.row), tonumber(buf, 16), ctx.row_time(V.cur.row + 1)); return true end
+  end
   if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
   else ctx.edit.set_fx(heads, lpb(), buf:sub(1, 1), tonumber(buf:sub(2), 16)) end

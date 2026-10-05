@@ -65,6 +65,12 @@ _G.reaper = {
     return 0
   end,
   GetTakeName = function(tk) return tk.name or '' end,
+  -- огибающая громкости take (5 окт): tk.venv = { {t, v}, … }, режим 0 (амплитуда)
+  GetTakeEnvelopeByName = function(tk, nm) return nm == 'Volume' and tk.venv or nil end,
+  CountEnvelopePoints = function(env) return #env end,
+  GetEnvelopePoint = function(env, i) local p = env[i + 1]; return true, p[1], p[2], 0, 0, false end,
+  GetEnvelopeScalingMode = function() return 0 end,
+  ScaleFromEnvelopeMode = function(_, v) return v end,
   GetMediaSourceLength = function(src) return src.len, src.qn end,
   MIDI_GetHash = function(tk) return true, tk.hash or 'h' end,
   MIDI_GetTrackHash = function(tr) return true, tr.hash or 'th' end,
@@ -337,6 +343,21 @@ do
   eq('inverse map: inside the first segment', near(M.item_time_of_src(pts, 1), 0.5), true)
   eq('inverse map: second segment', near(M.item_time_of_src(pts, 2.5), 1.5), true)
   eq('inverse map: slope 1 after the last marker', near(M.item_time_of_src(pts, 4), 3), true)
+end
+-- точки огибающей громкости take — числами в колонке vol (5 окт)
+do
+  for k in pairs(tracks) do tracks[k] = nil end
+  -- item 2 с (4 QN = 16 строк при LPB 4), точки на 1.0 с (0.5) и 1.5 с (0.0)
+  local tk = { name = 'pad', src = { len = 4, qn = false }, venv = { { 1.0, 0.5 }, { 1.5, 0 } } }
+  local it = { pos = 0, len = 2, take = tk }
+  tk.item = it
+  tracks[1] = { name = 'P', items = { it } }
+  state_count = state_count + 1
+  local snap = M.build(4)
+  local sub = snap.cols[1].lanes[1].subs[1]
+  eq('env point 0.5 at row 8 shows 40', sub[8] and sub[8].vol, '40')
+  eq('env point 0 at row 12 shows 00', sub[12] and sub[12].vol, '00')
+  eq('rows without points stay empty', sub[9] and sub[9].vol, nil)
 end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
