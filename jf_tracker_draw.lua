@@ -1631,7 +1631,7 @@ local function draw_ctrl(L, info, H, hover)
       local gap = 3
       -- 4 окт: пустого места нет — транспорт сразу под кнопками окон, под ним
       -- быстрые вкл / выкл; заметки и скринсеты — всплывашками у кнопок
-      thin(y + 1); y = y + gap
+      y = y + gap                                     -- 5 окт: без линии между группами
     end
     for _, it in ipairs(g.items) do
       if it[1] == 'beats' then
