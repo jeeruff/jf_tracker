@@ -3,424 +3,284 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>jf_tracker — help</title>
+<title>jf_tracker help</title>
 <style>
   :root {
-    --bg: #f4f4f2; --panel: #e9e9e5; --text: #1c1c1c; --grey: #666; --line: #c9c9c4;
-    --amber: #b4581a; --cyan: #1d6f7a; --code: #e2e2dc;
+    --bg: #f5f4f0; --panel: #ebe9e3; --text: #1b1b1a; --grey: #6b6a66; --line: #d2cfc6;
+    --amber: #b0561a; --cyan: #1d6e79; --code: #e4e1d9; --pink: #b0279b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0e1012; --panel: #16191c; --text: #d8dcdc; --grey: #8a9090; --line: #2c3236;
-      --amber: #e88a3a; --cyan: #5fb8c4; --code: #1e2327;
+      --bg: #0f1113; --panel: #171a1d; --text: #d9dcdb; --grey: #8b908f; --line: #2b3034;
+      --amber: #e88a3a; --cyan: #5fb8c4; --code: #1f2427; --pink: #e05ad0;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0e1012; --panel: #16191c; --text: #d8dcdc; --grey: #8a9090; --line: #2c3236;
-    --amber: #e88a3a; --cyan: #5fb8c4; --code: #1e2327;
+    --bg: #0f1113; --panel: #171a1d; --text: #d9dcdb; --grey: #8b908f; --line: #2b3034;
+    --amber: #e88a3a; --cyan: #5fb8c4; --code: #1f2427; --pink: #e05ad0;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; }
-  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 26px; margin: 0 0 4px; font-weight: 600; }
-  h1 small { color: var(--grey); font-weight: 400; font-size: 15px; margin-left: 10px; }
-  h2 { font-size: 18px; margin: 36px 0 10px; padding-bottom: 4px; border-bottom: 1px solid var(--line); font-weight: 600; }
-  h3 { font-size: 15px; margin: 22px 0 6px; color: var(--amber); font-weight: 600; text-transform: none; }
-  p { margin: 6px 0 10px; }
-  code, kbd { font: 13px/1.4 "JetBrains Mono", Menlo, monospace; }
-  code { background: var(--code); padding: 1px 5px; border-radius: 2px; }
-  kbd { display: inline-block; min-width: 1.6em; text-align: center; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--panel); color: var(--text); }
-  table { border-collapse: collapse; width: 100%; margin: 6px 0 14px; }
-  th, td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font: 600 30px/1.2 "JetBrains Mono", Menlo, monospace; margin: 0; letter-spacing: -0.5px; }
+  .sub { color: var(--grey); margin: 4px 0 18px; }
+  h2 { font-size: 21px; margin: 48px 0 12px; font-weight: 650; }
+  h3 { font-size: 16px; margin: 26px 0 6px; font-weight: 650; }
+  p { margin: 8px 0 12px; }
+  a { color: var(--cyan); }
+  code, kbd { font: 13.5px/1.4 "JetBrains Mono", Menlo, monospace; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 3px; }
+  kbd { display: inline-block; min-width: 1.7em; text-align: center; padding: 0 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 15px; }
+  td, th { text-align: left; vertical-align: top; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
   th { color: var(--grey); font-weight: 500; font-size: 13px; }
-  td:first-child { white-space: nowrap; width: 34%; }
-  .nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 14px 0 6px; font-size: 14px; }
-  .nav a { color: var(--cyan); text-decoration: none; }
+  td:first-child { white-space: nowrap; width: 30%; }
+  .nav { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .nav a { text-decoration: none; }
   .nav a:hover { text-decoration: underline; }
-  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 16px; }
-  .box { border: 1px solid var(--line); background: var(--panel); padding: 8px 10px; }
-  .box b { display: block; font-family: "JetBrains Mono", Menlo, monospace; font-size: 13px; font-weight: 500; color: var(--amber); }
-  .box span { font-size: 13px; color: var(--grey); }
-  .rule { border-left: 3px solid var(--amber); padding: 2px 12px; margin: 10px 0; background: var(--panel); }
-  .tracker { font: 12px/1.35 "JetBrains Mono", Menlo, monospace; background: var(--code); padding: 10px 12px; overflow-x: auto; white-space: pre; color: var(--text); }
-  .tracker .c { color: var(--cyan); } .tracker .g { color: var(--grey); } .tracker .a { color: var(--amber); }
-  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; }
-  footer { margin-top: 40px; color: var(--grey); font-size: 13px; }
+  .lead { font-size: 18px; line-height: 1.5; }
+  .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+  .keys div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .keys b { display: block; font-size: 13px; color: var(--grey); font-weight: 500; margin-bottom: 4px; }
+  .rows { font: 14px/1.5 "JetBrains Mono", Menlo, monospace; background: var(--code); border-radius: 6px; padding: 12px 14px; white-space: pre; overflow-x: auto; }
+  .rows .g { color: var(--grey); } .rows .a { color: var(--amber); }
+  figure { margin: 18px 0; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); min-height: 80px; }
+  figcaption { color: var(--grey); font-size: 14px; margin-top: 6px; }
+  ol.legend { columns: 2; column-gap: 28px; padding-left: 20px; font-size: 15px; }
+  ol.legend li { break-inside: avoid; margin-bottom: 6px; }
+  .graph { width: 100%; height: auto; display: block; margin: 12px 0; }
+  .graph .node rect { fill: var(--panel); stroke: var(--line); }
+  .graph .node.core rect { stroke: var(--amber); }
+  .graph .node.reaper rect { fill: var(--code); stroke: var(--cyan); }
+  .graph text { fill: var(--text); font: 13px "JetBrains Mono", Menlo, monospace; }
+  .graph text.small { fill: var(--grey); font-size: 11px; }
+  .graph path { stroke: var(--grey); fill: none; stroke-width: 1.4; }
+  .graph path.w { stroke: var(--amber); }
+  .graph .lbl { fill: var(--grey); font-size: 11px; }
+  footer { margin-top: 56px; color: var(--grey); font-size: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
 </style>
 </head>
 <body>
 <main>
-<h1>jf_tracker <small>a tracker view of the REAPER timeline with Vim editing, a pattern sequencer and a slicer</small></h1>
+<h1>jf_tracker</h1>
+<p class="sub">a tracker shell over the REAPER project, with Vim keys</p>
 <div class="nav">
-  <a href="#phil">Philosophy</a> <a href="#arch">Architecture</a> <a href="#view">On screen</a>
-  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a>
-  <a href="#cmd">Commands :</a> <a href="#matrix">Matrix</a> <a href="#pool">Pool and browser</a> <a href="#slice">Slicer</a> <a href="#dsp">DSP</a> <a href="#alias">Aliases</a> <a href="#fx">Command columns</a> <a href="#env">Envelopes</a>
+  <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
+  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a> <a href="#cmd">: commands</a>
+  <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
+  <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
 
-<h2 id="phil">Philosophy</h2>
-<div class="rule"><b>Why.</b> Build a whole track without looking at REAPER: first a few patterns, then their sequence — all from the keyboard, in one window, without jumping between plugin windows and the arrangement. Mixing comes later, in REAPER itself, on the same tracks and items.</div>
-<div class="rule"><b>The tracker is a view. REAPER is the engine.</b> Everything you see is the project's tracks, items, takes, MIDI notes, fixed lanes, regions and envelopes. There is no storage format of its own. Close the window and the project plays and edits like any REAPER project.</div>
-<div class="rule"><b>Vim.</b> A tracker row is a Vim line, an event (item or note) is a word, a subcolumn is a column. Modes NORMAL / INSERT / VISUAL / V-LINE / <code>:</code>. Counts, operators with motions (<code>d3j</code>, <code>dw</code>, <code>yy</code>, <code>cG</code>), a register, <kbd>.</kbd>, macros <kbd>q</kbd>/<kbd>@</kbd>.</div>
-<div class="rule"><b>Why jf.</b> These are the author's initials and nickname, but not only that: <kbd>j</kbd> and <kbd>f</kbd> are the keys with bumps under the index fingers, where the hands rest on the home row. The name says what the whole tracker says: hands on the keyboard, mouse optional.</div>
-<div class="rule"><b>Tickless.</b> Time is continuous. A row = 1/LPB of a quarter note; anything smaller than a row is a fraction <code>xx/256</code> in the delay column. LPB is only the view scale: changing LPB changes nothing in the project.</div>
-<div class="rule"><b>Every edit is an undo block</b> <code>jf_tracker: …</code>. The standard Ctrl+Z (and <kbd>u</kbd>) reverts it as a whole.</div>
-<div class="rule"><b>Why so close to REAPER.</b> Nothing to export and nothing to lose: the tempo map, FX, routing, render, other scripts and plugins see everything as it is. You can close the tracker at any moment — the work is already in the project.</div>
-<div class="rule"><b>lib.</b> The right-hand panel holds the sounds the notes play: all audio items of the project, one entry per sound. Library entries live on their track after the <code>=LIB</code> marker at the end of the project. An entry's notes are linked copies (tag <code>P_EXT:jf_iid</code>): an edit in the item panel changes all of its notes; a stretched note becomes unique (or "apply to all"). Truncation by the next note, a note's pitch and volume are properties of the note, not a new sound.</div>
-<div class="rule"><b>No icons or symbols — letters only.</b> Buttons and labels are letters and words; when a sign is needed, a letter from another alphabet is used: <code>Δ</code> — FX delta solo, <code>ø</code> — phase. Alphabets have plenty of letters.</div>
-<div class="rule"><b>Native graphics and speed.</b> A <code>gfx</code> window, dockable, only REAPER's built-in bitmap font (×1..×3, ×4 for PT-mode) via a string cache, theme colors with a contrast check. Column widths are computed from the font; nothing overlaps. An idle frame ≈ 2.5 ms at 33 fps.</div>
+<h2 id="why">Why</h2>
+<p class="lead">Hands stay on the home row. <kbd>j</kbd> and <kbd>f</kbd> are the two keys with bumps under your index
+fingers, and that is the name. <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> move the cursor, and <kbd>f</kbd> jumps to
+anything on screen by a two-letter label. The mouse is optional.</p>
+<p class="lead">It is REAPER, hard native. The tracker is only a shell over your project. What you see are real tracks,
+items, takes, MIDI notes, fixed lanes, regions, envelopes and FX. There is no file format of its own: close the window and
+the project is exactly as it was, and every edit is one REAPER undo step.</p>
+<p>The grammar is Vim: modes, operators with motions (<code>d3j</code>, <code>dw</code>, <code>yy</code>), counts,
+registers, the <kbd>.</kbd> repeat, macros, the <kbd>:</kbd> command line. Every control is a letter, never an icon: when a
+sign is needed, it comes from another alphabet (<code>Δ</code> delta solo, <code>ø</code> phase).</p>
+
+<h2 id="start">First steps</h2>
+<table>
+<tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>move: field, row. <kbd>gg</kbd> <kbd>G</kbd> start / end, <kbd>{</kbd> <kbd>}</kbd> bars</td></tr>
+<tr><td><kbd>f</kbd></td><td>labels on everything on screen: type two letters and you are there</td></tr>
+<tr><td><kbd>i</kbd> … <kbd>Esc</kbd></td><td>INSERT: the top row writes notes. <kbd>Esc</kbd> toggles back, as in Renoise</td></tr>
+<tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>next module: the keyboard goes there (a pink frame shows where)</td></tr>
+<tr><td><kbd>\</kbd> &nbsp; <kbd>?</kbd></td><td>the menu of everything / the keys of the focused module</td></tr>
+<tr><td><code>:tutorial</code></td><td>a guided tour, twelve steps</td></tr>
+</table>
+
+<h2 id="screen">On screen</h2>
+<figure>
+  <img src="help/screen.png" alt="the whole jf_tracker window">
+  <figcaption>The whole window. The numbers match the list below.</figcaption>
+</figure>
+<ol class="legend">
+  <li><b>main module</b>: help, about, options, notes, tutorial, screensets; quick switches laid out like the screen</li>
+  <li><b>top panel</b>: tabs <code>rec</code> <code>item</code> <code>modulate</code> <code>midi</code> <code>scopes</code> <code>master</code></li>
+  <li><b>matrix</b>: the song as patterns (regions) × tracks</li>
+  <li><b>tracker</b>: rows = steps, columns = tracks; note · instrument · volume · delay · commands</li>
+  <li><b>transport strip</b>: position, BPM, signature, beats, octave, step; the keyboard on the left (<kbd>m</kbd>)</li>
+  <li><b>lib and slices</b>: the sounds of the cursor track and the slices of the selected one</li>
+  <li><b>browser</b>: files, Media Explorer databases, projects, kits</li>
+  <li><b>DSP</b>: the FX chain of the cursor track, with meters</li>
+</ol>
+<p>The module with the keyboard focus has a pink frame; in INSERT the tracker frame is red. By default a plain click works
+inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves the focus (option <code>focus by mouse</code>).</p>
+
+<h2 id="normal">NORMAL</h2>
+<div class="keys">
+<div><b>move</b>
+<kbd>h</kbd> <kbd>l</kbd> field · <kbd>j</kbd> <kbd>k</kbd> row<br>
+<kbd>H</kbd> <kbd>L</kbd> track · <kbd>0</kbd> <kbd>$</kbd> first / last column<br>
+<kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd> event · <kbd>W</kbd> <kbd>B</kbd> any column<br>
+<kbd>gg</kbd> <kbd>G</kbd> <kbd>10G</kbd> · <kbd>{</kbd> <kbd>}</kbd> bar<br>
+<kbd>^D</kbd> <kbd>^U</kbd> half page · <kbd>zz</kbd> center</div>
+<div><b>edit</b>
+<kbd>x</kbd> delete · <kbd>dd</kbd> <kbd>d</kbd>{motion}<br>
+<kbd>yy</kbd> <kbd>y</kbd>{motion} copy · <kbd>p</kbd> paste<br>
+<kbd>c</kbd>{motion} change · <kbd>s</kbd> split · <kbd>M</kbd> mute<br>
+<kbd>^A</kbd> <kbd>^X</kbd> ±1 · <kbd>r</kbd>{value} set<br>
+<kbd>u</kbd> <kbd>^R</kbd> undo · <kbd>.</kbd> repeat · <kbd>q</kbd> <kbd>@</kbd> macros</div>
+<div><b>view and the rest</b>
+<kbd>f</kbd> jump labels · <kbd>/</kbd> <kbd>n</kbd> <kbd>N</kbd> search<br>
+<kbd>za</kbd> <kbd>zM</kbd> <kbd>zR</kbd> fold tracks<br>
+<kbd>+</kbd> <kbd>-</kbd> LPB · <kbd>F</kbd> follow · <kbd>m</kbd> keyboard strip<br>
+<kbd>a</kbd> envelopes · <kbd>A</kbd> any parameter (fzf)<br>
+<kbd>\</kbd> menu · <kbd>?</kbd> keys · <kbd>F1</kbd> this page</div>
+</div>
+<p>A count goes before any motion or edit: <kbd>3j</kbd>, <kbd>d2w</kbd>, <kbd>5@a</kbd>. A Russian layout works by key
+position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd> the status line lists what can follow.</p>
+
+<h2 id="insert">INSERT</h2>
+<figure>
+  <img src="help/insert.png" alt="INSERT mode with the keyboard strip">
+  <figcaption>INSERT: the red frame and the keyboard strip under the tracker.</figcaption>
+</figure>
+<div class="rows"> <span class="a">2 3   5 6 7   9 0</span>          <span class="g">black keys</span>
+<span class="a">q w e r t y u i o p</span>        <span class="g">notes: q = C of the octave, like Ableton</span>
+ a s d f g h j k l ;        <span class="g">a step auto · s :step · d delete · f fx fields · g start · hjkl move · ; whole sample</span>
+z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar · M mute · , . sound</span></div>
+<table>
+<tr><td><kbd>Shift</kbd>+note</td><td>listen only, nothing is written</td></tr>
+<tr><td><kbd>Ctrl</kbd>+note</td><td>a held note: its length is as long as you hold the key</td></tr>
+<tr><td>sliced sound</td><td>every note key writes a slice: <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> … = slices 1 2 3 4 …; <kbd>Option</kbd>+key — the selected slice at that pitch, <kbd>Cmd</kbd>+key — the whole sample at that pitch</td></tr>
+<tr><td>MIDI keyboard</td><td>writes into the cursor column the same way</td></tr>
+</table>
+
+<h2 id="visual">VISUAL</h2>
+<p><kbd>v</kbd> selects a block, <kbd>V</kbd> whole rows; a mouse drag in the body does the same. On a selection:
+<kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>M</kbd> <kbd>^A</kbd> <kbd>^X</kbd> <kbd>r</kbd>{note}, and commands
+such as <code>:interp vol</code> (a ramp), <code>:arp up 2</code>, <code>:scramble</code>, <code>:legato</code>.
+<kbd>Option</kbd>+drag on an event moves the whole block.</p>
+
+<h2 id="cmd">: commands</h2>
+<p><kbd>:</kbd> opens the command line, <kbd>Tab</kbd> completes, the help line shows the arguments. The ones you will use most:</p>
+<table>
+<tr><td><code>:len N</code> &nbsp; <code>:sig 5/4</code></td><td>pattern length in steps (<code>Ns</code> seconds, <code>Nb</code> bars) / time signature for the project or one pattern</td></tr>
+<tr><td><code>:add [bars] [name]</code> &nbsp; <code>:name</code></td><td>a new pattern after the last one / rename the cursor pattern</td></tr>
+<tr><td><code>:arp</code> <code>:legato</code> <code>:interp</code> <code>:scramble</code></td><td>generators and shapers over the selection or the pattern</td></tr>
+<tr><td><code>:quantize</code> &nbsp; <code>:beatsync</code></td><td>smart quantize of the sample / fit it to the tempo</td></tr>
+<tr><td><code>:pt</code> &nbsp; <code>:big</code> &nbsp; <code>:macro</code></td><td>PT-mode (four big channels, a nod to ProTracker) / big font / the song from above, a row per bar</td></tr>
+<tr><td><code>:wave</code> <code>:reg</code> <code>:lpb</code> <code>:theme</code> <code>:dock</code></td><td>view: waves, only the cursor region, rows per beat, theme, docked or floating</td></tr>
+<tr><td><code>:options</code> &nbsp; <code>:tutorial</code></td><td>all options in one window / the tour</td></tr>
+</table>
+
+<h2 id="matrix">Matrix</h2>
+<p>The song is a list of patterns. A pattern is a REAPER region; regions with the same name are copies of one pattern
+(aliases), and an edit in one copy goes into all of them (<code>autosync</code>). Each slot row shows the name, the time
+signature and the length; a click on them edits. Cells are pattern × track.</p>
+<table>
+<tr><td><kbd>Space</kbd> on a slot</td><td>queue it: it starts at the end of the playing one (live)</td></tr>
+<tr><td><kbd>o</kbd> <kbd>O</kbd> <kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd></td><td>new slot after / before, delete, copy, paste: slots edit like Vim lines</td></tr>
+<tr><td><kbd>&lt;</kbd> <kbd>&gt;</kbd></td><td>another pattern in this slot</td></tr>
+<tr><td><kbd>A</kbd> / <kbd>C</kbd> / <kbd>U</kbd></td><td>repeat linked to the right / free copy / make this repeat unique</td></tr>
+<tr><td><kbd>^H</kbd> <kbd>^J</kbd> <kbd>^K</kbd> <kbd>^L</kbd></td><td>move the matrix cursor straight from the tracker</td></tr>
+</table>
+
+<h2 id="lib">Lib and slices</h2>
+<p>The lib is the sounds of the cursor track: every distinct audio source its items use, plus the track library (items
+after the <code>=LIB</code> marker at the end of the project). A note is a linked copy of its sound, so an edit in the
+item tab changes all its notes. Click — select (and listen, with <code>preview</code> on); double click — drop the sample
+onto the track at the cursor.</p>
+<p>The slices module lists the slices of the selected sound: <kbd>j</kbd> <kbd>k</kbd> select, the selected slice is what
+the item tab edits.</p>
+
+<h2 id="item">Item tab</h2>
+<figure>
+  <img src="help/item.png" alt="the item tab with slices">
+  <figcaption>The item tab: the sample with its slices and its properties on the right.</figcaption>
+</figure>
+<table>
+<tr><td><kbd>s</kbd> menu</td><td><kbd>s</kbd><kbd>t</kbd> slice at transients · <kbd>s</kbd><kbd>8</kbd> (<kbd>2</kbd> <kbd>4</kbd> <kbd>1</kbd> <kbd>3</kbd> <kbd>6</kbd>) equal parts 8 (2 4 16 32 64) · <kbd>s</kbd><kbd>d</kbd> delete slices · <kbd>s</kbd><kbd>q</kbd> smart quantize · <kbd>s</kbd><kbd>z</kbd> autotrim</td></tr>
+<tr><td>mouse</td><td>drag a slice line to move it, a click selects it; the strip under a slice slips it</td></tr>
+<tr><td>selection</td><td>drag over the wave. <kbd>Enter</kbd> — insert at the cursor; drag it onto a track or the lib — the whole sample goes into the lib and the selection becomes its slice</td></tr>
+<tr><td>views</td><td><code>peaks</code> <code>spec</code> <code>sgram</code> (a real spectrogram) <code>big</code></td></tr>
+<tr><td>properties</td><td>volume, pan, transpose, rate, beatsync, keep pitch, stretch, loop, fades: <kbd>J</kbd> <kbd>K</kbd> row, <kbd>H</kbd> <kbd>L</kbd> value</td></tr>
+</table>
+
+<h2 id="browser">Browser</h2>
+<p>Files, Media Explorer databases, projects and track-template kits. <kbd>j</kbd> <kbd>k</kbd> move, <kbd>Enter</kbd> /
+double click — into the lib of the cursor track, <kbd>Cmd</kbd>+<kbd>Enter</kbd> — replace the sample of the selected sound
+everywhere, drag — onto a track. <kbd>/</kbd> searches right in the list (fzf syntax). <code>play</code> listens to the selected
+row, <code>keys</code> lets the note keys play it at their pitch. <kbd>1</kbd>…<kbd>5</kbd> are folder bookmarks.</p>
+
+<h2 id="dsp">DSP</h2>
+<figure>
+  <img src="help/dsp.png" alt="the DSP panel">
+  <figcaption>The DSP panel: input meter, the chain, output meter and gain compensation.</figcaption>
+</figure>
+<p>The FX chain of the cursor track as blocks. Thin meters at the edges show the input and the output; <code>c</code> under the
+output keeps the output as loud as the input (gain compensation through REAPER's own Volume Adjustment), so you judge an
+effect by its sound, not by its loudness. Each block has <code>Δ</code> (hear only what the effect adds), <code>B</code>
+bypass, <code>O</code> its window, a preset row <code>&lt; name &gt;</code>. The stock ReaPlugs get pictures (EQ curve,
+compressor curve, bands, delay taps), Airwindows get their category and description.</p>
+<table>
+<tr><td><kbd>h</kbd> <kbd>l</kbd> / <kbd>j</kbd> <kbd>k</kbd></td><td>block / parameter; <kbd>+</kbd> <kbd>-</kbd> value; <kbd>b</kbd> bypass; <kbd>o</kbd> window</td></tr>
+<tr><td><kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd> <kbd>cc</kbd></td><td>delete, copy, paste, pack into a container</td></tr>
+<tr><td><code>:fxa</code> <code>:fxb</code> <code>:morph N</code></td><td>A/B snapshots of a block and a morph between them</td></tr>
+<tr><td><kbd>/</kbd> or the list on the left</td><td>add an effect; drag a block by its title to reorder</td></tr>
+</table>
+
+<h2 id="transport">Transport strip</h2>
+<p>Under the tracker: position, BPM, LPB, time signature, the beats of the bar, metronome, follow, loop, octave, step,
+instrument, velocity. Click or wheel changes a value; a click on the signature asks whether it is for the whole project or
+one pattern. The keyboard on the left shows what the note keys play and hides with <kbd>m</kbd>; the strip stays. Options:
+<code>big BPM</code>, and <code>status bar: keyboard</code> puts the status line into the strip.</p>
+
+<h2 id="map">Tracker → REAPER</h2>
+<table>
+<tr><th>tracker</th><th>REAPER</th></tr>
+<tr><td>row</td><td>a step of the grid in quarter notes; LPB only zooms the view, the project does not change</td></tr>
+<tr><td>track column</td><td>a track; folders are indented</td></tr>
+<tr><td>lane column</td><td>a fixed item lane</td></tr>
+<tr><td>audio note</td><td>an item: the note is its pitch, volume is <code>D_VOL</code></td></tr>
+<tr><td>MIDI note</td><td>a note of the take; <code>OFF</code> is the note-off</td></tr>
+<tr><td>command column</td><td>item and take properties: offset, pan, volume, fades, loop, pitch, slice, beatsync</td></tr>
+<tr><td>sound (lib)</td><td>a distinct audio source; slices are times stored on the item</td></tr>
+<tr><td>pattern</td><td>a region; same name — the same pattern</td></tr>
+<tr><td>envelope column</td><td>a visible track envelope, in its theme colour</td></tr>
+<tr><td>undo</td><td>one REAPER undo step per edit, named <code>jf_tracker: …</code></td></tr>
+</table>
 
 <h2 id="arch">Architecture</h2>
-<div class="flow">
-  <div class="box"><b>jf_tracker.lua</b><span>window, defer loop, module focus, mouse and context menu, hydra, top panel, region queue, single instance (owner)</span></div>
-  <div class="box"><b>jf_tracker_model.lua</b><span>project snapshot → rows/subcolumns, track pool, envelopes, FX modulation, regions and patterns, peaks. The only reader of reaper.*</span></div>
-  <div class="box"><b>jf_tracker_vim.lua</b><span>NORMAL/INSERT/VISUAL/:/search, motions and operators, macros, hydra, fzf picker. No reaper.*</span></div>
-  <div class="box"><b>jf_tracker_edit.lua</b><span>ALL writes to the project, each an undo block: events, fields, commands, slices, envelopes, modulation, depot</span></div>
-  <div class="box"><b>jf_tracker_draw.lua</b><span>gfx: layout (L.flat), cells, waveforms, envelopes in theme colors, meters, top panel with tabs, popups, focus frame. Bitmap ×N via a string cache</span></div>
-  <div class="box"><b>jf_tracker_matrix.lua</b><span>pattern sequencer: slots "&lt; NN &gt; name", grid, schema/micro view, queue, zoom</span></div>
-  <div class="box"><b>jf_tracker_alias.lua</b><span>pattern = region name: copy sync, repeat, slot switching, =LIB library, time shift</span></div>
-  <div class="box"><b>jf_tracker_slicer.lua</b><span>virtual slicing in the sample tab: equal / by transients, P_EXT:jf_slices</span></div>
-  <div class="box"><b>jf_tracker_browser.lua</b><span>sidebar: files, Media Explorer databases, jf_pm projects; preview, auto-preview, drag &amp; drop onto tracks, adding to the depot (=LIB)</span></div>
-  <div class="box"><b>jf_tracker_preview.lua</b><span>audition: CF_Preview through track FX, slices, files; MIDI — via transport</span></div>
-  <div class="box"><b>jf_tracker_keys.lua</b><span>piano, Russian layout → QWERTY, key codes — user file</span></div>
-</div>
-<p><b>Data flow.</b> Per frame: <code>model.snapshot(lpb)</code> is rebuilt only when <code>GetProjectStateChangeCount</code>, LPB or the MIDI hash (<code>MIDI_GetTrackHash</code>, polled at 4 Hz) changes → <code>model.regions</code> → <code>draw.layout</code> builds the flat subcolumn list <code>L.flat</code> (notes, lane subcolumns, folded tracks, envelopes) → <code>draw.frame</code> draws everything and returns what is under the mouse → a key is translated by layout and goes to the focused module (tracker → <code>vim.key</code>, matrix, top tab, browser) → edits go through <code>edit.*</code> in an undo block, the <code>edit.after</code> hook syncs same-named regions → the model drops its cache.</p>
-<p><b>Cursor</b> — a triple <code>(fi, row, field)</code>: index in <code>L.flat</code>, absolute row from QN 0, field (note · vol · delay · commands; an envelope has one field). Motions and operators work on the rectangle <code>[fi0..fi1] × [row0..row1]</code>; what is inside (item, note, folded track, envelope) is the model's concern.</p>
-<p><b>Keyboard focus</b> belongs to one module: tracker, matrix, top tab (sample = slicer, modulation = modulation list, scope), browser. It has a pink <code>#ff00ff</code> frame; <kbd>Tab</kbd> cycles, Option+click on a module gives it focus (a plain click works inside a module without moving focus; the "focus by mouse" option switches this), <kbd>Esc</kbd> returns it to the tracker.</p>
-<p><b>Single instance.</b> On start the script writes its id to ExtState <code>jf_tracker/owner</code>; an instance that sees a foreign id exits. Any re-launch takes over the window.</p>
-<p><b>Concept mapping.</b></p>
-<table>
-<tr><th>Tracker</th><th>REAPER</th></tr>
-<tr><td>Row</td><td>grid step in QN; LPB is the view scale and changes nothing in the project</td></tr>
-<tr><td>Track column</td><td>track; folders — indent and dimmed header; sample depot — the track's items after the <code>=LIB</code> marker (a <code>DEPOT</code> track is legacy, still read)</td></tr>
-<tr><td>Lane column</td><td>fixed item lane (<code>I_FREEMODE = 2</code>, REAPER 7)</td></tr>
-<tr><td>Subcolumn</td><td>first free one: MIDI polyphony and overlapping items are one mechanism</td></tr>
-<tr><td>Note (audio)</td><td>item start: take name, <code>D_PITCH</code> or <code>D_PLAYRATE</code> (track pitch mode), vol = <code>D_VOL</code></td></tr>
-<tr><td>Note (MIDI)</td><td>take note (<code>MIDI_GetAllEvts</code>), <code>OFF</code> = note-off, delay = fraction of a row</td></tr>
-<tr><td>Continuation <code>|</code> / waveform</td><td>item body (peaks from <code>PCM_Source_GetPeaks</code>) or note body</td></tr>
-<tr><td>Command columns</td><td>item/take properties: 9 offset, 8 pan, C vol, I/O fades, L loop, M channel, P pitch, S slice, T beatsync</td></tr>
-<tr><td>Instrument</td><td>unique audio source of the track's items; items after the <code>=LIB</code> marker are the track library (<code>*</code>); slices are time codes in <code>P_EXT:jf_slices</code></td></tr>
-<tr><td>Pattern / slot</td><td>region; same-named regions are one pattern; library — regions after the <code>=LIB</code> marker</td></tr>
-<tr><td>Envelopes</td><td>visible track envelopes, vertical, in theme colors; points via <code>InsertEnvelopePoint</code>/<code>SetEnvelopePoint</code></td></tr>
-<tr><td>Modulation</td><td>native FX parameter modulation (<code>param.N.lfo/acs/plink.active</code>)</td></tr>
-</table>
+<p>One rule holds it together: one module reads REAPER, one module writes to it, and everything else works on the
+snapshot in between.</p>
+<svg class="graph" viewBox="0 0 820 330" role="img" aria-label="data flow: REAPER project to model to draw and vim, edit back to REAPER">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10" style="fill: var(--grey); stroke: none"/></marker>
+  <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10" style="fill: var(--amber); stroke: none"/></marker></defs>
+  <g class="node reaper"><rect x="300" y="10" width="220" height="54" rx="6"/><text x="410" y="34" text-anchor="middle">REAPER project</text><text class="small" x="410" y="52" text-anchor="middle">tracks · items · MIDI · regions · FX</text></g>
+  <g class="node core"><rect x="40" y="120" width="200" height="60" rx="6"/><text x="140" y="145" text-anchor="middle">model</text><text class="small" x="140" y="164" text-anchor="middle">the only reader → snapshot</text></g>
+  <g class="node"><rect x="310" y="120" width="200" height="60" rx="6"/><text x="410" y="145" text-anchor="middle">draw</text><text class="small" x="410" y="164" text-anchor="middle">gfx window, layout, cells</text></g>
+  <g class="node"><rect x="580" y="120" width="200" height="60" rx="6"/><text x="680" y="145" text-anchor="middle">screen</text><text class="small" x="680" y="164" text-anchor="middle">you</text></g>
+  <g class="node"><rect x="580" y="240" width="200" height="60" rx="6"/><text x="680" y="265" text-anchor="middle">vim</text><text class="small" x="680" y="284" text-anchor="middle">modes, motions, : commands</text></g>
+  <g class="node core"><rect x="310" y="240" width="200" height="60" rx="6"/><text x="410" y="265" text-anchor="middle">edit</text><text class="small" x="410" y="284" text-anchor="middle">the only writer, undo blocks</text></g>
+  <g class="node"><rect x="40" y="240" width="200" height="60" rx="6"/><text x="140" y="265" text-anchor="middle">matrix · alias · slicer</text><text class="small" x="140" y="284" text-anchor="middle">patterns, copies, slices</text></g>
+  <path d="M300,46 C200,46 140,70 140,116" marker-end="url(#ar)"/><text class="lbl" x="170" y="80">read on change</text>
+  <path d="M240,150 L306,150" marker-end="url(#ar)"/>
+  <path d="M510,150 L576,150" marker-end="url(#ar)"/>
+  <path d="M680,180 L680,236" marker-end="url(#ar)"/><text class="lbl" x="690" y="212">keys, mouse</text>
+  <path class="w" d="M576,270 L514,270" marker-end="url(#aw)"/>
+  <path class="w" d="M410,240 C410,200 560,90 520,52" marker-end="url(#aw)"/><text class="lbl" x="470" y="206">write + undo</text>
+  <path d="M306,282 L244,282" marker-end="url(#ar)"/><text class="lbl" x="250" y="276">after edit: sync copies</text>
+</svg>
+<p><b>model</b> reads the project only when it changed (project state, LPB, MIDI hash) and builds a snapshot of rows,
+columns, sounds, regions and envelopes. <b>draw</b> paints it and reports what is under the mouse. <b>vim</b> turns keys
+into motions and edits; every edit goes through <b>edit</b>, inside one undo block, and after it the copies of a pattern are
+synced. The files: <code>jf_tracker.lua</code> (window and wiring), <code>_model</code>, <code>_draw</code>, <code>_vim</code>,
+<code>_edit</code>, <code>_matrix</code>, <code>_alias</code>, <code>_slicer</code>, <code>_browser</code>, <code>_preview</code>,
+<code>_dspmods</code> (the DSP pictures).</p>
 
-<h2 id="view">On screen</h2>
-<div class="tracker"><span class="g">[control: play BPM LPB oct step inst …] [scope | sample | modulation] [track instruments]</span>
-<span class="g">schema fill sync │ ptn           │ A drums        M S R │ B lanes      M S R</span>
-<span class="g">      names ↑   │ 0000 </span><span class="a">D-4 80 ..</span> 9A0 <span class="g">│ Volume ╱ │ C-4 64 .. ...</span>
-<span class="g">&lt;02&gt; intro ▬ ▬ │ 0001 </span>amen         <span class="g">│</span> ... .. .. ...  <span class="g">│  |</span>
-<span class="g">&lt;03&gt; A     ▬ ▬ │ 0002 </span> ~~~         <span class="g">│ C-3 80 .. ... │ OFF</span></div>
-<p><b>Top</b> — a panel as in Renoise 2: control on the left (click toggles, wheel changes), tabs in the center <b>scope</b> (track peak meters) · <b>sample</b> (sample editor: waveform, slices, transients) · <b>modulation</b> (FX parameters with modulation: LFO, ACS, LINK), on the right the instruments of the track under the cursor with mini waveforms.</p>
-<p><b>Left</b> — the pattern matrix: buttons (schema/micro view, fill, sync), track names vertical, slot rows <code>&lt; NN &gt; name</code> with pattern-switch arrows, a grid of cells; schema — lines per quarter of the region, muted — red X; playing slot — amber, queued — cyan.</p>
-<p><b>Center</b> — the tracker: row numbers, tracks → lanes → subcolumns <code>note vol delay [commands]</code>, then the track's envelopes as lines in theme colors. The cursor is an inverted field, its row is highlighted with an amber edge; REAPER's edit cursor — green edge; playhead — amber row. Peak meters (<code>:meters</code>) grow from the bottom of the column. A folded track (<kbd>za</kbd>) is a narrow column of dots.</p>
-<p><b>Right</b> — the file browser sidebar (<code>:side</code>). <b>Bottom</b> — an interactive status bar: on the left the Vim mode, typed keys, focus, queue and message; then a short description of what the mouse is over and what click / double click / right click / wheel do (LPB, position, octave etc. are not repeated — they are in the control block at the top). Popups above it: <code>:</code> command hints, hydra <kbd>\</kbd>, fzf picker <kbd>A</kbd>. The module with keyboard focus has a pink frame.</p>
-
-<h2 id="normal">NORMAL — navigation</h2>
-<div class="two">
-<table>
-<tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> / arrows</td><td>field left/right (note → vol → delay → commands → next subcolumn), row down/up</td></tr>
-<tr><td><kbd>H</kbd> <kbd>L</kbd></td><td>previous / next track</td></tr>
-<tr><td><kbd>0</kbd> <kbd>$</kbd></td><td>first / last column</td></tr>
-<tr><td><kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd></td><td>next / previous event / the boundary right after the current one (cursor edge = item end)</td></tr>
-<tr><td><kbd>W</kbd> <kbd>B</kbd></td><td>event in any subcolumn of the track</td></tr>
-<tr><td><kbd>gg</kbd> <kbd>G</kbd> <kbd>10G</kbd></td><td>start / end / row 10</td></tr>
-<tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>previous / next bar</td></tr>
-<tr><td><kbd>^D</kbd> <kbd>^U</kbd> <kbd>^F</kbd> <kbd>^B</kbd></td><td>half page / page</td></tr>
-<tr><td><kbd>zz</kbd> <kbd>zt</kbd> <kbd>zb</kbd></td><td>scroll: cursor to center / top / bottom</td></tr>
-<tr><td><kbd>3j</kbd>, <kbd>2w</kbd> …</td><td>count before any motion</td></tr>
-</table>
-<table>
-<tr><td><kbd>za</kbd> <kbd>zc</kbd> <kbd>zo</kbd></td><td>fold/unfold a track into dots</td></tr>
-<tr><td><kbd>zM</kbd> <kbd>zR</kbd></td><td>fold / unfold all</td></tr>
-<tr><td><kbd>F</kbd></td><td>follow — the view follows the playhead</td></tr>
-<tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
-<tr><td><kbd>Enter</kbd></td><td>REAPER edit cursor to the cursor row</td></tr>
-<tr><td><kbd>Tab</kbd></td><td><b>keyboard focus</b> cycle: tracker → matrix → top tab → browser. The focused module has a pink <code>#ff00ff</code> frame; Option+click on a module also gives it focus (a plain click does not, unless "focus by mouse" is on). Focus on the sample tab enables slicer editing right away; on modulation — <kbd>j</kbd> <kbd>k</kbd> row, <kbd>l</kbd>/<kbd>Enter</kbd> LFO, <kbd>a</kbd> ACS, <kbd>p</kbd> LINK. <kbd>Esc</kbd> returns focus to the tracker</td></tr>
-<tr><td><kbd>^H</kbd> <kbd>^J</kbd> <kbd>^K</kbd> <kbd>^L</kbd></td><td>Ctrl: matrix cursor straight from the tracker (view and edit cursor follow the region)</td></tr>
-<tr><td><kbd>⌥H</kbd> <kbd>⌥L</kbd> / <kbd>⌥J</kbd> <kbd>⌥K</kbd></td><td>Option: previous / next track; next / previous event of the track (any subcolumn)</td></tr>
-<tr><td><kbd>⌘J</kbd> <kbd>⌘L</kbd> / <kbd>⌘K</kbd> <kbd>⌘H</kbd></td><td>Cmd: next / previous track instrument (macOS grabs ⌘H for "Hide application")</td></tr>
-<tr><td>right click</td><td>context menu: event / selection / track header / matrix / pool</td></tr>
-<tr><td>click / double click on an event</td><td>select the item in REAPER (standard actions work on it) / Item properties (MIDI — editor)</td></tr>
-<tr><td><kbd>+</kbd> <kbd>-</kbd></td><td>LPB (1 2 3 4 6 8 12 16), time position is kept</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>input octave −/+</td></tr>
-<tr><td><kbd>(</kbd> <kbd>)</kbd></td><td>depot instrument −/+</td></tr>
-<tr><td><kbd>F1</kbd></td><td>this help</td></tr>
-<tr><td><kbd>F11</kbd></td><td>dock ↔ full-screen floating window (<code>:dock</code>)</td></tr>
-<tr><td>Russian layout</td><td>keys are translated by position (Russian layout → QWERTY): <kbd>&#1088;</kbd><kbd>&#1086;</kbd><kbd>&#1083;</kbd><kbd>&#1076;</kbd> = <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd>, <kbd>&#1046;</kbd> = <kbd>:</kbd>; piano and hex too</td></tr>
-</table>
-</div>
-
-<h3>NORMAL — edits</h3>
-<table>
-<tr><td><kbd>x</kbd>, <kbd>3x</kbd></td><td>delete the event under the cursor (n rows); goes to the register</td></tr>
-<tr><td><kbd>dd</kbd>, <kbd>d</kbd>{motion}</td><td>delete a row / range: <code>d3j</code>, <code>dw</code>, <code>dG</code>, <code>d}</code></td></tr>
-<tr><td><kbd>yy</kbd>, <kbd>y</kbd>{motion}</td><td>copy to the register (item — state chunk without GUID, note — as numbers)</td></tr>
-<tr><td><kbd>p</kbd></td><td>paste the register from the cursor row into the cursor column (with offsets)</td></tr>
-<tr><td><kbd>cc</kbd>, <kbd>c</kbd>{motion}</td><td>delete and enter INSERT</td></tr>
-<tr><td><kbd>s</kbd></td><td>split everything covering the row at that row (<code>SplitMediaItem</code> / two notes)</td></tr>
-<tr><td><kbd>M</kbd></td><td>mute / unmute event (Shift+m; <code>B_MUTE</code>, muted notes). Plain <kbd>m</kbd> shows / hides the on-screen keyboard strip at the bottom of the tracker</td></tr>
-<tr><td><kbd>^A</kbd> <kbd>^X</kbd>, <kbd>12^A</kbd></td><td>±1 to the field under the cursor (with a count — by n): note — semitone, vol, delay, command xx</td></tr>
-<tr><td><kbd>r</kbd>{note} / <kbd>r</kbd>{hex hex} / <kbd>r</kbd>{letter hex hex}</td><td>set a field value: pitch, vol/delay, command</td></tr>
-<tr><td><kbd>u</kbd> <kbd>^R</kbd></td><td>undo / redo — REAPER's standard</td></tr>
-<tr><td><kbd>.</kbd></td><td>repeat the last edit (with a count)</td></tr>
-<tr><td><kbd>q</kbd>{a–z} … <kbd>q</kbd></td><td>record a macro into a register</td></tr>
-<tr><td><kbd>@</kbd>{a–z}, <kbd>@@</kbd>, <kbd>5@a</kbd></td><td>play a macro / the last one / n times</td></tr>
-<tr><td><kbd>i</kbd> / <kbd>v</kbd> <kbd>V</kbd> / <kbd>:</kbd></td><td>INSERT (<kbd>Esc</kbd> also toggles INSERT / NORMAL, as in Renoise) / VISUAL / V-LINE / command line (command list below, <kbd>Tab</kbd> completes)</td></tr>
-<tr><td><kbd>a</kbd> / <kbd>A</kbd></td><td>show/hide active envelopes / fzf over all automation parameters of the track (track envelopes and every parameter of every FX); letters filter, <kbd>^N</kbd> <kbd>^P</kbd> or arrows move, <kbd>Enter</kbd> creates and shows the envelope</td></tr>
-<tr><td><kbd>/</kbd>text <kbd>n</kbd> <kbd>N</kbd> <kbd>*</kbd></td><td>search by sample name, note (<code>C-4</code>) or command (<code>9A0</code>); next / previous / name under the cursor</td></tr>
-<tr><td><kbd>\</kbd></td><td><b>action hydra</b> (leader): <kbd>e</kbd> event/selection, <kbd>t</kbd> track, <kbd>p</kbd> pattern, <kbd>v</kbd> view, <kbd>i</kbd> instrument, <kbd>:</kbd> <kbd>/</kbd>; inside, one key = one action, <kbd>Backspace</kbd> back, <kbd>Esc</kbd> close. Same as the right-click context menu</td></tr>
-<tr><td><kbd>?</kbd></td><td>key cheat sheet</td></tr>
-<tr><td><kbd>f</kbd></td><td><b>jump hints</b> (like Vimium): two-letter labels are put on visible targets — in the tracker one per bar in each track column (jump "to this bar of this track"), track headers, M/S/R, envelopes, matrix cells and arrows, tabs, control, instruments, modulations, DSP blocks and parameters, browser rows; type a label and focus and cursor go there, no mouse. <kbd>Esc</kbd> cancels</td></tr>
-</table>
-
-<h2 id="insert">INSERT — Ableton layout (<kbd>i</kbd> from NORMAL, <kbd>Esc</kbd> toggles back)</h2>
-<div class="tracker"> 2 3   5 6 7   9 0        <span class="g">← black keys</span>
-q w e r t y u i o p        <span class="g">← C D E F G A B C D E  (q = C of the current octave, like Ableton's top row)</span>
- a s d f g h j k l          <span class="g">← a step auto · s :step · d delete · f fx field · g start · h j k l motion</span>
-z x c   b n m , .          <span class="g">← z x octave · c C velocity · b n bar · M mute · , . instrument</span></div>
-<table>
-<tr><td><kbd>d</kbd> in INSERT</td><td>Vim operator: <kbd>dd</kbd>, <kbd>d3w</kbd>, <kbd>dG</kbd>… — waits for a count and motion, back to INSERT after deleting</td></tr>
-<tr><td>track header</td><td>name across the full width; below it <code>R I M S A</code> (as in REAPER: record, monitoring, mute, solo, automation); volume slider <code>v</code> (−60…+12 dB) and pan <code>p</code>; stereo pan — <code>p</code> + <code>w</code> (width), dual pan — <code>L</code> + <code>R</code>; drag with the mouse, wheel — fine, double click — reset</td></tr>
-<tr hidden><td>Garden (tab <code>garden</code>, <code>:garden</code>)</td><td>region × track grid: number = loop period of the first item (in steps), <code>-</code> no loop, <code>x</code> muted, <code>*</code> Orca plants here; digits+Enter or <kbd>&gt;</kbd> — loop N steps, <kbd>&lt;</kbd> region to item end, <kbd>+</kbd>/<kbd>−</kbd>/wheel — period, <kbd>m</kbd> mute, Enter/Space — queue, <kbd>o</kbd> — Orca field, <kbd>O</kbd> — Orca on/off, <kbd>p</kbd> pin, <kbd>x</kbd> clear planted. Field: arrows, any character, <kbd>.</kbd> erase, <kbd>!</kbd> bang; <code>:</code> track instr oct note vel length — plants a note one row ahead, <code>$</code> — slice, <code>;</code> — queue region, <code>=</code> — FX parameter. Planting has no undo; <code>:garden pin</code> before rendering</td></tr>
-<tr><td>MIDI in the Sample tab</td><td>when the Sample tab has focus, MIDI input auditions the instrument: sliced — C4 = slice 1, C#4 = slice 2…; whole — transposed from C-4. This is a preview (CF_Preview through track FX), nothing is written to the project. Natively MIDI goes to the track's plugin (e.g. jf_slixer) if the track listens to input</td></tr>
-<tr><td>buttons <code>select</code> / <code>insert</code></td><td>under the instruments: sound on instrument selection / sound on note insert</td></tr>
-<tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd><kbd>Tab</kbd></td><td>modules clockwise: tracker → instruments → browser → DSP → matrix → top dock → tracker (Shift — backward)</td></tr>
-<tr><td><kbd>Option</kbd><kbd>Tab</kbd> / <kbd>Option</kbd><kbd>Shift</kbd><kbd>Tab</kbd></td><td>top dock tabs in a cycle: sample → modulation → retro → scopes → master → sample (Shift — backward)</td></tr>
-<tr><td>DSP from the keyboard</td><td><kbd>h</kbd>/<kbd>l</kbd> block, <kbd>j</kbd>/<kbd>k</kbd> parameter, <kbd>+</kbd>/<kbd>-</kbd> (<kbd>^A</kbd>/<kbd>^X</kbd>) value, Shift — coarser, Enter — toggle / bypass, <kbd>b</kbd> bypass, <kbd>o</kbd> FX window, <kbd>a</kbd> add, <kbd>x</kbd> delete, <kbd>A</kbd> parameter envelope</td></tr>
-<tr><td>instrument list</td><td>a tree by tracks: the source sample (wherever it lives — even in the library after <code>=LIB</code>), with its slices and chunks <code>sN</code> indented under it; there is no library group any more</td></tr>
-<tr><td>sample properties panel</td><td>right of the waveform in the Sample tab: volume, pan, transpose, finetune, rate, keep pitch, stretch (REAPER algorithm), loop, fade in/out, take fx, normalize — for the source or slice selected in the list; <kbd>J</kbd>/<kbd>K</kbd> row, <kbd>H</kbd>/<kbd>L</kbd> value, <kbd>R</kbd> reset; mouse: wheel, click, double click — reset</td></tr>
-<tr><td>matrix: <kbd>&lt;</kbd> <kbd>&gt;</kbd> <kbd>=</kbd></td><td>buttons at the bottom of the matrix | tracker divider: <kbd>&lt;</kbd> collapse to a strip, <kbd>&gt;</kbd> expand, <kbd>=</kbd> drag width (double click — auto); the matrix is visible even without regions, <kbd>+</kbd> adds the first one</td></tr>
-<tr><td>browser search</td><td><kbd>/</kbd>, <kbd>f</kbd> or the <code>find</code> button — the query is typed right in the list, by context: in a folder — recursively from the current folder, in an open database — across the database, otherwise in the current list. fzf syntax: space-separated words (fuzzy, all must match), <code>^start</code>, <code>end$</code>, <code>'exact</code>, <code>!exclude</code>. Arrows — through results, Enter — finish typing, Esc — reset. Instruments: <kbd>/</kbd> or <code>find</code> — fzf window</td></tr>
-<tr><td>right panel: <kbd>&gt;</kbd> <kbd>&lt;</kbd> <kbd>=</kbd></td><td>at the bottom of the divider: <kbd>&gt;</kbd> collapse instruments and browser to a strip, <kbd>&lt;</kbd> expand, <kbd>=</kbd> drag width (double click — auto)</td></tr>
-<tr><td>focus by mouse</td><td>by default a plain click works inside a module without moving keyboard focus; Option+click moves focus to it. The "focus by mouse" option switches this</td></tr>
-<tr><td>browser mini player</td><td>at the bottom of the browser: waveform of the playing (or selected) file with position, click — play from there; <code>vol</code> slider — preview volume (drag, wheel in 1 dB steps, double click — 0 dB)</td></tr>
-<tr><td>tracker ruler</td><td>left of the row numbers: regions — a bar in their color and the name on the first row, markers — a tick and name on their row (like REAPER's ruler, only vertical); hover — what is here, click — cursor to the row. Track volume and pan are on one header row; items are translucent, grid dots show through</td></tr>
-<tr><td>slicing</td><td>in the Sample tab, via the <kbd>s</kbd> menu: <kbd>s</kbd><kbd>2</kbd> / <kbd>s</kbd><kbd>4</kbd> / <kbd>s</kbd><kbd>8</kbd> / <kbd>s</kbd><kbd>1</kbd> / <kbd>s</kbd><kbd>3</kbd> / <kbd>s</kbd><kbd>6</kbd> — 2 / 4 / 8 / 16 / 32 / 64 equal parts, <kbd>s</kbd><kbd>t</kbd> — by transients, <kbd>s</kbd><kbd>d</kbd> — delete slices, <kbd>s</kbd><kbd>q</kbd> — smart quantize, <kbd>s</kbd><kbd>z</kbd> — autotrim. Buttons under the header: <code>2 4 8 16 32 64</code>, <code>transients</code>, <code>sens-</code>/<code>sens+</code> — fewer / more transients, <code>clear</code> — remove slicing; slicing applies immediately</td></tr>
-<tr><td>new pattern</td><td>inserting a note, pasting or dropping onto a row without a region (new project, empty bar in the matrix) creates a region for that bar; its name is empty, like a new REAPER region, and the matrix shows it as <code>#N</code>; undone together with the insert</td></tr>
-<tr><td>file from the browser in the Sample tab</td><td>the large waveform shows the preview play position; on the right, instead of properties — file info (format, length, sample rate, channels, bit depth, size, BPM / key from metadata, folder), <code>&gt;</code> before the name — the file is playing now. Preview plays the whole file</td></tr>
-<tr><td><kbd>⌘</kbd><kbd>Enter</kbd> in the browser</td><td>the selected file replaces the sample of the selected instrument in all of its items: note positions and lengths are kept, offset goes to file start, take name = file name, old slicing is removed; one undo</td></tr>
-<tr><td>renaming</td><td>double click on the track name in the header → <code>:tname name</code>; click on the instrument name in the properties panel → <code>:iname name</code> (renames all items of the instrument)</td></tr>
-<tr><td><kbd>F2</kbd>…<kbd>F6</kbd></td><td>dock tabs: sample, modulation, retro, scopes, master</td></tr>
-<tr><td>track header</td><td>name | R I M S A | volume full width | pan | lane −/+ and envelopes; the column caption row is in Options (column captions)</td></tr>
-<tr><td>smart quantize</td><td><code>quantize</code> button in the Sample tab, <kbd>s</kbd><kbd>q</kbd>, <code>:quantize</code>: loud transients (from 60 % of peak) — to the nearest beats, quiet ones — to sixteenths, two on one spot — the loud one stays; length — to whole bars (if ≥ ¾ bar) or beats. Stretch markers on the take, keep pitch is turned on, one undo</td></tr>
-<tr><td>BPM</td><td>click — tempo list (at the top <code>take from selected item</code>: file metadata → number in the name → length in whole bars), double click — type a number <code>[..._]</code> (Enter / Esc), wheel ±1</td></tr>
-<tr><td><code>W B</code></td><td>next / previous event in any column (and envelope points), the cursor moves there; <code>w b</code> — own column</td></tr>
-<tr><td>envelope points</td><td>events for Vim: <code>w b e</code>, <code>dd dw db d2w</code> delete, <code>yy</code> yank, <code>p</code> paste (value and shape); click in NORMAL — cursor, in INSERT — point; wheel — scroll</td></tr>
-<tr><td>DSP <code>ad ai</code></td><td>delete a parameter's automation / automation item at the item under the cursor (track FX only); the envelope name in the header is a menu: delete curve, clear points</td></tr>
-<tr><td>empty slots <code>..</code></td><td>after the instruments — empty slots; select a slot and press <code>p</code> / Enter in the retro tab — the capture becomes an instrument (in the track library); drop onto slots a retro selection (drag from the selection), a sample module selection or a browser file</td></tr>
-<tr><td>time selection</td><td>dragging over the step numbers sets REAPER's time selection by rows, click — clear</td></tr>
-<tr><td>notes</td><td>"notes" button in the control — an editor left of DSP: <code>project</code> — project notes, <code>context</code> — notes of the item under the cursor (no item — the track's, needs SWS); saved on exit (Esc / Tab) and one second after typing</td></tr>
-<tr><td>browser <code>*.*</code> <code>.*</code></td><td>all file types / hidden files; Enter on MIDI, video, image — insert at the cursor row, on anything else — open with the default app</td></tr>
-<tr><td>loop seams</td><td>the seam line of an item and automation item can be dragged: loop period length; Option — stretch (playrate); Cmd — no snap</td></tr>
-<tr><td>envelope by mouse</td><td>point — drag it (any mode): up/down by rows, sideways — value, Cmd — no snap; automation item — the left strip moves it, top edge — start, bottom — length; loop seams — diagonal cuts</td></tr>
-<tr><td>mouse in the body</td><td>drag — block selection (NORMAL and INSERT); Option+drag on an event — move by rows and columns (the whole VISUAL block), one undo; item edge: drag — trim, Option — stretch (playrate), Cmd — no snap</td></tr>
-<tr><td>view all / reg</td><td>above the region name: <code>all</code> — the whole track, <code>reg</code> — only the rows of the cursor region (when playing with follow — the playhead's), the rest is empty; <code>:reg</code></td></tr>
-<tr><td>fold <code>za zM</code></td><td>a folded track shows only the waveform and the note column (chord notes — only the note); automation is always visible: a one-character-wide line and hex values of points; <code>zC</code> — the old one-character strip</td></tr>
-<tr><td>curve shape</td><td>envelope column, second field — segment shape from the point: <code>lin sqr slo fas fae bez</code> (as REAPER's Set segment shape menu); in INSERT — abbreviation letters (chosen as soon as unambiguous: <code>b</code> → bez), in NORMAL <code>^A ^X</code> — cycle, <code>:shape fas</code> (VISUAL — range)</td></tr>
-<tr><td>snap</td><td><code>snap</code> button in the sample module: selection edges, slice markers and slice zone edges stick to transients and markers (within 8 px); transients are detected automatically</td></tr>
-<tr><td>REX / XRNI</td><td>Enter on <code>.rx2</code> / <code>.rex</code> in the browser — into the track library with ReCycle slicing (REAPER decodes the audio, slice points come from the file); <code>.xrni</code> (Renoise, Redux) — unpacked into the project folder (unsaved — ~/samples/_imported), each sample an instrument with its own slices</td></tr>
-<tr><td>take FX</td><td><code>take fx</code> row in sample properties: click or select — DSP shows the instrument's take FX (empty — focus goes to the effect list, Enter adds to the take); double click — REAPER's take FX window; <code>t</code> or the <code>track</code> / <code>take</code> buttons in the DSP header — switch</td></tr>
-<tr><td>DSP block buttons</td><td><code>O</code> effect window, <code>B</code> bypass, <code>x</code> in the corner — delete</td></tr>
-<tr><td>slices</td><td>in the instrument tree — branches <code>|-</code> / <code>`-</code> under the sample; click on a slice — the sample module shows the whole sample with the slice zone; triangles at the top drag start and end, the strip at the bottom drags the whole zone (same length); offset and length of all notes of that slice instrument change</td></tr>
-<tr><td>chords</td><td>chord notes are narrow "note velocity" subcolumns in the same lane; a separate lane only for a REAPER fixed lane</td></tr>
-<tr><td>hints</td><td>"hints" button in the control: a row of main keys under each module, the focused module brighter; full description — <code>?</code></td></tr>
-<tr><td>DSP: keys</td><td><code>dd</code> delete effect, <code>dc</code> unpack container, <code>yy p P</code> copy, <code>cc</code> pack into container, <code>aa</code> parameter automation, <code>ap</code> pick parameter, <code>af /</code> add, <code>v</code> effect range</td></tr>
-<tr><td>operator hint</td><td>after <code>d</code>, <code>y</code>, <code>c</code>, <code>g</code>, <code>z</code>… the status shows possible continuations on the right</td></tr>
-<tr><td><code>dW</code> <code>dt</code></td><td>delete the whole item under the cursor (not the note) / clear the cursor track within the region (outside a region — from =START to =END)</td></tr>
-<tr><td>sample safety</td><td>when the last item with a file is deleted, the file is put into the track library (after =LIB) in the same undo; files from the browser are copied into the media folder of a saved project. Both in Options</td></tr>
-<tr><td>browser: folders</td><td><code>1..5</code> bookmarks (empty — remember, Shift — overwrite, Cmd+click — clear), <code>&lt; &gt;</code> / <code>H L</code> history, <code>*</code> / <code>:mkdir</code> new folder, full path row — click a folder</td></tr>
-<tr><td>DSP: effect list</td><td>fzf search over installed FX on the left; Enter / double click — to the end of the chain, drag onto the panel — at the amber bar; a block is dragged by its title</td></tr>
-<tr><td><code>?</code> help</td><td>context help at the bottom (in place of DSP): keys of the focused module; a pressed key lights up with a burst of dots; Tab into help — fzf search over all pages, arrows ← → pages, Esc back. "? help" button in the control</td></tr>
-<tr><td>Cmd+Z / Cmd+Shift+Z</td><td>undo / redo anywhere in the tracker</td></tr>
-<tr><td>matrix: slots</td><td><code>o O</code> new bar after / before, <code>dd</code> delete slot (to register), <code>yy Y</code> yank, <code>p P</code> paste after / before, <code>D ^D</code> duplicate as a new pattern, <code>x</code> cut cell, <code>n cc cw r i</code> name, <code>=</code> length, <code>[ ]</code> ± bar, <code>{ }</code> ± step, <code>u ^R</code>, <code>R</code> ruler</td></tr>
-<tr><td>matrix: ruler</td><td>on the left "bar.beat" of the slot start, bar ticks; rows <code>=START</code> and <code>=END</code> before and after the slots; <code>ruler</code> button</td></tr>
-<tr><td>region corner</td><td>region number and name in its color (theme color if none is set); buttons <code>/2 x2 dup</code> on one line: halve / double length / copy to the right as a new pattern; a color strip by the step numbers</td></tr>
-<tr><td>time selection</td><td>REAPER's time selection is visible in the tracker: bright grey background on step numbers, a pale band across the pattern and a <code>]</code> bracket at the right edge of the ruler</td></tr>
-<tr><td>cursor region</td><td>its name (or <code>#N</code>) with a color bar is always visible above the row numbers</td></tr>
-<tr><td>library</td><td>regions and items count as library only if they are after the <code>=LIB</code> marker <b>and</b> after <code>=END</code>; <code>=LIB</code> is never placed before <code>=END</code></td></tr>
-<tr><td>note modifier</td><td><kbd>Shift</kbd>+note — audition only (inserts nothing); <kbd>Option</kbd>+note — insert alongside in a new subcolumn (even the same note); <kbd>Ctrl</kbd>+note — capture the channel's sound with modulation (planned for F5, for now audition)</td></tr>
-<tr><td><kbd>Esc</kbd></td><td>toggles INSERT ↔ NORMAL, as in Renoise (<kbd>v</kbd> / <kbd>V</kbd> in NORMAL — VISUAL / V-LINE)</td></tr>
-<tr><td><kbd>c</kbd> / <kbd>C</kbd>, <code>:vel N</code></td><td>velocity of inserted notes −8 / +8 (1…127, in INSERT), shown in the control as <code>vel</code></td></tr>
-<tr><td><kbd>&gt;</kbd> <kbd>N&gt;</kbd> <kbd>&lt;</kbd></td><td>loop: item to region end / period of N steps (source section, MIDI — source length) / region to item end; <code>:loop N|region|off</code>, hydra <kbd>\</kbd><kbd>l</kbd>; period boundaries — faint ticks in the waveform column</td></tr>
-<tr><td><kbd>⌘1</kbd>…<kbd>⌘9</kbd> <kbd>⌘0</kbd>, <kbd>⌘J</kbd>/<kbd>⌘K</kbd></td><td>track pool slot — the instrument to insert (digits without ⌘ are the black keys of the top piano row); the selected one sounds for 1 s — toggle <code>[&gt;] preview</code> under the instrument list or <code>:poolprev</code></td></tr>
-<tr><td><kbd>`</kbd></td><td>note-off: shorten the event covering the row so it ends there</td></tr>
-<tr><td>third header row</td><td>subcolumn captions: <code>wv</code> waveform, <code>nt</code> note, <code>vl</code> volume/velocity, <code>dl</code> delay, <code>fx1…</code> commands, <code>env</code> envelope; hover — full description in the status bar</td></tr>
-<tr><td>name row in a cell</td><td>instrument number (pool), then the name — only if it fits entirely in the item; otherwise just the number</td></tr>
-<tr><td>instruments (pool)</td><td>grouped by the first track that uses them (header — track name and a line), within a group by length, library last; tags <code>@</code> cursor track, <code>$</code> sliced, <code>*</code> library, <code>sN</code> chunk = slice N of the parent (hover over tags — explanation in the status bar); <code>sort</code> button: track / len / mark — numbers do not change</td></tr>
-<tr><td><kbd>Ctrl</kbd><kbd>+</kbd> / <kbd>Ctrl</kbd><kbd>−</kbd></td><td>bitmap scale x1…x4 (integers; fractional was tried — looks bad); in TTF — font size</td></tr>
-<tr><td>sample: <code>vol</code>, <code>normalize</code></td><td>item volume in dB (wheel / <kbd>&lt;</kbd> <kbd>&gt;</kbd> = 1 dB, click = 0 dB) and peak normalization to 0 dB (<kbd>n</kbd>); views only <code>peaks</code> / <code>spec</code> (REAPER's native spectral peaks, color as in the track column)</td></tr>
-<tr><td>matrix: <kbd>+</kbd> / <code>:add [bars] [name]</code></td><td>a new region after the last one, from the start of the next bar, asks for a name right away; the <code>=END</code> marker moves past it</td></tr>
-<tr><td>matrix: name, length</td><td>double click on the name / <kbd>n</kbd> → <code>:name text</code>; click on the length / <kbd>=</kbd> → <code>:len N</code> (steps by LPB; <code>5s</code> / <code>2b</code> are understood too). Following regions, markers and items of all tracks shift by the difference, lengths are kept; undo reverts</td></tr>
-<tr><td>waveform column <code>wv</code></td><td>always REAPER's spectral peaks (color = frequency) + stretch markers as amber ticks; <code>:wave</code> / control — on/off only (peaks/rect modes removed)</td></tr>
-<tr><td>field order</td><td><code>wv nt vl fx1… dl</code> — commands before delay (standard columns, at least one fx column); <kbd>h</kbd>/<kbd>l</kbd>/<kbd>$</kbd> move in this order</td></tr>
-<tr><td>region length in steps</td><td>in the matrix the length column is in steps by LPB; above the row numbers a box with the cursor region's length and <code>&lt; &gt;</code> arrows (click / wheel = ±1 step, following regions and items shift)</td></tr>
-<tr><td>markers <code>=END</code> / <code>=LIB</code></td><td>the instrument pool reads items before <code>=END</code> (sequence) and after <code>=LIB</code> (library, tag <code>*</code>); everything between them is not read</td></tr>
-<tr><td><code>options</code> in the control, <code>:options</code></td><td>a window with all options: j/k row, Enter/Space/h/l/+/− change, Esc close; mouse — click a row, wheel</td></tr>
-<tr><td><code>step auto</code></td><td>click on <code>step</code> in the control or <code>:step auto</code>: after an insert the cursor jumps past the end of the inserted item or slice</td></tr>
-<tr><td><kbd>−</kbd> <kbd>+</kbd> in a lane row</td><td>minimum number of subcolumns in the lane (overlapping items make the layout add more)</td></tr>
-<tr><td>sample module: slice instrument</td><td>shows the source (the parent with the same file) and highlights, slightly lighter, the zone the item plays; slice markers can be dragged with the mouse</td></tr>
-<tr><td>wave detail (Options)</td><td>peaks per pixel 1/2/4 — a more precise waveform in the track column and the sample module</td></tr>
-<tr><td>matrix: <code>=START</code> … <code>=END</code></td><td>the matrix shows only this span; free space between regions and up to <code>=END</code> appears as "bar" rows, one per bar; naming such a row (<kbd>n</kbd> / double click) creates a region; items after <code>=END</code> (storage, <code>=LIB</code>) are not shown by the tracker and it does not jump there after REAPER's cursor; <code>zoom</code> button</td></tr>
-<tr><td>note on an occupied row</td><td>without Shift: the note goes exactly on the cursor step, the previous item of the lane extending through the step (any subcolumn) is cut at the real boundary; with x-fade on — a crossfade instead of a cut. <kbd>Shift</kbd>+note — alongside, touching nothing</td></tr>
-<tr><td>piano key (note field)</td><td>insert a note and <b>audition</b> it (audio — the sample through track FX, MIDI — transport from the row); cursor moves down by <code>step</code></td></tr>
-<tr><td>hex digits (vol / delay field)</td><td>two digits → value; input is shown in the status as <code>[7_]</code>, Esc cancels</td></tr>
-<tr><td>letter + hex hex (command field)</td><td>for example <code>9 8 0</code> → offset to half of the source, <code>S 1 0</code> → beatsync to 16 rows</td></tr>
-<tr><td><kbd>Backspace</kbd> <kbd>Delete</kbd></td><td>note field — delete event; vol/delay — reset (80 / 00); command — remove</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>octave −/+</td></tr>
-<tr><td>arrows, PgUp/PgDn, Home/End</td><td>navigation without leaving INSERT</td></tr>
-<tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
-<tr><td><kbd>Esc</kbd></td><td>to NORMAL; the whole insert session is one edit for <kbd>.</kbd></td></tr>
-</table>
-<p>Where it inserts: if the row has a MIDI item on the track (or the track has no audio) — a MIDI note <code>step</code> rows long (an item one bar long is created if there is none); otherwise — a copy of an item from the <code>DEPOT</code> track (instrument <code>inst</code>) with <code>D_PITCH</code> = note − C-4.</p>
-
-<h2 id="visual">VISUAL and V-LINE</h2>
-<table>
-<tr><td><kbd>v</kbd> / <kbd>V</kbd></td><td>block from anchor to cursor / rows across all columns</td></tr>
-<tr><td>motions</td><td>extend the selection</td></tr>
-<tr><td><kbd>o</kbd></td><td>anchor ↔ cursor</td></tr>
-<tr><td><kbd>d</kbd> <kbd>x</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>m</kbd> <kbd>s</kbd> <kbd>^A</kbd> <kbd>^X</kbd> <kbd>r</kbd>{note}</td><td>operator on the selection, then NORMAL</td></tr>
-<tr><td><kbd>p</kbd></td><td>replace the selection with the register</td></tr>
-<tr><td><kbd>Esc</kbd></td><td>clear the selection</td></tr>
-</table>
-
-<h2 id="cmd">Command line <code>:</code></h2>
-<table>
-<tr><td><code>:q</code> <code>:w</code> <code>:wq</code></td><td>close window / save project / both</td></tr>
-<tr><td><code>:lpb 8</code></td><td>rows per quarter note (1…64)</td></tr>
-<tr><td><code>:step 2</code></td><td>cursor step after input and MIDI note length in rows</td></tr>
-<tr><td><code>:oct 5</code> <code>:inst 2</code></td><td>input octave / depot instrument</td></tr>
-<tr><td><code>:font 0</code> / <code>:font 24</code></td><td>REAPER bitmap (default) / TTF JetBrainsMono Nerd Font Mono at size N</td></tr>
-<tr><td><code>:scale 2</code></td><td>bitmap scale ×1…4, pixel-perfect (strings are cached in offscreen buffers and blitted)</td></tr>
-<tr><td><code>:space 2</code></td><td>gap above letters in a row, px (part of the row height)</td></tr>
-<tr><td><code>:tab scope|sample|modulation</code></td><td>center tab of the top panel: quadrascope and peak meters / sample editor (slicer) / native FX parameter modulation of the track (LFO, ACS, LINK — click toggles)</td></tr>
-<tr><td><code>:scopes</code></td><td>oscilloscopes: Lua cannot see audio, so a tiny JSFX bridge <code>jf_tracker_scope</code> is put on every track (writes a decimated signal to gmem), and the scope tab draws an oscilloscope per track; turning it off removes the bridge. One undo block</td></tr>
-<tr><td><code>:top</code> <code>:meters</code> <code>:poolprev</code></td><td>top panel (control, meters, instruments) / peak meters over the columns, as in ProTracker (a translucent bar going up from the playhead row) / slot audition on selection</td></tr>
-<tr><td><code>:rec</code> <code>:input</code> <code>:smartin</code></td><td>record arm the cursor track / hydra for choosing the record input (mono, stereo, MIDI) / the most active input via the jf_smart_set_input script; also in hydra <kbd>\r</kbd></td></tr>
-<tr><td><code>:side</code> <code>:browse ~/samples</code></td><td>file browser sidebar / its root</td></tr>
-<tr><td><code>:fx 2</code></td><td>how many command columns to show per subcolumn (0 — hide)</td></tr>
-<tr><td><code>:env</code></td><td>show / hide envelope columns</td></tr>
-<tr><td><code>:preview</code></td><td>audition on input on/off</td></tr>
-<tr><td><code>:pitchmode shift</code> / <code>resample</code></td><td>pitch mode of the track under the cursor: <code>D_PITCH</code> (length kept) or <code>D_PLAYRATE</code> without preserve pitch (classic PT2, length changes)</td></tr>
-<tr><td><code>:sync</code> <code>:autosync</code></td><td>overwrite same-named regions with the content of the region under the cursor / do it after every edit (on by default)</td></tr>
-<tr><td><code>:ramp xx [len]</code> <code>:fade in|out [len]</code></td><td>envelope ramp to xx / event fade; len — rows or <code>Nb</code> beats, default 1 beat</td></tr>
-<tr><td><code>:follow</code> <code>:debug</code></td><td>follow; fps, last key code, peak cache in the status</td></tr>
-<tr><td><code>:fold</code> <code>:unfold</code></td><td>fold / unfold all tracks</td></tr>
-</table>
-
-<h2 id="matrix">Pattern matrix (live)</h2>
-<p>The left panel appears when the project has regions. A row is a <b>sequence slot</b> (region): <code>&lt; NN &gt;</code> pattern number and name; a column is a track (vertical name, color strip). Cells are outlined by a grid, as in Renoise. Two zooms (<kbd>z</kbd>, the <code>schema/detail</code> button, <code>:mxzoom</code>): <b>schema</b> — horizontal lines per quarter of the region where there are events (thicker — denser); <b>micro view</b> — events as ticks at their positions, cyan — MIDI. Muted — red X. The <code>fill/grid</code> button hides the fill, <code>sync</code> syncs same-named regions.</p>
-<p><b>Numbers are interactive</b>: the <code>&lt;</code> <code>&gt;</code> arrows by a slot (or <kbd>&lt;</kbd> <kbd>&gt;</kbd> in the matrix) switch the slot's pattern — the region changes its length (everything after shifts) and content, as in the Renoise sequencer. So that patterns do not get lost, the only remaining instance moves to the <b>library</b>: the zone after the <code>=LIB</code> marker at the end of the project, not part of the sequence. Pattern = region name, number = the lowest index among its regions. <kbd>Tab</kbd> moves focus to the matrix. The matrix is <b>live</b>: while the project is stopped, the cursor on a region drags REAPER's edit cursor with it; during playback the edit cursor and playhead are independent — <kbd>Space</kbd> <b>queues</b> the region (cyan row), the jump happens at the boundary of the current region or bar.</p>
-<table>
-<tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>cell; the tracker scrolls to the region start, the cursor goes to that track</td></tr>
-<tr><td><kbd>g</kbd> <kbd>G</kbd></td><td>first / last region</td></tr>
-<tr><td><kbd>Space</kbd></td><td>playing — queue the region (again — unqueue); stopped — play from here</td></tr>
-<tr><td><kbd>z</kbd></td><td>matrix zoom: schema ↔ micro view</td></tr>
-<tr><td><kbd>m</kbd> / <kbd>Enter</kbd></td><td>mute all items of the cell (one undo block)</td></tr>
-<tr><td><kbd>y</kbd> / <kbd>p</kbd></td><td>remember the region as a pattern / append its repeat at the end of the project (alias)</td></tr>
-<tr><td>click / right click</td><td>select cell / mute</td></tr>
-<tr><td><kbd>Tab</kbd> <kbd>Esc</kbd></td><td>back to the tracker</td></tr>
-</table>
-
-<h2 id="pool">Track pool and browser</h2>
-<p>The top panel, as in Renoise 2: on the left the <b>control</b> (play, BPM, LPB, octave, step, instrument, follow, loop, pitch mode, font, command columns, meters — click toggles, wheel changes by ±1), in the center <b>track peak meters</b> (click — cursor to the track), on the right the <b>instruments</b> of the track under the cursor: number of samples, "N name" and a thin waveform in the item color; the list changes when you move to another track. These are the unique audio sources of the track's items and, marked with an asterisk, items of the <code>DEPOT</code> track. <kbd>⌘1</kbd>…<kbd>⌘0</kbd> and <kbd>⌘J</kbd>/<kbd>⌘K</kbd> select a slot (it sounds for a second through track FX if the <code>[&gt;] preview</code> toggle under the list is on), <kbd>(</kbd> <kbd>)</kbd> page through. The selected slot is the instrument whose copy a piano key inserts.</p>
-<p><b>Browser sidebar</b> (<code>:side</code>, root <code>:browse path</code>, default <code>~/samples</code>): <kbd>j</kbd> <kbd>k</kbd> — cursor, <kbd>l</kbd>/<kbd>Enter</kbd> — enter a folder or add a file to <code>DEPOT</code>, <kbd>h</kbd>/<kbd>Backspace</kbd> — up, <kbd>Space</kbd> — audition for a second, double click — same as Enter.</p>
-
-<h2 id="slice">Virtual slicing (slicer)</h2>
-<p>The slicer lives in the <b>sample</b> tab of the top panel, right under the tabs (scope · sample · modulation). The tab always shows the selected instrument of the cursor track with its slices; double click on the waveform, on a sample in the instrument panel, <code>:slice</code> or <kbd>\is</kbd> enable editing (keys go to the slicer, Esc returns). Slices are only time codes in <code>P_EXT:jf_slices</code> on the instrument item; no files, no source edits. Slicing goes through the <kbd>s</kbd> menu: <kbd>s</kbd><kbd>2</kbd> <kbd>s</kbd><kbd>4</kbd> <kbd>s</kbd><kbd>8</kbd> <kbd>s</kbd><kbd>1</kbd>(16) <kbd>s</kbd><kbd>3</kbd>(32) <kbd>s</kbd><kbd>6</kbd>(64) — equal parts; <kbd>s</kbd><kbd>t</kbd> — by transients (detection from REAPER peaks, 500 Hz), <kbd>+</kbd> <kbd>-</kbd> — sensitivity; <kbd>s</kbd><kbd>d</kbd> — delete slices; <kbd>s</kbd><kbd>q</kbd> — smart quantize; <kbd>s</kbd><kbd>z</kbd> — autotrim; <kbd>q</kbd>…<kbd>p</kbd> — audition a slice; <kbd>Esc</kbd>. Slicing applies immediately. In the instrument panel a sliced sample is marked <code>/N</code>.</p>
-<p>Inserting: with a sliced instrument selected, in INSERT every note key inserts a slice, chromatically: <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> <kbd>e</kbd> … = slices 1 2 3 4 5 …, <kbd>z</kbd> / <kbd>x</kbd> shift by an octave (12 slices). Each slice is a separate item with the right offset and length (<code>P_EXT:jf_slice</code>); Option + key - the selected slice at that pitch, Cmd + key - the whole sample at that pitch. The home and bottom rows stay commands. In the command column <code>Sxx</code> — slice xx (without slicing — offset xx/256 of the source, as in Renoise); beatsync moved to <code>Txx</code>.</p>
-
-<h2 id="dsp">DSP panel</h2>
-<p><code>:dsp</code> (hydra <kbd>\vD</kbd>) opens the bottom panel with the FX of the track under the cursor: each effect is a block with its name and first eight parameters. The view is uniform; REAPER reports the widget type itself (<code>TrackFX_GetParameterStepSizes</code>): toggle — a square switch, stepped parameter (up to 16 steps) — segments, continuous — a bar with the formatted value. The <b>module registry</b> <code>jf_tracker_dspmods.lua</code> (user file) defines a curated view for known effects: which parameters, in what order, with what label, in how many columns — parameters are matched by a substring of the name. Currently described: the ecosystem slicer <code>jf_slixer</code> (slicing mode and sensitivity, parts, trigger, loop, stretch, arpeggio, glide, quantize, dry/wet, gain) and ReaEQ. Click or drag on a slider sets the value, wheel — ±2 %, double click on the name opens the plugin window. From the keyboard (dsp focus, pink frame): <kbd>h</kbd> <kbd>l</kbd> — effect, <kbd>j</kbd> <kbd>k</kbd> — parameter, <kbd>^A</kbd> <kbd>^X</kbd> or <kbd>+</kbd> <kbd>-</kbd> — ±2 % (with Shift ±10 %), <kbd>b</kbd>/<kbd>Enter</kbd> — bypass, <kbd>o</kbd> — window, <kbd>x</kbd> — delete, <kbd>a</kbd> — add effect (fzf over all installed), <kbd>A</kbd> — fzf over this effect's parameters → envelope. Everything on one screen, no plugin windows. Automation stays vertical in the track column.</p>
-
-<div hidden>
-<h2 id="monome">Monome</h2>
-<p>Through the jf_grid ecosystem daemon: the <code>daemon_tracker.lua</code> module puts the pattern matrix on the grid (row — slot, column — track; brightness: empty · events · muted · playhead row · queue · cursor). A press queues the region (during playback) or plays from it. The mod appears in the daemon's mod list when <code>:scopes</code> is on (the JSFX bridge on tracks is its presence marker).</p>
-
-</div>
-<h2 id="alias">Pattern aliases</h2>
-<p>A pattern repeat is a <b>region with the same name</b>. The content of repeats is copies of items (like aliases in Renoise): after each edit the region under the cursor overwrites all same-named regions in the same undo block. In the matrix <kbd>y</kbd> remembers a region, <kbd>p</kbd> puts its repeat after the end of the project. Rename a region in REAPER and it leaves the group. Copies are tagged <code>P_EXT:jf_pattern</code>.</p>
-
-<h2 id="fx">Command columns</h2>
-<p>Two kinds. <b>Static</b> ones are read from item/take properties and edited in place. <b>Envelope commands and generators</b> are stored on the item as text (<code>P_EXT:jf_cmds</code>) and rebuilt in full on every edit: take envelopes inside the event are cleared and rebuilt, generated copies are deleted and created again — everything stays native points and items. Input is the same: command field, <kbd>i</kbd> + letter + hex hex, <kbd>^A</kbd>/<kbd>^X</kbd>, Backspace removes. Shown at the event head, <code>:fx N</code> of them.</p>
-<table>
-<tr><th>Command</th><th>Meaning</th><th>In REAPER</th></tr>
-<tr><td><code>9xx</code></td><td>offset in the source, fraction of the length</td><td><code>D_STARTOFFS</code></td></tr>
-<tr><td><code>8xx</code></td><td>pan, 80 = center</td><td>take <code>D_PAN</code></td></tr>
-<tr><td><code>Ixx</code> / <code>Oxx</code></td><td>fade in / out, length in rows × 16 (the default 10 ms is not shown)</td><td><code>D_FADEINLEN</code> / <code>D_FADEOUTLEN</code></td></tr>
-<tr><td><code>L00</code></td><td>source loop off (on by default in REAPER)</td><td><code>B_LOOPSRC</code></td></tr>
-<tr><td><code>M0x</code></td><td>channel: 1 swap, 2 mono, 3 L, 4 R</td><td><code>I_CHANMODE</code></td></tr>
-<tr><td><code>Sxx</code></td><td>slice xx of a sliced instrument; without slicing — offset xx/256</td><td><code>D_STARTOFFS</code> + <code>D_LENGTH</code> from <code>P_EXT:jf_slices</code></td></tr>
-<tr><td><code>Txx</code></td><td>beatsync (stretch) to xx rows</td><td><code>D_PLAYRATE</code> with <code>B_PPITCH = 1</code></td></tr>
-<tr><td><code>Uxx</code> / <code>Dxx</code></td><td>pitch slide up/down by xx/16 semitone per row over the whole event</td><td>take Pitch envelope (audio, range ±3 by default) / pitchbend ±2 (MIDI)</td></tr>
-<tr><td><code>Gxx</code></td><td>glide: from the previous event's pitch to its own over xx rows</td><td>take Pitch</td></tr>
-<tr><td><code>4xy</code></td><td>vibrato: period 16/x rows, depth y/8 semitone</td><td>take Pitch (sine as points)</td></tr>
-<tr><td><code>0xy</code></td><td>arpeggio: 0, x, y semitones, a third of a row each</td><td>take Pitch (steps)</td></tr>
-<tr><td><code>Axy</code></td><td>volume slide: +x/16 per row up, −y/16 down</td><td>take Volume</td></tr>
-<tr><td><code>Rxy</code></td><td>retrigger: copies every x/16 row, volume ×(1 − y/16)</td><td>items with <code>P_EXT:jf_gen</code>, deleted on rebuild</td></tr>
-<tr><td><code>Pxx</code></td><td>probability: the event is muted with chance 1 − xx/FF (rolled on every edit)</td><td><code>B_MUTE</code></td></tr>
-<tr><td><code>Fxx</code></td><td>tempo BPM = xx (hex) from this row</td><td>tempo marker</td></tr>
-<tr><td><code>Bxx</code></td><td>jump: when the playhead reaches the event row — go to sequence slot xx</td><td>performed by the tracker per frame (SetEditCurPos seekplay), no project edit</td></tr>
-<tr><td><code>Cxx</code></td><td>volume, 80 = 0 dB (same as the vol column)</td><td><code>D_VOL</code></td></tr>
-</table>
-
-<h2 id="env">Envelopes</h2>
-<p>Visible track envelopes are drawn to the right of its lanes as in REAPER's arrangement and <b>in the same theme color</b> (<code>col_env1</code> volume, <code>col_env2</code> pan, <code>env_track_mute</code>, …): a smooth value line (0…1 of the range horizontally, sub-points between rows), points as small squares, hex next to a point. Enabled by <code>:env</code>. Automation stays in the track column, vertical.</p>
-<p><b>Editing</b> — as in the arrangement: click or drag on an envelope column sets/moves the row's point (value from x), right click deletes the row's point, wheel moves by 1/64. From the keyboard an envelope column is an ordinary cursor column (<kbd>h</kbd> <kbd>l</kbd> enter it): in INSERT two hex digits set a point (<code>00…FF</code>) and step down, <kbd>Backspace</kbd> deletes; in NORMAL <kbd>x</kbd> / <kbd>Backspace</kbd> delete the row's point, <kbd>^A</kbd> <kbd>^X</kbd> move by 1/64 (with a count). Every edit is an undo block.</p>
-<p><b>DSP panel (<code>:dsp</code>, hydra <kbd>\</kbd><kbd>d</kbd>).</b> Effect blocks of the cursor track. With the panel focused: <kbd>h</kbd> <kbd>l</kbd> — effect, <kbd>j</kbd> <kbd>k</kbd> — parameter, <kbd>^A</kbd> <kbd>^X</kbd> / <kbd>+</kbd> <kbd>-</kbd> — value, <kbd>b</kbd> — bypass, <kbd>o</kbd> — plugin window, <kbd>x</kbd> / <kbd>Backspace</kbd> / <kbd>Delete</kbd> — delete effect, <kbd>a</kbd> or <kbd>/</kbd> — fzf over all installed effects (add to the track). The same fzf from anywhere — hydra <kbd>\</kbd><kbd>f</kbd>. The status bar is at the very bottom of the window, under the panel.</p>
-<p><b>Track header: A M S R.</b> Left of M/S/R is the automation indicator <code>A</code>: outlined if the track has envelopes, filled when this track's envelope columns are shown. Click on <code>A</code> expands/hides envelopes <b>of this track only</b>; the <kbd>a</kbd> key — all tracks at once (and resets per-track toggles). The status shows the track's envelope list.</p>
-<p><b><kbd>o</kbd> — show in REAPER.</b> In NORMAL on an event: the item is selected in REAPER, the arrangement zooms to it (<i>View: Toggle zoom to selected items</i>), the track scrolls into view, the REAPER window comes to the front.</p>
-<p><b>Focus frame.</b> Pink — which module receives keys; in tracker INSERT it is red and one pixel thicker: keys write to the project. Item frames are 2 px plus an almost transparent fill tinted with the item color.</p>
-<p><b>Browser (sidebar, <code>:side</code>).</b> Header: tabs <code>files</code> (folders and audio of the <code>:browse</code> root), <code>db</code> (REAPER Media Explorer databases from <code>reaper.ini</code>, files from <code>MediaDB/*.ReaperFileList</code>, with duration) and <code>pm</code> (projects from the jf_pm index, newest first; Enter — subproject on the cursor track, Space — project render or <code>jf_preview.wav</code>), buttons <code>auto</code> — auto-preview of the row under the cursor (3 s, key <kbd>p</kbd>), <code>&lt;&gt;</code> — narrow/wide sidebar and <code>x</code> — hide. <b>Drag &amp; drop:</b> a browser row can be dragged onto a track column — the file becomes an item at the row under the mouse (lane by fixed lanes), <code>.rpp</code> — a subproject (InsertMedia, as in jf_pm). <b>Depot:</b> Enter on a file puts it on the cursor track after the <code>=LIB</code> marker at the end of the project (the marker is created if missing) — this is the track's instrument library; a separate DEPOT track is no longer needed. With the browser focused: <kbd>j</kbd> <kbd>k</kbd> cursor, <kbd>Enter</kbd> / <kbd>l</kbd> — open a folder or database / file → DEPOT (instrument), <kbd>-</kbd> / <kbd>h</kbd> / <kbd>Backspace</kbd> — up, <kbd>Space</kbd> — audition, <kbd>/</kbd> — filter by name (like Media Explorer search; Enter/Esc — finish typing, Esc when empty — clear), <kbd>t</kbd> — switch tab, <kbd>w</kbd> — width, <kbd>q</kbd> — hide.</p>
-<h2 id="oct1">Added October 1</h2>
-<table>
-<tr><td><kbd>Tab</kbd> / <kbd>Shift-Tab</kbd></td><td>focus forward / backward in a cycle from anywhere: tracker → matrix → top → instruments → browser → DSP. Option+click on a module also moves the frame (plain click too, if "focus by mouse" is on).</td></tr>
-<tr><td><kbd>Shift</kbd>+click, <kbd>Shift</kbd>+drag</td><td>block from the anchor (cursor) to the click, dragging moves the second corner (VISUAL)</td></tr>
-<tr><td><kbd>Backspace</kbd> / <kbd>Shift+Backspace</kbd></td><td>delete the row's time on the cursor track / on all tracks — items and automation are pulled up <b>only inside the region</b>. Count = rows. <code>:deltime [N] [all]</code></td></tr>
-<tr><td><kbd>Insert</kbd> / <kbd>I</kbd> / <kbd>Shift</kbd></td><td>insert a row of time (within the region, the tail is cut at its boundary). <code>:instime [N] [all]</code></td></tr>
-<tr><td><kbd>o</kbd></td><td>show the item in REAPER: select, zoom, track into view</td></tr>
-<tr><td>matrix: <code>trim</code> / <kbd>t</kbd> / <code>:trim</code></td><td>hard patterns: items are cut at region boundaries; with <code>:autosync</code> — after every edit</td></tr>
-<tr><td>matrix: <kbd>z</kbd> / <code>zoom</code></td><td>detailed vertical zoom: a row of 4 lines, time top to bottom, blocks in item color, mini envelopes, playhead as a line</td></tr>
-<tr><td>control <code>wave</code> / <code>:wave</code></td><td>waveform column left of the note on every item row: <code>peaks</code> / <code>rect</code> / <code>spec</code> (REAPER's spectral coloring) / <code>off</code>. Offline media gives no peaks.</td></tr>
-<tr><td>top: <code>sample</code></td><td>sample module: drag — selection; drag the selection out onto a tracker column — an item with offset; <kbd>Enter</kbd> — insert at the cursor row; <kbd>D</kbd> — to the depot (=LIB) for slicing; <kbd>a</kbd> all; <kbd>Space</kbd> — listen. A file from the browser: <kbd>v</kbd> or automatically with <code>auto</code>.</td></tr>
-<tr><td>top: <code>retro</code> / <code>:retro [add]</code></td><td>jf_rec retro sampler (40 s ring buffer on the track): buffer waveform, drag — selection, <kbd>a</kbd> all, <kbd>Space</kbd> preview, <kbd>p</kbd> — onto the track at the cursor row, <kbd>d</kbd> — to the track depot, <kbd>j</kbd>/<kbd>k</kbd> — another track with jf_rec, <kbd>+</kbd> — add jf_rec. Export is done by the plugin in its own UI (its TCP panel must be visible).</td></tr>
-<tr><td>top: <code>master</code></td><td>master: L/R meters, analyzer (<code>scope</code> / <code>spec</code> / <code>sgram</code> — buttons, <kbd>m</kbd>, <code>:scopemode</code>), FX chain. Needs <code>:scopes</code> (the bridge also goes on the master, slot 31).</td></tr>
-<tr hidden><td>control: <code>mono</code></td><td>jf_grid bus: daemon alive, grid/arc, owner; <code>take</code> — surface to the tracker, <code>grid</code> — give it back; a mini grid and a legend of what the tracker mod shows on the device</td></tr>
-<tr><td>DSP</td><td>dragging a block by its title — FX order (left to right = top to bottom in REAPER); containers are expanded: children and routing (<code>|</code> after the previous, <code>=</code> parallel, <code>+</code> summed); right click on a parameter — <b>modulation</b>: LFO, ACS, link (fzf), modulation window, envelope</td></tr>
-<tr><td>browser: <code>pm</code></td><td>Enter on a project — go inside like a folder: <code>tracks</code> (Enter/drag — insert the track as a chunk with absolute paths), <code>samples</code> (like files), <code>regions</code> (Enter/drag — a subproject trimmed to the region), <code>markers</code>; <code>wave</code> — mini waveforms by files</td></tr>
-<tr><td>mouse resize</td><td>left edge of the browser — width, bottom edge of the top panel — height (double click — auto)</td></tr>
-<tr><td>INSERT: note</td><td>on a row with an event name — <b>overwrite</b> (the old one is deleted); on a continuation row — the event is cut at this row, the new note goes into the same subcolumn; <kbd>Shift</kbd>+note — alongside, in a free subcolumn</td></tr>
-<tr><td><kbd>dw</kbd> <kbd>de</kbd> <kbd>cw</kbd> <kbd>yw</kbd> from empty space</td><td>like Vim, they "understand" there is an event ahead: they take the event the motion lands on</td></tr>
-<tr><td>matrix: block</td><td><kbd>Shift</kbd>+hjkl or <kbd>v</kbd> — selection from the anchor; <kbd>Ctrl+N</kbd> — mute the block; <kbd>Ctrl+X</kbd> / <kbd>⌘Backspace</kbd> — cut; <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd> — copy and paste from the cursor (target cells are replaced, tails are cut at the region); <kbd>Ctrl+hjkl</kbd> — motion from any module</td></tr>
-<tr><td>matrix: <code>&lt; NN &gt;</code></td><td>patterns in name order, number = position (the arrows go 1, 2, 3…); right of the name — region length in bars</td></tr>
-<tr><td>sample module</td><td>the waveform and virtual slicing are always visible when an instrument is selected (letters q…p above the slices); view <code>peaks</code> / <code>spec</code> (color by frequency) / <code>sgram</code> (spectrogram) — buttons on the right or <kbd>v</kbd>; slicing (<kbd>s</kbd> menu: 2/4/8/16/32/64, <kbd>s</kbd><kbd>t</kbd> transients, <kbd>+</kbd>/<kbd>-</kbd>) applies immediately, no Enter needed; a muted instrument — dimmer waveform, <code>(muted)</code></td></tr>
-<tr><td>x-fade: control <code>xf</code>, hydra <kbd>\</kbd><kbd>x</kbd>, <code>:xfade</code></td><td>on — a new note at the seam with the previous one gets a crossfade (the previous one is extended by the x-fade length, its fade-out and the new one's fade-in = that length); off — overlap without crossfade (auto fades are zeroed). <kbd>\</kbd><kbd>x</kbd><kbd>c</kbd> — crossfade now (VISUAL selection or all subcolumns of the cursor track in the region), <kbd>d</kbd> — remove, <kbd>1</kbd>…<kbd>5</kbd> — 5/10/20/50/100 ms, <kbd>+</kbd>/<kbd>-</kbd>; wheel over <code>xf</code> — length</td></tr>
-<tr><td><code>lock</code> (control, <code>:lock</code>)</td><td>tracker cursor ≡ REAPER's edit cursor and selected track, both ways: click in the arrangement or select a track — the tracker cursor jumps there; move the cursor in the tracker — REAPER's edit cursor and selection follow. <code>follow</code> is separate: the view follows the playhead during playback</td></tr>
-<tr><td>recording from MIDI input</td><td>INSERT + <code>R</code> on the cursor track with a MIDI input: notes are written at the cursor row with velocity; a chord — one row, adjacent subcolumns; the step happens after all keys are released; <code>step 0</code> — the next chord overwrites the row; Shift on the first note — alongside, no overwrite; aftertouch (poly / channel) and CC — into the same MIDI item as a curve over the hold time</td></tr>
-<tr><td>recording from audio input</td><td>INSERT + <code>R</code> on a track with <code>jf_rec</code> and an audio input: sound above the threshold — attack (first transient, with 10 ms pre-roll), 0.25 s of silence — end of phrase; the chunk lands as an item at the cursor row with pitch 0 and rate 1 (base note C-4); step — after the chunk, <code>step 0</code> — overwrite, Shift on the attack — alongside. jf_rec itself prints the audio (its panel must be visible); the tracker places the item exactly on the row</td></tr>
-<tr><td>retro to row</td><td><kbd>p</kbd> / Enter in the <code>retro</code> tab — the chunk lands at the cursor row from the first transient of the selection (attack exactly on the row); <kbd>P</kbd> — as selected</td></tr>
-<tr><td>top: <code>modulation</code></td><td>modulation matrix — a table of the track's native parameter modulation: <code>BASE</code> · <code>L1</code> SHP SPD SYN STR (LFO) · <code>ENV</code> ATT REL E.ST (follower, ACS) · <code>LNK</code> SRC SCL OFS (link). <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> — cell, Enter/Space — toggle / shape / source choice (fzf), <kbd>+</kbd><kbd>-</kbd> ^A ^X — value, <kbd>&gt;</kbd><kbd>&lt;</kbd> — ×10, <kbd>a</kbd> — add parameter (fzf), <kbd>x</kbd> — remove, <kbd>o</kbd> — FX window, <kbd>w</kbd> — native modulation window; mouse: click, double click, wheel (Shift ×10)</td></tr>
-<tr><td>DSP row</td><td>name · white widget (bar / square / steps) · value on the right; no background; click and drag only on the widget</td></tr>
-<tr><td><kbd>=</kbd> / <kbd>N=</kbd> / <code>:beatsync [beat|bar|N]</code></td><td>beatsync: the event end (audio — stretch preserving pitch, MIDI — note length) is pulled to the nearest beat, to N rows or to a bar; in VISUAL — all selected events</td></tr>
-<tr><td>mouse: items</td><td>item frame edge (±3 px) — trim start/end as in the arrangement, frame body with <kbd>Option</kbd> — move; snaps to rows, <kbd>⌘</kbd> — no snap; one undo block per gesture</td></tr>
-<tr><td>browser: buttons</td><td>as text: at the top — where to go (<code>files db pm proj</code>), at the bottom — view (<code>wave auto &lt;&gt; hide</code>); the sidebar spans the full window height</td></tr>
-<tr><td>track header in bitmap</td><td>letters only: <code>A M S I R</code> (<code>I</code> — input monitoring: off → on → auto)</td></tr>
-<tr><td>x-fade: rules</td><td>only true successions in one lane are crossfaded (a note ends at the start of the next one); chords, layers, Shift+note and held notes are not cut; MIDI and muted items do not take part; extension never goes past the end of the file; <kbd>\</kbd><kbd>x</kbd><kbd>d</kbd> restores the length and removes the fades (tag <code>P_EXT:jf_xfade</code>); insert, paste and file drop all go through x-fade</td></tr>
-<tr><td>matrix: double click</td><td>playing — queue the region; stopped — open this spot in the tracker on the cell's channel, without starting playback</td></tr>
-<tr><td>instruments</td><td>one shared project-wide list for all tracks (as in Renoise 3): unique sources of all tracks + the library after <code>=LIB</code> (<code>*</code>). <code>@</code> before the name — the sample is on the cursor track; the one selected in the header shows <code>@ tracks</code> where it is used. With the sidebar open the list sits above the browser, the border between them can be dragged (double click — auto); without the sidebar — on the right of the top panel</td></tr>
-<tr><td>sample module and browser</td><td>a file you listen to in the browser (Space, <code>auto</code>) or open with <kbd>v</kbd> is shown right away in the <code>sample</code> tab; selecting an instrument returns the module to it</td></tr>
-<tr><td>browser: <code>proj</code></td><td>all audio sources of the project (Project Bay has no ReaScript API, so we take what is actually in items, including the =LIB library): Enter — to the cursor track's depot, drag — onto a track, <kbd>v</kbd> — to the sample module</td></tr>
-<tr><td><code>:font</code> / <code>:nerd</code></td><td>without a number — Nerd Font 24 with icons ↔ bitmap; <code>:font N</code> — size</td></tr>
-<tr><td><code>:hybrid</code></td><td>REAPER bitmap text + Nerd icons: the string is split into ASCII (bitmap) and glyphs (Nerd font at bitmap size); turns on by itself with <code>:font 0</code> and <code>:icons</code></td></tr>
-<tr><td><code>:fontface [name]</code></td><td>Nerd font: in TTF mode — for text, in hybrid — for icons. Pixel fonts among the installed: DepartureMono, BigBlueTerm437, BigBlueTermPlus, GohuFont 14/11, ProggyClean, Terminess, ProFont IIx, 3270; without a name — the next one in a cycle</td></tr>
-<tr><td>track header: A M S 🎧 R</td><td>M, S, R — always letters; headphones — input monitoring: click off → on → auto (tape, outline only)</td></tr>
-<tr><td>Tab with reaper-keys</td><td>reaper-keys holds Tab in the main section; its gate <code>rk.lua</code> has a bridge: if the jf_tracker window has focus, Tab / Shift-Tab go to the tracker (<code>jf_tracker/inject</code>)</td></tr>
-<tr><td><code>:icons</code></td><td>Nerd icons on buttons and tabs in TTF mode (<code>:font 24</code>)</td></tr>
-</table>
-<p><b>Item frames.</b> Each item has a thin border over its rows (start and end are fractional, by position in the bar): audio — in its subcolumn, a MIDI item — across the whole lane, notes inside. The color is the item's (or track's) color, dimmed; an item selected in REAPER is brighter, a muted one dimmer. This way a MIDI note and its item are not confused. A new note in INSERT, if there is no MIDI item on the row, creates an item one bar long. <b>Automation items</b> in envelope columns are a translucent fill with a border in the theme color (<code>env_item_vol</code> / <code>pan</code> / <code>mute</code> / <code>pitch</code>), as in the arrangement; a selected one is brighter.</p>
-<p><b>Text automation macros</b> (handover stage 10): in INSERT on an envelope column <kbd>/</kbd> — a ramp from the current value to the maximum over 1 beat (LPB rows), <kbd>\</kbd> — a fall to the minimum over 1 beat; the cursor jumps to the end of the ramp, so <kbd>/</kbd><kbd>\</kbd> in a row make a "hill". Intermediate points inside the ramp are removed; REAPER interpolates linearly between two points. Arbitrary ramp — <code>:ramp xx [len]</code>: to value <code>xx</code> (hex) over <code>len</code> rows or <code>Nb</code> beats (<code>:ramp 00 2b</code>), and in VISUAL / V-LINE — over the selected rows. On the vol field of an audio event <kbd>/</kbd> and <kbd>\</kbd> are fade-in / fade-out over 1 beat (these are the <code>Ixx</code>/<code>Oxx</code> commands), <code>:fade in|out [len]</code> — with a length.</p>
-<p><b>Track header</b>: buttons <kbd>M</kbd> <kbd>S</kbd> <kbd>R</kbd> (mute, solo, rec arm — click toggles), tracks nested in a folder are indented and dimmed, the folder is marked "+".</p>
-
-<footer>jf_tracker · Scripts/jf_tracker · tests: <code>lua tests/test_model.lua</code>, <code>lua tests/test_vim.lua</code>, live run <code>tests/smoke_edit.lua</code></footer>
+<footer>
+jf_tracker · free software under the GNU GPL v3 · needs REAPER 7, SWS and js_ReaScriptAPI ·
+<a href="https://jeeruff.itch.io/jftracker">itch.io</a> · <a href="https://github.com/jeeruff/jf_tracker-release">github</a> ·
+<a href="https://ko-fi.com/jeeruff">ko-fi</a> · <a href="https://jeeruff.bandcamp.com">bandcamp</a><br>
+Parts are based on Paketti for Renoise by Esa Ruoho (Lackluster), used with his permission.
+</footer>
 </main>
 </body>
 </html>
