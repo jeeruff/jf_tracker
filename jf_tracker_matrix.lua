@@ -113,7 +113,8 @@ function MX.width(L, nregions, ncols)
   L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
   L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
-  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_dur_w)
+  L.mx_sig_w = MX.fold and 0 or (U.measure('15/16') + L.pad)         -- размер такта в начале региона (5 окт)
+  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = (MX.zoom == 'detail' and L.cw * 3 or L.cw * 2) + 2 * L.pad
   L.mx_row_h = MX.zoom == 'detail' and L.rh * MX.DETAIL_ROWS or L.rh
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
@@ -225,7 +226,7 @@ function MX.draw(L, snap, regions, info)
     if not rg.gap and info.region_rgb then
       local c = info.region_rgb(rg.color)
       if c then
-        U.set(U.tint(c, 0.22)); gfx.rect(RW + 3, y + 1, L.mx_label_w - L.mx_dur_w - 3 - RW, L.rh - 1, 1)
+        U.set(U.tint(c, 0.22)); gfx.rect(RW + 3, y + 1, L.mx_label_w - L.mx_dur_w - L.mx_sig_w - 3 - RW, L.rh - 1, 1)
         U.set(c); gfx.rect(RW + 1, y + 1, 2, rh - 1, 1)
       end
     end
@@ -261,7 +262,7 @@ function MX.draw(L, snap, regions, info)
     end
     -- имя и длина — интерактивные (1 окт): dblclick имени → :name, клик по
     -- длине → :len; hover.name / hover.dur = ri
-    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - 2 - L.pad   -- mx_idx_w уже с линейкой
+    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - L.mx_sig_w - 2 - L.pad   -- mx_idx_w уже с линейкой
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
@@ -277,6 +278,16 @@ function MX.draw(L, snap, regions, info)
       U.text(L.mx_label_w - L.pad - U.measure(ds), y + 1, ds, hot_dur and U.AMBER or U.GREY)
       if hot_dur then hover.dur = ri end
       if ctx.hint then ctx.hint('mxdur', dx, y, L.mx_dur_w, L.rh, ri) end
+      -- размер такта в начале региона (5 окт): клик — :sig для этого паттерна
+      if L.mx_sig_w > 0 and info.sig_at and not rg.gap then
+        local n, d = info.sig_at(rg.pos)
+        local ss = ('%d/%d'):format(n or 4, d or 4)
+        local sx = dx - L.mx_sig_w
+        local hot_sig = hover.ri == ri and mx >= sx and mx < dx
+        U.text(dx - L.pad - U.measure(ss), y + 1, ss, hot_sig and U.AMBER or U.DIM)
+        if hot_sig then hover.sig = ri end
+        if ctx.hint then ctx.hint('mxsig', sx, y, L.mx_sig_w, L.rh, ri) end
+      end
     end
     end
     for ci = 1, #snap.cols do

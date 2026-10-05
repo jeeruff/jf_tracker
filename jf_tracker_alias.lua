@@ -124,6 +124,8 @@ local function copy_span(tr, src, dst, tag, link)
   return #chunks
 end
 
+A.copy_span = copy_span          -- заполнение долей последней долей (:sig, 5 окт)
+
 -- Переписать все одноимённые регионы содержимым src. Без своего undo-блока:
 -- зовётся из edit.run (хук) или из A.append (свой блок).
 -- Лайв (2 окт): хук зовётся после каждой правки, а пересоздание items

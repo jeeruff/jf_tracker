@@ -2235,6 +2235,108 @@ ctx = {
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. rg.name
   end,
+  -- ── размер такта (5 окт) ─────────────────────────────────────────────
+  sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
+  -- строка :sig с текущим размером; rg — для паттерна (матрица), иначе спросит
+  sig_prompt = function(rg)
+    local n, d = ctx.sig_at(rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0))
+    if rg then state.sig_rg = rg.idx; state.popup_at = { kind = 'mxrow', ri = MX.cur.ri } else state.sig_rg = nil end
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = ('sig %d/%d%s'):format(n, d, rg and ' here' or '')
+  end,
+  -- :sig N/D [all|here]: весь проект или паттерн; такт длиннее прежнего —
+  -- спросить, чем заполнить недостающие доли
+  sig_cmd = function(arg)
+    local n, d, scope = (arg or ''):match('^%s*(%d+)%s*/%s*(%d+)%s*(%a*)')
+    n, d = tonumber(n), tonumber(d)
+    if not n or n < 1 or n > 64 or not ({ [1] = 1, [2] = 1, [4] = 1, [8] = 1, [16] = 1, [32] = 1 })[d or 0] then vim.msg = 'sig N/D [all|here] - e.g. :sig 5/4'; return end
+    local rg
+    if state.sig_rg then for _, r in ipairs(regions) do if r.idx == state.sig_rg then rg = r end end end
+    state.sig_rg = nil
+    rg = rg or alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local function go(sc)
+      if sc == 'here' and not rg then vim.msg = 'sig: the cursor is not in a pattern'; return end
+      local t0 = sc == 'all' and 0 or rg.pos
+      local on, od = ctx.sig_at(t0)
+      if n * 4 / d > on * 4 / od + 1e-9 then
+        local g = n * 4 / d - on * 4 / od
+        OPT.ask.open(('%d/%d -> %d/%d: every bar gets %g more quarter(s)'):format(on, od, n, d, g), 'what goes into the new beats of each bar? (later patterns and items move)', {
+          { key = 'k', label = 'keep the notes as they are (bars re-count)', fn = function() ctx.sig_apply(sc, rg, n, d, 'keep') end },
+          { key = 'e', label = 'empty beats at the end of each bar', fn = function() ctx.sig_apply(sc, rg, n, d, 'empty') end },
+          { key = 'l', label = 'repeat the last beat of each bar', fn = function() ctx.sig_apply(sc, rg, n, d, 'last') end },
+        })
+      else ctx.sig_apply(sc, rg, n, d, 'keep') end
+    end
+    if scope == 'all' or scope == 'here' then go(scope)
+    else
+      OPT.ask.open(('time signature %d/%d'):format(n, d), 'for the whole project or only this pattern?', {
+        { key = 'n', label = 'cancel', fn = function() vim.msg = 'sig: unchanged' end },
+        { key = 'a', label = 'whole project', fn = function() go('all') end },
+        { key = 'r', label = 'this pattern' .. (rg and (' (' .. rg.name .. ')') or ' - none at the cursor'), fn = function() go('here') end },
+      })
+    end
+  end,
+  -- маркеры темпа / размера с позиции t и дальше — на dt (вставка долей)
+  shift_tempo_markers = function(t, dt)
+    for i = reaper.CountTempoTimeSigMarkers(0) - 1, 0, -1 do
+      local ok, tp, _, _, bpm, num, den, lin = reaper.GetTempoTimeSigMarker(0, i)
+      if ok and tp >= t - 1e-6 then reaper.SetTempoTimeSigMarker(0, i, tp + dt, -1, -1, bpm, num, den, lin) end
+    end
+  end,
+  -- размер n/d маркером в t (есть маркер ровно там — правим его)
+  set_sig_marker = function(t, n, d)
+    local i = reaper.FindTempoTimeSigMarker(0, t + 1e-4)
+    if i >= 0 then
+      local ok, tp, _, _, bpm, _, _, lin = reaper.GetTempoTimeSigMarker(0, i)
+      if ok and math.abs(tp - t) < 1e-3 then reaper.SetTempoTimeSigMarker(0, i, tp, -1, -1, bpm, n, d, lin); return end
+    end
+    reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, reaper.TimeMap2_GetDividedBpmAtTime(0, t), n, d, false)
+  end,
+  sig_apply = function(sc, rg, n, d, mode)
+    local t0 = sc == 'all' and 0 or rg.pos
+    local t1 = rg and sc == 'here' and rg.rgnend or 0
+    if sc == 'all' then for _, r in ipairs(regions) do if r.rgnend > t1 then t1 = r.rgnend end end; if t1 <= 0 then t1 = reaper.GetProjectLength(0) end end
+    local on, od = ctx.sig_at(t0)
+    local an, ad = ctx.sig_at(t1)                                     -- размер после паттерна (вернуть)
+    local q0, q1 = reaper.TimeMap2_timeToQN(0, t0), reaper.TimeMap2_timeToQN(0, t1)
+    local oldbar, g = on * 4 / od, n * 4 / d - on * 4 / od
+    local tracks = {}
+    for i = 0, reaper.CountTracks(0) - 1 do tracks[#tracks + 1] = reaper.GetTrack(0, i) end
+    local hook = edit.after
+    edit.after = nil
+    local nb = 0
+    edit.run(('time signature %d/%d'):format(n, d), function()
+      if mode ~= 'keep' and g > 1e-9 then
+        -- с конца: позиции более ранних тактов не сдвигаются
+        for k = math.floor((q1 - q0) / oldbar + 1e-6), 1, -1 do
+          local qb = q0 + k * oldbar
+          local tb = reaper.TimeMap2_QNToTime(0, qb)
+          local dt = reaper.TimeMap2_QNToTime(0, qb + g) - tb
+          ctx.shift_tempo_markers(tb, dt)
+          alias.shift_markers(tb, dt)
+          edit.time_insert(tracks, tb, dt, math.huge)
+          if mode == 'last' then
+            local ts = reaper.TimeMap2_QNToTime(0, qb - math.min(g, oldbar))
+            for _, tr in ipairs(tracks) do alias.copy_span(tr, { pos = ts, rgnend = tb }, { pos = tb, rgnend = tb + dt }, nil, false) end
+          end
+          t1 = t1 + dt; nb = nb + 1
+        end
+        if sc == 'here' then alias.set_end(rg, t1) end
+      end
+      if sc == 'all' then
+        for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
+          local ok, tp, _, _, bpm, num, _, lin = reaper.GetTempoTimeSigMarker(0, i)
+          if ok and num > 0 then reaper.SetTempoTimeSigMarker(0, i, tp, -1, -1, bpm, n, d, lin) end
+        end
+        ctx.set_sig_marker(0, n, d)
+      else
+        ctx.set_sig_marker(t1, an, ad)                                -- после паттерна — прежний размер
+        ctx.set_sig_marker(t0, n, d)
+      end
+    end)
+    edit.after = hook
+    ctx.mx_refresh(); model.invalidate()
+    vim.msg = ('time signature %d/%d: %s%s'):format(n, d, sc == 'all' and 'whole project' or ('pattern ' .. rg.name), nb > 0 and (', %d bar(s) got %s beats'):format(nb, mode == 'last' and 'repeated' or 'empty') or '')
+  end,
   mx_len_prompt = function(ri)
     if ri then MX.goto_cell(seq, snap, ri, MX.cur.ci) end
     local rg = seq[MX.cur.ri]
@@ -5191,8 +5293,7 @@ function ctrl_action(name, delta)
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
-  elseif name == 'sig' or name == 'beats' then
-    vim.msg = ('time signature %d/%d at the cursor: %d rows per bar at LPB %d (change it with a REAPER tempo marker)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
+  elseif name == 'sig' or name == 'beats' then ctx.sig_prompt()
   end
 end
 
@@ -5854,7 +5955,7 @@ local function frame()
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
@@ -6249,6 +6350,7 @@ local function frame()
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
+  elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
@@ -6758,6 +6860,9 @@ local function frame()
       MX.goto_cell(seq, snap, hover.matrix.name, MX.cur.ci)
       if dbl and click.zone == 'mxname' and click.row == hover.matrix.name then ctx.mx_name_prompt() end
       click = { t = now2, zone = 'mxname', row = hover.matrix.name }
+    elseif hover.matrix and hover.matrix.sig then
+      MX.goto_cell(seq, snap, hover.matrix.sig, MX.cur.ci); ctx.sig_prompt(seq[hover.matrix.sig])
+      click = { t = now2, zone = 'mxsig' }
     elseif hover.matrix and hover.matrix.dur then
       ctx.mx_len_prompt(hover.matrix.dur)
       click = { t = now2, zone = 'mxdur', row = hover.matrix.dur }
