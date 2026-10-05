@@ -4310,6 +4310,10 @@ local function hint_go(t)
   elseif t.kind == 'recbtn' then ctx.set_focus('top'); state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
+  elseif t.kind == 'slice' then
+    ctx.set_focus('slices')
+    local root = ctx.slice_root()
+    if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(d) end
   elseif t.kind == 'midirow' then state.toptab = 'midi'; ctx.set_focus('top'); MM.cur = d
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')

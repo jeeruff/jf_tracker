@@ -6,10 +6,10 @@ local function eq(n, a, b) checks = checks + 1; if a ~= b then fails = fails + 1
 H.reset()
 for i = 1, 30 do H.add('event', 0, i * 20, 10, 10, i) end
 eq('start', H.start(), true)
-eq('labels aa', H.targets[1].label, 'aa'); eq('labels as', H.targets[2].label, 'as'); eq('13th = sa', H.targets[13].label, 'sa')
+eq('labels aa', H.targets[1].label, 'aa'); eq('labels as', H.targets[2].label, 'as'); eq('27th = sa', H.targets[27].label, 'sa')
 eq('frozen during typing', (function() H.add('x', 0, 0, 1, 1); return #H.targets end)(), 30)
 eq('first letter pending', H.key(('s'):byte()), 'pending')
-local t = H.key(('a'):byte()); eq('sa → target 13', type(t) == 'table' and t.data, 13); eq('inactive after pick', H.active, false)
+local t = H.key(('a'):byte()); eq('sa → target 27', type(t) == 'table' and t.data, 27); eq('inactive after pick', H.active, false)
 H.reset(); for i = 1, 3 do H.add('mx', 0, 0, 1, 1, i) end; H.start()
 eq('esc cancels', H.key(27), 'cancel'); eq('inactive', H.active, false)
 H.start(); H.key(('q'):byte()); H.key(('q'):byte()); eq('bad label resets typed', H.typed, '')

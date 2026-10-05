@@ -110,6 +110,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
     U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
     if hot then SP.slice_hover = r.k end
+    if ctx.hint then ctx.hint('slice', x, ry, w, L.rh, r.k) end      -- метка f (5 окт)
   end
   return SP.slice_hover
 end
