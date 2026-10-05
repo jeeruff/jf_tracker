@@ -178,31 +178,6 @@ function MX.draw(L, snap, regions, info)
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
-  -- поле маркеров последовательности (5 окт): start 1.1  end 9.1 — справа от
-  -- кнопок, если влезает; иначе столбиком под кнопками, слева от имён треков
-  -- (над колонкой имён регионов). Не влезает нигде — нет (без наложений)
-  if not MX.fold then
-    local mk = info.marks or {}
-    local f = { { 'mkstart', 'start', mk.start and mk.start.bar or '--' }, { 'mkend', 'end', mk.stop and mk.stop.bar or '--' } }
-    local lw = math.max(U.measure('start '), U.measure('end '))
-    local bws, tw = {}, 0
-    for i, e in ipairs(f) do bws[i] = lw + U.measure(e[3]) + 2 * L.pad; tw = tw + bws[i] + L.pad end
-    local pos
-    if bx + tw <= W - 4 then pos = { { bx, hy + 1 }, { bx + bws[1] + L.pad, hy + 1 } }
-    elseif math.max(bws[1], bws[2]) <= L.mx_label_w - 2 * L.pad and 2 * (L.rh + 2) <= MX.name_h then
-      local y0 = hy + L.rh + 4
-      pos = { { L.pad, y0 }, { L.pad, y0 + L.rh + 2 } }
-    end
-    for i, e in ipairs(pos and f or {}) do
-      local x, y, bw = pos[i][1], pos[i][2], bws[i]
-      local hot = mx >= x and mx < x + bw and my >= y and my < y + L.rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, bw, L.rh, 1)
-      U.set(U.LINE); gfx.rect(x, y, bw, L.rh, 0)
-      U.text(x + L.pad, y + 1, e[2], hot and U.AMBER or U.GREY)
-      U.text(x + L.pad + lw, y + 1, e[3], U.CYAN)
-      if hot then hover.btn = e[1] end
-    end
-  end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
   for ci, col in ipairs(snap.cols) do
@@ -217,20 +192,30 @@ function MX.draw(L, snap, regions, info)
   local rh = L.mx_row_h or L.rh
   local RW = L.mx_ruler_w or 0
   local marks = info.marks or {}
-  -- маркер =START строкой до первого слота, =END — после последнего (2 окт)
-  local function mark_row(mk, y)
-    local c = mk.rgb or U.CYAN
+  -- маркер =START строкой до первого слота, =END — после последнего (2 окт);
+  -- такт маркера — поле ввода прямо на линии (5 окт): клик — набор такта
+  -- (цифры, точка, Enter, Esc), колесо — ±такт, Shift+клик — строка курсора.
+  -- Маркера нет — строка тусклая с «--», поле его создаст
+  local function mark_row(mk, y, which)
+    local c = mk.missing and U.GREY or (mk.rgb or U.CYAN)
     U.set(c); gfx.rect(0, y + math.floor(L.rh / 2), W - 4, 1, 1)
-    if RW > 0 then
-      U.set(U.PANEL); gfx.rect(L.pad, y, U.measure(mk.bar) + 2, L.rh, 1)
-      U.text(L.pad + 1, y + 1, mk.bar, c)
-    end
-    local lx = RW + L.pad
+    local ed = MX.mkedit and MX.mkedit.which == which
+    local val = ed and (MX.mkedit.buf .. '_') or mk.bar
+    local fw = math.max(U.measure(val), U.measure('000.0')) + 4
+    local fx = L.pad
+    local lx = math.max(RW, fx + fw + L.pad) + L.pad
+    local hot = mx >= fx and mx < fx + fw and my >= y and my < y + L.rh
+    U.set(ed and U.BG or (hot and U.tint(U.AMBER, 0.3) or U.PANEL)); gfx.rect(fx, y, fw, L.rh, 1)
+    U.set((ed or hot) and U.AMBER or U.LINE); gfx.rect(fx, y, fw, L.rh, 0)
+    U.text(fx + 2, y + 1, val, ed and U.AMBER or c)
+    if hot then hover.btn = which == 'start' and 'mkstart' or 'mkend' end
     U.set(U.PANEL); gfx.rect(lx - 2, y, U.measure(mk.name) + 4, L.rh, 1)
     U.text(lx, y + 1, mk.name, c)
   end
-  if marks.start then mark_row(marks.start, top); top = top + L.rh end
-  local bottom = ybot - (marks.stop and L.rh or 0)
+  local mk_start = marks.start or { name = '=START', bar = '--', missing = true }
+  local mk_stop = marks.stop or { name = '=END', bar = '--', missing = true }
+  mark_row(mk_start, top, 'start'); top = top + L.rh
+  local bottom = ybot - L.rh
   local nvis = math.max(1, math.floor((bottom - top) / rh))
   MX.scroll = MX.scroll or 0
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
@@ -404,10 +389,10 @@ function MX.draw(L, snap, regions, info)
       if ctx.hint then ctx.hint('mx', x, y, L.mx_cell_w, rh, { ri = ri, ci = ci }) end
     end
   end
-  if marks.stop then
+  do
     local last = math.min(#regions, MX.scroll + nvis)
     local ye = top + (last - MX.scroll) * rh
-    if last == #regions and ye + L.rh <= ybot then mark_row(marks.stop, ye) end
+    if last == #regions and ye + L.rh <= ybot then mark_row(mk_stop, ye, 'end') end
   end
   if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
   return hover

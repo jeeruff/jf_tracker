@@ -4609,7 +4609,7 @@ ctx = {
       { key = '/', label = 'search', fn = function() vim.mode = 'search'; vim.searchline = '' end },
       { key = '?', label = 'keys cheat sheet', sub = function() return ctx.hydra_keys() end },
     }
-    return { title = '\\ actions', items = items }
+    return { title = '` menu', items = items }
   end,
   hydra_keys = function()
     local K = {
@@ -6972,7 +6972,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
-  elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat], Shift+click - cursor row, wheel - one bar; :start / :end'
+  elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
@@ -7487,7 +7487,7 @@ local function frame()
         -- поле Start / End: клик — ввод такта, Shift+клик — строка курсора
         local w = hover.matrix.btn == 'mkstart' and 'start' or 'end'
         if gfx.mouse_cap & 8 == 8 then ctx.seq_marker(w)
-        else vim.cmd_from = vim.mode == 'cmd' and 'normal' or vim.mode; vim.mode = 'cmd'; vim.cmdline = w .. ' ' end
+        else ctx.set_focus('matrix'); MX.mkedit = { which = w, buf = '' } end
       elseif hover.matrix.btn == 'add' then ctx.mx_add() end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
@@ -8446,6 +8446,7 @@ local function frame()
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
+  if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
@@ -8698,7 +8699,8 @@ local function frame()
       -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
       local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
       if c == 96 and vim.mode ~= 'insert' and not typing then
-        vim.open_hydra(ctx.hydra_root()); state.popup_at = { kind = 'ctrlbtn', name = 'help' }
+        -- на трекере — выпадает из блока курсора (5 окт), иначе у кнопки help
+        vim.open_hydra(ctx.hydra_root()); state.popup_at = state.focus == 'tracker' and ctx.cursor_anchor() or { kind = 'ctrlbtn', name = 'help' }
         return
       end
       local m0 = ctx.mods()
@@ -8726,6 +8728,13 @@ local function frame()
         if mr then vim.cur.row = mr; return end
       end
       if state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
+      elseif state.focus == 'matrix' and MX.mkedit then
+        -- поле такта маркера на линии =START / =END (5 окт)
+        local me = MX.mkedit
+        if c == 27 then MX.mkedit = nil
+        elseif c == 13 then MX.mkedit = nil; ctx.seq_marker(me.which, me.buf ~= '' and me.buf or nil)
+        elseif c == 8 then me.buf = me.buf:sub(1, -2)
+        elseif (c >= 48 and c <= 57) or c == 46 then if #me.buf < 7 then me.buf = me.buf .. string.char(c) end end
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
