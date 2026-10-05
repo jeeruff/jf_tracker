@@ -1952,7 +1952,7 @@ function D.piano_strip(L, x, y, w, h, p)
   local lbl = ('oct %d'):format(p.octave or 4)
   local zx = p.hints and 'z- x+' or ''
   local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
-  text(x + L.pad, ly, lbl, U.AMBER)
+  text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
   if zx ~= '' then text(x + L.pad, ly + L.rh, zx, U.GREY) end   -- октава: z ниже, x выше
   local kx = x + lw
   local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 10))
@@ -1960,7 +1960,9 @@ function D.piano_strip(L, x, y, w, h, p)
   local ky, kh = y + 2, h - 3
   local letters = kw >= ms('W') + 4
   local held, last = p.held or {}, p.last
-  local white_c = U.mix(U.BG, U.TEXT, 0.85)
+  -- модуль не трекер: клавиши блёклые — клавиатура сейчас не играет (5 окт)
+  local dim = p.active == false
+  local white_c = U.mix(U.BG, U.TEXT, dim and 0.35 or 0.85)
   local function key_fill(off, base)
     if held[off] then return U.tint(U.AMBER, 0.75) end
     if off == last then return U.mix(base, U.AMBER, 0.35) end
@@ -1994,7 +1996,7 @@ function D.piano_strip(L, x, y, w, h, p)
   local hx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
   local hw = x + w - hx - L.pad
   if hw > 0 then
-    local kc = p.ins and U.AMBER or U.TEXT
+    local kc = dim and U.GREY or (p.ins and U.AMBER or U.TEXT)
     if p.hints then
       key_items(hx, ly, hw, D.PIANO_ROWS[1], kc, L.pad)
       key_items(hx, ly + L.rh, hw, D.PIANO_ROWS[2], kc, L.pad)

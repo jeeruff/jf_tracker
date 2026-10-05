@@ -5798,15 +5798,18 @@ local function frame()
     swap_state = function() return (ctx.swap_info()) end,
     -- пианинка (4 окт): октава, держимые клавиши (JS_VKeys), последняя сыгранная
     piano = state.piano_show and (function()
+      -- клавиши идут в пианинку только из трекера / вкладки сэмпла (5 окт):
+      -- в другом модуле — без подсветки нажатий, полоса блёклая
+      local active = state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample')
       local held = {}
-      if reaper.JS_VKeys_GetState then
+      if active and reaper.JS_VKeys_GetState then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
         for code, off in pairs(keys.piano) do
           local vk = string.char(code):upper():byte()
           if ks and ks:byte(vk) ~= 0 then held[off] = true end
         end
       end
-      return { octave = vim.octave, held = held, last = vim.piano_last }
+      return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active }
     end)() or nil,
     zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
