@@ -1531,7 +1531,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'options', 'options', btn = true, on = c.options_open }, { 'notes', 'notes', btn = true, on = c.notes },
       { 'tutorial', 'tutorial', btn = true, on = c.tour }, { 'screensets', 'screensets', btn = true, on = c.ss_open },
     } },
-    -- транспорт и ввод (5 окт) — в полосе под трекером (D.transport_rows)
+    -- транспорт и ввод (5 окт) — в полосе под трекером (D.transport_groups)
     -- быстрые вкл / выкл (4 окт): самое частое из вида — кнопками в рамке
     -- быстрые вкл / выкл (5 окт): колонка — где это на экране: слева / в центре
     -- (сверху вниз, как на экране) / справа; пустые клетки — { false }
@@ -1968,25 +1968,27 @@ end
 D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
 D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }   -- [3] — после какой белой
 -- транспорт (5 окт, из главного модуля): две строки ячеек { id, текст, цвет };
--- id — те же, что у главного модуля (клик / колесо — ctrl_action)
-function D.transport_rows(c)
+-- транспорт блоками (5 окт): сетка | шаг | переключатели; в блоке — две
+-- строки ячеек { id, текст, цвет }; id — те же, что у главного модуля
+-- (клик / колесо — ctrl_action). Время и BPM — свой крупный блок слева
+function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
   local num = math.max(1, math.min(16, c.sig_num or 4))
   local cur = c.beat and (math.floor(c.beat) + 1) or 0
-  return {
-    { not c.bigbpm and { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } or false,
-      not c.bigbpm and { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } or false,
-      { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig },
-      { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } },
-      { 'metro', 'metro ' .. (c.metro and 'on' or 'off'), c.metro and U.CYAN or U.GREY },
-      { 'follow', 'follow ' .. (c.follow and 'on' or 'off'), c.follow and U.CYAN or U.GREY },
-      { 'loop', 'loop ' .. (c.loop and 'on' or 'off'), c.loop and U.CYAN or U.GREY } },
-    { { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
-      { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
-      { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
-      { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
-      { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY } },
-  }
+  local function tg(id, label, on) return { id, label .. ' ' .. (on and 'on' or 'off'), on and U.CYAN or U.GREY } end
+  local g = {}
+  if not c.bigbpm then
+    g[#g + 1] = { { { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },
+                  { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
+  end
+  g[#g + 1] = { { { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig } },
+                { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
+  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) } },
+                { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
+  g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
+                { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
+                  { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
+  return g
 end
 
 -- полоса под трекером: слева клавиатура (m прячет), в остальном месте по
@@ -2055,7 +2057,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if c.bigbpm then
     local big = {
       { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT, '' },
-      { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT, 'BPM' },
+      { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT, '' },   -- BPM крупно тоже (5 окт)
     }
     for _, b in ipairs(big) do
       local bw = D.big_measure(b[2], 2)
@@ -2070,35 +2072,49 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       end
     end
   end
-  local gap = 2 * L.pad
-  for ri, row in ipairs(D.transport_rows(c)) do
-    local items, total = {}, 0
-    for _, it in ipairs(row) do
-      if it then
-        local iw = ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0)
-        if total + iw + (#items > 0 and gap or 0) > tw then break end           -- ячейка целиком или никак
-        total = total + iw + (#items > 0 and gap or 0)
-        items[#items + 1] = { it = it, w = iw }
-      end
+  -- блоки (5 окт): ширина блока — по длинной из двух строк; между блоками —
+  -- тусклая вертикальная черта; что не влезло — целым блоком в конец не идёт
+  local gap, sep = 2 * L.pad, 3 * L.pad
+  local function cw_of(it) return ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) end
+  local groups, total = {}, 0
+  for _, g in ipairs(D.transport_groups(c)) do
+    local gw = 0
+    for _, row in ipairs(g) do
+      local rw = 0
+      for k, it in ipairs(row) do rw = rw + cw_of(it) + (k > 1 and gap or 0) end
+      gw = math.max(gw, rw)
     end
-    local cx = tx + math.floor((tw - total) / 2)
-    local cy = ly + (ri - 1) * L.rh
-    for _, e in ipairs(items) do
-      local it = e.it
-      local hot = cell_hot(cx, cy, e.w, L.rh)
-      if hot then set(D.CURROW); gfx.rect(cx - 2, cy, e.w + 4, L.rh, 1); hover.ctrl = it[1] end
-      text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
-      if it.beats then
-        local bs = math.max(4, L.rh - 6)
-        local bx = cx + ms(it[2]) + L.pad
-        for k = 1, it.beats.num do
-          set(k == it.beats.cur and U.AMBER or U.DIM)
-          gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
+    local need = gw + (#groups > 0 and sep or 0)
+    if total + need > tw then break end
+    total = total + need
+    groups[#groups + 1] = { g = g, w = gw }
+  end
+  local gx = tx + math.max(0, math.floor((tw - total) / 2))
+  for gi, G in ipairs(groups) do
+    if gi > 1 then
+      set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(gx + math.floor(sep / 2) - 1, ly + 1, 1, 2 * L.rh - 2, 1)
+      gx = gx + sep
+    end
+    for ri, row in ipairs(G.g) do
+      local cx, cy = gx, ly + (ri - 1) * L.rh
+      for _, it in ipairs(row) do
+        local w = cw_of(it)
+        local hot = cell_hot(cx, cy, w, L.rh)
+        if hot then set(D.CURROW); gfx.rect(cx - 2, cy, w + 4, L.rh, 1); hover.ctrl = it[1] end
+        text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
+        if it.beats then
+          local bs = math.max(4, L.rh - 6)
+          local bx = cx + ms(it[2]) + L.pad
+          for k = 1, it.beats.num do
+            set(k == it.beats.cur and U.AMBER or U.DIM)
+            gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
+          end
         end
+        hint('ctrl', cx, cy, w, L.rh, it[1])
+        cx = cx + w + gap
       end
-      hint('ctrl', cx, cy, e.w, L.rh, it[1])
-      cx = cx + e.w + gap
     end
+    gx = gx + G.w
   end
   -- статус третьей строкой (опция status bar: keyboard)
   if st then
