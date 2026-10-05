@@ -1974,7 +1974,7 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 function D.transport_buttons(c)
   local ps = c.playstate or 0
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
-           { 'tp_pause', 'II', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', 'o', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '>>' },
+           { 'tp_pause', 'II', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', 'o', c.recording and U.RED or U.TEXT, U.RED }, { 'tp_fwd', '>>' },
            { 'loop', '8', c.loop and U.CYAN or U.GREY } }                         -- луп (5 окт): вместо «loop on»
 end
 function D.transport_groups(c)
@@ -2040,7 +2040,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 0)
-      D.big_text(bx + L.pad, ly, b[2], hot and U.AMBER or (b[3] or U.TEXT), 2)
+      D.big_text(bx + L.pad, ly, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет буквы (o всегда красная)
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, bw, 2 * L.rh, b[1])
       bx = bx + bw + L.pad
