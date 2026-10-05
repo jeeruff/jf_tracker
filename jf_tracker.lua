@@ -6866,6 +6866,7 @@ local function frame()
         lw = 0                                       -- список — отдельный модуль справа (4 окт)
       end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
+      if sel_e and not sel_e.file then pw = SPROP.fit_w(L, pw, h) end           -- только занятые колонки, остаток — волне
       -- свойства семпла слева от волны (4 окт, опция props position)
       local pleft = state.propspos == 'left'
       local px = pleft and x or (x + w - lw - (lw > 0 and L.pad or 0) - pw)

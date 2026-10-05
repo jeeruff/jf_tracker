@@ -51,6 +51,15 @@ function SP.value(e, k)
   return ''
 end
 
+-- ширина, которую свойства реально займут (5 окт): высокая панель — все строки
+-- в одной-двух колонках, остаток отдаётся волне (не пустое место справа)
+function SP.fit_w(L, w, h)
+  local per = math.max(1, math.floor((h - L.rh) / L.rh))
+  local ncols = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
+  local colw = math.floor((w + L.pad) / ncols)
+  local need = math.min(ncols, math.ceil(#SP.ROWS / per))
+  return math.min(w, need * colw)
+end
 function SP.draw(L, x, y, w, h, e, focused)
   SP.hover = nil
   SP.slider = nil
