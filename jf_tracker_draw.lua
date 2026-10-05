@@ -236,6 +236,7 @@ function D.layout(snap, state, nregions)
   -- stretch-маркеры; только on/off (просьба 1 окт, режимы peaks/rect убраны)
   L.wave = (state.wavemode == 'column') and 'spec' or 'off'
   D.wave_none = state.wavemode == 'off'                -- без волны совсем (3 окт)
+  D.show_smk = state.stretchmarks ~= false
   D.wave_back = state.wavemode == 'back'               -- волна фоном во всю ширину item, под текстом (3 окт)
   -- text only (4 окт): в ячейках только текст — без волны, заливки и рамки item
   if state.textonly then L.wave = 'off'; D.wave_none = true; D.wave_back = false end
@@ -686,7 +687,7 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     end
   end
   -- stretch-маркеры: янтарная чёрточка во всю ширину колонки на своей строке
-  if column and head.smk and not inv then
+  if column and head.smk and not inv and D.show_smk ~= false then          -- опция stretch markers (5 окт)
     set(U.AMBER)
     for _, fr in ipairs(head.smk) do
       local q = math.floor(fr * total)
@@ -2725,9 +2726,13 @@ function D.frame(L, snap, rows, state, info)
                 while rr < it.r1 - 1e-6 and guard < 512 do
                   local ly = yr(rr)
                   if ly > cy0 and ly < cy1 then
-                    gfx.a = 0.9; gfx.rect(x0 + 2, ly, w0 - 4, 1, 1)
-                    for k = 0, 1 do gfx.line(x0 + 2 + k, ly - 5, x0 + 10 + k, ly + 3) end
-                    gfx.a = 1
+                    -- шов лупа как в REAPER (5 окт): контрастная линия поперёк и
+                    -- треугольные вырезы на обеих границах item, остриём внутрь
+                    set(U.mix(col, U.TEXT, 0.6)); gfx.rect(x0 + 1, ly, w0 - 2, 1, 1)
+                    local tz = math.max(3, math.floor(L.rh / 3))
+                    gfx.triangle(x0, ly - tz, x0, ly + tz, x0 + tz, ly)
+                    gfx.triangle(x0 + w0 - 1, ly - tz, x0 + w0 - 1, ly + tz, x0 + w0 - 1 - tz, ly)
+                    set(col)
                     -- стык тянется: длина периода (Option — растяжение)
                     if mx >= x0 and mx < x0 + w0 and math.abs(my - ly) <= 3 then
                       hover.seam = { kind = 'item', item = it.item, k = guard + 1, midi = it.midi, x0 = x0, w = w0 }
