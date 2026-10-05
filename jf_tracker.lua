@@ -156,7 +156,7 @@ local state = {
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
-  statpos = reaper.GetExtState(EXT, 'statpos') == 'tracker' and 'tracker' or 'bottom',
+  statpos = ({ tracker = 'tracker', keyboard = 'keyboard' })[reaper.GetExtState(EXT, 'statpos')] or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
   gridtab = flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')),
@@ -2859,7 +2859,7 @@ ctx = {
       flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
-      { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'status line at the window bottom or inside the tracker module', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
+      { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),

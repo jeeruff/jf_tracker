@@ -315,7 +315,11 @@ function D.layout(snap, state, nregions)
   -- положение верхнего модуля (3 окт): top — над трекером, mid — над DSP,
   -- bottom — под DSP; статус-бар: bottom — низ окна, tracker — строка в модуле трекера
   L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom') and state.toppos or 'top'
-  L.statpos = state.statpos == 'tracker' and 'tracker' or 'bottom'
+  L.statpos = (state.statpos == 'tracker' or state.statpos == 'keyboard') and state.statpos or 'bottom'
+  -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
+  -- статус внизу окна
+  L.kbstat = L.statpos == 'keyboard' and state.piano_strip and true or false
+  if L.statpos == 'keyboard' and not L.kbstat then L.statpos = 'bottom' end
   L.header_y = L.toppos == 'top' and L.top_h or 0
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
@@ -338,7 +342,7 @@ function D.layout(snap, state, nregions)
   -- чтобы тело не прыгало, когда треки перестают помещаться
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
-  L.piano_h = state.piano_strip and (2 * L.rh + 6) or 0
+  L.piano_h = state.piano_strip and ((L.kbstat and 3 or 2) * L.rh + 6) or 0
   L.low_h = L.hsb_h + L.piano_h                     -- всё, что под телом в модуле трекера
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0))
   L.hsb_y = L.body_y + L.body_h
@@ -1921,13 +1925,35 @@ end
 -- p = { octave, held = { [смещение] = true }, last = смещение }
 D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
 D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }   -- [3] — после какой белой
+-- что делают ряды в INSERT (5 окт): домашний и нижний; верхний — ноты
+D.PIANO_ROWS = {
+  { { 'a', 'step auto' }, { 's', ':step' }, { 'd', 'delete' }, { 'f', 'fx cols' }, { 'g', 'top' }, { 'hjkl', 'move' }, { ';', 'whole sample' } },
+  { { 'z x', 'octave' }, { 'c C', 'velocity' }, { 'b n', 'bars' }, { ', .', 'sound' }, { 'Shift', 'listen' }, { 'Ctrl', 'hold' }, { 'Esc', 'NORMAL' } },
+}
+
+-- строка «клавиша описание» пунктами: пункт целиком или никак (без наложений)
+local function key_items(x, y, w, items, kc, pad)
+  local cx = x
+  for _, it in ipairs(items) do
+    local kw2, dw = ms(it[1]), ms(it[2])
+    if cx + kw2 + pad + dw > x + w then break end
+    text(cx, y, it[1], kc)
+    text(cx + kw2 + pad, y, it[2], U.GREY)
+    cx = cx + kw2 + pad + dw + 2 * pad
+  end
+end
+
 function D.piano_strip(L, x, y, w, h, p)
   local out = { white = 0, black = 0, letters = 0 }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   set(D.SEP); gfx.rect(x, y, w, 1, 1)
+  local nl = p.status and 3 or 2
+  local ly = y + math.floor((h - nl * L.rh) / 2)
   local lbl = ('oct %d'):format(p.octave or 4)
-  local lw = ms(lbl) + 2 * L.pad
-  text(x + L.pad, y + math.floor((h - L.rh) / 2), lbl, U.AMBER)
+  local zx = 'z- x+'
+  local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
+  text(x + L.pad, ly, lbl, U.AMBER)
+  text(x + L.pad, ly + L.rh, zx, U.GREY)                -- октава: z ниже, x выше
   local kx = x + lw
   local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 10))
   if kw < 4 then return out end
@@ -1962,6 +1988,23 @@ function D.piano_strip(L, x, y, w, h, p)
       text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], U.readable(U.TEXT, fill, 4.5))
       out.letters = out.letters + 1
     end
+  end
+  -- справа: что делают домашний и нижний ряды в INSERT (в NORMAL — Vim,
+  -- поэтому клавиши серые); третья строка — статус (опция status bar: keyboard)
+  local hx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
+  local hw = x + w - hx - L.pad
+  if hw > 0 then
+    local kc = p.ins and U.AMBER or U.TEXT
+    key_items(hx, ly, hw, D.PIANO_ROWS[1], kc, L.pad)
+    key_items(hx, ly + L.rh, hw, D.PIANO_ROWS[2], kc, L.pad)
+    if p.status then
+      local sy = ly + 2 * L.rh
+      local left = fit(p.status[1], math.floor(hw / 3))
+      text(hx, sy, left, p.ins and D.FOCUS_INS or U.AMBER)
+      local dx = hx + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
+      if p.status[2] ~= '' and dx < hx + hw then text(dx, sy, fit(p.status[2], hx + hw - dx), U.TEXT) end
+    end
+    out.hints = true
   end
   return out
 end
@@ -3634,6 +3677,11 @@ function D.frame(L, snap, rows, state, info)
   end
   -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
   if L.piano_h > 0 and info.piano then
+    info.piano.ins = info.vmode == 'insert'
+    if L.kbstat then
+      info.piano.status = { info.status_left or '', (info.status_right ~= '' and info.status_right) or D.aw_status or '' }
+      D.aw_status = nil
+    end
     D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, info.piano)
   end
   -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
