@@ -154,7 +154,10 @@ end
 -- перетаскивание слайс-маркера k (просьба 1 окт): между соседями, commit на отпускании
 function S.slice_down(k)
   if not S.entry or not S.slices[k] then return end
-  S.drag = { kind = 'slice', k = k }
+  S.drag = { kind = 'slice', k = k, t0 = S.slices[k], mx0 = gfx.mouse_x }
+  -- клик по линии слайса (5 окт) — этот слайс выбран в модуле слайсов
+  if ctx and ctx.select_slice then ctx.select_slice(S.entry, k) end
+  if ctx and ctx.set_last_slice then ctx.set_last_slice(k) end
 end
 function S.mouse_move(frac)
   if S.drag and S.drag.kind == 'slice' and S.entry and frac then
@@ -169,7 +172,15 @@ end
 function S.mouse_up()
   local d = S.drag
   S.drag = nil
-  if d and d.kind == 'slice' then commit(); S.msg = ('slice %d moved'):format(d.k); return d end
+  if d and d.kind == 'slice' then
+    -- клик без протяжки — только выбор (граница не двигается, без правки)
+    if math.abs(gfx.mouse_x - (d.mx0 or gfx.mouse_x)) < 3 then
+      if d.t0 then S.slices[d.k] = d.t0 end
+      S.msg = ('slice S%02X selected'):format(d.k)
+      return d
+    end
+    commit(); S.msg = ('slice %d moved'):format(d.k); return d
+  end
   if S.sel and S.sel.b < S.sel.a then S.sel.a, S.sel.b = S.sel.b, S.sel.a end
   if S.sel and S.sel.b - S.sel.a < 0.001 then S.sel = nil end
   return d

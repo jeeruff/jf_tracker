@@ -1911,6 +1911,7 @@ ctx = {
   -- 0 — весь айтем. Option+нота играет и пишет его с питчем
   selected_slice = function(root) if root and ctx.ssel.item == root.item then return ctx.ssel.k or 0 end return nil end,
   select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell } end end,
+  set_last_slice = function(k) vim.last_slice = k end,
   mx_zoom = function() MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail' end,
   mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
