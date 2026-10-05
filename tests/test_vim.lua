@@ -639,6 +639,10 @@ keysin('j'); eq('keys on: j moves down', V.cur.row, r0 + 1)
 keysin('k'); eq('keys on: k moves up', V.cur.row, r0)
 local nc = #calls; keysin('q'); eq('keys on: q plays, writes nothing', #calls, nc + 1); eq('keys on: q previews', last():match('^prev') ~= nil, true)
 keysin('x'); eq('keys on: x = octave up, not delete', V.octave, 5); keysin('z')
+-- 5 окт: клавиатура вкл, INSERT: d3w — команда Vim, а не ноты 3 и w
+reset(); AUTO_KBD = false; PIANO_ON = true; V.mode = 'insert'; V.cur.row = 0
+local nd = #calls; keysin('d3'); eq('keys INSERT: d3 waits, no note', #calls, nd); keysin('w')
+eq('keys INSERT: d3w deletes', (last() or ''):match('^delete') ~= nil, true); eq('keys INSERT: back in INSERT', V.mode, 'insert')
 PIANO_ON = false; AUTO_KBD = true
 -- 5 окт: Shift+hjkl — выделение; INSERT s — выделение с возвратом; Option+s (ß) — :step
 reset(); keysin('L'); eq('L: visual from normal', V.mode, 'visual'); eq('L: anchor at the start', V.anchor and V.anchor.fi, 1)

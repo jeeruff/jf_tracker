@@ -215,10 +215,11 @@ end
 -- клавиши; true — съедена
 function SP.key(c, e)
   local ch = c < 256 and string.char(c) or ''
-  if ch == 'J' then SP.sel = math.min(#SP.ROWS, SP.sel + 1)
-  elseif ch == 'K' then SP.sel = math.max(1, SP.sel - 1)
-  elseif ch == 'H' then if e then ctx.sp_adjust(e, SP.ROWS[SP.sel].k, -1) end
-  elseif ch == 'L' then if e then ctx.sp_adjust(e, SP.ROWS[SP.sel].k, 1) end
+  -- 5 окт: j k — строка, h l — значение (как Vim); заглавные — то же
+  if ch == 'J' or ch == 'j' then SP.sel = math.min(#SP.ROWS, SP.sel + 1)
+  elseif ch == 'K' or ch == 'k' then SP.sel = math.max(1, SP.sel - 1)
+  elseif ch == 'H' or ch == 'h' then if e then ctx.sp_adjust(e, SP.ROWS[SP.sel].k, -1) end
+  elseif ch == 'L' or ch == 'l' then if e then ctx.sp_adjust(e, SP.ROWS[SP.sel].k, 1) end
   elseif ch == 'R' then if e then ctx.sp_reset(e, SP.ROWS[SP.sel].k) end
   else return false end
   return true

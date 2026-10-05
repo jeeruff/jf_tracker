@@ -8740,7 +8740,7 @@ local function frame()
   end
   if c_raw > 0 then
     ctx.keylog = ctx.keylog or {}
-    table.insert(ctx.keylog, ('%s %d>%d %s/%s%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or '')))
+    table.insert(ctx.keylog, ('%s %d>%d %s/%s%s cap%d inj%s row%d fi%d%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or ''), gfx.mouse_cap, tostring(inject_cap), vim.cur.row, vim.cur.fi, state.kslider and ' SLIDER' or ''))   -- 5 окт: моды и курсор для разбора «hjkl не работает»
     if #ctx.keylog > 24 then table.remove(ctx.keylog, 1) end
     reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
