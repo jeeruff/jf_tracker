@@ -40,6 +40,7 @@ MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкл
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
+SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
@@ -1224,6 +1225,50 @@ ctx = {
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
   -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
   scramble = function() vim.run_cmd('scramble') end,
+  -- импульс ReaVerb (5 окт): путь к файлу — FILE0 плагина, иначе из его
+  -- состояния в чанке трека (base64 → поиск пути .wav / .aif / .flac)
+  ir_path_cache = {},
+  ir_path = function(tr, fx)
+    local guid = reaper.TrackFX_GetFXGUID(tr, fx) or tostring(fx)
+    local c = ctx.ir_path_cache[guid]
+    if c and reaper.time_precise() - c.t < 3 then return c.path end
+    local path
+    local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'FILE0')
+    if ok and v and v ~= '' then path = v end
+    if not path then
+      local _, chunk = reaper.GetTrackStateChunk(tr, '', false)
+      local B = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      local function b64(s)
+        s = s:gsub('[^' .. B .. '=]', '')
+        return (s:gsub('.', function(x) if x == '=' then return '' end local r, f = '', (B:find(x) - 1); for i = 6, 1, -1 do r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0') end; return r end)
+          :gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x) if #x ~= 8 then return '' end local c2 = 0; for i = 1, 8 do c2 = c2 + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0) end; return string.char(c2) end))
+      end
+      for blk in (chunk or ''):gmatch('<VST "[^"]*ReaVerb[^"]*"[^\n]*\n(.-)\n>') do
+        local data = b64(blk)
+        local pth = data:match('(/[^%z\r\n]-%.[Ww][Aa][Vv])') or data:match('(/[^%z\r\n]-%.[Aa][Ii][Ff]+)') or data:match('(/[^%z\r\n]-%.[Ff][Ll][Aa][Cc])')
+        if pth then path = pth; break end
+      end
+    end
+    ctx.ir_path_cache[guid] = { path = path, t = reaper.time_precise() }
+    return path
+  end,
+  -- спектрограмма записи lib / файла (5 окт): задание SL.sg; nil — не из чего
+  sgram = function(e)
+    if not e then return nil end
+    local key, reader, sr, len
+    if e.file and e.path then
+      key = 'f:' .. e.path
+      if SL.sg.jobs[key] then return SL.sg.jobs[key] end
+      reader, sr, len = SL.sg.wav_reader(e.path)
+    elseif e.take and reaper.ValidatePtr(e.take, 'MediaItem_Take*') then
+      key = 't:' .. tostring(e.guid or e.item) .. ':' .. ('%.4f'):format(e.len or 0)
+      if SL.sg.jobs[key] then return SL.sg.jobs[key] end
+      reader, sr, len = SL.sg.take_reader(e.take)
+      len = e.len or len
+    end
+    if not reader then return nil end
+    return SL.sg.get(key, reader, len or 1, sr, 1024, 128)
+  end,
   -- выбранный слайс инструмента (4 окт): { item = корень, k = 0 весь / 1.. }
   ssel = {},
   slice_root = function()
@@ -3948,6 +3993,19 @@ MX.ruler = state.mxruler
 MX.fold = state.mxfold
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
+-- импульс ReaVerb (5 окт): задание спектрограммы файла импульса для вида ir
+draw.ir_job = function(f)
+  local t = dsp_target()
+  if not t or model.is_take(t.track) then return nil end
+  local p = ctx.ir_path(t.track, f.i)
+  if not p then return nil end
+  local nm = p:match('[^/]+$') or p
+  local key = 'ir:' .. p
+  if SL.sg.jobs[key] then return SL.sg.jobs[key], nm end
+  local rd, sr, len = SL.sg.wav_reader(p)
+  if not rd then return nil, nm .. ' (not wav)' end
+  return SL.sg.get(key, rd, len, sr, 256, 64), nm
+end
 MMX.init(U, ctx)
 MMX.PP.init(U, ctx)
 draw.macro.init(U)
@@ -5315,6 +5373,7 @@ local function frame()
   U.begin_frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
+  SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
   if state.hold then
     local h = state.hold

@@ -361,8 +361,12 @@
 - [ ] Параметры: start end loop at loop, rate hz smooth pitch fine base volume, attack release gate reverse ping pong mode, poly glide chord hold velocity, stretch, LFO
 - [ ] learn (E) в DSP: X / Y — назначить оси XY-пэда своему модулю, пэд в первой колонке, тянуть мышью
 
+## Спектрограмма (0.6.36)
+- [ ] Вкладка item: кнопка `sgram` (рядом с spec / peaks) — настоящая спектрограмма (время × частота, тёмный → синий → красный → жёлтый), считается за доли секунды с «%», зум волны работает и на ней
+- [ ] ReaVerb в DSP: первая колонка — спектрограмма файла импульса (wav), под ней имя файла; нет файла — подсказка
+
 ## В работе (ещё не готово)
-- DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
+- DSP: файлы RS5K в модуле слайсов; пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue
 - легато: само подстраиваться при смене темпа (сейчас — повторить :legato)
 - jf_pm: сабпроекты и депо (README)

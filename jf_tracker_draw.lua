@@ -1019,7 +1019,7 @@ function D.aw_colour(cat)
   end
   return U.readable(c, U.BG, 4.0)
 end
-D.FX_VIEWS = { amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true }
+D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true }
 local VRH = 8
 local function pnum(f, vals, label)
   for i, p in ipairs(f.params or {}) do
@@ -1142,6 +1142,14 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       set(U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
       a = a * g
     end
+  elseif kind == 'ir' then
+    -- импульс ReaVerb (5 окт): спектрограмма файла импульса; ниже — имя
+    local j, nm = D.ir_job and D.ir_job(f)
+    if j then
+      gfx.blit(j.img, 1, 0, 0, 0, j.cols, j.rows, x + 1, y + 1, w - 2, h - VRH - 3)
+      if not j.done then text(x + 3, y + 2, ('%d%%'):format(math.floor(j.col / j.cols * 100)), U.GREY) end
+    else text(x + 3, y + 2, fit('no impulse file (load one in ReaVerb)', w - 6), U.DIM) end
+    if nm then text(x + 3, y + h - VRH - 1, fit(nm, w - 6), U.GREY) end
   elseif kind == 'amigo' then
     -- лента сэмпла: Start..End — играемая часть, Loop Start — метка; ниже —
     -- режимы буквами и Sample Rate шкалой (лоу-фай: левее — грязнее)

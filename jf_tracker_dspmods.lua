@@ -260,6 +260,15 @@ DM.modules = {
     },
   },
   {
+    -- ReaVerb (5 окт): спектрограмма импульса (вид ir); после ReaVerbate в
+    -- списке — «reaverb» — подстрока «reaverbate»
+    match = 'reaverb',
+    title = 'ReaVerb',
+    cols = 2,
+    view = 'ir',
+    params = { { 'Wet', 'wet' }, { 'Dry', 'dry' }, { 'Pre-verb', 'pre-verb' }, { 'Width', 'width' }, { 'Pan', 'pan' } },
+  },
+  {
     -- ReaPitch (4 окт): сдвиг — полутоны, центы, октавы, форманта
     match = 'reapitch',
     title = 'ReaPitch',

@@ -392,7 +392,7 @@ function S.autotrim()
 end
 
 function S.cycle_view()
-  S.view = S.view == 'peaks' and 'spec' or 'peaks'
+  S.view = ({ peaks = 'spec', spec = 'sgram', sgram = 'peaks' })[S.view] or 'peaks'
   return S.view
 end
 
@@ -415,7 +415,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- кнопки вида справа в заголовке
   local vx = x + w
   local hover_view
-  for _, v in ipairs({ 'big', 'spec', 'peaks' }) do
+  for _, v in ipairs({ 'big', 'sgram', 'spec', 'peaks' }) do
     local bw = U.measure(v) + 2 * L.pad
     vx = vx - bw
     local on = (v == 'big' and ctx.state and ctx.state.sample_big) or S.view == v
@@ -508,7 +508,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- S.env читалась линейно и растягивала файл на всю ширину, а item в лупе
   -- за концом файла играет начало — картинки расходились. S.env — для детекции
   local env = (editing and S.view == 'peaks' and not (ctx.peaks and e.item)) and S.env or nil
-  if S.view == 'spec' and ctx.peaks then
+  local sgj = S.view == 'sgram' and ctx.sgram and ctx.sgram(e)
+  if sgj then
+    -- спектрограмма (5 окт): картинка задания, окно зума va..vb; досчитывается
+    local c0 = math.floor(va / len * sgj.cols)
+    local c1 = math.max(c0 + 1, math.floor(vb / len * sgj.cols))
+    gfx.blit(sgj.img, 1, 0, c0, 0, c1 - c0, sgj.rows, x, wy, w, wh)
+    if not sgj.done then U.text(x + 4, wy + 2, ('spectrogram %d%%'):format(math.floor(sgj.col / sgj.cols * 100)), U.GREY) end
+  elseif S.view == 'sgram' then
+    U.text(x + 4, wy + 2, 'spectrogram: no audio to read (wav files and lib items)', U.GREY)
+  elseif S.view == 'spec' and ctx.peaks then
     local pk = ctx.peaks(e, ntot, true)
     if pk and pk.n > 0 then
       for px = 0, w - 1 do

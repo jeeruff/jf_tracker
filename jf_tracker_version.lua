@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.35'
+V.VERSION = '0.6.36'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.36', d = '2026-10-05', items = {
+    'spectrogram: the item tab view sgram - a real time x frequency heat map (Hann 1024, native FFT, log frequency, -90..0 dB), computed a little each frame into a picture; works with the wave zoom',
+    'ReaVerb in DSP: the spectrogram of the impulse file; Amigo module; the user module learn assigns XY pad axes (X / Y)',
+  } },
   { v = '0.6.35', d = '2026-10-04', items = {
     'DSP blocks for the REAPER fx: ReaEQ curve, ReaComp transfer curve, ReaXcomp bands, ReaDelay repeats, ReaVerbate room, ReaGate / ReaLimit level scale, ReaPitch shift - a picture in the first column, the parameters next to it',
     'Airwindows plugins: the category (coloured) and a one-line description from the Airwindopedia under the name - every block tells what it is at a glance',
