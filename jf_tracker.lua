@@ -4612,6 +4612,8 @@ edit.after = function(desc)
 end
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
+draw.key_label = keys.label                              -- подписи клавиш в раскладке (5 окт)
+ctx.key_label = keys.label
 draw.themes = dofile(DIR .. '/jf_tracker_themes.lua')   -- темы трекера (3 окт); полем draw: у главного чанка предел локальных
 ctx.load_user_themes()                                   -- свои темы из Data/jf_tracker_themes (5 окт)
 if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
@@ -6674,7 +6676,7 @@ local function frame()
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
-      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = string.char(code) end
+      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
       local rows = { { k = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices) do
         rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }

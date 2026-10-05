@@ -37,11 +37,25 @@ local ru = {
   ['№']='#',
 }
 keys.layout = {}
-for from, to in pairs(ru) do keys.layout[utf8.codepoint(from)] = to:byte() end
+keys.to_ru = {}                                   -- латиница → кириллица (подписи клавиш)
+for from, to in pairs(ru) do keys.layout[utf8.codepoint(from)] = to:byte(); keys.to_ru[to] = from end
 
--- код клавиши из gfx.getchar → код в латинской раскладке (или как есть)
+-- код клавиши из gfx.getchar → код в латинской раскладке (или как есть).
+-- Не-ASCII REAPER присылает как 'u' << 24 | код символа (5 окт: без снятия
+-- префикса кириллица не находилась вовсе). keys.ru — последняя буква была
+-- русской: подписи клавиш показываем кириллицей
+keys.ru = false
 function keys.translate(c)
-  return keys.layout[c] or c
+  local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+  local t = keys.layout[cp]
+  if t then keys.ru = true; return t end
+  if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) then keys.ru = false end
+  return c
+end
+-- подпись клавиши (латинская буква / символ) в текущей раскладке
+function keys.label(ch)
+  if keys.ru and keys.to_ru[ch] then return keys.to_ru[ch] end
+  return ch
 end
 
 -- ── спец-клавиши (коды gfx.getchar) ───────────────────────────────────────

@@ -2027,7 +2027,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- тёмная буква на светлой клавише — с подложкой цвета клавиши (5 окт): без
           -- неё картинка текста ×2 складывается с фоном, и тёмное пропадало
           local kf = key_fill(k[1], white_c)
-          text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], U.readable(U.BG, kf, dim and 3.0 or 4.5), kf)
+          local lb = D.key_label and D.key_label(k[2]) or k[2]               -- русская раскладка — кириллицей (5 окт)
+          text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, U.readable(U.BG, kf, dim and 3.0 or 4.5), kf)
           out.letters = out.letters + 1
         end
       end

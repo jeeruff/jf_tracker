@@ -646,7 +646,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local base = (ctx and ctx.slice_base and ctx.slice_base()) or 60
     for code, off in pairs((ctx and ctx.piano) or {}) do
       local k = (oct + 1) * 12 + off - base + 1
-      key_of[k] = string.char(code)
+      key_of[k] = (ctx.key_label and ctx.key_label(string.char(code))) or string.char(code)
     end
   end
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh

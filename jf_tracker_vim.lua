@@ -941,7 +941,8 @@ function V.note_key(c, mods)
     return base, 'hold'
   end
   local ch = (c < 256) and string.char(c) or ''
-  if OPTCH[c] then return OPTCH[c]:byte(), 'beside' end
+  local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c   -- 'u'-префикс не-ASCII (5 окт)
+  if OPTCH[cp] then return OPTCH[cp]:byte(), 'beside' end
 
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end
