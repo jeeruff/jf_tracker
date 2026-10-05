@@ -3598,7 +3598,7 @@ ctx = {
     for _, it in ipairs(ctx.option_items()) do if state.dev or it.key ~= 'gridtab' then items[#items + 1] = it end end
     -- hotkeys (5 окт): все клавиши со страниц ? — клавиша, модуль, описание;
     -- / ищет по клавише, описанию и модулю
-    items[#items + 1] = { sep = true, title = 'hotkeys' }
+    items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
       local page = KH.PAGES[pg]
       if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca')) then
@@ -3609,7 +3609,7 @@ ctx = {
       end
     end
     -- профили (5 окт): сохранить / загрузить / удалить набор опций
-    items[#items + 1] = { sep = true, title = 'profiles' }
+    items[#items + 1] = { sep = true, title = 'profiles', group = 'options' }
     items[#items + 1] = { label = 'save the options as a profile', kind = 'action', value = ':optsave', desc = 'all options into Data/jf_tracker_profiles/<name>.txt', fn = function()
       OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'optsave ' end }
     for _, name in ipairs(ctx.list_files(ctx.profile_dir(), 'txt')) do

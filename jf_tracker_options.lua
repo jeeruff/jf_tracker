@@ -37,10 +37,12 @@ function O.rebuild()
     end
   elseif O.tab == 'all' then view = O.all
   else
-    local on = false
+    -- вкладка = группа разделов (5 окт): заголовок с group = 'hotkeys' и всё под
+    -- ним — вкладка hotkeys, остальное — options
+    local grp = 'options'
     for _, it in ipairs(O.all) do
-      if it.sep then on = it.title == O.tab
-      elseif on then view[#view + 1] = it end
+      if it.sep then grp = it.group or 'options' end
+      if grp == O.tab then view[#view + 1] = it end
     end
   end
   O.items = view
@@ -50,9 +52,13 @@ end
 function O.open(items, tab)
   O.compact, O.numbuf = nil, nil
   O.all = items or O.all
-  -- вкладки убраны (5 окт, «дурацкая идея»): все опции одной страницей,
-  -- разделы — заголовками; поиск остался
-  O.tabs, O.tab = {}, 'all'
+  -- вкладки по разделам убраны (5 окт, «дурацкая идея»); остались две —
+  -- options и hotkeys (группы заголовков); без групп — одна страница
+  O.tabs = {}
+  for _, it in ipairs(O.all) do
+    if it.sep and it.group then O.tabs = { 'options', 'hotkeys' }; break end
+  end
+  if #O.tabs > 0 then O.tab = (tab == 'hotkeys') and 'hotkeys' or 'options' else O.tab = 'all' end
   O.query, O.typing = '', false
   O.page = 'list'
   O.active = true
@@ -426,7 +432,7 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  if not O.compact then U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
+  if not O.compact then U.text(hx, by + 2, ctx.fit((#O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: options / hotkeys   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'), bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска

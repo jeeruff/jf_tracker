@@ -25,6 +25,19 @@ O.key(('/'):byte()); for ch in ('hint'):gmatch('.') do O.key(ch:byte()) end
 eq('fzf: one match', #O.items, 1); eq('fzf: the hints row', O.items[1].key, 'hints')
 O.key(27); eq('Esc clears the search', O.query, ''); eq('back to the whole page', #O.items, #items)
 O.open(items, 'look'); eq('a remembered tab is ignored', #O.items, #items)
+-- две вкладки (5 окт): options и hotkeys — по group заголовков
+do
+  local g = {
+    { sep = true, title = 'look' }, { key = 'a', label = 'a', kind = 'toggle', get = function() return false end, set = function() end },
+    { sep = true, title = 'hotkeys', group = 'hotkeys' }, { label = 'dd', kind = 'action', desc = 'delete' }, { label = 'yy', kind = 'action', desc = 'yank' },
+    { sep = true, title = 'profiles', group = 'options' }, { label = 'save', kind = 'action' },
+  }
+  O.open(g)
+  eq('tabs options, hotkeys', table.concat(O.tabs, ','), 'options,hotkeys')
+  eq('options tab: look + profiles', #O.items, 4)
+  O.key(9); eq('Tab -> hotkeys', O.tab, 'hotkeys'); eq('hotkeys rows', #O.items, 3)
+  O.open(g, 'hotkeys'); eq('open on hotkeys', O.tab, 'hotkeys')
+end
 -- компактная панель (5 окт): число цифрами, Enter, границы, Esc
 local vol = 0
 O.open_panel({ { label = 'volume', kind = 'num', min = -60, max = 12, step = 0.5, get = function() return vol end, set = function(v) vol = v end } }, 'item x', { x = 10, y = 10 })
