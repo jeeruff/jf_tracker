@@ -69,7 +69,7 @@ Both extensions are available through [ReaPack](https://reapack.com/).
 **With ReaPack (recommended).**
 
 1. In REAPER, open *Extensions → ReaPack → Import repositories…* and paste
-   `https://github.com/jeeruff/jf_tracker/raw/master/index.xml`.
+   `https://github.com/jeeruff/jf_tracker-release/raw/main/index.xml`.
 2. Open *Extensions → ReaPack → Browse packages*, find `jf_tracker` and
    `jf_tracker effects`, and install both.
 3. The `jf_tracker` script appears in the action list. Bind it to a key if you
