@@ -83,10 +83,20 @@ local tcache, next_img = {}, 100
 -- вертикальный текст, 960..1019 спектрограммы анализатора, 1022 логотип about, 1023 черновик поворота
 local IMG_FIRST, IMG_LAST = 100, 799
 
+-- пиксельные TTF (5 окт, опция font): кириллица, греческий, блоки, рамки —
+-- без гибрида; px — родной размер (кегль = px × масштаб — чётко)
+D.TTF_FACES = {
+  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12 },    -- DOS 8×12, жирный
+  departure = { face = 'DepartureMono Nerd Font Mono', px = 11 },    -- тонкий, больше всех символов
+  gohu = { face = 'GohuFont uni14 Nerd Font Mono', px = 14 },        -- терминальный, все стрелки
+}
 function D.set_font(state)
-  local n = 0                      -- TTF убран (3 окт): всегда битмап
-  if n > 0 then
-    gfx.setfont(1, state.fontface or 'JetBrainsMono Nerd Font Mono', n)
+  local tf = D.TTF_FACES[state.ttf or 'off']
+  D.ttf = tf and true or false
+  if tf then
+    local fs = tonumber(state.fontscale) or 2
+    if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
+    gfx.setfont(1, tf.face, math.floor(tf.px * fs + 0.5))
     D.font_id = 1
     D.SCALE = 1
   else
@@ -225,7 +235,7 @@ function D.layout(snap, state, nregions)
   gfx.setfont(D.font_id)
   local L = {}
   L.th = TH()
-  L.rh = L.th + 2 + D.SPACE
+  L.rh = L.th + 2 + D.SPACE + (D.SCALE % 1 ~= 0 and 1 or 0)   -- x1.5 (5 окт): +1 px снизу текста в кнопках
   L.pad = ms(' ')
   if L.pad < 2 then L.pad = math.max(3, math.floor(ms('W') / 2)) end
   L.cw = ms('W')
@@ -506,9 +516,29 @@ local function text(x, y, s, col, bg)
   end
   local e = txt_img(s, col, bg)
   local mode = gfx.mode
-  gfx.mode = (bg and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании
   gfx.a = 1
-  gfx.blit(e.id, 1, 0, 0, 0, e.w, e.h, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
+  if D.SCALE % 1 ~= 0 then
+    -- дробный масштаб (x1.5, 5 окт): ближайший сосед даёт штрихи 1-2-1-2 px;
+    -- поэтому картинка ×(2·масштаб) без сглаживания и вывод /2 со сглаживанием —
+    -- все штрихи одной толщины, край мягкий
+    local k = math.floor(D.SCALE * 2 + 0.5)
+    if not e.ov or e.ovk ~= k then
+      if next_img > IMG_LAST then tcache, next_img = {}, IMG_FIRST end
+      local id = next_img; next_img = next_img + 1
+      local d0 = gfx.dest
+      gfx.setimgdim(id, e.w * k, e.h * k)
+      gfx.dest = id
+      gfx.mode = 4
+      gfx.blit(e.id, 1, 0, 0, 0, e.w, e.h, 0, 0, e.w * k, e.h * k)
+      gfx.dest = d0
+      e.ov, e.ovk = id, k
+    end
+    gfx.mode = bg and 0 or 1                -- со сглаживанием: /2
+    gfx.blit(e.ov, 1, 0, 0, 0, e.w * k, e.h * k, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
+  else
+    gfx.mode = (bg and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании
+    gfx.blit(e.id, 1, 0, 0, 0, e.w, e.h, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
+  end
   gfx.mode = mode
 end
 D.text = text
@@ -585,7 +615,7 @@ function D.vtext(x, y, h_avail, str, col, bg, top)
     e = { id = B, w = h, h = w }
     vcache[key] = e
   end
-  local mode = gfx.mode; gfx.mode = 0; gfx.a = 1
+  local mode = gfx.mode; gfx.mode = 4; gfx.a = 1            -- 4 — без размытия при масштабе (5 окт)
   -- прижать к низу отведённой высоты (как в Renoise: имя растёт снизу)
   local dh = e.h * D.SCALE
   local dy = top and y or (y + math.max(0, h_avail - dh))

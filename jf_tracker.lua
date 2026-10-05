@@ -137,6 +137,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
+  ttf = ({ bigblue = 'bigblue', departure = 'departure', gohu = 'gohu' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
   bigbpm = flag('bigbpm', true),
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
@@ -388,7 +389,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1211,6 +1212,8 @@ ctx = {
     FB.push_recent(it); ctx.fxb_save()
     state.dsp = true
     vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
+    -- 5 окт: фокус — туда, откуда пришли к поиску эффектов
+    if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
   end,
   -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
   item_at_cursor = function()
@@ -3107,6 +3110,7 @@ ctx = {
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { sep = true, title = 'look' },
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
+      { key = 'ttf', label = 'font', kind = 'cycle', values = { 'off', 'bigblue', 'departure', 'gohu' }, desc = 'off - the REAPER bitmap; bigblue / departure / gohu - pixel TTF fonts with Cyrillic, Greek, blocks and box drawing (sharp at x1 x2 x3)', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
       { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
@@ -4080,7 +4084,8 @@ ctx = {
   end,
   set_focus = function(f)
     -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
-    if ctx.click_guard and f ~= state.focus and f ~= 'notes' then return end
+    if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' then return end   -- поиск эффектов — по клику (5 окт)
+    if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
@@ -6059,7 +6064,7 @@ local function frame()
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
-  draw.hybrid = true                                     -- не-ASCII (кириллица) — системным моно-шрифтом высотой с битмап
+  draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
   local hover
   if idle_skip then hover = idle.hover else
   hover = draw.frame(L, snap, rows, state, {
