@@ -978,21 +978,20 @@ end
 -- полосы L / R, −60..0 дБ, сверху подпись, снизу пик в дБ
 function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
+  -- тонкий (5 окт): буква сверху, две полоски, число дБ — в статусе по наведению
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  set(U.LINE); gfx.rect(x, y, w, h, 0)
   text(x + math.floor((w - ms(label)) / 2), y + 1, label, U.GREY)
   local pk = math.max(lv and lv[1] or 0, lv and lv[2] or 0)
-  local db = pk > 1e-6 and 20 * math.log(pk, 10) or -150
-  local vt = db <= -60 and '-inf' or ('%.1f'):format(db)
-  text(x + math.floor((w - ms(vt)) / 2), y + h - L.rh, vt, db > -0.1 and U.RED or U.GREY)
-  local my0, mh = y + L.rh + 1, h - 2 * L.rh - 2
+  D.meter_db = D.meter_db or {}
+  D.meter_db[what] = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+  local my0, mh = y + L.rh + 1, h - L.rh - 2
   if mh > 4 then
-    local bw = math.max(2, math.floor((w - 3 * L.pad) / 2))
+    local bw = math.max(2, math.floor((w - 3) / 2))
     for ch = 1, 2 do
       local v = lv and lv[ch] or 0
       local d = v > 1e-6 and 20 * math.log(v, 10) or -150
       local fr = math.max(0, math.min(1, (d + 60) / 60))
-      local bxx = x + L.pad + (ch - 1) * (bw + L.pad)
+      local bxx = x + 1 + (ch - 1) * (bw + 1)
       set(U.DIM); gfx.rect(bxx, my0, bw, mh, 0)
       local hh = math.floor(fr * (mh - 2) + 0.5)
       if hh > 0 then
@@ -3090,10 +3089,10 @@ function D.frame(L, snap, rows, state, info)
     end
     local bx = fbw + L.pad
     local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
-    local mw = ms('-00.0') + 2 * L.pad
+    local mw = math.max(ms('o') + 4, 12)                -- тонкие метры (5 окт)
     local mby, mbh = dy + L.rh + 4, L.dsp_h - L.rh - 6 - (L.hint_h or 0)
     if lvl then
-      D.dsp_meter(L, bx, mby, mw, mbh, lvl.src, lvl.inp, 'in', hover)
+      D.dsp_meter(L, bx, mby, mw, mbh, lvl.src == 'in' and 'i' or 'p', lvl.inp, 'in', hover)
       bx = bx + mw + L.pad
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
@@ -3423,12 +3422,11 @@ function D.frame(L, snap, rows, state, info)
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
     if lvl then
       local cbh = L.rh
-      D.dsp_meter(L, bx, mby, mw, mbh - cbh - 2, 'out', lvl.out, 'out', hover)
+      D.dsp_meter(L, bx, mby, mw, mbh - cbh - 2, 'o', lvl.out, 'out', hover)
       local cy = mby + mbh - cbh
       local hot = mx >= bx and mx < bx + mw and my >= cy and my < cy + cbh
       local on = lvl.comp_on
-      local lbl = lvl.comp_db and ('%+.1f'):format(lvl.comp_db) or 'comp'
-      if hot and not lvl.comp_db then lbl = 'comp' end
+      local lbl = 'c'                                    -- comp буквой (5 окт), значение — в статусе
       set(on and U.tint(U.CYAN, 0.35) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(bx, cy, mw, cbh, 1)
       set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(bx, cy, mw, cbh, 0)
       text(bx + math.floor((mw - ms(lbl)) / 2), cy, fit(lbl, mw - 2), on and U.CYAN or (hot and U.AMBER or U.GREY))

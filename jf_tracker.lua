@@ -6067,8 +6067,11 @@ local function frame()
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspab then state.status = hover.dspab.f.name .. ': A / B morph - drag between the two snapshots (:fxa, :fxb store them, :morph N)'
-  elseif hover.dspmeter then state.status = hover.dspmeter == 'out' and 'out: the track after all fx and the fader (peak)' or 'in: the record input when the track is armed (in), else the items before the fx (pre)'
-  elseif hover.dspcomp then state.status = 'gain comp: click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
+  elseif hover.dspmeter then
+    local db = draw.meter_db and draw.meter_db[hover.dspmeter] or -150
+    local dt = db <= -60 and '-inf' or ('%.1f dB'):format(db)
+    state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
+  elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
