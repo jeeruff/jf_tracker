@@ -2000,6 +2000,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   set(D.SEP); gfx.rect(x, y, w, 1, 1)
   local ly = y + 3
+  local x_all, w_all = x, w
+  -- big status (5 окт): левая треть — режим крупно (две строки высотой),
+  -- клавиатура и транспорт — правее; мелкий статус — строкой под ними
+  local cc = info and info.ctrl or {}
+  if cc.bigstatus and st and w > 60 * L.cw then
+    local third = math.floor(w / 3)
+    local s = ((st[1] or ''):match('^[^|]*') or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
+    local room = third - 3 * L.pad
+    while s ~= '' and D.big_measure(s, 2) > room do s = s:sub(1, -2) end
+    if s ~= '' then D.big_text(x + L.pad, ly, s, (p and p.ins) and D.FOCUS_INS or U.AMBER, 2) end
+    set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(x + third - L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
+    x, w = x + third, w - third
+    st.big = true
+  end
   local tx = x + L.pad
   if p then
     local dim = p.active == false
@@ -2117,7 +2131,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     gx = gx + G.w
   end
   -- статус третьей строкой (опция status bar: keyboard)
-  if st then
+  if st and st.big then
+    -- big status: режим уже крупно слева — здесь только мелкое, во всю ширину
+    if st.small and st[2] ~= '' then text(x_all + L.pad, ly + 2 * L.rh, fit(st[2], w_all - 2 * L.pad), U.TEXT) end
+  elseif st and st.small ~= false then
     local sy = ly + 2 * L.rh
     local sx0 = x + L.pad
     local sw = x + w - L.pad - sx0
@@ -3853,9 +3870,9 @@ function D.frame(L, snap, rows, state, info)
     local p = info.piano
     if p then p.ins = info.vmode == 'insert' end
     local st
-    if L.kbstat then
-      st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '' }
-      D.aw_status = nil
+    if L.kbstat or (info.ctrl and info.ctrl.bigstatus) then
+      st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '', small = L.kbstat }
+      if L.kbstat then D.aw_status = nil end
     end
     D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
   end
