@@ -1,9 +1,18 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.37'
-V.DATE = '2026-10-04'
+V.VERSION = '0.7.0'
+V.DATE = '2026-10-05'
 V.CHANGES = {
+  { v = '0.7.0', d = '2026-10-05', items = {
+    'first public release - GNU GPL v3; English help (F1)',
+    'the keyboard is INSERT: no separate keys mode - in INSERT the top row writes notes, NORMAL is Vim; m shows / hides the keyboard strip (shown by default), with the INSERT rows described next to it (hints option) and optionally the status line inside it (status bar: keyboard)',
+    'f jump labels work again and never overlap; the tour starts with why jf, hjkl and f, and moves the focus to each step itself',
+    'mouse: a plain click keeps the keyboard focus, Option+click moves it (option focus by mouse); lib: double click drops the sample onto the track at the cursor',
+    'item tab: drag the selection onto a track or the lib - the whole sample goes into the lib with the selection as a slice (on a track the slice is written into the row)',
+    'browser: play (auto-preview, on by default) and keys (the note keys play the selected file at their pitch) on the player line',
+    'item boxes are drawn under the wave and the text; the focus frame is closed on all sides; Airwindows descriptions in the status bar',
+  } },
   { v = '0.6.37', d = '2026-10-05', items = {
     'context menus in the tracker style: a hydra at the mouse with mnemonic letters, clickable; \\ opens the same menu for the selected thing in DSP, the matrix, the lib and the fx list',
     'the instrument number is a cursor field (l from the note, hex in INSERT, ^A / ^X); a click on a slice line selects the slice; the zone strip slips the selected slice; DSP: open the fx window after adding (toggle), option dsp meters; thin meters',
