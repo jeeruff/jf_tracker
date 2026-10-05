@@ -168,7 +168,23 @@ local function draw_about(L, W, H)
         if a1 > a0 then gfx.blit(1022, 1, 0, a0 - sx, 0, a1 - a0, ih, a0, y, a1 - a0, ih) end
       else
         local lx0 = bx + math.floor((bw - iw) / 2)
-        gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
+        if O.logo.water then
+          -- вода (5 окт): верх — как есть; от середины ряда water вниз (под чёрной
+          -- полосой — отражение) — по строке пикселей со сдвигом синусом, глубже —
+          -- сильнее; по краям — чёрная плашка, сдвиг не открывает фон
+          local t = ctx.now and ctx.now() or os.clock()
+          local sy0 = math.floor(ch / 2) + (O.logo.water - 1) * ch + math.floor(ch / 2)
+          gfx.blit(1022, 1, 0, 0, 0, iw, sy0, lx0, y, iw, sy0)
+          local amp = math.max(1, math.floor(cw * 0.6))
+          gfx.set(0, 0, 0, 1); gfx.rect(lx0 - amp, y + sy0, iw + 2 * amp, ih - sy0, 1)
+          for py = sy0, ih - 1 do
+            local depth = (py - sy0) / math.max(1, ih - sy0)
+            local off = math.floor(amp * (0.25 + 0.75 * depth) * math.sin(t * 2.4 + py * 0.45) + 0.5)
+            gfx.blit(1022, 1, 0, 0, py, iw, 1, lx0 + off, y + py, iw, 1)
+          end
+        else
+          gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
+        end
         if O.logo.drip and LGO.drops then
           -- кровь (3 окт): капля растёт из нижнего края буквы, отрывается и
           -- падает блоком с тёмным хвостом, уходит за край; под логотипом — место
