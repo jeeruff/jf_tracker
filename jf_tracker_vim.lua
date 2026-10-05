@@ -1318,7 +1318,7 @@ function V.key_impl(c)
       return
     end
     if V.piano then
-      if V.mode == 'normal' and (c == ESC or c == 13) then V.mode = 'insert'; V.msg = 'INSERT with the keyboard: the top row writes notes'; return end
+      if V.mode == 'normal' and (c == ESC or c == 13) then V.mode = 'insert'; V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
       if c == ('z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
       if c == ('x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
       local mods = ctx.mods and ctx.mods() or {}

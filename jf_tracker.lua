@@ -2142,6 +2142,7 @@ ctx = {
     return true
   end,
   keyq = {},
+  hints_on = function() return state.hints end,
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
   loop_cells = function()
     if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
@@ -4475,7 +4476,8 @@ ctx = {
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
-    vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes, z x octave, INSERT writes them' or 'keyboard off (m): Vim keys'
+    if state.hints then vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes, z x octave, INSERT writes them' or 'keyboard off (m): Vim keys'
+    else vim.msg = state.piano_show and 'keyboard on' or 'keyboard off' end   -- длинно — только с хинтами (5 окт)
     relayout()
   end,
   set_focus = function(f)
