@@ -533,7 +533,7 @@ local function text(x, y, s, col, bg)
       gfx.dest = d0
       e.ov, e.ovk = id, k
     end
-    gfx.mode = bg and 0 or 1                -- со сглаживанием: /2
+    gfx.mode = (bg and 0 or 1) | 4          -- без сглаживания (5 окт: сглаженный /2 мелкий текст размывал)
     gfx.blit(e.ov, 1, 0, 0, 0, e.w * k, e.h * k, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
   else
     gfx.mode = (bg and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании
