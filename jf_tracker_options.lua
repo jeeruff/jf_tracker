@@ -433,13 +433,14 @@ function O.draw(L, W, H)
   O.tab_hot, O.find_hot = nil, nil
   if not O.compact then
     local ty = by + rh + 4
+    -- поиск (5 окт): строка ввода слева, широкая; пустая — подсказка тусклым
     local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/ find')
-    local fw = math.max(U.measure('/ find') , U.measure(fq)) + 2 * L.pad
-    local fx = bx + bw - fw - L.pad
-    local tx = bx + L.pad
+    local fw = math.max(math.floor(bw / 3), U.measure(fq) + 2 * L.pad)
+    local fx = bx + L.pad
+    local tx = fx + fw + L.pad
     for _, t in ipairs(O.tabs) do
       local w = U.measure(t) + 2 * L.pad
-      if tx + w > fx - L.pad then break end
+      if tx + w > bx + bw - L.pad then break end
       local on = t == O.tab and O.query == ''
       local hot = mx >= tx and mx < tx + w and my >= ty and my < ty + rh
       if hot then O.tab_hot = t end
