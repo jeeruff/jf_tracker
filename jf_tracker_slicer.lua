@@ -364,14 +364,22 @@ end
 
 -- smart quantize (2 окт; 5 окт — все к шестнадцатым): транзиенты → stretch-маркеры; было: сильные к
 -- ближайшим долям, слабые к шестнадцатым; длина — до целых тактов / долей
+-- параметры квантайзера (5 окт, панель Q): шаг сетки в QN, захват (доля
+-- шага), предел растяжения куска, сила притяжения 0..1
+S.qprm = { step = 0.25, window = 1 / 3, maxr = 1.25, strength = 1 }
+S.qpreview = false               -- панель открыта: превью плана на волне
+function S.quant_hits()
+  local hits = {}
+  for k, t in ipairs(S.trans) do hits[#hits + 1] = { t = t, amp = (S.trans_amp or {})[k] or 0 } end
+  return hits
+end
 function S.smart_quantize()
   local e = S.entry
   if not e or e.file or not e.item then S.msg = 'quantize: open an instrument (not a browser file)'; return end
   S.detect()
   if #S.trans == 0 then S.msg = 'quantize: no transients (sens+ for more)'; return end
-  local hits = {}
-  for k, t in ipairs(S.trans) do hits[#hits + 1] = { t = t, amp = (S.trans_amp or {})[k] or 0 } end
-  local n, kept, newlen = ctx.edit.smart_quantize(e.item, hits)
+  local hits = S.quant_hits()
+  local n, kept, newlen = ctx.edit.smart_quantize(e.item, hits, S.qprm)
   S.msg = n and ('quantized: %d of %d transients, length %.3fs'):format(kept or 0, #hits, newlen or 0) or 'quantize failed'
 end
 
@@ -478,7 +486,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local bx = x
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'quantize', 'quant' }, { 'scramble', 'scram' } }
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end
@@ -587,6 +595,20 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     for _, t in ipairs(S.trans) do
       local px = tx(t)
       if px >= x and px < x + w then gfx.line(px, wy, px, wy + 6); gfx.line(px, wy + wh - 6, px, wy + wh) end
+    end
+    -- превью квантайзера (5 окт): пойманный удар — голубая черта, цель —
+    -- янтарная, между ними стрелка-линия сверху; пропущенные — красные
+    if S.qpreview and e.item and S.entry and S.entry.item == e.item and ctx.edit.quant_plan then
+      local plan = ctx.edit.quant_plan(e.item, S.quant_hits(), S.qprm)
+      for _, k in ipairs(plan.kept) do
+        local a, b = tx(k.t), tx(k.n)
+        U.set(U.CYAN); gfx.rect(a, wy, 1, wh, 1)
+        U.set(U.AMBER); gfx.rect(b, wy, 1, wh, 1)
+        gfx.rect(math.min(a, b), wy + 2, math.abs(b - a) + 1, 2, 1)
+      end
+      U.set(U.RED)
+      for _, sk in ipairs(plan.skipped) do local a = tx(sk.t); gfx.rect(a, wy + wh - 10, 1, 10, 1) end
+      S.qinfo = ('%d caught, %d skipped, length %.3fs'):format(#plan.kept, #plan.skipped, plan.newlen or 0)
     end
   end
   -- играемая зона исходника: чуть светлее фон и края

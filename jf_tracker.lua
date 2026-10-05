@@ -1343,7 +1343,33 @@ ctx = {
   end,
   -- нарезка во вкладке item (4 окт): s — меню, вторая клавиша — как резать
   -- квантайзер (5 окт): панель параметров — в работе; пока применяет план по умолчанию
-  quant_open = function() SL.smart_quantize(); vim.msg = SL.msg or 'quantized' end,
+  -- панель квантайзера (5 окт): параметры у свойств сэмпла, превью плана на волне
+  quant_open = function()
+    if not (SL.active and SL.entry and SL.entry.item) then vim.msg = 'quantize: pick a sample of the track first'; return end
+    SL.detect(); SL.qpreview = true
+    local q = SL.qprm
+    local GRIDS = { ['1/4'] = 1, ['1/8'] = 0.5, ['1/16'] = 0.25, ['1/32'] = 0.125 }
+    local items = {
+      { label = 'grid', kind = 'cycle', values = { '1/4', '1/8', '1/16', '1/32' }, desc = 'where the hits go',
+        get = function() for k, v in pairs(GRIDS) do if v == q.step then return k end end return '1/16' end, set = function(v) q.step = GRIDS[v] or 0.25 end },
+      { label = 'catch %', kind = 'num', min = 5, max = 50, step = 5, desc = 'a hit further than this share of the grid step stays where it is',
+        get = function() return math.floor(q.window * 100 + 0.5) end, set = function(v) q.window = v / 100 end },
+      { label = 'max stretch %', kind = 'num', min = 5, max = 100, step = 5, desc = 'a piece between markers may get this much faster / slower, else the hit is skipped',
+        get = function() return math.floor((q.maxr - 1) * 100 + 0.5) end, set = function(v) q.maxr = 1 + v / 100 end },
+      { label = 'strength %', kind = 'num', min = 0, max = 100, step = 10, desc = 'how far towards the grid (100 = onto it)',
+        get = function() return math.floor(q.strength * 100 + 0.5) end, set = function(v) q.strength = v / 100 end },
+      { label = 'sensitivity', kind = 'num', min = 0, max = 100, step = 5, desc = 'more - more hits are caught',
+        get = function() return math.floor(SL.sens * 100 + 0.5) end, set = function(v) SL.sens = v / 100; SL.detect() end },
+      { label = 'apply', kind = 'action', value = 'stretch markers', desc = 'write the stretch markers as shown on the wave', fn = function() SL.smart_quantize(); SL.qpreview = false; vim.msg = SL.msg; model.invalidate() end },
+      { label = 'remove markers', kind = 'action', value = 'clear', desc = 'remove all stretch markers of this sample', fn = function()
+          local it = SL.entry.item; local tk = reaper.GetActiveTake(it)
+          edit.run('remove stretch markers', function() local n = reaper.GetTakeNumStretchMarkers(tk); if n > 0 then reaper.DeleteTakeStretchMarkers(tk, 0, n) end; reaper.UpdateItemInProject(it) end)
+          model.invalidate(); vim.msg = 'stretch markers removed' end },
+    }
+    local r = ctx.sprops_rect
+    OPT.open_panel(items, 'quantize - cyan hit -> amber target, red skipped', r and { x = r[1], y = r[2] } or nil)
+    vim.msg = 'quantize: tune, the wave shows the plan; apply writes the stretch markers'
+  end,
   slice_quick = function(ch)
     local EQ = { ['@'] = 4, ['#'] = 8, ['$'] = 16, ['%'] = 32, ['^'] = 64, ['&'] = 128 }
     if not (EQ[ch] or ch == '!' or ch == 'Q') then return false end
@@ -1372,7 +1398,7 @@ ctx = {
       { key = '2', label = '2 equal', fn = eq(2) }, { key = '4', label = '4 equal', fn = eq(4) }, { key = '8', label = '8 equal', fn = eq(8) },
       { key = '1', label = '16 equal', fn = eq(16) }, { key = '3', label = '32 equal', fn = eq(32) }, { key = '6', label = '64 equal', fn = eq(64) },
       { key = 'd', label = 'delete the slices', fn = function() if not ready() then return end; SL.clear() end },        -- s d (4 окт): d = delete, как в Vim
-      { key = 'q', label = 'smart quantize', fn = function() if not ready() then return end; SL.smart_quantize() end },
+      { key = 'Q', label = 'quantize ... (panel, the plan on the wave)', fn = function() if not ready() then return end; ctx.quant_open() end },
       { key = 'z', label = 'autotrim the silence', fn = function() if not ready() then return end; SL.autotrim() end },
     } })
     state.popup_at = { kind = 'sprops' }                -- поверх панели свойств сэмпла (5 окт)
@@ -8752,6 +8778,7 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
+  if SL.qpreview and not (OPT.active and OPT.compact and (OPT.compact.title or ''):match('^quantize')) then SL.qpreview = false end   -- панель закрыта — без превью
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
