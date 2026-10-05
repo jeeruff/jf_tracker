@@ -143,6 +143,7 @@ local state = {
   -- время и BPM мелко (5 окт, просьба): новый ключ — прежнее «вкл» не тянется
   bigbpm = flag('bigbpm2', false),
   bigstatus = flag('bigstatus', true),
+  zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
   transpos = reaper.GetExtState(EXT, 'transpos') ~= '' and reaper.GetExtState(EXT, 'transpos') or 'tracker',   -- полоса транспорта: tracker | top | bottom (5 окт)
   reclib = flag('reclib', true),                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
@@ -393,7 +394,7 @@ local function save_win()
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
-  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
+  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
@@ -2143,6 +2144,26 @@ ctx = {
     return true
   end,
   keyq = {},
+  -- зум колесом (5 окт): общие модификаторы трекера и матрицы. Возвращает
+  -- dv, dh — величины колеса для вертикального / горизонтального зума, или nil
+  zoom_axes = function(wv, wh)
+    local m = ctx.mods()
+    if (state.zoommods or 'cmd') == 'split' then
+      if m.cmd and not m.alt then return 0, (wv ~= 0 and wv or wh) end
+      if m.alt and not m.cmd then return (wv ~= 0 and wv or wh), 0 end
+      return nil
+    end
+    if m.cmd then return wv, wh end
+    return nil
+  end,
+  zacc = { v = 0, h = 0 },
+  -- дискретный шаг из колеса / трекпада: копится до 120 (щелчок колеса)
+  zoom_steps = function(axis, amount)
+    ctx.zacc[axis] = ctx.zacc[axis] + amount / 120
+    local n = ctx.zacc[axis] >= 0 and math.floor(ctx.zacc[axis]) or math.ceil(ctx.zacc[axis])
+    ctx.zacc[axis] = ctx.zacc[axis] - n
+    return n
+  end,
   -- v в свойствах сэмпла (5 окт): верхняя панель — ровно под все строки
   sprops_fit = function()
     local r = ctx.sprops_rect; if not r then return end
@@ -3529,6 +3550,7 @@ ctx = {
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
+      { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
@@ -8453,8 +8475,10 @@ local function frame()
   if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and hover.matrix and hover.matrix.inside and not OPT.active and not (vim.hydra or vim.picker) then
     local wv, wh = gfx.mouse_wheel, gfx.mouse_hwheel or 0
     local m = ctx.mods()
-    if m.cmd and wv ~= 0 then MX.set_zoom(MX.vz * 2 ^ (wv / 960), nil)
-    elseif m.alt and wv ~= 0 then MX.set_zoom(nil, MX.hz * 2 ^ (wv / 960))
+    local zv, zh = ctx.zoom_axes(wv, wh)
+    if zv then
+      if zv ~= 0 then MX.set_zoom(MX.vz * 2 ^ (zv / 960), nil) end
+      if zh ~= 0 then MX.set_zoom(nil, MX.hz * 2 ^ (zh / 960)) end
     else
       if m.shift and wh == 0 then wh, wv = -wv, 0 end
       MX.wacc_v = (MX.wacc_v or 0) - wv / 120
@@ -8518,11 +8542,23 @@ local function frame()
   end
   -- горизонтальное колесо / трекпад (3 окт): прокрутка треков; Cmd — зум ширины
   -- (0 как у треков, 1 все компактно, 2 все полоской)
+  -- зум трекера (5 окт): те же модификаторы, что у матрицы (ctx.zoom_axes) —
+  -- вертикаль = LPB, горизонталь = ширина треков; трекпад копится до щелчка
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and not hover.dsp and not hover.browser and not hover.fxb and not OPT.active then
+    local zv, zh = ctx.zoom_axes(gfx.mouse_wheel, gfx.mouse_hwheel or 0)
+    if zv then
+      local nv, nh = ctx.zoom_steps('v', zv), ctx.zoom_steps('h', zh)
+      if nv ~= 0 then ctrl_action('lpb', nv > 0 and 1 or -1) end
+      if nh ~= 0 then
+        state.wzoom = math.max(0, math.min(2, (state.wzoom or 0) - (nh > 0 and 1 or -1)))
+        vim.msg = 'width zoom: ' .. ({ [0] = 'as set per track', [1] = 'all compact', [2] = 'all strips' })[state.wzoom]
+      end
+      gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
+    end
+  end
   if (gfx.mouse_hwheel or 0) ~= 0 then
     local d = gfx.mouse_hwheel > 0 and 1 or -1
-    if gfx.mouse_cap & 4 == 4 then
-      state.wzoom = math.max(0, math.min(2, (state.wzoom or 0) - d))
-      vim.msg = 'width zoom: ' .. ({ [0] = 'as set per track', [1] = 'all compact', [2] = 'all strips' })[state.wzoom]
+    if false then
     elseif not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
       state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll
@@ -8537,9 +8573,6 @@ local function frame()
     -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
-    elseif gfx.mouse_cap & 4 == 4 and not hover.dsp then
-      -- Cmd + колесо — зум LPB (3 окт): вверх — мельче шаг (больше строк на долю)
-      ctrl_action('lpb', step > 0 and -1 or 1)
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
     else

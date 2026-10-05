@@ -145,7 +145,7 @@ KH.PAGES = {
     { k = 'u ⌘⇧Z', d = 'undo / redo' },
     { k = 'z f t', d = 'zoom detail / fill / trim items to regions' },
     { k = 'R', d = 'ruler of bars on the left on / off (button ruler)' },
-    { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks, Cmd - row height zoom, Option - cell width zoom (smooth, as in REAPER); scroll bars right and bottom' },
+    { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Tab', d = 'next module' },
   } },
   inst = { title = 'lib', e = {
