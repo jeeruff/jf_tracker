@@ -2613,10 +2613,11 @@ function D.frame(L, snap, rows, state, info)
       hint(kind, x, y, w1, L.rh, what)
       return x + w1 + 2
     end
-    -- ряд 0: all | reg
+    -- ряд 0: proj | region (5 окт: было all | reg); не влезает — region → rgn
     local x0 = bx
-    x0 = small(x0, hy + 1, 'all', 'all', not info.view_reg, 'viewbtn')
-    small(x0, hy + 1, 'reg', 'reg', info.view_reg, 'viewbtn')
+    local lb = (ms('proj') + ms('region') + 4 * L.pad + 6 <= bw) and 'region' or 'rgn'
+    x0 = small(x0, hy + 1, 'proj', 'all', not info.view_reg, 'viewbtn')
+    small(x0, hy + 1, lb, 'reg', info.view_reg, 'viewbtn')
     -- ряд 1: номер + имя
     local ny = hy + 1 + L.rh
     if rg then
@@ -3613,8 +3614,9 @@ function D.frame(L, snap, rows, state, info)
   -- разделители D.SEP: 1 px, тусклые (одна линия, без наложений)
   do
     local rects = {
-      tracker = { tx0, hy, W - tx0, L.body_y + L.body_h + L.low_h - hy },
-      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, L.body_y + L.body_h + L.low_h - hy } or nil,
+      -- до низа модуля (5 окт): статус в трекере и строка подсказок — внутри рамки
+      tracker = { tx0, hy, W - tx0, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy },
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
       browser = L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,
