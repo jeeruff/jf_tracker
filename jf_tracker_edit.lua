@@ -2736,38 +2736,40 @@ function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 -- позиция воспроизведения — так растягивается звук. Длина — до целых тактов
 -- (сэмпл ≥ ¾ такта) или долей; концевой маркер едет вместе с концом.
 -- Возвращает число поставленных маркеров хитов, число оставленных хитов, новую длину.
-function E.smart_quantize(item, hits)
-  local take = R.GetActiveTake(item)
-  if not take or R.TakeIsMIDI(take) then return nil end
+-- план квантайза (5 окт): что пойманно и куда поедет — для превью на волне
+-- и для применения. prm = { step = QN шага сетки (0.25 = 1/16), window = доля
+-- шага, дальше которой удар не трогаем, maxr = предел растяжения куска
+-- (1.25 → 0.8..1.25), strength = 0..1 — насколько тянуть к сетке }.
+-- Возвращает { kept = { {t, tq, n, amp} }, skipped = { {t, why} }, newlen, qn0 }
+function E.quant_plan(item, hits, prm)
+  prm = prm or {}
+  local step, window, maxr, strength = prm.step or 0.25, prm.window or (1 / 3), prm.maxr or 1.25, prm.strength or 1
   local pos = R.GetMediaItemInfo_Value(item, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
   local qn0 = R.TimeMap2_timeToQN(0, pos)
-  local maxa = 0
-  for _, h in ipairs(hits) do if h.amp > maxa then maxa = h.amp end end
-  -- цели в QN (5 окт, переделано): каждый удар — к ближайшей шестнадцатой.
-  -- Раньше сильные тянулись к целой доле — синкопы брейка уезжали на 1/8 и
-  -- куски растягивались 0.7x..1.7x («месиво»). Удар дальше трети шага от
-  -- сетки (флэм, призрачная нота) не трогаем; кусок между маркерами — не
-  -- больше чем на четверть быстрее / медленнее; коллизия — громкий остаётся
-  local step = 0.25
-  local kept = {}
+  local kept, skipped = {}, {}
   for _, h in ipairs(hits) do
     if h.t > 0.005 and h.t < len - 0.005 then
       local q = R.TimeMap2_timeToQN(0, pos + h.t)
       local tq = math.floor(q / step + 0.5) * step
-      if tq <= qn0 + 1e-6 or math.abs(tq - q) > step / 3 then tq = nil end
+      if tq <= qn0 + 1e-6 then skipped[#skipped + 1] = { t = h.t, why = 'start' }; tq = nil
+      elseif math.abs(tq - q) > step * window then skipped[#skipped + 1] = { t = h.t, why = 'far' }; tq = nil end
       if tq then
+        tq = q + (tq - q) * strength
         local prev = kept[#kept]
         local p_t, p_q = prev and prev.t or 0, prev and prev.tq or qn0
         local src_d = h.t - p_t
         local dst_d = R.TimeMap2_QNToTime(0, tq) - R.TimeMap2_QNToTime(0, p_q)
         local ratio = src_d > 0 and dst_d / src_d or 0
         if prev and tq <= prev.tq + 1e-6 then
-          if h.amp > prev.amp then kept[#kept] = { t = h.t, tq = tq, amp = h.amp } end
-        elseif ratio >= 0.8 and ratio <= 1.25 then kept[#kept + 1] = { t = h.t, tq = tq, amp = h.amp } end
+          if h.amp > prev.amp then skipped[#skipped + 1] = { t = prev.t, why = 'twin' }; kept[#kept] = { t = h.t, tq = tq, amp = h.amp }
+          else skipped[#skipped + 1] = { t = h.t, why = 'twin' } end
+        elseif ratio >= 1 / maxr and ratio <= maxr then kept[#kept + 1] = { t = h.t, tq = tq, amp = h.amp }
+        else skipped[#skipped + 1] = { t = h.t, why = 'stretch' } end
       end
     end
   end
+  for _, k in ipairs(kept) do k.n = R.TimeMap2_QNToTime(0, k.tq) - pos end
   -- длина: до целых тактов (если ≥ ¾ такта), иначе до целых долей
   local qe = R.TimeMap2_timeToQN(0, pos + len)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn0 + 1e-9)
@@ -2776,7 +2778,15 @@ function E.smart_quantize(item, hits)
   local nb = beats >= 0.75 * bar and math.max(bar, math.floor(beats / bar + 0.5) * bar) or math.max(1, math.floor(beats + 0.5))
   local last_tq = kept[#kept] and kept[#kept].tq or qn0
   if qn0 + nb <= last_tq + 1e-6 then nb = math.ceil((last_tq - qn0) + 0.25) end
-  local newlen = R.TimeMap2_QNToTime(0, qn0 + nb) - pos
+  return { kept = kept, skipped = skipped, newlen = R.TimeMap2_QNToTime(0, qn0 + nb) - pos, qn0 = qn0, len = len }
+end
+
+function E.smart_quantize(item, hits, prm)
+  local take = R.GetActiveTake(item)
+  if not take or R.TakeIsMIDI(take) then return nil end
+  local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
+  local plan = E.quant_plan(item, hits, prm)
+  local kept, newlen = plan.kept, plan.newlen
   local placed = 0
   run('smart quantize', function()
     local nm = R.GetTakeNumStretchMarkers(take)
@@ -2788,7 +2798,7 @@ function E.smart_quantize(item, hits)
     R.SetTakeStretchMarker(take, -1, 0)
     for _, k in ipairs(kept) do
       R.SetTakeStretchMarker(take, -1, k.t)
-      want[#want + 1] = { o = k.t, n = R.TimeMap2_QNToTime(0, k.tq) - pos }
+      want[#want + 1] = { o = k.t, n = k.n }
     end
     R.SetTakeStretchMarker(take, -1, len)
     want[#want + 1] = { o = len, n = newlen }

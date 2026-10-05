@@ -1339,6 +1339,27 @@ ctx = {
     return true
   end,
   -- нарезка во вкладке item (4 окт): s — меню, вторая клавиша — как резать
+  -- квантайзер (5 окт): панель параметров — в работе; пока применяет план по умолчанию
+  quant_open = function() SL.smart_quantize(); vim.msg = SL.msg or 'quantized' end,
+  slice_quick = function(ch)
+    local EQ = { ['@'] = 4, ['#'] = 8, ['$'] = 16, ['%'] = 32, ['^'] = 64, ['&'] = 128 }
+    if not (EQ[ch] or ch == '!' or ch == 'Q') then return false end
+    if not SL.active and ctx.open_slicer then ctx.open_slicer() end
+    if not (SL.active and SL.entry and not SL.entry.file) then vim.msg = 'slice: pick a sample of the track first'; return true end
+    if EQ[ch] then SL.equal(EQ[ch]); vim.msg = ('%d equal slices'):format(EQ[ch])
+    elseif ch == '!' then
+      -- повтор ! — следующая чувствительность по кругу
+      local SENS = { 0.3, 0.5, 0.7, 0.9 }
+      local now = reaper.time_precise()
+      local i = (ctx.tr_cycle and now - ctx.tr_cycle.t < 8 and ctx.tr_cycle.entry == SL.entry.item) and (ctx.tr_cycle.i % #SENS + 1) or 1
+      ctx.tr_cycle = { i = i, t = now, entry = SL.entry.item }
+      SL.sens = SENS[i]; SL.use_transients()
+      vim.msg = ('transients: %d slices (sens %.1f, ! again - %s)'):format(#(SL.slices or {}), SL.sens, i < #SENS and 'more' or 'back to few')
+    elseif ch == 'Q' then ctx.quant_open()
+    end
+    model.invalidate()
+    return true
+  end,
   slice_hydra = function()
     -- слайсер на выбранном сэмпле должен быть открыт — иначе резать нечего
     local function ready() if not SL.active and ctx.open_slicer then ctx.open_slicer() end; return SL.active and SL.entry and not SL.entry.file end
@@ -8823,6 +8844,13 @@ local function frame()
     c = 0
   elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
+    c = 0
+  end
+  -- быстрая нарезка (5 окт): фокус в lib или во вкладке сэмпла — ! по
+  -- транзиентам (повтор — чувствительность выше, по кругу), @ # $ % ^ & — 4..128
+  -- равных частей, Q — квантайзер; Shift+1-«слушать» там уступает место
+  if c > 0 and (state.focus == 'inst' or (state.focus == 'top' and state.toptab == 'sample'))
+     and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering) and c < 256 and ctx.slice_quick(string.char(c)) then
     c = 0
   end
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
