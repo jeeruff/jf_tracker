@@ -2403,7 +2403,8 @@ ctx = {
         local exe = reaper.GetExePath() .. '/REAPER.app/Contents/MacOS/REAPER'
         reaper.Main_OnCommand(40859, 0)                      -- File: New project tab
         reaper.Main_openProject(path)
-        reaper.ExecProcess(('"%s" -nonewinst "%s/tests/run_tracker.lua"'):format(exe, DIR), -1)
+        -- сам скрипт, не tests/run_tracker.lua: tests/ в релиз не входит (5 окт)
+        reaper.ExecProcess(('"%s" -nonewinst "%s/jf_tracker.lua"'):format(exe, DIR), -1)
       end },
     })
   end,
@@ -8086,4 +8087,12 @@ end)(frame)
 reaper.atexit(save_win)
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
+-- расширения (релиз 5 окт): без SWS прослушивание молчит, без js_ReaScriptAPI нет
+-- удержания нот — сказать сразу, а не оставить гадать
+do
+  local miss = {}
+  if not reaper.CF_CreatePreview then miss[#miss + 1] = 'SWS (preview)' end
+  if not reaper.JS_VKeys_GetState then miss[#miss + 1] = 'js_ReaScriptAPI (held notes, key state)' end
+  if #miss > 0 then vim.msg = 'missing: ' .. table.concat(miss, ', ') .. ' - install through ReaPack' end
+end
 frame()
