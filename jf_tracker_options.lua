@@ -344,8 +344,9 @@ function O.draw(L, W, H)
             local on2 = v == cur
             local h2 = mx >= x and mx < x + w and my >= y and my < y + rh
             if h2 then O.hbtn = { i = i, k = k } end
-            U.set(on2 and U.tint(U.AMBER, 0.35) or (h2 and U.PANEL or U.BG)); gfx.rect(x, y + 1, w, rh - 2, 1)
-            U.set(on2 and U.AMBER or (h2 and U.TEXT or U.LINE)); gfx.rect(x, y + 1, w, rh - 2, 0)
+            U.set(on2 and U.tint(U.AMBER, 0.35) or (h2 and U.PANEL or U.BG)); gfx.rect(x, y + 1, w, rh - 1, 1)
+            -- 5 окт: на 1 px выше дна строки — снизу текста пусто, как у кнопок главного модуля
+            U.set(on2 and U.AMBER or (h2 and U.TEXT or U.LINE)); gfx.rect(x, y + 1, w, rh - 1, 0)
             U.text(x + L.pad, y + 1, lb, on2 and U.AMBER or (h2 and U.TEXT or U.GREY))
             x = x + w + 2
           end
