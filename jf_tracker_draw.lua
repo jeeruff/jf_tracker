@@ -2173,21 +2173,24 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local first = g[1] and g[1][1] and g[1][1][1]
     if STRIP_HINTS[first] then D.strip_cols[#D.strip_cols + 1] = { gx, gx + math.max(gw, sep), STRIP_HINTS[first] } end
   end
-  -- кнопки транспорта: маленькие, << > || o >> loop
+  -- кнопки транспорта: << > || o >> loop — ×2 (5 окт), чётко: битмап целым
+  -- масштабом без сглаживания (big_text); плотно, зазор 2 px
   local blist = D.transport_buttons(c)
-  local bws, btot = {}, 0
-  for i, b in ipairs(blist) do bws[i] = ms(b[2]) + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  local bws, tws, btot = {}, {}, 0
+  for i, b in ipairs(blist) do tws[i] = D.big_measure(b[2], 2); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
-    local bx, by = bx0, ly + math.floor(L.rh / 2)
+    local bx, by, bh = bx0, ly - 1, 2 * L.rh
+    -- по высоте — по центру чернил (у крупного битмапа сверху пустая полоса шрифта)
+    local ty = by + math.max(1, math.floor((bh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.3 * L.rh + 0.5))
     for i, b in ipairs(blist) do
       local bw = bws[i]
-      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] ~= nil
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
-      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
-      text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (o — красная)
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
+      D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет (o — красная)
       if hot then hover.ctrl = b[1] end
-      hint('ctrl', bx, by, bw, L.rh, b[1])
+      hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
