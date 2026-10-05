@@ -2245,6 +2245,78 @@ ctx = {
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
+  -- ── свойства item под курсором (5 окт): гидра вместо окна REAPER ──────
+  -- числа — строкой :iprop key value (с текущим), переключатели — сразу
+  item_props = function(item, anchor)
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'no item'; return end
+    local tk = reaper.GetActiveTake(item)
+    local function iv(k) return reaper.GetMediaItemInfo_Value(item, k) end
+    local function tv(k) return tk and reaper.GetMediaItemTakeInfo_Value(tk, k) or 0 end
+    local vol = iv('D_VOL')
+    local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
+    local pan = tv('D_PAN')
+    local function pan_s(v) return math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5)) end
+    local nm = tk and reaper.GetTakeName(tk) or ''
+    local function ask(key, cur) return function()
+      state.iprop_item = item
+      vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = ('iprop %s %s'):format(key, cur)
+    end end
+    local function tog(key, scope, label) return function()
+      edit.run('item ' .. label, function()
+        if scope == 'take' then if tk then reaper.SetMediaItemTakeInfo_Value(tk, key, tv(key) >= 0.5 and 0 or 1) end
+        else reaper.SetMediaItemInfo_Value(item, key, iv(key) >= 0.5 and 0 or 1) end
+        reaper.UpdateItemInProject(item)
+      end)
+      model.invalidate(); vim.msg = label .. ' toggled'
+    end end
+    local function onoff(b) return b and 'on' or 'off' end
+    vim.open_hydra({ title = 'item ' .. nm, items = {
+      { key = 'v', label = ('volume  %+.1f dB'):format(db), fn = ask('vol', ('%.1f'):format(db)) },
+      { key = 'p', label = 'pan  ' .. pan_s(pan), fn = ask('pan', pan_s(pan)) },
+      { key = 't', label = ('transpose  %+g st'):format(math.floor(tv('D_PITCH') * 100 + 0.5) / 100), fn = ask('pitch', ('%g'):format(math.floor(tv('D_PITCH') * 100 + 0.5) / 100)) },
+      { key = 'r', label = ('rate  %.3f'):format(tv('D_PLAYRATE')), fn = ask('rate', ('%.3f'):format(tv('D_PLAYRATE'))) },
+      { key = 'k', label = 'keep pitch  ' .. onoff(tv('B_PPITCH') >= 0.5), fn = tog('B_PPITCH', 'take', 'keep pitch') },
+      { key = 'l', label = 'loop  ' .. onoff(iv('B_LOOPSRC') >= 0.5), fn = tog('B_LOOPSRC', 'item', 'loop') },
+      { key = 'm', label = 'mute  ' .. onoff(iv('B_MUTE') >= 0.5), fn = tog('B_MUTE', 'item', 'mute') },
+      { key = 'i', label = ('fade in  %d ms'):format(math.floor(iv('D_FADEINLEN') * 1000 + 0.5)), fn = ask('fadein', math.floor(iv('D_FADEINLEN') * 1000 + 0.5)) },
+      { key = 'o', label = ('fade out  %d ms'):format(math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5)), fn = ask('fadeout', math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5)) },
+      { key = 's', label = ('start offset  %.3f s'):format(tv('D_STARTOFFS')), fn = ask('offs', ('%.3f'):format(tv('D_STARTOFFS'))) },
+      { key = 'n', label = 'name  ' .. nm, fn = ask('name', nm) },
+      { key = 'w', label = 'REAPER item properties window', fn = function() select_item_in_reaper(item); reaper.Main_OnCommand(40009, 0) end },
+    } })
+    state.popup_at = anchor or ctx.cursor_anchor()
+  end,
+  -- :iprop key value — число / имя в item из item_props
+  item_prop = function(key, val)
+    local item = state.iprop_item
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'iprop: no item (open the item menu first)'; return end
+    local tk = reaper.GetActiveTake(item)
+    local n = tonumber(val)
+    local ok = true
+    edit.run('item ' .. key, function()
+      if key == 'vol' and n then reaper.SetMediaItemInfo_Value(item, 'D_VOL', n <= -150 and 0 or 10 ^ (n / 20))
+      elseif key == 'pan' and tk then
+        local v = val:upper():match('^C$') and 0 or (val:upper():match('^L(%d+)') and -tonumber(val:upper():match('^L(%d+)')) / 100) or (val:upper():match('^R(%d+)') and tonumber(val:upper():match('^R(%d+)')) / 100) or n
+        if v then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PAN', math.max(-1, math.min(1, v))) else ok = false end
+      elseif key == 'pitch' and tk and n then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', n)
+      elseif key == 'rate' and tk and n and n > 0 then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', n)
+      elseif key == 'fadein' and n then reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', math.max(0, n / 1000))
+      elseif key == 'fadeout' and n then reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', math.max(0, n / 1000))
+      elseif key == 'offs' and tk and n then reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', n)
+      elseif key == 'name' and tk then reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', val, true)
+      else ok = false end
+      reaper.UpdateItemInProject(item)
+    end)
+    model.invalidate()
+    vim.msg = ok and ('item %s = %s'):format(key, val) or 'iprop: vol dB | pan C/L37/R50 | pitch st | rate x | fadein ms | fadeout ms | offs s | name text'
+  end,
+  -- якорь всплывашки: ячейка курсора трекера
+  cursor_anchor = function()
+    local f = L.flat[vim.cur.fi]
+    local r = vim.cur.row - (rows[1] and rows[1].row or 0)
+    if f and f.x and r >= 0 and r < L.nrows then return { kind = 'xy', x = f.x, y = L.body_y + (r + 1) * L.rh } end
+    return { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   -- ── запись (5 окт) ───────────────────────────────────────────────────
   -- kind: 'tracker' — тейк остаётся на треке с курсора; 'inst' — новые тейки
   -- после остановки уходят в lib трека (каждый — свой инструмент)
@@ -4532,8 +4604,9 @@ function event_actions(hover)
   local head = cell and (cell.kind == 'audio' or cell.kind == 'midi') and cell or (cell and cell.of)
   if head and head.item then
     add(head.kind == 'audio' and 'Item properties' or 'Open in MIDI editor', function()
+      if head.kind == 'audio' then ctx.item_props(head.item); return end          -- своя гидра (5 окт)
       select_item_in_reaper(head.item)
-      reaper.Main_OnCommand(head.kind == 'audio' and 40009 or 40153, 0)
+      reaper.Main_OnCommand(40153, 0)
     end, 'i')
     add('Select item in REAPER', function() select_item_in_reaper(head.item) end, 'l')
   end
@@ -7339,7 +7412,8 @@ local function frame()
         if head and head.item then
           select_item_in_reaper(head.item)
           if dbl and click.zone == 'body' and click.fi == hover.fi and click.row == hover.row.row then
-            reaper.Main_OnCommand(head.kind == 'audio' and 40009 or 40153, 0)
+            if head.kind == 'audio' then ctx.item_props(head.item, { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 })   -- своя гидра (5 окт)
+            else reaper.Main_OnCommand(40153, 0) end
           end
         end
         click = { t = now2, zone = 'body', fi = hover.fi, row = hover.row.row }

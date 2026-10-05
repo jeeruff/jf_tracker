@@ -677,6 +677,7 @@ local function run_cmd(line)
   elseif cmd == 'name' then ctx.mx_name(arg)
   elseif cmd == 'redo' then ctx.edit.redo(); V.msg = 'redo'                     -- 5 окт: Ctrl+R теперь вкладка rec
   elseif cmd == 'undo' then ctx.edit.undo(); V.msg = 'undo'
+  elseif cmd == 'iprop' then local k, v = (arg or ''):match('^(%S+)%s*(.*)$'); if k and ctx.item_prop then ctx.item_prop(k, v or '') end   -- свойства item (5 окт)
   elseif cmd == 'len' then ctx.mx_len(arg)
   elseif cmd == 'sig' then ctx.sig_cmd(arg)
   elseif cmd == 'add' then local b, nm = arg:match('^(%d*)%s*(.*)$'); ctx.mx_add(tonumber(b) or 1, nm)
