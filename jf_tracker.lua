@@ -2973,7 +2973,7 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
-      flag('bigbpm', 'big BPM', 'the BPM in a large font in the transport bar under the tracker'),
+      flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
@@ -7917,7 +7917,8 @@ local function frame()
   -- дополнение) и открытые fzf-пикер / hydra
   -- Ctrl + / Ctrl - : масштаб битмапа шагом 0.25 (просьба 1 окт); в TTF-режиме — кегль
   -- (на Mac Ctrl+минус может прийти кодом 31 = ^_ ; плюс — 61 '=' или 43 '+')
-  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+  -- масштаб шрифта: Ctrl или Cmd + = / - (5 окт: Cmd — как привычно на маке)
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and (ctx.mods().ctrl or ctx.mods().cmd) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
     if (state.font or 0) == 0 then
       ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale or 2) + d)))

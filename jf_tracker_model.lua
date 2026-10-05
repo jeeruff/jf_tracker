@@ -232,10 +232,18 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     local slen = M.src_period(src)
     local r = rate > 0 and rate or 1
     local per = slen / r
+    local first = math.max(0, slen - head.offs) / r
+    -- stretch-маркеры (5 окт): шов там, где источник доходит до конца по карте
+    -- маркеров, а не длина / rate — иначе шов стоял ровно на такте, а в REAPER раньше
+    if head.smap then
+      local t_end = M.item_time_of_src(head.smap, slen / r)
+      local t_beg = M.item_time_of_src(head.smap, head.offs / r)
+      if t_end and t_beg and t_end > t_beg + 1e-4 then first = t_end; per = t_end - t_beg end
+    end
     if per > 1e-4 and per < head.len - 1e-4 then
       local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
       head.loop_rows = (R.TimeMap2_timeToQN(0, pos + per) - qn0) * lpb
-      head.loop_first = (R.TimeMap2_timeToQN(0, pos + math.max(0, slen - head.offs) / r) - qn0) * lpb
+      head.loop_first = (R.TimeMap2_timeToQN(0, pos + first) - qn0) * lpb
       head.loop_src = slen                     -- период в секундах источника (волна лупа — по модулю)
     end
   end
@@ -1311,6 +1319,22 @@ end
 -- пике 32-бит слово, младшие 15 бит — частота в Гц)
 -- stretch-маркеры как карта «время item → время источника» (2 окт): список
 -- { pos, src } по pos и подпись для ключа кэша пиков; nil, если маркеров нет
+-- обратная карта (5 окт): позиция маркера-источника u (в долях при playrate,
+-- как GetTakeStretchMarker) → время item; вне маркеров — наклон 1
+function M.item_time_of_src(pts, u)
+  if not pts or #pts == 0 then return nil end
+  if u <= pts[1].src then return pts[1].pos - (pts[1].src - u) end
+  for k = 1, #pts - 1 do
+    local a, b = pts[k], pts[k + 1]
+    if u <= b.src then
+      local d = b.src - a.src
+      return d > 1e-9 and (a.pos + (u - a.src) / d * (b.pos - a.pos)) or a.pos
+    end
+  end
+  local z = pts[#pts]
+  return z.pos + (u - z.src)
+end
+
 function M.stretch_map(take)
   if not take or not R.GetTakeNumStretchMarkers then return nil end
   local n = R.GetTakeNumStretchMarkers(take)

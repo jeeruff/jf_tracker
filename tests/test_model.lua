@@ -330,5 +330,13 @@ do
   for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 1) == 'S' then hasS = f elseif f:sub(1, 1) == 'T' then hasT = true end end
   eq('slice number as S02', hasS, 'S02'); eq('no T on a slice note', hasT, false)
 end
+-- обратная карта stretch-маркеров (5 окт): шов лупа по маркерам
+do
+  local pts = { { pos = 0, src = 0 }, { pos = 1, src = 2 }, { pos = 2, src = 3 } }
+  local function near(a, b) return math.abs((a or -99) - b) < 1e-9 end
+  eq('inverse map: inside the first segment', near(M.item_time_of_src(pts, 1), 0.5), true)
+  eq('inverse map: second segment', near(M.item_time_of_src(pts, 2.5), 1.5), true)
+  eq('inverse map: slope 1 after the last marker', near(M.item_time_of_src(pts, 4), 3), true)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

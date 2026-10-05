@@ -1925,7 +1925,7 @@ function D.transport_rows(c)
   local num = math.max(1, math.min(16, c.sig_num or 4))
   local cur = c.beat and (math.floor(c.beat) + 1) or 0
   return {
-    { { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
+    { not c.bigbpm and { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } or false,
       not c.bigbpm and { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } or false,
       { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig },
       { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } },
@@ -1975,7 +1975,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.LINE); gfx.rect(bx, ky, kw - 1, kh, 0)
         out.white = out.white + 1
         if letters then
-          text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], U.readable(U.BG, key_fill(k[1], white_c), 4.5))
+          -- тёмная буква на светлой клавише — с подложкой цвета клавиши (5 окт): без
+          -- неё картинка текста ×2 складывается с фоном, и тёмное пропадало
+          local kf = key_fill(k[1], white_c)
+          text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], U.readable(U.BG, kf, dim and 3.0 or 4.5), kf)
           out.letters = out.letters + 1
         end
       end
@@ -1998,23 +2001,29 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if tw <= 0 or not info then return out end
   local c = info.ctrl or {}
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
-  -- BPM крупно (опция big BPM): высотой в две строки, слева от транспорта
+  -- время и BPM крупно (опция big time and BPM): высотой в две строки, слева
   if c.bigbpm then
     local s0 = D.SCALE
-    D.SCALE = s0 * 2
-    local bs = c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f'):format(c.bpm or 0)
-    local bw = ms(bs)
-    if bw + ms('BPM') + 2 * L.pad < tw then
-      local hot = cell_hot(tx, ly, bw, 2 * L.rh)
-      text(tx, ly, bs, (hot or c.bpm_edit) and U.AMBER or U.TEXT)
-      if hot then hover.ctrl = 'bpm' end
-      hint('ctrl', tx, ly, bw, 2 * L.rh, 'bpm')
+    local big = {
+      { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT, '' },
+      { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT, 'BPM' },
+    }
+    for _, b in ipairs(big) do
+      D.SCALE = s0 * 2
+      local bw = ms(b[2])
       D.SCALE = s0
-      text(tx + bw + L.pad, ly + L.rh, 'BPM', U.GREY)
-      bw = bw + L.pad + ms('BPM') + 3 * L.pad
-      tx, tw = tx + bw, tw - bw
+      local cw = bw + (b[4] ~= '' and (L.pad + ms(b[4])) or 0) + 3 * L.pad
+      if cw < tw then
+        local hot = cell_hot(tx, ly, bw, 2 * L.rh)
+        D.SCALE = s0 * 2
+        text(tx, ly, b[2], hot and U.AMBER or b[3])
+        D.SCALE = s0
+        if b[4] ~= '' then text(tx + bw + L.pad, ly + L.rh, b[4], U.GREY) end
+        if hot then hover.ctrl = b[1] end
+        hint('ctrl', tx, ly, bw, 2 * L.rh, b[1])
+        tx, tw = tx + cw, tw - cw
+      end
     end
-    D.SCALE = s0
   end
   local gap = 2 * L.pad
   for ri, row in ipairs(D.transport_rows(c)) do
