@@ -137,7 +137,8 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
-  bigbpm = flag('bigbpm', true),                      -- 5 окт: по умолчанию вкл
+  bigbpm = flag('bigbpm', true),
+  recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
@@ -382,7 +383,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm', 'stretchmarks' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -2241,6 +2242,70 @@ ctx = {
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
+  -- ── запись (5 окт) ───────────────────────────────────────────────────
+  -- kind: 'tracker' — тейк остаётся на треке с курсора; 'inst' — новые тейки
+  -- после остановки уходят в lib трека (каждый — свой инструмент)
+  rec_start = function(kind)
+    local col = cur_col()
+    if not col then vim.msg = 'rec: no track under the cursor'; return end
+    if reaper.GetPlayState() & 4 == 4 then vim.msg = 'rec: already recording'; return end
+    local tr = col.track
+    local before = {}
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do before[reaper.GetTrackMediaItem(tr, i)] = true end
+    local t0 = edit.row_time(vim.cur.row, state.lpb, 0)
+    if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') ~= 1 then reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', 1) end
+    state.rec_sess = { kind = kind, track = tr, row = vim.cur.row, t0 = t0, before = before, name = col.name }
+    reaper.SetEditCurPos(t0, false, false)
+    reaper.Main_OnCommand(1013, 0)                                 -- Transport: Record
+    vim.msg = (kind == 'inst' and 'rec into a new sound of %s' or 'rec into %s from row %04d'):format(col.name, vim.cur.row)
+      .. ' - Space: keep, Enter: keep + cursor back, Esc: delete'
+  end,
+  rec_stop = function(c)
+    if c == 27 then
+      if state.recdelprompt == false then
+        reaper.Main_OnCommand(40668, 0); state.rec_sess = nil; vim.msg = 'rec: take deleted'; model.invalidate(); return
+      end
+      reaper.Main_OnCommand(1008, 0)                               -- пауза, пока решаем
+      OPT.ask.open('delete the take?', 'Esc stopped the recording', {
+        { key = 'k', label = 'keep it', fn = function() reaper.Main_OnCommand(40667, 0); ctx.rec_finish(false) end },
+        { key = 'd', label = 'delete it', fn = function() reaper.Main_OnCommand(40668, 0); state.rec_sess = nil; vim.msg = 'rec: take deleted'; model.invalidate() end },
+        { key = 'a', label = "delete it, don't ask again", fn = function()
+            state.recdelprompt = false; reaper.Main_OnCommand(40668, 0); state.rec_sess = nil
+            vim.msg = 'rec: take deleted (no question from now on - options: ask before deleting a take)'; model.invalidate() end },
+      })
+      return
+    end
+    reaper.Main_OnCommand(40667, 0)                                -- Stop (save all recorded media)
+    ctx.rec_finish(c == 13)
+  end,
+  rec_finish = function(back)
+    local s = state.rec_sess
+    state.rec_sess = nil
+    if not s then return end
+    if s.kind == 'inst' and reaper.ValidatePtr(s.track, 'MediaTrack*') then
+      local new = {}
+      for i = 0, reaper.CountTrackMediaItems(s.track) - 1 do
+        local it = reaper.GetTrackMediaItem(s.track, i)
+        if not s.before[it] then new[#new + 1] = it end
+      end
+      local n = 0
+      edit.run('rec to lib', function()
+        for _, it in ipairs(new) do
+          local tk = reaper.GetActiveTake(it)
+          local src = tk and reaper.GetMediaItemTake_Source(tk)
+          local path = src and reaper.GetMediaSourceFileName(src, '')
+          if path and path ~= '' and edit.depot_add(path, s.track) then reaper.DeleteTrackMediaItem(s.track, it); n = n + 1 end
+        end
+      end)
+      vim.msg = ('rec: %d take(s) -> lib of %s'):format(n, s.name or '')
+    else vim.msg = 'rec: take kept' end
+    if back then
+      vim.cur.row = s.row
+      reaper.SetEditCurPos(s.t0, false, false)
+      vim.msg = vim.msg .. ', cursor back to the start'
+    end
+    model.invalidate()
+  end,
   -- поиски (5 окт): Ctrl+/ — все эффекты (список слева от DSP), Cmd+/ — файлы
   -- (браузер), Option+/ — по цепи DSP трека курсора: блок или его параметр
   fx_search_global = function()
@@ -3053,6 +3118,7 @@ ctx = {
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
+      flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
@@ -5990,6 +6056,7 @@ local function frame()
     end
   end
   if not idle_skip then HN.reset() end
+  if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len = state.xfade, (state.xfade_ms or 10) / 1000
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.hybrid = true                                     -- не-ASCII (кириллица) — системным моно-шрифтом высотой с битмап
@@ -7932,6 +7999,21 @@ local function frame()
       if tab then state.top = true; state.toptab = tab; ctx.set_focus('top'); vim.msg = 'tab: ' .. tab
       else ctx.set_focus('tracker'); vim.msg = 'tracker' end
       c = 0
+    end
+  end
+  -- запись (5 окт): Ctrl+R / F12 — вкладка rec; Option+R — в трекер с курсора;
+  -- Cmd+R — в инструмент (новый файл → lib); во время записи Esc — удалить
+  -- тейк (с вопросом, опция), Space — сохранить, Enter — сохранить и курсор
+  -- на начало записи. Ctrl+R больше не redo (redo — Cmd+Shift+Z, :redo)
+  do
+    local m = ctx.mods()
+    if c > 0 and not vim.picker and not OPT.ask.active and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      local rec = reaper.GetPlayState() & 4 == 4
+      if rec and state.rec_sess and (c == 27 or c == 32 or c == 13) then ctx.rec_stop(c); c = 0
+      elseif c == 6697266 or (c == 18 and m.ctrl and not m.cmd) then
+        state.top = true; state.toptab = 'retro'; ctx.set_focus('top'); vim.msg = 'tab: rec'; c = 0
+      elseif c == 1962934446 or ((c == 114 or c == 18) and m.alt and not m.cmd) then ctx.rec_start('tracker'); c = 0
+      elseif (c == 18 or c == 114) and m.cmd and not m.ctrl then ctx.rec_start('inst'); c = 0 end
     end
   end
   -- Cmd+Z — undo, Cmd+Shift+Z — redo: везде в трекере, в любом модуле (2 окт)

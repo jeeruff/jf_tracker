@@ -67,7 +67,7 @@
 <p class="sub">a tracker shell over the REAPER project, with Vim keys</p>
 <div class="nav">
   <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
-  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a> <a href="#cmd">: commands</a>
+  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
   <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
@@ -129,7 +129,7 @@ inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves 
 <kbd>yy</kbd> <kbd>y</kbd>{motion} copy · <kbd>p</kbd> paste<br>
 <kbd>c</kbd>{motion} change · <kbd>s</kbd> split · <kbd>M</kbd> mute<br>
 <kbd>^A</kbd> <kbd>^X</kbd> ±1 · <kbd>r</kbd>{value} set<br>
-<kbd>u</kbd> <kbd>^R</kbd> undo · <kbd>.</kbd> repeat · <kbd>q</kbd> <kbd>@</kbd> macros</div>
+<kbd>u</kbd> undo · <kbd>⌘⇧Z</kbd> redo · <kbd>.</kbd> repeat · <kbd>q</kbd> <kbd>@</kbd> macros</div>
 <div><b>view and the rest</b>
 <kbd>f</kbd> jump labels · <kbd>/</kbd> <kbd>n</kbd> <kbd>N</kbd> search<br>
 <kbd>za</kbd> <kbd>zM</kbd> <kbd>zR</kbd> fold tracks<br>
@@ -154,6 +154,14 @@ z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar
 <tr><td><kbd>Ctrl</kbd>+note</td><td>a held note: its length is as long as you hold the key</td></tr>
 <tr><td>sliced sound</td><td>every note key writes a slice: <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> … = slices 1 2 3 4 …; <kbd>Option</kbd>+key — the selected slice at that pitch, <kbd>Cmd</kbd>+key — the whole sample at that pitch</td></tr>
 <tr><td>MIDI keyboard</td><td>writes into the cursor column the same way</td></tr>
+</table>
+
+<h2 id="rec">Recording</h2>
+<table>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>F12</kbd></td><td>the <code>rec</code> tab (the jf_rec ring of the track)</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>R</kbd></td><td>record into the tracker: the cursor track is armed, recording starts at the cursor row</td></tr>
+<tr><td><kbd>Cmd</kbd>+<kbd>R</kbd></td><td>record a new sound: the take goes into the lib of the cursor track as its own instrument</td></tr>
+<tr><td>while recording</td><td><kbd>Space</kbd> — keep, the cursor stays where it stopped; <kbd>Enter</kbd> — keep and the cursor goes back to the start; <kbd>Esc</kbd> — delete the take (asks first; option <code>ask before deleting a take</code>)</td></tr>
 </table>
 
 <h2 id="visual">VISUAL</h2>
