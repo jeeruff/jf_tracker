@@ -1985,6 +1985,9 @@ function D.transport_groups(c)
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) } },
                 { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
+  -- запись (5 окт): рядом с метрономом
+  g[#g + 1] = { { { 'rec', c.recording and 'REC' or 'rec', c.recording and U.RED or U.TEXT }, tg('punch', 'punch', c.punch) },
+                { tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
   g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
@@ -2005,11 +2008,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- клавиатура и транспорт — правее; мелкий статус — строкой под ними
   local cc = info and info.ctrl or {}
   if cc.bigstatus and st and w > 60 * L.cw then
-    local third = math.floor(w / 3)
+    -- ширина — по тексту (5 окт: треть была многовато), не больше трети;
+    -- INSERT — красным
     local s = ((st[1] or ''):match('^[^|]*') or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-    local room = third - 3 * L.pad
+    local room = math.floor(w / 3) - 3 * L.pad
     while s ~= '' and D.big_measure(s, 2) > room do s = s:sub(1, -2) end
-    if s ~= '' then D.big_text(x + L.pad, ly, s, (p and p.ins) and D.FOCUS_INS or U.AMBER, 2) end
+    local third = (s ~= '' and D.big_measure(s, 2) or 0) + 3 * L.pad
+    local ins = info and info.vmode == 'insert'
+    if s ~= '' then D.big_text(x + L.pad, ly, s, ins and U.RED or U.AMBER, 2) end
     set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(x + third - L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
     x, w = x + third, w - third
     st.big = true
@@ -2926,6 +2932,10 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
+    -- треки с включённой записью (5 окт): чуть покрасневший фон колонки
+    for _, cc in ipairs(L.cols) do
+      if cc.x and cc.col and cc.col.armed then gfx.set(U.RED[1], U.RED[2], U.RED[3], 0.07); gfx.rect(cc.x, y, cc.w, L.rh, 1); gfx.a = 1 end
+    end
     -- до ячеек этой строки: нижний пиксель — уходящему, верхний+1 — следующему
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
@@ -3164,9 +3174,10 @@ function D.frame(L, snap, rows, state, info)
     local a, b = math.max(info.timesel[1], row0, info.view_clip and info.view_clip[1] or -math.huge), math.min(info.timesel[2], row0 + nr, info.view_clip and info.view_clip[2] or math.huge)
     if b > a then
       local y0, y1 = L.body_y + (a - row0) * L.rh, L.body_y + (b - row0) * L.rh
-      local grey = { 0.80, 0.80, 0.80 }
+      -- авто-панч (5 окт): та же зона красным — запись только в ней
+      local grey = info.punch and U.RED or { 0.80, 0.80, 0.80 }
       set(grey)
-      gfx.a = 0.16; gfx.rect(tx0 + L.ruler_w + 2, y0, L.label_w - L.ruler_w - 3, y1 - y0, 1)
+      gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.ruler_w + 2, y0, L.label_w - L.ruler_w - 3, y1 - y0, 1)
       gfx.a = 0.05; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1)
       gfx.a = 1
       local sx = tx0 + L.ruler_w - 3                 -- спина скобки; усы — влево: «]»

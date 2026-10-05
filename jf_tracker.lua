@@ -140,7 +140,8 @@ local state = {
   ttf = ({ bigblue = 'bigblue', iosevka = 'iosevka' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
   opt_tab = reaper.GetExtState(EXT, 'opttab') ~= '' and reaper.GetExtState(EXT, 'opttab') or nil,   -- последняя вкладка опций (5 окт)
   bigbpm = flag('bigbpm', true),
-  bigstatus = flag('bigstatus', true),                -- режим крупно слева в полосе транспорта (5 окт)
+  bigstatus = flag('bigstatus', true),
+  reclib = flag('reclib', true),                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
@@ -386,7 +387,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm', 'bigstatus', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm', 'bigstatus', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -2514,6 +2515,21 @@ ctx = {
         end
       end)
       vim.msg = ('rec: %d take(s) -> lib of %s'):format(n, s.name or '')
+    elseif state.reclib and reaper.ValidatePtr(s.track, 'MediaTrack*') then
+      -- rec→lib (5 окт): тейк остаётся на месте и ещё становится инструментом
+      local n = 0
+      edit.run('rec copy to lib', function()
+        for i = 0, reaper.CountTrackMediaItems(s.track) - 1 do
+          local it = reaper.GetTrackMediaItem(s.track, i)
+          if not s.before[it] then
+            local tk = reaper.GetActiveTake(it)
+            local src = tk and reaper.GetMediaItemTake_Source(tk)
+            local path = src and reaper.GetMediaSourceFileName(src, '')
+            if path and path ~= '' and edit.depot_add(path, s.track) then n = n + 1 end
+          end
+        end
+      end)
+      vim.msg = ('rec: take kept, %d new in the lib'):format(n)
     else vim.msg = 'rec: take kept' end
     if back then
       vim.cur.row = s.row
@@ -5908,6 +5924,16 @@ function ctrl_action(name, delta)
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  -- блок записи (5 окт): rec, punch (авто-панч по time selection), pre-roll, rec→lib
+  elseif name == 'rec' then
+    if reaper.GetPlayState() & 4 == 4 then if state.rec_sess then ctx.rec_stop(32) else reaper.Main_OnCommand(1016, 0) end
+    else ctx.rec_start('tracker') end
+  elseif name == 'punch' then
+    local p = ctx.cmd_by_text('record mode: time selection auto punch')
+    if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_by_text('record mode: normal') or 40252, 0)
+    elseif p then reaper.Main_OnCommand(p, 0) end
+  elseif name == 'preroll' then local p = ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
+  elseif name == 'reclib' then state.reclib = not state.reclib; vim.msg = 'rec -> lib ' .. (state.reclib and 'on: recorded takes also become instruments' or 'off')
   elseif name == 'sig' or name == 'beats' then ctx.sig_prompt()
   end
 end
@@ -6558,6 +6584,7 @@ local function frame()
       local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')
       return b, reaper.format_timestr_pos(t, '', 0)
     end or nil,
+    punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
     timesel = (function()
       local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
       if b - a < 1e-6 then return nil end
@@ -6643,6 +6670,9 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib,
+      punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+      preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
@@ -7002,6 +7032,10 @@ local function frame()
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
+  elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
+  elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
+  elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'
+  elseif hover.ctrl == 'reclib' then state.status = 'rec -> lib: a take recorded into the tracker also becomes a new instrument in the lib'
   elseif hover.ctrl == 'sig' then state.status = ('time signature at the cursor %d/%d - %d rows per bar, %d per beat (LPB)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
   elseif hover.ctrl == 'beats' then state.status = ('bar %d, beat %d of %d - squares: beats of the bar (amber edge = downbeat), lit = current; %d rows/beat, %d rows/bar'):format(beat_info.bar, math.floor(beat_info.beat) + 1, beat_info.num, state.lpb, beat_info.rows_bar)
   elseif hover.ctrl == 'xfade' then state.status = 'x-fade of inserted notes: click on/off, wheel: length (ms); off = overlaps without crossfade; \\x: menu'
