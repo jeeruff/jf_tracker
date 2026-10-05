@@ -15,7 +15,7 @@ T.STEPS = {
     text = 'h j k l move the cursor, gg / G - start / end, { } - bars. Try h j k l now.',
     check = function(e, b) return e.fi ~= b.fi or e.row ~= b.row end },
   { mod = 'tracker', title = 'Write notes',
-    text = 'i - INSERT, m - the keyboard (as in Ableton): the top row q 2 w 3 e ... writes notes, z / x - octave. Press i, m, play a few keys, then Esc.',
+    text = 'i - INSERT: the keyboard is on, the top row q 2 w 3 e ... writes notes, z / x - octave. Press i, play a few keys, then Esc.',
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'inst', title = 'Pick a sound',
     text = 'The lib: every sample of the project. Tab to it and j / k, or , . in INSERT. Pick another sound.',

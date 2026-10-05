@@ -264,12 +264,8 @@ ctrl_down = true; V.key(51); eq('INSERT: Ctrl+3 = black key held (hold note D#5)
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
 cmd_down = true; V.key(51); eq('NORMAL: ⌘3 → pool slot 3', last(), 'pool:3'); V.key(48); eq('⌘0 → slot 10', last(), 'pool:10'); cmd_down = false
-AUTO_KBD = false; V.piano = false
-keysin('m'); eq('m → piano layer', V.piano, true)
-local np = #calls; keysin('q'); eq('piano layer: q only sounds', last(), 'prev:72'); eq('piano layer: nothing inserted', #calls, np + 1)
-ctrl_down = true; V.key(17); eq('piano layer: Ctrl+q holds', last(), 'hold:72'); ctrl_down = false
-keysin('m'); eq('m again → piano off', V.piano, false)
-AUTO_KBD = true
+-- 5 окт: слоя пианино в NORMAL нет — m не включает клавиатуру, q — Vim
+keysin('m'); eq('NORMAL m: no keyboard layer', V.piano, false); eq('NORMAL: stays normal', V.mode, 'normal')
 keysin('iq');      eq('len = step', last(), 'ins:trA@5:72:2'); eq('advance by step', V.cur.row, 7)
 V.key(27)
 keysin(':lpb 8'); V.key(13); eq('lpb cmd', lpb_calls[#lpb_calls], 8)
@@ -624,20 +620,11 @@ reset()
 keysin(':scramble'); V.key(13); eq(':scramble without a region: the whole cursor track', last(), 'scramble:hat,kick,ov,snare')
 reset()
 keysin('v8j:scramble'); V.key(13); eq(':scramble in VISUAL: the selection', last(), 'scramble:kick,snare')
--- m и INSERT (4 окт, Vim + Ableton): без m INSERT — управление, с m — ноты
-AUTO_KBD = false
-reset(); V.piano = false
-keysin('iq'); eq('INSERT without m: q writes nothing', #calls, 0)
-eq('INSERT without m: hint', (V.msg or ''):match('keyboard off') ~= nil, true)
-keysin('m'); eq('m in INSERT turns the keyboard on', V.piano, true)
-keysin('q'); eq('INSERT + m: q writes C-4', last(), 'ins:trA@0:60:1')
-keysin('m'); eq('m again: off', V.piano, false)
-V.key(27); reset(); V.piano = false
-keysin('m'); eq('NORMAL m: keys on', V.piano, true)
-keysin('i'); eq('NORMAL + m: i is a note, not INSERT', V.mode, 'normal')
-V.key(13); eq('NORMAL + m: Enter -> INSERT', V.mode, 'insert')
-keysin('q'); eq('then q writes', last(), 'ins:trA@0:60:1')
-AUTO_KBD = true
+-- 5 окт: клавиатура = INSERT (без m): i — и сразу ноты; Esc — назад
+reset()
+keysin('iq'); eq('INSERT: q writes C-4 at once', last(), 'ins:trA@0:60:1'); eq('INSERT: keyboard on', V.piano, true)
+keysin('m'); eq('INSERT: m does not turn it off', V.piano, true)
+V.key(27); eq('Esc: NORMAL, keyboard off', V.piano, false)
 -- Esc переключает INSERT (4 окт, как Renoise)
 reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
 keysin('3'); V.key(27); eq('Esc with a count only clears it', V.mode, 'normal')

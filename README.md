@@ -83,7 +83,7 @@ In short:
 | Keys | What they do |
 | --- | --- |
 | `h j k l`, `gg` / `G`, `{ }` | Move: by cell, to the start / end, by bar. |
-| `i`, then `m` | INSERT, then the keyboard on. `q 2 w 3 e r 5 t …` write notes; `z` / `x` change the octave. |
+| `i` | INSERT: the keyboard writes notes. `q 2 w 3 e r 5 t …` write notes, `z` / `x` change the octave. |
 | `Esc` | Toggles INSERT, as in Renoise. |
 | `x`, `dw`, `yy p`, `u`, `.` | Delete, delete with a motion, copy and paste, undo, repeat. |
 | `v` / `V` | Select a block / whole rows. |

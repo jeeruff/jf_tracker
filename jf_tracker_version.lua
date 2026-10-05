@@ -657,7 +657,7 @@ V.TUTORIAL = {
   'jf_tracker in ten steps - every key here is a Vim habit',
   '',
   '1. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
-  '2. Write notes. i - INSERT, m - the keyboard on. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
+  '2. Write notes. i - INSERT, the keyboard is on. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
   '3. Pick a sound. The lib on the right: Tab to it, j k - select; in INSERT , . switch sounds. Shift+note only plays.',
   '4. Slice a break. Select a sample, the item tab on top: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
   '5. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',

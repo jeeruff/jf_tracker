@@ -337,7 +337,7 @@ function D.layout(snap, state, nregions)
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
   -- чтобы тело не прыгало, когда треки перестают помещаться
   L.hsb_h = 8
-  -- пианинка (4 окт): слой пианино (m) — полоса клавиш под скролл-баром, над статусом
+  -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   L.piano_h = state.piano_strip and (2 * L.rh + 6) or 0
   L.low_h = L.hsb_h + L.piano_h                     -- всё, что под телом в модуле трекера
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0))
@@ -3518,21 +3518,6 @@ function D.frame(L, snap, rows, state, info)
     }
     D.module_rects = rects          -- только для рамки фокуса: границы модулей — разделители D.SEP (1 px)
   end
-  -- рамка фокуса клавиатуры: модуль, которому идут клавиши
-  do
-    local f = info.focus
-    local rects = D.module_rects or {}
-    local r = rects[f]
-    if r then
-      -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
-      local ins = info.vmode == 'insert' and info.focus == 'tracker'
-      set(ins and D.FOCUS_INS or D.FOCUS)
-      -- ободок ровно по границе модуля, без зазора: 1 px; INSERT — красный, 2 px
-      gfx.rect(r[1], r[2], r[3], r[4], 0)
-      if ins then gfx.rect(r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, 0) end
-    end
-  end
-
   -- статус — в самом низу окна, под DSP-панелью (раньше делил y с ней и
   -- перекрывал её шапку)
   -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
@@ -3712,6 +3697,22 @@ function D.frame(L, snap, rows, state, info)
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
+  -- рамка фокуса клавиатуры: модуль, которому идут клавиши; последней в
+  -- кадре (5 окт) — скроллбар, пианинка и разделители закрывали низ и право
+  do
+    local f = info.focus
+    local rects = D.module_rects or {}
+    local r = rects[f]
+    if r then
+      -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
+      local ins = info.vmode == 'insert' and info.focus == 'tracker'
+      set(ins and D.FOCUS_INS or D.FOCUS)
+      -- ободок ровно по границе модуля, без зазора: 1 px; INSERT — красный, 2 px
+      gfx.rect(r[1], r[2], r[3], r[4], 0)
+      if ins then gfx.rect(r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, 0) end
+    end
+  end
+
   return hover
 end
 
