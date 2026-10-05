@@ -50,12 +50,9 @@ end
 function O.open(items, tab)
   O.compact, O.numbuf = nil, nil
   O.all = items or O.all
-  O.tabs = {}
-  for _, it in ipairs(O.all) do if it.sep and it.title then O.tabs[#O.tabs + 1] = it.title end end
-  O.tabs[#O.tabs + 1] = 'all'
-  local ok = false
-  for _, t in ipairs(O.tabs) do if t == (tab or O.tab) then ok = true end end
-  O.tab = ok and (tab or O.tab) or O.tabs[1]
+  -- вкладки убраны (5 окт, «дурацкая идея»): все опции одной страницей,
+  -- разделы — заголовками; поиск остался
+  O.tabs, O.tab = {}, 'all'
   O.query, O.typing = '', false
   O.page = 'list'
   O.active = true
@@ -70,6 +67,7 @@ function O.open_panel(items, title, anchor)
 end
 function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end end
 function O.step_tab(d)
+  if #O.tabs == 0 then return end
   local i = 1
   for k, t in ipairs(O.tabs) do if t == O.tab then i = k end end
   O.set_tab(O.tabs[(i - 1 + d) % #O.tabs + 1])
@@ -428,7 +426,7 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  if not O.compact then U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   Tab / [ ]: tabs   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
+  if not O.compact then U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска
