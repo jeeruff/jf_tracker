@@ -7094,7 +7094,7 @@ local function frame()
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool then
     local col = hover.pool.ci and snap.cols[hover.pool.ci] or cur_col(); local e = col and col.pool[hover.pool.i]
-    state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick: onto the track at the cursor'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
+    state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick: open in the item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
   elseif hover.matrix and hover.matrix.btn then
     state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
   elseif hover.matrix and hover.matrix.ri then
@@ -7687,9 +7687,11 @@ local function frame()
       state.prev_by_mouse = true
       pool_select(hover.pool.i)
       state.prev_by_mouse = nil
-      -- двойной клик (5 окт): сэмпл на трек в курсор, как двойной клик в Media Explorer;
-      -- фокус остаётся, где был
-      if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.insert_whole()
+      -- двойной клик (5 окт, правка): инструмент остаётся на своём месте, фокус —
+      -- в модуль сэмпла (вкладка item). Вставка на трек — Enter / insert
+      if dbl and click.zone == 'pool' and click.row == hover.pool.i then
+        draw.lib_drag = nil
+        state.top = true; state.toptab = 'sample'; ctx.set_focus('top'); vim.msg = 'item: ' .. ((cur_col() and cur_col().pool[hover.pool.i] or {}).name or '')
       else draw.lib_drag = { i = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y } end   -- протяжка — перестановка
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
