@@ -2136,6 +2136,7 @@ ctx = {
     if #vim.picker.matches == 0 then vim.picker.query = ''; vim.picker_refilter() end
     return true
   end,
+  keyq = {},
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
   loop_cells = function()
     if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
@@ -4975,22 +4976,73 @@ end
 
 -- контекстное меню (5 окт): в стиле трекера — гидрой у мыши, буквы по
 -- смыслу (первая свободная буква подписи), «!» — отмеченный пункт (*)
+-- 5 окт: контекстная гидра показывает ВСЕ хоткеи модуля — пункты зоны и
+-- записи его страницы справки; хоткей пункта — отдельной яркой колонкой,
+-- выбор записи справки нажимает её клавиши (очередь ctx.keyq)
+ctx.CTX_NAMED = { Enter = 13, Space = 32, Esc = 27, Tab = 9, BS = 8 }
+function ctx.tok_codes(t)
+  if ctx.CTX_NAMED[t] then return { ctx.CTX_NAMED[t] } end
+  if t:match('^%^%u$') then return { t:byte(2) - 64 } end
+  if #t == 1 and t:byte() >= 33 and t:byte() <= 126 then return { t:byte() } end
+  if #t == 2 and t:match('^%a%a$') then return { t:byte(1), t:byte(2) } end
+end
+ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
+                    sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top' }
+function ctx.ctx_page(hover)
+  if hover.matrix then return 'matrix' elseif hover.pool then return 'inst' elseif hover.dsp then return 'dsp'
+  elseif type(hover.fxb) == 'table' then return 'fxb'
+  elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
+  local f = state.focus
+  if f == 'top' then local t = state.toptab; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
+  if f == 'slices' then return 'sample' end
+  if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
+  return ctx.CTX_FOCUS[f] and f or nil
+end
 local function context_menu(hover, anchor)
-  local items = ctx.context_items(hover)
-  if not items or #items == 0 then return end
-  local used, hitems = { ['?'] = true }, {}
+  local items = ctx.context_items(hover) or {}
+  local used, hitems, have = { ['?'] = true }, {}, {}
+  local function pick_key(want, label)
+    local k = want and not used[want] and want or nil
+    if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
+    if not k then for ch in ('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):gmatch('.') do if not used[ch] then k = ch; break end end end
+    if k then used[k] = true end
+    return k
+  end
   for _, it in ipairs(items) do
     local label = it[1]
     if label ~= '--' then
       local on = label:sub(1, 1) == '!'
       if on then label = label:sub(2) end
-      local k = it.key and not used[it.key] and it.key or nil
-      if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
-      if not k then for ch in ('abcdefghijklmnopqrstuvwxyz0123456789'):gmatch('.') do if not used[ch] then k = ch; break end end end
-      if k then used[k] = true; hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2] } end
+      -- «… (Space)» → хоткей в свою колонку
+      local base, hk = label:match('^(.-)%s*%(([^()]+)%)$')
+      if hk and #hk <= 8 and not hk:find(':') then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end else hk = nil end
+      local k = pick_key(it.key, label)
+      if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2], hk = hk } end
     end
   end
-  vim.open_hydra({ title = 'menu', items = hitems })
+  local page = ctx.ctx_page(hover)
+  local P = page and KH.PAGES[page]
+  if P then
+    for _, e in ipairs(P.e) do
+      local toks = {}
+      for t in e.k:gmatch('%S+') do toks[#toks + 1] = t end
+      local first = toks[1]
+      local nav = e.k:match('^h j k l') or e.k:match('^hjkl') or e.k == 'j k' or e.k == 'h l' or e.k == 'gg G' or e.k == 'g G'
+                  or e.k == '?' or e.k:match('^Esc') or e.k:match('^%? ')
+      local codes = first and ctx.tok_codes(first)
+      if codes and not nav and not have[first] then
+        have[first] = true
+        local k = pick_key(#first == 1 and first or nil, e.d)
+        local foc = ctx.CTX_FOCUS[page]
+        if k then hitems[#hitems + 1] = { key = k, label = e.d, hk = e.k, fn = function()
+          if foc and state.focus ~= foc then ctx.set_focus(foc) end
+          for _, cd in ipairs(codes) do ctx.keyq[#ctx.keyq + 1] = cd end
+        end } end
+      end
+    end
+  end
+  if #hitems == 0 then return end
+  vim.open_hydra({ title = page and ('menu: ' .. (P and P.title or page)) or 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
 ctx.open_context = context_menu          -- для \ из ctx.context_key (объявлен выше этого места)
@@ -8392,6 +8444,8 @@ local function frame()
 
   local c = gfx.getchar()
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
+  -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
+  if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then

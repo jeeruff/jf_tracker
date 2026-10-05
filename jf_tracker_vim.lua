@@ -1758,7 +1758,7 @@ function V.popup()
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
-      lines[#lines + 1] = { key = it.key, text = it.label .. (it.sub and ' …' or '') }
+      lines[#lines + 1] = { key = it.key, text = it.label .. (it.sub and ' …' or ''), hk = it.hk }
     end
     return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
   elseif V.mode == 'cmd' then

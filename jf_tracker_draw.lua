@@ -3944,12 +3944,17 @@ function D.popup(L, p, anchor)
   local maxrows = math.max(1, math.floor((L.body_h / 2) / L.rh))
   local ncol = math.max(1, math.ceil(n / maxrows))
   local nrow = math.min(n, maxrows)
-  local kw, tw = 0, 0
+  local kw, tw, hw = 0, 0, 0
   for _, ln in ipairs(p.lines) do
     kw = math.max(kw, ms(ln.key or ''))
     tw = math.max(tw, ms(ln.text or ''))
+    if ln.hk then hw = math.max(hw, ms(ln.hk)) end
   end
-  local colw = L.pad + kw + 2 * L.pad + tw + 2 * L.pad
+  -- колонка хоткеев (5 окт): своя ширина, без наложений; описания ужимаются
+  local hcol = hw > 0 and (hw + 2 * L.pad) or 0
+  local maxcol = math.floor((W - 3 * L.pad) / ncol)
+  if L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad > maxcol then tw = math.max(ms('WWWWWWWW'), maxcol - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad)) end
+  local colw = L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2
@@ -3977,7 +3982,8 @@ function D.popup(L, p, anchor)
     if mhot then D.popup_hot = ln.key end
     if p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
-    text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.text or '', tw), U.GREY)
+    if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
+    text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), U.GREY)
   end
 end
 
