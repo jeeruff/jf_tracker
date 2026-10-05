@@ -5928,6 +5928,10 @@ function ctrl_action(name, delta)
   elseif name == 'rec' then
     if reaper.GetPlayState() & 4 == 4 then if state.rec_sess then ctx.rec_stop(32) else reaper.Main_OnCommand(1016, 0) end
     else ctx.rec_start('tracker') end
+  elseif name == 'tp_rew' then reaper.Main_OnCommand(40084, 0)            -- Transport: Rewind a little bit
+  elseif name == 'tp_fwd' then reaper.Main_OnCommand(40085, 0)            -- Transport: Fast forward a little bit
+  elseif name == 'tp_play' then reaper.Main_OnCommand(1007, 0)            -- Transport: Play
+  elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
   elseif name == 'punch' then
     local p = ctx.cmd_by_text('record mode: time selection auto punch')
     if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_by_text('record mode: normal') or 40252, 0)
@@ -6670,7 +6674,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib,
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -7032,6 +7036,10 @@ local function frame()
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
+  elseif hover.ctrl == 'tp_rew' then state.status = 'rewind a little'
+  elseif hover.ctrl == 'tp_fwd' then state.status = 'fast forward a little'
+  elseif hover.ctrl == 'tp_play' then state.status = 'play (Space)'
+  elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
   elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'

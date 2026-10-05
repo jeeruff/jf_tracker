@@ -1986,9 +1986,13 @@ function D.transport_groups(c)
   g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) } },
                 { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
   -- запись (5 окт): рядом с метрономом
-  g[#g + 1] = { { { 'rec', c.recording and 'REC' or 'rec', c.recording and U.RED or U.TEXT }, tg('punch', 'punch', c.punch) },
-                { tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
-  g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
+  -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
+  -- punch, pre-roll, rec>lib
+  local ps = c.playstate or 0
+  g[#g + 1] = { { { 'tp_rew', '[<<]' }, { 'tp_play', '[>]', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
+                  { 'tp_pause', '[II]', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '[o]', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '[>>]' } },
+                { tg('metro', 'metro', c.metro), tg('punch', 'punch', c.punch), tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
+  g[#g + 1] = { { tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
   return g
