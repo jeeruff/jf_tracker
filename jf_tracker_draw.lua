@@ -1975,12 +1975,13 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 -- строки ячеек { id, текст, цвет }; id — те же, что у главного модуля
 -- (клик / колесо — ctrl_action). Время и BPM — свой крупный блок слева
 function D.transport_buttons(c)
-  -- обычные кнопки словами (5 окт: значки отменены) — [rev][play/stop][rec][pause][fwd][loop]
+  -- маленькие кнопки символами ASCII (5 окт): единственное исключение из
+  -- правила «словами» — << > || o >> loop; play — и stop (зелёная, пока играет)
   local ps = c.playstate or 0
   local playing = ps & 1 == 1
-  return { { 'tp_rew', 'rev' }, { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil },
-           { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil },
-           { 'tp_fwd', 'fwd' }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
+  return { { 'tp_rew', '<<' }, { 'tp_play', '>', playing and U.GREEN or nil },
+           { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'o', c.recording and U.RED or nil, U.RED },
+           { 'tp_fwd', '>>' }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
 end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -2011,8 +2012,38 @@ end
 -- полоса под трекером: слева клавиатура (m прячет), в остальном месте по
 -- центру — транспорт двумя строками (BPM крупно — опция big BPM), статус —
 -- третьей строкой (status bar: keyboard). p — клавиатура или nil
+-- подсказки под полосой транспорта (5 окт): каждая — под своим элементом.
+-- D.strip_cols = { { x0, x1, { {клавиша, что}, … } }, … } собирает piano_strip,
+-- рисует D.strip_hints в строке подсказок трекера
+D.strip_cols = {}
+local STRIP_HINTS = {
+  play = { { 'dblclick', 'type BPM' } },
+  lpb = { { 'wheel', 'LPB' }, { 'click', 'sig' } },
+  step = { { 'wheel', 'value' }, { 'c C', 'vel' } },
+  metro = { { 'click', 'toggle' }, { 'Opt+R', 'rec' } },
+  follow = { { 'F', 'follow' }, { 'click', 'toggle' } },
+}
+function D.strip_hints(L, x, y, w, active)
+  local cols = D.strip_cols
+  if not cols or #cols == 0 or not L.hint_h or L.hint_h <= 0 then return false end
+  set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
+  set(U.LINE); gfx.rect(x, y, w, 1, 1)
+  local sp = math.max(L.pad, ms(' '))
+  for _, cl in ipairs(cols) do
+    local cx, x1 = math.max(x + L.pad, cl[1]), math.min(x + w - L.pad, cl[2])
+    for _, it in ipairs(cl[3]) do
+      local kw, dw = ms(it[1]), ms(it[2])
+      if cx + kw + sp + dw > x1 then break end
+      text(cx, y + 1, it[1], active and U.AMBER or U.GREY)
+      text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.mix(U.GREY, U.PANEL, 0.25))
+      cx = cx + kw + sp + dw + 2 * sp
+    end
+  end
+  return true
+end
 function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local out = { white = 0, black = 0, letters = 0 }
+  D.strip_cols = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   set(D.SEP); gfx.rect(x, y, w, 1, 1)
@@ -2084,6 +2115,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         end
       end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
+      D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { 'q2w3e', 'notes' }, { 'z x', 'oct' } }) or { { 'z x', 'oct' }, { 'm', 'keys' } } }
     end
   end
   -- кнопки транспорта (5 окт): после клавиатуры, перед временем / BPM и
@@ -2107,6 +2139,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         bx = bx + bw + 2
       end
       set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
+      D.strip_cols[#D.strip_cols + 1] = { tx, bx + 2 * L.pad, { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
       tx = bx + 3 * L.pad
     end
   end
@@ -2175,6 +2208,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         cx = cx + w + gap
       end
     end
+    local first = G.g[1] and G.g[1][1] and G.g[1][1][1]
+    if STRIP_HINTS[first] then D.strip_cols[#D.strip_cols + 1] = { gx, gx + math.max(G.w, sep), STRIP_HINTS[first] } end
     gx = gx + G.w
   end
   -- статус третьей строкой (опция status bar: keyboard)
@@ -3312,7 +3347,10 @@ function D.frame(L, snap, rows, state, info)
   if (L.hint_h or 0) > 0 then
     local hy2 = L.under_y
     if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
-    D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
+    -- под полосой транспорта — подсказки её элементов, каждая под своим (5 окт)
+    if not (L.piano_h > 0 and info.hint_bars and D.strip_hints(L, L.matrix_w, hy2, L.win_w - L.matrix_w, info.focus == 'tracker')) then
+      D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
+    end
   end
   -- режим справки (?): то же место внизу занимает контекстная справка
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
