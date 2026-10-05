@@ -3596,6 +3596,68 @@ ctx = {
     vim.msg = it and ('span %.2fs → %s @ %04d'):format(b - a, f.col.name, row) or 'span: failed'
   end,
   drop_span_cursor = function(entry, a, b) ctx.drop_span(vim.cur.fi, vim.cur.row, entry, a, b) end,
+  -- выделение сэмпл-модуля как слайс (5 окт): материнский сэмпл целиком — в lib
+  -- трека (уже есть — он же), границы выделения — в его нарезку; → item, k.
+  -- Без своего undo: зовётся внутри edit.run
+  span_as_slice = function(track, entry, a, b)
+    local mother, sa, sb
+    local path = entry.file and entry.path
+    if not path and entry.item and reaper.ValidatePtr(entry.item, 'MediaItem*') then
+      -- уже инструмент этой lib — он и мать; иначе мать — файл источника
+      if reaper.GetMediaItem_Track(entry.item) == track then
+        for _, c in ipairs(snap.cols or {}) do
+          if c.track == track then for _, e in ipairs(c.pool or {}) do if e.item == entry.item and not e.parent then mother = entry.item end end end
+        end
+      end
+      if mother then sa, sb = a, b
+      else
+        local tk = reaper.GetActiveTake(entry.item)
+        local src = tk and reaper.GetMediaItemTake_Source(tk)
+        path = src and reaper.GetMediaSourceFileName(src, '')
+      end
+    end
+    if not mother then
+      if not path or path == '' then return nil end
+      -- секунды item → секунды файла (мать — файл с начала, скорость 1)
+      local offs, rate = entry.offs or 0, entry.rate or 1
+      sa, sb = offs + a * rate, offs + b * rate
+      for _, c in ipairs(snap.cols or {}) do
+        if c.track == track then
+          for _, e in ipairs(c.pool or {}) do
+            local tk = e.item and not e.parent and reaper.ValidatePtr(e.item, 'MediaItem*') and reaper.GetActiveTake(e.item)
+            local src = tk and reaper.GetMediaItemTake_Source(tk)
+            if src and reaper.GetMediaSourceFileName(src, '') == path and (reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0) == 0 then mother = e.item end
+          end
+        end
+      end
+      mother = mother or edit.depot_add(path, track)
+    end
+    if not mother then return nil end
+    local len = reaper.GetMediaItemInfo_Value(mother, 'D_LENGTH')
+    local sl = edit.item_slices(mother)
+    local function has(t) for _, v in ipairs(sl) do if math.abs(v - t) < 1e-3 then return true end end end
+    if not has(sa) then sl[#sl + 1] = sa end
+    if sb < len - 1e-3 and not has(sb) then sl[#sl + 1] = sb end
+    table.sort(sl)
+    edit.set_slices(mother, sl)
+    local k = 1
+    for i, v in ipairs(sl) do if math.abs(v - sa) < 1e-3 then k = i end end
+    return mother, k
+  end,
+  -- бросок выделения (5 окт): на трек — мать в его lib + слайс в строку;
+  -- в lib — мать + слайс
+  drop_span_slice = function(fi, row, entry, a, b)
+    local f = fi and L.flat[fi]
+    local col = f and f.col or cur_col()
+    if not col or (f and f.folded) then return end
+    local mother, k
+    edit.run('drop slice', function()
+      mother, k = ctx.span_as_slice(col.track, entry, a, b)
+      if mother and f then edit.insert_slice(col.track, col.fixed and f.lane and f.lane.idx or nil, state.lpb, row, mother, k) end
+    end)
+    model.invalidate()
+    vim.msg = mother and (f and ('slice S%02X (%.2fs) → %s @ %04d'):format(k, b - a, col.name, row) or ('slice S%02X (%.2fs) → lib of %s'):format(k, b - a, col.name)) or 'drop: no source file'
+  end,
   depot_span = function(entry, a, b)
     local c = cur_col(); if not c then return end
     local it = edit.depot_span(c.track, entry, a, b)
@@ -7343,16 +7405,20 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       SL.mouse_move(hover.sample and hover.sample.frac)
       if SL.drag.kind == 'out' and SL.drag.active then
-        state.status = (hover.fi and hover.row) and ('drop selection → %s @ %04d'):format(hover.col and hover.col.name or '', hover.row.row) or 'drag selection - drop on a track column'
+        state.status = (hover.fi and hover.row) and ('drop selection → %s @ %04d'):format(hover.col and hover.col.name or '', hover.row.row) or 'drag selection - drop on a track (mother + slice in the row) or on the lib (mother + slice)'
       end
     else
       local d = SL.mouse_up()
-      if d and d.kind == 'out' and d.active and hover.pool then
+      -- 5 окт: бросок — мать целиком в lib + выделение слайсом; на lib — в любое
+      -- место модуля, на трек — ещё и слайс в строку
+      local ir = draw.module_rects and draw.module_rects.inst
+      local on_lib = hover.pool or (ir and gfx.mouse_x >= ir[1] and gfx.mouse_x < ir[1] + ir[3] and gfx.mouse_y >= ir[2] and gfx.mouse_y < ir[2] + ir[4])
+      if d and d.kind == 'out' and d.active and on_lib then
         local a, b = SL.span()
-        if a then ctx.depot_span(SL.entry, a, b) end                    -- на инструменты — новый инструмент в библиотеке
+        if a then ctx.drop_span_slice(nil, nil, SL.entry, a, b) end
       elseif d and d.kind == 'out' and d.active and hover.fi and hover.row then
         local a, b = SL.span()
-        if a then ctx.drop_span(hover.fi, hover.row.row, SL.entry, a, b) end
+        if a then ctx.drop_span_slice(hover.fi, hover.row.row, SL.entry, a, b) end
       end
     end
   end
