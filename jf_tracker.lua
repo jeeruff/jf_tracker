@@ -3153,7 +3153,7 @@ ctx = {
     local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
     if k == 'st' then return (math.floor(p + 0.5) + 24) / 48, true end
     if k == 'cent' then return ((p - math.floor(p + 0.5)) * 100 + 50) / 100, true end
-    if k == 'rate' then return (math.log(reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), 2) + 2) / 4, true end
+    if k == 'rate' then return ctx.rate_frac(reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')), true end
     if k == 'fin' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEINLEN') / math.max(1e-3, len) end
     if k == 'fout' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN') / math.max(1e-3, len) end
     if k == 'snap' then return reaper.GetMediaItemInfo_Value(it, 'D_SNAPOFFSET') / math.max(1e-3, len) end
@@ -3182,7 +3182,11 @@ ctx = {
     elseif k == 'cent' then
       local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
       P('take:D_PITCH', math.floor(p + 0.5) + (math.floor(fr * 100 + 0.5) - 50) / 100, 'add', 'sample finetune')
-    elseif k == 'rate' then P('take:D_PLAYRATE', 2 ^ (fr * 4 - 2), 'mul', 'sample rate')
+    elseif k == 'rate' then
+      -- лёгкая привязка (5 окт): ближе 1.2% дорожки к метке — ровно на неё
+      local r = 2 ^ (ctx.RATE_LO + fr * (ctx.RATE_HI - ctx.RATE_LO))
+      for _, m in ipairs(ctx.RATE_MARKS) do if math.abs(fr - ctx.rate_frac(m)) < 0.012 then r = m end end
+      P('take:D_PLAYRATE', r, 'mul', 'sample rate')
     elseif k == 'fin' then P('D_FADEINLEN', fr * len, 'abs', 'sample fade')
     elseif k == 'fout' then P('D_FADEOUTLEN', fr * len, 'abs', 'sample fade')
     elseif k == 'snap' then P('D_SNAPOFFSET', fr * len, 'abs', 'snap offset')
@@ -3192,6 +3196,16 @@ ctx = {
       if sl > 0 then P('take:D_STARTOFFS', fr * sl, 'abs', 'start offset') end
     end
     model.invalidate()
+  end,
+  -- rate: лог-шкала ×0.2 … ×5, метки на простых отношениях (5 окт)
+  RATE_LO = math.log(0.2, 2), RATE_HI = math.log(5, 2),
+  RATE_MARKS = { 0.2, 0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1, 1.5, 2, 3, 4, 5 },
+  rate_frac = function(r) return (math.log(math.max(1e-3, r), 2) - ctx.RATE_LO) / (ctx.RATE_HI - ctx.RATE_LO) end,
+  sp_marks = function(k)
+    if k ~= 'rate' then return nil end
+    local out = {}
+    for _, m in ipairs(ctx.RATE_MARKS) do out[#out + 1] = ctx.rate_frac(m) end
+    return out
   end,
   sp_reset = function(e, k)
     local it, tk = e.item, e.take

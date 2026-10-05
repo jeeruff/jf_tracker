@@ -709,7 +709,9 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     pool[at].slices = t
   end
   local _, bs = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)
-  pool[at].bsync = tonumber(bs)                          -- beatsync инструмента: долей (3 окт)
+  -- beatsync: «N;span;rate0;pp0» (edit.bsync_set) — долей = первое поле (5 окт:
+  -- tonumber всей строки давал nil, lib и свойства показывали off)
+  pool[at].bsync = bs and tonumber(bs:match('^%s*([^;]+)')) or nil
   pool[at].iid = M.iid(it)
 end
 

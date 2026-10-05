@@ -67,12 +67,20 @@ function SP.draw(L, x, y, w, h, e, focused)
   local thot = tmx >= x and tmx < x + w and tmy >= y and tmy < y + L.rh
   if thot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x, y, w, L.rh, 1); SP.hover = { title = true, row = 0 } end
   U.text(x + L.pad, y, ctx.fit(title, w - L.pad), U.AMBER)
-  local lw = math.min(math.floor(w * 0.45), L.cw * 16)
-  local n = math.min(#SP.ROWS, math.floor((h - L.rh) / L.rh))
+  -- колонки (5 окт): широкая панель — строки сверху вниз, потом следующая
+  -- колонка; ширина колонки как у прежней узкой панели, ничего не тянется
+  local per = math.max(1, math.floor((h - L.rh) / L.rh))
+  local colw = math.min(w, L.cw * 36)
+  local ncols = math.max(1, math.floor((w + L.pad) / colw))
+  local n = math.min(#SP.ROWS, per * ncols)
+  local lw = math.min(math.floor(colw * 0.45), L.cw * 16)
   if SP.sel > #SP.ROWS then SP.sel = #SP.ROWS end
+  local x0, w0 = x, w
   for i = 1, n do
     local r = SP.ROWS[i]
-    local ry = y + i * L.rh
+    local ci = (i - 1) // per
+    local x, w = x0 + ci * colw, (ci == ncols - 1) and (x0 + w0 - (x0 + ci * colw)) or (colw - L.pad)
+    local ry = y + ((i - 1) % per + 1) * L.rh
     local sel = focused and i == SP.sel
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
     U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), sel and U.AMBER or U.GREY)
@@ -81,7 +89,8 @@ function SP.draw(L, x, y, w, h, e, focused)
     local fr, centered = nil, false
     if ctx.sp_frac then fr, centered = ctx.sp_frac(e, r.k) end
     local vw = math.max(U.measure('-00.0 dB'), U.measure(vt)) + L.pad
-    local sx, sw = x + lw, w - lw - vw - 2 * L.pad
+    -- 5 окт: имя | значение | дорожка — значение сразу за именем
+    local sx, sw = x + lw + vw, w - lw - vw - L.pad
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
     if fr and sw >= L.cw * 4 then
       local cy = ry + math.floor(L.rh / 2)
@@ -94,7 +103,12 @@ function SP.draw(L, x, y, w, h, e, focused)
         gfx.rect(math.min(mid, px), ry + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
         U.set(U.LINE); gfx.rect(mid, ry + 3, 1, L.rh - 6, 1)
       else gfx.rect(sx, ry + 4, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 8, 1) end
-      U.text(x + w - L.pad - U.measure(vt), ry, vt, U.TEXT)
+      -- метки привязки (rate: ×½ ×1.5 ×2 …) — чёрточки под дорожкой
+      if ctx.sp_marks then
+        U.set(U.GREY)
+        for _, mf in ipairs(ctx.sp_marks(r.k) or {}) do gfx.rect(sx + math.floor(mf * sw + 0.5), ry + L.rh - 3, 1, 2, 1) end
+      end
+      U.text(x + lw, ry, vt, U.TEXT)
       if onbar then SP.slider = { k = r.k, x = sx, w = sw } end
     else
       U.text(x + lw, ry, ctx.fit(vt, w - lw - L.pad), U.TEXT)
