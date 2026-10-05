@@ -1496,22 +1496,27 @@ local function draw_ctrl(L, info, H, hover)
       { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
     } },
     -- быстрые вкл / выкл (4 окт): самое частое из вида — кнопками в рамке
-    { name = 'quick', items = {
-      -- по месту модулей (4 окт): левая колонка — то, что слева (матрица,
-      -- линейка, …), середина — тело трекера и низ (DSP), правая — справа (браузер, …)
-      { 'q_mx', 'matrix', c.q_mx and U.CYAN or U.GREY }, { 'q_scopes', 'scopes', c.q_scopes and U.CYAN or U.GREY }, { 'q_side', 'browser', c.q_side and U.CYAN or U.GREY },
-      { 'q_ruler', 'ruler', c.q_ruler and U.CYAN or U.GREY }, { 'q_meters', 'meters', c.q_meters and U.CYAN or U.GREY }, { 'q_input', 'input', c.q_input and U.CYAN or U.GREY },
-      { 'q_captions', 'col names', c.q_captions and U.CYAN or U.GREY }, { 'q_wave', 'wave', c.q_wave and U.CYAN or U.GREY }, { 'q_envs', 'envs', c.q_envs and U.CYAN or U.GREY },
-      { 'q_names', 'names', c.q_names and U.CYAN or U.GREY }, { 'q_colors', 'colours', c.q_colors and U.CYAN or U.GREY }, { 'q_preview', 'preview', c.q_preview and U.CYAN or U.GREY },
-      { 'q_hints', 'hints', c.q_hints and U.CYAN or U.GREY }, { 'q_dsp', 'dsp', c.q_dsp and U.CYAN or U.GREY },
-      { 'q_keys', 'keys', c.q_keys and U.CYAN or U.GREY, sizer = true }, { 'q_listen', 'listen', c.q_listen and U.CYAN or U.GREY },
-    } },
+    -- быстрые вкл / выкл (5 окт): колонка — где это на экране: слева / в центре
+    -- (сверху вниз, как на экране) / справа; пустые клетки — { false }
+    { name = 'quick', items = (function()
+      local function q(id, label, on, extra) local t = { id, label, on and U.CYAN or U.GREY }; if extra then for k, v in pairs(extra) do t[k] = v end end; return t end
+      local cols = {
+        { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen) },
+        { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
+          q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
+        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'keys', c.q_keys, { sizer = true }) },
+      }
+      local out, n = {}, math.max(#cols[1], #cols[2], #cols[3])
+      for r = 1, n do for k = 1, 3 do out[#out + 1] = cols[k][r] or { false } end end
+      return out
+    end)() },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
   L.ctrl_area = { 0, 0, L.ctrl_w, H - 2 }                 -- главный модуль: фокус ctrl (3 окт)
   D.ctrl_rect = D.ctrl_rect or {}
   local y = 2
   local function cell(it, ci)
+    if not it[1] then return end                   -- пустая клетка колонки
     local x = L.pad + ci * colw
     if y + L.rh > H - 2 then return end
     local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
