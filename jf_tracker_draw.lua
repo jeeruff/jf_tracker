@@ -608,6 +608,7 @@ function D.ic(name, text)
 end
 
 function D.field_rect(L, fld)
+  if fld == 'inst' then return L.x_inst or L.x_note, ms('00') end      -- поле инструмента (5 окт)
   if fld == 1 then return L.x_note, L.w_note
   elseif fld == 2 then return L.x_vol, L.w_vol
   elseif fld == 3 then return L.x_del, L.w_del
@@ -723,8 +724,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local function draw_inst()
     if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
-    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), cell.muted and U.GREY or U.GREEN)
-    else text(x + L.x_inst, ty, '..', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY) end
+    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.GREEN))
+    else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
   end
   if not cell then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
@@ -2620,6 +2621,7 @@ function D.frame(L, snap, rows, state, info)
               set(D.VIS); gfx.rect(x, y, f.w, L.rh, 1)
             end
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
+            if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
@@ -2642,6 +2644,11 @@ function D.frame(L, snap, rows, state, info)
               for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
                 local fx, fw = D.field_rect(f.G or L, fld)
                 if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
+              end
+              -- номер инструмента под мышью (5 окт) — подполе ноты
+              local G2 = f.G or L
+              if G2.x_inst and mx >= x + G2.x_inst and mx < x + G2.x_inst + ms('00') + 2 then hover.field = 1; hover.fsub = 'inst' end
+              do
               end
             end
           end

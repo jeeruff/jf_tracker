@@ -340,6 +340,13 @@ local function motion(c, n)
   local L = ctx.layout()
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
   elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(0, cur.row - n), linewise = true }
+  -- поле инструмента (5 окт): подполе ноты между нотой и громкостью
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and V.inst_field_ok() and (cur.field or 1) == 1 and cur.sub ~= 'inst' then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and V.inst_field_ok() and ((cur.field or 1) == 2 and cur.sub ~= 'inst') then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'inst' then
+    return { fi = cur.fi, row = cur.row, field = 1 }
   elseif c == ('h'):byte() or c == LEFT then local fi, fld = step_field(-1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('l'):byte() or c == RIGHT then local fi, fld = step_field(1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('H'):byte() or c == ('L'):byte() then
@@ -455,7 +462,13 @@ local function apply(op, f0, f1, r0, r1)
   elseif op == '+' or op == '-' then
     local d = (V.count or 1) * (op == '+' and 1 or -1)
     local fld = V.cur.field or 1
-    if fld == 1 then E.transpose(heads, lpb(), d)
+    if fld == 1 and V.cur.sub == 'inst' then
+      -- инструмент ±d (5 окт)
+      for _, h in ipairs(heads) do
+        local n0 = ctx.inst_num_of and ctx.inst_num_of(h) or nil
+        if n0 and ctx.set_inst then ctx.set_inst({ h }, math.max(1, n0 + d)) end
+      end
+    elseif fld == 1 then E.transpose(heads, lpb(), d)
     elseif fld == 2 then for _, h in ipairs(heads) do E.set_vol({ h }, lpb(), tonumber(h.vol, 16) + d) end
     elseif fld == 3 then for _, h in ipairs(heads) do E.set_delay({ h }, lpb(), h.delay + d) end
     else
@@ -864,7 +877,7 @@ local function keys_control(c)
   local function heads() return V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) end
   if ch == 'h' or ch == 'j' or ch == 'k' or ch == 'l' or ch == 'H' or ch == 'L' or ch == 'G' then
     local m = motion(c, V.count or 1)
-    if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field end; clamp_cur(); ensure_visible() end
+    if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
     V.count = nil; V.hexbuf = nil; return true
   elseif ch == 'g' then V.cur.row = 0; ensure_visible(); return true
   elseif ch == 'b' or ch == 'n' then
@@ -1042,7 +1055,7 @@ function V.key_impl(c)
     local m = motion(c, 1)
     if m and (c == UP or c == DOWN or c == LEFT or c == RIGHT or c == PGUP or c == PGDN or c == HOME or c == END) then
       V.cur.fi, V.cur.row = m.fi, m.row
-      if m.field then V.cur.field = m.field end
+      if m.field then V.cur.field = m.field; V.cur.sub = m.sub end
       V.hexbuf = nil; clamp_cur(); ensure_visible(); return
     end
     if c == 32 then E.play_stop(); return end
@@ -1099,6 +1112,19 @@ function V.key_impl(c)
         end
       end
       V.hexbuf = nil; return
+    end
+    if V.cur.sub == 'inst' and fld == 1 then
+      -- поле инструмента (5 окт): две hex-цифры — номер инструмента ноты
+      local ch2 = (c < 256) and string.char(c):upper() or ''
+      if ch2:match('^[0-9A-F]$') then
+        local buf = (V.hexbuf or '') .. ch2
+        if #buf < 2 then V.hexbuf = buf; return end
+        V.hexbuf = nil
+        if ctx.set_inst then ctx.set_inst(V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row), tonumber(buf, 16)) end
+        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      end
+      if V.hexbuf then return end
+      keys_control(c); return
     end
     if fld > 1 then
       -- поля vol / delay / команд: hex-ввод, потом шаг вниз; не-hex → управление KEYS
@@ -1464,7 +1490,7 @@ function V.key_impl(c)
   local t = motion(c, n)
   if t then
     V.cur.fi, V.cur.row = t.fi, t.row
-    if t.field then V.cur.field = t.field end
+    if t.field then V.cur.field = t.field; V.cur.sub = t.sub end
     clamp_cur(); ensure_visible(); V.count = nil; finish_move(); return
   end
 
@@ -1770,6 +1796,14 @@ function V.run_cmd(line)
   local r = run_cmd(line)
   if V.mode == 'visual' or V.mode == 'vline' then V.mode = 'normal' end
   return r
+end
+
+-- поле инструмента есть, если в раскладке есть колонка номера (не узкая колонка)
+function V.inst_field_ok()
+  local f = flat()[V.cur.fi]
+  if not f or f.env or f.compact or f.folded then return false end
+  local G = f.G or ctx.layout()
+  return G.x_inst ~= nil
 end
 
 return V

@@ -1225,6 +1225,28 @@ ctx = {
   -- все item трека в песне, библиотека за =LIB остаётся (4 окт)
   -- строки региона под курсором (4 окт: скрэмбл без выделения) или nil
   scramble = function() vim.run_cmd('scramble') end,
+  -- поле инструмента (5 окт): номер инструмента ноты и его смена — нота
+  -- заменяется нотой инструмента n того же трека (строка, длина, питч те же)
+  inst_num_of = function(h) return h and h.item and snap and ((snap.inst_num and snap.inst_num[h.item]) or (snap.inst_of and snap.inst_of[h.item])) end,
+  set_inst = function(heads, n)
+    local f = L.flat[vim.cur.fi]; local col = f and f.col
+    local e = col and (col.pool or {})[n]
+    if not (e and e.item) then vim.msg = ('no instrument %02d on this track'):format(n); return end
+    local done = 0
+    edit.run('set instrument', function()
+      for _, h in ipairs(heads) do
+        if h.kind == 'audio' then
+          local pitch = model.BASE_NOTE + math.floor((h.semis or 0) + 0.5)
+          local rows = math.max(1, h.rows or 1)
+          edit.delete({ h }, state.lpb)
+          edit.insert_note(col.track, nil, state.lpb, h.row0, pitch, vim.vel, rows, e.item)
+          done = done + 1
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = done > 0 and ('instrument %02d (%s)'):format(n, e.name or '') or 'instrument: audio notes only'
+  end,
   -- импульс ReaVerb (5 окт): путь к файлу — FILE0 плагина, иначе из его
   -- состояния в чанке трека (base64 → поиск пути .wav / .aif / .flac)
   ir_path_cache = {},
@@ -4286,7 +4308,7 @@ local function context_menu(hover)
     end
   elseif hover.row and hover.fi then
     vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
-    if hover.field then vim.cur.field = hover.field end
+    if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
     for _, a in ipairs(event_actions(hover)) do add(a[1], a.fn, a.key) end
     if hover.col then for _, a in ipairs(track_actions(hover.col)) do add(a[1], a.fn, a.key) end end
   else
@@ -6844,7 +6866,7 @@ local function frame()
           if (vim.mode == 'visual' or vim.mode == 'vline') and gfx.mouse_cap & 16 ~= 16 then vim.mode = 'normal' end
           vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
         end
-        if hover.field then vim.cur.field = hover.field end
+        if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
         local head = cell
         local opt = gfx.mouse_cap & 16 == 16
         -- протяжка без модификатора — выделение блока (NORMAL и INSERT), 2 окт
