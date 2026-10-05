@@ -1294,7 +1294,14 @@ end
 -- Вертикальная волна item: npix пиков (по пикселю на строку высоты).
 -- Кеш по GUID item + offs/len/rate + npix. Пики, которых у REAPER ещё нет,
 -- достраиваются порциями (BUILD_STEPS за вызов), чтобы окно не замирало.
-local peaks = {}
+-- кеш волн с пределом (5 окт): новый ключ на каждую ширину / зум / item —
+-- без предела рос всю сессию; > 600 — сброс, видимые пересчитаются за кадры
+local peaks_n = 0
+local function new_peaks()
+  peaks_n = 0
+  return setmetatable({}, { __newindex = function(t, k, v) rawset(t, k, v); peaks_n = peaks_n + 1 end })
+end
+local peaks = new_peaks()
 local building = {}
 M.BUILD_STEPS = 40
 
@@ -1385,6 +1392,7 @@ end
 M.OVERSAMPLE = 1   -- 1/2/4: пиков на пиксель (Options → wave detail); max/min по группе
 function M.peaks(head, npix, want_spec)
   if not head.src or npix < 2 then return nil end
+  if peaks_n > 600 then peaks = new_peaks() end
   npix = math.floor(npix)
   -- луп (2 окт): пики одного периода источника, разложенные по item по модулю
   -- периода (раньше читался «источник» за его концом — волна сбивалась)
@@ -1585,7 +1593,7 @@ function M.file_peaks(path, npix)
   return M.peaks(e, npix)
 end
 
-function M.clear_peaks() peaks = {}; building = {} end
+function M.clear_peaks() peaks = new_peaks(); building = {} end
 M.peaks_cache_size = function() local n = 0; for _ in pairs(peaks) do n = n + 1 end; return n end
 
 return M
