@@ -8434,6 +8434,22 @@ local function frame()
       c = 0
     end
   end
+  -- Cmd+Enter — фокус на инструменты (lib); Option+Enter — выбрать в lib
+  -- инструмент ноты под курсором (5 окт). Только из трекера, NORMAL / INSERT
+  do
+    local m = ctx.mods()
+    if c == 13 and state.focus == 'tracker' and (vim.mode == 'normal' or vim.mode == 'insert') and not vim.picker and not vim.hydra and (m.cmd or m.alt) and not m.ctrl then
+      if m.cmd then ctx.set_focus('inst'); vim.msg = 'instruments'
+      else
+        local f = L and L.flat[vim.cur.fi]
+        local cell = f and f.sub and f.sub[vim.cur.row]
+        if cell and cell.kind == 'cont' then cell = cell.of end
+        local n = cell and cell.item and snap and snap.inst_of and snap.inst_of[cell.item]
+        if n then pool_select(n); vim.msg = ('instrument %02d'):format(n) else vim.msg = 'no instrument under the cursor' end
+      end
+      c = 0
+    end
+  end
   c = keys.translate(c)
   -- Option+H / J / K / L (4 окт): символ зависит от раскладки (в русской Option+р —
   -- не «˙»), поэтому смотрим физическую клавишу; код — как от Option+h в US

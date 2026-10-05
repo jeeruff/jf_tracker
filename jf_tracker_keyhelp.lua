@@ -87,6 +87,8 @@ KH.PAGES = {
     { k = 'o', d = 'reveal item in REAPER' },
     { k = 'BS Ins', d = 'delete / insert time in region (Shift: all tracks)' },
     { k = 'Tab S-Tab', d = 'focus next / previous module; Option-Tab: dock tabs' },
+    { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
+    { k = 'Opt-Enter', d = 'select the instrument of the note under the cursor in the lib' },
     { k = 'F1', d = 'manual' },
     { k = 'F2', d = 'tracker <-> item tab (from any tab - back to the tracker)' },
     { k = 'F3', d = 'modulate; again - the next tab in a circle' },
