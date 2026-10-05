@@ -10,6 +10,10 @@ in one window: patterns, their order, sounds, slices, effects.
 - **Vim is the foundation.** Modes, operators + motions (`dw`, `d3j`, `yy p`),
   counts, registers, the `.` repeat and the `:` command line drive every
   module. The mouse is optional.
+- **Why jf.** They are the author's initials, but there is more to it. `j`
+  and `f` are the two keys with bumps under the index fingers, where the hands
+  rest on the home row. The name says what the whole tracker is about: hands on
+  the keyboard, the mouse optional.
 - **Letters, not icons.** Every control is text. When a symbol is needed it
   comes from another alphabet: `Δ` is delta solo, `ø` is phase.
 

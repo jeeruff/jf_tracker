@@ -3109,6 +3109,7 @@ function D.frame(L, snap, rows, state, info)
       local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, L.dsp_h - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
     end
+    D.aw_status = nil
     local drag = info.dsp_drag                 -- { k = блок } | { new = true } — идёт перетаскивание
     local blocks = {}
     local bw = L.cw * 22
@@ -3181,8 +3182,11 @@ function D.frame(L, snap, rows, state, info)
         local tag = awi.cat ~= '' and ('[' .. awi.cat .. '] ') or ''
         local ccol = D.aw_colour(awi.cat)
         text(bx + L.pad, ay, fit(tag, bw - 2 * L.pad), ccol)
-        local tx2 = bx + L.pad + ms(tag)
-        text(tx2, ay, fit(awi.desc or '', bx + bw - L.pad - tx2), U.GREY)
+        -- описание — в статус (5 окт): под мышью или выбранный блок
+        local over = mx >= bx and mx < bx + bw and my >= by and my < by + bh
+        if (over or (is_sel and not D.aw_status)) and (awi.desc or '') ~= '' then
+          D.aw_status = (f.airwin or '') .. ' ' .. tag .. awi.desc
+        end
       end
       local pcol0 = 0
       if f.container and f.kids then
@@ -3549,6 +3553,9 @@ function D.frame(L, snap, rows, state, info)
     text(sx + L.pad, sy + 2, left, (D.mono and info.vmode == 'insert') and D.FOCUS_INS or U.AMBER)
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
+    if desc == '' then desc = D.aw_status or '' end
+    D.aw_status = nil                    -- DSP спрятан — строка не залипает
+    D.aw_status = nil
     if desc ~= '' then
       if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 1, sh - 2, 1) end
       text(hx, sy + 2, fit(desc, sx + sw - hx - L.pad), U.TEXT)

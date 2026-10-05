@@ -644,6 +644,7 @@ V.INTRO = {
   'drive every module - the mouse is optional.',
   'The tracker is only a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes and FX stay native,',
   'nothing to export or lose - close the window and the project plays on; every edit is one REAPER undo step.',
+  'Why jf: the initials of the author, and j f are the two keys with bumps - the fingers on the home row.',
   'No icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
 }
 V.THANKS = {
