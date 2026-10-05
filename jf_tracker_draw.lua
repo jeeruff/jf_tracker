@@ -2182,18 +2182,28 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local blist = D.transport_buttons(c)
   local bws, tws, btot = {}, {}, 0
   local bk = c.tpbuttons and 2 or 1                     -- полный набор — ×2; rec / loop — обычного размера
-  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], 2) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], D.ttf and 1.7 or 2) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
-    local bx, by, bh = bx0, (bk == 2) and (ly - 1) or (ly + math.floor(L.rh / 2)), bk * L.rh
-    -- по высоте — по центру чернил (у крупного битмапа сверху пустая полоса шрифта)
-    local ty = by + math.max(1, math.floor((bh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.3 * L.rh + 0.5))
+    -- крупные (5 окт, правка): кнопка на всю высоту полосы (+2 px сверху и снизу),
+    -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
+    local bx, by, bh = bx0, (bk == 2) and (ly - 2) or (ly + math.floor(L.rh / 2)), (bk == 2) and (2 * L.rh + 4) or L.rh
+    local ty = by + 2 + math.max(1, math.floor((2 * L.rh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.2 * L.rh + 0.5))
+    -- скруглённый угол: срезать 2 px угла и поставить пиксель рамки по диагонали
+    local function round_corner(cx, cy, dx, dy, frame)
+      set(U.PANEL)
+      gfx.rect(cx, cy, 1, 1, 1); gfx.rect(cx + dx, cy, 1, 1, 1); gfx.rect(cx, cy + dy, 1, 1, 1)
+      set(frame); gfx.rect(cx + dx, cy + dy, 1, 1, 1)
+    end
     for i, b in ipairs(blist) do
       local bw = bws[i]
       local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] ~= nil
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
-      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет (o — красная)
+      local frame = hot and U.AMBER or (on and b[3] or U.LINE)
+      if i == 1 then round_corner(bx, by, 1, 1, frame); round_corner(bx, by + bh - 1, 1, -1, frame) end
+      if i == #blist then round_corner(bx + bw - 1, by, -1, 1, frame); round_corner(bx + bw - 1, by + bh - 1, -1, -1, frame) end
+      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), D.ttf and 1.7 or 2)   -- b[4]: свой цвет (o — красная)
       else text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
