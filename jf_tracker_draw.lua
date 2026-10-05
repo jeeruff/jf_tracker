@@ -2878,6 +2878,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  D.vis_box = nil
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
@@ -2923,7 +2924,13 @@ function D.frame(L, snap, rows, state, info)
           local x = f.x
           if x then
             if vis and fi >= vis.f0 and fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
-              set(D.VIS); gfx.rect(x, y, f.w, L.rh, 1)
+              -- 5 окт: полупрозрачно — рамки и цвета items под выделением видны;
+              -- границу блока рисует контур после строк
+              set(U.CYAN, 0.16); gfx.rect(x, y, f.w, L.rh, 1); gfx.a = 1
+              local vb = D.vis_box
+              if not vb then vb = {}; D.vis_box = vb end
+              vb.x0 = math.min(vb.x0 or x, x); vb.x1 = math.max(vb.x1 or (x + f.w), x + f.w)
+              vb.y0 = math.min(vb.y0 or y, y); vb.y1 = math.max(vb.y1 or (y + L.rh), y + L.rh)
             end
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
@@ -2988,6 +2995,8 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  -- контур выделения (5 окт): видно границу блока, содержимое не закрыто
+  if D.vis_box then local b = D.vis_box; set(U.CYAN); gfx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 0); D.vis_box = nil end
 
 
   -- направляющая тянущегося стыка лупа
