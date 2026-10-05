@@ -2040,7 +2040,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 0)
-      D.big_text(bx + L.pad, ly, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет буквы (o всегда красная)
+      if b[1] == 'rec' then
+        -- запись (5 окт, просьба): красный круг с заливкой — в шрифте нет надёжного ●
+        local r = math.max(3, math.floor(math.min(tw, 2 * L.rh) * 0.38))
+        set(hot and U.AMBER or U.RED); gfx.circle(bx + math.floor(bw / 2), ly - 1 + L.rh, r, 1, 1)
+      else D.big_text(bx + L.pad, ly, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, bw, 2 * L.rh, b[1])
       bx = bx + bw + L.pad
