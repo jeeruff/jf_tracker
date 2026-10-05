@@ -8658,6 +8658,12 @@ local function frame()
       c = 0
     end
   end
+  -- Shift+Esc (5 окт): снять time selection REAPER — в любом модуле, вне ввода
+  if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
+    reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
+    vim.msg = 'time selection removed'
+    c = 0
+  end
   -- Cmd+Enter — фокус на инструменты (lib); Option+Enter — выбрать в lib
   -- инструмент ноты под курсором (5 окт). Только из трекера, NORMAL / INSERT
   do
