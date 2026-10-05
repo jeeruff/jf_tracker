@@ -8587,6 +8587,7 @@ local function frame()
       if c_raw >= 1 and c_raw <= 26 then nm = 'ctrl+' .. string.char(c_raw + 96)
       elseif c_raw < 127 then nm = string.char(c_raw)
       elseif c_raw >= 26161 and c_raw <= 26169 then nm = 'f' .. (c_raw - 26160)
+      elseif c_raw >= 0x75000000 and c_raw < 0x75110000 then nm = utf8.char(c_raw - 0x75000000)   -- кириллица и Option-символы: префикс 'u' (5 окт)
       elseif c_raw < 0x110000 and utf8 then nm = utf8.char(c_raw)
       else nm = '#' .. c_raw end
     end
