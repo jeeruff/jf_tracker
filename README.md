@@ -1,21 +1,34 @@
 # jf_tracker
 
-A tracker view of REAPER with a Vim layer. Write a whole track from the keyboard
-in one window: patterns, their order, sounds, slices, effects.
+A tracker view of REAPER with a Vim layer.
 
-- **The tracker is only a view, and REAPER is the engine.** Tracks, items, MIDI,
-  regions, envelopes and FX stay native. There is nothing to export and nothing
-  to lose: close the window and the project plays on. Every edit is one REAPER
-  undo step.
+I waited for someone to build a tracker for REAPER. More than seven years later
+it was time to do it myself. A tracker lets your hands leave the mouse alone
+and type the notes that the keyboard can type anyway.
+
+- **Why jf.** These are my initials and short nick, and `j` and `f` are also
+  the keys under your index fingers on the home row. The tracker is meant to
+  be played from the keyboard.
 - **Vim is the foundation.** Modes, operators + motions (`dw`, `d3j`, `yy p`),
   counts, registers, the `.` repeat and the `:` command line drive every
   module. The mouse is optional.
-- **Why jf.** They are the author's initials, but there is more to it. `j`
-  and `f` are the two keys with bumps under the index fingers, where the hands
-  rest on the home row. The name says what the whole tracker is about: hands on
-  the keyboard, the mouse optional.
-- **Letters, not icons.** Every control is text. When a symbol is needed it
-  comes from another alphabet: `Δ` is delta solo, `ø` is phase.
+- **Native REAPER.** Tracks, items, MIDI, regions, envelopes and FX stay plain
+  REAPER. Close the window and the project plays on. Every edit is one undo
+  step.
+- **A script ecosystem tied together.** You can look natively into other
+  REAPER projects and take, say, an automation curve from another one, or just
+  enjoy that you can.
+- **PT-mode.** A simple view without a crowd of channels. It is a tribute to the
+  old-school ProTracker way, the tracker a ton of jungle and electronic music
+  was written on.
+- **Letters, not icons.** When a symbol is needed it comes from another
+  alphabet: `Δ` is delta solo, `ø` is phase.
+
+I am not a professional programmer. Claude helped me write this, so I see no
+point in making it a commercial product. What you get here is worth roughly
+750 euro of tokens and months of almost non-stop work, which I loved doing and
+will keep doing. If it makes you as happy as it makes me, buy me a coffee:
+<https://ko-fi.com/jeeruff>.
 
 ## Features
 
@@ -106,4 +119,4 @@ The DSP module texts use descriptions from Chris Johnson's
 jf_tracker is free software under the [GNU General Public License v3](LICENSE).
 It comes with no warranty.
 
-If it is useful to you, you can support development at <https://jeeruff.com>.
+Support: <https://ko-fi.com/jeeruff>. Music: <https://jeeruff.bandcamp.com>.

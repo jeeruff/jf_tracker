@@ -648,13 +648,19 @@ V.CHANGES = {
 -- about (4 окт): под логотипом — короткое описание (введение автора допишем),
 -- благодарности; дальше — изменения
 V.INTRO = {
-  'a tracker view of reaper: write a whole track from the keyboard in one window - patterns, their order, sounds.',
-  'vim is the foundation: modes, operators + motions, counts, registers, the dot repeat and the : command line',
-  'drive every module - the mouse is optional.',
-  'the tracker is only a view, reaper is the engine: tracks, items, midi, regions, envelopes and fx stay native,',
-  'nothing to export or lose - close the window and the project plays on; every edit is one reaper undo step.',
-  'why jf: the initials of the author, and j f are the two keys with bumps - the fingers on the home row.',
+  'i waited for someone to build a tracker for reaper. more than seven years later it was time to do it myself.',
+  'a tracker lets your hands leave the mouse alone and type the notes that the keyboard can type anyway.',
+  'why jf: my initials and short nick - and j f are the keys under your index fingers on the home row. the tracker is meant to be played from the keyboard.',
+  'vim is the foundation: modes, operators + motions, counts, registers, the dot repeat and the : command line drive every module.',
+  'it stays as close to native reaper as it can: tracks, items, midi, regions, envelopes and fx are plain reaper - close the window and the project plays on; every edit is one undo step.',
+  'it needs sws and js_reascriptapi - the extensions most people making music in reaper have installed anyway.',
+  'it grew out of my own ecosystem of scripts and ties them together: look natively into other reaper projects and take, say, an automation curve from another one - or just enjoy that you can.',
+  'pt-mode is a simple view without a crowd of channels - a tribute to the old-school protracker way, the tracker a ton of jungle and electronic music was written on.',
   'no icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
+  'i am not a professional programmer - claude helped me write it, so i see no point in making it a commercial product.',
+  'what you get here is worth roughly 750 euro of tokens and months of almost non-stop work, which i loved doing and will keep doing - it is what i could do 24/7.',
+  'if it makes you as happy as it makes me, buy me a coffee:',
+  'https://ko-fi.com/jeeruff',
 }
 V.THANKS = {
   'thanks to my friends and teachers - in particular esa ruoho (lackluster):',
