@@ -178,6 +178,31 @@ function MX.draw(L, snap, regions, info)
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
+  -- поле маркеров последовательности (5 окт): start 1.1  end 9.1 — справа от
+  -- кнопок, если влезает; иначе столбиком под кнопками, слева от имён треков
+  -- (над колонкой имён регионов). Не влезает нигде — нет (без наложений)
+  if not MX.fold then
+    local mk = info.marks or {}
+    local f = { { 'mkstart', 'start', mk.start and mk.start.bar or '--' }, { 'mkend', 'end', mk.stop and mk.stop.bar or '--' } }
+    local lw = math.max(U.measure('start '), U.measure('end '))
+    local bws, tw = {}, 0
+    for i, e in ipairs(f) do bws[i] = lw + U.measure(e[3]) + 2 * L.pad; tw = tw + bws[i] + L.pad end
+    local pos
+    if bx + tw <= W - 4 then pos = { { bx, hy + 1 }, { bx + bws[1] + L.pad, hy + 1 } }
+    elseif math.max(bws[1], bws[2]) <= L.mx_label_w - 2 * L.pad and 2 * (L.rh + 2) <= MX.name_h then
+      local y0 = hy + L.rh + 4
+      pos = { { L.pad, y0 }, { L.pad, y0 + L.rh + 2 } }
+    end
+    for i, e in ipairs(pos and f or {}) do
+      local x, y, bw = pos[i][1], pos[i][2], bws[i]
+      local hot = mx >= x and mx < x + bw and my >= y and my < y + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, bw, L.rh, 1)
+      U.set(U.LINE); gfx.rect(x, y, bw, L.rh, 0)
+      U.text(x + L.pad, y + 1, e[2], hot and U.AMBER or U.GREY)
+      U.text(x + L.pad + lw, y + 1, e[3], U.CYAN)
+      if hot then hover.btn = e[1] end
+    end
+  end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
   for ci, col in ipairs(snap.cols) do

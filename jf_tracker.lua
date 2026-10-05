@@ -2082,6 +2082,42 @@ ctx = {
     MX.loops = not MX.loops
     vim.msg = MX.loops and 'matrix loops: digits+Enter loop N steps, > to region end, < fit, + - period, m mute' or 'matrix loops: off'
   end,
+  -- маркеры =START / =END с поля матрицы (5 окт): arg — 'такт[.доля]',
+  -- число секунд или nil (строка курсора трекера)
+  seq_marker = function(which, arg)
+    local name = which == 'start' and model.START_MARKER or model.END_MARKER
+    local t
+    if type(arg) == 'number' then t = arg
+    elseif arg and arg ~= '' then
+      local b, bt = arg:match('^(%d+)%.?(%d*)$')
+      if not b then vim.msg = which .. ' bar[.beat], e.g. 9 or 9.3; empty = cursor row'; return end
+      t = reaper.TimeMap2_beatsToTime(0, math.max(0, (tonumber(bt) or 1) - 1), math.max(0, tonumber(b) - 1))
+    else t = edit.row_time(vim.cur.row, state.lpb, 0) end
+    t = math.max(0, t)
+    local other = model.marker_pos(which == 'start' and model.END_MARKER or model.START_MARKER)
+    if other and ((which == 'start' and t >= other - 1e-6) or (which == 'end' and t <= other + 1e-6)) then
+      vim.msg = which == 'start' and 'start must be before end' or 'end must be after start'; return
+    end
+    edit.run(name .. ' marker', function()
+      local _, nmk, nrg = reaper.CountProjectMarkers(0)
+      for i = 0, nmk + nrg - 1 do
+        local _, isr, _, _, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+        if not isr and nm == name then reaper.SetProjectMarkerByIndex(0, i, false, t, 0, idx, nm, col); return end
+      end
+      reaper.AddProjectMarker(0, false, t, 0, name, -1)
+    end)
+    ctx.mx_refresh()
+    local bt, m = reaper.TimeMap2_timeToBeats(0, t)
+    vim.msg = ('%s at %d.%d'):format(name, m + 1, math.floor(bt + 1e-6) + 1)
+  end,
+  -- колесом по полю: ±1 такт, доля в такте сохраняется
+  seq_marker_nudge = function(which, d)
+    local p = model.marker_pos(which == 'start' and model.START_MARKER or model.END_MARKER)
+    if not p then return ctx.seq_marker(which) end
+    local bt, m = reaper.TimeMap2_timeToBeats(0, p)
+    if m + d < 0 then return end
+    ctx.seq_marker(which, reaper.TimeMap2_beatsToTime(0, bt, m + d))
+  end,
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
   loop_cells = function()
     if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
@@ -6866,6 +6902,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
+  elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat], Shift+click - cursor row, wheel - one bar; :start / :end'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
@@ -7376,6 +7413,11 @@ local function frame()
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
       elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
+      elseif hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend' then
+        -- поле Start / End: клик — ввод такта, Shift+клик — строка курсора
+        local w = hover.matrix.btn == 'mkstart' and 'start' or 'end'
+        if gfx.mouse_cap & 8 == 8 then ctx.seq_marker(w)
+        else vim.cmd_from = vim.mode == 'cmd' and 'normal' or vim.mode; vim.mode = 'cmd'; vim.cmdline = w .. ' ' end
       elseif hover.matrix.btn == 'add' then ctx.mx_add() end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
@@ -8231,6 +8273,10 @@ local function frame()
     local e = cur_col() and (cur_col().pool or {})[vim.inst]
     SPROP.sel = SPROP.hover.row
     if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
+    gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then
+    ctx.seq_marker_nudge(hover.matrix.btn == 'mkstart' and 'start' or 'end', gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.fxb then
