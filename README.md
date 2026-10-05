@@ -50,12 +50,26 @@ Both extensions are available through [ReaPack](https://reapack.com/).
 
 ## Install
 
+**With ReaPack (recommended).** After buying you get a personal link:
+`https://jeeruff.com/jf_tracker/r/<your license key>/index.xml`.
+
+1. In REAPER, open *Extensions → ReaPack → Import repositories…* and paste the
+   link.
+2. Open *Extensions → ReaPack → Browse packages*, find `jf_tracker` and
+   `jf_tracker effects`, and install both.
+3. The `jf_tracker` script appears in the action list. Bind it to a key if you
+   like.
+
+Updates arrive through ReaPack's *Synchronize packages*.
+
+**By hand.**
+
 1. Copy the `jf_tracker` folder into REAPER's `Scripts` folder. In REAPER,
    *Options → Show REAPER resource path* shows where that is.
-2. Copy `effects/jf_rec.jsfx` into REAPER's `Effects` folder. It is optional
-   and only needed for the `rec` DSP module.
-3. *Actions → Show action list → New action → Load ReaScript…* and pick
-   `jf_tracker.lua`. Bind it to a key if you like.
+2. Copy `effects/jf_rec.jsfx` and `effects/jf_tracker_scope.jsfx` into
+   REAPER's `Effects` folder. They are the retro sampler and the scopes.
+3. Open *Actions → Show action list → New action → Load ReaScript…* and pick
+   `jf_tracker.lua`.
 
 ## First steps
 
