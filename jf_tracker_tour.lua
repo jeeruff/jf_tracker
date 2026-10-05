@@ -22,7 +22,7 @@ T.STEPS = {
     text = 'f puts two-letter labels on everything on screen: any module, button or bar. Type a label and you are there. Press f, then a label.',
     check = function(e, b) return e.hj ~= b.hj end },
   { mod = 'tracker', focus = 'tracker', title = 'Write notes',
-    text = 'i - INSERT: the keyboard writes notes, the top row q 2 w 3 e ... (the keyboard at the bottom shows it), z / x - octave. Press i, play a few keys, then Esc.',
+    text = 'The keyboard at the bottom is on (m toggles it): q 2 w 3 e ... play notes, z / x - octave. Esc - INSERT, now the keys write. Press Esc, play a few keys, Esc again.',
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'inst', focus = 'inst', title = 'Pick a sound',
     text = 'The lib: every sample of the project. j / k pick a sound (in INSERT , . do the same). Pick another sound.',

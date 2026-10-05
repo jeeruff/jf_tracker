@@ -76,7 +76,7 @@ KH.PAGES = {
     { k = '\\', d = 'hydra menu of all actions' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
-    { k = 'm', d = 'show / hide the keyboard at the bottom (notes are written in INSERT)' },
+    { k = 'm', d = 'keyboard on / off: on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'Space Enter', d = 'play / stop, move edit cursor here' },
     { k = 'F', d = 'follow playhead on / off' },
     { k = 'o', d = 'reveal item in REAPER' },

@@ -3965,10 +3965,13 @@ ctx = {
   side_hide = function() state.side = false; if state.focus == 'browser' then ctx.set_focus('tracker') end end,
   -- фокус клавиатуры: 'tracker' | 'matrix' | 'top' (вкладка верха) | 'browser'.
   -- Розовая рамка показывает, кому идут клавиши. Tab — по кругу.
+  -- клавиатура (5 окт): видна = работает; приоритет над Vim-клавишами верхнего ряда
+  piano_on = function() return state.piano_show and true or false end,
   toggle_piano = function()
     state.piano_show = not state.piano_show
+    vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
-    vim.msg = state.piano_show and 'keyboard shown (m)' or 'keyboard hidden (m)'
+    vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes, z x octave, INSERT writes them' or 'keyboard off (m): Vim keys'
     relayout()
   end,
   set_focus = function(f)
@@ -5902,7 +5905,7 @@ local function frame()
     reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count'))), false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,

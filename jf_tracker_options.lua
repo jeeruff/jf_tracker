@@ -208,6 +208,31 @@ local function draw_about(L, W, H)
           end
           gfx.a = 1
         end
+        if O.logo.glint then
+          -- блик по металлу (5 окт): косая полоса света идёт по буквам — та же
+          -- картинка поверх себя, сложением: светлеют только линии, чёрное
+          -- остаётся чёрным; мышь над логотипом — блик идёт за ней
+          local t = ctx.now and ctx.now() or os.clock()
+          local band = math.max(cw * 3, math.floor(iw / 14))
+          local over = gfx.mouse_x >= lx0 and gfx.mouse_x < lx0 + iw and gfx.mouse_y >= y and gfx.mouse_y < y + ih
+          local cx = over and (gfx.mouse_x - lx0) or (((t % 3.5) / 3.5) * (iw + 2 * band + ih) - band - ih / 2)
+          local m0, a0 = gfx.mode, gfx.a
+          gfx.mode = 1                                         -- сложение
+          local step = 2
+          for py = 0, ih - 1, step do
+            local x0 = math.floor(cx - band / 2 + (ih / 2 - py) * 0.6)   -- наклон полосы
+            local sx0, sx1 = math.max(0, x0), math.min(iw, x0 + band)
+            if sx1 > sx0 then
+              -- к краям полосы — слабее: три ступени яркости
+              for k = 0, 2 do
+                local inset = math.floor(k * band / 6)
+                local a1, b1 = math.max(sx0, x0 + inset), math.min(sx1, x0 + band - inset)
+                if b1 > a1 then gfx.a = 0.28; gfx.blit(1022, 1, 0, a1, py, b1 - a1, step, lx0 + a1, y + py, b1 - a1, step) end
+              end
+            end
+          end
+          gfx.mode, gfx.a = m0, a0
+        end
         if O.logo.pulse then
           -- перелив (3 окт): медленная волна по столбцам — от полной яркости до
           -- чёрного; поверх готовой картинки полупрозрачные чёрные полосы

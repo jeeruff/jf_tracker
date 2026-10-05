@@ -87,7 +87,8 @@ sign is needed, it comes from another alphabet (<code>Δ</code> delta solo, <cod
 <table>
 <tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>move: field, row. <kbd>gg</kbd> <kbd>G</kbd> start / end, <kbd>{</kbd> <kbd>}</kbd> bars</td></tr>
 <tr><td><kbd>f</kbd></td><td>labels on everything on screen: type two letters and you are there</td></tr>
-<tr><td><kbd>i</kbd> … <kbd>Esc</kbd></td><td>INSERT: the top row writes notes. <kbd>Esc</kbd> toggles back, as in Renoise</td></tr>
+<tr><td><kbd>m</kbd></td><td>the keyboard on / off. On, it has priority: the top row and the digits play notes, <kbd>z</kbd> <kbd>x</kbd> change the octave. Off, every key is Vim</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>INSERT and back, as in Renoise: in INSERT the keyboard writes notes (with the keyboard off, <kbd>i</kbd> works too)</td></tr>
 <tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
 <tr><td><kbd>Tab</kbd></td><td>next module: the keyboard goes there (a pink frame shows where)</td></tr>
 <tr><td><kbd>\</kbd> &nbsp; <kbd>?</kbd></td><td>the menu of everything / the keys of the focused module</td></tr>
@@ -129,11 +130,11 @@ inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves 
 <div><b>view and the rest</b>
 <kbd>f</kbd> jump labels · <kbd>/</kbd> <kbd>n</kbd> <kbd>N</kbd> search<br>
 <kbd>za</kbd> <kbd>zM</kbd> <kbd>zR</kbd> fold tracks<br>
-<kbd>+</kbd> <kbd>-</kbd> LPB · <kbd>F</kbd> follow · <kbd>m</kbd> keyboard strip<br>
+<kbd>+</kbd> <kbd>-</kbd> LPB · <kbd>F</kbd> follow · <kbd>m</kbd> keyboard on / off<br>
 <kbd>a</kbd> envelopes · <kbd>A</kbd> any parameter (fzf)<br>
 <kbd>\</kbd> menu · <kbd>?</kbd> keys · <kbd>F1</kbd> this page</div>
 </div>
-<p>A count goes before any motion or edit: <kbd>3j</kbd>, <kbd>d2w</kbd>, <kbd>5@a</kbd>. A Russian layout works by key
+<p>With the keyboard on (<kbd>m</kbd>) the top row and the digits play notes and <kbd>z</kbd> <kbd>x</kbd> change the octave; the rest of the keys stay Vim. A count goes before any motion or edit: <kbd>3j</kbd>, <kbd>d2w</kbd>, <kbd>5@a</kbd>. A Russian layout works by key
 position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd> the status line lists what can follow.</p>
 
 <h2 id="insert">INSERT</h2>

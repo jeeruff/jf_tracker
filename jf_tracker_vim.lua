@@ -1046,6 +1046,11 @@ function V.key_impl(c)
     if chk == ':' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = ''; V.hexbuf = nil; return end
     if chk == '/' and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) then V.cmd_from = 'insert'; V.mode = 'search'; V.searchline = ''; V.hexbuf = nil; return end
     if chk == '?' then V.open_hydra(ctx.hydra_keys()); return end
+    -- m — клавиатура вкл / выкл и в INSERT (5 окт): выключена — ноты не пишутся
+    if chk == 'm' and not V.hexbuf and not V.shapebuf then
+      if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end
+      return
+    end
     local m = motion(c, 1)
     if m and (c == UP or c == DOWN or c == LEFT or c == RIGHT or c == PGUP or c == PGDN or c == HOME or c == END) then
       V.cur.fi, V.cur.row = m.fi, m.row
@@ -1137,7 +1142,7 @@ function V.key_impl(c)
     -- клавиатура выключена (m): нотные клавиши не пишут (4 окт)
     if not V.piano then
       local base = V.note_key(c, ctx.mods and ctx.mods() or {})
-      if ctx.piano and ctx.piano[base] then V.msg = 'notes are written in INSERT (i)' end
+      if ctx.piano and ctx.piano[base] then V.msg = 'keyboard off - m turns it on' end
       return
     end
     -- модификатор ноты (2 окт): Shift — только прослушать, Option — вставить
@@ -1261,11 +1266,52 @@ function V.key_impl(c)
     return
   end
 
-  -- слой пианино в NORMAL (m) убран 5 окт: клавиатура = INSERT, NORMAL = Vim;
-  -- m — только показать / спрятать пианинку внизу трекера
-  if V.mode == 'normal' and not V.pending and not V.op and c == ('m'):byte() then
-    if ctx.toggle_piano then ctx.toggle_piano() end
-    return
+  -- клавиатура (5 окт, по просьбе): m — вкл / выкл (видна снизу = работает).
+  -- Включена — у неё приоритет в NORMAL и VISUAL: верхний ряд и цифры —
+  -- ноты (звучат; Cmd+нота — с удержанием), z / x — октава, Esc / Enter —
+  -- INSERT (i здесь — нота). Выключена — чистый Vim.
+  if (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.pending and not V.op then
+    if c == ('m'):byte() then
+      if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end
+      return
+    end
+    if V.piano then
+      if V.mode == 'normal' and (c == ESC or c == 13) then V.mode = 'insert'; V.msg = 'INSERT with the keyboard: the top row writes notes'; return end
+      if c == ('z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
+      if c == ('x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
+      local mods = ctx.mods and ctx.mods() or {}
+      local base, how = V.note_key(c, mods)
+      if ctx.piano and ctx.piano[base] then
+        local f0 = flat()[V.cur.fi]
+        local inst0 = f0 and (f0.col.pool or {})[V.inst]
+        local chq = (base < 256) and string.char(base) or ''
+        V.piano_last = ctx.piano[base]                         -- пианинка: последняя сыгранная клавиша
+        -- нарезанный: нота — слайс по клавише; Option — выбранный с питчем; Cmd — весь
+        local kp0 = piano_pitch(base)
+        local SB0 = V.slice_base()
+        local sliced0 = inst0 and inst0.slices and #inst0.slices > 0 and kp0
+        local psemis, k = 0, nil
+        if sliced0 and how ~= 'whole' then
+          if how == 'beside' then
+            local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
+            if selk > 0 then k = selk; psemis = kp0 - SB0 end
+          else k = kp0 - SB0 + 1 end
+        end
+        if k and (k < 1 or k > #inst0.slices) then V.msg = ('no slice %d'):format(k); return end
+        if k then V.last_slice = k; if how ~= 'beside' and ctx.select_slice then ctx.select_slice(inst0, k) end end
+        local pitch = (not k) and piano_pitch(base) or nil
+        if f0 and (k or pitch) then
+          local lane = f0.lane or f0.col.lanes[1]
+          if how == 'hold' or how == 'hold_stretch' then
+            if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch, slice = k,
+              item = inst0 and inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
+          elseif k then
+            if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], inst0.slices[k + 1] or inst0.len, psemis) end
+          elseif ctx.preview then ctx.preview(f0.col.track, pitch, inst0 and inst0.item, V.cur.row, 1) end
+        end
+        return
+      end
+    end
   end
 
   -- ожидание второй клавиши
@@ -1719,7 +1765,7 @@ function V.pending_hint()
 end
 
 function V.status()
-  local m = ({ normal = '', insert = '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
+  local m = ({ normal = V.piano and '-- KEYS --' or '', insert = V.piano and '-- INSERT KEYS --' or '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
                cmd = ':' .. (V.cmdline or ''), search = '/' .. (V.searchline or '') })[V.mode] or ''
   local extra = ''
   if V.macro then extra = ' rec@' .. V.macro.name end
@@ -1731,10 +1777,10 @@ end
 
 -- обёртка: оператор, начатый из INSERT (d…), по завершении возвращает в INSERT
 function V.key(c)
-  V.piano = V.mode == 'insert'                 -- 5 окт: клавиатура = INSERT, без m
+  if ctx.piano_on then V.piano = ctx.piano_on() end    -- клавиатура = видна снизу (m), 5 окт
   local p0 = V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)
   local r = V.key_impl(c)
-  V.piano = V.mode == 'insert'
+  if ctx.piano_on then V.piano = ctx.piano_on() end
   -- набор сокращения формы живёт только на месте: курсор ушёл — сброс (ревью 2 окт)
   if V.shapebuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.shapebuf = nil end
   if V.mode ~= 'insert' then V.shapebuf = nil end
