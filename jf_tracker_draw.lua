@@ -1974,8 +1974,8 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 function D.transport_buttons(c)
   local ps = c.playstate or 0
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
-           { 'tp_pause', 'II', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', 'o', c.recording and U.RED or U.TEXT, U.RED }, { 'tp_fwd', '>>' },
-           { 'loop', D.ttf and '∞' or '8', c.loop and U.CYAN or U.GREY } }   -- TTF — символ ∞, битмап — 8 на боку                         -- луп (5 окт): вместо «loop on»
+           { 'tp_pause', 'II', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '●', c.recording and U.RED or U.TEXT, U.RED }, { 'tp_fwd', '>>' },
+           { 'loop', '∞', c.loop and U.CYAN or U.GREY } }                   -- луп — символ ∞ (8 на боку)                         -- луп (5 окт): вместо «loop on»
 end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -2034,22 +2034,15 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local bx = x + L.pad
     for _, b in ipairs(D.transport_buttons(info.ctrl)) do
       -- обычные кнопки (5 окт): рамка, фон; включённая — фоном своего цвета.
-      -- луп — символ 8 на боку (повёрнутый текст, не рисунок)
-      local side = b[1] == 'loop' and not D.ttf
-      local tw = side and math.floor(gfx.texth * D.SCALE * 2) or D.big_measure(b[2], 2)
+      -- ● и ∞ — символы (в битмапе — запасным моно-шрифтом), не рисунки
+      local tw = D.big_measure(b[2], 2)
       local bw = tw + 2 * L.pad
       local hot = mx >= bx and mx < bx + bw and my >= ly and my < ly + 2 * L.rh
       local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 0)
       local fg = hot and U.AMBER or (b[4] or b[3] or U.TEXT)               -- b[4]: свой цвет буквы (o всегда красная)
-      if side then
-        local fill = hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)
-        local s0 = D.SCALE; D.SCALE = s0 * 2
-        local gh = gfx.measurestr('8') * D.SCALE
-        D.vtext(bx + L.pad, ly - 1 + math.floor((2 * L.rh - gh) / 2), gh, '8', fg, fill, true)
-        D.SCALE = s0
-      else D.big_text(bx + L.pad, ly, b[2], fg, 2) end
+      D.big_text(bx + L.pad, ly, b[2], fg, 2)
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, bw, 2 * L.rh, b[1])
       bx = bx + bw + L.pad
