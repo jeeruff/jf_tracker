@@ -1030,7 +1030,7 @@ function V.key_impl(c)
 
   -- лидер \ — hydra действий (контекстное меню с клавиатуры), ? — шпаргалка
   if c == ('\\'):byte() and not (V.mode == 'insert' and (env_of(V.cur.fi) or (V.cur.field or 1) == 2)) then
-    V.open_hydra(ctx.hydra_root()); return   -- в INSERT на огибающей / vol `\` — макрос спада
+    if ctx.context_key then ctx.context_key() else V.open_hydra(ctx.hydra_root()) end; return   -- 5 окт: \ — контекст; главная — `
   end
 
   record(c)

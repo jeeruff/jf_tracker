@@ -40,7 +40,7 @@ T.STEPS = {
     text = ': opens the command line - :arp up 2, :legato, :macro, :pt, :big; Tab completes. Press :',
     check = function(e) return e.mode == 'cmd' end },
   { mod = 'tracker', focus = 'tracker', title = 'Leader menu',
-    text = '\\ opens the menu of everything: \\ o options as quick switches, \\ v view, \\ v a about. Press \\',
+    text = '` opens the main menu of everything (v view, P project, o options); \\ - the menu of what is under the cursor, like the right click. Press `',
     check = function(e) return e.hydra end },
   { mod = 'ctrl', focus = 'tracker', title = 'Play',
     text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',

@@ -2240,6 +2240,42 @@ ctx = {
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
+  -- поиски (5 окт): Ctrl+/ — все эффекты (список слева от DSP), Cmd+/ — файлы
+  -- (браузер), Option+/ — по цепи DSP трека курсора: блок или его параметр
+  fx_search_global = function()
+    state.dsp = true; state.fxb = true; state.khelp = false
+    FB.query, FB.cur, FB.scroll = '', 1, 0
+    ctx.relayout(); ctx.set_focus('fxb')
+    vim.msg = 'fx: type to find, Enter adds to the cursor track'
+  end,
+  file_search = function()
+    state.side = true; ctx.relayout(); ctx.set_focus('browser')
+    if B.mode ~= 'files' then B.set_mode('files') end
+    B.start_find()
+  end,
+  dsp_search = function()
+    local t = dsp_target()
+    if not t or #(t.fx or {}) == 0 then vim.msg = 'dsp: no fx on the cursor track'; return end
+    local items = {}
+    for k, f in ipairs(t.fx) do
+      items[#items + 1] = { label = f.name, data = { k = k } }
+      for pi, prm in ipairs(f.params or {}) do items[#items + 1] = { label = f.name .. ' · ' .. (prm.name or ''), data = { k = k, p = pi } } end
+    end
+    vim.open_picker('dsp of ' .. (t.name or 'track'), items, function(it)
+      state.dsp = true; ctx.relayout(); ctx.set_focus('dsp')
+      dsp_sel.fx = it.data.k; dsp_sel.param = it.data.p
+      vim.msg = it.label
+    end)
+  end,
+  -- \ в трекере (5 окт): контекст ячейки под курсором — то же, что правая кнопка
+  context_key = function()
+    local f = L.flat[vim.cur.fi]
+    local hv = { fi = vim.cur.fi, row = { row = vim.cur.row }, field = vim.cur.field, fsub = vim.cur.sub,
+                 cell = f and f.sub and f.sub[vim.cur.row], col = f and f.col }
+    local r = vim.cur.row - (rows[1] and rows[1].row or 0)
+    local anchor = (f and f.x and r >= 0 and r < L.nrows) and { kind = 'xy', x = f.x, y = L.body_y + (r + 1) * L.rh } or nil
+    if ctx.open_context then ctx.open_context(hv, anchor) end
+  end,
   -- шаг слайдера шапки (колесо, клавиатура): громкость 0.5 dB, панорама 0.02;
   -- coarse — 3 dB / 0.1
   trs_nudge = function(col, what, d, coarse)
@@ -4509,6 +4545,7 @@ local function context_menu(hover, anchor)
   vim.open_hydra({ title = 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
+ctx.open_context = context_menu          -- для \ из ctx.context_key (объявлен выше этого места)
 function ctx.context_items(hover)
   local items = {}
   local function add(label, fn, key) items[#items + 1] = { label, fn, key = key } end
@@ -8062,6 +8099,17 @@ local function frame()
       -- фокусе (2 окт: в модуляции a открывал выбор параметра, а набор и Enter
       -- съедала матрица модуляции — выбрать было нельзя)
       if vim.picker or vim.hydra then return vim.key(c) end
+      -- 5 окт: две гидры — ` главная (у главного модуля слева сверху), \ —
+      -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
+      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
+      if c == 96 and vim.mode ~= 'insert' and not typing then
+        vim.open_hydra(ctx.hydra_root()); state.popup_at = { kind = 'ctrlbtn', name = 'help' }
+        return
+      end
+      local m0 = ctx.mods()
+      if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты
+      if not typing and (c == 1962934519 or (c == 47 and m0.alt)) then ctx.dsp_search(); return end     -- Option+/ (÷) — DSP
+      if not typing and c == 47 and m0.cmd then ctx.file_search(); return end                           -- Cmd+/ — файлы
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
       if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         local hv = {}

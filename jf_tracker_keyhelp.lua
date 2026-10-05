@@ -73,7 +73,9 @@ KH.PAGES = {
     { k = '[ ] ( )', d = 'octave down / up, instrument previous / next' },
     { k = '/ n N *', d = 'search, next, previous, word under cursor' },
     { k = ':', d = 'command line (Tab completes)' },
-    { k = '\\', d = 'hydra menu of all actions' },
+    { k = '`', d = 'the main menu (all actions; at the main module); in INSERT ` is note-off' },
+    { k = '\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
+    { k = '^/ ⌥/ ⌘/', d = 'search: all effects / the DSP chain of the track / files' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = 'm', d = 'keyboard on / off: on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
@@ -331,7 +333,7 @@ KH.PAGES = {
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'track' }, { 'yy p', 'copy' }, { 'v', 'select' },
-              { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'help' } },
+              { '/', 'find' }, { ':', 'cmd' }, { '`', 'menu' }, { '\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'help' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'D', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },

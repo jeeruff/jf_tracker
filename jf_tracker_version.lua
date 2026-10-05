@@ -683,7 +683,7 @@ V.TUTORIAL = {
   '7. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '8. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '9. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
-  '10. Leader. \\ opens the menu: \\ o - options as quick switches, \\ v - view, \\ v a - about.',
+  '10. Menus. ` - the main menu of everything (v view, P project, o options); \\ - the context menu of what is under the cursor, the same as the right click. Ctrl+/ - find an effect, Option+/ - inside the DSP chain, Cmd+/ - a file.',
   '11. Play. Space - play / stop, F - follow the playhead; =START and =END markers bound the song.',
   '12. Help. ? shows the keys of the focused module; Tab in the help searches all pages.',
   '',
