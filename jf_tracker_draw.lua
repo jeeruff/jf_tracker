@@ -2879,6 +2879,15 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.vis_box = nil
+  -- граница регионов (5 окт): тонкие линии цвета регионов у линии такта —
+  -- уходящий над ней, следующий под ней; фоном, items рисуются поверх
+  local rgedge = {}
+  if info.ruler and info.ruler.regions then
+    for _, rg in ipairs(info.ruler.regions) do
+      local e0 = rgedge[rg.r0] or {}; e0.nxt = rg.rgb or D.BAR; rgedge[rg.r0] = e0
+      local e1 = rgedge[rg.r1] or {}; e1.prv = rg.rgb or D.BAR; rgedge[rg.r1] = e1
+    end
+  end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
@@ -2887,6 +2896,10 @@ function D.frame(L, snap, rows, state, info)
     if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
+    -- до ячеек этой строки: нижний пиксель — уходящему, верхний+1 — следующему
+    local eg, en = rgedge[r.row], rgedge[r.row + 1]
+    if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
+    if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)
