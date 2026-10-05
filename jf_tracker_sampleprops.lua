@@ -159,15 +159,53 @@ end
 -- строка 0 — весь сэмпл, дальше слайсы: клавиша, Sxx, длина; выбранный —
 -- подсветка, без нот — тусклый. rows = { { k, len, key, has } }, sel = k.
 -- Возвращает k под мышью (SP.slice_hover)
-function SP.draw_slices(L, x, y, w, h, rows, sel)
+-- зум списка (5 окт): строки ×1 / ×2 / ×3 — превью (волна слайса, кривая
+-- automation) крупнее; кнопка zoom в шапке списка
+SP.szoom = 1
+SP.zprev = 0
+local function zoom_button(L, x, y, w)
+  local lbl = SP.szoom > 1 and ('zoom x' .. SP.szoom) or 'zoom'
+  local bw = U.measure(lbl) + 2 * L.pad
+  local bx = x + w - bw
+  local mx, my, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
+  local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+  local press = cap & 1 == 1 and SP.zprev & 1 == 0
+  SP.zprev = cap
+  if hot and press then SP.szoom = SP.szoom % 3 + 1; SP.zoom_clicked = true end
+  U.set(SP.szoom > 1 and U.tint(U.AMBER, 0.3) or (hot and U.PANEL or U.BG)); gfx.rect(bx, y, bw, L.rh, 1)
+  U.set((hot or SP.szoom > 1) and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
+  U.text(bx + L.pad, y, lbl, (hot or SP.szoom > 1) and U.AMBER or U.GREY)
+  SP.zoom_hot = hot
+  return bw + L.pad
+end
+
+-- мини-волна куска [a, b) секунд item (пики всего item, своя часть)
+local function mini_wave(e, a, b, x, y, w, h, col)
+  if not (e and ctx.peaks) or w < 4 or h < 3 or (e.len or 0) <= 0 then return end
+  local pk = ctx.peaks(e, 2048)
+  if not (pk and pk.n and pk.n > 0) then return end
+  local cy, hh = y + h / 2, h / 2
+  U.set(col)
+  for px = 0, w - 1 do
+    local t = a + (b - a) * px / w
+    local idx = math.max(1, math.min(pk.n, math.floor(t / e.len * pk.n) + 1))
+    local lo, hi = pk.min[idx] or 0, pk.max[idx] or 0
+    if hi - lo < 0.04 then lo, hi = -0.02, 0.02 end
+    gfx.line(x + px, cy - hi * hh, x + px, cy - lo * hh)
+  end
+end
+
+function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   SP.slice_hover = nil
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
-  U.text(x + L.pad, y, ctx.fit(('slices %d'):format(math.max(0, #rows - 1)), w - L.pad), U.AMBER)
+  local zw = zoom_button(L, x, y, w)
+  U.text(x + L.pad, y, ctx.fit(('slices %d'):format(math.max(0, #rows - 1)), w - L.pad - zw), U.AMBER)
+  local RH = L.rh * SP.szoom
   -- подсказка клавиш (4 окт): только с опцией hints, нижней строкой
   local hints = ctx.state and ctx.state.hints
-  local n = math.max(1, math.floor((h - L.rh) / L.rh) - (hints and 1 or 0))
-  if hints then U.text(x + L.pad, y + (n + 1) * L.rh, ctx.fit('opt+j k: step', w - L.pad), U.DIM) end
+  local n = math.max(1, math.floor((h - L.rh - (hints and L.rh or 0)) / RH))
+  if hints then U.text(x + L.pad, y + h - L.rh, ctx.fit('opt+j k: step', w - L.pad), U.DIM) end
   SP.slice_scroll = SP.slice_scroll or 0
   local si = 1
   for i, r in ipairs(rows) do if r.k == sel then si = i end end
@@ -178,19 +216,24 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
     if si > SP.slice_scroll + n then SP.slice_scroll = si - n end
   end
   SP.slice_scroll = math.max(0, math.min(math.max(0, #rows - n), SP.slice_scroll))
+  SP.slice_nvis = n
   for i = 1, n do
     local r = rows[SP.slice_scroll + i]
     if not r then break end
-    local ry = y + i * L.rh
+    local ry = y + L.rh + (i - 1) * RH
     local on = r.k == sel
-    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
-    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + RH
+    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, RH, 1) end
     local lbl = r.k == 0 and (('%s %s'):format(r.key or ' ', (r.name and r.name ~= '') and r.name or 'whole')) or (('%s S%02X'):format(r.key or ' ', r.k))
     local lt = r.len < 10 and ('%.2fs'):format(r.len) or ('%.1fs'):format(r.len)
     U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
+    -- зум: волна куска строкой ниже подписи
+    if SP.szoom > 1 and root and r.t0 then
+      mini_wave(root, r.t0, r.t0 + r.len, x + L.pad, ry + L.rh, w - 2 * L.pad, RH - L.rh - 2, on and U.AMBER or U.mix(U.TEXT, U.BG, 0.3))
+    end
     if hot then SP.slice_hover = r.k end
-    if ctx.hint then ctx.hint('slice', x, ry, w, L.rh, r.k) end      -- метка f (5 окт)
+    if ctx.hint then ctx.hint('slice', x, ry, w, RH, r.k) end      -- метка f (5 окт)
   end
   return SP.slice_hover
 end
@@ -201,39 +244,47 @@ function SP.draw_ai(L, x, y, w, h, list, sel)
   SP.slice_hover = nil
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  U.text(x + L.pad, y, ctx.fit(('automation %d'):format(#list), w - 2 * L.pad), U.GREY)
+  local zw = zoom_button(L, x, y, w)
+  U.text(x + L.pad, y, ctx.fit(('automation %d'):format(#list), w - 2 * L.pad - zw), U.GREY)
   if #list == 0 then U.text(x + L.pad, y + L.rh, ctx.fit('no automation items on this track', w - 2 * L.pad), U.DIM); return nil end
-  local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
+  local RH = L.rh * SP.szoom
+  local nvis = math.max(1, math.floor((h - L.rh) / RH))
+  SP.slice_nvis = nvis
   SP.slice_scroll = math.max(0, math.min(SP.slice_scroll or 0, math.max(0, #list - nvis)))
   for r = SP.slice_scroll + 1, math.min(#list, SP.slice_scroll + nvis) do
     local a = list[r]
-    local ry = y + (r - SP.slice_scroll) * L.rh
+    local ry = y + L.rh + (r - SP.slice_scroll - 1) * RH
     local on = r == sel
-    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
-    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + RH
+    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, RH, 1) end
     local lt = (a.len or 0) < 10 and ('%.2fs'):format(a.len or 0) or ('%.1fs'):format(a.len or 0)
-    local lw = math.floor(w * 0.45)
+    local zoomed = SP.szoom > 1
+    local lw = zoomed and (w - U.measure(lt) - 2 * L.pad) or math.floor(w * 0.45)
     U.text(x + L.pad, ry, ctx.fit(a.label or '', lw - L.pad), on and U.AMBER or U.TEXT)
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
-    -- мини-линия: точки пула, время и значение — по своим min / max
-    local px0, pw = x + lw, w - lw - U.measure(lt) - 3 * L.pad
+    -- мини-линия: точки пула, время и значение — по своим min / max; в зуме —
+    -- под подписью во всю ширину
+    local px0, pw, py0, ph
+    if zoomed then px0, pw, py0, ph = x + L.pad, w - 2 * L.pad, ry + L.rh, RH - L.rh - 2
+    else px0, pw, py0, ph = x + lw, w - lw - U.measure(lt) - 3 * L.pad, ry + 3, L.rh - 6 end
     local pts = a.pts or {}
-    if pw > 8 and #pts > 0 then
+    if pw > 8 and ph > 2 and #pts > 0 then
       local t0, t1, v0, v1 = math.huge, -math.huge, a.min or math.huge, a.max or -math.huge
       for _, p in ipairs(pts) do t0 = math.min(t0, p[1]); t1 = math.max(t1, p[1]); if not a.min then v0 = math.min(v0, p[2]); v1 = math.max(v1, p[2]) end end
+      if a.pos and a.len and a.len > 0 then t0, t1 = a.pos, a.pos + a.len end
       if t1 - t0 < 1e-9 then t1 = t0 + 1 end
       if v1 - v0 < 1e-9 then v1 = v0 + 1 end
       U.set(on and U.AMBER or U.CYAN)
       local lx, ly
       for _, p in ipairs(pts) do
-        local qx = px0 + math.floor((p[1] - t0) / (t1 - t0) * (pw - 1))
-        local qy = ry + L.rh - 3 - math.floor(math.max(0, math.min(1, (p[2] - v0) / (v1 - v0))) * (L.rh - 6))
+        local qx = px0 + math.floor(math.max(0, math.min(1, (p[1] - t0) / (t1 - t0))) * (pw - 1))
+        local qy = py0 + ph - 1 - math.floor(math.max(0, math.min(1, (p[2] - v0) / (v1 - v0))) * (ph - 1))
         if lx then gfx.line(lx, ly, qx, qy) end
         lx, ly = qx, qy
       end
     end
     if hot then SP.slice_hover = r end
-    if ctx.hint then ctx.hint('slice', x, ry, w, L.rh, r) end
+    if ctx.hint then ctx.hint('slice', x, ry, w, RH, r) end
   end
   return SP.slice_hover
 end

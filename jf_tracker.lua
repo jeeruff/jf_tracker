@@ -7052,8 +7052,8 @@ local function frame()
       if state.auto_inst then
         local list = ctx.ai_list()
         local hv = SPROP.draw_ai(Lx, x, y, w - 5, h, list, ctx.ai_sel)
-        local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
-        draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh, SPROP.slice_scroll or 0, nvis, #list)
+        local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+        draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #list)
         return hv
       end
       local root, col = ctx.slice_root()
@@ -7062,13 +7062,13 @@ local function frame()
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
       for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
-      local rows = { { k = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
+      local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices) do
-        rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
+        rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
       end
-      local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k)
-      local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
-      draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh, SPROP.slice_scroll or 0, nvis, #rows)
+      local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k, root)
+      local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+      draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #rows)
       return hv
     end or nil,
   })
