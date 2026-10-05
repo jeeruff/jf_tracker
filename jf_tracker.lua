@@ -40,7 +40,8 @@ MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкл
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
-SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
+SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
+edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
@@ -144,6 +145,7 @@ local state = {
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
   textonly = reaper.GetExtState(EXT, 'textonly') == '1',
   steplisten = reaper.GetExtState(EXT, 'steplisten') == '1',
+  fxopen = reaper.GetExtState(EXT, 'fxopen') == '1',               -- окно FX после добавления (5 окт)
   slicespos = (reaper.GetExtState(EXT, 'slicespos') == 'split') and 'split' or 'module',   -- модуль слайсов: отдельно / половина lib (4 окт)      -- step listen (4 окт)
   propspos = (reaper.GetExtState(EXT, 'propspos2') == 'left') and 'left' or 'right',   -- перенос влево отменён (4 окт): по умолчанию справа          -- text only (4 окт)
   keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',
@@ -378,7 +380,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3296,7 +3298,8 @@ ctx = {
         for ln in f:lines() do
           if ln:match('^# Categories') then in_cats = true
           elseif in_cats and ln:match('^#') then in_cats = false end
-          local cat, list = in_cats and ln:match('^([%w%s%-]+):%s*(.+)$')
+          local cat, list                        -- не «in_cats and match»: and режет второе значение
+          if in_cats then cat, list = ln:match('^([%w%s%-]+):%s*(.+)$') end
           if cat then for nm in list:gmatch('[^,]+') do local k = nm:gsub('^%s+', ''):gsub('%s+$', ''):lower(); ctx.aw_db[k] = ctx.aw_db[k] or {}; ctx.aw_db[k].cat = cat end end
           local nm, desc = ln:match('^############ (%S+) is (.-)%.?%s*$')
           if not nm then nm, desc = ln:match('^############ (%S+) (.-)%.?%s*$') end
@@ -4306,6 +4309,7 @@ local function context_menu(hover)
       add('Open FX window', function() edit.fx_show(col.track, f.i) end)
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
       add('Add FX … (fzf)', function() ctx.fx_picker() end)
+      add((state.fxopen and '!' or '') .. 'Open the fx window after adding', function() state.fxopen = not state.fxopen; edit.open_on_add = state.fxopen; vim.msg = 'fx window after adding: ' .. (state.fxopen and 'open' or 'closed') end)
     end
   elseif hover.row and hover.fi then
     vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
@@ -6487,6 +6491,22 @@ local function frame()
       -- край зоны слайса: тянуть начало / конец слайса по большому сэмплу (2 окт)
       ctx.set_focus('top')
       local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+      -- выбранный слайс модуля слайсов (5 окт): его кусок, если есть ноты;
+      -- нет нот — тянутся сами границы слайса в нарезке сэмпла
+      local root = ctx.slice_root()
+      local sk = root and ctx.selected_slice(root)
+      if sk and sk > 0 then
+        local child = ctx.slice_child(col, root, sk)
+        if child then e = child
+        elseif root.slices and root.slices[sk] then
+          local a0 = root.slices[sk]
+          local b0 = root.slices[sk + 1] or root.len
+          local wv = SL.wave
+          local grab = (wv and wv.w > 0) and SL.x_to_t(gfx.mouse_x) or a0
+          SL.zone_drag = { edge = SL.zone_hot, e = root, p = root, a = a0, b = b0, a0 = a0, b0 = b0, grab = grab, marks = sk }
+          e = nil
+        end
+      end
       if e and e.parent and e.item then
         local p = e.parent; local pr = (p.rate and p.rate ~= 0) and p.rate or 1
         local a0, b0 = (e.offs - p.offs) / pr, (e.offs - p.offs + e.len * (e.rate or 1)) / pr
@@ -7245,7 +7265,22 @@ local function frame()
       end
     else
       -- простой клик без сдвига — не правка (без undo-точки)
-      if math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6 then ctx.slice_bounds(zd) end
+      if math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6 then
+        if zd.marks then
+          -- слайс без нот: границы k и k+1 нарезки сэмпла (5 окт)
+          local sl = {}
+          for i, t in ipairs(zd.p.slices or {}) do sl[i] = t end
+          local k = zd.marks
+          local lo = (sl[k - 1] or -1) + 0.002
+          local hi = (sl[k + 2] or (zd.p.len + 1)) - 0.002
+          sl[k] = math.max(lo, zd.a)
+          if sl[k + 1] then sl[k + 1] = math.min(hi, zd.b) end
+          edit.set_slices(zd.p.item, sl)
+          if SL.entry and SL.entry.item == zd.p.item then SL.slices = sl end
+          model.invalidate()
+          vim.msg = ('slice S%02X moved'):format(k)
+        else ctx.slice_bounds(zd) end
+      end
       SL.zone_drag = nil
     end
   end

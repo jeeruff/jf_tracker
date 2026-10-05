@@ -1144,7 +1144,8 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     end
   elseif kind == 'ir' then
     -- импульс ReaVerb (5 окт): спектрограмма файла импульса; ниже — имя
-    local j, nm = D.ir_job and D.ir_job(f)
+    local j, nm
+    if D.ir_job then j, nm = D.ir_job(f) end
     if j then
       gfx.blit(j.img, 1, 0, 0, 0, j.cols, j.rows, x + 1, y + 1, w - 2, h - VRH - 3)
       if not j.done then text(x + 3, y + 2, ('%d%%'):format(math.floor(j.col / j.cols * 100)), U.GREY) end

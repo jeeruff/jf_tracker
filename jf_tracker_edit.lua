@@ -1907,8 +1907,14 @@ function E.take_chain_window(take)
   R.Main_OnCommand(40638, 0)                 -- Item: Show FX chain for item take
 end
 -- pos — место в цепочке (0 = первым), nil — в конец
+-- окно FX после добавления (5 окт, галочка в меню DSP): false — закрыть
+-- (параметры и так в блоке DSP), true — открыть; REAPER сам может открыть
+E.open_on_add = false
 function E.fx_add(track, name, pos)
-  run('fx add', function() add_fx(track, name, pos and (-1000 - pos) or -1) end)
+  run('fx add', function()
+    local idx = add_fx(track, name, pos and (-1000 - pos) or -1)
+    if idx and idx >= 0 then FA(track).Show(track, idx, E.open_on_add and 3 or 2) end
+  end)
   if model then model.invalidate() end
 end
 function E.fx_remove(track, fx)
