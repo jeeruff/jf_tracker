@@ -3625,7 +3625,7 @@ ctx = {
       if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca')) then
         local mod = (page.title or pg):gsub('%s*%-.*$', '')
         for _, en in ipairs(page.e or {}) do
-          if en.k and en.d then items[#items + 1] = { label = en.k, kind = 'action', value = mod, key = mod, desc = en.d } end
+          if en.k and en.d then items[#items + 1] = { label = en.k, kind = 'action', value = mod, key = mod, desc = en.d, hk = true } end
         end
       end
     end

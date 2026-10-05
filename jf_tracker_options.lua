@@ -32,8 +32,11 @@ end
 function O.rebuild()
   local view = {}
   if O.query ~= '' then
+    -- поиск — только в открытой вкладке (5 окт)
+    local grp = 'options'
     for _, it in ipairs(O.all) do
-      if not it.sep and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
+      if it.sep then grp = it.group or 'options' end
+      if not it.sep and (#O.tabs == 0 or grp == O.tab) and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.value or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
     end
   elseif O.tab == 'all' then view = O.all
   else
@@ -180,6 +183,13 @@ end
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
   local it = O.items[O.hover or O.sel]
+  -- список (хоткеи, действия, полоса прокрутки): колесо листает (5 окт)
+  if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' then
+    local nv = O.nvis or 10
+    O.scroll = math.max(0, math.min(math.max(0, #O.items - nv), O.scroll - d * 3))
+    O.sel = math.max(O.scroll + 1, math.min(O.scroll + nv, O.sel))
+    return
+  end
   if it and it.masked and it.masked() then return end
   O.adjust(it, d)
 end
@@ -199,6 +209,7 @@ function O.click(mx, my)
   if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.tab_hot then O.set_tab(O.tab_hot); return end
   if O.find_hot then O.typing = true; return end
+  if O.sb_hot then O.sb_drag = true; return end
   if O.hover then
     O.sel = O.hover
     local it = O.items[O.sel]
@@ -405,9 +416,9 @@ function O.draw(L, W, H)
   end
   local bw = math.min(W - 2 * L.pad - 20, math.max(lw + vw + dw + 3 * L.pad, L.cw * 72))
   local nvis = math.max(3, math.min(n, math.floor((H - 6 * rh) / rh)))
-  local nvis2 = math.max(3, nvis - 1)
+  local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
-  local bh = (nvis + 4) * rh
+  local bh = (nvis + 4 + ((#O.tabs > 0) and 1 or 0)) * rh
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
   if O.compact then
     nvis = math.min(n, math.floor((H - 4 * rh) / rh))
@@ -443,7 +454,9 @@ function O.draw(L, W, H)
     local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/ find')
     local fw = math.max(math.floor(bw / 3), U.measure(fq) + 2 * L.pad)
     local fx = bx + L.pad
-    local tx = fx + fw + L.pad
+    -- вкладки — строкой над поиском (5 окт)
+    local tx = bx + L.pad
+    local fy = ty + ((#O.tabs > 0) and rh or 0)
     for _, t in ipairs(O.tabs) do
       local w = U.measure(t) + 2 * L.pad
       if tx + w > bx + bw - L.pad then break end
@@ -455,14 +468,35 @@ function O.draw(L, W, H)
       U.text(tx + L.pad, ty, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
       tx = tx + w + 2
     end
-    local fhot = mx >= fx and mx < fx + fw and my >= ty and my < ty + rh
+    local fhot = mx >= fx and mx < fx + fw and my >= fy and my < fy + rh
     if fhot then O.find_hot = true end
-    U.set(O.typing and U.tint(U.AMBER, 0.25) or (fhot and U.PANEL or U.BG)); gfx.rect(fx, ty, fw, rh - 1, 1)
-    U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, ty, fw, rh - 1, 0)
-    U.text(fx + L.pad, ty, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
+    U.set(O.typing and U.tint(U.AMBER, 0.25) or (fhot and U.PANEL or U.BG)); gfx.rect(fx, fy, fw, rh - 1, 1)
+    U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, fy, fw, rh - 1, 0)
+    U.text(fx + L.pad, fy, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
   end
   local by0 = by
-  if not O.compact then by = by + rh end                   -- список — под строкой вкладок
+  if not O.compact then by = by + rh * ((#O.tabs > 0) and 2 or 1) end   -- список — под вкладками и поиском
+  O.nvis = nvis
+  -- полоса прокрутки списка (5 окт): хоткеев сотни
+  O.sb_hot = nil
+  local sbw = 0
+  if #O.items > nvis then
+    sbw = 7
+    local sx, sy, sh = bx + bw - sbw - 2, by + rh + 4, nvis * rh
+    local th = math.max(8, math.floor(sh * nvis / #O.items))
+    local maxs = math.max(1, #O.items - nvis)
+    if O.sb_drag then
+      if gfx.mouse_cap & 1 == 1 then
+        local f = math.max(0, math.min(1, (my - sy - th / 2) / math.max(1, sh - th)))
+        O.scroll = math.floor(f * maxs + 0.5); O.sel = math.max(O.scroll + 1, math.min(O.scroll + nvis, O.sel))
+      else O.sb_drag = nil end
+    end
+    local ty2 = sy + math.floor((sh - th) * math.min(1, O.scroll / maxs))
+    O.sb_hot = mx >= sx - 2 and mx < sx + sbw + 2 and my >= sy and my < sy + sh
+    U.set(U.DIM); gfx.rect(sx + 3, sy, 1, sh, 1)
+    U.set((O.sb_hot or O.sb_drag) and U.AMBER or U.LINE); gfx.rect(sx, ty2, sbw, th, 1)
+  end
+  O.sbw = sbw
   O.hover = nil
   O.hbtn = nil
   O.vrect = {}
@@ -528,6 +562,11 @@ function O.draw(L, W, H)
         else
           U.text(vx, y + 1, ctx.fit(vt, room), U.TEXT)
         end
+      elseif it.hk then
+        -- хоткей (5 окт): модуль узкой колонкой, описание — своей колонкой до края
+        local mw = L.cw * 12
+        U.text(vx, y + 1, ctx.fit(vt, mw - L.pad), U.GREY)
+        U.text(vx + mw, y + 1, ctx.fit(it.desc or '', bx + bw - L.pad - (O.sbw or 0) - vx - mw), U.TEXT)
       else
         U.text(vx, y + 1, ctx.fit(vt, vw - L.pad), on and U.CYAN or (it.kind == 'toggle' and U.GREY or U.TEXT))
       end
