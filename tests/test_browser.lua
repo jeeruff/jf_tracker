@@ -61,4 +61,18 @@ B.click('allfiles'); eq('*.* shows txt', has('notes.txt') ~= nil, true); eq('txt
 B.click('hidden'); eq('.* shows dot file', has('.hidden.wav') ~= nil, true)
 eq('other not previewed', B.preview_path(has('notes.txt')), nil)
 B.click('allfiles'); B.click('hidden')
+-- pm без jf_pm (5 окт): индекса нет — папки и .rpp с папки проектов
+tree['/proj'] = { dirs = { 'songs', '.hidden' }, files = { 'b tune.RPP', 'a beat.rpp', 'a beat.rpp-bak', 'notes.txt' } }
+tree['/proj/songs'] = { dirs = {}, files = { 'jungle.rpp' } }
+reaper.get_config_var_string = function(k) if k == 'defsavepath' then return true, '/proj' end return false, '' end
+B.pm, B.pmfolder, B.pmproj, B.pmdir = nil, nil, nil, nil
+B.set_mode('pm')
+eq('pm folders: no index -> folder mode', B.pm_folders, true)
+eq('pm folders: dirs first, then projects', names(), 'songs,a beat,b tune')
+B.cur = 1; B.enter()
+eq('pm folders: Enter goes into the folder', names(), 'jungle')
+B.up()
+eq('pm folders: h goes back up', names(), 'songs,a beat,b tune')
+eq('pm folders: a project entry is a pm project', B.entries[2].pm and B.entries[2].path, '/proj/a beat.rpp')
+B.set_mode('files')
 print(('%d checks, %d failed'):format(n, bad))

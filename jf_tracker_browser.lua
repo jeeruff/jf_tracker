@@ -363,7 +363,50 @@ function B.read_pm()
     end
   end
   table.sort(out, function(a, b) return a.mtime > b.mtime end)
+  -- без jf_pm (5 окт): индекса нет или он пуст — папки и .rpp по диску, с папки
+  -- проектов REAPER по умолчанию; Enter — внутрь папки / проекта, h — выше
+  if #out == 0 then
+    B.pm_folders = true
+    out = B.read_pm_folder()
+  else B.pm_folders = nil end
   B.pm = out
+  return out
+end
+
+-- папка проектов по умолчанию: Options → Paths (defsavepath), иначе
+-- ~/Documents/REAPER Media, иначе домашняя
+function B.pm_root()
+  local home = os.getenv('HOME') or '/'
+  local p = R.get_config_var_string and select(2, R.get_config_var_string('defsavepath'))
+  if p and p ~= '' then return p end
+  local media = home .. '/Documents/REAPER Media'
+  if R.EnumerateSubdirectories and (R.EnumerateSubdirectories(media, 0) or R.EnumerateFiles(media, 0)) then return media end
+  return home
+end
+
+function B.read_pm_folder()
+  B.pmfolder = B.pmfolder or B.pm_root()
+  local dir, out = B.pmfolder, {}
+  local i = 0
+  while R.EnumerateSubdirectories do
+    local d = R.EnumerateSubdirectories(dir, i)
+    if not d then break end
+    if d:sub(1, 1) ~= '.' then out[#out + 1] = { name = d, dir = true, pmfolder = dir .. '/' .. d } end
+    i = i + 1
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  local files = {}
+  i = 0
+  while R.EnumerateFiles do
+    local f = R.EnumerateFiles(dir, i)
+    if not f then break end
+    if f:lower():match('%.rpp$') and f:sub(1, 1) ~= '.' and not f:find('TemporaryUnsaved', 1, true) then
+      files[#files + 1] = { name = f:gsub('%.[Rr][Pp][Pp]$', ''), path = dir .. '/' .. f, pm = true, dir = false, mtime = 0 }
+    end
+    i = i + 1
+  end
+  table.sort(files, function(a, b) return a.name:lower() < b.name:lower() end)
+  for _, f in ipairs(files) do out[#out + 1] = f end
   return out
 end
 
@@ -590,6 +633,7 @@ function B.enter()
   if not e then return end
   if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
+  elseif e.pmfolder then B.pmfolder = e.pmfolder; B.pm = nil; B.cur = 1; B.filter = ''; B.set_all(B.read_pm())   -- папка проектов (без jf_pm)
   elseif e.dir then B.go(B.full(e))
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
@@ -619,7 +663,11 @@ function B.up()
   end
   if B.mode == 'pm' then
     if B.pmdir then B.pmdir = nil; B.cur = 1; B.refresh_pm()
-    elseif B.pmproj then B.pmproj = nil; B.cur = 1; B.set_all(B.read_pm()) end
+    elseif B.pmproj then B.pmproj = nil; B.cur = 1; B.set_all(B.read_pm())
+    elseif B.pm_folders and B.pmfolder then
+      local parent = B.pmfolder:match('(.*)/[^/]+$')
+      if parent and parent ~= '' then B.pmfolder = parent; B.pm = nil; B.cur = 1; B.set_all(B.read_pm()) end
+    end
     return
   end
   -- выше корня :browse тоже можно (полный путь в строке пути, 2 окт)
@@ -850,7 +898,7 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
-  elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or ('jf_pm: %d projects'):format(#B.all)
+  elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
   if B.filter ~= '' or B.filtering then
     local scope = B.mode == 'files' and 'in folder' or (B.mode == 'db' and B.db and 'in db' or 'in list')
