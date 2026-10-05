@@ -86,9 +86,8 @@ local IMG_FIRST, IMG_LAST = 100, 799
 -- пиксельные TTF (5 окт, опция font): кириллица, греческий, блоки, рамки —
 -- без гибрида; px — родной размер (кегль = px × масштаб — чётко)
 D.TTF_FACES = {
-  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12 },    -- DOS 8×12, жирный
-  departure = { face = 'DepartureMono Nerd Font Mono', px = 11 },    -- тонкий, больше всех символов
-  gohu = { face = 'GohuFont uni14 Nerd Font Mono', px = 14 },        -- терминальный, все стрелки
+  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12 },    -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
+  iosevka = { face = 'IosevkaTerm Nerd Font Mono', px = 14 },        -- вектор, узкий, 7429 символов
 }
 function D.set_font(state)
   local tf = D.TTF_FACES[state.ttf or 'off']
@@ -96,7 +95,8 @@ function D.set_font(state)
   if tf then
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
-    gfx.setfont(1, tf.face, math.floor(tf.px * fs + 0.5))
+    D.ttf_face, D.ttf_size = tf.face, math.floor(tf.px * fs + 0.5)
+    gfx.setfont(1, D.ttf_face, D.ttf_size)
     D.font_id = 1
     D.SCALE = 1
   else
@@ -542,6 +542,21 @@ local function text(x, y, s, col, bg)
   gfx.mode = mode
 end
 D.text = text
+-- крупный текст (время и BPM, 5 окт): битмап — масштабом ×k, TTF — свой кегль
+-- ×k в слоте 3 (картинка ×2 размывала TTF)
+function D.big_measure(s, k)
+  if D.ttf then gfx.setfont(3, D.ttf_face, D.ttf_size * k); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
+  local s0 = D.SCALE; D.SCALE = s0 * k; local w = ms(s); D.SCALE = s0; return w
+end
+function D.big_text(x, y, s, col, k)
+  if D.ttf then
+    gfx.setfont(3, D.ttf_face, D.ttf_size * k)
+    set(col); gfx.x, gfx.y = math.floor(x), math.floor(y + D.SPACE); gfx.drawstr(s)
+    gfx.setfont(D.font_id)
+    return
+  end
+  local s0 = D.SCALE; D.SCALE = s0 * k; text(x, y, s, col); D.SCALE = s0
+end
 local function fit(s, w)
   if ms(s) <= w then return s end
   local n = #s
@@ -1525,7 +1540,7 @@ local function draw_ctrl(L, info, H, hover)
         { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen) },
         { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
           q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
-        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'keys', c.q_keys, { sizer = true }) },
+        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }) },
       }
       local out, n = {}, math.max(#cols[1], #cols[2], #cols[3])
       for r = 1, n do for k = 1, 3 do out[#out + 1] = cols[k][r] or { false } end end
@@ -2036,21 +2051,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
   -- время и BPM крупно (опция big time and BPM): высотой в две строки, слева
   if c.bigbpm then
-    local s0 = D.SCALE
     local big = {
       { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT, '' },
       { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT, 'BPM' },
     }
     for _, b in ipairs(big) do
-      D.SCALE = s0 * 2
-      local bw = ms(b[2])
-      D.SCALE = s0
+      local bw = D.big_measure(b[2], 2)
       local cw = bw + (b[4] ~= '' and (L.pad + ms(b[4])) or 0) + 3 * L.pad
       if cw < tw then
         local hot = cell_hot(tx, ly, bw, 2 * L.rh)
-        D.SCALE = s0 * 2
-        text(tx, ly, b[2], hot and U.AMBER or b[3])
-        D.SCALE = s0
+        D.big_text(tx, ly, b[2], hot and U.AMBER or b[3], 2)
         if b[4] ~= '' then text(tx + bw + L.pad, ly + L.rh, b[4], U.GREY) end
         if hot then hover.ctrl = b[1] end
         hint('ctrl', tx, ly, bw, 2 * L.rh, b[1])

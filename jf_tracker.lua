@@ -137,7 +137,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
-  ttf = ({ bigblue = 'bigblue', departure = 'departure', gohu = 'gohu' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
+  ttf = ({ bigblue = 'bigblue', iosevka = 'iosevka' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
   bigbpm = flag('bigbpm', true),
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
@@ -3110,8 +3110,8 @@ ctx = {
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { sep = true, title = 'look' },
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
-      { key = 'ttf', label = 'font', kind = 'cycle', values = { 'off', 'bigblue', 'departure', 'gohu' }, desc = 'off - the REAPER bitmap; bigblue / departure / gohu - pixel TTF fonts with Cyrillic, Greek, blocks and box drawing (sharp at x1 x2 x3)', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
-      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
+      { key = 'ttf', label = 'font', kind = 'cycle', values = { 'off', 'bigblue', 'iosevka' }, desc = 'off - the REAPER bitmap; bigblue - BigBlueTerm, pixel DOS font; iosevka - Iosevka Term, narrow vector font with the most symbols (font scale = their size)', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
+      { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
@@ -5422,6 +5422,10 @@ function ctrl_action(name, delta)
       state.kc_scale = math.max(1, math.min(6, cur + (name == 'q_kcp' and 1 or -1)))
       state.keycast = true
       vim.msg = 'keycaster x' .. state.kc_scale
+      -- проба размера (5 окт): в кейкастер — jftracker и версия
+      ctx.kc = ctx.kc or {}
+      ctx.kc[#ctx.kc + 1] = { label = 'jftracker ' .. VER.VERSION, t = reaper.time_precise(), n = 1 }
+      if #ctx.kc > 16 then table.remove(ctx.kc, 1) end
     end
   elseif name == 'q_wave' then if delta == 0 then state.wave_last = (state.wavemode ~= 'off') and state.wavemode or state.wave_last; ctx.wave_mode((state.wavemode ~= 'off') and 'off' or (state.wave_last or 'back')) end
   elseif name == 'q_meters' then if delta == 0 then state.meters = not state.meters end
