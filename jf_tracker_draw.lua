@@ -3180,6 +3180,19 @@ function D.frame(L, snap, rows, state, info)
   end
   -- контур выделения (5 окт): видно границу блока, содержимое не закрыто
   if D.vis_box then local b = D.vis_box; set(U.CYAN); gfx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 0); D.vis_box = nil end
+  -- каналы при mute / solo (5 окт, как во всех трекерах; опция tint channels):
+  -- заглушённые — тусклые; есть solo — тусклые все, кроме solo
+  if state.tintmute ~= false then
+    local any_solo = false
+    for _, c in ipairs(L.cols) do if c.col and c.col.solo then any_solo = true; break end end
+    for _, c in ipairs(L.cols) do
+      if c.x and c.col and (c.col.muted or (any_solo and not c.col.solo)) then
+        gfx.set(U.BG[1], U.BG[2], U.BG[3], 0.55); gfx.rect(c.x, L.body_y, c.w, L.body_h, 1)
+        gfx.set(U.BG[1], U.BG[2], U.BG[3], 0.35); gfx.rect(c.x, L.header_y, c.w, L.body_y - L.header_y, 1)
+        gfx.a = 1
+      end
+    end
+  end
 
 
   -- направляющая тянущегося стыка лупа

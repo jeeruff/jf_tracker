@@ -143,7 +143,8 @@ local state = {
   -- время и BPM мелко (5 окт, просьба): новый ключ — прежнее «вкл» не тянется
   bigbpm = flag('bigbpm2', false),
   bigstatus = flag('bigstatus', true),
-  tpbuttons = flag('tpbuttons', false),             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
+  tpbuttons = flag('tpbuttons', false),
+  tintmute = flag('tintmute', true),                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
   transpos = reaper.GetExtState(EXT, 'transpos') ~= '' and reaper.GetExtState(EXT, 'transpos') or 'tracker',   -- полоса транспорта: tracker | top | bottom (5 окт)
   reclib = flag('reclib', true),                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
@@ -392,7 +393,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3640,6 +3641,7 @@ ctx = {
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
+      flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
       flag('tpbuttons', 'transport buttons', 'big << > || o >> loop in the transport bar; off - only [rec] and [loop], the keys do the rest (Space play, Opt+R rec)'),
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
