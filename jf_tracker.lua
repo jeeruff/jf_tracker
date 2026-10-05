@@ -3096,6 +3096,20 @@ ctx = {
       local key = k == 'fin' and 'D_FADEINLEN' or 'D_FADEOUTLEN'
       P(key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'abs', 'sample fade')
     elseif k == 'bsync' then ctx.bsync_adjust(e, d)
+    -- 5 окт: остальное из окна свойств item
+    elseif k == 'tvol' then
+      local v = reaper.GetMediaItemTakeInfo_Value(tk, 'D_VOL')
+      local db = v > 1e-6 and 20 * math.log(math.abs(v), 10) or -60
+      P('take:D_VOL', 10 ^ (math.max(-60, math.min(24, db + d * 0.5)) / 20), 'mul', 'take volume')
+    elseif k == 'offs' then P('take:D_STARTOFFS', math.max(0, reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + d * (fine and 0.001 or 0.01)), 'abs', 'start offset')
+    elseif k == 'len' then P('D_LENGTH', math.max(0.01, reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') + d * (fine and 0.001 or 0.01)), 'abs', 'length')
+    elseif k == 'snap' then P('D_SNAPOFFSET', math.max(0, reaper.GetMediaItemInfo_Value(it, 'D_SNAPOFFSET') + d * (fine and 0.001 or 0.01)), 'abs', 'snap offset')
+    elseif k == 'finshape' or k == 'foutshape' then
+      local key = k == 'finshape' and 'C_FADEINSHAPE' or 'C_FADEOUTSHAPE'
+      P(key, (math.floor(reaper.GetMediaItemInfo_Value(it, key)) + d) % 7, 'abs', 'fade shape')
+    elseif k == 'chan' then P('take:I_CHANMODE', (math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE')) + d) % 5, 'abs', 'channel mode')
+    elseif k == 'mute' then P('B_MUTE', reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 0 or 1, 'abs', 'mute')
+    elseif k == 'lock' then P('C_LOCK', reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 0 or 1, 'abs', 'lock')
     elseif k == 'fx' then ctx.take_fx_focus(e)                          -- DSP показывает take FX (2 окт)
     elseif k == 'norm' then
       -- нормализация по представителю, остальным — то же отношение громкости
@@ -3107,6 +3121,75 @@ ctx = {
         edit.inst_prop(items, it, 'D_VOL', v1, 'mul', 'normalize')
       end)
       vim.msg = ('normalized (peak 0 dB), %d note(s) of the instrument'):format(#items)
+    end
+    model.invalidate()
+  end,
+  -- новые строки свойств (5 окт): текст и доля слайдера читаем здесь (модуль — без reaper.*)
+  sp_raw = function(e, k)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return '' end
+    local SH = { [0] = 'linear', 'fast start', 'fast end', 'fast start steep', 'fast end steep', 'slow start/end', 'slow start/end steep' }
+    local CH = { [0] = 'normal', 'reverse stereo', 'mono (mix)', 'mono (left)', 'mono (right)' }
+    if k == 'tvol' then local v = reaper.GetMediaItemTakeInfo_Value(tk, 'D_VOL'); return v > 1e-6 and ('%+.1f dB'):format(20 * math.log(math.abs(v), 10)) or '-inf' end
+    if k == 'offs' then return ('%.3f s'):format(reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) end
+    if k == 'len' then return ('%.3f s'):format(reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')) end
+    if k == 'snap' then return ('%.3f s'):format(reaper.GetMediaItemInfo_Value(it, 'D_SNAPOFFSET')) end
+    if k == 'finshape' then return SH[math.floor(reaper.GetMediaItemInfo_Value(it, 'C_FADEINSHAPE'))] or '?' end
+    if k == 'foutshape' then return SH[math.floor(reaper.GetMediaItemInfo_Value(it, 'C_FADEOUTSHAPE'))] or '?' end
+    if k == 'chan' then return CH[math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE'))] or 'channel' end
+    if k == 'mute' then return reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 'on' or 'off' end
+    if k == 'lock' then return reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 'on' or 'off' end
+    return ''
+  end,
+  -- доля слайдера и «от центра»; nil — строка без слайдера
+  sp_frac = function(e, k)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return nil end
+    local function dbf(v) local db = v > 1e-6 and 20 * math.log(math.abs(v), 10) or -60; return (math.max(-60, math.min(12, db)) + 60) / 72 end
+    local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if k == 'vol' then return dbf(reaper.GetMediaItemInfo_Value(it, 'D_VOL')) end
+    if k == 'tvol' then return dbf(reaper.GetMediaItemTakeInfo_Value(tk, 'D_VOL')) end
+    if k == 'pan' then return (reaper.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + 1) / 2, true end
+    local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
+    if k == 'st' then return (math.floor(p + 0.5) + 24) / 48, true end
+    if k == 'cent' then return ((p - math.floor(p + 0.5)) * 100 + 50) / 100, true end
+    if k == 'rate' then return (math.log(reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), 2) + 2) / 4, true end
+    if k == 'fin' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEINLEN') / math.max(1e-3, len) end
+    if k == 'fout' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN') / math.max(1e-3, len) end
+    if k == 'snap' then return reaper.GetMediaItemInfo_Value(it, 'D_SNAPOFFSET') / math.max(1e-3, len) end
+    if k == 'offs' then
+      local src = reaper.GetMediaItemTake_Source(tk)
+      local sl = src and reaper.GetMediaSourceLength(src) or 0
+      return sl > 0 and reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') / sl or nil
+    end
+    return nil
+  end,
+  -- протяжка слайдера: доля → значение (всем нотам инструмента, как колесо)
+  sp_set_frac = function(e, k, fr)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
+    fr = math.max(0, math.min(1, fr))
+    local items = ctx.inst_group(e)
+    local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
+    local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if k == 'vol' or k == 'tvol' then
+      local v = fr <= 0.002 and 0 or 10 ^ ((fr * 72 - 60) / 20)
+      if k == 'vol' then P('D_VOL', v, 'mul', 'sample volume') else P('take:D_VOL', v, 'mul', 'take volume') end
+    elseif k == 'pan' then P('take:D_PAN', fr * 2 - 1, 'add', 'sample pan')
+    elseif k == 'st' then
+      local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
+      P('take:D_PITCH', math.floor(fr * 48 + 0.5) - 24 + (p - math.floor(p + 0.5)), 'add', 'sample transpose')
+    elseif k == 'cent' then
+      local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
+      P('take:D_PITCH', math.floor(p + 0.5) + (math.floor(fr * 100 + 0.5) - 50) / 100, 'add', 'sample finetune')
+    elseif k == 'rate' then P('take:D_PLAYRATE', 2 ^ (fr * 4 - 2), 'mul', 'sample rate')
+    elseif k == 'fin' then P('D_FADEINLEN', fr * len, 'abs', 'sample fade')
+    elseif k == 'fout' then P('D_FADEOUTLEN', fr * len, 'abs', 'sample fade')
+    elseif k == 'snap' then P('D_SNAPOFFSET', fr * len, 'abs', 'snap offset')
+    elseif k == 'offs' then
+      local src = reaper.GetMediaItemTake_Source(tk)
+      local sl = src and reaper.GetMediaSourceLength(src) or 0
+      if sl > 0 then P('take:D_STARTOFFS', fr * sl, 'abs', 'start offset') end
     end
     model.invalidate()
   end,
@@ -3122,6 +3205,13 @@ ctx = {
     elseif k == 'fin' then P('D_FADEINLEN', 0, 'abs', 'sample fade reset')
     elseif k == 'fout' then P('D_FADEOUTLEN', 0, 'abs', 'sample fade reset')
     elseif k == 'bsync' then ctx.bsync_set(e, nil)
+    elseif k == 'tvol' then P('take:D_VOL', 1, 'mul', 'take volume reset')
+    elseif k == 'offs' then P('take:D_STARTOFFS', 0, 'abs', 'start offset reset')
+    elseif k == 'snap' then P('D_SNAPOFFSET', 0, 'abs', 'snap offset reset')
+    elseif k == 'finshape' then P('C_FADEINSHAPE', 0, 'abs', 'fade shape reset')
+    elseif k == 'foutshape' then P('C_FADEOUTSHAPE', 0, 'abs', 'fade shape reset')
+    elseif k == 'chan' then P('take:I_CHANMODE', 0, 'abs', 'channel mode reset')
+    elseif k == 'len' then return
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
   end,
@@ -6530,7 +6620,7 @@ local function frame()
         else sel_e = root; zone = nil end
         lw = 0                                       -- список — отдельный модуль справа (4 окт)
       end
-      local pw = sel_e and math.min(L.cw * 30, math.floor((w - lw) * 0.34)) or 0
+      local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       -- свойства семпла слева от волны (4 окт, опция props position)
       local pleft = state.propspos == 'left'
       local px = pleft and x or (x + w - lw - (lw > 0 and L.pad or 0) - pw)
@@ -7163,7 +7253,8 @@ local function frame()
       SPROP.sel = SPROP.hover.row
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
-      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
+      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
     elseif hover.dspcomp then
@@ -8038,6 +8129,17 @@ local function frame()
     -- колесо над модулем слайсов (4 окт): листать список
     SPROP.slice_scroll = math.max(0, (SPROP.slice_scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
     gfx.mouse_wheel = 0
+  end
+  -- протяжка слайдера свойств сэмпла (5 окт): пока кнопка держится; правка —
+  -- только когда мышь сдвинулась (не undo-шаг на каждый кадр)
+  if SPROP.drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if gfx.mouse_x ~= SPROP.drag.lx then
+        SPROP.drag.lx = gfx.mouse_x
+        local e = cur_col() and (cur_col().pool or {})[vim.inst]
+        if e then ctx.sp_set_frac(e, SPROP.drag.k, (gfx.mouse_x - SPROP.drag.x) / math.max(1, SPROP.drag.w)) end
+      end
+    else SPROP.drag = nil end
   end
   if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
     local e = cur_col() and (cur_col().pool or {})[vim.inst]

@@ -19,6 +19,11 @@ SP.ROWS = {
   { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'ppitch', label = 'keep pitch' },
   { k = 'mode', label = 'stretch' }, { k = 'loop', label = 'loop' },
   { k = 'fin', label = 'fade in' }, { k = 'fout', label = 'fade out' },
+  -- 5 окт: остальное из окна свойств item REAPER (позиция у сэмпла lib не нужна)
+  { k = 'finshape', label = 'fade in shape' }, { k = 'foutshape', label = 'fade out shape' },
+  { k = 'tvol', label = 'take volume' }, { k = 'offs', label = 'start offset' }, { k = 'len', label = 'length' },
+  { k = 'snap', label = 'snap offset' }, { k = 'chan', label = 'channels' },
+  { k = 'mute', label = 'mute' }, { k = 'lock', label = 'lock' },
   { k = 'fx', label = 'take fx' }, { k = 'norm', label = 'normalize' },
 }
 
@@ -42,11 +47,13 @@ function SP.value(e, k)
   if k == 'fout' then return ('%d ms'):format(math.floor((e.fout or 0) * 1000 + 0.5)) end
   if k == 'fx' then return (e.nfx or 0) > 0 and (('%d: %s'):format(e.nfx, (e.fxnames or {})[1] or '')) or 'none (click: add, dbl: window)' end
   if k == 'norm' then return 'L: peak 0 dB' end
+  if ctx.sp_raw then return (ctx.sp_raw(e, k)) or '' end
   return ''
 end
 
 function SP.draw(L, x, y, w, h, e, focused)
   SP.hover = nil
+  SP.slider = nil
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
   if not e or not e.item then
@@ -60,7 +67,7 @@ function SP.draw(L, x, y, w, h, e, focused)
   local thot = tmx >= x and tmx < x + w and tmy >= y and tmy < y + L.rh
   if thot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x, y, w, L.rh, 1); SP.hover = { title = true, row = 0 } end
   U.text(x + L.pad, y, ctx.fit(title, w - L.pad), U.AMBER)
-  local lw = math.floor(w * 0.45)
+  local lw = math.min(math.floor(w * 0.45), L.cw * 16)
   local n = math.min(#SP.ROWS, math.floor((h - L.rh) / L.rh))
   if SP.sel > #SP.ROWS then SP.sel = #SP.ROWS end
   for i = 1, n do
@@ -69,8 +76,30 @@ function SP.draw(L, x, y, w, h, e, focused)
     local sel = focused and i == SP.sel
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
     U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), sel and U.AMBER or U.GREY)
-    U.text(x + lw, ry, ctx.fit(SP.value(e, r.k), w - lw - L.pad), U.TEXT)
-    if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then SP.hover = { row = i, k = r.k } end
+    -- слайдер (5 окт): у чисел — дорожка между подписью и значением, тянуть мышью
+    local vt = SP.value(e, r.k)
+    local fr, centered = nil, false
+    if ctx.sp_frac then fr, centered = ctx.sp_frac(e, r.k) end
+    local vw = math.max(U.measure('-00.0 dB'), U.measure(vt)) + L.pad
+    local sx, sw = x + lw, w - lw - vw - 2 * L.pad
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if fr and sw >= L.cw * 4 then
+      local cy = ry + math.floor(L.rh / 2)
+      local onbar = hot and mx >= sx - 2 and mx < sx + sw + 2
+      U.set(U.DIM); gfx.rect(sx, cy - 1, sw, 2, 1)
+      U.set((onbar or (SP.drag and SP.drag.k == r.k)) and U.AMBER or U.TEXT)
+      fr = math.max(0, math.min(1, fr))
+      if centered then
+        local mid, px = sx + math.floor(sw / 2), sx + math.floor(fr * sw + 0.5)
+        gfx.rect(math.min(mid, px), ry + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
+        U.set(U.LINE); gfx.rect(mid, ry + 3, 1, L.rh - 6, 1)
+      else gfx.rect(sx, ry + 4, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 8, 1) end
+      U.text(x + w - L.pad - U.measure(vt), ry, vt, U.TEXT)
+      if onbar then SP.slider = { k = r.k, x = sx, w = sw } end
+    else
+      U.text(x + lw, ry, ctx.fit(vt, w - lw - L.pad), U.TEXT)
+    end
+    if hot then SP.hover = { row = i, k = r.k, bar = SP.slider and SP.slider.k == r.k and SP.slider or nil } end
     if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end
   end
 end

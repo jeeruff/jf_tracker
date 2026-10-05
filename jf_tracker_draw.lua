@@ -319,7 +319,8 @@ function D.layout(snap, state, nregions)
   L.label_w = L.ruler_w + L.num_w + L.tl_w
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
-  L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh), math.floor(gfx.h * 0.19)))) or 0
+  -- 5 окт: на 15% выше (больше строк свойств сэмпла)
+  L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh * 1.15), math.floor(gfx.h * 0.19 * 1.15)))) or 0
   if state.top and state.top_px then L.top_h = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), state.top_px)) end
   -- большой редактор сэмпла (3 окт, :big): вкладка item на всю высоту окна
   if state.top and state.sample_big and state.toptab == 'sample' then L.top_h = math.max(L.top_h, gfx.h - (state.statpos == 'tracker' and 0 or (L.rh + 4)) - 2) end
