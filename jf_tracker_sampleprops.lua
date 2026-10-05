@@ -75,26 +75,49 @@ function SP.draw(L, x, y, w, h, e, focused)
   local tmx, tmy = gfx.mouse_x, gfx.mouse_y
   local thot = tmx >= x and tmx < x + w and tmy >= y and tmy < y + L.rh
   if thot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x, y, w, L.rh, 1); SP.hover = { title = true, row = 0 } end
-  U.text(x + L.pad, y, ctx.fit(title, w - L.pad), U.AMBER)
+  -- кнопка v (5 окт): раскрыть верхнюю панель так, чтобы все свойства влезли
+  local per0 = math.max(1, math.floor((h - L.rh) / L.rh))
+  local nc0 = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
+  local overflow = #SP.ROWS > per0 * nc0
+  local vbw = overflow and (U.measure('v') + 2 * L.pad) or 0
+  if overflow then
+    local bx = x + w - vbw
+    local vh = tmx >= bx and tmx < bx + vbw and tmy >= y and tmy < y + L.rh
+    U.set(vh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, vbw, L.rh, 1)
+    U.set(vh and U.AMBER or U.LINE); gfx.rect(bx, y, vbw, L.rh, 0)
+    U.text(bx + L.pad, y, 'v', vh and U.AMBER or U.TEXT)
+    if vh then SP.hover = { fit = true } end
+  end
+  U.text(x + L.pad, y, ctx.fit(title, w - L.pad - vbw - L.pad), U.AMBER)
   -- колонки (5 окт): широкая панель — строки сверху вниз, потом следующая
   -- колонка; ширина колонки как у прежней узкой панели, ничего не тянется
   local per = math.max(1, math.floor((h - L.rh) / L.rh))
   -- колонок столько, сколько влезает по ~36 символов; ширина — поровну (5 окт:
   -- последняя забирала весь остаток, у первой дорожки были узкие)
-  local ncols = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
-  local colw = math.floor((w + L.pad) / ncols)
-  local n = math.min(#SP.ROWS, per * ncols)
+  -- не влезает — скролл-бар средней толщины справа (5 окт)
+  local sbw = overflow and 7 or 0
+  local wc = w - sbw - (overflow and 2 or 0)
+  local ncols = math.max(1, math.floor((wc + L.pad) / math.min(wc, L.cw * 36)))
+  local colw = math.floor((wc + L.pad) / ncols)
+  local cap = per * ncols
+  SP.scroll = SP.scroll or 0
+  if SP.sel > SP.scroll + cap then SP.scroll = SP.sel - cap end
+  if SP.sel <= SP.scroll then SP.scroll = SP.sel - 1 end
+  SP.scroll = math.max(0, math.min(SP.scroll, math.max(0, #SP.ROWS - cap)))
+  if overflow and ctx.vbar then ctx.vbar('sprops', x + w - sbw, y + L.rh, sbw, per * L.rh, SP.scroll, cap, #SP.ROWS) end
+  local n = math.min(#SP.ROWS, SP.scroll + cap)
   -- колонка имён — по самому длинному имени (5 окт: пустое место до значений)
   local lw = 0
   for _, r in ipairs(SP.ROWS) do lw = math.max(lw, U.measure(r.label)) end
   lw = math.min(lw + 2 * L.pad, math.floor(colw * 0.45))
   if SP.sel > #SP.ROWS then SP.sel = #SP.ROWS end
   local x0, w0 = x, w
-  for i = 1, n do
+  for i = SP.scroll + 1, n do
     local r = SP.ROWS[i]
-    local ci = (i - 1) // per
+    local j = i - SP.scroll
+    local ci = (j - 1) // per
     local x, w = x0 + ci * colw, colw - L.pad
-    local ry = y + ((i - 1) % per + 1) * L.rh
+    local ry = y + ((j - 1) % per + 1) * L.rh
     local sel = focused and i == SP.sel
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
     U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), sel and U.AMBER or U.GREY)

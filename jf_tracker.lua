@@ -2143,6 +2143,16 @@ ctx = {
     return true
   end,
   keyq = {},
+  -- v в свойствах сэмпла (5 окт): верхняя панель — ровно под все строки
+  sprops_fit = function()
+    local r = ctx.sprops_rect; if not r then return end
+    local w = ctx.sprops_maxw or r[3]
+    local nc = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
+    local need = (math.ceil(#SPROP.ROWS / nc) + 1) * L.rh + 2
+    state.top_px = math.floor(L.top_h + (need - r[4]))
+    ctx.relayout()
+    vim.msg = 'top panel fits the sample properties'
+  end,
   hints_on = function() return state.hints end,
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
   loop_cells = function()
@@ -3002,7 +3012,7 @@ ctx = {
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
-    elseif key == 'slices' then return SPROP.slice_scroll or 0 end
+    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 end
     return 0
   end,
   vbar_scroll = function(key, v)
@@ -3010,7 +3020,7 @@ ctx = {
     local mx = r and math.max(0, r.total - r.nvis) or v
     v = math.max(0, math.min(mx, v))
     if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
-    elseif key == 'slices' then SPROP.slice_scroll = v end
+    elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1) end
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -6866,6 +6876,7 @@ local function frame()
         lw = 0                                       -- список — отдельный модуль справа (4 окт)
       end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
+      ctx.sprops_maxw = pw
       if sel_e and not sel_e.file then pw = SPROP.fit_w(L, pw, h) end           -- только занятые колонки, остаток — волне
       -- свойства семпла слева от волны (4 окт, опция props position)
       local pleft = state.propspos == 'left'
@@ -7111,6 +7122,7 @@ local function frame()
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
+  elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
     state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.hsb then
@@ -7509,8 +7521,9 @@ local function frame()
       ctx.set_focus('top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
       if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
+      if SPROP.hover.fit then ctx.sprops_fit(); click = { t = now2, zone = 'spropfit' }; goto sprop_done end
       local same = click.zone == 'sprop' and click.row == SPROP.hover.row
-      SPROP.sel = SPROP.hover.row
+      SPROP.sel = SPROP.hover.row or SPROP.sel
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
@@ -8427,7 +8440,7 @@ local function frame()
   end
   if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
     local e = cur_col() and (cur_col().pool or {})[vim.inst]
-    SPROP.sel = SPROP.hover.row
+    SPROP.sel = SPROP.hover.row or SPROP.sel
     if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
     gfx.mouse_wheel = 0
   end
