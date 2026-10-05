@@ -1,9 +1,13 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.6.36'
+V.VERSION = '0.6.37'
 V.DATE = '2026-10-04'
 V.CHANGES = {
+  { v = '0.6.37', d = '2026-10-05', items = {
+    'context menus in the tracker style: a hydra at the mouse with mnemonic letters, clickable; \\ opens the same menu for the selected thing in DSP, the matrix, the lib and the fx list',
+    'the instrument number is a cursor field (l from the note, hex in INSERT, ^A / ^X); a click on a slice line selects the slice; the zone strip slips the selected slice; DSP: open the fx window after adding (toggle), option dsp meters; thin meters',
+  } },
   { v = '0.6.36', d = '2026-10-05', items = {
     'spectrogram: the item tab view sgram - a real time x frequency heat map (Hann 1024, native FFT, log frequency, -90..0 dB), computed a little each frame into a picture; works with the wave zoom',
     'ReaVerb in DSP: the spectrogram of the impulse file; Amigo module; the user module learn assigns XY pad axes (X / Y)',

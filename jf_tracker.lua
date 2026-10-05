@@ -145,7 +145,8 @@ local state = {
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
   textonly = reaper.GetExtState(EXT, 'textonly') == '1',
   steplisten = reaper.GetExtState(EXT, 'steplisten') == '1',
-  fxopen = reaper.GetExtState(EXT, 'fxopen') == '1',               -- окно FX после добавления (5 окт)
+  fxopen = reaper.GetExtState(EXT, 'fxopen') == '1',
+  dspmeters = reaper.GetExtState(EXT, 'dspmeters') ~= '0',          -- метры входа / выхода в DSP (5 окт)               -- окно FX после добавления (5 окт)
   slicespos = (reaper.GetExtState(EXT, 'slicespos') == 'split') and 'split' or 'module',   -- модуль слайсов: отдельно / половина lib (4 окт)      -- step listen (4 окт)
   propspos = (reaper.GetExtState(EXT, 'propspos2') == 'left') and 'left' or 'right',   -- перенос влево отменён (4 окт): по умолчанию справа          -- text only (4 окт)
   keycast = reaper.GetExtState(EXT, 'keycast') ~= '0',
@@ -380,7 +381,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2857,6 +2858,7 @@ ctx = {
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker' }, desc = 'status line at the window bottom or inside the tracker module', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
+      flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
       { sep = true, title = 'track' },
@@ -4218,7 +4220,27 @@ function view_actions()
   }
 end
 
-local function context_menu(hover)
+-- контекстное меню (5 окт): в стиле трекера — гидрой у мыши, буквы по
+-- смыслу (первая свободная буква подписи), «!» — отмеченный пункт (*)
+local function context_menu(hover, anchor)
+  local items = ctx.context_items(hover)
+  if not items or #items == 0 then return end
+  local used, hitems = { ['?'] = true }, {}
+  for _, it in ipairs(items) do
+    local label = it[1]
+    if label ~= '--' then
+      local on = label:sub(1, 1) == '!'
+      if on then label = label:sub(2) end
+      local k = it.key and not used[it.key] and it.key or nil
+      if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
+      if not k then for ch in ('abcdefghijklmnopqrstuvwxyz0123456789'):gmatch('.') do if not used[ch] then k = ch; break end end end
+      if k then used[k] = true; hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2] } end
+    end
+  end
+  vim.open_hydra({ title = 'menu', items = hitems })
+  state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
+function ctx.context_items(hover)
   local items = {}
   local function add(label, fn, key) items[#items + 1] = { label, fn, key = key } end
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
@@ -4319,15 +4341,7 @@ local function context_menu(hover)
   else
     for _, a in ipairs(view_actions()) do add(a[1], a.fn, a.key) end
   end
-  if #items == 0 then return end
-  local labels = {}
-  for i, it in ipairs(items) do labels[i] = it[1] end
-  gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
-  local r = gfx.showmenu(table.concat(labels, '|'))
-  if r > 0 and items[r] then
-    local ok, e = pcall(items[r][2])
-    if not ok then vim.msg = tostring(e):match('[^\n]*$') end
-  end
+  return items
 end
 
 -- ── кадр ──────────────────────────────────────────────────────────────────
@@ -5699,7 +5713,7 @@ local function frame()
     zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
-    dsp_levels = (state.dsp and not state.khelp) and ctx.dsp_levels or nil,
+    dsp_levels = (state.dsp and not state.khelp and state.dspmeters ~= false) and ctx.dsp_levels or nil,   -- опция dsp meters (5 окт)
     fx_delta = ctx.fx_delta,
     fx_preset = ctx.fx_preset,
     airwin_info = ctx.airwin_info,
@@ -6018,7 +6032,7 @@ local function frame()
   end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
-  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and state.popup_at.kind == 'ctrlbtn') then state.popup_at = nil end
+  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy')) then state.popup_at = nil end
   local anchor
   do
     local pa = state.popup_at
@@ -6315,6 +6329,15 @@ local function frame()
         U.click = false
       end
     end
+  end
+  -- гидра / контекстное меню мышью (5 окт): клик по строке — её буква, мимо — закрыть
+  if (U.click or U.rclick) and vim.hydra and not OPT.active then
+    if draw.popup_hot and U.click then vim.hydra_key(draw.popup_hot:byte())
+    else
+      local r = draw.popup_rect
+      if not (r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]) then vim.hydra = nil end
+    end
+    U.click, U.rclick = false, false
   end
   if U.click and OPT.ask.active then OPT.ask.click(); U.click = false end
   -- скролл-бары списков (4 окт): ползунок тянется, клик мимо — страница
@@ -7741,6 +7764,20 @@ local function frame()
       -- фокусе (2 окт: в модуляции a открывал выбор параметра, а набор и Enter
       -- съедала матрица модуляции — выбрать было нельзя)
       if vim.picker or vim.hydra then return vim.key(c) end
+      -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
+      if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+        local hv = {}
+        if state.focus == 'dsp' then
+          local t = dsp_target(); local fx = t and t.fx[dsp_sel.fx]
+          if fx then hv.dsp = { fx = dsp_sel.fx, f = fx, param = dsp_sel.param } end
+        elseif state.focus == 'matrix' then hv.matrix = { ri = MX.cur.ri, ci = MX.cur.ci }
+        elseif state.focus == 'inst' then hv.pool = { i = vim.inst }
+        elseif state.focus == 'fxb' then hv.fxb = { row = FB.cur }
+        end
+        local r = draw.module_rects and draw.module_rects[state.focus]
+        context_menu(hv, r and { kind = 'xy', x = r[1] + 8, y = r[2] + 2 * L.rh } or nil)
+        return
+      end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       if state.macro and state.focus == 'tracker' and vim.mode == 'normal' then
         local mr = draw.macro.key(c, vim.cur.row, beat_info.rows_bar or (state.lpb * 4), snap and snap.last_row)
