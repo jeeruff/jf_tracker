@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="jf_tracker">
+  <category name="jf_tracker">
+    <reapack name="jf_tracker.lua" type="script" desc="jf_tracker - tracker view of REAPER with Vim keys">
+      <version name="0.7.0" author="jeeruff" time="2026-10-05T12:56:15Z">
+        <changelog>- first public release - GNU GPL v3; English help (F1)
+- the transport moved into the strip under the tracker (always there, the keyboard on its left by m); the main module is windows and quick options, laid out by screen position; option big BPM
+- time signature: sig column in the matrix, :sig N/D for the whole project or one pattern - a longer bar can get its new beats empty or with the last beat repeated
+- loop seams like in REAPER, the wave follows a dragged seam; option stretch markers; about: the story, links to itch.io, github, bandcamp and ko-fi
+- the keyboard is INSERT: no separate keys mode - in INSERT the top row writes notes, NORMAL is Vim; m shows / hides the keyboard strip (shown by default), with the INSERT rows described next to it (hints option) and optionally the status line inside it (status bar: keyboard)
+- f jump labels work again and never overlap; the tour starts with why jf, hjkl and f, and moves the focus to each step itself
+- mouse: a plain click keeps the keyboard focus, Option+click moves it (option focus by mouse); lib: double click drops the sample onto the track at the cursor
+- item tab: drag the selection onto a track or the lib - the whole sample goes into the lib with the selection as a slice (on a track the slice is written into the row)
+- browser: play (auto-preview, on by default) and keys (the note keys play the selected file at their pitch) on the player line
+- item boxes are drawn under the wave and the text; the focus frame is closed on all sides; Airwindows descriptions in the status bar</changelog>
+        <source file="LICENSE">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/LICENSE</source>
+        <source file="README.md">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/README.md</source>
+        <source file="daemon_tracker.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/daemon_tracker.lua</source>
+        <source file="jf_tracker.lua" main="main">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker.lua</source>
+        <source file="jf_tracker_alias.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_alias.lua</source>
+        <source file="jf_tracker_ask.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_ask.lua</source>
+        <source file="jf_tracker_browser.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_browser.lua</source>
+        <source file="jf_tracker_cmds.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_cmds.lua</source>
+        <source file="jf_tracker_draw.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_draw.lua</source>
+        <source file="jf_tracker_dspkeys.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_dspkeys.lua</source>
+        <source file="jf_tracker_dspmods.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_dspmods.lua</source>
+        <source file="jf_tracker_edit.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_edit.lua</source>
+        <source file="jf_tracker_fxbrowser.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_fxbrowser.lua</source>
+        <source file="jf_tracker_fxclass.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_fxclass.lua</source>
+        <source file="jf_tracker_garden.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_garden.lua</source>
+        <source file="jf_tracker_help.html">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_help.html</source>
+        <source file="jf_tracker_hints.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_hints.lua</source>
+        <source file="jf_tracker_import.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_import.lua</source>
+        <source file="jf_tracker_instkeys.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_instkeys.lua</source>
+        <source file="jf_tracker_keyhelp.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_keyhelp.lua</source>
+        <source file="jf_tracker_keys.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_keys.lua</source>
+        <source file="jf_tracker_lfogen.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_lfogen.lua</source>
+        <source file="jf_tracker_logo.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_logo.lua</source>
+        <source file="jf_tracker_macro.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_macro.lua</source>
+        <source file="jf_tracker_matrix.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_matrix.lua</source>
+        <source file="jf_tracker_midimap.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_midimap.lua</source>
+        <source file="jf_tracker_model.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_model.lua</source>
+        <source file="jf_tracker_modmatrix.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_modmatrix.lua</source>
+        <source file="jf_tracker_notes.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_notes.lua</source>
+        <source file="jf_tracker_options.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_options.lua</source>
+        <source file="jf_tracker_orca.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_orca.lua</source>
+        <source file="jf_tracker_params.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_params.lua</source>
+        <source file="jf_tracker_preview.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_preview.lua</source>
+        <source file="jf_tracker_sampleprops.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_sampleprops.lua</source>
+        <source file="jf_tracker_screensets.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_screensets.lua</source>
+        <source file="jf_tracker_sgram.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_sgram.lua</source>
+        <source file="jf_tracker_slicer.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_slicer.lua</source>
+        <source file="jf_tracker_themes.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_themes.lua</source>
+        <source file="jf_tracker_tour.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_tour.lua</source>
+        <source file="jf_tracker_ui.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_ui.lua</source>
+        <source file="jf_tracker_version.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_version.lua</source>
+        <source file="jf_tracker_vim.lua">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/jf_tracker_vim.lua</source>
+      </version>
+    </reapack>
+    <reapack name="jf_tracker effects.jsfx" type="effect" desc="jf_tracker helpers: jf_rec (retro sampler), jf_tracker_scope">
+      <version name="0.7.0" author="jeeruff" time="2026-10-05T12:56:15Z">
+        <source file="jf_rec.jsfx">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/effects/jf_rec.jsfx</source>
+        <source file="jf_tracker_scope.jsfx">https://github.com/jeeruff/jf_tracker/raw/v0.7.0/effects/jf_tracker_scope.jsfx</source>
+      </version>
+    </reapack>
+  </category>
+</index>
