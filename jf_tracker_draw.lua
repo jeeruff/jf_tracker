@@ -1993,7 +1993,8 @@ function D.transport_groups(c)
     g[#g + 1] = { { { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },
                   { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
   end
-  g[#g + 1] = { { { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig } },
+  -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
+  g[#g + 1] = { { { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) } },
                 { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
@@ -2001,8 +2002,8 @@ function D.transport_groups(c)
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
   -- кнопки [<<][>][II][o][>>] — крупно справа от модуса (D.transport_buttons)
-  g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('punch', 'punch', c.punch) },
-                { tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
+  g[#g + 1] = { { tg('punch', 'punch', c.punch), tg('preroll', 'pre-roll', c.preroll) },
+                { tg('reclib', 'rec>lib', c.reclib) } }
   g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
@@ -2020,7 +2021,7 @@ local STRIP_HINTS = {
   play = { { 'dblclick', 'type BPM' } },
   lpb = { { 'wheel', 'LPB' }, { 'click', 'sig' } },
   step = { { 'wheel', 'value' }, { 'c C', 'vel' } },
-  metro = { { 'click', 'toggle' }, { 'Opt+R', 'rec' } },
+  punch = { { 'click', 'toggle' }, { 'Opt+R', 'rec' } },
   follow = { { 'F', 'follow' }, { 'click', 'toggle' } },
 }
 function D.strip_hints(L, x, y, w, active)
@@ -2118,83 +2119,32 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { 'q2w3e', 'notes' }, { 'z x', 'oct' } }) or { { 'z x', 'oct' }, { 'm', 'keys' } } }
     end
   end
-  -- кнопки транспорта (5 окт): после клавиатуры, перед временем / BPM и
-  -- остальными блоками; обычного размера, словами; включённая — фоном
-  if info and info.ctrl then
-    local bx = tx
-    local by = ly + math.floor(L.rh / 2)
-    local need = 0
-    local list = D.transport_buttons(info.ctrl)
-    for _, b in ipairs(list) do need = need + ms(b[2]) + 2 * L.pad + 2 end
-    if bx + need + 3 * L.pad < x + w then
-      for _, b in ipairs(list) do
-        local bw = ms(b[2]) + 2 * L.pad
-        local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
-        local on = b[3] ~= nil
-        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
-        set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
-        text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (rec — красный)
-        if hot then hover.ctrl = b[1] end
-        hint('ctrl', bx, by, bw, L.rh, b[1])
-        bx = bx + bw + 2
-      end
-      set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
-      D.strip_cols[#D.strip_cols + 1] = { tx, bx + 2 * L.pad, { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
-      tx = bx + 3 * L.pad
-    end
-  end
+  -- полоса транспорта (5 окт): от детального к общему — клавиатура, шаг
+  -- (step / inst / vel / pitch), кнопки транспорта, время и BPM, LPB / sig /
+  -- доли / metro, запись; тоглы — у самого правого края. Блоки слева
+  -- направо, что не влезло — не рисуется (без наложений)
   local tw = x + w - L.pad - tx
   if tw <= 0 or not info then return out end
   local c = info.ctrl or {}
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
-  -- время и BPM крупно (опция big time and BPM): высотой в две строки, слева
-  if c.bigbpm then
-    local big = {
-      { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT, '' },
-      { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT, '' },   -- BPM крупно тоже (5 окт)
-    }
-    for _, b in ipairs(big) do
-      local bw = D.big_measure(b[2], 2)
-      local cw = bw + (b[4] ~= '' and (L.pad + ms(b[4])) or 0) + 3 * L.pad
-      if cw < tw then
-        local hot = cell_hot(tx, ly, bw, 2 * L.rh)
-        D.big_text(tx, ly, b[2], hot and U.AMBER or b[3], 2)
-        if b[4] ~= '' then text(tx + bw + L.pad, ly + L.rh, b[4], U.GREY) end
-        if hot then hover.ctrl = b[1] end
-        hint('ctrl', tx, ly, bw, 2 * L.rh, b[1])
-        tx, tw = tx + cw, tw - cw
-      end
-    end
-  end
-  -- блоки (5 окт): ширина блока — по длинной из двух строк; между блоками —
-  -- тусклая вертикальная черта; что не влезло — целым блоком в конец не идёт
   local gap, sep = 2 * L.pad, 3 * L.pad
   local function cw_of(it) return ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) end
-  local groups, total = {}, 0
-  for _, g in ipairs(D.transport_groups(c)) do
+  local function group_w(g)
     local gw = 0
     for _, row in ipairs(g) do
       local rw = 0
       for k, it in ipairs(row) do rw = rw + cw_of(it) + (k > 1 and gap or 0) end
       gw = math.max(gw, rw)
     end
-    local need = gw + (#groups > 0 and sep or 0)
-    if total + need > tw then break end
-    total = total + need
-    groups[#groups + 1] = { g = g, w = gw }
+    return gw
   end
-  local gx = tx + math.max(0, math.floor((tw - total) / 2))
-  for gi, G in ipairs(groups) do
-    if gi > 1 then
-      set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(gx + math.floor(sep / 2) - 1, ly + 1, 1, 2 * L.rh - 2, 1)
-      gx = gx + sep
-    end
-    for ri, row in ipairs(G.g) do
+  local function draw_group(g, gx, gw)
+    for ri, row in ipairs(g) do
       local cx, cy = gx, ly + (ri - 1) * L.rh
       for _, it in ipairs(row) do
-        local w = cw_of(it)
-        local hot = cell_hot(cx, cy, w, L.rh)
-        if hot then set(D.CURROW); gfx.rect(cx - 2, cy, w + 4, L.rh, 1); hover.ctrl = it[1] end
+        local iw = cw_of(it)
+        local hot = cell_hot(cx, cy, iw, L.rh)
+        if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, L.rh, 1); hover.ctrl = it[1] end
         text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
         if it.beats then
           local bs = math.max(4, L.rh - 6)
@@ -2204,13 +2154,74 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
           end
         end
-        hint('ctrl', cx, cy, w, L.rh, it[1])
-        cx = cx + w + gap
+        hint('ctrl', cx, cy, iw, L.rh, it[1])
+        cx = cx + iw + gap
       end
     end
-    local first = G.g[1] and G.g[1][1] and G.g[1][1][1]
-    if STRIP_HINTS[first] then D.strip_cols[#D.strip_cols + 1] = { gx, gx + math.max(G.w, sep), STRIP_HINTS[first] } end
-    gx = gx + G.w
+    local first = g[1] and g[1][1] and g[1][1][1]
+    if STRIP_HINTS[first] then D.strip_cols[#D.strip_cols + 1] = { gx, gx + math.max(gw, sep), STRIP_HINTS[first] } end
+  end
+  -- кнопки транспорта: маленькие, << > || o >> loop
+  local blist = D.transport_buttons(c)
+  local bws, btot = {}, 0
+  for i, b in ipairs(blist) do bws[i] = ms(b[2]) + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  local function draw_buttons(bx0)
+    local bx, by = bx0, ly + math.floor(L.rh / 2)
+    for i, b in ipairs(blist) do
+      local bw = bws[i]
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      local on = b[3] ~= nil
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
+      text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (o — красная)
+      if hot then hover.ctrl = b[1] end
+      hint('ctrl', bx, by, bw, L.rh, b[1])
+      bx = bx + bw + 2
+    end
+    D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
+  end
+  -- время и BPM крупно (опция big time and BPM)
+  local big = c.bigbpm and {
+    { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
+    { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
+  } or nil
+  local bigw = 0
+  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
+  local function draw_big(bx)
+    for _, b in ipairs(big) do
+      local hot = cell_hot(bx, ly, b.w, 2 * L.rh)
+      D.big_text(bx, ly, b[2], hot and U.AMBER or b[3], 2)
+      if hot then hover.ctrl = b[1] end
+      hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
+      bx = bx + b.w + 3 * L.pad
+    end
+  end
+  -- порядок блоков
+  local by_id = {}
+  for _, g in ipairs(D.transport_groups(c)) do by_id[g[1][1][1]] = g end
+  local order = {}
+  local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
+  addg('step')
+  order[#order + 1] = { w = btot, draw = draw_buttons }
+  if big then order[#order + 1] = { w = bigw, draw = draw_big } else addg('play') end
+  addg('lpb'); addg('punch')
+  local last = by_id.follow and { w = group_w(by_id.follow), draw = function(gx, gw) draw_group(by_id.follow, gx, gw) end }
+  local right = x + w - L.pad
+  local limit = right - (last and (last.w + sep) or 0)
+  local cx = tx
+  local function divider(at) set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(at, ly + 1, 1, 2 * L.rh - 2, 1) end
+  for i, b in ipairs(order) do
+    local start = cx + (i > 1 and sep or 0)
+    if start + b.w > limit then break end
+    if i > 1 then divider(cx + math.floor(sep / 2) - 1) end
+    b.draw(start, b.w)
+    cx = start + b.w
+  end
+  -- тоглы — у правого края
+  if last and right - last.w >= cx + sep then
+    local lx = right - last.w
+    divider(lx - math.floor(sep / 2) - 1)
+    last.draw(lx, last.w)
   end
   -- статус третьей строкой (опция status bar: keyboard)
   if st and st.big then
