@@ -4096,7 +4096,8 @@ function D.popup(L, p, anchor)
   local W = gfx.w
   local sy = L.body_y + L.body_h
   local n = #p.lines
-  local maxrows = math.max(1, math.floor((L.body_h / 2) / L.rh))
+  -- одна колонка (5 окт): столбец на всю высоту окна, вторая — только если не влезло
+  local maxrows = math.max(1, math.floor((gfx.h - 4 * L.rh - (L.status_h or 0)) / L.rh) - 1)
   local ncol = math.max(1, math.ceil(n / maxrows))
   local nrow = math.min(n, maxrows)
   local kw, tw, hw = 0, 0, 0
@@ -4105,6 +4106,7 @@ function D.popup(L, p, anchor)
     tw = math.max(tw, ms(ln.text or ''))
     if ln.hk then hw = math.max(hw, ms(ln.hk)) end
   end
+  tw = math.min(tw, ms(string.rep('W', 60)))          -- длинные описания — обрезаются (fit), меню не во весь экран
   -- колонка хоткеев (5 окт): своя ширина, без наложений; описания ужимаются
   local hcol = hw > 0 and (hw + 2 * L.pad) or 0
   local maxcol = math.floor((W - 3 * L.pad) / ncol)
@@ -4122,6 +4124,7 @@ function D.popup(L, p, anchor)
     if anchor.above then y = anchor.y - h - 2 >= 2 and (anchor.y - h - 2) or (anchor.y + 3 * L.rh)   -- над ячейкой; транспорт наверху — под полосой (5 окт)
     elseif anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end
+  y = math.max(2, math.min(y, gfx.h - h - 2))         -- высокое меню целиком в окне (5 окт)
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   -- рамка поярче (2 окт): видна поверх любого модуля
