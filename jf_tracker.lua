@@ -134,6 +134,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
+  focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
   mxfold = flag('mxfold', false),
@@ -381,7 +382,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2860,6 +2861,7 @@ ctx = {
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
+      { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
@@ -3717,6 +3719,17 @@ ctx = {
     do local src = reaper.PCM_Source_CreateFromFile(path); if src then len = reaper.GetMediaSourceLength(src) or 0; reaper.PCM_Source_Destroy(src) end end
     PV.sync = B.sync; PV.file(ctx.preview_track(), path, nil, frac * len)
   end,
+  -- keys браузера (5 окт): нотная клавиша играет выбранный файл, C-4 — как есть
+  browser_note = function(c)
+    local off = keys.piano[c]
+    if off == nil then return false end
+    local path = B.preview_path(B.entries[B.cur])
+    if not path then return true end
+    local semis = (vim.octave + 1) * 12 + off - 60
+    PV.sync = B.sync; PV.file(ctx.preview_track(), path, nil, nil, semis)
+    vim.msg = ('keys: %s %+d'):format(path:match('[^/]+$') or path, semis)
+    return true
+  end,
   preview_file = function(path, sec)
     local c = cur_col()
     PV.sync = B.sync; PV.file(ctx.preview_track(), path, sec)   -- без лимита: файл целиком, следующий выбор останавливает
@@ -3737,6 +3750,8 @@ ctx = {
     relayout()
   end,
   set_focus = function(f)
+    -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
+    if ctx.click_guard and f ~= state.focus and f ~= 'notes' then return end
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
@@ -6239,7 +6254,7 @@ local function frame()
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool then
     local col = hover.pool.ci and snap.cols[hover.pool.ci] or cur_col(); local e = col and col.pool[hover.pool.i]
-    state.status = e and (('inst %02d: %s%s%s - click: select, dblclick: slicer'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
+    state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick: onto the track at the cursor'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
   elseif hover.matrix and hover.matrix.btn then
     state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
   elseif hover.matrix and hover.matrix.ri then
@@ -6272,7 +6287,7 @@ local function frame()
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
     state.status = 'go to ' .. (c and c.path or '?')
   elseif type(hover.browser) == 'string' then
-    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'auto-preview selected row (p)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', sync = 'sync: while the project plays, a file starts on the next bar (native measure align); stopped - at once', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
+    state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'play: listen to the selected row (p), on by default', keys = 'keys: the note keys play the selected file at their pitch (q = as is at octave 4)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', sync = 'sync: while the project plays, a file starts on the next bar (native measure align); stopped - at once', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
@@ -6384,6 +6399,7 @@ local function frame()
   -- всплывающий слайдер свёрнутой кнопки: клик мимо него и мимо кнопок — закрыть
   if U.click and draw.trspop and not hover.trspop_in and not hover.trsbtn then draw.trspop = nil end
   if U.click and draw.sendpop and not hover.sendpop_in and not (hover.trkio and hover.trkio.what == 'sends') then draw.sendpop = nil end
+  ctx.click_guard = U.click and state.focusclick ~= 'click' and not ctx.mods().alt or nil
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()
@@ -6802,7 +6818,9 @@ local function frame()
       state.prev_by_mouse = true
       pool_select(hover.pool.i)
       state.prev_by_mouse = nil
-      if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.open_slicer(hover.pool.i)
+      -- двойной клик (5 окт): сэмпл на трек в курсор, как двойной клик в Media Explorer;
+      -- фокус остаётся, где был
+      if dbl and click.zone == 'pool' and click.row == hover.pool.i then ctx.insert_whole()
       else draw.lib_drag = { i = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y } end   -- протяжка — перестановка
       click = { t = now2, zone = 'pool', row = hover.pool.i }
     elseif hover.btn and hover.btn.what == 'auto' then
@@ -7716,6 +7734,7 @@ local function frame()
     else ctx.set_font(math.max(6, state.font + d)); vim.msg = 'font ' .. state.font end
     c = 0
   end
+  ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Option-Tab / Option-Shift-Tab: вкладки верхнего дока по кругу (sample → … → master → sample)
   if (c == 9 or c == 25) and ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then

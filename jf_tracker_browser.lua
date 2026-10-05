@@ -33,7 +33,8 @@ B.scroll = 0
 B.focus = false
 B.mode = 'files'    -- 'files' | 'db' | 'pm'
 B.pm = nil          -- карточки jf_pm (ленивое чтение индекса jf_pm_index.json)
-B.auto = false      -- автопревью: курсор на файле → слушаем (кнопка auto)
+B.auto = true       -- автопревью: курсор на файле → слушаем (кнопка play; по умолчанию вкл, 5 окт)
+B.keys = false      -- клавиатура играет выбранный файл с высотой (кнопка keys, 5 окт)
 B.drag = nil        -- перетаскивание: { e=, x0=, y0=, active= }
 B.db = nil          -- открытая база { file=, title= } или nil (список баз)
 B.dbs = nil         -- базы из reaper.ini (ленивое чтение)
@@ -544,6 +545,7 @@ end
 function B.click(what)
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
+  elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'pvvol' then B.vol_drag = true
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
@@ -666,6 +668,7 @@ function B.key(c)
     else return false end
     return true
   end
+  if B.keys and ctx.browser_note and ctx.browser_note(c) then return true end   -- keys: q 2 w 3 e … — файл с высотой
   if ch:match('^[1-5]$') then B.mark(tonumber(ch))
   elseif MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
   elseif ch == 'H' then B.history(-1)
@@ -735,7 +738,7 @@ function B.draw(U, L, x, y, w, h)
   do
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
-    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave }, { 'auto', 'auto', B.auto },
+    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave },
                          { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
@@ -777,10 +780,15 @@ function B.draw(U, L, x, y, w, h)
     local db = vol > 1e-6 and 20 * math.log(vol, 10) or -60
     local frac = (math.max(-40, math.min(6, db)) + 40) / 46
     local lbl, vs = 'vol', db <= -40 and '-inf' or ('%+.1f'):format(db)
+    -- play / keys — на строке плеера (5 окт): автопрослушивание и клавиатура
+    -- с высотой выбранного файла
+    local px0 = x0
+    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end
+    local lx0 = px0 + L.pad
     local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
-    local sx0, sw = x0 + lw, math.max(8, ww - lw - vw)
+    local sx0, sw = lx0 + lw, math.max(8, x0 + ww - lx0 - lw - vw)
     local hot = mx >= sx0 - 2 and mx < sx0 + sw + 2 and my >= sy and my < sy + L.rh
-    U.text(x0, sy, lbl, U.GREY)
+    U.text(lx0, sy, lbl, U.GREY)
     U.set(U.DIM); gfx.rect(sx0, sy + math.floor(L.rh / 2) - 1, sw, 2, 1)
     U.set(hot and U.AMBER or U.TEXT); gfx.rect(sx0, sy + 4, math.max(1, math.floor(frac * sw + 0.5)), L.rh - 8, 1)
     U.text(sx0 + sw + L.pad, sy, vs, U.GREY)

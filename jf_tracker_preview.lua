@@ -158,7 +158,7 @@ function P.midi(t0, t1)
 end
 
 -- файл с диска (браузер): через трек, лимит секунд
-function P.file(track, path, max_sec, from)
+function P.file(track, path, max_sec, from, semis)
   if not P.available() or not path then return false end
   local src = R.PCM_Source_CreateFromFile(path)
   if not src then return false end
@@ -171,6 +171,8 @@ function P.file(track, path, max_sec, from)
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_SetValue(pv, 'D_VOLUME', P.vol)
   if from and from > 0 then R.CF_Preview_SetValue(pv, 'D_POSITION', from) end
+  -- keys браузера (5 окт): высота как у сэмплера — скорость 2^(n/12)
+  if semis and semis ~= 0 then R.CF_Preview_SetValue(pv, 'D_PLAYRATE', 2 ^ (semis / 12)) end
   -- sync браузера (3 окт): нативное ожидание начала такта — только пока
   -- проект играет (на паузе SWS иначе молча продолжает превью)
   if P.sync and R.GetPlayState() & 1 == 1 then R.CF_Preview_SetValue(pv, 'D_MEASUREALIGN', 1) end
