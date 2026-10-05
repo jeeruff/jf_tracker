@@ -43,6 +43,17 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 
 local BTNS = { { 'fold', 'fold' }, { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
 local FOLD_BTNS = { { 'fold', 'fold' } }        -- свёрнутая: одна кнопка — развернуть
+-- кнопки, которые видны (5 окт): sync — только без autosync (он и так
+-- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
+local function btns()
+  if MX.fold then return FOLD_BTNS end
+  local out = {}
+  for _, b in ipairs(BTNS) do
+    local hide = (b[1] == 'sync' and ctx and ctx.autosync_on and ctx.autosync_on()) or (b[1] == 'loops' and not (ctx and ctx.dev_on and ctx.dev_on()))
+    if not hide then out[#out + 1] = b end
+  end
+  return out
+end
 MX.loops = false         -- слой лупов (бывший Garden, 2 окт): период лупа в ячейках, клавиши лупов
 MX.ruler = true          -- вертикальная линейка тактов слева (кнопка ruler, R)
 MX.fold = false          -- свёрнутая матрица (3 окт): номера, имена треков, ячейки — без имён / длин / линейки (кнопка fold, F)
@@ -119,7 +130,7 @@ function MX.width(L, nregions, ncols)
   L.mx_row_h = MX.zoom == 'detail' and L.rh * MX.DETAIL_ROWS or L.rh
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
   local bw = L.pad
-  for _, b in ipairs(MX.fold and FOLD_BTNS or BTNS) do
+  for _, b in ipairs(btns()) do
     local label = b[2]
     if b[1] == 'zoom' then label = 'zoom' elseif b[1] == 'fill' then label = 'grid' end
     if ctx and ctx.ic then label = ctx.ic(b[1], label) end
@@ -153,7 +164,7 @@ function MX.draw(L, snap, regions, info)
   U.set(U.PANEL); gfx.rect(0, hy, W, ybot - hy, 1)
   -- кнопки
   local bx = L.pad
-  for _, b in ipairs(MX.fold and FOLD_BTNS or BTNS) do
+  for _, b in ipairs(btns()) do
     local label = b[2]
     if b[1] == 'zoom' then label = 'zoom' end
     if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end

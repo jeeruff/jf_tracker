@@ -2236,6 +2236,8 @@ ctx = {
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. rg.name
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
+  autosync_on = function() return state.autosync end,
+  dev_on = function() return state.dev end,
   sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
   -- строка :sig с текущим размером; rg — для паттерна (матрица), иначе спросит
   sig_prompt = function(rg)
