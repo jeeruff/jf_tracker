@@ -13,5 +13,10 @@ local t = H.key(('a'):byte()); eq('sa → target 13', type(t) == 'table' and t.d
 H.reset(); for i = 1, 3 do H.add('mx', 0, 0, 1, 1, i) end; H.start()
 eq('esc cancels', H.key(27), 'cancel'); eq('inactive', H.active, false)
 H.start(); H.key(('q'):byte()); H.key(('q'):byte()); eq('bad label resets typed', H.typed, '')
-H.reset(); eq('no targets', H.start(), false)
+-- регрессия 5 окт: кадр после f (reset) не стирает метки
+H.stop(); H.reset(); H.add('mx', 0, 0, 1, 1, 'k'); H.start(); H.reset()
+eq('targets survive reset while active', #H.targets, 1)
+H.key(('a'):byte()); local hit = H.key(('a'):byte())
+eq('label still works', type(hit) == 'table' and hit.data, 'k')
+H.stop(); H.reset(); eq('no targets', H.start(), false)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

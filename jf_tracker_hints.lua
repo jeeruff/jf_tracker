@@ -19,7 +19,9 @@ H.targets = {}
 H.typed = ''
 local ALPHA = 'asdfghjklqwe'    -- 12 букв → 144 метки из двух
 
-function H.reset() H.targets = {} end
+-- кадр: новый список целей; во время набора метки — заморожен (5 окт: reset
+-- чистил его каждый кадр, и после f меток не было вовсе)
+function H.reset() if not H.active then H.targets = {} end end
 
 function H.add(kind, x, y, w, h, data)
   if H.active then return end        -- во время набора список заморожен
