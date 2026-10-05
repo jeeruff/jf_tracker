@@ -534,7 +534,9 @@ function V.parse_note(nm)
   return (tonumber(oct) + 1) * 12 + p
 end
 -- нота слайса 1 (4 окт): C-4 = слайс 1, дальше хроматически
-function V.slice_base() return (ctx.model and ctx.model.BASE_NOTE) or 60 end
+-- 5 окт (как в Renoise): q = C-4 — весь сэмпл, слайсы начинаются со следующей
+-- клавиши: slice_base — нота слайса 1 = C-4 + 1
+function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 end
 local function piano_pitch(c)
   local off = ctx.piano[c]
   if off == nil then return nil end
@@ -1166,8 +1168,9 @@ function V.key_impl(c)
     if sliced and how == 'beside' then
       local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
       if selk == 0 then sliced = false; how = 'insert'
-      else semis = kp - SB; kp = SB + selk - 1; how = 'insert' end
+      else semis = kp - (SB - 1); kp = SB + selk - 1; how = 'insert' end
     end
+    if sliced and kp - SB + 1 == 0 then sliced = false end          -- q: весь сэмпл — обычный путь ноты
     if sliced then
       local k = kp - SB + 1
       if k < 1 or k > #inst0.slices then V.msg = ('no slice %d (the sample has %d) - z / x shift by an octave'):format(k, #inst0.slices); return end
@@ -1296,8 +1299,8 @@ function V.key_impl(c)
         if sliced0 and how ~= 'whole' then
           if how == 'beside' then
             local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
-            if selk > 0 then k = selk; psemis = kp0 - SB0 end
-          else k = kp0 - SB0 + 1 end
+            if selk > 0 then k = selk; psemis = kp0 - (SB0 - 1) end
+          else k = kp0 - SB0 + 1; if k == 0 then k = nil end end             -- q: весь сэмпл
         end
         if k and (k < 1 or k > #inst0.slices) then V.msg = ('no slice %d'):format(k); return end
         if k then V.last_slice = k; if how ~= 'beside' and ctx.select_slice then ctx.select_slice(inst0, k) end end
@@ -1386,7 +1389,8 @@ function V.key_impl(c)
         for _, h in ipairs(heads) do if h.kind == 'audio' and (h.fx or {})[1] and tostring(h.fx[1]):match('^S%x%x$') then slc[#slc + 1] = h else rest[#rest + 1] = h end end
         if #slc > 0 and rhow ~= 'whole' then
           if rhow == 'beside' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
-          else E.set_fx(slc, lpb(), 'S', math.max(1, pitch - V.slice_base() + 1)) end
+          elseif pitch - V.slice_base() + 1 < 1 then V.msg = 'q is the whole sample - a slice note keeps its slice (; inserts the whole sample)'
+          else E.set_fx(slc, lpb(), 'S', pitch - V.slice_base() + 1) end
         else for _, h in ipairs(slc) do rest[#rest + 1] = h end end
         if #rest > 0 then E.set_pitch(rest, lpb(), pitch) end
         V.mode = 'normal'; finish_edit()

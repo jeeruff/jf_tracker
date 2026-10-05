@@ -596,7 +596,7 @@ ctx = {
       if it and rows then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', edit.row_time(vim.cur.row + rows, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)) end
     end)
     vim.last_slice = k
-    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name(model.BASE_NOTE + k - 1), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
+    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name(model.BASE_NOTE + k), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
     ctx.ins_advance(rows)
   end,
   insert_whole = function(rows)
@@ -638,7 +638,7 @@ ctx = {
         spark = spark .. BL[math.max(1, math.min(5, math.floor(m * 5) + 1))]
       end
     end
-    return ('slice %-2d %-4s %5.2f rows  %s'):format(k, model.note_name(model.BASE_NOTE + k - 1), rows, spark), rate
+    return ('slice %-2d %-4s %5.2f rows  %s'):format(k, model.note_name(model.BASE_NOTE + k), rows, spark), rate
   end,
   insert_hydra = function()
     local _, _, inst = ctx.ins_target()
@@ -1346,7 +1346,7 @@ ctx = {
     state.popup_at = { kind = 'sprops' }                -- поверх панели свойств сэмпла (5 окт)
   end,
   octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)
-  slice_base = function() return model.SLICE_BASE or model.BASE_NOTE or 60 end,     -- кнопка scramble вкладки item (4 окт)
+  slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 end,   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then return nil end
@@ -4972,8 +4972,9 @@ local function poll_midi_in()
       local st, d1, d2 = b:byte(1), b:byte(2) or 0, b:byte(3) or 0
       if st and (st & 0xF0) == 0x90 and d2 > 0 and e and tr then
         if e.slices and #e.slices > 0 then
-          local idx = d1 - 59
-          if idx >= 1 and idx <= #e.slices then
+          local idx = d1 - model.BASE_NOTE                               -- C-4 = весь сэмпл, C#4 = слайс 1 (5 окт)
+          if idx == 0 and e.item then PV.audio(tr, e.item, 0); vim.msg = 'MIDI C-4 -> the whole sample'
+          elseif idx >= 1 and idx <= #e.slices then
             PV.slice(tr, e, e.slices[idx], e.slices[idx + 1] or e.len)
             vim.msg = ('MIDI %s -> slice %d'):format(model.note_name(d1), idx)
           end
@@ -6392,9 +6393,10 @@ local function frame()
       local root, col = ctx.slice_root()
       if not (root and root.slices) then return nil end
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
-      local rows = { { k = 0, len = root.len or 0, has = true, name = root.name } }   -- имя item вместо whole (5 окт)
       local key_of = {}
-      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1] = string.char(code) end
+      -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
+      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = string.char(code) end
+      local rows = { { k = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices) do
         rows[#rows + 1] = { k = kk, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
       end

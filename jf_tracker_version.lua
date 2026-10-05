@@ -679,7 +679,7 @@ V.TUTORIAL = {
   '3. Jump anywhere. f puts two-letter labels on everything on screen - type a label and you are there.',
   '4. Write notes. m - the keyboard on / off (on: it has priority over Vim keys). The top row q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p plays C .. E, z / x - octave; Esc - INSERT, where the keys write; Esc - back. With the keyboard off everything is plain Vim (i - INSERT).',
   '5. Pick a sound. The lib on the right: j k - select; in INSERT , . switch sounds. Shift+note only plays.',
-  '6. Slice a break. Select a sample, the item tab on top: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
+  '6. Slice a break. Select a sample, the item tab on top: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT q writes the whole sample, the next keys its slices: 2 w 3 e = slices 1 2 3 4 (as in Renoise; the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
   '7. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '8. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '9. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',

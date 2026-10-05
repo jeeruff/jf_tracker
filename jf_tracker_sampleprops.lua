@@ -105,7 +105,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
     local on = r.k == sel
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
     if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
-    local lbl = r.k == 0 and ((r.name and r.name ~= '') and r.name or 'whole') or (('%s S%02X'):format(r.key or ' ', r.k))
+    local lbl = r.k == 0 and (('%s %s'):format(r.key or ' ', (r.name and r.name ~= '') and r.name or 'whole')) or (('%s S%02X'):format(r.key or ' ', r.k))
     local lt = r.len < 10 and ('%.2fs'):format(r.len) or ('%.1fs'):format(r.len)
     U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)

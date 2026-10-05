@@ -581,13 +581,14 @@ do
   V.inst = 1; V.octave = 4; V.step = 0
   V.cur = { fi = 1, row = 30, field = 1 }
   keysin('i')
-  keysin('q'); eq('q = slice 1', last(), 'slice:trA@30:1')
-  keysin('2'); eq('2 = slice 2 (black key)', last(), 'slice:trA@30:2')
-  keysin('w'); eq('w = slice 3', last(), 'slice:trA@30:3')
-  keysin('p'); eq('p = slice 17', last(), 'slice:trA@30:17')
+  -- 5 окт (Renoise): q = весь сэмпл на своей высоте, слайсы со следующей клавиши
+  keysin('q'); eq('q = the whole sample at C-4', last():match('^ins:trA@%d+:60:') ~= nil, true)
+  keysin('2'); eq('2 = slice 1 (black key)', last(), 'slice:trA@30:1')
+  keysin('w'); eq('w = slice 2', last(), 'slice:trA@30:2')
+  keysin('p'); eq('p = slice 16', last(), 'slice:trA@30:16')
   local n0 = #calls
-  keysin('x'); keysin('q'); eq('x then q = slice 13', last(), 'slice:trA@30:13')
-  keysin('p'); eq('past the last slice (29 of 20): nothing', last(), 'slice:trA@30:13')
+  keysin('x'); keysin('2'); eq('x then 2 = slice 13', last(), 'slice:trA@30:13')
+  keysin('p'); eq('past the last slice (28 of 20): nothing', last(), 'slice:trA@30:13')
   keysin('z')
   V.last_slice = 5
   alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑)
@@ -595,12 +596,12 @@ do
   keysin(';'); eq('; inserts the whole sample', last(), 'whole')
   -- арп из слайсов (4 окт): :arp live, клавиша-слайс уходит в живой арп
   V.arp_live = true; keysin('w'); V.arp_live = false
-  eq('arp live on a sliced sample takes slice 3 (pitch 62)', last(), 'arplive:62@' .. V.cur.row)
+  eq('arp live on a sliced sample takes slice 2 (pitch 62)', last(), 'arplive:62@' .. V.cur.row)
   -- 4 окт: Cmd+нота — весь айтем с питчем, Ctrl+нота — удержание
   cmd_down = true; keysin('w'); cmd_down = false
   eq('Cmd+w on a sliced sample = the whole item at D', last():match('^ins:trA@%d+:62:') ~= nil, true)
   ctrl_down = true; V.key(23); ctrl_down = false     -- Ctrl+w
-  eq('Ctrl+w = held slice 3', last(), 'hold:s3')
+  eq('Ctrl+w = held slice 2', last(), 'hold:s2')
   V.key(27)
   pool[1].slices = nil
 end
