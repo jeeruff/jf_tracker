@@ -2021,6 +2021,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- big status (5 окт): левая треть — режим крупно (две строки высотой),
   -- клавиатура и транспорт — правее; мелкий статус — строкой под ними
   local cc = info and info.ctrl or {}
+  -- big status ОТКЛЮЧЁН (5 окт): не хватало места остальному транспорту; код оставлен
+  --[==[
   if cc.bigstatus and st and w > 60 * L.cw then
     -- ширина — по тексту (5 окт: треть была многовато), не больше трети;
     -- INSERT — красным
@@ -2034,6 +2036,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     x, w = x + third, w - third
     st.big = true
   end
+  --]==]
   -- кнопки транспорта (5 окт): обычного размера, словами, справа от модуса;
   -- включённая — фоном своего цвета; по высоте — посередине полосы
   if info and info.ctrl and w > 50 * L.cw then
