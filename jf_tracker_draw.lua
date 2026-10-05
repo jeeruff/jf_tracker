@@ -2143,7 +2143,20 @@ function D.vbar(key, x, y, w, h, scroll, nvis, total)
   local drag = D.vbar_drag and D.vbar_drag.key == key
   set(U.DIM); gfx.rect(x + math.floor(w / 2), y, 1, h, 1)
   set((hot or drag) and U.AMBER or U.LINE); gfx.rect(x, ty, w, th, 1)
-  D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th }
+  D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
+end
+-- горизонтальная полоса (5 окт, матрица): та же запись, ось x
+function D.hbar(key, x, y, w, h, scroll, nvis, total)
+  D.vbars[key] = nil
+  if total <= nvis or w < 8 then return end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local tw = math.max(6, math.floor(w * nvis / total))
+  local tx = x + math.floor((w - tw) * math.min(1, scroll / math.max(1, total - nvis)))
+  local hot = mx >= x and mx < x + w and my >= y - 3 and my < y + h + 3
+  local drag = D.vbar_drag and D.vbar_drag.key == key
+  set(U.DIM); gfx.rect(x, y + math.floor(h / 2), w, 1, 1)
+  set((hot or drag) and U.AMBER or U.LINE); gfx.rect(tx, y, tw, h, 1)
+  D.vbars[key] = { horiz = true, x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx, th = tw, a0 = x, alen = w }
 end
 
 D.pool_scroll = 0

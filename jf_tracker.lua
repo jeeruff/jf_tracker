@@ -544,7 +544,8 @@ ctx = {
   relayout = relayout,
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
-  vbar = function(...) return draw.vbar(...) end,      -- тонкий скролл-бар списков (4 окт)
+  vbar = function(...) return draw.vbar(...) end,
+  hbar = function(...) return draw.hbar(...) end,      -- тонкий скролл-бар списков (4 окт)
   -- tutorial (4 окт): первые шаги — окном about без логотипа
   -- повтор паттерна над курсором (4 окт, Paketti): регион под курсором (вне —
   -- =START..=END); all — все треки, иначе трек курсора. Один undo
@@ -1930,7 +1931,7 @@ ctx = {
   selected_slice = function(root) if root and ctx.ssel.item == root.item then return ctx.ssel.k or 0 end return nil end,
   select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell } end end,
   set_last_slice = function(k) vim.last_slice = k end,
-  mx_zoom = function() MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail' end,
+  mx_zoom = function() MX.toggle_zoom() end,
   mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
@@ -2963,7 +2964,7 @@ ctx = {
   end,
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
-    if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0
+    if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
     elseif key == 'slices' then return SPROP.slice_scroll or 0 end
     return 0
   end,
@@ -2971,7 +2972,7 @@ ctx = {
     local r = draw.vbars[key]
     local mx = r and math.max(0, r.total - r.nvis) or v
     v = math.max(0, math.min(mx, v))
-    if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v
+    if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
     elseif key == 'slices' then SPROP.slice_scroll = v end
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
@@ -7177,8 +7178,9 @@ local function frame()
   if U.click and not OPT.active then
     for key, r in pairs(draw.vbars) do
       if r.hot then
-        if gfx.mouse_y >= r.ty and gfx.mouse_y < r.ty + r.th then draw.vbar_drag = { key = key, dy = gfx.mouse_y - r.ty }
-        else ctx.vbar_scroll(key, ctx.vbar_get(key) + (gfx.mouse_y < r.ty and -r.nvis or r.nvis)) end
+        local mp = r.horiz and gfx.mouse_x or gfx.mouse_y
+        if mp >= r.ty and mp < r.ty + r.th then draw.vbar_drag = { key = key, dy = mp - r.ty }
+        else ctx.vbar_scroll(key, ctx.vbar_get(key) + (mp < r.ty and -r.nvis or r.nvis)) end
         U.click = false
         break
       end
@@ -7187,7 +7189,7 @@ local function frame()
   if draw.vbar_drag then
     local d, r = draw.vbar_drag, draw.vbars[draw.vbar_drag.key]
     if gfx.mouse_cap & 1 == 1 and r then
-      local f = (gfx.mouse_y - d.dy - r.y) / math.max(1, r.h - r.th)
+      local f = ((r.horiz and gfx.mouse_x or gfx.mouse_y) - d.dy - r.a0) / math.max(1, r.alen - r.th)
       ctx.vbar_scroll(d.key, math.floor(math.max(0, math.min(1, f)) * (r.total - r.nvis) + 0.5))
     else draw.vbar_drag = nil end
   end
@@ -8348,6 +8350,25 @@ local function frame()
   if gfx.mouse_wheel ~= 0 and hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then
     ctx.seq_marker_nudge(hover.matrix.btn == 'mkstart' and 'start' or 'end', gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
+  end
+  -- колесо над матрицей (5 окт, без фокуса, как в REAPER): колесо — слоты,
+  -- гориз. колесо / Shift — колонки, Cmd — плавный зум высоты, Option — ширины
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and hover.matrix and hover.matrix.inside and not OPT.active and not (vim.hydra or vim.picker) then
+    local wv, wh = gfx.mouse_wheel, gfx.mouse_hwheel or 0
+    local m = ctx.mods()
+    if m.cmd and wv ~= 0 then MX.set_zoom(MX.vz * 2 ^ (wv / 960), nil)
+    elseif m.alt and wv ~= 0 then MX.set_zoom(nil, MX.hz * 2 ^ (wv / 960))
+    else
+      if m.shift and wh == 0 then wh, wv = -wv, 0 end
+      MX.wacc_v = (MX.wacc_v or 0) - wv / 120
+      MX.wacc_h = (MX.wacc_h or 0) + wh / 120
+      local dv = MX.wacc_v >= 0 and math.floor(MX.wacc_v) or math.ceil(MX.wacc_v)
+      local dh = MX.wacc_h >= 0 and math.floor(MX.wacc_h) or math.ceil(MX.wacc_h)
+      MX.wacc_v, MX.wacc_h = MX.wacc_v - dv, MX.wacc_h - dh
+      if dv ~= 0 then ctx.vbar_scroll('matrix', (MX.scroll or 0) + dv) end
+      if dh ~= 0 then MX.hs = math.max(0, (MX.hs or 0) + dh) end
+    end
+    gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
   end
   if gfx.mouse_wheel ~= 0 and hover.fxb then
     FB.cur = math.max(1, math.min(#FB.results(), FB.cur + (gfx.mouse_wheel > 0 and -3 or 3)))

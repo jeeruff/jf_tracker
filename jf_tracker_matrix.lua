@@ -116,6 +116,18 @@ MX.name_h = 0
 -- MX.DETAIL_ROWS раз выше, ширина почти та же; время в ячейке идёт сверху
 -- вниз, как в трекере: items — цветными блоками, огибающие — линиями.
 MX.DETAIL_ROWS = 4
+-- плавный зум (5 окт, как в REAPER): MX.vz — высота строки в строках текста
+-- (Cmd+колесо), MX.hz — ширина ячейки в символах (Option+колесо); detail —
+-- когда строка выше 1.75; MX.hs — первая видимая колонка (гориз. прокрутка)
+MX.vz, MX.hz, MX.hs = 1, 2, 0
+function MX.set_zoom(vz, hz)
+  MX.vz = math.max(1, math.min(10, vz or MX.vz))
+  MX.hz = math.max(1, math.min(16, hz or MX.hz))
+  MX.zoom = MX.vz >= 1.75 and 'detail' or 'schematic'
+end
+function MX.toggle_zoom()
+  if MX.zoom == 'detail' then MX.set_zoom(1, 2) else MX.set_zoom(MX.DETAIL_ROWS, 3) end
+end
 
 function MX.width(L, nregions, ncols)
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
@@ -126,8 +138,8 @@ function MX.width(L, nregions, ncols)
   L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
   L.mx_sig_w = MX.fold and 0 or (U.measure('15/16') + L.pad)         -- размер такта в начале региона (5 окт)
   L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_sig_w + L.mx_dur_w)
-  L.mx_cell_w = (MX.zoom == 'detail' and L.cw * 3 or L.cw * 2) + 2 * L.pad
-  L.mx_row_h = MX.zoom == 'detail' and L.rh * MX.DETAIL_ROWS or L.rh
+  L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
+  L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
   local bw = L.pad
   for _, b in ipairs(btns()) do
@@ -162,6 +174,7 @@ function MX.draw(L, snap, regions, info)
   local hy = L.mx_top or L.header_y
   local ybot = L.mx_bot or (L.body_y + L.body_h + (L.low_h or L.hsb_h or 0))
   U.set(U.PANEL); gfx.rect(0, hy, W, ybot - hy, 1)
+  hover.inside = mx >= 0 and mx < W and my >= hy and my < ybot      -- колесо над матрицей (5 окт)
   -- кнопки
   local bx = L.pad
   for _, b in ipairs(btns()) do
@@ -181,12 +194,14 @@ function MX.draw(L, snap, regions, info)
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
   for ci, col in ipairs(snap.cols) do
-    local x = L.mx_label_w + (ci - 1) * L.mx_cell_w
+    local x = L.mx_label_w + (ci - 1 - MX.hs) * L.mx_cell_w
     if x + L.mx_cell_w > W - 4 then break end
+    if ci > MX.hs then
     local is_cur = (info.cur_ci == ci)
     ctx.vtext(x + (L.mx_cell_w - L.th) / 2, ny, MX.name_h - 2, col.name ~= '' and col.name or tostring(ci),
       is_cur and U.AMBER or U.TEXT, U.PANEL)
     if col.rgb then U.set(col.rgb); gfx.rect(x + 1, ny + MX.name_h, L.mx_cell_w - 2, 2, 1) end
+    end
   end
   local top = hy + L.mx_head_h
   local rh = L.mx_row_h or L.rh
@@ -215,7 +230,19 @@ function MX.draw(L, snap, regions, info)
   local mk_start = marks.start or { name = '=START', bar = '--', missing = true }
   local mk_stop = marks.stop or { name = '=END', bar = '--', missing = true }
   mark_row(mk_start, top, 'start'); top = top + L.rh
-  local bottom = ybot - L.rh
+  -- колонки по горизонтали (5 окт): сколько влезает, прокрутка MX.hs за
+  -- курсором; полоса снизу, если не все
+  local ncv = math.max(1, math.floor((W - 4 - L.mx_label_w) / L.mx_cell_w))
+  local ncols = #snap.cols
+  if MX.last_ci ~= MX.cur.ci then
+    MX.last_ci = MX.cur.ci
+    if MX.cur.ci - 1 < MX.hs then MX.hs = MX.cur.ci - 1 end
+    if MX.cur.ci - 1 >= MX.hs + ncv then MX.hs = MX.cur.ci - ncv end
+  end
+  MX.hs = math.max(0, math.min(MX.hs, math.max(0, ncols - ncv)))
+  local hbar_h = ncols > ncv and 5 or 0
+  if hbar_h > 0 and ctx.hbar then ctx.hbar('matrixh', L.mx_label_w, ybot - 4, ncv * L.mx_cell_w, 3, MX.hs, ncv, ncols) end
+  local bottom = ybot - L.rh - hbar_h
   local nvis = math.max(1, math.floor((bottom - top) / rh))
   MX.scroll = MX.scroll or 0
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
@@ -312,8 +339,9 @@ function MX.draw(L, snap, regions, info)
     end
     end
     for ci = 1, #snap.cols do
-      local x = L.mx_label_w + (ci - 1) * L.mx_cell_w
+      local x = L.mx_label_w + (ci - 1 - MX.hs) * L.mx_cell_w
       if x + L.mx_cell_w > W - 4 then break end              -- узкая матрица (ширина мышью): не лезть в трекер
+      if ci > MX.hs then
       local g = grid[ri][ci]
       local col = snap.cols[ci]
       U.set(U.DIM); gfx.rect(x, y, L.mx_cell_w, rh, 0)
@@ -387,6 +415,7 @@ function MX.draw(L, snap, regions, info)
       end
       if hover.ri == ri and mx >= x and mx < x + L.mx_cell_w then hover.ci = ci end
       if ctx.hint then ctx.hint('mx', x, y, L.mx_cell_w, rh, { ri = ri, ci = ci }) end
+      end
     end
   end
   do
@@ -504,7 +533,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'l' or c == 1919379572 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci + 1)
   elseif ch == 'G' then MX.goto_cell(regions, snap, #regions, MX.cur.ci)
   elseif ch == 'M' or c == 13 then MX.toggle_mute(regions, snap)                -- mute — Shift+m, как в трекере (3 окт)
-  elseif ch == 'z' then MX.zoom = MX.zoom == 'detail' and 'schematic' or 'detail'
+  elseif ch == 'z' then MX.toggle_zoom()
   elseif ch == 'f' then MX.fill = not MX.fill
   elseif ch == 'F' then if ctx.mx_fold_toggle then ctx.mx_fold_toggle() else MX.fold = not MX.fold end
   elseif ch == 'R' then ctx.mx_ruler_toggle()
