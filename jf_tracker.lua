@@ -6273,7 +6273,7 @@ local function frame()
       local root, col = ctx.slice_root()
       if not (root and root.slices) then return nil end
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
-      local rows = { { k = 0, len = root.len or 0, has = true } }
+      local rows = { { k = 0, len = root.len or 0, has = true, name = root.name } }   -- имя item вместо whole (5 окт)
       local key_of = {}
       for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1] = string.char(code) end
       for kk, t0 in ipairs(root.slices) do
