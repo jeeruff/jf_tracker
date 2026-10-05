@@ -33,13 +33,28 @@ function H.start()
   if #H.targets == 0 then return false end
   local n = #ALPHA
   local max = n * n
-  for i, t in ipairs(H.targets) do
-    if i > max then t.label = nil else
-      local a = math.floor((i - 1) / n) + 1
-      local b = (i - 1) % n + 1
+  -- 5 окт: метка, налезающая на уже поставленную, не ставится (кнопки R I M S
+  -- уже метки) — её буквы достаются следующей цели; размер метки — с прошлой
+  -- отрисовки
+  local lw, lh = H.lw or 16, H.lh or 12
+  local placed, k = {}, 0
+  for _, t in ipairs(H.targets) do
+    t.label = nil
+    local free = k < max
+    if free then
+      for _, p in ipairs(placed) do
+        if t.x < p.x + lw + 1 and p.x < t.x + lw + 1 and t.y < p.y + lh and p.y < t.y + lh then free = false; break end
+      end
+    end
+    if free then
+      local a = math.floor(k / n) + 1
+      local b = k % n + 1
       t.label = ALPHA:sub(a, a) .. ALPHA:sub(b, b)
+      placed[#placed + 1] = t
+      k = k + 1
     end
   end
+  if k == 0 then return false end
   H.active = true
   H.typed = ''
   return true
@@ -68,6 +83,7 @@ function H.draw(U, L)
   if not H.active then return end
   local lw = U.measure('aa') + 4
   local lh = U.texth() + 2
+  H.lw, H.lh = lw, lh
   for _, t in ipairs(H.targets) do
     if t.label and (H.typed == '' or t.label:sub(1, #H.typed) == H.typed) then
       local x, y = t.x, t.y
