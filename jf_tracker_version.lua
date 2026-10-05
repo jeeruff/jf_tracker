@@ -648,18 +648,18 @@ V.CHANGES = {
 -- about (4 окт): под логотипом — короткое описание (введение автора допишем),
 -- благодарности; дальше — изменения
 V.INTRO = {
-  'A tracker view of REAPER: write a whole track from the keyboard in one window - patterns, their order, sounds.',
-  'Vim is the foundation: modes, operators + motions, counts, registers, the dot repeat and the : command line',
+  'a tracker view of reaper: write a whole track from the keyboard in one window - patterns, their order, sounds.',
+  'vim is the foundation: modes, operators + motions, counts, registers, the dot repeat and the : command line',
   'drive every module - the mouse is optional.',
-  'The tracker is only a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes and FX stay native,',
-  'nothing to export or lose - close the window and the project plays on; every edit is one REAPER undo step.',
-  'Why jf: the initials of the author, and j f are the two keys with bumps - the fingers on the home row.',
-  'No icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
+  'the tracker is only a view, reaper is the engine: tracks, items, midi, regions, envelopes and fx stay native,',
+  'nothing to export or lose - close the window and the project plays on; every edit is one reaper undo step.',
+  'why jf: the initials of the author, and j f are the two keys with bumps - the fingers on the home row.',
+  'no icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
 }
 V.THANKS = {
-  'Thanks to my friends and teachers - in particular Esa Ruoho (Lackluster):',
-  'parts of jf_tracker are based on his Paketti for Renoise, used with his permission.',
-  'Support his work: https://www.patreon.com/esaruoho',
+  'thanks to my friends and teachers - in particular esa ruoho (lackluster):',
+  'parts of jf_tracker are based on his paketti for renoise, used with his permission.',
+  'support his work: https://www.patreon.com/esaruoho',
 }
 -- tutorial (4 окт): первые шаги, ячейка tutorial главного модуля / :tutorial
 V.TUTORIAL = {
@@ -682,7 +682,9 @@ V.TUTORIAL = {
 }
 
 function V.lines()
-  local out = { 'https://jeeruff.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
+  -- ссылки (5 окт): каждая — своей строкой, кликабельна
+  local out = { 'https://jeeruff.com', 'itch.io   https://jeeruff.itch.io/jftracker', 'github    https://github.com/jeeruff',
+                'bandcamp  https://jeeruff.bandcamp.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
   out[#out + 1] = ''
   out[#out + 1] = 'Free software, GNU GPL v3 (see LICENSE). No warranty.'

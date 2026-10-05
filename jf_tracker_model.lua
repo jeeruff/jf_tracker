@@ -1436,7 +1436,9 @@ function M.peaks(head, npix, want_spec)
     return out
   end
   local os = M.OVERSAMPLE or 1
-  local key = string.format('%s|%.4f|%.4f|%.4f|%d%s|%d', head.guid, head.offs, head.len, head.rate, npix, want_spec and 's' or '', os)
+  -- период лупа и длина источника — в ключе (5 окт): шов лупа меняет секцию
+  -- источника, а guid / offs / len те же — волна оставалась старой
+  local key = string.format('%s|%.4f|%.4f|%.4f|%d%s|%d|%.4f|%s', head.guid, head.offs, head.len, head.rate, npix, want_spec and 's' or '', os, head.loop_src or 0, tostring(head.src))
   local p = peaks[key]
   if p ~= nil then
     -- отрицательный результат (офлайн-медиа, ещё нет пиков) — не навсегда: повтор через 2 с
