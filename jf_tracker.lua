@@ -1583,6 +1583,13 @@ ctx = {
     local _, nm = reaper.GetEnvelopeName(se, '')
     return { e = { env = se, name = nm or 'env', min = 0, max = 1 }, label = (nm or 'env') .. ' (selected)' }
   end,
+  -- длина цели генератора в строках — для превью
+  lfo_span_rows = function()
+    local tg = ctx.lfo_target()
+    local t0, t1
+    if tg and tg.ai then t0, t1 = tg.ai.pos, tg.ai.pos + tg.ai.len else t0, t1 = ctx.lfo_span() end
+    return model.row_of_time(t1, state.lpb) - model.row_of_time(t0, state.lpb)
+  end,
   lfo_span = function()
     local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
     if t1 > t0 + 1e-6 then return t0, t1, 'time selection' end
@@ -1709,7 +1716,8 @@ ctx = {
     if tg.ai then t0, t1, where = tg.ai.pos, tg.ai.pos + tg.ai.len, 'automation item'; mode = 'into' end
     local r0, r1 = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
     local pts
-    if LG.type == 'lfo' then pts = LG.points(r0, r1)
+    -- 5 окт: волна от начала цели (как в превью), а не от строки 0 проекта
+    if LG.type == 'lfo' then pts = LG.points(0, r1 - r0); for _, p in ipairs(pts) do p.row = p.row + r0 end
     else
       local scol = snap and snap.cols[LG.src_i]
       if not scol and not (LG.type == 'follow' and LG.fsrc == 'env') then vim.msg = LG.type .. ': no source track'; return end
@@ -6953,14 +6961,14 @@ local function frame()
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
-          local hv = LG.draw(U, Lx, x, y, w, h, focused, ctx.fit, tgt and tgt.label or nil)
+          local hv = LG.draw(U, Lx, x, y, w, h, focused, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
           lfo_hover = lfo_hover or hv
           return nil
         end
         return left(x, y, w, h)
       end
       local tgt = ctx.lfo_target()
-      lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
+      lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
       pages(x, state.ai_edit and { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'item', 'ai' } } or { { 'matrix', 'matrix' }, { 'params', 'params' } })
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)

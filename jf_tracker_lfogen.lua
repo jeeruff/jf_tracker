@@ -319,7 +319,7 @@ local function field_text(f)
 end
 
 -- отрисовка в (x, y, w, h); hover = { field = i } | { preview = true }
-function LG.draw(U, L, x, y, w, h, focused, fit, target)
+function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
   U.text(x, y, fit(LG.type .. ' -> ' .. (target or 'envelope at the cursor'), w), focused and U.AMBER or U.GREY)
@@ -377,14 +377,17 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target)
       if hot and not hover then hover = { field = i } end
     end
   end
-  -- предпросмотр: два периода
+  -- предпросмотр (5 окт): ровно то, что запишется — длина цели в строках
+  -- (span: item / time selection / регион / такт), волна от её начала;
+  -- без цели — два периода
   local py = fy + #LG.FIELDS * L.rh + 4
   local ph = y + h - py
   if LG.type == 'lfo' and ph >= 3 * L.rh / 2 and w > 16 then
     U.set(U.PANEL); gfx.rect(x, py, w, ph, 1)
     U.set(U.LINE); gfx.rect(x, py, w, ph, 0)
-    local pts = LG.points(0, LG.period * 2)
-    local function px(row) return x + 1 + math.floor(row / (LG.period * 2) * (w - 3)) end
+    local n = (span and span > 0) and span or (LG.period * 2)
+    local pts = LG.points(0, n)
+    local function px(row) return x + 1 + math.floor(row / n * (w - 3)) end
     local function pyv(v) return py + ph - 2 - math.floor(v * (ph - 4)) end
     U.set(U.CYAN)
     for k, p in ipairs(pts) do
