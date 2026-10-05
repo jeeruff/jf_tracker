@@ -2187,7 +2187,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- крупные (5 окт, правка): кнопка на всю высоту полосы (+2 px сверху и снизу),
     -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
     local bx, by, bh = bx0, (bk == 2) and (ly - 2) or (ly + math.floor(L.rh / 2)), (bk == 2) and (2 * L.rh + 4) or L.rh
-    local ty = by + 2 + math.max(1, math.floor((2 * L.rh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.2 * L.rh + 0.5))
+    local ty = by + 2 + math.max(1, math.floor((2 * L.rh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.08 * L.rh + 0.5))
     -- скруглённый угол: срезать 2 px угла и поставить пиксель рамки по диагонали
     local function round_corner(cx, cy, dx, dy, frame)
       set(U.PANEL)
