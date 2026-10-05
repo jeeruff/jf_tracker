@@ -66,8 +66,14 @@ function IK.key(c, cur, n, nslots)
     if IK.anchor then IK.anchor = nil; return true end
     return 'leave'
   end
+  -- automation — строка после всех слотов (5 окт): j с последнего слота — туда, k — обратно
+  if ctx.auto_on and ctx.auto_on() then
+    if ch == 'k' or c == UP then ctx.inst_select(math.max(1, nslots)); return true end
+    if ch == 'j' or c == DOWN then return true end
+  end
   if ch == 'd' or ch == 'y' then IK.pending = ch; ctx.msg(ch .. '...'); return true end
-  if ch == 'j' or c == DOWN then ctx.inst_select(math.min(math.max(1, nslots), cur + 1))
+  if (ch == 'j' or c == DOWN) and cur >= nslots and ctx.auto_select then ctx.auto_select()
+  elseif ch == 'j' or c == DOWN then ctx.inst_select(math.min(math.max(1, nslots), cur + 1))
   elseif ch == 'k' or c == UP then ctx.inst_select(math.max(1, cur - 1))
   elseif ch == 'J' or ch == 'K' then ctx.lib_step(ch == 'J' and 1 or -1)   -- исходник ниже / выше (3 окт)
   elseif ch == 'g' then ctx.inst_select(1)

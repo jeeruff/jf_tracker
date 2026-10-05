@@ -195,6 +195,49 @@ function SP.draw_slices(L, x, y, w, h, rows, sel)
   return SP.slice_hover
 end
 
+-- automation как инструмент (5 окт): пулы automation items трека — подпись,
+-- мини-линия кривой, длина; выбранный подсвечен. Возвращает номер под мышью
+function SP.draw_ai(L, x, y, w, h, list, sel)
+  SP.slice_hover = nil
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  U.text(x + L.pad, y, ctx.fit(('automation %d'):format(#list), w - 2 * L.pad), U.GREY)
+  if #list == 0 then U.text(x + L.pad, y + L.rh, ctx.fit('no automation items on this track', w - 2 * L.pad), U.DIM); return nil end
+  local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
+  SP.slice_scroll = math.max(0, math.min(SP.slice_scroll or 0, math.max(0, #list - nvis)))
+  for r = SP.slice_scroll + 1, math.min(#list, SP.slice_scroll + nvis) do
+    local a = list[r]
+    local ry = y + (r - SP.slice_scroll) * L.rh
+    local on = r == sel
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    local lt = (a.len or 0) < 10 and ('%.2fs'):format(a.len or 0) or ('%.1fs'):format(a.len or 0)
+    local lw = math.floor(w * 0.45)
+    U.text(x + L.pad, ry, ctx.fit(a.label or '', lw - L.pad), on and U.AMBER or U.TEXT)
+    U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
+    -- мини-линия: точки пула, время и значение — по своим min / max
+    local px0, pw = x + lw, w - lw - U.measure(lt) - 3 * L.pad
+    local pts = a.pts or {}
+    if pw > 8 and #pts > 0 then
+      local t0, t1, v0, v1 = math.huge, -math.huge, a.min or math.huge, a.max or -math.huge
+      for _, p in ipairs(pts) do t0 = math.min(t0, p[1]); t1 = math.max(t1, p[1]); if not a.min then v0 = math.min(v0, p[2]); v1 = math.max(v1, p[2]) end end
+      if t1 - t0 < 1e-9 then t1 = t0 + 1 end
+      if v1 - v0 < 1e-9 then v1 = v0 + 1 end
+      U.set(on and U.AMBER or U.CYAN)
+      local lx, ly
+      for _, p in ipairs(pts) do
+        local qx = px0 + math.floor((p[1] - t0) / (t1 - t0) * (pw - 1))
+        local qy = ry + L.rh - 3 - math.floor(math.max(0, math.min(1, (p[2] - v0) / (v1 - v0))) * (L.rh - 6))
+        if lx then gfx.line(lx, ly, qx, qy) end
+        lx, ly = qx, qy
+      end
+    end
+    if hot then SP.slice_hover = r end
+    if ctx.hint then ctx.hint('slice', x, ry, w, L.rh, r) end
+  end
+  return SP.slice_hover
+end
+
 -- информация о файле браузера (2 окт): вместо свойств, когда в модуле файл
 -- info = { name, dir, rows = { {label, value} … } } — собирает main (ctx.file_info)
 function SP.draw_info(L, x, y, w, h, info, playing)

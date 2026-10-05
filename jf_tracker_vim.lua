@@ -1197,6 +1197,11 @@ function V.key_impl(c)
     local inst0 = f0 and (f0.col.pool or {})[V.inst]
     local chq = (c < 256) and string.char(c) or ''
     local kp = piano_pitch(c)
+    -- automation как инструмент (5 окт): клавиша — выбранный пул со скоростью по высоте
+    if kp and ctx.auto_on and ctx.auto_on() and how ~= 'audition' then
+      if ctx.ai_insert(kp, V.cur.row) then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
+      return
+    end
     local SB = V.slice_base()
     local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
     local semis = 0

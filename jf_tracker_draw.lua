@@ -2369,11 +2369,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
+  rows[#rows + 1] = { auto = true }               -- automation как инструмент — последней строкой (5 окт)
   L.pool_rows = rows
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
-  for r, row in ipairs(rows) do if row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent) then sel_r = r end end
+  for r, row in ipairs(rows) do if (not info.auto_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом можно листать
@@ -2423,6 +2424,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(row.hdr, w - 12), U.TEXT)
       -- разделитель: длинная линия после имени
       set(U.LINE); gfx.rect(ix + 6 + tw + L.pad, y + math.floor(L.rh / 2), w - 8 - tw - 2 * L.pad, 1, 1)
+    elseif row.auto then
+      local sel = info.auto_inst
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      text(ix + 6, y + 1, fit('~~ automation' .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
+      if hot then hover.pool = { ci = info.pool_ci, auto = true } end
+      hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
     elseif row.empty then
       -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека
       local sel = row.empty == inst

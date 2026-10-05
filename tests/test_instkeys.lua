@@ -20,6 +20,8 @@ IK.init({
   inst_listen_toggle = function() log[#log + 1] = 'listen_toggle' end,
   inst_find = function() log[#log + 1] = 'find' end,
   inst_track = function(d) log[#log + 1] = 'track:' .. d end,
+  auto_on = function() return AUTO end,
+  auto_select = function() AUTO = true; log[#log + 1] = 'auto' end,
 })
 local function k(s) local r; for ch in s:gmatch('.') do r = IK.key(ch:byte(), cur, 3, 8) end; return r end
 
@@ -53,5 +55,9 @@ k('h'); eq('h track left', last(), 'track:-1')
 eq('Esc leaves', IK.key(27, cur, 3, 8), 'leave')
 eq('u is not ours (vim undo)', IK.key(('u'):byte(), cur, 3, 8), false)
 
+-- automation (5 окт): j с последнего слота — строка automation, k — обратно
+AUTO = false; cur = 8; IK.key(('j'):byte(), cur, 3, 8); eq('j past the last slot -> automation', log[#log], 'auto')
+IK.key(('k'):byte(), cur, 3, 8); eq('k from automation -> last slot', log[#log], 'sel:8')
+AUTO = false
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

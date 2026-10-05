@@ -491,6 +491,7 @@ function PV.inst_preview(e, track, by_mouse)
   state.prev_hold = (mode == 'hold' and by_mouse) or nil
 end
 local function pool_select(n)
+  state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
   local col = cur_col()
   local pool = col and col.pool or {}
   n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
@@ -2166,6 +2167,73 @@ ctx = {
     return true
   end,
   keyq = {},
+  -- ── automation как инструмент (5 окт, как во FL) ─────────────────────
+  -- строка automation последней в lib; список — пулы automation items трека
+  -- курсора; нотная клавиша вставляет выбранный пул в его огибающую на курсор,
+  -- скорость — от высоты: C-4 = ×1, октава вверх = ×2
+  auto_on = function() return state.auto_inst and true or false end,
+  auto_select = function()
+    state.auto_inst = true
+    local n = #ctx.ai_list()
+    vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
+  end,
+  ai_sel = 1,
+  ai_list = function()
+    local col = cur_col(); if not col then return {} end
+    local c = ctx.ai_cache
+    if c and c.snap == snap and c.col == col then return c.list end
+    local list, seen = {}, {}
+    for _, e in ipairs(col.envs or {}) do
+      for _, ai in ipairs(e.ais or {}) do
+        local pid = math.floor((reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_POOL_ID', 0, false) or 0) + 0.5)
+        local key = tostring(e.env) .. ':' .. pid
+        if not seen[key] then
+          seen[key] = true
+          local pts = {}
+          local mode = reaper.GetEnvelopeScalingMode(e.env)
+          for p = 0, reaper.CountEnvelopePointsEx(e.env, ai.idx) - 1 do
+            local _, t, v = reaper.GetEnvelopePointEx(e.env, ai.idx, p)
+            pts[#pts + 1] = { t, reaper.ScaleFromEnvelopeMode(mode, v) }
+          end
+          list[#list + 1] = { env = e.env, envname = e.name, idx = ai.idx, pool = pid, len = ai.len, pos = ai.pos,
+            rate = reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_PLAYRATE', 0, false) or 1, label = ai.label, pts = pts, min = e.min, max = e.max }
+        end
+      end
+    end
+    ctx.ai_cache = { snap = snap, col = col, list = list }
+    if ctx.ai_sel > #list then ctx.ai_sel = math.max(1, #list) end
+    return list
+  end,
+  ai_insert = function(pitch, row)
+    local a = ctx.ai_list()[ctx.ai_sel]
+    if not a then vim.msg = 'automation: no automation items on this track'; return false end
+    local rate = 2 ^ ((pitch - 60) / 12)
+    local t = edit.row_time(row, state.lpb, 0)
+    local base = (a.len or 1) * (a.rate or 1)                  -- длина пула при ×1
+    edit.run('insert automation item', function()
+      local i = reaper.InsertAutomationItem(a.env, a.pool, t, base / rate)
+      if i and i >= 0 then reaper.GetSetAutomationItemInfo(a.env, i, 'D_PLAYRATE', rate, true) end
+    end)
+    model.invalidate()
+    vim.msg = ('automation %s x%.2f'):format(a.label, rate)
+    return true
+  end,
+  -- Opt / Cmd+Enter на automation item: выбрать его пул в списке
+  ai_pick_at = function(fi, row)
+    local f = L and L.flat[fi]
+    local e = f and f.env
+    if not (e and e.ais) then return false end
+    for _, ai in ipairs(e.ais) do
+      if row >= math.floor(ai.r0 + 1e-6) and row < ai.r1 - 1e-6 then
+        local pid = math.floor((reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_POOL_ID', 0, false) or 0) + 0.5)
+        state.auto_inst = true
+        for i, a in ipairs(ctx.ai_list()) do if a.env == e.env and a.pool == pid then ctx.ai_sel = i end end
+        vim.msg = 'automation: ' .. (ai.label or '')
+        return true
+      end
+    end
+    return false
+  end,
   -- зум колесом (5 окт): общие модификаторы трекера и матрицы. Возвращает
   -- dv, dh — величины колеса для вертикального / горизонтального зума, или nil
   zoom_axes = function(wv, wh)
@@ -4942,6 +5010,7 @@ local function hint_go(t)
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'recbtn' then ctx.set_focus('top'); state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
+  elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
   elseif t.kind == 'slice' then
     ctx.set_focus('slices')
@@ -5195,6 +5264,8 @@ function ctx.context_items(hover)
     radio('full', 'full - to the end of the item (Esc stops)')
     radio('hold', 'hold - while the mouse button is held on the row')
     radio('sec', 'first second')
+  elseif hover.pool and hover.pool.auto then
+    add('Select automation', function() ctx.auto_select() end)
   elseif hover.pool then
     local col = cur_col()
     add('Select instrument', function() pool_select(hover.pool.i) end)
@@ -5535,7 +5606,10 @@ local function poll_midi_in()
     if kind and dev_ok and ch_ok and gfx.mouse_cap & 8 == 8 then
       if kind == 0x90 and d2 > 0 then vim.msg = ('MIDI %s (Shift: listen only)'):format(model.note_name(d1)) end
     elseif kind and dev_ok and ch_ok then
-      if kind == 0x90 and d2 > 0 then
+      if kind == 0x90 and d2 > 0 and state.auto_inst then
+        -- automation как инструмент (5 окт): нота MIDI — пул со скоростью по высоте
+        if ctx.ai_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
+      elseif kind == 0x90 and d2 > 0 then
         if midiin.nheld == 0 then
           -- новый аккорд: строка курсора; без Shift — перезапись того, что там стоит
           midiin.row = vim.cur.row
@@ -6771,7 +6845,7 @@ local function frame()
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
     tabs = ctx.top_tabs(),
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil,
     inspreview = state.preview,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -6947,6 +7021,14 @@ local function frame()
     browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
     -- модуль слайсов (4 окт): список слайсов выбранного инструмента + скролл-бар
     slices_draw = state.slices_on and function(Lx, x, y, w, h)
+      -- automation (5 окт): список пулов automation items трека с мини-линиями
+      if state.auto_inst then
+        local list = ctx.ai_list()
+        local hv = SPROP.draw_ai(Lx, x, y, w - 5, h, list, ctx.ai_sel)
+        local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+        draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh, SPROP.slice_scroll or 0, nvis, #list)
+        return hv
+      end
       local root, col = ctx.slice_root()
       if not (root and root.slices) then return nil end
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
@@ -7197,6 +7279,8 @@ local function frame()
     local m = hover.btn.col.recmon or 0
     state.status = hover.btn.col.name .. ': input monitoring ' .. ({ [0] = 'off', [1] = 'on', [2] = 'auto (tape)' })[m] .. ' - click: off → on → auto'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
+  elseif hover.pool and hover.pool.auto then
+    state.status = 'automation: automation items of the track as one instrument - the slices list shows them; a note key inserts the selected one, its rate by the key (C-4 = x1, an octave up = x2)'
   elseif hover.pool then
     local col = hover.pool.ci and snap.cols[hover.pool.ci] or cur_col(); local e = col and col.pool[hover.pool.i]
     state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick: open in the item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
@@ -7562,7 +7646,8 @@ local function frame()
       -- модуль слайсов (4 окт): клик — выбрать и прослушать
       ctx.set_focus('slices')
       local root = ctx.slice_root()
-      if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
+      if state.auto_inst then ctx.ai_sel = hover.slices; local a = ctx.ai_list()[hover.slices]; vim.msg = a and ('automation %s: a note key inserts it'):format(a.label) or ''
+      elseif root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
       click = { t = now2, zone = 'slicelist' }
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
@@ -7788,6 +7873,9 @@ local function frame()
       for i, f in ipairs(L.flat) do if f.col == hover.scope then vim.cur.fi = i; break end end
       ctx.set_focus('top')
       click = { t = now2, zone = 'scope' }
+    elseif hover.pool and hover.pool.auto then
+      ctx.set_focus('inst'); ctx.auto_select()
+      click = { t = now2, zone = 'poolauto' }
     elseif hover.pool then
       ctx.set_focus('inst')
       state.prev_by_mouse = true
@@ -8700,7 +8788,9 @@ local function frame()
   do
     local m = ctx.mods()
     if c == 13 and state.focus == 'tracker' and (vim.mode == 'normal' or vim.mode == 'insert') and not vim.picker and not vim.hydra and (m.cmd or m.alt) and not m.ctrl then
-      if m.cmd then ctx.set_focus('inst'); vim.msg = 'instruments'
+      if ctx.ai_pick_at(vim.cur.fi, vim.cur.row) then
+        if m.cmd then ctx.set_focus('slices') end
+      elseif m.cmd then ctx.set_focus('inst'); vim.msg = 'instruments'
       else
         local f = L and L.flat[vim.cur.fi]
         local cell = f and f.sub and f.sub[vim.cur.row]

@@ -161,6 +161,7 @@ KH.PAGES = {
     { k = 'yp', d = 'duplicate the instrument (copy into the library)', t = { 'yp', 'yP' } },
     { k = 'v', d = 'range from here: j k extend, d / x cut, y yank, Esc' },
     { k = 'Enter s', d = 'open in sample tab (slicer)' },
+    { k = '~~', t = {}, d = 'automation: the last row - automation items of the track as one instrument (j past the last slot); the slices list shows them, a note key / MIDI note inserts the selected one, rate by the key (C-4 = x1, octave up = x2); Opt+Enter on an automation item picks it' },
     { k = 'Space', d = 'preview (how its note sounds: offset, rate, pitch); Esc stops' },
     { k = 'a', d = 'preview on select on / off (button preview; rclick: full / hold / first second)' },
     { k = 'bsync', d = 'header button: beatsync - the item lasts N beats at the tempo where each note sits (wheel in the item panel: N)' },
