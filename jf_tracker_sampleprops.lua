@@ -70,8 +70,10 @@ function SP.draw(L, x, y, w, h, e, focused)
   -- колонки (5 окт): широкая панель — строки сверху вниз, потом следующая
   -- колонка; ширина колонки как у прежней узкой панели, ничего не тянется
   local per = math.max(1, math.floor((h - L.rh) / L.rh))
-  local colw = math.min(w, L.cw * 36)
-  local ncols = math.max(1, math.floor((w + L.pad) / colw))
+  -- колонок столько, сколько влезает по ~36 символов; ширина — поровну (5 окт:
+  -- последняя забирала весь остаток, у первой дорожки были узкие)
+  local ncols = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
+  local colw = math.floor((w + L.pad) / ncols)
   local n = math.min(#SP.ROWS, per * ncols)
   local lw = math.min(math.floor(colw * 0.45), L.cw * 16)
   if SP.sel > #SP.ROWS then SP.sel = #SP.ROWS end
@@ -79,7 +81,7 @@ function SP.draw(L, x, y, w, h, e, focused)
   for i = 1, n do
     local r = SP.ROWS[i]
     local ci = (i - 1) // per
-    local x, w = x0 + ci * colw, (ci == ncols - 1) and (x0 + w0 - (x0 + ci * colw)) or (colw - L.pad)
+    local x, w = x0 + ci * colw, colw - L.pad
     local ry = y + ((i - 1) % per + 1) * L.rh
     local sel = focused and i == SP.sel
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
