@@ -2658,8 +2658,8 @@ function E.track_undo(desc) R.Undo_OnStateChange2(0, 'jf_tracker: ' .. desc) end
 -- ── smart quantize (2 окт; принципы jf_transient_stretch_quantize и
 -- jf_QuantumCut) ──────────────────────────────────────────────────────────
 -- hits = { {t = время от начала item, amp = громкость атаки} } по времени.
--- Сильные (amp ≥ 0.6·max) → ближайшая доля (целый QN), слабые → ближайшая
--- шестнадцатая. Два хита в одну точку — остаётся громкий. Stretch-маркер
+-- Каждый удар → ближайшая шестнадцатая (5 окт; далёкие от сетки и резкие
+-- растяжения пропускаются). Два хита в одну точку — остаётся громкий. Stretch-маркер
 -- ставится на исходное место (srcpos считает REAPER), потом двигается только
 -- позиция воспроизведения — так растягивается звук. Длина — до целых тактов
 -- (сэмпл ≥ ¾ такта) или долей; концевой маркер едет вместе с концом.
@@ -2672,20 +2672,27 @@ function E.smart_quantize(item, hits)
   local qn0 = R.TimeMap2_timeToQN(0, pos)
   local maxa = 0
   for _, h in ipairs(hits) do if h.amp > maxa then maxa = h.amp end end
-  -- цели в QN, монотонно; коллизия — громкий остаётся
+  -- цели в QN (5 окт, переделано): каждый удар — к ближайшей шестнадцатой.
+  -- Раньше сильные тянулись к целой доле — синкопы брейка уезжали на 1/8 и
+  -- куски растягивались 0.7x..1.7x («месиво»). Удар дальше трети шага от
+  -- сетки (флэм, призрачная нота) не трогаем; кусок между маркерами — не
+  -- больше чем на четверть быстрее / медленнее; коллизия — громкий остаётся
+  local step = 0.25
   local kept = {}
   for _, h in ipairs(hits) do
     if h.t > 0.005 and h.t < len - 0.005 then
       local q = R.TimeMap2_timeToQN(0, pos + h.t)
-      local strong = maxa > 0 and h.amp >= 0.6 * maxa
-      local step = strong and 1 or 0.25
       local tq = math.floor(q / step + 0.5) * step
-      if tq <= qn0 + 1e-6 then tq = nil end                  -- на начало item не тянем
+      if tq <= qn0 + 1e-6 or math.abs(tq - q) > step / 3 then tq = nil end
       if tq then
         local prev = kept[#kept]
+        local p_t, p_q = prev and prev.t or 0, prev and prev.tq or qn0
+        local src_d = h.t - p_t
+        local dst_d = R.TimeMap2_QNToTime(0, tq) - R.TimeMap2_QNToTime(0, p_q)
+        local ratio = src_d > 0 and dst_d / src_d or 0
         if prev and tq <= prev.tq + 1e-6 then
           if h.amp > prev.amp then kept[#kept] = { t = h.t, tq = tq, amp = h.amp } end
-        else kept[#kept + 1] = { t = h.t, tq = tq, amp = h.amp } end
+        elseif ratio >= 0.8 and ratio <= 1.25 then kept[#kept + 1] = { t = h.t, tq = tq, amp = h.amp } end
       end
     end
   end

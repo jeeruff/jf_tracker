@@ -362,7 +362,7 @@ function S.button(id)
   elseif id == 'scram' and ctx.scramble then ctx.scramble() end
 end
 
--- smart quantize (2 окт): транзиенты сэмпла → stretch-маркеры, сильные к
+-- smart quantize (2 окт; 5 окт — все к шестнадцатым): транзиенты → stretch-маркеры; было: сильные к
 -- ближайшим долям, слабые к шестнадцатым; длина — до целых тактов / долей
 function S.smart_quantize()
   local e = S.entry
