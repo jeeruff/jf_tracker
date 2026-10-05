@@ -318,8 +318,7 @@ function D.layout(snap, state, nregions)
   L.statpos = (state.statpos == 'tracker' or state.statpos == 'keyboard') and state.statpos or 'bottom'
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
-  L.kbstat = L.statpos == 'keyboard' and state.piano_strip and true or false
-  if L.statpos == 'keyboard' and not L.kbstat then L.statpos = 'bottom' end
+  L.kbstat = L.statpos == 'keyboard'                  -- полоса транспорта есть всегда (5 окт)
   L.header_y = L.toppos == 'top' and L.top_h or 0
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
@@ -342,7 +341,8 @@ function D.layout(snap, state, nregions)
   -- чтобы тело не прыгало, когда треки перестают помещаться
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
-  L.piano_h = state.piano_strip and ((L.kbstat and 3 or 2) * L.rh + 6) or 0
+  -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
+  L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6
   L.low_h = L.hsb_h + L.piano_h                     -- всё, что под телом в модуле трекера
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0))
   L.hsb_y = L.body_y + L.body_h
@@ -1481,20 +1481,7 @@ local function draw_ctrl(L, info, H, hover)
       { 'options', 'options', btn = true, on = c.options_open }, { 'notes', 'notes', btn = true, on = c.notes },
       { 'tutorial', 'tutorial', btn = true, on = c.tour }, { 'screensets', 'screensets', btn = true, on = c.ss_open },
     } },
-    { name = 'control', items = {
-      { 'play', (D.icons and (D.ic(c.playing and 'play' or 'stop', '') .. ' ') or (c.playing and '> ' or '# ')) .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
-      { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) },
-      { 'sig', 'sig ' .. sig }, { 'metro', D.ic('metro', 'metro ' .. (c.metro and 'on' or 'off')), c.metro and U.CYAN or U.GREY },
-      { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY },
-      { 'beats', nil },                                             -- строка долей во всю ширину
-      { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
-      { 'vel', ('vel %d'):format(c.vel or 100) },
-      { 'follow', D.ic('follow', 'follow ' .. (c.follow and 'on' or 'off')), c.follow and U.CYAN or U.GREY },
-      { 'loop', D.ic('loop', 'loop ' .. (c.loop and 'on' or 'off')), c.loop and U.CYAN or U.GREY },
-      { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
-      { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
-      { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
-    } },
+    -- транспорт и ввод (5 окт) — в полосе под трекером (D.transport_rows)
     -- быстрые вкл / выкл (4 окт): самое частое из вида — кнопками в рамке
     -- быстрые вкл / выкл (5 окт): колонка — где это на экране: слева / в центре
     -- (сверху вниз, как на экране) / справа; пустые клетки — { false }
@@ -1930,90 +1917,143 @@ end
 -- p = { octave, held = { [смещение] = true }, last = смещение }
 D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
 D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }   -- [3] — после какой белой
--- что делают ряды в INSERT (5 окт): домашний и нижний; верхний — ноты
-D.PIANO_ROWS = {
-  { { 'a', 'step auto' }, { 's', ':step' }, { 'd', 'delete' }, { 'f', 'fx cols' }, { 'g', 'top' }, { 'hjkl', 'move' }, { ';', 'whole sample' } },
-  { { 'z x', 'octave' }, { 'c C', 'velocity' }, { 'b n', 'bars' }, { ', .', 'sound' }, { 'Shift', 'listen' }, { 'Ctrl', 'hold' }, { 'Esc', 'NORMAL' } },
-}
-
--- строка «клавиша описание» пунктами: пункт целиком или никак (без наложений)
-local function key_items(x, y, w, items, kc, pad)
-  local cx = x
-  for _, it in ipairs(items) do
-    local kw2, dw = ms(it[1]), ms(it[2])
-    if cx + kw2 + pad + dw > x + w then break end
-    text(cx, y, it[1], kc)
-    text(cx + kw2 + pad, y, it[2], U.GREY)
-    cx = cx + kw2 + pad + dw + 2 * pad
-  end
+-- транспорт (5 окт, из главного модуля): две строки ячеек { id, текст, цвет };
+-- id — те же, что у главного модуля (клик / колесо — ctrl_action)
+function D.transport_rows(c)
+  local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
+  local num = math.max(1, math.min(16, c.sig_num or 4))
+  local cur = c.beat and (math.floor(c.beat) + 1) or 0
+  return {
+    { { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
+      not c.bigbpm and { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } or false,
+      { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig },
+      { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } },
+      { 'metro', 'metro ' .. (c.metro and 'on' or 'off'), c.metro and U.CYAN or U.GREY },
+      { 'follow', 'follow ' .. (c.follow and 'on' or 'off'), c.follow and U.CYAN or U.GREY },
+      { 'loop', 'loop ' .. (c.loop and 'on' or 'off'), c.loop and U.CYAN or U.GREY } },
+    { { 'oct', ('oct %d'):format(c.oct or 0) }, { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) },
+      { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') },
+      { 'lock', 'lock ' .. (c.lock and 'on' or 'off'), c.lock and U.CYAN or U.GREY },
+      { 'fixed', 'fixed ' .. (c.fixed and 'on' or 'off'), c.fixed and U.CYAN or U.GREY },
+      { 'xfade', c.xfade and ('xf %dms'):format(c.xfade_ms or 10) or 'xf off', c.xfade and U.CYAN or U.GREY } },
+  }
 end
 
-function D.piano_strip(L, x, y, w, h, p)
+-- полоса под трекером: слева клавиатура (m прячет), в остальном месте по
+-- центру — транспорт двумя строками (BPM крупно — опция big BPM), статус —
+-- третьей строкой (status bar: keyboard). p — клавиатура или nil
+function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local out = { white = 0, black = 0, letters = 0 }
+  local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   set(D.SEP); gfx.rect(x, y, w, 1, 1)
-  local nl = p.status and 3 or 2
-  local ly = y + math.floor((h - nl * L.rh) / 2)
-  local lbl = ('oct %d'):format(p.octave or 4)
-  local zx = p.hints and 'z- x+' or ''
-  local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
-  text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
-  if zx ~= '' then text(x + L.pad, ly + L.rh, zx, U.GREY) end   -- октава: z ниже, x выше
-  local kx = x + lw
-  local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 10))
-  if kw < 4 then return out end
-  local ky, kh = y + 2, h - 3
-  local letters = kw >= ms('W') + 4
-  local held, last = p.held or {}, p.last
-  -- модуль не трекер: клавиши блёклые — клавиатура сейчас не играет (5 окт)
-  local dim = p.active == false
-  local white_c = U.mix(U.BG, U.TEXT, dim and 0.35 or 0.85)
-  local function key_fill(off, base)
-    if held[off] then return U.tint(U.AMBER, 0.75) end
-    if off == last then return U.mix(base, U.AMBER, 0.35) end
-    return base
-  end
-  for i, k in ipairs(D.PIANO_WHITE) do
-    local bx = kx + (i - 1) * kw
-    set(key_fill(k[1], white_c)); gfx.rect(bx, ky, kw - 1, kh, 1)
-    set(U.LINE); gfx.rect(bx, ky, kw - 1, kh, 0)
-    out.white = out.white + 1
-    if letters then
-      local fg = U.readable(U.BG, key_fill(k[1], white_c), 4.5)
-      text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], fg)
-      out.letters = out.letters + 1
+  local ly = y + 3
+  local tx = x + L.pad
+  if p then
+    local dim = p.active == false
+    local lbl = ('oct %d'):format(p.octave or 4)
+    local zx = 'z- x+'
+    local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
+    text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
+    text(x + L.pad, ly + L.rh, zx, U.GREY)
+    local kx = x + lw
+    local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 22))       -- клавиатуре — до ~половины полосы
+    if kw >= 4 then
+      local ky, kh = y + 2, 2 * L.rh + 3
+      local letters = kw >= ms('W') + 4
+      local held, last = p.held or {}, p.last
+      local white_c = U.mix(U.BG, U.TEXT, dim and 0.35 or 0.85)
+      local function key_fill(off, base)
+        if held[off] then return U.tint(U.AMBER, 0.75) end
+        if off == last then return U.mix(base, U.AMBER, 0.35) end
+        return base
+      end
+      for i, k in ipairs(D.PIANO_WHITE) do
+        local bx = kx + (i - 1) * kw
+        set(key_fill(k[1], white_c)); gfx.rect(bx, ky, kw - 1, kh, 1)
+        set(U.LINE); gfx.rect(bx, ky, kw - 1, kh, 0)
+        out.white = out.white + 1
+        if letters then
+          text(bx + math.floor((kw - 1 - ms(k[2])) / 2), ky + kh - L.rh, k[2], U.readable(U.BG, key_fill(k[1], white_c), 4.5))
+          out.letters = out.letters + 1
+        end
+      end
+      local bw, bh = math.max(3, math.floor(kw * 0.6)), math.floor(kh * 0.6)
+      for _, k in ipairs(D.PIANO_BLACK) do
+        local bx = kx + k[3] * kw - math.floor(bw / 2) - 1
+        local fill = key_fill(k[1], U.PANEL)
+        set(fill); gfx.rect(bx, ky, bw, bh, 1)
+        set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
+        out.black = out.black + 1
+        if letters and bw >= ms('W') + 2 then
+          text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], U.readable(U.TEXT, fill, 4.5))
+          out.letters = out.letters + 1
+        end
+      end
+      tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
     end
   end
-  local bw, bh = math.max(3, math.floor(kw * 0.6)), math.floor(kh * 0.6)
-  for _, k in ipairs(D.PIANO_BLACK) do
-    local bx = kx + k[3] * kw - math.floor(bw / 2) - 1
-    local fill = key_fill(k[1], U.PANEL)
-    set(fill); gfx.rect(bx, ky, bw, bh, 1)
-    set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
-    out.black = out.black + 1
-    if letters and bw >= ms('W') + 2 then
-      text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], U.readable(U.TEXT, fill, 4.5))
-      out.letters = out.letters + 1
+  local tw = x + w - L.pad - tx
+  if tw <= 0 or not info then return out end
+  local c = info.ctrl or {}
+  local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
+  -- BPM крупно (опция big BPM): высотой в две строки, слева от транспорта
+  if c.bigbpm then
+    local s0 = D.SCALE
+    D.SCALE = s0 * 2
+    local bs = c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f'):format(c.bpm or 0)
+    local bw = ms(bs)
+    if bw + ms('BPM') + 2 * L.pad < tw then
+      local hot = cell_hot(tx, ly, bw, 2 * L.rh)
+      text(tx, ly, bs, (hot or c.bpm_edit) and U.AMBER or U.TEXT)
+      if hot then hover.ctrl = 'bpm' end
+      hint('ctrl', tx, ly, bw, 2 * L.rh, 'bpm')
+      D.SCALE = s0
+      text(tx + bw + L.pad, ly + L.rh, 'BPM', U.GREY)
+      bw = bw + L.pad + ms('BPM') + 3 * L.pad
+      tx, tw = tx + bw, tw - bw
+    end
+    D.SCALE = s0
+  end
+  local gap = 2 * L.pad
+  for ri, row in ipairs(D.transport_rows(c)) do
+    local items, total = {}, 0
+    for _, it in ipairs(row) do
+      if it then
+        local iw = ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0)
+        if total + iw + (#items > 0 and gap or 0) > tw then break end           -- ячейка целиком или никак
+        total = total + iw + (#items > 0 and gap or 0)
+        items[#items + 1] = { it = it, w = iw }
+      end
+    end
+    local cx = tx + math.floor((tw - total) / 2)
+    local cy = ly + (ri - 1) * L.rh
+    for _, e in ipairs(items) do
+      local it = e.it
+      local hot = cell_hot(cx, cy, e.w, L.rh)
+      if hot then set(D.CURROW); gfx.rect(cx - 2, cy, e.w + 4, L.rh, 1); hover.ctrl = it[1] end
+      text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
+      if it.beats then
+        local bs = math.max(4, L.rh - 6)
+        local bx = cx + ms(it[2]) + L.pad
+        for k = 1, it.beats.num do
+          set(k == it.beats.cur and U.AMBER or U.DIM)
+          gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
+        end
+      end
+      hint('ctrl', cx, cy, e.w, L.rh, it[1])
+      cx = cx + e.w + gap
     end
   end
-  -- справа: что делают домашний и нижний ряды в INSERT (в NORMAL — Vim,
-  -- поэтому клавиши серые); третья строка — статус (опция status bar: keyboard)
-  local hx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
-  local hw = x + w - hx - L.pad
-  if hw > 0 then
-    local kc = dim and U.GREY or (p.ins and U.AMBER or U.TEXT)
-    if p.hints then
-      key_items(hx, ly, hw, D.PIANO_ROWS[1], kc, L.pad)
-      key_items(hx, ly + L.rh, hw, D.PIANO_ROWS[2], kc, L.pad)
-    end
-    if p.status then
-      local sy = ly + 2 * L.rh
-      local left = fit(p.status[1], math.floor(hw / 3))
-      text(hx, sy, left, p.ins and D.FOCUS_INS or U.AMBER)
-      local dx = hx + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
-      if p.status[2] ~= '' and dx < hx + hw then text(dx, sy, fit(p.status[2], hx + hw - dx), U.TEXT) end
-    end
-    out.hints = true
+  -- статус третьей строкой (опция status bar: keyboard)
+  if st then
+    local sy = ly + 2 * L.rh
+    local sx0 = x + L.pad
+    local sw = x + w - L.pad - sx0
+    local left = fit(st[1], math.floor(sw / 3))
+    text(sx0, sy, left, (p and p.ins) and D.FOCUS_INS or U.AMBER)
+    local dx = sx0 + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
+    if st[2] ~= '' and dx < sx0 + sw then text(dx, sy, fit(st[2], sx0 + sw - dx), U.TEXT) end
   end
   return out
 end
@@ -3685,14 +3725,15 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
-  if L.piano_h > 0 and info.piano then
-    info.piano.ins = info.vmode == 'insert'
-    info.piano.hints = state.hints and true or false      -- подсказки рядов — с опцией hints (5 окт)
+  if L.piano_h > 0 then
+    local p = info.piano
+    if p then p.ins = info.vmode == 'insert' end
+    local st
     if L.kbstat then
-      info.piano.status = { info.status_left or '', (info.status_right ~= '' and info.status_right) or D.aw_status or '' }
+      st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '' }
       D.aw_status = nil
     end
-    D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, info.piano)
+    D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
   end
   -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
   -- место; мышь, метки f и прямоугольники — со сдвигом, как у верхней панели

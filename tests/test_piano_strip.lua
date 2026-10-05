@@ -17,12 +17,16 @@ local snap = { cols = { { guid = 'A', name = 'A', lanes = { { idx = 0, subs = { 
 local state = { fontscale = 1, folds = {}, fxcols = 1, envs = false, hscroll = 1, wave = 'off' }
 D.set_font(state)
 local L0 = D.layout(snap, state, 0)
-eq(L0.piano_h, 0, 'no strip without the piano layer')
+-- 5 окт: полоса транспорта есть всегда, клавиатура в ней — по m
+eq(L0.piano_h > 0, true, 'transport strip always reserved')
 state.piano_strip = true
 local L1 = D.layout(snap, state, 0)
-eq(L1.piano_h > 0, true, 'strip reserved')
-eq(L1.body_h, L0.body_h - L1.piano_h, 'body shorter by the strip')
-eq(L1.stat_y, L0.stat_y, 'status stays where it was')
+eq(L1.piano_h, L0.piano_h, 'keyboard on / off does not move the layout')
+state.statpos = 'keyboard'
+local L2 = D.layout(snap, state, 0)
+eq(L2.piano_h, L0.piano_h + L0.rh, 'status in the strip: one more row')
+eq(L2.status_h, 0, 'no bottom status bar then')
+state.statpos = nil
 local r = D.piano_strip(L1, 0, 0, 800, L1.piano_h, { octave = 4, held = { [0] = true }, last = 2 })
 eq(r.white, 10, '10 white keys'); eq(r.black, 7, '7 black keys'); eq(r.letters, 17, 'all letters')
 local r2 = D.piano_strip(L1, 0, 0, 120, L1.piano_h, { octave = 4, held = {} })

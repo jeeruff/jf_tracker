@@ -137,6 +137,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
+  bigbpm = flag('bigbpm', false),                     -- BPM крупно в полосе транспорта (5 окт)
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
@@ -380,7 +381,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigbpm' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
@@ -2970,6 +2971,7 @@ ctx = {
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
+      flag('bigbpm', 'big BPM', 'the BPM in a large font in the transport bar under the tracker'),
       flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
@@ -6013,6 +6015,7 @@ local function frame()
       return t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name end)(),
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     ctrl = {
+      bigbpm = state.bigbpm,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
       lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
