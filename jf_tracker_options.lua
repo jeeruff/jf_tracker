@@ -14,11 +14,57 @@ local U, ctx
 
 function O.init(u, c) U, ctx = u, c end
 
-function O.open(items)
-  O.items = items or O.items
+-- 5 окт: вкладки по разделам (sep с title), вкладка all — все на одной
+-- странице, / — fzf по всем опциям (имя + описание); O.items — то, что видно
+O.all, O.tabs, O.tab, O.query, O.typing = {}, {}, nil, '', false
+local function fuzzy(hay, q)
+  hay = hay:lower()
+  for w in q:lower():gmatch('%S+') do
+    local pos = 1
+    for ch in w:gmatch('.') do
+      local f = hay:find(ch, pos, true)
+      if not f then return false end
+      pos = f + 1
+    end
+  end
+  return true
+end
+function O.rebuild()
+  local view = {}
+  if O.query ~= '' then
+    for _, it in ipairs(O.all) do
+      if not it.sep and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
+    end
+  elseif O.tab == 'all' then view = O.all
+  else
+    local on = false
+    for _, it in ipairs(O.all) do
+      if it.sep then on = it.title == O.tab
+      elseif on then view[#view + 1] = it end
+    end
+  end
+  O.items = view
+  O.sel = math.max(1, math.min(#O.items, O.sel))
+  while O.items[O.sel] and O.items[O.sel].sep and O.sel < #O.items do O.sel = O.sel + 1 end
+end
+function O.open(items, tab)
+  O.all = items or O.all
+  O.tabs = {}
+  for _, it in ipairs(O.all) do if it.sep and it.title then O.tabs[#O.tabs + 1] = it.title end end
+  O.tabs[#O.tabs + 1] = 'all'
+  local ok = false
+  for _, t in ipairs(O.tabs) do if t == (tab or O.tab) then ok = true end end
+  O.tab = ok and (tab or O.tab) or O.tabs[1]
+  O.query, O.typing = '', false
   O.page = 'list'
   O.active = true
-  O.sel = math.max(1, math.min(#O.items, O.sel))
+  O.rebuild()
+end
+function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end end
+function O.step_tab(d)
+  local i = 1
+  for k, t in ipairs(O.tabs) do if t == O.tab then i = k end end
+  O.set_tab(O.tabs[(i - 1 + d) % #O.tabs + 1])
 end
 -- about отдельно, из главного модуля (3 окт): fn() → { logo = { lines = … }, text = { строки } };
 -- Esc закрывает окно целиком, не возвращает в список опций
@@ -30,6 +76,7 @@ end
 function O.close() O.active = false; O.drag = nil end
 
 local function val_text(it)
+  if it.kind == 'action' then return it.value or '' end
   local v = it.get()
   if it.kind == 'toggle' then return v and 'on' or 'off' end
   if it.kind == 'cycle' then return tostring(v) end
@@ -40,6 +87,7 @@ end
 -- изменить строку: d = +1/-1 (num/cycle), 0 = переключить (toggle) / шаг вперёд
 function O.adjust(it, d)
   if not it then return end
+  if it.kind == 'action' then if it.fn then it.fn() end; return end   -- строка-действие (5 окт)
   if it.kind == 'toggle' then it.set(not it.get())
   elseif it.kind == 'cycle' then
     local v = it.get(); local k = 1
@@ -67,12 +115,26 @@ function O.key(c)
     return true
   end
   local shift = ctx.mods and ctx.mods().shift
+  -- поиск: набор прямо в окне
+  if O.typing then
+    if c == 27 then O.typing = false; O.query = ''; O.rebuild()
+    elseif c == 13 then O.typing = false
+    elseif c == 8 then O.query = O.query:sub(1, -2); O.sel = 1; O.rebuild()
+    elseif c == 1685026670 then O.sel = math.min(#O.items, O.sel + 1)
+    elseif c == 30064 then O.sel = math.max(1, O.sel - 1)
+    elseif c >= 32 and c < 127 then O.query = O.query .. ch; O.sel = 1; O.rebuild() end
+    return true
+  end
+  if ch == '/' or ch == 'f' then O.typing = true; O.query = ''; O.rebuild(); return true end
+  if c == 9 or ch == ']' then O.step_tab(shift and -1 or 1); return true end
+  if c == 25 or ch == '[' then O.step_tab(-1); return true end
+  if c == 27 and O.query ~= '' then O.query = ''; O.rebuild(); return true end
   local n = #O.items
   local it = O.items[O.sel]
   if it and it.masked and it.masked() and (c == 13 or ch == ' ' or ch == 'l' or ch == 'h' or ch == '+' or ch == '-') then it.unmask(); return true end
   if c == 27 or ch == 'q' then O.close()
-  elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1)
-  elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1)
+  elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel < n do O.sel = O.sel + 1 end
+  elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel > 1 do O.sel = O.sel - 1 end
   elseif ch == 'g' then O.sel = 1
   elseif ch == 'G' then O.sel = n
   elseif c == 13 or ch == ' ' then O.adjust(it, 0)
@@ -103,6 +165,8 @@ end
 function O.click(mx, my)
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
+  if O.tab_hot then O.set_tab(O.tab_hot); return end
+  if O.find_hot then O.typing = true; return end
   if O.hover then
     O.sel = O.hover
     local it = O.items[O.sel]
@@ -309,7 +373,9 @@ function O.draw(L, W, H)
   end
   local bw = math.min(W - 2 * L.pad - 20, math.max(lw + vw + dw + 3 * L.pad, L.cw * 72))
   local nvis = math.max(3, math.min(n, math.floor((H - 6 * rh) / rh)))
-  local bh = (nvis + 3) * rh
+  local nvis2 = math.max(3, nvis - 1)
+  nvis = nvis2
+  local bh = (nvis + 4) * rh
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
   O.box = { bx, by, bw, bh }
   if O.sel - 1 < O.scroll then O.scroll = O.sel - 1 end
@@ -327,9 +393,36 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  U.text(hx, by + 2, ctx.fit('j k: row   Enter / Space / h l + -: change   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY)   -- до крестика
+  U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   Tab / [ ]: tabs   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY)   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
+  -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска
+  O.tab_hot, O.find_hot = nil, nil
+  do
+    local ty = by + rh + 4
+    local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/ find')
+    local fw = math.max(U.measure('/ find') , U.measure(fq)) + 2 * L.pad
+    local fx = bx + bw - fw - L.pad
+    local tx = bx + L.pad
+    for _, t in ipairs(O.tabs) do
+      local w = U.measure(t) + 2 * L.pad
+      if tx + w > fx - L.pad then break end
+      local on = t == O.tab and O.query == ''
+      local hot = mx >= tx and mx < tx + w and my >= ty and my < ty + rh
+      if hot then O.tab_hot = t end
+      U.set(on and U.tint(U.AMBER, 0.35) or (hot and U.PANEL or U.BG)); gfx.rect(tx, ty, w, rh - 1, 1)
+      U.set(on and U.AMBER or (hot and U.TEXT or U.LINE)); gfx.rect(tx, ty, w, rh - 1, 0)
+      U.text(tx + L.pad, ty, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      tx = tx + w + 2
+    end
+    local fhot = mx >= fx and mx < fx + fw and my >= ty and my < ty + rh
+    if fhot then O.find_hot = true end
+    U.set(O.typing and U.tint(U.AMBER, 0.25) or (fhot and U.PANEL or U.BG)); gfx.rect(fx, ty, fw, rh - 1, 1)
+    U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, ty, fw, rh - 1, 0)
+    U.text(fx + L.pad, ty, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
+  end
+  local by0 = by
+  by = by + rh                                             -- список — под строкой вкладок
   O.hover = nil
   O.hbtn = nil
   O.vrect = {}
@@ -400,10 +493,10 @@ function O.draw(L, W, H)
     end
   end
   O.vrect_last = O.vrect
-  U.set(U.LINE); gfx.rect(bx, by + bh - rh - 2, bw, 1, 1)
+  U.set(U.LINE); gfx.rect(bx, by0 + bh - rh - 2, bw, 1, 1)
   -- описание — строки под мышью, иначе выбранной клавишами
   local it = O.items[O.hover or O.sel]
-  U.text(bx + L.pad, by + bh - rh, ctx.fit(it and it.desc or '', bw - 2 * L.pad), U.GREY)   -- описания короткие (3 окт), в строку
+  U.text(bx + L.pad, by0 + bh - rh, ctx.fit(it and it.desc or '', bw - 2 * L.pad), U.GREY)   -- описания короткие (3 окт), в строку
 end
 
 return O

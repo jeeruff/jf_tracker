@@ -46,6 +46,32 @@ TH.PAL = {
 -- цвет ячейки курсора в mono — единственное цветное (просьба 3 окт)
 TH.MONO_CURSOR = hex('#ffb000')
 
+-- свои темы (5 окт): файл Data/jf_tracker_themes/<имя>.txt, строки key = #rrggbb
+-- (ключи как у PAL); main читает папку и зовёт TH.add
+TH.KEYS = { 'bg', 'panel', 'text', 'grey', 'dim', 'line', 'amber', 'cyan', 'green', 'red', 'hdr', 'hdrsel' }
+function TH.parse(txt)
+  local p = {}
+  for k, v in (txt or ''):gmatch('([%w_]+)%s*=%s*(#?%x%x%x%x%x%x)') do p[k:lower()] = v:sub(1, 1) == '#' and v or ('#' .. v) end
+  for _, k in ipairs(TH.KEYS) do if not p[k] then return nil, 'missing ' .. k end end
+  return p
+end
+function TH.add(name, p)
+  TH.PAL[name] = p
+  for _, n in ipairs(TH.LIST) do if n == name then return end end
+  TH.LIST[#TH.LIST + 1] = name
+end
+-- палитра U → текст шаблона (для своей темы из текущей)
+function TH.template(U, name)
+  local function h(c) c = c or { 0, 0, 0 }; return ('#%02x%02x%02x'):format(math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5)) end
+  local src = { bg = U.BG, panel = U.PANEL, text = U.TEXT, grey = U.GREY, dim = U.DIM, line = U.LINE, amber = U.AMBER, cyan = U.CYAN,
+                green = U.GREEN, red = U.RED, hdr = U.HDR or U.PANEL, hdrsel = U.HDRSEL or U.LINE }
+  local out = { '# jf_tracker theme "' .. name .. '" - edit the colours, keep the keys; options -> theme -> reload my themes',
+    '# bg window, panel panels, text / grey text and dimmed text, dim grid lines, line frames,',
+    '# amber accent and cursor, cyan / green / red roles, hdr / hdrsel track header and selected header', '' }
+  for _, k in ipairs(TH.KEYS) do out[#out + 1] = ('%-7s = %s'):format(k, h(src[k])) end
+  return table.concat(out, '\n') .. '\n'
+end
+
 function TH.valid(name) return name == 'reaper' or TH.PAL[name] ~= nil end
 
 -- применить тему к U; false — reaper (нативная палитра, U не трогается)

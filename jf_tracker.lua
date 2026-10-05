@@ -138,6 +138,7 @@ local state = {
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
   ttf = ({ bigblue = 'bigblue', iosevka = 'iosevka' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
+  opt_tab = reaper.GetExtState(EXT, 'opttab') ~= '' and reaper.GetExtState(EXT, 'opttab') or nil,   -- последняя вкладка опций (5 окт)
   bigbpm = flag('bigbpm', true),
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
@@ -389,7 +390,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('xfade_ms', tostring(state.xfade_ms))
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2245,6 +2246,83 @@ ctx = {
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
+  -- ── свои темы и профили опций (5 окт) ────────────────────────────────
+  theme_dir = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_themes' end,
+  profile_dir = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_profiles' end,
+  list_files = function(dir, ext)
+    local out, i = {}, 0
+    while true do
+      local f = reaper.EnumerateFiles(dir, i)
+      if not f then break end
+      if f:lower():match('%.' .. ext .. '$') then out[#out + 1] = f:gsub('%.' .. ext .. '$', '') end
+      i = i + 1
+    end
+    table.sort(out)
+    return out
+  end,
+  load_user_themes = function()
+    local dir, n = ctx.theme_dir(), 0
+    for _, name in ipairs(ctx.list_files(dir, 'txt')) do
+      local fh = io.open(dir .. '/' .. name .. '.txt', 'r')
+      if fh then
+        local p = draw.themes.parse(fh:read('a')); fh:close()
+        if p then draw.themes.add(name, p); n = n + 1 end
+      end
+    end
+    return n
+  end,
+  theme_template = function()
+    local dir = ctx.theme_dir()
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local base, k = 'my-theme', 1
+    local name = base
+    while reaper.file_exists(dir .. '/' .. name .. '.txt') do k = k + 1; name = base .. '-' .. k end
+    local fh = io.open(dir .. '/' .. name .. '.txt', 'w')
+    if not fh then vim.msg = 'theme: cannot write ' .. dir; return end
+    fh:write(draw.themes.template(U, name)); fh:close()
+    ctx.load_user_themes()
+    vim.msg = ('theme template %s.txt from the current colours - edit it, then "reload my themes" (%s)'):format(name, dir)
+  end,
+  -- профиль: key = value всех опций с key
+  opt_save = function(name)
+    name = (name or ''):gsub('[/:]', '-'):gsub('^%s+', ''):gsub('%s+$', '')
+    if name == '' then vim.msg = 'optsave name'; return end
+    local dir = ctx.profile_dir()
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local fh = io.open(dir .. '/' .. name .. '.txt', 'w')
+    if not fh then vim.msg = 'profile: cannot write ' .. dir; return end
+    local n = 0
+    for _, it in ipairs(ctx.option_items()) do
+      if it.key and it.get and it.kind ~= 'action' then fh:write(('%s = %s\n'):format(it.key, tostring(it.get()))); n = n + 1 end
+    end
+    fh:close()
+    vim.msg = ('profile %s: %d options saved'):format(name, n)
+  end,
+  opt_load = function(name)
+    local fh = io.open(ctx.profile_dir() .. '/' .. (name or '') .. '.txt', 'r')
+    if not fh then vim.msg = 'no profile ' .. tostring(name); return end
+    local vals = {}
+    for line in fh:lines() do local k, v = line:match('^%s*([%w_]+)%s*=%s*(.-)%s*$'); if k then vals[k] = v end end
+    fh:close()
+    local n = 0
+    for _, it in ipairs(ctx.option_items()) do
+      local v = it.key and vals[it.key]
+      if v and it.set and it.kind ~= 'action' then
+        local val
+        if it.kind == 'toggle' then val = v == 'true'
+        elseif it.kind == 'num' then val = tonumber(v)
+        else for _, x in ipairs(it.values or {}) do if tostring(x) == v then val = x end end end
+        if val ~= nil then pcall(it.set, val); n = n + 1 end
+      end
+    end
+    ctx.relayout()
+    vim.msg = ('profile %s: %d options loaded'):format(name, n)
+  end,
+  opt_del = function(name)
+    local ok = os.remove(ctx.profile_dir() .. '/' .. (name or '') .. '.txt')
+    vim.msg = ok and ('profile %s deleted'):format(name) or ('no profile ' .. tostring(name))
+  end,
+  opt_tab = function(t) state.opt_tab = t end,
   -- ── свойства item под курсором (5 окт): гидра вместо окна REAPER ──────
   -- числа — строкой :iprop key value (с текущим), переключатели — сразу
   item_props = function(item, anchor)
@@ -3180,8 +3258,12 @@ ctx = {
     local items = {
       -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
+      { sep = true, title = 'theme' },
+      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor; my themes - from Data/jf_tracker_themes', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
+      { label = 'make a theme from the current colours', kind = 'action', value = 'template', desc = 'writes Data/jf_tracker_themes/my-theme.txt: twelve colours as key = #rrggbb - edit them in any text editor', fn = function() ctx.theme_template() end },
+      { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
+      { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
       { sep = true, title = 'look' },
-      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = { 'off', 'bigblue', 'iosevka' }, desc = 'off - the REAPER bitmap; bigblue - BigBlueTerm, pixel DOS font; iosevka - Iosevka Term, narrow vector font with the most symbols (font scale = their size)', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
@@ -3240,7 +3322,14 @@ ctx = {
   options = function()
     local items = {}
     for _, it in ipairs(ctx.option_items()) do if state.dev or it.key ~= 'gridtab' then items[#items + 1] = it end end
-    OPT.open(items)
+    -- профили (5 окт): сохранить / загрузить / удалить набор опций
+    items[#items + 1] = { sep = true, title = 'profiles' }
+    items[#items + 1] = { label = 'save the options as a profile', kind = 'action', value = ':optsave', desc = 'all options into Data/jf_tracker_profiles/<name>.txt', fn = function()
+      OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'optsave ' end }
+    for _, name in ipairs(ctx.list_files(ctx.profile_dir(), 'txt')) do
+      items[#items + 1] = { label = name, kind = 'action', value = 'load', desc = 'load the profile ' .. name .. ' (delete: :optdel ' .. name .. ')', fn = function() ctx.opt_load(name) end }
+    end
+    OPT.open(items, state.opt_tab)
   end,
   -- \ o (4 окт): опции гидрой — буква у каждой (первая свободная буква подписи,
   -- тема — t); переключатель — сразу, выбор — список значений, число — + / -
@@ -4408,6 +4497,7 @@ end
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
 draw.themes = dofile(DIR .. '/jf_tracker_themes.lua')   -- темы трекера (3 окт); полем draw: у главного чанка предел локальных
+ctx.load_user_themes()                                   -- свои темы из Data/jf_tracker_themes (5 окт)
 if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
