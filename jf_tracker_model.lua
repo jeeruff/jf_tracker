@@ -1015,7 +1015,13 @@ function build_track_fx(tr)
           params[#params + 1] = e
         end
       end
-      out[#out + 1] = { i = fx, name = um.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = um.cols or 2, user = true, fxname = short }
+      local ue = { i = fx, name = um.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = um.cols or 2, user = true, fxname = short }
+      -- XY-пэд своего модуля (5 окт): оси — параметры плагина из learn (X / Y)
+      if um.xy_x and um.xy_y then
+        for k, e in ipairs(params) do if e.i == um.xy_x then ue.xy_x = k end; if e.i == um.xy_y then ue.xy_y = k end end
+        if ue.xy_x and ue.xy_y then ue.xy = true; ue.cols = math.max(2, ue.cols) end   -- пэд — первая колонка, параметры — правее
+      end
+      out[#out + 1] = ue
     elseif lay then
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       local names = {}

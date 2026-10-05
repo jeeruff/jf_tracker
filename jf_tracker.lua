@@ -318,9 +318,12 @@ local function umod_load()
   local f = io.open(UMOD_FILE, 'r')
   if not f then return t end
   for line in f:lines() do
-    local name, title, cols, list = line:match('^([^\t]+)\t([^\t]*)\t(%d+)\t(.*)$')
+    local name, title, cols, list = line:match('^([^\t]+)\t([^\t]*)\t(%d+)\t([^\t]*)')
     if name then
       local m = { title = title ~= '' and title or nil, cols = tonumber(cols) or 2, params = {} }
+      -- XY-пэд (5 окт): пятое поле «xy:X:Y» — номера параметров плагина
+      local xx, yy = line:match('\txy:(%-?%d+):(%-?%d+)')
+      if xx then m.xy_x, m.xy_y = tonumber(xx), tonumber(yy) end
       for i, lab in list:gmatch('(%d+):([^,]*)') do m.params[#m.params + 1] = { i = tonumber(i), label = lab ~= '' and lab or nil } end
       t[name] = m
     end
@@ -340,7 +343,8 @@ local function umod_save(t)
     local m = t[k]
     local parts = {}
     for _, p in ipairs(m.params) do parts[#parts + 1] = p.i .. ':' .. (p.label or ''):gsub('[,:\t\n]', ' ') end
-    f:write(('%s\t%s\t%d\t%s\n'):format(k, (m.title or ''):gsub('[\t\n]', ' '), m.cols or 2, table.concat(parts, ',')))
+    local xy = (m.xy_x and m.xy_y) and ('\txy:%d:%d'):format(m.xy_x, m.xy_y) or ''
+    f:write(('%s\t%s\t%d\t%s%s\n'):format(k, (m.title or ''):gsub('[\t\n]', ' '), m.cols or 2, table.concat(parts, ','), xy))
   end
   f:close()
   return true
@@ -1056,7 +1060,7 @@ ctx = {
     local _, tn, fxn, pn = reaper.GetLastTouchedFX()
     dsp_learn = { k = dsp_sel.fx, name = short, fx = f.i, track = t.track, last = ('%s|%s|%s'):format(tn, fxn, pn) }
     model.invalidate()
-    vim.msg = 'module learn: turn knobs in the plugin window - they join this block; x remove, J K move, < > columns, R reset, E / Esc done'
+    vim.msg = 'module learn: turn knobs in the plugin window - they join this block; x remove, J K move, < > columns, X / Y - XY pad axes, R reset, E / Esc done'
   end,
   -- ключи правки модуля в learn: x J K < > R; true — съедено
   dsp_learn_key = function(ch)
@@ -1069,6 +1073,14 @@ ctx = {
     elseif ch == 'K' and i > 1 and m.params[i - 1] then m.params[i], m.params[i - 1] = m.params[i - 1], m.params[i]; dsp_sel.param = i - 1
     elseif ch == '<' or ch == ',' then m.cols = math.max(1, (m.cols or 2) - 1)
     elseif ch == '>' or ch == '.' then m.cols = math.min(4, (m.cols or 2) + 1)
+    elseif ch == 'X' or ch == 'Y' then
+      -- XY-пэд (5 окт): выбранный параметр — ось X / Y; повтор — снять
+      local p = m.params[i]
+      if p then
+        local key = ch == 'X' and 'xy_x' or 'xy_y'
+        m[key] = (m[key] ~= p.i) and p.i or nil
+        vim.msg = ('XY: %s = %s%s'):format(ch, m[key] and (p.label or ('#' .. p.i)) or 'off', (m.xy_x and m.xy_y) and ' - the pad is in the first column' or ' - set the other axis too')
+      end
     elseif ch == 'R' then
       model.user_mods[dsp_learn.name] = nil; umod_save(model.user_mods); model.auto_reset(dsp_learn.name); model.invalidate()
       vim.msg = 'module reset: back to the automatic / curated layout'; dsp_learn = nil; return true
