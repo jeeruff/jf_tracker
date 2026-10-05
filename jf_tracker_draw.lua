@@ -2032,19 +2032,23 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- кнопки транспорта крупно (×2), сразу справа от модуса (5 окт)
   if info and info.ctrl and w > 50 * L.cw then
     local bx = x + L.pad
-    for _, b in ipairs(D.transport_buttons(info.ctrl)) do
-      -- обычные кнопки (5 окт): рамка, фон; включённая — фоном своего цвета.
-      -- ● и ∞ — символы (в битмапе — запасным моно-шрифтом), не рисунки
-      local tw = D.big_measure(b[2], 2)
-      local bw = tw + 2 * L.pad
-      local hot = mx >= bx and mx < bx + bw and my >= ly and my < ly + 2 * L.rh
+    local btns = D.transport_buttons(info.ctrl)
+    -- одна ширина у всех (5 окт: «поровнее»), символ по центру; по высоте —
+    -- по центру кнопки, не впритык к верхней рамке
+    local tws, maxw = {}, 0
+    for i, b in ipairs(btns) do tws[i] = D.big_measure(b[2], 2); maxw = math.max(maxw, tws[i]) end
+    local bw, bh, by = maxw + 2 * L.pad, 2 * L.rh, ly - 1
+    local th = D.ttf and (D.ttf_px or L.th) * 2 or 2 * (L.th or gfx.texth)
+    local ty = by + math.max(1, math.floor((bh - th) / 2) + 1) - (D.SPACE or 0)
+    for i, b in ipairs(btns) do
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 1)
-      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, ly - 1, bw, 2 * L.rh, 0)
-      local fg = hot and U.AMBER or (b[4] or b[3] or U.TEXT)               -- b[4]: свой цвет буквы (o всегда красная)
-      D.big_text(bx + L.pad, ly, b[2], fg, 2)
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
+      local fg = hot and U.AMBER or (b[4] or b[3] or U.TEXT)               -- b[4]: свой цвет символа (● всегда красный)
+      D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], fg, 2)
       if hot then hover.ctrl = b[1] end
-      hint('ctrl', bx, ly, bw, 2 * L.rh, b[1])
+      hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + L.pad
     end
     set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
