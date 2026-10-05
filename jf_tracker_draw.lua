@@ -334,7 +334,13 @@ function D.layout(snap, state, nregions)
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
   L.kbstat = L.statpos == 'keyboard'                  -- полоса транспорта есть всегда (5 окт)
-  L.header_y = L.toppos == 'top' and L.top_h or 0
+  -- положение полосы транспорта (5 окт): tracker — под трекером (как было),
+  -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
+  -- снаружи трекера — со своей строкой подсказок под ней
+  L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
+  L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0)) or 0
+  L.top_first = L.toppos == 'top'
+  L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0)
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
@@ -358,17 +364,18 @@ function D.layout(snap, state, nregions)
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6
-  L.low_h = L.hsb_h + L.piano_h                     -- всё, что под телом в модуле трекера
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0))
+  L.low_h = L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.hsb_y = L.body_y + L.body_h
   L.piano_y = L.hsb_y + L.hsb_h
+  if L.tppos == 'top' then L.piano_y = 0 elseif L.tppos == 'bottom' then L.piano_y = gfx.h - L.status_h - L.tp_h end
   L.stat_y = L.body_y + L.body_h + L.low_h          -- статус в трекере (status_in)
   L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
   local after = L.under_y + L.hint_h
   L.trk_bot = after                                 -- низ модуля трекера (тело, статус в нём, подсказки)
   if L.toppos == 'mid' then L.top_y = after; L.dsp_y = after + L.top_h
   elseif L.toppos == 'bottom' then L.dsp_y = after; L.top_y = after + L.dsp_h
-  else L.top_y = 0; L.dsp_y = after end
+  else L.top_y = (L.tppos == 'top' and L.tp_h or 0); L.dsp_y = after end
   -- главный модуль отдельно от верхней панели (3 окт, экспериментально):
   -- state.ctrlpos top — левый верх (над матрицей), mid — низ левой колонки над
   -- DSP, bottom — слева в полосе DSP (список эффектов сдвигается вправо).
@@ -1544,7 +1551,9 @@ local function draw_ctrl(L, info, H, hover)
         { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen) },
         { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
           q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
-        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }) },
+        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }),
+          -- тоглы из полосы транспорта (5 окт)
+          q('follow', 'follow', c.follow), q('lock', 'lock', c.lock), q('fixed', 'fixed', c.fixed), q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade) },
       }
       local out, n = {}, math.max(#cols[1], #cols[2], #cols[3])
       for r = 1, n do for k = 1, 3 do out[#out + 1] = cols[k][r] or { false } end end
@@ -1670,7 +1679,7 @@ local function draw_topbar(L, info)
   -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
   -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
   -- иначе стык без линии или две линии рядом
-  set(D.SEP); gfx.rect(0, (L.top_y or 0) > 0 and 0 or H - 2, gfx.w, D.SEPW, 1)
+  set(D.SEP); gfx.rect(0, (not L.top_first) and 0 or H - 2, gfx.w, D.SEPW, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
 
   if not L.ctrl_alone then draw_ctrl(L, info, H, hover) end
@@ -2017,6 +2026,7 @@ end
 -- D.strip_cols = { { x0, x1, { {клавиша, что}, … } }, … } собирает piano_strip,
 -- рисует D.strip_hints в строке подсказок трекера
 D.strip_cols = {}
+D.strip_cell = {}
 local STRIP_HINTS = {
   play = { { 'dblclick', 'type BPM' } },
   lpb = { { 'wheel', 'LPB' }, { 'click', 'sig' } },
@@ -2155,6 +2165,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           end
         end
         hint('ctrl', cx, cy, iw, L.rh, it[1])
+        D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
         cx = cx + iw + gap
       end
     end
@@ -2205,7 +2216,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   order[#order + 1] = { w = btot, draw = draw_buttons }
   if big then order[#order + 1] = { w = bigw, draw = draw_big } else addg('play') end
   addg('lpb'); addg('punch')
-  local last = by_id.follow and { w = group_w(by_id.follow), draw = function(gx, gw) draw_group(by_id.follow, gx, gw) end }
+  local last = nil                -- тоглы (follow / lock / fixed / x-fade) — в главном модуле (5 окт)
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
@@ -3359,7 +3370,7 @@ function D.frame(L, snap, rows, state, info)
     local hy2 = L.under_y
     if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
     -- под полосой транспорта — подсказки её элементов, каждая под своим (5 окт)
-    if not (L.piano_h > 0 and info.hint_bars and D.strip_hints(L, L.matrix_w, hy2, L.win_w - L.matrix_w, info.focus == 'tracker')) then
+    if not (L.piano_h > 0 and L.tppos == 'tracker' and info.hint_bars and D.strip_hints(L, L.matrix_w, hy2, L.win_w - L.matrix_w, info.focus == 'tracker')) then
       D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
     end
   end
@@ -3975,7 +3986,16 @@ function D.frame(L, snap, rows, state, info)
       st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '', small = L.kbstat }
       if L.kbstat then D.aw_status = nil end
     end
-    D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
+    if L.tppos == 'tracker' then D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
+    else
+      -- снаружи трекера: во всю ширину окна без сайдбара, подсказки — своей строкой под ней
+      D.piano_strip(L, 0, L.piano_y, L.win_w, L.piano_h, p, info, hover, st)
+      if (L.hint_h or 0) > 0 then
+        if not (info.hint_bars and D.strip_hints(L, 0, L.piano_y + L.piano_h, L.win_w, info.focus == 'tracker')) then
+          set(U.PANEL); gfx.rect(0, L.piano_y + L.piano_h, L.win_w, L.hint_h, 1)
+        end
+      end
+    end
   end
   -- главный модуль отдельно (3 окт): рисуется в буфер 99 и выводится в своё
   -- место; мышь, метки f и прямоугольники — со сдвигом, как у верхней панели
@@ -4042,7 +4062,7 @@ function D.frame(L, snap, rows, state, info)
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   -- верхняя линия главного модуля и верхней панели (5 окт): как у lib сверху;
   -- до сайдбара — у него своя
-  if L.top_h > 0 and (L.top_y or 0) == 0 then set(D.SEP); gfx.rect(0, 0, (L.side_w or 0) > 0 and (L.side_x or L.win_w) - 2 or L.win_w, D.SEPW, 1) end
+  if L.top_h > 0 and L.top_first then set(D.SEP); gfx.rect(0, L.top_y or 0, (L.side_w or 0) > 0 and (L.side_x or L.win_w) - 2 or L.win_w, D.SEPW, 1) end
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши; последней в
   -- кадре (5 окт) — скроллбар, пианинка и разделители закрывали низ и право
   do
@@ -4095,7 +4115,8 @@ function D.popup(L, p, anchor)
     if anchor.right and ax + w > W - L.pad then ax = anchor.right - w end
     x = math.max(L.pad, math.min(W - w - L.pad, ax))
     local bottom = gfx.h - (L.status_h or 0) - 2
-    if anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
+    if anchor.above then y = anchor.y - h - 2 >= 2 and (anchor.y - h - 2) or (anchor.y + 3 * L.rh)   -- над ячейкой; транспорт наверху — под полосой (5 окт)
+    elseif anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
