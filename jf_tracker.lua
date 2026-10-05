@@ -1569,6 +1569,10 @@ ctx = {
   -- REAPER (своя запись из снимка, если трек виден). Где: time selection,
   -- иначе регион курсора, иначе такт от строки курсора.
   lfo_target = function()
+    local ae = state.ai_edit
+    if ae and mod_pane == 'ai' and reaper.ValidatePtr(ae.env, 'TrackEnvelope*') then
+      return { e = { env = ae.env, min = ae.min, max = ae.max, name = ae.label }, label = 'item ' .. (ae.label or ''), ai = ae }
+    end
     local f = L and L.flat[vim.cur.fi]
     if f and f.env then return { e = f.env, label = (f.col and f.col.name or '') .. ' / ' .. (f.env.name or 'env') } end
     local se = reaper.GetSelectedEnvelope(0)
@@ -1702,6 +1706,7 @@ ctx = {
     if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope column (or select an envelope in REAPER)'; return end
     local e = tg.e
     local t0, t1, where = ctx.lfo_span()
+    if tg.ai then t0, t1, where = tg.ai.pos, tg.ai.pos + tg.ai.len, 'automation item'; mode = 'into' end
     local r0, r1 = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
     local pts
     if LG.type == 'lfo' then pts = LG.points(r0, r1)
@@ -1722,7 +1727,7 @@ ctx = {
     local function raw(v) return lo + math.max(0, math.min(1, v)) * (hi - lo) end
     local n = 0
     edit.run(mode == 'ai' and 'LFO automation item' or 'LFO points', function()
-      local idx = -1
+      local idx = mode == 'into' and tg.ai.idx or -1
       if mode == 'ai' then
         idx = reaper.InsertAutomationItem(e.env, -1, t0, t1 - t0)
         if not idx or idx < 0 then return end
@@ -2179,6 +2184,12 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- редактор automation item (5 окт): вкладка modulation, страница item
+  ai_edit_open = function(a)
+    state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool }
+    state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
+    vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'
+  end,
   ai_list = function()
     local col = cur_col(); if not col then return {} end
     local c = ctx.ai_cache
@@ -6924,6 +6935,12 @@ local function frame()
         end
       end
       local function left(lx, ly, lw2, lh)
+        if mod_pane == 'ai' then
+          ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
+          ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2, lh, state.ai_edit, ctx.fit,
+            function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end)
+          return nil
+        end
         if mod_pane == 'params' then
           local hv = MMX.PP.draw(Lx, lx, ly, lw2, lh, col, focused)
           if hv then lfo_hover = lfo_hover or { pane = 'params', pp = hv } end
@@ -6932,7 +6949,7 @@ local function frame()
         return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
       end
       if not wide then
-        pages(x, { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'curves', 'lfo' } })
+        pages(x, state.ai_edit and { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'item', 'ai' }, { 'curves', 'lfo' } } or { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'curves', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -6945,7 +6962,7 @@ local function frame()
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil)
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      pages(x, { { 'matrix', 'matrix' }, { 'params', 'params' } })
+      pages(x, state.ai_edit and { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'item', 'ai' } } or { { 'matrix', 'matrix' }, { 'params', 'params' } })
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
     end,
     sample_draw = function(x, y, w, h)
@@ -7251,6 +7268,8 @@ local function frame()
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
+  elseif ctx.aied_hover and ctx.aied_hover.status and mod_pane == 'ai' and state.toptab == 'modulation' then
+    state.status = ctx.aied_hover.status
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
@@ -7648,9 +7667,15 @@ local function frame()
       -- модуль слайсов (4 окт): клик — выбрать и прослушать
       ctx.set_focus('slices')
       local root = ctx.slice_root()
-      if state.auto_inst then ctx.ai_sel = hover.slices; local a = ctx.ai_list()[hover.slices]; vim.msg = a and ('automation %s: a note key inserts it'):format(a.label) or ''
+      if state.auto_inst then
+        local same = click.zone == 'slicelist' and click.row == hover.slices
+        ctx.ai_sel = hover.slices; local a = ctx.ai_list()[hover.slices]
+        vim.msg = a and ('automation %s: a note key inserts it, double click edits it'):format(a.label) or ''
+        if dbl and same and a then ctx.ai_edit_open(a) end
+        click = { t = now2, zone = 'slicelist', row = hover.slices }; goto ai_click_done
       elseif root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
       click = { t = now2, zone = 'slicelist' }
+      ::ai_click_done::
     elseif SPROP.hover and state.top and state.toptab == 'sample' then
       ctx.set_focus('top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
