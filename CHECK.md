@@ -356,6 +356,11 @@
 - [ ] Любой Airwindows (например Acceleration, Density, Pressure6): под именем `[категория]` цветом и одна фраза описания из Airwindopedia
 - [ ] Список слайсов: подсказка opt+j k — только с hints и внизу
 
+## Amigo в DSP
+- [ ] Amigo (PotenzaDSP) на треке: блок Amigo в 3 колонки; первая — лента сэмпла (Start..End оранжевым, Loop Start голубым), буквы rev / pp / loop / gate горят при включении, Sample Rate — шкала (левее — грязнее) с числом
+- [ ] Параметры: start end loop at loop, rate hz smooth pitch fine base volume, attack release gate reverse ping pong mode, poly glide chord hold velocity, stretch, LFO
+- [ ] learn (E) в DSP: X / Y — назначить оси XY-пэда своему модулю, пэд в первой колонке, тянуть мышью
+
 ## В работе (ещё не готово)
 - DSP: пресеты Serum / Surge / Nerve из их файлов — искать путь
 - Paketti: дальше по PAKETTI.md — humanize / wonkify, аккорды (strum, инверсии), fill euclid, слайсы в паттерн, reverse / rotate / shuffle, expand / shrink, операции огибающих, zero-crossing, WAV cue

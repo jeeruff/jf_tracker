@@ -242,6 +242,24 @@ DM.modules = {
     params = { { 'Threshold', 'thresh' }, { 'Ceiling', 'ceiling' }, { 'Release', 'release' } },
   },
   {
+    -- Amigo Sampler (PotenzaDSP, 5 окт): лента сэмпла — Start / End / Loop
+    -- Start, режимы и Sample Rate лоу-фай шкалой (вид amigo); 2184 параметра
+    -- плагина — в основном MIDI-назначения, здесь только звук
+    match = 'amigo',
+    title = 'Amigo',
+    cols = 3,
+    view = 'amigo',
+    params = {
+      { 'Sample Start', 'start' }, { 'Sample End', 'end' }, { 'Loop Start', 'loop at' }, { 'Loop', 'loop', exact = true },
+      { 'Sample Rate', 'rate hz' }, { 'Lin Interp', 'smooth' }, { 'Pitch', 'pitch' }, { 'Finetune', 'fine' },
+      { 'Base Note', 'base' }, { 'Volume', 'volume' }, { 'Attack', 'attack' }, { 'Release', 'release' },
+      { 'Gate', 'gate' }, { 'Reverse', 'reverse' }, { 'Ping Pong', 'ping pong' }, { 'Slice Mode', 'mode' },
+      { 'Polyphony', 'poly' }, { 'Glide', 'glide' }, { 'Chord', 'chord' }, { 'Hold', 'hold' },
+      { 'Velocity', 'velocity' }, { 'Stretch', 'stretch' }, { 'Stretch Length', 'str len' }, { 'Cycle Length', 'cycle' },
+      { 'LFO Amount', 'lfo amt' }, { 'LFO Rate', 'lfo rate' }, { 'LFO Shape', 'lfo shape' }, { 'LFO Modulation', 'lfo to' },
+    },
+  },
+  {
     -- ReaPitch (4 окт): сдвиг — полутоны, центы, октавы, форманта
     match = 'reapitch',
     title = 'ReaPitch',

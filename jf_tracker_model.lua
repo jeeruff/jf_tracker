@@ -1030,7 +1030,8 @@ function build_track_fx(tr)
       for _, spec in ipairs(lay.params) do
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
-          if names[pi]:find(want, 1, true) then
+          -- exact (5 окт): имя целиком (Amigo: «Loop» иначе находит «Loop Start»)
+          if (spec.exact and names[pi] == want) or (not spec.exact and names[pi]:find(want, 1, true)) then
             params[#params + 1] = param_entry(tr, fx, pi, spec[2])
             params[#params].cat = M.param_cat(tr, fx, short, pi, names[pi], params[#params].kind)
             if lay.wave and want == lay.wave.start then wa = #params end
