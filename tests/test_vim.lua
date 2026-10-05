@@ -101,6 +101,7 @@ local function reset()
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
     edit = E, state = state, piano = keys.piano,
+    piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
     snap = function() return snap end, layout = function() return L end, relayout = layout,
     bar_of_row = function(row) local b = math.floor(row / 16) * 16; return b, b + 16 end,
     row_time = function(row) return row * 0.125 end,
@@ -628,5 +629,14 @@ V.key(27); eq('Esc: NORMAL, keyboard off', V.piano, false)
 -- Esc переключает INSERT (4 окт, как Renoise)
 reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
 keysin('3'); V.key(27); eq('Esc with a count only clears it', V.mode, 'normal')
+-- 5 окт: клавиатура вкл (m) — hjkl в NORMAL ходят, верхний ряд играет
+reset(); AUTO_KBD = false
+PIANO_ON = true
+local r0 = V.cur.row
+keysin('j'); eq('keys on: j moves down', V.cur.row, r0 + 1)
+keysin('k'); eq('keys on: k moves up', V.cur.row, r0)
+local nc = #calls; keysin('q'); eq('keys on: q plays, writes nothing', #calls, nc + 1); eq('keys on: q previews', last():match('^prev') ~= nil, true)
+keysin('x'); eq('keys on: x = octave up, not delete', V.octave, 5); keysin('z')
+PIANO_ON = false; AUTO_KBD = true
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

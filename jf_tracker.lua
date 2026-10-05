@@ -137,7 +137,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
-  bigbpm = flag('bigbpm', false),
+  bigbpm = flag('bigbpm', true),                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
@@ -2280,7 +2280,7 @@ ctx = {
     end
     state.kslider = nil
     vim.msg = 'slider: done'
-    return c == 27 or c == 13                                 -- Esc / Enter — съедены; другое — дальше
+    return c == 27 or c == 13                                 -- Esc / Enter — съедены; другое (Tab …) — дальше
   end,
   dev_on = function() return state.dev end,
   sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
@@ -5958,7 +5958,7 @@ local function frame()
   if idle_skip then hover = idle.hover else
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
-    status_left = left,
+    status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
@@ -6531,10 +6531,11 @@ local function frame()
     local e = hover.sample.e or hover.sample
     state.status = (type(e) == 'table' and e.name or 'sample') .. ' - drag: select, drag selection out: to track column; Enter: insert @cursor; D: to lib; :slice / \\is: slicer'
   elseif hover.scope then state.status = 'scope ' .. hover.scope.name .. ' - click: cursor to track'
-  elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d$') then
+  elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d+$') then
+    -- путь — во всплывашке у кнопки (5 окт), здесь только клавиши
     local i = tonumber(hover.browser:sub(3))
-    state.status = B.marks[i] and ('bookmark %d: %s - click: go, Shift+click: set to this folder, Cmd+click: clear (keys %d / Shift+%d)'):format(i, B.marks[i], i, i)
-      or ('bookmark %d empty - click: remember this folder (Shift+%d)'):format(i, i)
+    state.status = B.marks[i] and ('bookmark %d - click: go, Shift+click: set to this folder, Cmd+click: clear (key %d)'):format(i, i % 10)
+      or ('bookmark %d empty - click: remember this folder (key %d)'):format(i, i % 10)
   elseif type(hover.browser) == 'string' and hover.browser:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
     state.status = 'go to ' .. (c and c.path or '?')
@@ -6652,6 +6653,7 @@ local function frame()
   if U.click and draw.trspop and not hover.trspop_in and not hover.trsbtn then draw.trspop = nil end
   if U.click and draw.sendpop and not hover.sendpop_in and not (hover.trkio and hover.trkio.what == 'sends') then draw.sendpop = nil end
   ctx.click_guard = U.click and state.focusclick ~= 'click' and not ctx.mods().alt or nil
+  if U.click and state.kslider then state.kslider = nil end                -- клик — выход из режима слайдера
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click then
     local now2 = reaper.time_precise()

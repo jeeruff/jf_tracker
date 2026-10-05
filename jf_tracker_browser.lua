@@ -58,9 +58,11 @@ B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 B.marks = {}
 B.crumbs = {}       -- сегменты пути последней отрисовки { label=, path= }
-local MARK_SHIFT = { ['!'] = 1, ['@'] = 2, ['#'] = 3, ['$'] = 4, ['%'] = 5 }
+-- закладок 10 (5 окт): 1..9 и 0; Shift — перезаписать
+B.NMARKS = 10
+local MARK_SHIFT = { ['!'] = 1, ['@'] = 2, ['#'] = 3, ['$'] = 4, ['%'] = 5, ['^'] = 6, ['&'] = 7, ['*'] = 8, ['('] = 9, [')'] = 10 }
 local function load_marks()
-  for i = 1, 5 do
+  for i = 1, B.NMARKS do
     local v = R.GetExtState and R.GetExtState('jf_tracker', 'bmark' .. i) or ''
     B.marks[i] = (v ~= '' and v) or nil
   end
@@ -613,7 +615,7 @@ function B.click(what)
   elseif what == 'back' then B.history(-1)
   elseif what == 'fwd' then B.history(1)
   elseif what == 'mkdir' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
-  elseif what:match('^bm%d$') then
+  elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
     B.mark(tonumber(what:sub(3)), m.cmd and 'clear' or (m.shift and 'set' or nil))
   elseif what:match('^crumb%d+$') then
@@ -681,7 +683,7 @@ function B.describe(idx)
   local e = B.entries[idx]
   if not e then return '' end
   if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
-  if e.dir then return ('folder %s - Enter: open'):format(e.name) end
+  if e.dir then return '' end                                       -- 5 окт: без имени / пути папки
   if e.pm then
     local len = e.len and e.len > 0 and (' %d:%02d'):format(math.floor(e.len / 60), math.floor(e.len % 60)) or ''
     return ('project %s%s - Enter: inside, o: open in REAPER, T: tags, s: status, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
@@ -693,7 +695,7 @@ function B.describe(idx)
   if e.mark then return 'marker ' .. e.name end
   if e.proj then return ('%s - used %d× (first on %s); Enter: to the lib of the cursor track, drag: to track, v: sample view'):format(e.path, e.n, e.track or '?') end
   local len = e.len and (' %d:%05.2f'):format(math.floor(e.len / 60), e.len % 60) or ''
-  return ('%s%s - Enter: to lib, Space: preview, v: view in sample tab, drag: to track'):format(B.full(e), len)
+  return ('%sEnter: to lib, Space: preview, v: view in sample tab, drag: to track'):format(len ~= '' and (len:sub(2) .. ' - ') or '')
 end
 
 function B.preview()
@@ -717,7 +719,7 @@ function B.key(c)
     return true
   end
   if B.keys and ctx.browser_note and ctx.browser_note(c) then return true end   -- keys: q 2 w 3 e … — файл с высотой
-  if ch:match('^[1-5]$') then B.mark(tonumber(ch))
+  if ch:match('^%d$') then B.mark(ch == '0' and 10 or tonumber(ch))
   elseif MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
@@ -749,9 +751,12 @@ end
 -- hover: число — строка списка, строка — кнопка шапки ('files','db','size','hide')
 -- кнопки закладок 1..5: занятая — циан, текущая папка — янтарь, пустая — тускло
 function B.draw_marks(btn, bx, by, U)
-  for i = 1, 5 do
+  B.mark_rects = {}
+  for i = 1, B.NMARKS do
     local p = B.marks[i]
-    bx = btn(bx, by, tostring(i), 'bm' .. i, p ~= nil and p == B.path, p and U.CYAN or U.DIM)
+    local x0 = bx
+    bx = btn(bx, by, tostring(i % 10), 'bm' .. i, p ~= nil and p == B.path, p and U.CYAN or U.DIM)
+    B.mark_rects[i] = { x0, by, bx - x0 }
   end
   return bx
 end
@@ -780,7 +785,7 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, y, t, t, B.mode == t)
     end
     -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
-    local mw = 5 * (U.measure('5') + 3 * L.pad)
+    local mw = B.NMARKS * (U.measure('5') + 3 * L.pad)
     if bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
   end
   do
@@ -957,6 +962,25 @@ function B.draw(U, L, x, y, w, h)
     if ctx.hint then ctx.hint('browser', x + 2, ry, w - 4, L.rh, idx) end
   end
   if ctx.vbar then ctx.vbar('browser', vb[1], vb[2], 2, vb[3] * L.rh, B.scroll, vb[3], #B.entries) end
+  -- закладка под мышью (5 окт): точный путь всплывашкой под кнопкой, по ширине
+  -- сайдбара (длинный — с начала обрезан …); статус-бар путём не засоряем
+  local bi = type(hover) == 'string' and tonumber(hover:match('^bm(%d+)$'))
+  local r = bi and B.mark_rects and B.mark_rects[bi]
+  if r then
+    local p = B.marks[bi]
+    local txt = p or 'empty - click: remember this folder'
+    local maxw = w - 2 * L.pad - 2
+    if U.measure(txt) > maxw then
+      while #txt > 4 and U.measure('…' .. txt) > maxw do txt = txt:sub(2) end
+      txt = '…' .. txt
+    end
+    local tw2 = U.measure(txt) + 2 * L.pad
+    local px = math.max(x + 1, math.min(x + w - tw2 - 1, r[1]))
+    local py = r[2] + L.rh + 1
+    U.set(U.PANEL); gfx.rect(px, py, tw2, L.rh + 2, 1)
+    U.set(U.AMBER); gfx.rect(px, py, tw2, L.rh + 2, 0)
+    U.text(px + L.pad, py + 1, txt, p and U.TEXT or U.GREY)
+  end
   return hover
 end
 
