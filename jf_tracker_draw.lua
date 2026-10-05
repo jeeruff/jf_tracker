@@ -3611,7 +3611,8 @@ function D.frame(L, snap, rows, state, info)
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
-          if steps_inline then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv end
+          if steps_inline then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
+          elseif p.kind == 'steps' and p.nsteps then hover.dsp.steplist = true end   -- клик — список (5 окт)
         end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
       end

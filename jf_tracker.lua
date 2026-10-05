@@ -3213,6 +3213,41 @@ ctx = {
     for _, m in ipairs(ctx.RATE_MARKS) do out[#out + 1] = ctx.rate_frac(m) end
     return out
   end,
+  -- выпадашка выбора (5 окт): stretch, формы фейдов, каналы — список у мыши
+  sp_menu = function(e, k)
+    local it, tk = e.item, e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return false end
+    local items = ctx.inst_group(e)
+    local function P(key, v, desc) edit.inst_prop(items, it, key, v, 'abs', desc); model.invalidate() end
+    local list, title = {}, k
+    local KEYS = '123456789abcdefghijklmnopqrstuvwxyz'
+    local function add(label, fn, on) local n = #list + 1; list[n] = { key = KEYS:sub(n, n), label = label .. (on and '  *' or ''), fn = fn } end
+    if k == 'mode' then
+      title = 'stretch'
+      local cur = reaper.GetMediaItemTakeInfo_Value(tk, 'I_PITCHMODE')
+      add('project default', function() P('take:I_PITCHMODE', -1, 'stretch mode') end, cur < 0)
+      for m = 0, 63 do
+        local ok, nm = reaper.EnumPitchShiftModes(m)
+        if ok and nm and nm ~= '' then add(nm, function() P('take:I_PITCHMODE', m << 16, 'stretch mode') end, cur >= 0 and (math.floor(cur) >> 16) == m) end
+      end
+    elseif k == 'finshape' or k == 'foutshape' then
+      title = k == 'finshape' and 'fade in shape' or 'fade out shape'
+      local key = k == 'finshape' and 'C_FADEINSHAPE' or 'C_FADEOUTSHAPE'
+      local cur = math.floor(reaper.GetMediaItemInfo_Value(it, key))
+      for i, nm in ipairs({ 'linear', 'fast start', 'fast end', 'fast start steep', 'fast end steep', 'slow start/end', 'slow start/end steep' }) do
+        add(nm, function() P(key, i - 1, 'fade shape') end, cur == i - 1)
+      end
+    elseif k == 'chan' then
+      title = 'channels'
+      local cur = math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE'))
+      for i, nm in ipairs({ 'normal', 'reverse stereo', 'mono (mix)', 'mono (left)', 'mono (right)' }) do
+        add(nm, function() P('take:I_CHANMODE', i - 1, 'channel mode') end, cur == i - 1)
+      end
+    else return false end
+    vim.open_hydra({ title = title, items = list })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    return true
+  end,
   sp_reset = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
@@ -7288,7 +7323,8 @@ local function frame()
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
-      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mode' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
+      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
     elseif hover.dspcomp then
@@ -7461,6 +7497,22 @@ local function frame()
         local p = hover.dsp.f.params[hover.dsp.param]
         if p and p.kind == 'toggle' then
           edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, model.fxapi(col.track).GetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i) >= 0.5 and 0 or 1)
+        elseif p and hover.dsp.steplist and hover.dsp.onwidget then
+          -- выпадашка значений (5 окт): до 35 — меню у мыши, больше — поиск
+          local labs = ctx.step_labels(hover.dsp.f, p) or {}
+          local fx, tr, n = p.fx or hover.dsp.f.i, col.track, p.nsteps
+          local cur = math.floor(model.fxapi(tr).GetParamNormalized(tr, fx, p.i) * (n - 1) + 0.5)
+          local function setk(k) edit.fx_param(tr, fx, p.i, k / math.max(1, n - 1)) end
+          if n <= 35 then
+            local KEYS, list = '123456789abcdefghijklmnopqrstuvwxyz', {}
+            for k = 0, n - 1 do list[#list + 1] = { key = KEYS:sub(k + 1, k + 1), label = (labs[k + 1] or tostring(k)) .. (k == cur and '  *' or ''), fn = function() setk(k) end } end
+            vim.open_hydra({ title = p.name, items = list })
+            state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+          else
+            local list = {}
+            for k = 0, n - 1 do list[#list + 1] = { label = labs[k + 1] or tostring(k), data = k } end
+            vim.open_picker(p.name, list, function(it) setk(it.data) end)
+          end
         elseif p and hover.dsp.onwidget then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
       elseif dbl and click.zone == 'dsp' and col then
         edit.fx_show(col.track, hover.dsp.f.i)
@@ -7900,7 +7952,7 @@ local function frame()
     else dspwave_drag = nil end
   end
   -- протяжка по слайдеру DSP
-  if hover.dsp and hover.dsp.param and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
+  if hover.dsp and hover.dsp.param and not hover.dsp.steplist and not (vim.hydra or vim.picker) and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
     local col = dsp_target()
     local p = col and hover.dsp.f.params[hover.dsp.param]
     if p and p.kind ~= 'toggle' and hover.dsp.sv then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
