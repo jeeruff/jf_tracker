@@ -2037,25 +2037,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     st.big = true
   end
   --]==]
-  -- кнопки транспорта (5 окт): обычного размера, словами, справа от модуса;
-  -- включённая — фоном своего цвета; по высоте — посередине полосы
-  if info and info.ctrl and w > 50 * L.cw then
-    local bx = x + L.pad
-    local by = ly + math.floor(L.rh / 2)
-    for _, b in ipairs(D.transport_buttons(info.ctrl)) do
-      local bw = ms(b[2]) + 2 * L.pad
-      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
-      local on = b[3] ~= nil
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
-      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
-      text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (rec — красный)
-      if hot then hover.ctrl = b[1] end
-      hint('ctrl', bx, by, bw, L.rh, b[1])
-      bx = bx + bw + 2
-    end
-    set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
-    w = w - (bx + 2 * L.pad - x); x = bx + 2 * L.pad
-  end
   local tx = x + L.pad
   if p then
     local dim = p.active == false
@@ -2103,6 +2084,30 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         end
       end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
+    end
+  end
+  -- кнопки транспорта (5 окт): после клавиатуры, перед временем / BPM и
+  -- остальными блоками; обычного размера, словами; включённая — фоном
+  if info and info.ctrl then
+    local bx = tx
+    local by = ly + math.floor(L.rh / 2)
+    local need = 0
+    local list = D.transport_buttons(info.ctrl)
+    for _, b in ipairs(list) do need = need + ms(b[2]) + 2 * L.pad + 2 end
+    if bx + need + 3 * L.pad < x + w then
+      for _, b in ipairs(list) do
+        local bw = ms(b[2]) + 2 * L.pad
+        local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+        local on = b[3] ~= nil
+        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+        set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
+        text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (rec — красный)
+        if hot then hover.ctrl = b[1] end
+        hint('ctrl', bx, by, bw, L.rh, b[1])
+        bx = bx + bw + 2
+      end
+      set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
+      tx = bx + 3 * L.pad
     end
   end
   local tw = x + w - L.pad - tx
