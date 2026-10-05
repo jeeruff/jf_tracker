@@ -5933,7 +5933,7 @@ function ctrl_action(name, delta)
     else ctx.rec_start('tracker') end
   elseif name == 'tp_rew' then reaper.Main_OnCommand(40084, 0)            -- Transport: Rewind a little bit
   elseif name == 'tp_fwd' then reaper.Main_OnCommand(40085, 0)            -- Transport: Fast forward a little bit
-  elseif name == 'tp_play' then reaper.Main_OnCommand(1007, 0)            -- Transport: Play
+  elseif name == 'tp_play' then reaper.Main_OnCommand(reaper.GetPlayState() & 1 == 1 and 1016 or 1007, 0)   -- play / stop
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
   elseif name == 'punch' then
     local p = ctx.cmd_by_text('record mode: time selection auto punch')
@@ -7041,7 +7041,7 @@ local function frame()
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
   elseif hover.ctrl == 'tp_rew' then state.status = 'rewind a little'
   elseif hover.ctrl == 'tp_fwd' then state.status = 'fast forward a little'
-  elseif hover.ctrl == 'tp_play' then state.status = 'play (Space)'
+  elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'

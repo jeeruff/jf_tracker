@@ -1975,10 +1975,12 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 -- строки ячеек { id, текст, цвет }; id — те же, что у главного модуля
 -- (клик / колесо — ctrl_action). Время и BPM — свой крупный блок слева
 function D.transport_buttons(c)
+  -- обычные кнопки словами (5 окт: значки отменены) — [rev][play/stop][rec][pause][fwd][loop]
   local ps = c.playstate or 0
-  return { { 'tp_rew', '<<' }, { 'tp_play', '>', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
-           { 'tp_pause', 'II', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '●', c.recording and U.RED or U.TEXT, U.RED }, { 'tp_fwd', '>>' },
-           { 'loop', '∞', c.loop and U.CYAN or U.GREY } }                   -- луп — символ ∞ (8 на боку)                         -- луп (5 окт): вместо «loop on»
+  local playing = ps & 1 == 1
+  return { { 'tp_rew', 'rev' }, { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil },
+           { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil },
+           { 'tp_fwd', 'fwd' }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
 end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -2032,29 +2034,21 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     x, w = x + third, w - third
     st.big = true
   end
-  -- кнопки транспорта крупно (×2), сразу справа от модуса (5 окт)
+  -- кнопки транспорта (5 окт): обычного размера, словами, справа от модуса;
+  -- включённая — фоном своего цвета; по высоте — посередине полосы
   if info and info.ctrl and w > 50 * L.cw then
     local bx = x + L.pad
-    local btns = D.transport_buttons(info.ctrl)
-    -- одна ширина у всех (5 окт: «поровнее»), символ по центру; по высоте —
-    -- по центру кнопки, не впритык к верхней рамке
-    local tws, maxw = {}, 0
-    for i, b in ipairs(btns) do tws[i] = D.big_measure(b[2], 2); maxw = math.max(maxw, tws[i]) end
-    local bw, bh, by = maxw + 2 * L.pad, 2 * L.rh, ly - 1
-    local th = D.ttf and (D.ttf_px or L.th) * 2 or 2 * (L.th or gfx.texth)
-    -- центр по чернилам (5 окт, по скриншоту): у крупного битмапа над буквой
-    -- пустая полоса шрифта — символы сидели на 0.3 строки ниже центра кнопки
-    local ty = by + math.max(1, math.floor((bh - th) / 2) + 1) - (D.SPACE or 0) - math.floor(0.3 * L.rh + 0.5)
-    for i, b in ipairs(btns) do
-      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
-      local on = b[3] and b[3] ~= U.TEXT and b[3] ~= U.GREY
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
-      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
-      local fg = hot and U.AMBER or (b[4] or b[3] or U.TEXT)               -- b[4]: свой цвет символа (● всегда красный)
-      D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], fg, 2)
+    local by = ly + math.floor(L.rh / 2)
+    for _, b in ipairs(D.transport_buttons(info.ctrl)) do
+      local bw = ms(b[2]) + 2 * L.pad
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      local on = b[3] ~= nil
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, L.rh, 0)
+      text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))   -- b[4]: свой цвет (rec — красный)
       if hot then hover.ctrl = b[1] end
-      hint('ctrl', bx, by, bw, bh, b[1])
-      bx = bx + bw + L.pad
+      hint('ctrl', bx, by, bw, L.rh, b[1])
+      bx = bx + bw + 2
     end
     set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
     w = w - (bx + 2 * L.pad - x); x = bx + 2 * L.pad
