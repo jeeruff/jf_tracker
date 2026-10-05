@@ -636,7 +636,7 @@ local function run_cmd(line)
   elseif cmd == 'font' or cmd == 'nerd' or cmd == 'fontface' or cmd == 'face' or cmd == 'hybrid' then
     -- TTF и Nerd-иконки убраны (3 окт): только битмап REAPER, масштаб :scale 1..3
     V.msg = 'TTF fonts and icons are gone - bitmap only (:scale 1..3, Ctrl +/-)'
-  elseif cmd == 'scale' and n then local k = math.max(1, math.min(3, math.floor(n))); ctx.set_scale(k); V.msg = 'bitmap x' .. k .. (n > 3 and ' (x4 is kept for PT-mode)' or '')
+  elseif cmd == 'scale' and n then local k = (math.abs(n - 1.5) < 0.01) and 1.5 or math.max(1, math.min(3, math.floor(n))); ctx.set_scale(k); V.msg = 'bitmap x' .. tostring(k):gsub('%.0$', '') .. (n > 3 and ' (x4 is kept for PT-mode)' or '')
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
     -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden

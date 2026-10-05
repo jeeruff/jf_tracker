@@ -1339,6 +1339,7 @@ ctx = {
       { key = 'q', label = 'smart quantize', fn = function() if not ready() then return end; SL.smart_quantize() end },
       { key = 'z', label = 'autotrim the silence', fn = function() if not ready() then return end; SL.autotrim() end },
     } })
+    state.popup_at = { kind = 'sprops' }                -- поверх панели свойств сэмпла (5 окт)
   end,
   octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)
   slice_base = function() return model.SLICE_BASE or model.BASE_NOTE or 60 end,     -- кнопка scramble вкладки item (4 окт)
@@ -3004,7 +3005,7 @@ ctx = {
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { sep = true, title = 'look' },
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
-      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() return math.floor(state.fontscale or 2) end, set = function(v) ctx.set_scale(v) end },
+      { key = 'fontscale', label = 'bitmap scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
@@ -6262,6 +6263,7 @@ local function frame()
           SPROP.draw_info(L, px, y, pw, h, ctx.file_info(sel_e.path), ppath == sel_e.path)
         else
           SPROP.draw(L, px, y, pw, h, sel_e, state.focus == 'top')
+          ctx.sprops_rect = { px, y, pw, h, t = reaper.time_precise() }   -- якорь меню нарезки (5 окт)
         end
       else pw = 0; SPROP.hover = nil end
       if pleft then
@@ -6305,7 +6307,7 @@ local function frame()
   end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
-  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy')) then state.popup_at = nil end
+  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy' or state.popup_at.kind == 'sprops')) then state.popup_at = nil end
   local anchor
   do
     local pa = state.popup_at
@@ -6326,6 +6328,10 @@ local function frame()
       -- меню у своей кнопки главного модуля (скринсеты, 4 окт)
       local r = draw.ctrl_rect and draw.ctrl_rect[pa.name]
       if r then anchor = { x = r[1], y = r[2] + r[4] + 1 } end
+    elseif pa and pa.kind == 'sprops' then
+      -- меню нарезки (5 окт): поверх панели свойств сэмпла (volume / pan / transpose)
+      local r = ctx.sprops_rect
+      if r and reaper.time_precise() - (r.t or 0) < 0.5 then anchor = { x = r[1], y = r[2] } end
     elseif pa and pa.kind == 'inst' then
       anchor = { x = L.side_x or L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
     end
@@ -7983,8 +7989,12 @@ local function frame()
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and (ctx.mods().ctrl or ctx.mods().cmd) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
     if (state.font or 0) == 0 then
-      ctx.set_scale(math.max(1, math.min(draw.SCALE_MAX, math.floor(state.fontscale or 2) + d)))
-      vim.msg = ('bitmap x%d'):format(state.fontscale)
+      -- шаги x1 → x1.5 → x2 → x3 (5 окт)
+      local STEPS = { 1, 1.5, 2, 3 }
+      local cur, i = tonumber(state.fontscale) or 2, 1
+      for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
+      ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
+      vim.msg = ('bitmap x%s'):format(tostring(state.fontscale):gsub('%.0$', ''))
     else ctx.set_font(math.max(6, state.font + d)); vim.msg = 'font ' .. state.font end
     c = 0
   end

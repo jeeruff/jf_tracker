@@ -76,7 +76,8 @@ function IK.key(c, cur, n, nslots)
   elseif ch == 'x' then if cur <= n then ctx.inst_cut(cur, cur) end
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)
-  elseif c == 13 or ch == 's' then ctx.open_slicer()
+  elseif c == 13 then ctx.open_slicer()                         -- Enter — выбрать: сэмпл во вкладке item
+  elseif ch == 's' then if ctx.slice_hydra then ctx.slice_hydra() end   -- s — сразу меню нарезки (5 окт)
   elseif ch == ' ' then ctx.inst_listen()
   elseif ch == 'a' then ctx.inst_listen_toggle()
   elseif ch == '/' then ctx.inst_find()
