@@ -3869,6 +3869,9 @@ function D.frame(L, snap, rows, state, info)
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
+  -- верхняя линия главного модуля и верхней панели (5 окт): как у lib сверху;
+  -- до сайдбара — у него своя
+  if L.top_h > 0 and (L.top_y or 0) == 0 then set(D.SEP); gfx.rect(0, 0, (L.side_w or 0) > 0 and (L.side_x or L.win_w) - 2 or L.win_w, D.SEPW, 1) end
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши; последней в
   -- кадре (5 окт) — скроллбар, пианинка и разделители закрывали низ и право
   do
