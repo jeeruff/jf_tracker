@@ -48,6 +48,7 @@ function O.rebuild()
   while O.items[O.sel] and O.items[O.sel].sep and O.sel < #O.items do O.sel = O.sel + 1 end
 end
 function O.open(items, tab)
+  O.compact, O.numbuf = nil, nil
   O.all = items or O.all
   O.tabs = {}
   for _, it in ipairs(O.all) do if it.sep and it.title then O.tabs[#O.tabs + 1] = it.title end end
@@ -59,6 +60,13 @@ function O.open(items, tab)
   O.page = 'list'
   O.active = true
   O.rebuild()
+end
+-- компактная панель (5 окт): свойства item у курсора — те же строки, без
+-- вкладок и поиска, у точки anchor = { x, y }; title — заголовок
+function O.open_panel(items, title, anchor)
+  O.all, O.items, O.tabs, O.tab, O.query, O.typing = items, items, {}, nil, '', false
+  O.compact = { title = title or '', x = anchor and anchor.x, y = anchor and anchor.y }
+  O.page, O.active, O.sel, O.scroll, O.numbuf = 'list', true, 1, 0, nil
 end
 function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end end
 function O.step_tab(d)
@@ -77,6 +85,7 @@ function O.close() O.active = false; O.drag = nil end
 
 local function val_text(it)
   if it.kind == 'action' then return it.value or '' end
+  if it.kind == 'text' then return it.get and tostring(it.get()) or '' end
   local v = it.get()
   if it.kind == 'toggle' then return v and 'on' or 'off' end
   if it.kind == 'cycle' then return tostring(v) end
@@ -87,7 +96,7 @@ end
 -- изменить строку: d = +1/-1 (num/cycle), 0 = переключить (toggle) / шаг вперёд
 function O.adjust(it, d)
   if not it then return end
-  if it.kind == 'action' then if it.fn then it.fn() end; return end   -- строка-действие (5 окт)
+  if it.kind == 'action' or it.kind == 'text' then if it.fn then it.fn() end; return end   -- действие / текст (промпт) (5 окт)
   if it.kind == 'toggle' then it.set(not it.get())
   elseif it.kind == 'cycle' then
     local v = it.get(); local k = 1
@@ -115,6 +124,25 @@ function O.key(c)
     return true
   end
   local shift = ctx.mods and ctx.mods().shift
+  local cur = O.items[O.sel]
+  -- число цифрами (5 окт): 0-9 . - копятся, Enter — поставить, Esc / BS — правка
+  if cur and cur.kind == 'num' and (ch:match('^[%d%.]$') or (ch == '-' and not O.numbuf)) and not O.typing then
+    O.numbuf = (O.numbuf or '') .. ch; return true
+  end
+  if O.numbuf then
+    if c == 13 then
+      local v = tonumber(O.numbuf); O.numbuf = nil
+      if v and cur then
+        if cur.min then v = math.max(cur.min, v) end
+        if cur.max then v = math.min(cur.max, v) end
+        cur.set(v)
+      end
+      return true
+    elseif c == 8 then O.numbuf = O.numbuf:sub(1, -2); if O.numbuf == '' then O.numbuf = nil end; return true
+    elseif c == 27 then O.numbuf = nil; return true end
+    O.numbuf = nil
+  end
+  if O.compact and (ch == '/' or ch == 'f' or c == 9 or ch == '[' or ch == ']') then return true end
   -- поиск: набор прямо в окне
   if O.typing then
     if c == 27 then O.typing = false; O.query = ''; O.rebuild()
@@ -377,12 +405,19 @@ function O.draw(L, W, H)
   nvis = nvis2
   local bh = (nvis + 4) * rh
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
+  if O.compact then
+    nvis = math.min(n, math.floor((H - 4 * rh) / rh))
+    bw = math.min(W - 2 * L.pad, math.max(lw + vw + 3 * L.pad + L.cw * 12, L.cw * 52))
+    bh = (nvis + 2) * rh + 4
+    bx = math.max(L.pad, math.min(W - bw - L.pad, O.compact.x or bx))
+    by = math.max(2, math.min(H - bh - 2, O.compact.y or by))
+  end
   O.box = { bx, by, bw, bh }
   if O.sel - 1 < O.scroll then O.scroll = O.sel - 1 end
   if O.sel > O.scroll + nvis then O.scroll = O.sel - nvis end
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
-  U.text(bx + L.pad, by + 2, 'options', U.AMBER)
+  U.text(bx + L.pad, by + 2, ctx.fit(O.compact and O.compact.title or 'options', bw - 2 * L.pad - U.measure('x') - 2 * L.pad), U.AMBER)
   -- крестик закрытия в правом углу (3 окт)
   do
     local cw2 = U.measure('x') + 2 * L.pad
@@ -393,12 +428,12 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   Tab / [ ]: tabs   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY)   -- до крестика
+  if not O.compact then U.text(hx, by + 2, ctx.fit('j k: row   Enter / h l: change   Tab / [ ]: tabs   /: find   Esc: close', bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска
   O.tab_hot, O.find_hot = nil, nil
-  do
+  if not O.compact then
     local ty = by + rh + 4
     local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/ find')
     local fw = math.max(U.measure('/ find') , U.measure(fq)) + 2 * L.pad
@@ -422,7 +457,7 @@ function O.draw(L, W, H)
     U.text(fx + L.pad, ty, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
   end
   local by0 = by
-  by = by + rh                                             -- список — под строкой вкладок
+  if not O.compact then by = by + rh end                   -- список — под строкой вкладок
   O.hover = nil
   O.hbtn = nil
   O.vrect = {}
@@ -463,7 +498,8 @@ function O.draw(L, W, H)
         local shot = (hot and mx < vx + tw + 2 and mx >= vx - 2) or (O.drag and O.drag.i == i)
         U.set(U.DIM); gfx.rect(vx, cy - 1, tw, 2, 1)
         U.set(shot and U.AMBER or U.TEXT); gfx.rect(vx, y + 4, math.max(1, math.floor(fr * tw + 0.5)), rh - 8, 1)
-        U.text(vx + tw + L.pad, y + 1, vt, U.TEXT)
+        if O.numbuf and i == O.sel then vt = O.numbuf .. '_' end
+        U.text(vx + tw + L.pad, y + 1, vt, (O.numbuf and i == O.sel) and U.AMBER or U.TEXT)
       elseif it.kind == 'cycle' then
         -- все значения кнопками в ряд до правого края (описание — внизу при наведении)
         local room = bx + bw - L.pad - vx
@@ -493,6 +529,7 @@ function O.draw(L, W, H)
     end
   end
   O.vrect_last = O.vrect
+  if O.compact then O.vrect_last = O.vrect; return end
   U.set(U.LINE); gfx.rect(bx, by0 + bh - rh - 2, bw, 1, 1)
   -- описание — строки под мышью, иначе выбранной клавишами
   local it = O.items[O.hover or O.sel]

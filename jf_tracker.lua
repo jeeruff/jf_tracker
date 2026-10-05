@@ -2330,39 +2330,45 @@ ctx = {
     local tk = reaper.GetActiveTake(item)
     local function iv(k) return reaper.GetMediaItemInfo_Value(item, k) end
     local function tv(k) return tk and reaper.GetMediaItemTakeInfo_Value(tk, k) or 0 end
-    local vol = iv('D_VOL')
-    local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
-    local pan = tv('D_PAN')
-    local function pan_s(v) return math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5)) end
+    -- правка: свой undo-шаг, item обновить, модель — заново
+    local function put(desc, fn) edit.run('item ' .. desc, function() fn(); reaper.UpdateItemInProject(item) end); model.invalidate() end
+    local function itog(key, desc) return { label = desc, kind = 'toggle', get = function() return iv(key) >= 0.5 end, set = function(v) put(desc, function() reaper.SetMediaItemInfo_Value(item, key, v and 1 or 0) end) end } end
+    local srclen = 0
+    if tk then local src = reaper.GetMediaItemTake_Source(tk); srclen = src and reaper.GetMediaSourceLength(src) or 0 end
     local nm = tk and reaper.GetTakeName(tk) or ''
-    local function ask(key, cur) return function()
-      state.iprop_item = item
-      vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = ('iprop %s %s'):format(key, cur)
-    end end
-    local function tog(key, scope, label) return function()
-      edit.run('item ' .. label, function()
-        if scope == 'take' then if tk then reaper.SetMediaItemTakeInfo_Value(tk, key, tv(key) >= 0.5 and 0 or 1) end
-        else reaper.SetMediaItemInfo_Value(item, key, iv(key) >= 0.5 and 0 or 1) end
-        reaper.UpdateItemInProject(item)
-      end)
-      model.invalidate(); vim.msg = label .. ' toggled'
-    end end
-    local function onoff(b) return b and 'on' or 'off' end
-    vim.open_hydra({ title = 'item ' .. nm, items = {
-      { key = 'v', label = ('volume  %+.1f dB'):format(db), fn = ask('vol', ('%.1f'):format(db)) },
-      { key = 'p', label = 'pan  ' .. pan_s(pan), fn = ask('pan', pan_s(pan)) },
-      { key = 't', label = ('transpose  %+g st'):format(math.floor(tv('D_PITCH') * 100 + 0.5) / 100), fn = ask('pitch', ('%g'):format(math.floor(tv('D_PITCH') * 100 + 0.5) / 100)) },
-      { key = 'r', label = ('rate  %.3f'):format(tv('D_PLAYRATE')), fn = ask('rate', ('%.3f'):format(tv('D_PLAYRATE'))) },
-      { key = 'k', label = 'keep pitch  ' .. onoff(tv('B_PPITCH') >= 0.5), fn = tog('B_PPITCH', 'take', 'keep pitch') },
-      { key = 'l', label = 'loop  ' .. onoff(iv('B_LOOPSRC') >= 0.5), fn = tog('B_LOOPSRC', 'item', 'loop') },
-      { key = 'm', label = 'mute  ' .. onoff(iv('B_MUTE') >= 0.5), fn = tog('B_MUTE', 'item', 'mute') },
-      { key = 'i', label = ('fade in  %d ms'):format(math.floor(iv('D_FADEINLEN') * 1000 + 0.5)), fn = ask('fadein', math.floor(iv('D_FADEINLEN') * 1000 + 0.5)) },
-      { key = 'o', label = ('fade out  %d ms'):format(math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5)), fn = ask('fadeout', math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5)) },
-      { key = 's', label = ('start offset  %.3f s'):format(tv('D_STARTOFFS')), fn = ask('offs', ('%.3f'):format(tv('D_STARTOFFS'))) },
-      { key = 'n', label = 'name  ' .. nm, fn = ask('name', nm) },
-      { key = 'w', label = 'REAPER item properties window', fn = function() select_item_in_reaper(item); reaper.Main_OnCommand(40009, 0) end },
-    } })
-    state.popup_at = anchor or ctx.cursor_anchor()
+    local items = {
+      { label = 'volume', kind = 'num', min = -60, max = 12, step = 0.5, fmt = '%+.1f dB',
+        get = function() local v = iv('D_VOL'); return v > 1e-6 and math.floor(20 * math.log(v, 10) * 10 + 0.5) / 10 or -60 end,
+        set = function(v) put('volume', function() reaper.SetMediaItemInfo_Value(item, 'D_VOL', v <= -60 and 0 or 10 ^ (v / 20)) end) end },
+      { label = 'pan', kind = 'num', min = -100, max = 100, step = 1, fmt = '%+d',
+        get = function() return math.floor(tv('D_PAN') * 100 + 0.5) end,
+        set = function(v) if tk then put('pan', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PAN', v / 100) end) end end },
+      { label = 'transpose', kind = 'num', min = -48, max = 48, step = 1, fmt = '%+g st',
+        get = function() return math.floor(tv('D_PITCH') * 100 + 0.5) / 100 end,
+        set = function(v) if tk then put('transpose', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', v) end) end end },
+      { label = 'rate', kind = 'num', min = 0.1, max = 10, step = 0.01, fmt = '%.3f',
+        get = function() return tv('D_PLAYRATE') end,
+        set = function(v) if tk then put('rate', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', math.max(0.01, v)) end) end end },
+      { label = 'keep pitch', kind = 'toggle', get = function() return tv('B_PPITCH') >= 0.5 end,
+        set = function(v) if tk then put('keep pitch', function() reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', v and 1 or 0) end) end end },
+      itog('B_LOOPSRC', 'loop'), itog('B_MUTE', 'mute'),
+      { label = 'fade in', kind = 'num', min = 0, max = 5000, step = 5, fmt = '%d ms',
+        get = function() return math.floor(iv('D_FADEINLEN') * 1000 + 0.5) end,
+        set = function(v) put('fade in', function() reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', v / 1000) end) end },
+      { label = 'fade out', kind = 'num', min = 0, max = 5000, step = 5, fmt = '%d ms',
+        get = function() return math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5) end,
+        set = function(v) put('fade out', function() reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', v / 1000) end) end },
+      { label = 'start offset', kind = 'num', min = 0, max = math.max(0.001, srclen), step = 0.01, fmt = '%.3f s',
+        get = function() return tv('D_STARTOFFS') end,
+        set = function(v) if tk then put('start offset', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', v) end) end end },
+      { label = 'name', kind = 'text', get = function() return tk and reaper.GetTakeName(tk) or '' end, fn = function()
+          state.iprop_item = item; OPT.close()
+          vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'
+          vim.cmdline = 'iprop name ' .. (tk and reaper.GetTakeName(tk) or '') end },
+      { label = 'REAPER item properties window', kind = 'action', value = 'w', fn = function() OPT.close(); select_item_in_reaper(item); reaper.Main_OnCommand(40009, 0) end },
+    }
+    local a = anchor or ctx.cursor_anchor()
+    OPT.open_panel(items, 'item ' .. nm .. '   j k row, h l / digits value, Enter, Esc', { x = a.x, y = a.y })
   end,
   -- :iprop key value — число / имя в item из item_props
   item_prop = function(key, val)

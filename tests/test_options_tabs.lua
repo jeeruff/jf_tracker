@@ -27,5 +27,15 @@ eq('fzf: one match', #O.items, 1); eq('fzf: the hints row', O.items[1].key, 'hin
 O.key(27); eq('Esc clears the search', O.query, ''); eq('back to the tab', #O.items, #items)
 O.open(items, 'look'); eq('open on a remembered tab', O.tab, 'look')
 O.open(items, 'gone'); eq('unknown tab -> the first', O.tab, 'theme')
+-- компактная панель (5 окт): число цифрами, Enter, границы, Esc
+local vol = 0
+O.open_panel({ { label = 'volume', kind = 'num', min = -60, max = 12, step = 0.5, get = function() return vol end, set = function(v) vol = v end } }, 'item x', { x = 10, y = 10 })
+eq('panel: compact', O.compact ~= nil, true)
+for ch in ('-6'):gmatch('.') do O.key(ch:byte()) end
+eq('panel: digits buffered', O.numbuf, '-6'); O.key(13); eq('panel: Enter sets', vol, -6)
+for ch in ('99'):gmatch('.') do O.key(ch:byte()) end; O.key(13); eq('panel: clamped to max', vol, 12)
+O.key(('3'):byte()); O.key(27); eq('panel: Esc drops the number', O.numbuf, nil); eq('panel: value kept', vol, 12)
+O.key(('h'):byte()); eq('panel: h steps down', vol, 11.5)
+O.key(('/'):byte()); eq('panel: no search in the panel', O.typing, false)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
