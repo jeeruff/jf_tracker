@@ -1950,10 +1950,10 @@ function D.piano_strip(L, x, y, w, h, p)
   local nl = p.status and 3 or 2
   local ly = y + math.floor((h - nl * L.rh) / 2)
   local lbl = ('oct %d'):format(p.octave or 4)
-  local zx = 'z- x+'
+  local zx = p.hints and 'z- x+' or ''
   local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
   text(x + L.pad, ly, lbl, U.AMBER)
-  text(x + L.pad, ly + L.rh, zx, U.GREY)                -- октава: z ниже, x выше
+  if zx ~= '' then text(x + L.pad, ly + L.rh, zx, U.GREY) end   -- октава: z ниже, x выше
   local kx = x + lw
   local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 10))
   if kw < 4 then return out end
@@ -1995,8 +1995,10 @@ function D.piano_strip(L, x, y, w, h, p)
   local hw = x + w - hx - L.pad
   if hw > 0 then
     local kc = p.ins and U.AMBER or U.TEXT
-    key_items(hx, ly, hw, D.PIANO_ROWS[1], kc, L.pad)
-    key_items(hx, ly + L.rh, hw, D.PIANO_ROWS[2], kc, L.pad)
+    if p.hints then
+      key_items(hx, ly, hw, D.PIANO_ROWS[1], kc, L.pad)
+      key_items(hx, ly + L.rh, hw, D.PIANO_ROWS[2], kc, L.pad)
+    end
     if p.status then
       local sy = ly + 2 * L.rh
       local left = fit(p.status[1], math.floor(hw / 3))
@@ -3678,6 +3680,7 @@ function D.frame(L, snap, rows, state, info)
   -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
   if L.piano_h > 0 and info.piano then
     info.piano.ins = info.vmode == 'insert'
+    info.piano.hints = state.hints and true or false      -- подсказки рядов — с опцией hints (5 окт)
     if L.kbstat then
       info.piano.status = { info.status_left or '', (info.status_right ~= '' and info.status_right) or D.aw_status or '' }
       D.aw_status = nil
