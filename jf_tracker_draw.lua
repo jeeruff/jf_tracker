@@ -2488,6 +2488,9 @@ function D.frame(L, snap, rows, state, info)
         if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
+        -- слайдер под клавиатурой (метка f, 5 окт): янтарная рамка
+        local ks = info.kslider
+        if ks and ks.what == what and ks.col and ks.col.guid == col.guid then set(U.AMBER); gfx.rect(wx0 - 2, sy + 1, ww + 4, L.rh - 2, 0) end
       end
       local function db_of(v) return v > 1e-6 and 20 * math.log(v, 10) or -150 end
       local function pan_txt(p) if math.abs(p) < 0.005 then return 'C' end; return (p < 0 and 'L' or 'R') .. math.floor(math.abs(p) * 100 + 0.5) end

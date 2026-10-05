@@ -2239,6 +2239,49 @@ ctx = {
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
+  -- шаг слайдера шапки (колесо, клавиатура): громкость 0.5 dB, панорама 0.02;
+  -- coarse — 3 dB / 0.1
+  trs_nudge = function(col, what, d, coarse)
+    local key = TRS_KEY[what]
+    if not (col and key and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
+    local cur = reaper.GetMediaTrackInfo_Value(col.track, key)
+    local v
+    if what == 'vol' then
+      local db = cur > 1e-6 and 20 * math.log(cur, 10) or -60
+      v = 10 ^ (math.max(-60, math.min(12, db + d * (coarse and 3 or 0.5))) / 20)
+    else v = math.max(-1, math.min(1, cur + d * (coarse and 0.1 or 0.02))) end
+    edit.track_value(col.track, key, v); edit.track_undo('track ' .. what); model.invalidate()
+    vim.msg = what == 'vol' and ('%s vol %+.1f dB'):format(col.name, v > 1e-6 and 20 * math.log(v, 10) or -150) or ('%s %s %+.2f'):format(col.name, what, v)
+  end,
+  -- клавиатурный слайдер (метка f на слайдере, 5 окт): h l / j k — шаг,
+  -- Shift — крупно, 0 — сброс, Esc / Enter — готово; true — клавиша съедена
+  kslider_key = function(c)
+    local ks = state.kslider
+    local ch = c > 0 and c < 256 and string.char(c) or ''
+    if c == 1818584692 then ch = 'h' elseif c == 1919379572 then ch = 'l' elseif c == 1685026670 then ch = 'j' elseif c == 30064 then ch = 'k' end   -- стрелки
+    -- горизонтальный слайдер (5 окт): h l — значение (H L — крупно), j k —
+    -- соседний слайдер шапки сверху вниз: громкость, панорама, ширина / L R
+    if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' then
+      ctx.trs_nudge(ks.col, ks.what, (ch == 'h' or ch == 'H') and -1 or 1, ch == 'H' or ch == 'L'); return true
+    end
+    if ch == 'j' or ch == 'k' then
+      local pm = reaper.GetMediaTrackInfo_Value(ks.col.track, 'I_PANMODE')
+      local list = pm == 6 and { 'vol', 'panl', 'panr' } or (pm == 5 and { 'vol', 'pan', 'width' } or { 'vol', 'pan' })
+      local i = 1
+      for k, w in ipairs(list) do if w == ks.what then i = k end end
+      i = math.max(1, math.min(#list, i + (ch == 'j' and 1 or -1)))
+      ks.what = list[i]
+      vim.msg = ('%s %s: h l change, j k next slider, 0 reset, Esc done'):format(ks.col.name or '', ks.what)
+      return true
+    end
+    if ch == '0' then
+      edit.track_value(ks.col.track, TRS_KEY[ks.what], TRS_RESET[ks.what]); edit.track_undo('track ' .. ks.what .. ' reset'); model.invalidate()
+      vim.msg = ks.what .. ' reset'; return true
+    end
+    state.kslider = nil
+    vim.msg = 'slider: done'
+    return c == 27 or c == 13                                 -- Esc / Enter — съедены; другое — дальше
+  end,
   dev_on = function() return state.dev end,
   sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
   -- строка :sig с текущим размером; rg — для паттерна (матрица), иначе спросит
@@ -4266,6 +4309,9 @@ local function hint_go(t)
   elseif t.kind == 'btn' and d.what == 'auto' then ctx.automation_picker(d.col)
   elseif t.kind == 'hdrin' then
     if d.what == 'smart' then ctx.smart_input(d.col) else ctx.input_picker(d.col) end
+  elseif t.kind == 'trs' then
+    state.kslider = { col = d.col, what = d.what }
+    vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what)
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
@@ -5975,7 +6021,7 @@ local function frame()
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
@@ -7713,15 +7759,7 @@ local function frame()
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.trs then
-    local t, d = hover.trs, gfx.mouse_wheel > 0 and 1 or -1
-    local key = TRS_KEY[t.what]
-    local cur = reaper.GetMediaTrackInfo_Value(t.col.track, key)
-    local v
-    if t.what == 'vol' then
-      local db = cur > 1e-6 and 20 * math.log(cur, 10) or -60
-      v = 10 ^ (math.max(-60, math.min(12, db + d * 0.5)) / 20)
-    else v = math.max(-1, math.min(1, cur + d * 0.02)) end
-    edit.track_value(t.col.track, key, v); edit.track_undo('track ' .. t.what); model.invalidate()
+    ctx.trs_nudge(hover.trs.col, hover.trs.what, gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.garden and hover.garden.ri then
@@ -7960,6 +7998,7 @@ local function frame()
     vim.msg = 'focus: ' .. state.focus:upper()
     c = 0
   end
+  if c > 0 and state.kslider and not HN.active and ctx.kslider_key(c) then c = 0 end
   if c > 0 and HN.active then
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
