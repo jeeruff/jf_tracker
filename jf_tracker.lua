@@ -6482,7 +6482,12 @@ local function frame()
     state.status = hover.trsbtn.col.name .. ' ' .. hover.trsbtn.what .. ' - narrow track: click opens the slider, click again closes'
   elseif hover.trs then
     local names = { vol = 'volume', pan = 'pan', width = 'width (stereo pan)', panl = 'left pan (dual pan)', panr = 'right pan (dual pan)' }
-    state.status = ('%s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what)
+    -- значение — здесь (5 окт): в строке из двух слайдеров чисел нет
+    local w = hover.trs.what
+    local v = reaper.ValidatePtr(hover.trs.col.track, 'MediaTrack*') and reaper.GetMediaTrackInfo_Value(hover.trs.col.track, TRS_KEY[w] or 'D_VOL') or 0
+    local vs = w == 'vol' and (v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf') or (w == 'width' and ('%d%%'):format(math.floor(v * 100 + 0.5))
+      or (math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5))))
+    state.status = ('%s %s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what, vs)
   elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'

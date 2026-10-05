@@ -2431,7 +2431,7 @@ function D.frame(L, snap, rows, state, info)
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live
-      local function slider(sx, sy, sw, frac, centered, label, val, what, in_pop)
+      local function slider(sx, sy, sw, frac, centered, label, val, what, in_pop, noval)
         -- узко (3 окт): дорожке меньше трёх символов — слайдер сворачивается в
         -- кнопку-букву; клик — всплывающий слайдер под ней (D.trspop), повтор — закрыть
         if not in_pop and sw - ms(label) - 2 * L.pad < ms('000') then
@@ -2470,7 +2470,9 @@ function D.frame(L, snap, rows, state, info)
         local vw = vres + L.pad
         local lw = ms(label) + L.pad
         -- узкий трек (свёрнутый): значение не влезает — без него, не в соседа (ревью 2 окт)
-        local show_val = sw >= lw + vw + L.pad + 12
+        -- noval (5 окт): два слайдера в строке — без чисел, вся половина под дорожку;
+        -- значение — в статусе при наведении / протяжке
+        local show_val = not noval and sw >= lw + vw + L.pad + 12
         if not show_val then vw = 0 end
         local wx0, ww = sx + lw, math.max(4, sw - lw - vw - L.pad)
         local cy = sy + math.floor(L.rh / 2)
@@ -2507,12 +2509,12 @@ function D.frame(L, snap, rows, state, info)
       local px, pw = sx, sw
       if col.panmode == 5 then
         local half = math.floor(pw / 2)
-        slider(px, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
-        slider(px + half, py, pw - half, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width')
+        slider(px, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
+        slider(px + half, py, pw - half, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
       elseif col.panmode == 6 then
         local half = math.floor(pw / 2)
-        slider(px, py, half - L.pad, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl')
-        slider(px + half, py, pw - half, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr')
+        slider(px, py, half - L.pad, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl', nil, true)
+        slider(px + half, py, pw - half, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr', nil, true)
       else
         slider(px, py, pw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
       end
