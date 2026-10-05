@@ -1974,7 +1974,8 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 function D.transport_buttons(c)
   local ps = c.playstate or 0
   return { { 'tp_rew', '[<<]' }, { 'tp_play', '[>]', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
-           { 'tp_pause', '[II]', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '[o]', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '[>>]' } }
+           { 'tp_pause', '[II]', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '[o]', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '[>>]' },
+           { 'loop', '[8]', c.loop and U.CYAN or U.GREY } }                         -- луп (5 окт): вместо «loop on»
 end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -1996,7 +1997,7 @@ function D.transport_groups(c)
   -- кнопки [<<][>][II][o][>>] — крупно справа от модуса (D.transport_buttons)
   g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('punch', 'punch', c.punch) },
                 { tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
-  g[#g + 1] = { { tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
+  g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
   return g
