@@ -658,7 +658,7 @@ V.INTRO = {
   'pt-mode is a simple view without a crowd of channels - a tribute to the old-school protracker way, the tracker a ton of jungle and electronic music was written on.',
   'no icons and no symbols - only letters, and the alphabets have plenty: Δ is delta solo, ø is phase.',
   'i am not a professional programmer - claude helped me write it, so i see no point in making it a commercial product.',
-  'what you get here is worth roughly 750 euro of tokens and months of almost non-stop work, which i loved doing and will keep doing - it is what i could do 24/7.',
+  'what you get here is worth at least 2500 euro of tokens and months of almost non-stop work, which i loved doing and will keep doing - it is what i could do 24/7.',
   'if it makes you as happy as it makes me, buy me a coffee:',
   'https://ko-fi.com/jeeruff',
 }

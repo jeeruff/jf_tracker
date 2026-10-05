@@ -25,8 +25,8 @@ and type the notes that the keyboard can type anyway.
   alphabet: `Δ` is delta solo, `ø` is phase.
 
 I am not a professional programmer. Claude helped me write this, so I see no
-point in making it a commercial product. What you get here is worth roughly
-750 euro of tokens and months of almost non-stop work, which I loved doing and
+point in making it a commercial product. What you get here is worth at least
+2500 euro of tokens and months of almost non-stop work, which I loved doing and
 will keep doing. If it makes you as happy as it makes me, buy me a coffee:
 <https://ko-fi.com/jeeruff>.
 
