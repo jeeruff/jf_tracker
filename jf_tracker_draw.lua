@@ -2188,11 +2188,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
     local bx, by, bh = bx0, (bk == 2) and (ly - 2) or (ly + math.floor(L.rh / 2)), (bk == 2) and (2 * L.rh + 4) or L.rh
     local ty = by + 2 + math.max(1, math.floor((2 * L.rh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.08 * L.rh + 0.5))
-    -- скруглённый угол: срезать 2 px угла и поставить пиксель рамки по диагонали
+    -- скруглённый угол (5 окт: «ещё чуть подрезать»): срезать треугольник
+    -- i + j < R - 1 и провести рамку по диагонали i + j = R - 1
+    local R = 4
     local function round_corner(cx, cy, dx, dy, frame)
       set(U.PANEL)
-      gfx.rect(cx, cy, 1, 1, 1); gfx.rect(cx + dx, cy, 1, 1, 1); gfx.rect(cx, cy + dy, 1, 1, 1)
-      set(frame); gfx.rect(cx + dx, cy + dy, 1, 1, 1)
+      for i = 0, R - 2 do for j = 0, R - 2 - i do gfx.rect(cx + dx * i, cy + dy * j, 1, 1, 1) end end
+      set(frame)
+      for i = 0, R - 1 do gfx.rect(cx + dx * i, cy + dy * (R - 1 - i), 1, 1, 1) end
     end
     for i, b in ipairs(blist) do
       local bw = bws[i]
