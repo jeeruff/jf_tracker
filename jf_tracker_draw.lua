@@ -95,7 +95,7 @@ function D.set_font(state)
   if tf then
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
-    D.ttf_face, D.ttf_size = tf.face, math.floor(tf.px * fs + 0.5)
+    D.ttf_face, D.ttf_size, D.ttf_px = tf.face, math.floor(tf.px * fs + 0.5), tf.px
     gfx.setfont(1, D.ttf_face, D.ttf_size)
     D.font_id = 1
     D.SCALE = 1
@@ -3748,8 +3748,11 @@ function D.frame(L, snap, rows, state, info)
     local kx1 = W - L.pad
     local now = info.now or 0
     -- свой масштаб (4 окт: keys - / keys + в главном модуле)
-    local s0 = D.SCALE
-    if (info.keycast_scale or 0) > 0 then D.SCALE = info.keycast_scale end
+    local s0, kcs = D.SCALE, (info.keycast_scale or 0) > 0 and info.keycast_scale or nil
+    if kcs then
+      if D.ttf then gfx.setfont(3, D.ttf_face, math.floor(D.ttf_px * kcs + 0.5))   -- TTF: свой кегль, не зум (5 окт)
+      else D.SCALE = kcs end
+    end
     local krh = TH() + 2
     if kx1 - kx0 >= L.cw * 6 then
       local yb = L.body_y + L.body_h - krh - 2
@@ -3768,6 +3771,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     D.SCALE = s0
+    if D.ttf then gfx.setfont(D.font_id) end
   end
   -- скролл-бар треков (3 окт): дорожка под телом от номеров строк до края,
   -- ползунок = видимые треки из всех; клик мимо — страница, протяжка — скролл

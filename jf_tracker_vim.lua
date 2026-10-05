@@ -900,7 +900,6 @@ local function keys_control(c)
     if V.piano then if ctx.insert_whole then ctx.insert_whole() end end
     return true
   elseif ch == 'a' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto' or tostring(V.step)); return true
-  elseif ch == 's' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = 'step '; return true
   elseif ch == 'd' then
     -- d — оператор Vim (d3w, dd, dG…): ждёт счётчик и движение, потом обратно в INSERT (2 окт)
     V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true; V.hexbuf = nil; return true
@@ -1032,6 +1031,31 @@ function V.key_impl(c)
     V.count = nil; return
   end
 
+  -- Shift+hjkl (5 окт): выделение, как Shift+стрелки — не в VISUAL войти с
+  -- якорем на курсоре и шагнуть; из INSERT после операции — обратно в INSERT.
+  -- s в INSERT — то же выделение без шага; Option+s (ß) — шаг (:step)
+  do
+    local chs = (c < 256) and string.char(c) or ''
+    local mods = ctx.mods and ctx.mods() or {}
+    local SH = { H = 'h', J = 'j', K = 'k', L = 'l' }
+    local inmode = V.mode == 'normal' or V.mode == 'insert' or V.mode == 'visual' or V.mode == 'vline'
+    if inmode and not V.pending and not V.op and not V.hexbuf and not V.shapebuf then
+      if c == 223 or (chs == 's' and mods.alt) then
+        V.cmd_from = V.mode == 'insert' and 'insert' or 'normal'; V.mode = 'cmd'; V.cmdline = 'step '; return
+      end
+      if SH[chs] or (chs == 's' and V.mode == 'insert') then
+        if V.mode ~= 'visual' and V.mode ~= 'vline' then
+          if V.mode == 'insert' then V.back_insert = true end
+          V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
+        end
+        if SH[chs] then
+          local m = motion(SH[chs]:byte(), V.count or 1)
+          if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
+        end
+        V.count = nil; return
+      end
+    end
+  end
   -- лидер \ — hydra действий (контекстное меню с клавиатуры), ? — шпаргалка
   if c == ('\\'):byte() and not (V.mode == 'insert' and (env_of(V.cur.fi) or (V.cur.field or 1) == 2)) then
     if ctx.context_key then ctx.context_key() else V.open_hydra(ctx.hydra_root()) end; return   -- 5 окт: \ — контекст; главная — `
@@ -1790,7 +1814,8 @@ function V.key(c)
   -- набор сокращения формы живёт только на месте: курсор ушёл — сброс (ревью 2 окт)
   if V.shapebuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.shapebuf = nil end
   if V.mode ~= 'insert' then V.shapebuf = nil end
-  if V.back_insert and not V.pending and not V.op then
+  -- в INSERT вернуться, когда операция (или выделение — s / Shift+hjkl, 5 окт) закончилась
+  if V.back_insert and not V.pending and not V.op and V.mode ~= 'visual' and V.mode ~= 'vline' then
     if V.mode == 'normal' then V.mode = 'insert' end
     V.back_insert = nil
   end

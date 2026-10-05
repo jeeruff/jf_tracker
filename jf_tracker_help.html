@@ -120,7 +120,7 @@ inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves 
 <div class="keys">
 <div><b>move</b>
 <kbd>h</kbd> <kbd>l</kbd> field · <kbd>j</kbd> <kbd>k</kbd> row<br>
-<kbd>H</kbd> <kbd>L</kbd> track · <kbd>0</kbd> <kbd>$</kbd> first / last column<br>
+<kbd>⌥H</kbd> <kbd>⌥L</kbd> track · <kbd>0</kbd> <kbd>$</kbd> first / last column<br>
 <kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd> event · <kbd>W</kbd> <kbd>B</kbd> any column<br>
 <kbd>gg</kbd> <kbd>G</kbd> <kbd>10G</kbd> · <kbd>{</kbd> <kbd>}</kbd> bar<br>
 <kbd>^D</kbd> <kbd>^U</kbd> half page · <kbd>zz</kbd> center</div>
@@ -147,7 +147,7 @@ position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd>
 </figure>
 <div class="rows"> <span class="a">2 3   5 6 7   9 0</span>          <span class="g">black keys</span>
 <span class="a">q w e r t y u i o p</span>        <span class="g">notes: q = C of the octave, like Ableton</span>
- a s d f g h j k l ;        <span class="g">a step auto · s :step · d delete · f fx fields · g start · hjkl move · ; whole sample</span>
+ a s d f g h j k l ;        <span class="g">a step auto · s select (⌥s :step) · d delete · f fx fields · g start · hjkl move · ; whole sample</span>
 z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar · M mute · , . sound</span></div>
 <table>
 <tr><td><kbd>Shift</kbd>+note</td><td>listen only, nothing is written</td></tr>
@@ -165,7 +165,7 @@ z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar
 </table>
 
 <h2 id="visual">VISUAL</h2>
-<p><kbd>v</kbd> selects a block, <kbd>V</kbd> whole rows; a mouse drag in the body does the same. On a selection:
+<p><kbd>v</kbd> selects a block, <kbd>V</kbd> whole rows, <kbd>Shift</kbd>+<kbd>hjkl</kbd> selects from the cursor and extends (in INSERT also <kbd>s</kbd>); a mouse drag in the body does the same. On a selection:
 <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>M</kbd> <kbd>^A</kbd> <kbd>^X</kbd> <kbd>r</kbd>{note}, and commands
 such as <code>:interp vol</code> (a ramp), <code>:arp up 2</code>, <code>:scramble</code>, <code>:legato</code>.
 <kbd>Option</kbd>+drag on an event moves the whole block.</p>
