@@ -2207,6 +2207,82 @@ ctx = {
     return true
   end,
   keyq = {},
+  -- ── пик у курсора (5 окт): \q к сетке, \Q — куда укажешь ──────────────
+  -- атака рядом с t (секунды item): аудио-аксессор, огибающая блоками 2 мс,
+  -- атака — наибольший рост над средним 20 мс до неё
+  peak_near = function(it, t, win)
+    local tk = reaper.GetActiveTake(it)
+    if not tk or reaper.TakeIsMIDI(tk) then return nil end
+    local acc = reaper.CreateTakeAudioAccessor(tk)
+    if not acc then return nil end
+    local st = reaper.GetAudioAccessorStartTime(acc)
+    local sr, blk = 22050, 44
+    local a0 = math.max(0, t - win)
+    local n = math.floor((2 * win) * sr)
+    local buf = reaper.new_array(n)
+    reaper.GetAudioAccessorSamples(acc, sr, 1, st + a0, n, buf)
+    reaper.DestroyAudioAccessor(acc)
+    local s = buf.table()
+    local env = {}
+    for b = 0, math.floor(n / blk) - 1 do
+      local m = 0
+      for i = b * blk + 1, (b + 1) * blk do local v = math.abs(s[i] or 0); if v > m then m = v end end
+      env[#env + 1] = m
+    end
+    local best, bi = 0, nil
+    for i = 11, #env do
+      local avg = 0
+      for j = i - 10, i - 1 do avg = avg + env[j] end
+      avg = avg / 10
+      local rise = env[i] - avg
+      if rise > best then best, bi = rise, i end
+    end
+    if not bi or best < 0.02 then return nil end
+    return a0 + (bi - 1) * blk / sr
+  end,
+  -- stretch-маркер: звук из точки from (секунды item) переезжает в to
+  peak_move = function(it, from, to)
+    local tk = reaper.GetActiveTake(it)
+    local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    edit.run('move peak (stretch marker)', function()
+      if reaper.GetTakeNumStretchMarkers(tk) == 0 then reaper.SetTakeStretchMarker(tk, -1, 0); reaper.SetTakeStretchMarker(tk, -1, len) end
+      local idx
+      for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+        local _, pos = reaper.GetTakeStretchMarker(tk, i)
+        if math.abs(pos - from) < 0.005 then idx = i end
+      end
+      idx = idx or reaper.SetTakeStretchMarker(tk, -1, from)
+      local _, _, src = reaper.GetTakeStretchMarker(tk, idx)
+      local lo, hi = 0.001, len - 0.001
+      if idx > 0 then local _, p = reaper.GetTakeStretchMarker(tk, idx - 1); lo = p + 0.001 end
+      if idx < reaper.GetTakeNumStretchMarkers(tk) - 1 then local _, p = reaper.GetTakeStretchMarker(tk, idx + 1); hi = p - 0.001 end
+      reaper.SetTakeStretchMarker(tk, idx, math.max(lo, math.min(hi, to)), src)
+      reaper.UpdateItemInProject(it)
+    end)
+    model.invalidate()
+  end,
+  peak_at_cursor = function()
+    local h = vim.covering(vim.cur.fi, vim.cur.row)[1]
+    if not (h and h.kind == 'audio' and h.item) then vim.msg = 'peak: put the cursor on a sample'; return nil end
+    local pos = reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+    local t = edit.row_time(vim.cur.row, state.lpb, 0) - pos
+    local rl = edit.row_time(vim.cur.row + 1, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)
+    local p = ctx.peak_near(h.item, t + rl / 2, math.max(0.03, rl))
+    if not p then vim.msg = 'peak: no attack near the cursor'; return nil end
+    return h.item, p, pos
+  end,
+  peak_quantize = function()
+    local it, p, pos = ctx.peak_at_cursor(); if not it then return end
+    local r = math.floor(model.row_of_time(pos + p, state.lpb) + 0.5)
+    local to = edit.row_time(r, state.lpb, 0) - pos
+    ctx.peak_move(it, p, to)
+    vim.msg = ('peak %.3fs -> row %04d (%+.1f ms)'):format(p, r, (to - p) * 1000)
+  end,
+  peak_pick = function()
+    local it, p, pos = ctx.peak_at_cursor(); if not it then return end
+    ctx.qmove = { item = it, from = p, pos = pos }
+    vim.msg = ('peak at %.3fs: j k - the target row, Enter moves it there (stretch marker), Esc cancels'):format(p)
+  end,
   -- ── automation как инструмент (5 окт, как во FL) ─────────────────────
   -- строка automation последней в lib; список — пулы automation items трека
   -- курсора; нотная клавиша вставляет выбранный пул в его огибающую на курсор,
@@ -5128,6 +5204,10 @@ function event_actions(hover)
       reaper.Main_OnCommand(40153, 0)
     end, 'i')
     add('Select item in REAPER', function() select_item_in_reaper(head.item) end, 'l')
+    if head.kind == 'audio' then
+      add('Quantize the nearest peak to the row grid', function() ctx.peak_quantize() end, 'q')
+      add('Move the nearest peak to ... (j k a row, Enter)', function() ctx.peak_pick() end, 'Q')
+    end
   end
   local what = sel and 'selection' or 'event'
   if #heads > 0 or sel then
@@ -8838,6 +8918,16 @@ local function frame()
       ctx.mx_refresh()
       c = 0
     end
+  end
+  -- \Q (5 окт): пик ждёт строку-цель — Enter переносит, Esc отменяет
+  if ctx.qmove and state.focus == 'tracker' and (c == 13 or c == 27) and not vim.picker and not vim.hydra then
+    local q = ctx.qmove; ctx.qmove = nil
+    if c == 13 and reaper.ValidatePtr(q.item, 'MediaItem*') then
+      local to = edit.row_time(vim.cur.row, state.lpb, 0) - q.pos
+      ctx.peak_move(q.item, q.from, to)
+      vim.msg = ('peak moved to row %04d'):format(vim.cur.row)
+    else vim.msg = 'peak move cancelled' end
+    c = 0
   end
   -- Shift+Esc (5 окт): снять time selection REAPER — в любом модуле, вне ввода
   if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
