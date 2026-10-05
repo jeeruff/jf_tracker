@@ -2624,6 +2624,22 @@ ctx = {
   dev_on = function() return state.dev end,
   sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
   -- строка :sig с текущим размером; rg — для паттерна (матрица), иначе спросит
+  sig_menu = function()
+    local n0, d0 = ctx.sig_at(edit.row_time(vim.cur.row, state.lpb, 0))
+    local list = {}
+    for _, s in ipairs({ { '4', 4, 4 }, { '3', 3, 4 }, { '2', 2, 4 }, { '5', 5, 4 }, { '7', 7, 4 }, { 'e', 6, 8 }, { 's', 7, 8 }, { 'f', 5, 8 }, { 'n', 9, 8 }, { 't', 12, 8 } }) do
+      list[#list + 1] = { key = s[1], label = ('%d/%d'):format(s[2], s[3]) .. ((s[2] == n0 and s[3] == d0) and '  *' or ''), fn = function() ctx.sig_cmd(('%d/%d'):format(s[2], s[3])) end }
+    end
+    list[#list + 1] = { key = 'c', label = 'other ... (:sig N/D)', fn = function() ctx.sig_prompt() end }
+    vim.open_hydra({ title = 'time signature', items = list })
+    state.popup_at = { kind = 'strip', id = 'sig' }
+  end,
+  -- колесо по размеру: числитель ±1 сразу на весь проект, ноты как есть (сетка пересчитывается)
+  sig_wheel = function(d)
+    local n, dd = ctx.sig_at(0)
+    local nn = math.max(1, math.min(32, n + (d > 0 and 1 or -1)))
+    if nn ~= n then ctx.sig_apply('all', nil, nn, dd, 'keep'); vim.msg = ('sig %d/%d'):format(nn, dd); ctx.mx_refresh() end
+  end,
   sig_prompt = function(rg)
     local n, d = ctx.sig_at(rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0))
     if rg then state.sig_rg = rg.idx; state.popup_at = { kind = 'mxrow', ri = MX.cur.ri } else state.sig_rg = nil; state.popup_at = { kind = 'strip', id = 'sig' } end
@@ -5043,8 +5059,15 @@ local function context_menu(hover, anchor)
       if on then label = label:sub(2) end
       -- «… (Space)» → хоткей в свою колонку
       local base, hk = label:match('^(.-)%s*%(([^()]+)%)$')
-      if hk and #hk <= 8 and not hk:find(':') then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end else hk = nil end
+      -- в скобках — хоткей, только если похоже на клавиши (одиночные, ^X, za,
+      -- Space ...), а не слово вроде «bar»
+      local function keyish(t) return #t <= 2 or t:match('^%^') or t:match('^[A-Z][a-z]+$') or t:match('^:') or t:match('^Shift') or t:match('^Cmd') or t:match('^Ctrl') or t:match('^Opt') end
+      if hk and #hk <= 12 then
+        for t in hk:gmatch('[^%s/,]+') do if not keyish(t) then hk = nil; break end end
+      else hk = nil end
+      if hk then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end end
       local k = pick_key(it.key, label)
+      if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
       if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2], hk = hk } end
     end
   end
@@ -5062,7 +5085,7 @@ local function context_menu(hover, anchor)
         have[first] = true
         local k = pick_key(#first == 1 and first or nil, e.d)
         local foc = ctx.CTX_FOCUS[page]
-        if k then hitems[#hitems + 1] = { key = k, label = e.d, hk = e.k, fn = function()
+        if k then hitems[#hitems + 1] = { key = k, label = e.d, hk = (e.k ~= k) and e.k or nil, fn = function()
           if foc and state.focus ~= foc then ctx.set_focus(foc) end
           for _, cd in ipairs(codes) do ctx.keyq[#ctx.keyq + 1] = cd end
         end } end
@@ -5947,7 +5970,8 @@ function ctrl_action(name, delta)
     elseif p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'preroll' then local p = ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'reclib' then state.reclib = not state.reclib; vim.msg = 'rec -> lib ' .. (state.reclib and 'on: recorded takes also become instruments' or 'off')
-  elseif name == 'sig' or name == 'beats' then ctx.sig_prompt()
+  -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
+  elseif name == 'sig' or name == 'beats' then if delta == 0 then ctx.sig_menu() else ctx.sig_wheel(delta) end
   end
 end
 
@@ -6897,7 +6921,7 @@ local function frame()
   end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
-  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy' or state.popup_at.kind == 'sprops')) then state.popup_at = nil end
+  if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy' or state.popup_at.kind == 'sprops' or state.popup_at.kind == 'strip')) then state.popup_at = nil end
   local anchor
   do
     local pa = state.popup_at
