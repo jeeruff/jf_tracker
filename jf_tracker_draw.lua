@@ -1971,6 +1971,11 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 -- транспорт блоками (5 окт): сетка | шаг | переключатели; в блоке — две
 -- строки ячеек { id, текст, цвет }; id — те же, что у главного модуля
 -- (клик / колесо — ctrl_action). Время и BPM — свой крупный блок слева
+function D.transport_buttons(c)
+  local ps = c.playstate or 0
+  return { { 'tp_rew', '[<<]' }, { 'tp_play', '[>]', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
+           { 'tp_pause', '[II]', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '[o]', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '[>>]' } }
+end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
   local num = math.max(1, math.min(16, c.sig_num or 4))
@@ -1988,10 +1993,9 @@ function D.transport_groups(c)
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
-  local ps = c.playstate or 0
-  g[#g + 1] = { { { 'tp_rew', '[<<]' }, { 'tp_play', '[>]', (ps & 1 == 1 and ps & 2 == 0) and U.GREEN or U.TEXT },
-                  { 'tp_pause', '[II]', ps & 2 == 2 and U.AMBER or U.TEXT }, { 'rec', '[o]', c.recording and U.RED or U.TEXT }, { 'tp_fwd', '[>>]' } },
-                { tg('metro', 'metro', c.metro), tg('punch', 'punch', c.punch), tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
+  -- кнопки [<<][>][II][o][>>] — крупно справа от модуса (D.transport_buttons)
+  g[#g + 1] = { { tg('metro', 'metro', c.metro), tg('punch', 'punch', c.punch) },
+                { tg('preroll', 'pre-roll', c.preroll), tg('reclib', 'rec>lib', c.reclib) } }
   g[#g + 1] = { { tg('follow', 'follow', c.follow), tg('loop', 'loop', c.loop) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
@@ -2023,6 +2027,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(x + third - L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
     x, w = x + third, w - third
     st.big = true
+  end
+  -- кнопки транспорта крупно (×2), сразу справа от модуса (5 окт)
+  if info and info.ctrl and w > 50 * L.cw then
+    local bx = x + L.pad
+    for _, b in ipairs(D.transport_buttons(info.ctrl)) do
+      local bw = D.big_measure(b[2], 2)
+      local hot = mx >= bx and mx < bx + bw and my >= ly and my < ly + 2 * L.rh
+      D.big_text(bx, ly, b[2], hot and U.AMBER or (b[3] or U.TEXT), 2)
+      if hot then hover.ctrl = b[1] end
+      hint('ctrl', bx, ly, bw, 2 * L.rh, b[1])
+      bx = bx + bw + L.pad
+    end
+    set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx + L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
+    w = w - (bx + 2 * L.pad - x); x = bx + 2 * L.pad
   end
   local tx = x + L.pad
   if p then
