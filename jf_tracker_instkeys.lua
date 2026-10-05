@@ -77,7 +77,7 @@ function IK.key(c, cur, n, nslots)
   elseif ch == 'k' or c == UP then ctx.inst_select(math.max(1, cur - 1))
   elseif ch == 'J' or ch == 'K' then ctx.lib_step(ch == 'J' and 1 or -1)   -- исходник ниже / выше (3 окт)
   elseif ch == 'g' then ctx.inst_select(1)
-  elseif ch == 'G' then ctx.inst_select(math.max(1, n))
+  elseif ch == 'G' then if ctx.auto_select then ctx.auto_select() else ctx.inst_select(math.max(1, n)) end   -- G — в самый низ: automation (5 окт)
   elseif ch == 'v' then IK.anchor = IK.anchor and nil or cur
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)

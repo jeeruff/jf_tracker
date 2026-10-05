@@ -8785,6 +8785,10 @@ local function frame()
     vim.msg = 'time selection removed'
     c = 0
   end
+  -- Cmd+G (5 окт): из любого модуля — инструмент automation (последняя строка lib)
+  if (c == 103 or c == 71 or c == 7) and ctx.mods().cmd and not ctx.mods().ctrl and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    ctx.auto_select(); c = 0
+  end
   -- Cmd+Enter — фокус на инструменты (lib); Option+Enter — выбрать в lib
   -- инструмент ноты под курсором (5 окт). Только из трекера, NORMAL / INSERT
   do

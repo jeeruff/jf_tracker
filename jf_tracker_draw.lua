@@ -2911,6 +2911,13 @@ function D.frame(L, snap, rows, state, info)
   for _, c in ipairs(L.cols) do
     if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
   end
+  -- полосы строки курсора и плейхеда — до рамок items (5 окт): item и
+  -- automation item лежат поверх, сверху — только зелёная линия курсора
+  for i, r in ipairs(rows) do
+    local y = L.body_y + (i - 1) * L.rh
+    if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+  end
   -- рамки items — ДО строк (5 окт): фоном, под волной и текстом; раньше
   -- рисовались последними и резали ноту, начатую посреди строки.
   -- Тонкая кайма по дробным строкам начала/конца — так item
@@ -3058,8 +3065,6 @@ function D.frame(L, snap, rows, state, info)
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
     local is_cur_row = vc and vc.row == r.row
-    if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
-    if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
     -- треки с включённой записью (5 окт): чуть покрасневший фон колонки

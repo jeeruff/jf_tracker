@@ -46,7 +46,7 @@ cur = 5; local before = #log; k('x'); eq('x on empty slot does nothing', #log, b
 -- навигация и прочее
 cur = 8; k('j'); eq('j stops at last slot', cur, 8)
 k('g'); eq('g first', cur, 1)
-k('G'); eq('G last instrument', cur, 3)
+AUTO = false; k('G'); eq('G -> the automation row', log[#log], 'auto'); AUTO = false
 IK.key(13, cur, 3, 8); eq('Enter slicer', last(), 'slicer')
 k(' '); eq('Space listens', last(), 'listen')
 k('a'); eq('a toggles listen on select', last(), 'listen_toggle')

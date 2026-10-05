@@ -153,7 +153,7 @@ KH.PAGES = {
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
-    { k = 'g G', d = 'first / last' },
+    { k = 'g G', d = 'first / the automation row (G, also Cmd+G from anywhere)' },
     { k = 'h l', d = 'track left / right' },
     { k = 'dd', d = 'cut instrument: its events on the tracks and the library item (to the register)' },
     { k = 'yy', d = 'yank instrument to the register' },
