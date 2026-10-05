@@ -75,7 +75,10 @@ end
 
 function B.init(c, root)
   ctx = c
-  B.root = root or (os.getenv('HOME') .. '/samples')
+  -- ~/samples, если есть; иначе домашняя папка (релиз 5 окт)
+  local home = os.getenv('HOME') or '/'
+  local has = function(d) return reaper.EnumerateFiles and (reaper.EnumerateFiles(d, 0) or reaper.EnumerateSubdirectories(d, 0)) end
+  B.root = root or (has(home .. '/samples') and (home .. '/samples') or home)
   B.path = B.root
   load_marks()
   B.refresh()

@@ -1272,7 +1272,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   -- smart (4 окт: из шапки трека сюда) — кнопкой справа в строке in
   local sy0 = yy
   local sbw = ms('smart') + 2 * L.pad
-  local show_smart = w > ms('in ') + 6 * L.cw + sbw + 3 * L.pad
+  local show_smart = info.smart_ok and w > ms('in ') + 6 * L.cw + sbw + 3 * L.pad
   row('in', (io.input:gsub(' / in ', '/'):gsub(' / ', '/')) .. ' v', 'input')
   if show_smart and yy > sy0 then
     local sx = x + w - L.pad - sbw

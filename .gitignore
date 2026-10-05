@@ -3,3 +3,4 @@
 *.bak.*
 *.swp
 tests/shots/
+luac.out

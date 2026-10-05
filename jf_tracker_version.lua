@@ -658,7 +658,7 @@ V.TUTORIAL = {
   '1. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
   '2. Write notes. i - INSERT, m - the keyboard on. The top row plays and writes: q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p = C .. E, z / x - octave. Esc - back to NORMAL.',
   '3. Pick a sound. The lib on the right: Tab to it, j k - select; in INSERT , . switch sounds. Shift+note only plays.',
-  '4. Slice a break. Select a sample, the item tab on top: 8 = eight equal slices, t = by transients. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
+  '4. Slice a break. Select a sample, the item tab on top: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT every key writes a slice: q 2 w 3 e = slices 1 2 3 4 5 (the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
   '5. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '6. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '7. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
@@ -672,6 +672,8 @@ V.TUTORIAL = {
 function V.lines()
   local out = { 'https://jeeruff.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
+  out[#out + 1] = ''
+  out[#out + 1] = 'Free software, GNU GPL v3 (see LICENSE). No warranty.'
   out[#out + 1] = ''
   for _, l in ipairs(V.THANKS) do out[#out + 1] = l end
   out[#out + 1] = ''

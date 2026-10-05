@@ -20,7 +20,7 @@ local DIR = SELF:match('(.*)[/\\]') or '.'
 local RES = reaper.GetResourcePath()
 local EXT = 'jf_tracker'
 
-local U = dofile(RES .. '/Scripts/jf_looper/jf_looper_ui.lua')
+local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия (5 окт, релиз: без внешних зависимостей)
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
 local keys = dofile(DIR .. '/jf_tracker_keys.lua')
@@ -3187,10 +3187,12 @@ ctx = {
     local col = cur_col(); if not col then return end
     edit.run('rec arm', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_RECARM', col.armed and 0 or 1) end)
   end,
+  -- smart input — отдельный скрипт; нет его — кнопки нет (5 окт, релиз)
+  smart_input_path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua',
   smart_input = function(col)
     col = col or cur_col(); if not col then return end
     reaper.SetOnlyTrackSelected(col.track)
-    local path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua'
+    local path = ctx.smart_input_path
     local ok, e = pcall(dofile, path)
     vim.msg = ok and 'smart input set' or ('smart input: ' .. tostring(e):match('[^\n]*$'))
   end,
@@ -3471,7 +3473,7 @@ ctx = {
   end,
   -- импорт нарезанного инструмента (2 окт): REX/RX2 — звук декодирует REAPER,
   -- позиции слайсов из файла; XRNI (Renoise / Redux) — распаковка в папку
-  -- проекта (несохранённый — ~/samples/_imported), каждый настоящий сэмпл —
+  -- проекта (несохранённый — <ресурсы REAPER>/Data/jf_tracker_imported), каждый настоящий сэмпл —
   -- инструмент в библиотеке трека со своими слайсами. Один undo-шаг.
   -- col — трек-цель (бросок на колонку); по умолчанию трек курсора.
   -- Возвращает первый импортированный item (для вставки на строку броска).
@@ -3493,7 +3495,7 @@ ctx = {
     end
     if kind ~= 'xrni' then return end
     local _, proj = reaper.EnumProjects(-1, '')
-    local base = (proj and proj ~= '' and reaper.GetProjectPath()) or (os.getenv('HOME') .. '/samples/_imported')
+    local base = (proj and proj ~= '' and reaper.GetProjectPath()) or (reaper.GetResourcePath() .. '/Data/jf_tracker_imported')
     local dir = base .. '/xrni/' .. name:gsub('[/:]', '-')
     reaper.RecursiveCreateDirectory(dir, 0)
     local q = function(x) return "'" .. x:gsub("'", "'\\''") .. "'" end
@@ -3994,7 +3996,7 @@ end
 -- поверх — тема из jf_tracker_themes; draw пересчитывает свои цвета, кэши
 -- картинок текста и цветов сброшены. reaper — родная палитра как есть
 function ctx.apply_theme(name)
-  local ok, fresh = pcall(dofile, RES .. '/Scripts/jf_looper/jf_looper_ui.lua')
+  local ok, fresh = pcall(dofile, DIR .. '/jf_tracker_ui.lua')
   if not ok or type(fresh) ~= 'table' then return false end
   for k, v in pairs(fresh) do if type(v) == 'table' then U[k] = v end end
   if not draw.themes.valid(name) then name = 'reaper' end
@@ -5719,6 +5721,7 @@ local function frame()
     airwin_info = ctx.airwin_info,
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
+    smart_ok = reaper.file_exists(ctx.smart_input_path),
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end

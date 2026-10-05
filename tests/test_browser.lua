@@ -1,5 +1,5 @@
 -- test_browser.lua — поиск браузера на стабах (без REAPER): lua tests/test_browser.lua
-package.path = '/Users/jeeruff/Library/Application Support/REAPER/Scripts/jf_tracker/?.lua;' .. package.path
+package.path = './?.lua;' .. package.path
 local tree = { ['/r'] = { dirs = { 'Drums', 'Bass' }, files = { 'loop.wav' } },
   ['/r/Drums'] = { dirs = { 'Kicks' }, files = { 'snare 01.wav', 'hat_open.wav' } },
   ['/r/Drums/Kicks'] = { dirs = {}, files = { 'kick_808.wav', 'Kick Hard.aif' } },
@@ -13,7 +13,7 @@ reaper = {
   DeleteExtState = function(sec, k) if EXT then EXT[k] = nil end end,
   RecursiveCreateDirectory = function(p) local par, nm = p:match('^(.*)/([^/]+)$'); tree[p] = { dirs = {}, files = {} }; local t = tree[par]; if t then t.dirs[#t.dirs + 1] = nm end; return 1 end,
 }
-local B = dofile('/Users/jeeruff/Library/Application Support/REAPER/Scripts/jf_tracker/jf_tracker_browser.lua')
+local B = dofile('jf_tracker_browser.lua')
 B.init({}, '/r')
 B.path = '/r'; B.mode = 'files'; B.refresh()
 local n, bad = 0, 0
