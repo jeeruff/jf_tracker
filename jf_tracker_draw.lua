@@ -1989,6 +1989,10 @@ function D.transport_buttons(c)
   -- правила «словами» — << > || o >> loop; play — и stop (зелёная, пока играет)
   local ps = c.playstate or 0
   local playing = ps & 1 == 1
+  -- 5 окт: без опции «I really want to have transport buttons» — только [rec] и [loop]
+  if not c.tpbuttons then
+    return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
+  end
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', playing and U.GREEN or nil },
            { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'o', c.recording and U.RED or nil, U.RED },
            { 'tp_fwd', '>>' }, { 'loop', 'loop', c.loop and U.CYAN or nil } }
@@ -2000,7 +2004,7 @@ function D.transport_groups(c)
   local function tg(id, label, on) return { id, label .. ' ' .. (on and 'on' or 'off'), on and U.CYAN or U.GREY } end
   local g = {}
   if not c.bigbpm then
-    g[#g + 1] = { { { 'play', (c.playing and '> ' or '# ') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },
+    g[#g + 1] = { { { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },   -- > — намёк: клик играет (5 окт)
                   { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
   end
   -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
@@ -2177,9 +2181,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- масштабом без сглаживания (big_text); плотно, зазор 2 px
   local blist = D.transport_buttons(c)
   local bws, tws, btot = {}, {}, 0
-  for i, b in ipairs(blist) do tws[i] = D.big_measure(b[2], 2); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  local bk = c.tpbuttons and 2 or 1                     -- полный набор — ×2; rec / loop — обычного размера
+  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], 2) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
-    local bx, by, bh = bx0, ly - 1, 2 * L.rh
+    local bx, by, bh = bx0, (bk == 2) and (ly - 1) or (ly + math.floor(L.rh / 2)), bk * L.rh
     -- по высоте — по центру чернил (у крупного битмапа сверху пустая полоса шрифта)
     local ty = by + math.max(1, math.floor((bh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.3 * L.rh + 0.5))
     for i, b in ipairs(blist) do
@@ -2188,7 +2193,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local on = b[3] ~= nil
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
-      D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет (o — красная)
+      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), 2)   -- b[4]: свой цвет (o — красная)
+      else text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
@@ -2197,7 +2203,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   -- время и BPM крупно (опция big time and BPM)
   local big = c.bigbpm and {
-    { 'play', (c.playing and '> ' or '') .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
+    { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
     { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
   } or nil
   local bigw = 0
