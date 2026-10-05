@@ -8089,10 +8089,10 @@ reaper.atexit(save_win)
 if state.notes_open then pcall(ctx.notes_load) end
 -- расширения (релиз 5 окт): без SWS прослушивание молчит, без js_ReaScriptAPI нет
 -- удержания нот — сказать сразу, а не оставить гадать
-do
+(function()                          -- функция: у главного куска предел 200 локалов
   local miss = {}
   if not reaper.CF_CreatePreview then miss[#miss + 1] = 'SWS (preview)' end
   if not reaper.JS_VKeys_GetState then miss[#miss + 1] = 'js_ReaScriptAPI (held notes, key state)' end
   if #miss > 0 then vim.msg = 'missing: ' .. table.concat(miss, ', ') .. ' - install through ReaPack' end
-end
+end)()
 frame()
