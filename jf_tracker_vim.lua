@@ -1260,7 +1260,12 @@ function V.key_impl(c)
     return
   end
 
-  -- слой пианино в NORMAL (m) убран 5 окт: клавиатура = INSERT, NORMAL = Vim
+  -- слой пианино в NORMAL (m) убран 5 окт: клавиатура = INSERT, NORMAL = Vim;
+  -- m — только показать / спрятать пианинку внизу трекера
+  if V.mode == 'normal' and not V.pending and not V.op and c == ('m'):byte() then
+    if ctx.toggle_piano then ctx.toggle_piano() end
+    return
+  end
 
   -- ожидание второй клавиши
   local p = V.pending

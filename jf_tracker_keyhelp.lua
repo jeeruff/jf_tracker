@@ -76,6 +76,7 @@ KH.PAGES = {
     { k = '\\', d = 'hydra menu of all actions' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
+    { k = 'm', d = 'show / hide the keyboard at the bottom (notes are written in INSERT)' },
     { k = 'Space Enter', d = 'play / stop, move edit cursor here' },
     { k = 'F', d = 'follow playhead on / off' },
     { k = 'o', d = 'reveal item in REAPER' },

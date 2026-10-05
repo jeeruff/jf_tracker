@@ -11,43 +11,51 @@
 local T = { active = false, step = 1, ok = false, ok_t = 0, hover = nil }
 
 T.STEPS = {
-  { mod = 'tracker', title = 'Move',
-    text = 'h j k l move the cursor, gg / G - start / end, { } - bars. Try h j k l now.',
-    check = function(e, b) return e.fi ~= b.fi or e.row ~= b.row end },
-  { mod = 'tracker', title = 'Write notes',
-    text = 'i - INSERT: the keyboard is on, the top row q 2 w 3 e ... writes notes, z / x - octave. Press i, play a few keys, then Esc.',
+  -- 5 окт: сначала философия (почему jf), потом hjkl, потом f — куда угодно
+  { mod = 'tracker', focus = 'tracker', title = 'Why jf',
+    text = 'Put your index fingers on f and j - the two keys with bumps. That is the name: jf = hands on the home row. Every module answers to letters, the mouse is optional. Press j.',
+    check = function(e, b) return e.row ~= b.row end },
+  { mod = 'tracker', focus = 'tracker', title = 'Move',
+    text = 'h j k l move the cursor, gg / G - start / end, { } - bars. Try h and l: the cursor walks across the columns.',
+    check = function(e, b) return e.fi ~= b.fi end },
+  { mod = 'tracker', focus = 'tracker', title = 'Jump anywhere',
+    text = 'f puts two-letter labels on everything on screen: any module, button or bar. Type a label and you are there. Press f, then a label.',
+    check = function(e, b) return e.hj ~= b.hj end },
+  { mod = 'tracker', focus = 'tracker', title = 'Write notes',
+    text = 'i - INSERT: the keyboard writes notes, the top row q 2 w 3 e ... (the keyboard at the bottom shows it), z / x - octave. Press i, play a few keys, then Esc.',
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
-  { mod = 'inst', title = 'Pick a sound',
-    text = 'The lib: every sample of the project. Tab to it and j / k, or , . in INSERT. Pick another sound.',
+  { mod = 'inst', focus = 'inst', title = 'Pick a sound',
+    text = 'The lib: every sample of the project. j / k pick a sound (in INSERT , . do the same). Pick another sound.',
     check = function(e, b) return e.inst ~= b.inst end },
-  { mod = 'top', title = 'Slice a break',
-    text = 'The item tab shows the selected sample: s opens the slice menu - s8 = eight slices, st = transients; in INSERT every key of the keyboard is a slice: q = slice 1 (C-4), 2 = slice 2, w = 3 ... Open the item tab (F2).',
+  { mod = 'top', focus = 'top', title = 'Slice a break',
+    text = 'The item tab shows the selected sample: s opens the slice menu - s8 = eight slices, st = transients; in INSERT every key writes a slice: q = slice 1, 2 = slice 2 ... Open the item tab (F2).',
     check = function(e) return e.toptab == 'sample' end },
-  { mod = 'tracker', title = 'Edit like text',
+  { mod = 'tracker', focus = 'tracker', title = 'Edit like text',
     text = 'x deletes, dw / d3j / dG delete with a motion, yy p copy, u undo, . repeats. Make any edit.',
     check = function(e, b) return e.change ~= b.change end },
-  { mod = 'tracker', title = 'Select',
+  { mod = 'tracker', focus = 'tracker', title = 'Select',
     text = 'v selects a block, V whole rows; then d y M, or :interp vol to ramp the volumes. Press v.',
     check = function(e) return e.mode == 'visual' or e.mode == 'vline' end },
-  { mod = 'tracker', title = 'Commands',
+  { mod = 'tracker', focus = 'tracker', title = 'Commands',
     text = ': opens the command line - :arp up 2, :legato, :macro, :pt, :big; Tab completes. Press :',
     check = function(e) return e.mode == 'cmd' end },
-  { mod = 'tracker', title = 'Leader menu',
+  { mod = 'tracker', focus = 'tracker', title = 'Leader menu',
     text = '\\ opens the menu of everything: \\ o options as quick switches, \\ v view, \\ v a about. Press \\',
     check = function(e) return e.hydra end },
-  { mod = 'ctrl', title = 'Play',
-    text = 'Space - play / stop, F - follow the playhead; =START and =END bound the song. Press Space.',
+  { mod = 'ctrl', focus = 'tracker', title = 'Play',
+    text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',
     check = function(e) return e.playing end },
-  { mod = 'dsp', title = 'Help',
+  { mod = 'dsp', focus = 'tracker', title = 'Help',
     text = '? shows the keys of the focused module; Tab in the help searches all pages. Press ?',
     check = function(e) return e.khelp end },
 }
 
-function T.start() T.active, T.step, T.base, T.state, T.ok = true, 1, nil, {}, false end
+function T.start() T.active, T.step, T.base, T.state, T.ok, T.finished = true, 1, nil, {}, false, false; T.want_focus = T.STEPS[1].focus end
 function T.stop() T.active = false end
 function T.go(d)
   T.step = math.max(1, math.min(#T.STEPS, T.step + d))
   T.base, T.state, T.ok = nil, {}, false
+  T.want_focus = T.STEPS[T.step].focus        -- main переводит фокус (5 окт)
 end
 
 -- кадр: проверка действия; засчитанный шаг через 0.8 с переходит дальше

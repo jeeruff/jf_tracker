@@ -401,7 +401,10 @@ end
 
 -- ── помощники ─────────────────────────────────────────────────────────────
 local function relayout()
-  state.piano_strip = vim.piano or nil                 -- пианинка над статусом в слое пианино (4 окт)
+  -- пианинка (5 окт): видна по умолчанию, m в NORMAL прячет / показывает;
+  -- ExtState jf_tracker/piano = '0' — спрятана
+  if state.piano_show == nil then state.piano_show = reaper.GetExtState('jf_tracker', 'piano') ~= '0' end
+  state.piano_strip = state.piano_show or nil
   L = draw.layout(snap, state, #regions)
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
@@ -3727,6 +3730,12 @@ ctx = {
   side_hide = function() state.side = false; if state.focus == 'browser' then ctx.set_focus('tracker') end end,
   -- фокус клавиатуры: 'tracker' | 'matrix' | 'top' (вкладка верха) | 'browser'.
   -- Розовая рамка показывает, кому идут клавиши. Tab — по кругу.
+  toggle_piano = function()
+    state.piano_show = not state.piano_show
+    reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
+    vim.msg = state.piano_show and 'keyboard shown (m)' or 'keyboard hidden (m)'
+    relayout()
+  end,
   set_focus = function(f)
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if f == 'browser' and not state.side then f = 'tracker' end
@@ -5701,7 +5710,7 @@ local function frame()
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
     swap_state = function() return (ctx.swap_info()) end,
     -- пианинка (4 окт): октава, держимые клавиши (JS_VKeys), последняя сыгранная
-    piano = vim.piano and (function()
+    piano = state.piano_show and (function()
       local held = {}
       if reaper.JS_VKeys_GetState then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
@@ -6068,7 +6077,9 @@ local function frame()
   draw.popup(L, vim.popup(), anchor)
   -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
   if OPT.tour.active then
-    OPT.tour.tick({ fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil,
+    -- шаг сам ставит фокус на модуль, где он работает (5 окт)
+    if OPT.tour.want_focus then ctx.set_focus(OPT.tour.want_focus); OPT.tour.want_focus = nil end
+    OPT.tour.tick({ hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil,
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
@@ -7726,7 +7737,7 @@ local function frame()
   end
   if c > 0 and HN.active then
     local r = HN.key(c)
-    if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end end
+    if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
     c = 0
   elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end

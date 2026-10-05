@@ -2574,118 +2574,9 @@ function D.frame(L, snap, rows, state, info)
   for _, c in ipairs(L.cols) do
     if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
   end
-  for i, r in ipairs(rows) do
-    local y = L.body_y + (i - 1) * L.rh
-    local ty = y + 1
-    local is_cur_row = vc and vc.row == r.row
-    if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
-    if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
-    if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
-    elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
-    -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
-    -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
-    -- метки у номера строки нет (3 окт, просьба)
-    local cl = state.curline or 'top'
-    if cl ~= 'off' then
-      local ly = cl == 'bottom' and (y + L.rh - 1) or y
-      -- от края полос регионов / маркеров вправо (через линейку, если она
-      -- включена): на сами полосы не заходит (3 окт)
-      local lx = tx0 + L.ruler_w
-      if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
-      if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
-    end
-    text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
-    -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
-    -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
-    if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
-      local b, t = info.tl_label(r.row)
-      local tx = tx0 + L.ruler_w + L.pad
-      local tcol = r.bar and U.TEXT or U.GREY
-      local tlr = state.tlruler
-      if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
-      if tlr == 'time' or tlr == 'both' then text(tx, ty, t, tlr == 'both' and U.GREY or tcol) end
-    end
-    local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
-    if in_body then hover.row = r end
-    -- номера шагов (2 окт): протяжка = time selection REAPER
-    if in_body and mx >= tx0 + L.ruler_w and mx < tx0 + L.label_w then hover.rownum = r.row end
-    for _, c in ipairs(L.cols) do
-      -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
-      if r.bar and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
-      for _, ln in ipairs(c.lanes) do
-        for si = 1, ln.nsub do
-          local fi = ln.f0 + si - 1
-          local f = L.flat[fi]
-          local x = f.x
-          if x then
-            if vis and fi >= vis.f0 and fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
-              set(D.VIS); gfx.rect(x, y, f.w, L.rh, 1)
-            end
-            local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
-            if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
-            -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
-            -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
-            if inv then
-              D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
-              local G, folded, inv_f, fw0 = f.G or L, c.folded, inv, f.w
-              D.cur_box = function()
-                set(D.inv_bg)
-                if folded then gfx.rect(x, y, fw0, L.rh, 1)
-                else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
-              end
-              if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
-            end
-            local cell
-            if r.row < 0 or r.clip then
-            elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
-            else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
-            D.cur_box = nil
-            if in_body and mx >= x and mx < x + f.w then
-              hover.fi = fi; hover.cell = cell; hover.col = c.col
-              for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
-                local fx, fw = D.field_rect(f.G or L, fld)
-                if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
-              end
-              -- номер инструмента под мышью (5 окт) — подполе ноты
-              local G2 = f.G or L
-              if G2.x_inst and mx >= x + G2.x_inst and mx < x + G2.x_inst + ms('00') + 2 then hover.field = 1; hover.fsub = 'inst' end
-              do
-              end
-            end
-          end
-        end
-      end
-      for _, ev in ipairs(c.envs) do
-        local EG = ev.G or L
-        if r.clip then goto env_next end
-        if vc and vc.fi == ev.fi and vc.row == r.row then
-          set(info.focus == 'tracker' and U.AMBER or U.LINE)
-          if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
-        end
-        -- курсор поля формы — под значением точки (строка ниже курсора)
-        if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
-          set(info.focus == 'tracker' and U.AMBER or U.LINE)
-          gfx.rect(ev.x + L.pad + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
-        end
-        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1])
-        if in_body and mx >= ev.x and mx < ev.x + ev.w then
-          hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
-          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (EG.env_bar_w - 1)))
-          -- поле формы — с клавиатуры (l, буквы в INSERT); мышь — всегда значение
-          hover.field = 1
-          -- точный клик по точке (±4 px) — её можно тянуть в любом режиме (2 окт)
-          local ev0 = env_vals[ev][i]
-          if ev0 and ev0.pt then
-            local px = ev.x + EG.pad + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
-            if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row } end
-          end
-        end
-        ::env_next::
-      end
-    end
-  end
-
-  -- рамки items: тонкая кайма по дробным строкам начала/конца — так item
+  -- рамки items — ДО строк (5 окт): фоном, под волной и текстом; раньше
+  -- рисовались последними и резали ноту, начатую посреди строки.
+  -- Тонкая кайма по дробным строкам начала/конца — так item
   -- отличим от MIDI-нот внутри него. Аудио — в своей подколонке, MIDI — на
   -- всю lane. Цвет item (или трека), приглушённый; выбранный в REAPER — ярче.
   do
@@ -2812,6 +2703,117 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  for i, r in ipairs(rows) do
+    local y = L.body_y + (i - 1) * L.rh
+    local ty = y + 1
+    local is_cur_row = vc and vc.row == r.row
+    if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    if is_cur_row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
+    elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
+    -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
+    -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
+    -- метки у номера строки нет (3 окт, просьба)
+    local cl = state.curline or 'top'
+    if cl ~= 'off' then
+      local ly = cl == 'bottom' and (y + L.rh - 1) or y
+      -- от края полос регионов / маркеров вправо (через линейку, если она
+      -- включена): на сами полосы не заходит (3 окт)
+      local lx = tx0 + L.ruler_w
+      if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+      if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+    end
+    text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
+    -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
+    if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
+      local b, t = info.tl_label(r.row)
+      local tx = tx0 + L.ruler_w + L.pad
+      local tcol = r.bar and U.TEXT or U.GREY
+      local tlr = state.tlruler
+      if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
+      if tlr == 'time' or tlr == 'both' then text(tx, ty, t, tlr == 'both' and U.GREY or tcol) end
+    end
+    local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
+    if in_body then hover.row = r end
+    -- номера шагов (2 окт): протяжка = time selection REAPER
+    if in_body and mx >= tx0 + L.ruler_w and mx < tx0 + L.label_w then hover.rownum = r.row end
+    for _, c in ipairs(L.cols) do
+      -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
+      if r.bar and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
+      for _, ln in ipairs(c.lanes) do
+        for si = 1, ln.nsub do
+          local fi = ln.f0 + si - 1
+          local f = L.flat[fi]
+          local x = f.x
+          if x then
+            if vis and fi >= vis.f0 and fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
+              set(D.VIS); gfx.rect(x, y, f.w, L.rh, 1)
+            end
+            local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
+            if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
+            -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
+            -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
+            if inv then
+              D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
+              local G, folded, inv_f, fw0 = f.G or L, c.folded, inv, f.w
+              D.cur_box = function()
+                set(D.inv_bg)
+                if folded then gfx.rect(x, y, fw0, L.rh, 1)
+                else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
+              end
+              if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
+            end
+            local cell
+            if r.row < 0 or r.clip then
+            elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
+            else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
+            D.cur_box = nil
+            if in_body and mx >= x and mx < x + f.w then
+              hover.fi = fi; hover.cell = cell; hover.col = c.col
+              for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
+                local fx, fw = D.field_rect(f.G or L, fld)
+                if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
+              end
+              -- номер инструмента под мышью (5 окт) — подполе ноты
+              local G2 = f.G or L
+              if G2.x_inst and mx >= x + G2.x_inst and mx < x + G2.x_inst + ms('00') + 2 then hover.field = 1; hover.fsub = 'inst' end
+              do
+              end
+            end
+          end
+        end
+      end
+      for _, ev in ipairs(c.envs) do
+        local EG = ev.G or L
+        if r.clip then goto env_next end
+        if vc and vc.fi == ev.fi and vc.row == r.row then
+          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
+        end
+        -- курсор поля формы — под значением точки (строка ниже курсора)
+        if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
+          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          gfx.rect(ev.x + L.pad + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
+        end
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1])
+        if in_body and mx >= ev.x and mx < ev.x + ev.w then
+          hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
+          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (EG.env_bar_w - 1)))
+          -- поле формы — с клавиатуры (l, буквы в INSERT); мышь — всегда значение
+          hover.field = 1
+          -- точный клик по точке (±4 px) — её можно тянуть в любом режиме (2 окт)
+          local ev0 = env_vals[ev][i]
+          if ev0 and ev0.pt then
+            local px = ev.x + EG.pad + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
+            if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row } end
+          end
+        end
+        ::env_next::
+      end
+    end
+  end
+
 
   -- направляющая тянущегося стыка лупа
   if info.seam_guide then
