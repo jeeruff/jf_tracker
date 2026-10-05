@@ -75,7 +75,10 @@ function SP.draw(L, x, y, w, h, e, focused)
   local ncols = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
   local colw = math.floor((w + L.pad) / ncols)
   local n = math.min(#SP.ROWS, per * ncols)
-  local lw = math.min(math.floor(colw * 0.45), L.cw * 16)
+  -- колонка имён — по самому длинному имени (5 окт: пустое место до значений)
+  local lw = 0
+  for _, r in ipairs(SP.ROWS) do lw = math.max(lw, U.measure(r.label)) end
+  lw = math.min(lw + 2 * L.pad, math.floor(colw * 0.45))
   if SP.sel > #SP.ROWS then SP.sel = #SP.ROWS end
   local x0, w0 = x, w
   for i = 1, n do
