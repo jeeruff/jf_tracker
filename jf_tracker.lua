@@ -74,6 +74,9 @@ end
 
 local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16 }
 local state = {
+  -- режим разработчика (5 окт): файл .dev рядом со скриптом (в .gitignore) —
+  -- Orca и monome; в релизе их нет
+  dev = reaper.file_exists(DIR .. '/.dev'),
   lpb = tonumber(ext('lpb', 4)) or 4,
   row0 = 0, hscroll = 1, folds = {}, debug = false, last_key = 0, status = '',
   focus = 'tracker',
@@ -160,7 +163,7 @@ local state = {
   statpos = ({ tracker = 'tracker', keyboard = 'keyboard' })[reaper.GetExtState(EXT, 'statpos')] or 'bottom',
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
-  gridtab = flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')),
+  gridtab = reaper.file_exists(DIR .. '/.dev') and flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')) or false,
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
@@ -2063,7 +2066,7 @@ ctx = {
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     local t = { 'retro', 'sample', 'modulation', 'midi' }
     if state.gridtab then t[#t + 1] = 'grid' end
-    for _, x in ipairs({ 'garden', 'scopes', 'master' }) do t[#t + 1] = x end   -- scopes — скоп на каждый трек (3 окт)
+    for _, x in ipairs(state.dev and { 'garden', 'scopes', 'master' } or { 'scopes', 'master' }) do t[#t + 1] = x end   -- scopes — скоп на каждый трек (3 окт)
     return t
   end,
   mx_loops_toggle = function()
@@ -2902,7 +2905,11 @@ ctx = {
     end
     return items
   end,
-  options = function() OPT.open(ctx.option_items()) end,
+  options = function()
+    local items = {}
+    for _, it in ipairs(ctx.option_items()) do if state.dev or it.key ~= 'gridtab' then items[#items + 1] = it end end
+    OPT.open(items)
+  end,
   -- \ o (4 окт): опции гидрой — буква у каждой (первая свободная буква подписи,
   -- тема — t); переключатель — сразу, выбор — список значений, число — + / -
   options_hydra = function()
@@ -3132,6 +3139,7 @@ ctx = {
     vim.msg = 'garden: mute toggled'
   end,
   garden_cmd = function(arg)
+    if not state.dev then vim.msg = 'orca: not in this version'; return end
     local f = garden.f
     local a, rest = (arg or ''):match('^(%S*)%s*(.*)$')
     if a == 'show' or a == '' then state.top = true; state.toptab = 'garden'; ctx.set_focus('top'); return end
@@ -5469,7 +5477,8 @@ end
 
 local function frame()
   theme_check()
-  if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end   -- вкладка grid выключена в опциях
+  if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end
+  if state.toptab == 'garden' and not state.dev then state.toptab = 'master' end   -- Orca — только .dev   -- вкладка grid выключена в опциях
   -- заметки: автозапись через секунду после правки; context следует за item под курсором
   if state.notes_open then
     NT.edit_t = NT.dirty and (NT.edit_t or reaper.time_precise()) or nil
@@ -7683,7 +7692,7 @@ local function frame()
   if c == keys.f11 then toggle_dock(); c = 0 end
   -- F2..F6 — вкладки верхнего дока (2 окт): sample, modulation, retro, garden, master
   do
-    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'retro', [26165] = 'garden', [26166] = 'master' }
+    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'retro', [26165] = state.dev and 'garden' or 'scopes', [26166] = 'master' }
     if FTAB[c] and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       state.top = true; state.toptab = FTAB[c]; ctx.set_focus('top'); vim.msg = 'tab: ' .. FTAB[c]; c = 0
     end

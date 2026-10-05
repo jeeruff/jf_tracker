@@ -642,7 +642,7 @@ local function run_cmd(line)
     -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden
     if arg == 'sample' then V.msg = 'tab: item (the old sample tab)'; return end
     local a = (arg == 'mod' or arg == 'modulate') and 'modulation' or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
-    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or a == 'garden') and a or 'master'
+    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
     st.top = true; st.toptab = 'retro'

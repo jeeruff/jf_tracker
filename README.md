@@ -38,7 +38,6 @@ in one window: patterns, their order, sounds, slices, effects.
   - user-editable modules with an XY-pad learn.
 - A macro view, step listen, a keycaster, floating project notes with
   Markdown and todo boxes, screensets and themes.
-- Optional monome grid / arc support.
 - An interactive tour (`:tutorial`). `?` shows the keys of the focused module,
   and F1 opens the full help.
 
