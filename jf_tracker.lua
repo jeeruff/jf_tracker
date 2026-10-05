@@ -2067,9 +2067,10 @@ ctx = {
   -- вкладки верхней панели; grid — по опции (monome есть не у всех)
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
-    local t = { 'retro', 'sample', 'modulation', 'midi' }
+    -- 5 окт: grid и orca (только .dev) — в самом конце
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'scopes', 'master' }
     if state.gridtab then t[#t + 1] = 'grid' end
-    for _, x in ipairs(state.dev and { 'garden', 'scopes', 'master' } or { 'scopes', 'master' }) do t[#t + 1] = x end   -- scopes — скоп на каждый трек (3 окт)
+    if state.dev then t[#t + 1] = 'garden' end
     return t
   end,
   mx_loops_toggle = function()
@@ -7911,11 +7912,26 @@ local function frame()
   local quit = false
   if c == keys.f1 then open_help(); c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end
-  -- F2..F6 — вкладки верхнего дока (2 окт): sample, modulation, retro, garden, master
+  -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
+  -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
+  -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
   do
-    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'retro', [26165] = state.dev and 'garden' or 'scopes', [26166] = 'master' }
-    if FTAB[c] and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-      state.top = true; state.toptab = FTAB[c]; ctx.set_focus('top'); vim.msg = 'tab: ' .. FTAB[c]; c = 0
+    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'midi', [26165] = 'scopes', [26166] = 'master' }
+    local tab = FTAB[c]
+    if tab and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      local on_top = state.focus == 'top' and state.top
+      local cur = state.toptab == 'retro' and 'retro' or state.toptab
+      if c == 26162 and on_top then tab = nil                                  -- F2 из вкладки — в трекер
+      elseif c == 26163 and on_top and cur ~= 'sample' then
+        local T = ctx.top_tabs()
+        local i = 1
+        for k, t in ipairs(T) do if t == cur then i = k end end
+        tab = T[i % #T + 1]
+        if tab == 'sample' then tab = T[(i + 1) % #T + 1] end              -- круг F3 — без item (он на F2)
+      elseif c ~= 26163 and on_top and cur == tab then tab = nil end        -- повтор — в трекер
+      if tab then state.top = true; state.toptab = tab; ctx.set_focus('top'); vim.msg = 'tab: ' .. tab
+      else ctx.set_focus('tracker'); vim.msg = 'tracker' end
+      c = 0
     end
   end
   -- Cmd+Z — undo, Cmd+Shift+Z — redo: везде в трекере, в любом модуле (2 окт)
