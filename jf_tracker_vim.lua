@@ -982,6 +982,7 @@ function V.key_impl(c)
         V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
       end
     elseif c == BS then V.cmdline = (V.cmdline or ''):sub(1, -2); V.cmd_cycle = nil
+    elseif c == 47 and ctx.name_suggest and ctx.name_suggest(V.cmdline or '') then V.cmd_cycle = nil   -- «/» в имени — подсказки
     elseif c >= 32 and c < 127 then V.cmdline = (V.cmdline or '') .. string.char(c); V.cmd_cycle = nil end
     return
   end
@@ -1701,6 +1702,7 @@ local function picker_filter()
   if pk.sel > #pk.matches then pk.sel = math.max(1, #pk.matches) end
 end
 
+function V.picker_refilter() if V.picker then picker_filter() end end
 function V.open_picker(title, items, on_pick, query)
   V.picker = { title = title, items = items, query = query or '', sel = 1, matches = {}, on_pick = on_pick }
   picker_filter()

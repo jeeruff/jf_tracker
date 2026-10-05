@@ -89,6 +89,7 @@ KH.PAGES = {
     { k = 'Tab S-Tab', d = 'focus next / previous module; Option-Tab: dock tabs' },
     { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
     { k = 'Opt-Enter', d = 'select the instrument of the note under the cursor in the lib' },
+    { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
     { k = 'F2', d = 'tracker <-> item tab (from any tab - back to the tracker)' },
     { k = 'F3', d = 'modulate; again - the next tab in a circle' },

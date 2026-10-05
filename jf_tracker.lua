@@ -2118,6 +2118,24 @@ ctx = {
     if m + d < 0 then return end
     ctx.seq_marker(which, reaper.TimeMap2_beatsToTime(0, bt, m + d))
   end,
+  -- «/» в поле имени (5 окт): список частых имён (правила SWS + запас),
+  -- fzf по уже набранному; выбор подставляет имя, строка остаётся для Enter
+  name_suggest = function(line)
+    ctx.NAMES = ctx.NAMES or dofile(DIR .. '/jf_tracker_names.lua')
+    local pre, kind = ctx.NAMES.target(line or '')
+    if not pre then return false end
+    local items = {}
+    for _, nm in ipairs(ctx.NAMES.list(kind)) do items[#items + 1] = { label = nm } end
+    local back = vim.cmd_from
+    vim.open_picker(kind .. ' name', items, function(it)
+      vim.cmd_from = back; vim.mode = 'cmd'; vim.cmdline = pre .. it.label
+    end)
+    vim.picker.query = line:sub(#pre + 1)
+    vim.picker_refilter()
+    -- набранное — старое имя целиком (поле с текущим именем): тогда весь список
+    if #vim.picker.matches == 0 then vim.picker.query = ''; vim.picker_refilter() end
+    return true
+  end,
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
   loop_cells = function()
     if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
