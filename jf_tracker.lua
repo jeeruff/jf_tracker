@@ -8059,7 +8059,12 @@ local function frame()
       ts_drag = nil
     end
   elseif hover.rownum then
-    state.status = 'step numbers: drag = REAPER time selection, click = clear it'
+    -- на time selection (5 окт): как снять — Shift+Esc
+    local ta, tb = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    local ra, rb = model.row_of_time(ta, state.lpb), model.row_of_time(tb, state.lpb)
+    if tb - ta > 1e-6 and hover.rownum >= ra and hover.rownum < rb then
+      state.status = 'time selection: Shift+Esc removes it (anywhere), a click on the step numbers too; drag = a new one'
+    else state.status = 'step numbers: drag = REAPER time selection, click = clear it (Shift+Esc anywhere)' end
   end
   -- протяжка без модификатора: VISUAL-блок от точки нажатия до мыши
   if sel_drag then
