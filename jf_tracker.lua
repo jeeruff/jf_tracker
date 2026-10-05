@@ -4963,7 +4963,7 @@ function region_actions(rg)
     { 'Previous pattern in slot (<)', key = 'b', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
     { 'Yank pattern (y)', key = 'y', fn = function() ctx.alias_yank(rg) end },
     { 'Alias: linked repeat to the right (A)', key = 'a', fn = function() ctx.region_btn('alias') end },
-    { 'Clone: free copy to the right (C)', key = 'c', fn = function() ctx.region_btn('clone') end },
+    { 'Duplicate: free copy to the right (yp)', key = 'c', fn = function() ctx.region_btn('clone') end },
     { 'Make unique: unlink this repeat (U)', key = 'u', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'Paste pattern copy at end (p)', key = 'p', fn = function() ctx.alias_paste() end },
     { 'Sync this pattern', key = 's', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
@@ -5125,6 +5125,8 @@ local function context_menu(hover, anchor)
     end
   end
   if #hitems == 0 then return end
+  -- 5 окт: двойные хоткеи — нет; пока только жёлтые буквы, без колонки клавиш
+  for _, it in ipairs(hitems) do it.hk = nil end
   vim.open_hydra({ title = page and ('menu: ' .. (P and P.title or page)) or 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end

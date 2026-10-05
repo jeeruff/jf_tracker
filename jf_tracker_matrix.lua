@@ -475,7 +475,7 @@ local MX_HINT = {
   g = 'g: g first slot | Esc',
 }
 function MX.pending_hint() return MX.pending and MX_HINT[MX.pending] or nil end
-local OPS = { d = true, y = true, c = true, g = true }
+local OPS = { d = true, y = true, g = true }
 
 function MX.key(c, regions, snap)
   local ch = c < 256 and string.char(c) or ''
@@ -487,7 +487,7 @@ function MX.key(c, regions, snap)
     if c == 27 then return true end
     if op == 'd' and ch == 'd' then ctx.slot_delete()
     elseif op == 'y' and ch == 'y' then ctx.slot_yank()
-    elseif op == 'c' and (ch == 'c' or ch == 'w') then ctx.mx_name_prompt()
+    elseif op == 'y' and ch == 'p' then ctx.slot_new('clone')        -- yp — дубль (5 окт: одна клавиша на функцию)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
     else ctx.msg(op .. ch .. ': not a matrix command (? - help)') end
     return true
@@ -510,7 +510,6 @@ function MX.key(c, regions, snap)
   if c == 24 or (c == 8 and mods.cmd) then ctx.mx_block('cut'); return true end
   if c == 3 then ctx.mx_block('copy'); return true end
   if c == 22 then ctx.mx_block('paste'); return true end
-  if c == 4 then ctx.slot_new('clone'); return true end
   if c == 18 then ctx.edit.redo(); ctx.mx_refresh(); return true end
   -- Ctrl+hjkl приходят кодами 8/10/11/12 — те же движения
   if mods.ctrl and (c == 8 or c == 10 or c == 11 or c == 12) then
@@ -532,7 +531,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'h' or c == 1818584692 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci - 1)
   elseif ch == 'l' or c == 1919379572 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci + 1)
   elseif ch == 'G' then MX.goto_cell(regions, snap, #regions, MX.cur.ci)
-  elseif ch == 'M' or c == 13 then MX.toggle_mute(regions, snap)                -- mute — Shift+m, как в трекере (3 окт)
+  elseif ch == 'M' then MX.toggle_mute(regions, snap)                -- mute — Shift+m, как в трекере (3 окт)
   elseif ch == 'z' then MX.toggle_zoom()
   elseif ch == 'f' then MX.fill = not MX.fill
   elseif ch == 'F' then if ctx.mx_fold_toggle then ctx.mx_fold_toggle() else MX.fold = not MX.fold end
@@ -543,19 +542,17 @@ function MX.key(c, regions, snap)
   elseif ch == 'O' then ctx.slot_new('empty', true)
   elseif ch == 'p' then ctx.slot_new('put', false)
   elseif ch == 'P' then ctx.slot_new('put', true)
-  elseif ch == 'D' or ch == 'C' then ctx.slot_new('clone')         -- clone: независимая копия (как Duplicate / Clone в Renoise)
   elseif ch == 'A' then ctx.slot_new('alias')                       -- alias: связанный повтор
   elseif ch == 'U' then if ctx.slot_unique then ctx.slot_unique() end   -- make unique
-  elseif ch == 'Y' then ctx.slot_yank()
   elseif ch == 'x' then ctx.mx_block('cut')
-  elseif ch == 'n' or ch == 'r' or ch == 'i' then ctx.mx_name_prompt()
+  elseif ch == 'n' then ctx.mx_name_prompt()
   elseif ch == '=' then ctx.mx_len_prompt()
   elseif ch == ']' then ctx.slot_len_step('bar', 1)
   elseif ch == '[' then ctx.slot_len_step('bar', -1)
   elseif ch == '}' then ctx.slot_len_step('step', 1)
   elseif ch == '{' then ctx.slot_len_step('step', -1)
-  elseif ch == '<' or ch == ',' then ctx.slot_cycle(MX.cur.ri, -1)
-  elseif ch == '>' or ch == '.' then ctx.slot_cycle(MX.cur.ri, 1)
+  elseif ch == '<' then ctx.slot_cycle(MX.cur.ri, -1)
+  elseif ch == '>' then ctx.slot_cycle(MX.cur.ri, 1)
   elseif ch == 'u' then ctx.edit.undo(); ctx.mx_refresh()
   elseif c == 9 or c == 27 then ctx.toggle_focus()
   elseif ch == ' ' then MX.space(regions)

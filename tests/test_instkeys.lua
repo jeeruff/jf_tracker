@@ -28,10 +28,10 @@ k('yy'); eq('yy yanks', last(), 'yank:2-2')
 k('p'); eq('p puts after', last(), 'put:p')
 k('P'); eq('P puts before', last(), 'put:P')
 k('yp'); eq('yp duplicates: put', last(), 'put:p'); eq('yp duplicates: quiet yank first', log[#log - 1], 'yank:2-2:q')
-k('x'); eq('x cuts', last(), 'cut:2-2')
+local nx = #log; k('x'); eq('x is not a lib key any more (dd cuts)', #log, nx)
 k('d'); eq('pending hint after d', IK.pending_hint() ~= nil, true)
 IK.key(27, cur, 3, 8); eq('Esc cancels pending', IK.pending, nil)
-k('dq'); eq('unknown op does nothing', last(), 'cut:2-2')
+local nq = #log; k('dq'); eq('unknown op does nothing', #log, nq)
 -- диапазон
 cur = 1
 k('v'); k('j'); k('j'); eq('j extends in range', cur, 3)

@@ -2,7 +2,7 @@
 --
 -- Объект — инструмент (запись пула: уникальный сэмпл / слайс трека).
 --   j k g G      выбор (пустые слоты .. — тоже)   h l   трек влево / вправо
---   dd x         вырезать инструмент: его события на треках и item библиотеки
+--   dd           вырезать инструмент: его события на треках и item библиотеки
 --                уходят (в регистр), v — диапазон
 --   yy           взять в регистр (v — диапазон)
 --   p P          положить копию из регистра в библиотеку трека курсора
@@ -54,8 +54,8 @@ function IK.key(c, cur, n, nslots)
     else ctx.msg(op .. ch .. ': not a lib command (? - help)') end
     return true
   end
-  -- в диапазоне (v) d / x / y действуют сразу
-  if IK.anchor and (ch == 'd' or ch == 'x' or ch == 'y') then
+  -- в диапазоне (v) d / y действуют сразу (x убран 5 окт: вырезать — только d)
+  if IK.anchor and (ch == 'd' or ch == 'y') then
     local r0, r1 = IK.range(cur)
     r1 = math.min(r1, n)
     if r0 <= r1 then if ch == 'y' then ctx.inst_yank(r0, r1) else ctx.inst_cut(r0, r1) end end
@@ -73,7 +73,6 @@ function IK.key(c, cur, n, nslots)
   elseif ch == 'g' then ctx.inst_select(1)
   elseif ch == 'G' then ctx.inst_select(math.max(1, n))
   elseif ch == 'v' then IK.anchor = IK.anchor and nil or cur
-  elseif ch == 'x' then if cur <= n then ctx.inst_cut(cur, cur) end
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)
   elseif c == 13 then ctx.open_slicer()                         -- Enter — выбрать: сэмпл во вкладке item
