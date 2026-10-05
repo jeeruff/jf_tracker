@@ -8624,6 +8624,7 @@ local function frame()
   if t_4 - t_0 > prof.max then prof.max = t_4 - t_0 end
 
   local c = gfx.getchar()
+  ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
@@ -8733,11 +8734,14 @@ local function frame()
      and (vim.mode == 'insert' or vim.piano or (state.focus == 'top' and state.toptab == 'sample')) then
     local nk, now = ctx.note_key_last, reaper.time_precise()
     local vk = string.char(c):upper():byte()
-    local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - 0.005)
+    -- 5 окт: быстрые нажатия терялись — отпускание случалось ДО обработки
+    -- прошлого нажатия (медленный кадр) и не попадало в окно. Окно отпусканий
+    -- начинается за длительность того кадра (+20 мс) до обработки
+    local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - (nk.dt or 0) - 0.02)
     if up and up:byte(vk) == 0 and now - nk.t < 3 then
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
-    else ctx.note_key_last = { c = c, t = now } end
+    else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) } end
   end
   -- журнал клавиш (4 окт): сырой код → после раскладки и фильтров, режим, фокус;
   -- ExtState jf_tracker/keylog — последние 24 нажатия (диагностика «не работает»)
