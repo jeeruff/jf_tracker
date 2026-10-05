@@ -6,6 +6,9 @@ V.DATE = '2026-10-05'
 V.CHANGES = {
   { v = '0.7.0', d = '2026-10-05', items = {
     'first public release - GNU GPL v3; English help (F1)',
+    'the transport moved into the strip under the tracker (always there, the keyboard on its left by m); the main module is windows and quick options, laid out by screen position; option big BPM',
+    'time signature: sig column in the matrix, :sig N/D for the whole project or one pattern - a longer bar can get its new beats empty or with the last beat repeated',
+    'loop seams like in REAPER, the wave follows a dragged seam; option stretch markers; about: the story, links to itch.io, github, bandcamp and ko-fi',
     'the keyboard is INSERT: no separate keys mode - in INSERT the top row writes notes, NORMAL is Vim; m shows / hides the keyboard strip (shown by default), with the INSERT rows described next to it (hints option) and optionally the status line inside it (status bar: keyboard)',
     'f jump labels work again and never overlap; the tour starts with why jf, hjkl and f, and moves the focus to each step itself',
     'mouse: a plain click keeps the keyboard focus, Option+click moves it (option focus by mouse); lib: double click drops the sample onto the track at the cursor',

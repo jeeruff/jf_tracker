@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""make_index.py - ReaPack index.xml for the paid jf_tracker channel (5 Oct).
+"""make_index.py - ReaPack index.xml for jf_tracker (5 Oct).
 
 Adds the version from jf_tracker_version.lua as an entry pointing at tag
-v<version>. URLs are {{BASE}}/v/<tag>/<path>; the gate worker
-(jeeruff.com/jf_tracker/r/<license key>/) substitutes {{BASE}} with the
-buyer's own base and serves the files of that tag from the private repo.
+v<version>, files straight from the public GitHub repo:
+https://github.com/jeeruff/jf_tracker/raw/v<version>/<path>.
+ReaPack imports https://github.com/jeeruff/jf_tracker/raw/master/index.xml.
+(--gate: {{BASE}}/v/<tag>/<path> for the key-checking worker in
+~/code/web/jf_tracker_gate, not used now.)
 
 Usage:  tools/make_index.py            # index.xml for the current version
         tools/make_index.py --check    # print, write nothing
@@ -21,6 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / 'index.xml'
 NAME = 'jf_tracker'
+RAW = 'https://github.com/jeeruff/jf_tracker/raw'
+GATE = '--gate' in sys.argv
 # not shipped: development files
 SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$)')
 
@@ -62,7 +66,7 @@ def add_version(pkg, ver, tag, files, main=None, log=''):
         attrs = {'file': f.split('/')[-1] if f.startswith('effects/') else f}
         if f == main:
             attrs['main'] = 'main'
-        ET.SubElement(v, 'source', attrs).text = '{{BASE}}/v/%s/%s' % (tag, f)
+        ET.SubElement(v, 'source', attrs).text = (('{{BASE}}/v/%s/%s' if GATE else RAW + '/%s/%s') % (tag, f))
 
 
 def main():
