@@ -3036,10 +3036,11 @@ function D.frame(L, snap, rows, state, info)
                 while rr < ai.r1 - 1e-6 and guard < 512 do
                   local ly = yr(rr)
                   if ly > cy0 and ly < cy1 then
-                    -- стык лупа: линия поперёк и крупная косая насечка (видно издалека)
-                    gfx.a = 0.9; gfx.rect(ev.x + L.th + 4, ly, ev.w - L.th - 4, 1, 1)
-                    for k = 0, 1 do gfx.line(ev.x + L.th + 4 + k, ly - 5, ev.x + L.th + 12 + k, ly + 3) end
-                    gfx.a = 1
+                    -- стык лупа (6 окт): как у обычных items — треугольные вырезы
+                    -- на обеих границах, остриём внутрь (без косой палки)
+                    local tz = math.max(3, math.floor(L.rh / 3))
+                    gfx.triangle(ev.x, ly - tz, ev.x, ly + tz, ev.x + tz, ly)
+                    gfx.triangle(ev.x + ev.w - 1, ly - tz, ev.x + ev.w - 1, ly + tz, ev.x + ev.w - 1 - tz, ly)
                     if mx >= ev.x and mx < ev.x + ev.w and math.abs(my - ly) <= 3 then
                       hover.seam = { kind = 'ai', env = ev.e.env, idx = ai.idx, k = guard + 1, r0 = ai.r0, per = ai.loop_rows,
                                      first = (ai.loop_first or (ai.r0 + ai.loop_rows)) - ai.r0, x0 = ev.x, w = ev.w, name = ev.e.name }
