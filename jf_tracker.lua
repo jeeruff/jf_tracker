@@ -3856,6 +3856,14 @@ ctx = {
   end,
   ss_colname = function(ci) local c = snap and snap.cols[ci]; return c and c.name or ('track ' .. ci) end,
   ss_is_big = function() return state.ss_big and true or false end,
+  -- песочница тестов: проект без имени, треки sandbox_setup.lua
+  is_sandbox = function()
+    local _, pname = reaper.EnumProjects(-1, '')
+    if pname and pname ~= '' then return false end
+    local names = {}
+    for i = 0, reaper.CountTracks(0) - 1 do local _, nm = reaper.GetTrackName(reaper.GetTrack(0, i)); names[#names + 1] = nm end
+    return table.concat(names, ',') == 'A drums,B lanes,M synth,DEPOT'
+  end,
   -- zs / быстрая опция clips: тело трекера ↔ клипы сессии
   clips_toggle = function()
     state.clipsview = not state.clipsview
@@ -7370,6 +7378,8 @@ local function poll_cmd()
     local k, v2 = v:match('^flag%s+([%w_]+)%s+(%a+)')
     if k and state[k] ~= nil then state[k] = v2 == 'on'; reaper.SetExtState(EXT, k, v2 == 'on' and '1' or '0', true); B.pm = nil; vim.msg = k .. ' ' .. v2; relayout() end
   elseif name == 'ex' then vim.run_cmd((v:match('^ex%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^ex%s+(.*)$') or ''):gsub('_', ' '))   -- тест: любая :команда (пробелы — _)
+  elseif name == 'session' and (v:match('^session%s+launch') or v:match('^session%s+scene') or v:match('^session%s+stop') or v:match('^session%s+off')) and not ctx.is_sandbox() then
+    reaper.SetExtState(EXT, 'ssdump', 'REFUSED: not a sandbox', false)   -- тест-команды, что меняют проект, — только в песочнице (6 окт)
   elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
   elseif name == 'slicedump' then
