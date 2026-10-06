@@ -885,8 +885,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       local named = D.itemnames and cell.i == 1 and head.name ~= ''
       local fxv = head.fx or {}
       for fld = named and (nf + 1) or 1, nf do      -- строка имени: без точек под текстом
-        local skip = (fld > 3 and L.nfx > 0 and cell.i >= 1 and fxv[cell.i * L.nfx + (fld - 3)] ~= nil)
-                     or (fld == 2 and cell.vol ~= nil)
+        local skip = fld == 2 and cell.vol ~= nil
         if not skip then
           local fx = D.field_rect(L, fld)
           text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
@@ -900,13 +899,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
         if inv == 1 then text(x + L.x_note, ty, fit(head.name, L.w_note), U.BG)
         else text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), U.GREY) end
       end
-      local fx = head.fx or {}
-      if L.nfx > 0 and cell.i >= 1 then
-        for i = 1, L.nfx do
-          local v = fx[cell.i * L.nfx + i]
-          if v then text(x + L.x_fx[i], ty, v, c(3 + i, D.FX)) end
-        end
-      end
+      -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько
+      -- колонок fx (−+ в шапке); остальные скрыты, как в трекерах
     else
       text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT))
       for fld = 2, nf do
@@ -3270,6 +3264,8 @@ function D.frame(L, snap, rows, state, info)
       local lx = tx0 + L.ruler_w
       if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
       if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
+      -- 6 окт: кромки ещё раз после ячеек — серая ячейка курсора их закрывала
+      if is_cur_row or r.row == cur then D.edge_lines = D.edge_lines or {}; D.edge_lines[#D.edge_lines + 1] = { lx, ly, W - lx, r.row == cur } end
     end
     text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
@@ -3402,6 +3398,8 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
+  for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
+  D.edge_lines = nil
   -- ручки automation items (6 окт): поверх линий строк, непрозрачные; имя
   -- вертикально; швы лупа — вырезы цвета фона в ручке
   for _, hd in ipairs(D.ai_handles or {}) do

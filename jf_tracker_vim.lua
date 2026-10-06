@@ -531,6 +531,15 @@ local function hex_entry(c, fld, heads)
   local buf = V.hexbuf or ''
   local is_hex = ch:match('^[0-9A-F]$') ~= nil
   if fld >= 4 and buf == '' then
+    -- 6 окт, как в трекерах: команды просто стоят в колонках fx1, fx2 … по
+    -- порядку. Занятая колонка: цифры меняют ЗНАЧЕНИЕ её команды; другая
+    -- команда — только после удаления (BS). Пустая — буква + две цифры
+    local f = heads[1] and (heads[1].fx or {})[fld - 3]
+    if f then
+      if is_hex then V.hexbuf = f:sub(1, 1) .. ch; return false end
+      if ch:match('^%a$') then V.msg = ('%s: digits change its value; BS deletes it, then type another effect'):format(f) end
+      return false
+    end
     if not FX_LETTERS[ch] then return false end
     V.hexbuf = ch; return false
   end
