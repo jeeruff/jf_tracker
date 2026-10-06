@@ -144,6 +144,7 @@ local state = {
   bigbpm = flag('bigbpm2', false),
   bigstatus = flag('bigstatus', true),
   tpbuttons = flag('tpbuttons', false),
+  tpstyle = reaper.GetExtState(EXT, 'tpstyle') ~= '' and reaper.GetExtState(EXT, 'tpstyle') or (flag('tpbuttons', false) and 'symbols' or 'min'),   -- кнопки транспорта: min | symbols | text (6 окт)
   tintmute = flag('tintmute', true),
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
@@ -401,7 +402,7 @@ local function save_win()
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
-  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
+  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
@@ -431,7 +432,8 @@ local function relayout()
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
   if state.ptmode then
-    if state.pt_w ~= gfx.w then state.pt_w, state.pt_fit = gfx.w, true; state.fontscale = 4; draw.set_font(state); L = draw.layout(snap, state, #regions) end
+    if state.pt_w ~= gfx.w then state.pt_w, state.pt_fit = gfx.w, true; state.fontscale = 2;   -- 6 окт: ×4 было огромно, старт ×2
+      draw.set_font(state); L = draw.layout(snap, state, #regions) end
     while state.pt_fit and L.pt_n < math.min(4, L.pt_avail) and (state.fontscale or 1) > 1 do
       state.fontscale = state.fontscale - 1; draw.set_font(state); L = draw.layout(snap, state, #regions)
     end
@@ -3377,7 +3379,7 @@ ctx = {
       -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
       -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
       state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.wzoom, state.captions = 1, 'off', 'off', false, 4, 0, false
-      state.fontscale = 4
+      state.fontscale = 2                                    -- 6 окт: ×2 (×4 — огромно)
       state.pt_fit = true                                    -- кадр уменьшит масштаб, если 4 канала не влезли
       if not state.scopes then ctx.toggle_scopes(true) end
       state.ptmode = true
@@ -3930,7 +3932,7 @@ ctx = {
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
-      flag('tpbuttons', 'transport buttons', 'big << > || o >> loop in the transport bar; off - only [rec] and [loop], the keys do the rest (Space play, Opt+R rec)'),
+      { key = 'tpstyle', label = 'transport buttons', kind = 'cycle', values = { 'min', 'symbols', 'text' }, desc = 'min - only [rec] and [loop] (Space plays, Opt+R records); symbols - big << > || O >> loop; text - two rows of small word buttons, rec red', get = function() return state.tpstyle or 'min' end, set = function(v) state.tpstyle = v end },
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
@@ -7193,7 +7195,7 @@ local function frame()
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       oneclick = state.oneclick, autofocus = state.autofocus,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpbuttons, playstate = reaper.GetPlayState(),
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'symbols', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
