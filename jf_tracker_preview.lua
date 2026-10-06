@@ -70,6 +70,7 @@ function P.audio(track, depot_item, semis, max_sec)
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
+  P.cur_semis_add = (semis or 0) - (take and R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') or 0)   -- нота поверх питча take
   return true
 end
 
@@ -103,6 +104,26 @@ function P.inst(track, item, max_sec)
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = item, offs, rate
+  P.cur_semis_add = 0
+  return true
+end
+-- 6 окт: правка свойств инструмента на лету — звучащее превью этого item
+-- (или любого из items — копии инструмента) получает питч, rate, громкость
+-- сразу, слайдер слышно в реальном времени
+function P.live(items)
+  if not (cur and P.cur_item) then return false end
+  local hit = false
+  for _, it in ipairs(items or {}) do if it == P.cur_item then hit = true; break end end
+  if not hit or not R.ValidatePtr(P.cur_item, 'MediaItem*') then return false end
+  local take = R.GetActiveTake(P.cur_item)
+  if not take then return false end
+  local rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+  pcall(R.CF_Preview_SetValue, cur, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') + (P.cur_semis_add or 0))
+  pcall(R.CF_Preview_SetValue, cur, 'D_PLAYRATE', rate)
+  pcall(R.CF_Preview_SetValue, cur, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH'))
+  pcall(R.CF_Preview_SetValue, cur, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * R.GetMediaItemInfo_Value(P.cur_item, 'D_VOL'))
+  pcall(R.CF_Preview_SetValue, cur, 'D_PAN', R.GetMediaItemTakeInfo_Value(take, 'D_PAN'))
+  P.cur_rate = rate
   return true
 end
 -- секунды от начала item, который играет (nil — не играет инструмент)

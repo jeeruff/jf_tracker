@@ -4048,6 +4048,7 @@ ctx = {
       end)
       vim.msg = ('normalized (peak 0 dB), %d note(s) of the instrument'):format(#items)
     end
+    PV.live(items)                                  -- колесо / h l — тоже слышно сразу (6 окт)
     model.invalidate()
   end,
   -- новые строки свойств (5 окт): текст и доля слайдера читаем здесь (модуль — без reaper.*)
@@ -4122,6 +4123,7 @@ ctx = {
       local sl = src and reaper.GetMediaSourceLength(src) or 0
       if sl > 0 then P('take:D_STARTOFFS', fr * sl, 'abs', 'start offset') end
     end
+    PV.live(items)                                  -- звучащее превью — сразу с новым питчем / rate / громкостью (6 окт)
     model.invalidate()
   end,
   -- rate: лог-шкала ×0.2 … ×5, метки на простых отношениях (5 окт)
