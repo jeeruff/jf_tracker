@@ -208,6 +208,7 @@ function SS.key(c, seq, snap, grid, mods)
   return eaten
 end
 function SS.key_body(c, ch, seq, snap, grid, ncols)
+  if SS.pending_d and ch ~= 'd' then SS.pending_d = nil; if c == 27 then return true end end
   if ch == 'j' or c == 1685026670 then SS.cur.ri = SS.cur.ri + 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'k' or c == 30064 then SS.cur.ri = SS.cur.ri - 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'h' or c == 1818584692 then SS.cur.ci = SS.cur.ci - 1; clamp(seq, ncols)
@@ -217,6 +218,10 @@ function SS.key_body(c, ch, seq, snap, grid, ncols)
   elseif c == 13 or ch == 'o' then
     if SS.cur.ci == 0 then SS.scene(SS.cur.ri, seq, grid, ncols) else SS.launch(SS.cur.ri, SS.cur.ci, seq) end
   elseif ch == 'O' then SS.scene(SS.cur.ri, seq, grid, ncols)
+  elseif ch == 'd' then
+    if SS.pending_d then SS.pending_d = nil; ctx.ss_delete(SS.cur.ri, SS.cur.ci) else SS.pending_d = true; ctx.msg('d: d - delete the clip (its items in this slot) | Esc') end
+    return true
+  elseif c == 8 or c == 6579564 then ctx.ss_delete(SS.cur.ri, SS.cur.ci)   -- Backspace / Delete
   elseif ch == 'x' then SS.stop(SS.cur.ci)
   elseif ch == 'X' then SS.stop_all(ncols)
   elseif ch == 'q' then ctx.msg('session quantize: ' .. SS.next_quant())
@@ -266,6 +271,7 @@ function SS.menu_items(hv, seq, snap, grid, add)
     add('launch ' .. SS.slot_name(rg, d.ri) .. ' on ' .. ctx.ss_colname(d.ci), function() SS.launch(d.ri, d.ci, seq) end, 'l')
     add('scene: the whole row', function() SS.scene(d.ri, seq, grid, ncols) end, 's')
     add('stop this track', function() SS.stop(d.ci) end, 'x')
+    add('delete the clip (dd)', function() ctx.ss_delete(d.ri, d.ci) end, 'd')
   end
   add('stop all tracks', function() SS.stop_all(ncols) end, 'X')
   add('quantize: ' .. SS.quant .. ' (next)', function() ctx.msg('session quantize: ' .. SS.next_quant()) end, 'q')
@@ -334,6 +340,7 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
         for _, e in ipairs(cell.ev or {}) do
           local ex = cx + L.pad + math.floor(e.pos * (cw - 2 * L.pad))
           local ew = math.max(2, math.floor(e.len * (cw - 2 * L.pad)))
+          ew = math.max(0, math.min(ew, cx + cw - L.pad - ex))      -- не за край клетки
           local c = e.muted and U.DIM or (e.rgb or col.rgb or U.CYAN)
           -- аудио-клип (6 окт): волна item'а, фон — тусклый цвет; MIDI / пока строится — блок
           local pk = e.head and ew >= 4 and ctx.ss_peaks and ctx.ss_peaks(e.head, ew)
@@ -342,7 +349,7 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
             U.set(c)
             local mid = ry + L.pad + ih / 2
             for i = 1, math.min(ew, pk.n) do
-              local hi, lo = pk.max[i] or 0, pk.min[i] or 0
+              local hi, lo = math.max(-1, math.min(1, pk.max[i] or 0)), math.max(-1, math.min(1, pk.min[i] or 0))   -- волна не выше клетки
               local y0 = math.floor(mid - hi * ih / 2); local y1 = math.floor(mid - lo * ih / 2)
               gfx.rect(ex + i - 1, y0, 1, math.max(1, y1 - y0 + 1), 1)
             end
@@ -369,9 +376,11 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
       if ctx.hint then ctx.hint('sess', cx, ry, cw, chh, { ri = ri, ci = ci }) end
     end
   end
-  -- за краями
-  if SS.scroll > 0 then U.text(x + L.pad, gy0 - L.rh, ('^ %d'):format(SS.scroll), U.GREY) end
-  if SS.scroll + lay.rows_fit < nrows then U.text(x + L.pad, y + h - L.rh - L.pad, ('v %d'):format(nrows - SS.scroll - lay.rows_fit), U.GREY) end
+  -- скроллбар рядов (6 окт) справа от клеток; колесо — над сеткой
+  if nrows > lay.rows_fit and ctx.vbar then
+    local sbx = math.min(x + w - 4, gx0 + lay.cols_fit * lay.cell_w + 2)
+    ctx.vbar('clips', sbx, gy0, 3, lay.rows_fit * lay.cell_h, SS.scroll, lay.rows_fit, nrows)
+  end
   if SS.hs + lay.cols_fit < ncols then U.text(x + w - L.pad - U.measure('> 9'), cy + 1, ('> %d'):format(ncols - SS.hs - lay.cols_fit), U.GREY) end
   return hover
 end

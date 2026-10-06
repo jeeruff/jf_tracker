@@ -196,11 +196,17 @@ function MX.draw(L, snap, regions, info)
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
+  MX.ss_split_y = nil
   -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
   -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
   if MX.clips and ctx.ss_draw then
     local avail = ybot - hy - L.rh - 2
-    local ch = ctx.ss_height and ctx.ss_height(W - 6, math.floor(avail * 0.45)) or math.floor(avail * 0.4)
+    -- высота: тянется мышью за линию снизу (ctx.ss_px), иначе — по рядам, до 45 %
+    local px = ctx.ss_px and ctx.ss_px()
+    local ch = px and math.max(3 * L.rh, math.min(avail - 6 * L.rh, px))
+      or (ctx.ss_height and ctx.ss_height(W - 6, math.floor(avail * 0.45)) or math.floor(avail * 0.4))
+    MX.ss_top = hy + L.rh + 2                              -- верх блока клипов
+    MX.ss_split_y = MX.ss_top + ch                         -- линия раздела clips | слоты (ручка высоты)
     local hv = ctx.ss_draw(L, 0, hy + L.rh + 2, W - 6, ch)
     for k, v in pairs(hv) do hover[k] = v end
     hover.sess_view = true

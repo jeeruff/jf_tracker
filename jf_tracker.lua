@@ -151,6 +151,7 @@ local state = {
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
   ssbars = tonumber(ext('ssbars', 8)) or 8,
+  ss_px = tonumber(reaper.GetExtState(EXT, 'ss_px')),   -- высота clips над матрицей (тянется мышью)
   ssbsync = flag('ssbsync', true),                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
@@ -414,7 +415,7 @@ local function save_win()
   if state.ss_big and state.ss_saved then for k, v in pairs(state.ss_saved) do state[k] = v end; state.ss_big = false end   -- session big тоже
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8)
+  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or '')
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
@@ -3856,6 +3857,18 @@ ctx = {
   ss_is_big = function() return state.ss_big and true or false end,
   ss_height = function(w, cap) return MX.SS.height(w, cap, snap and #snap.cols or 1, #seq, L.cw, L.rh, L.pad) end,
   ss_peaks = function(head, n) return model.peaks(head, n) end,
+  ss_px = function() return state.ss_px end,
+  -- dd в clips (6 окт): клип = items трека в слоте — удаляются (undo); играет — стоп
+  ss_delete = function(ri, ci)
+    local col, rg = snap and snap.cols[ci], seq[ri]
+    if not (col and rg) then return end
+    local items = alias.items_in(col.track, rg.pos, rg.rgnend)
+    if #items == 0 then vim.msg = 'empty clip'; return end
+    if MX.SS.live[ci] and MX.SS.live[ci].ri == ri then MX.SS.stop(ci) end
+    edit.run('delete clip', function() for _, it in ipairs(items) do reaper.DeleteTrackMediaItem(col.track, it) end end)
+    model.invalidate()
+    vim.msg = ('clip deleted: %s / %s (%d items, u - undo)'):format(col.name, MX.SS.slot_name(rg, ri), #items)
+  end,
   -- клип под курсором (6 окт): его сэмпл — во вкладке item, зона = начало / конец клипа, L — точки лупа
   ss_focus = function(ri, ci, grid)
     local cell = grid and grid[ri] and grid[ri][ci]
@@ -8607,7 +8620,8 @@ local function frame()
     if state.side and math.abs(gfx.mouse_x - W0) <= 3 and gfx.mouse_y < gfx.h - L.status_h then edge = 'side'
     elseif L.fxb_rect and math.abs(gfx.mouse_x - (L.fxb_rect[1] + L.fxb_rect[3])) <= 3 and gfx.mouse_y >= L.fxb_rect[2] and gfx.mouse_y < L.fxb_rect[2] + L.fxb_rect[4] then edge = 'fxb'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
-    elseif state.top and math.abs(gfx.mouse_y - (L.top_first and ((L.top_y or 0) + L.top_h) or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top' end
+    elseif state.top and math.abs(gfx.mouse_y - (L.top_first and ((L.top_y or 0) + L.top_h) or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top'
+    elseif MX.clips and MX.ss_split_y and gfx.mouse_x < L.matrix_w and math.abs(gfx.mouse_y - MX.ss_split_y) <= 3 then edge = 'clips' end
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
         if resize_drag == 'mx' and MX.fold then state.mx_fold_px = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('folded matrix width %d px'):format(state.mx_fold_px)
@@ -8615,19 +8629,20 @@ local function frame()
         elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x - (L.fxb_rect and L.fxb_rect[1] or 0))); state.status = ('fx list width %d px'):format(state.fxb_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
+        elseif resize_drag == 'clips' then state.ss_px = math.max(3 * L.rh, gfx.mouse_y - (MX.ss_top or 0)); state.status = ('clips height %d px'):format(state.ss_px)
         else
           -- наверху — тянется нижний край; mid / bottom — верхний (растёт вверх)
           local want = L.top_first and (gfx.mouse_y - (L.top_y or 0)) or ((L.top_y + L.top_h) - gfx.mouse_y)
           state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
         end
-        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('lib %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
+        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' and resize_drag ~= 'clips' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('lib %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
-      state.status = edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: lib / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
+      state.status = edge == 'clips' and 'drag: clips height (dblclick: auto)' or edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: lib / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
       if U.click then
         local now2 = reaper.time_precise()
         if (now2 - click.t) < 0.4 and click.zone == 'resize' then
-          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil elseif edge == 'fxb' then state.fxb_px = nil else state.top_px = nil end
+          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil elseif edge == 'fxb' then state.fxb_px = nil elseif edge == 'clips' then state.ss_px = nil else state.top_px = nil end
         else resize_drag = edge end
         click = { t = now2, zone = 'resize' }
         U.click = false
