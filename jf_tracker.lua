@@ -404,7 +404,7 @@ local function save_win()
   -- PT-mode не сохраняется (3 окт): пишется раскладка, бывшая до него
   if state.ptmode and state.pt_saved then for k, v in pairs(state.pt_saved) do state[k] = v end; state.ptmode = false end
   if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
-  if ctx.PM and ctx.PM.flush then pcall(ctx.PM.flush, true) end                                        -- правки индекса jf_pm — на диск
+  if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
@@ -3663,6 +3663,7 @@ ctx = {
   pm_mod = function()
     if not ctx.PM then
       ctx.PM = dofile(DIR .. '/jf_tracker_pm.lua'); ctx.PM.init(U, ctx)
+      state.pm_flush = ctx.PM.flush
       local sh = reaper.GetExtState(EXT, 'pmshape'); ctx.PM.shape = (sh == 'square' or sh == 'compact') and sh or 'wide'
       ctx.PM.show_thumb, ctx.PM.show_icon = state.pmthumb ~= false, state.pmicon ~= false
     end

@@ -38,6 +38,8 @@
 | `daemon_tracker.lua` | модуль демона jf_grid (monome): грид = матрица, обмен через ExtState mx/gridkey |
 | `jf_tracker_browser.lua` | сайдбар: files / db (Media Explorer) / pm (jf_pm), auto-превью, drag & drop (`B.drag`), Enter → депо трека (=LIB) |
 | `jf_tracker_preview.lua` | предпрослушивание: аудио — CF_Preview через FX трека (SWS), MIDI — транспорт от строки |
+| `jf_tracker_pm.lua` | карточки jf_pm (экспериментально, `.dev` + опция pm cards): индекс корутиной, правки с отложенной записью, превью в картинках 0..87, сетка / big; тесты `tests/test_pm.lua` |
+| `jf_tracker_perf.lua` | performance (только API REAPER) и jftop — кадр трекера по частям |
 | `jf_tracker_help.html` | справка: философия, архитектура, глоссарий хоткеев; открывается по F1 |
 | `jf_tracker_keys.lua` | пианино INSERT-режима и коды спец-клавиш; файл пользователя |
 | `tests/test_vim.lua` | Vim-слой на стабах: `lua tests/test_vim.lua` (81 проверка) |

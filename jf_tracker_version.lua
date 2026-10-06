@@ -1,9 +1,23 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.7.0'
-V.DATE = '2026-10-05'
+V.VERSION = '0.8.0'
+V.DATE = '2026-10-06'
 V.CHANGES = {
+  { v = '0.8.0', d = '2026-10-06', items = {
+    'swing is the REAPER project grid swing: a swing button on the transport opens its menu (on / off, amounts with triplet 33 %, grid 1/4..1/32, custom), wheel +-1 %, :swing; new notes, slices, envelope points, the automation item editor and the quantizer follow it; every item has swing on by default (item tab row, item menu)',
+    'envelope lanes: - in a lane header hides it, + (and a+ on a track without lanes) adds one from the parameter picker; overlapping automation items get their own narrow handles; automation item points shown on the lanes (option); VISUAL selects the REAPER items and envelope points like the right-drag marquee',
+    'envelope lanes in INSERT: h j k l move, + / - one value step, x y p, dw / dd delete; segment shape by Ctrl+Opt+1..6 anywhere on the lane; values as midi 0..127 (default) or hex (option values) for envelope points and CC / PC lanes',
+    'automation item editor: Opt+click / drag erases, Cmd+drag draws free hand, REAPER cursors show the mode, pools stacked as lanes; grid to 1/128; tabs item / params / matrix',
+    'w / b move over the events of the whole track - every column and the envelope points, like words in Vim',
+    'fx commands stay on the note row in their fx columns (more columns with -+); on an occupied column digits change the value, another command after deleting it',
+    'slices are anchored to the waveform: changing the rate no longer shifts them (old slicings recover their rate); slice labels never overlap',
+    'performance view (REAPER API only, no external processes) and :jftop - the tracker frame part by part; option debug writes keys, clicks and errors to jf_tracker_debug.log',
+    'quick options are configurable: right click an option name in Options adds / removes it (a faint dot marks it); option sync track header size; quick option columns sized by their words',
+    'security: no shell or helper scripts, the browser opens only documents with the default app, XRNI unzip takes only the instrument and samples',
+    ':logo, about: youtube and e-mail; keycaster shows Cmd+letter as cmd; text transport buttons centred; many smaller fixes',
+    'experimental (dev): pm cards - the browser pm tab as a grid of jf_pm project cards with thumbnails, big view over the whole window',
+  } },
   { v = '0.7.0', d = '2026-10-05', items = {
     'first public release - GNU GPL v3; English help (F1)',
     'the transport moved into the strip under the tracker (always there, the keyboard on its left by m); the main module is windows and quick options, laid out by screen position; option big BPM',
