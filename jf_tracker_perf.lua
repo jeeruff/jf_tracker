@@ -1,8 +1,9 @@
 -- jf_tracker_perf.lua — производительность REAPER в духе htop (6 окт).
 --
--- Поштучной нагрузки на CPU по трекам / FX API REAPER не отдаёт (в бинарнике
--- таких функций нет), поэтому окно собирает то, что доступно:
---   процесс REAPER — CPU %, память, потоки (ps раз в 2 с);
+-- Нагрузки CPU и памяти REAPER API не отдаёт (ни по процессу, ни по трекам /
+-- FX). Внешних процессов окно не запускает (6 окт, решение пользователя: ps
+-- убран) — только API REAPER и сам трекер:
+--   трекер — доля кадра на отрисовку, память Lua, кадр / пересборка;
 --   аудио — частота, буфер, задержка выхода;
 --   треки — FX, PDC цепочки (сэмплы / мс), items; сортировка по тяжести;
 --   трекер — кадр, отрисовка, пересборка, куча Lua (из пульса main).
@@ -11,35 +12,12 @@
 local P = { active = false, t = 0, proc = nil, tracks = {}, scroll = 0 }
 local R = reaper
 
--- 6 окт, безопасность: никакого шелла и никаких файлов-скриптов — только
--- /bin/ps напрямую с постоянными аргументами (pid — число из его же вывода).
--- Через sh -c "…" вывод приходил пустым (CPU 0 %, Mem 0 MB)
-local function run(cmd)
-  local ok, out = pcall(R.ExecProcess, cmd, 1500)
-  if not ok or not out then return '' end
-  return (out:gsub('^%-?%d+\n', ''))
-end
-pcall(os.remove, R.GetResourcePath() .. '/jf_tracker_perf.sh')   -- след прежней версии
 
 function P.refresh()
   local now = R.time_precise()
   if now - P.t < 2 and P.proc then return end
   P.t = now
-  -- процесс REAPER: строка ps, чья команда кончается на /REAPER (сам бинарник)
-  local out = run('/bin/ps -A -o pid=,%cpu=,rss=,%mem=,comm=')
-  local pid, cpu, rss, mem
-  for line in out:gmatch('[^\n]+') do
-    local a, b, c, d, cm = line:match('^%s*(%d+)%s+([%d%.]+)%s+(%d+)%s+([%d%.]+)%s+(.+)$')
-    if cm and cm:match('/REAPER$') then pid, cpu, rss, mem = a, b, c, d; break end
-  end
-  local thr
-  if pid then
-    local n = 0
-    for _ in run('/bin/ps -M -p ' .. math.floor(tonumber(pid))):gmatch('[^\n]+') do n = n + 1 end
-    thr = n
-  end
-  P.raw = (not cpu) and (out:gsub('%s+', ' '):sub(1, 80)) or nil   -- не разобрали — сырой вывод в окно
-  P.proc = { cpu = tonumber(cpu) or 0, rss = (tonumber(rss) or 0) / 1024, mem = tonumber(mem) or 0, thr = math.max(0, (tonumber(thr) or 1) - 1) }
+  P.proc = true
   local _, sr = R.GetAudioDeviceInfo('SRATE', '')
   local _, bs = R.GetAudioDeviceInfo('BSIZE', '')
   P.audio = { sr = tonumber(sr) or 0, bs = tonumber(bs) or 0, lat = (R.GetOutputLatency and R.GetOutputLatency() or 0) * 1000 }
@@ -75,22 +53,25 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   local x, y = bx + L.pad, by + 2
   U.text(x, y, fit('performance  n: REAPER meter  Esc: close', bw - 2 * L.pad), U.AMBER)
   y = y + L.rh + 4
-  local pr = P.proc or {}
-  local lw = U.measure('Mem ') + L.pad
-  U.text(x, y, 'CPU', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (pr.cpu or 0) / 100, ('%.1f%%'):format(pr.cpu or 0)); y = y + L.rh + 2
-  U.text(x, y, 'Mem', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (pr.mem or 0) / 100, ('%.0f MB'):format(pr.rss or 0)); y = y + L.rh + 2
+  -- полоски — то, что считается без внешних процессов (6 окт): доля кадра
+  -- трекера на работу и память Lua; CPU / RAM самого REAPER — n (его метр)
+  local fps = tonumber(hb and hb:match('([%d%.]+)fps') or '') or 0
+  local dr = tonumber(hb and hb:match('draw ([%d%.]+)') or '') or 0
+  local rb = tonumber(hb and hb:match('rebuild ([%d%.]+)') or '') or 0
+  local frame_ms = fps > 0 and 1000 / fps or 33.3
+  local kb = collectgarbage('count')
+  local lw = U.measure('frame ') + L.pad
+  U.text(x, y, 'frame', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (dr + rb) / frame_ms, ('%.1f / %.0f ms'):format(dr + rb, frame_ms)); y = y + L.rh + 2
+  U.text(x, y, 'Lua', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, kb / (64 * 1024), ('%.1f MB'):format(kb / 1024)); y = y + L.rh + 2
   local a = P.audio or {}
+  local nfx, maxpdc = 0, 0
+  for _, t in ipairs(P.tracks) do nfx = nfx + t.fx; if t.pdc > maxpdc then maxpdc = t.pdc end end
   for _, line in ipairs({
-    P.raw and ('ps: ' .. (P.raw ~= '' and P.raw or '(no output)')) or ('threads %d'):format(pr.thr or 0),
     ('audio %d Hz, block %d (%.1f ms)'):format(a.sr or 0, a.bs or 0, (a.sr or 0) > 0 and (a.bs or 0) / a.sr * 1000 or 0),
     ('output latency %.1f ms'):format(a.lat or 0),
+    ('%d tracks, %d fx, longest PDC %.1f ms'):format(#P.tracks, nfx, (a.sr or 0) > 0 and maxpdc / a.sr * 1000 or 0),
   }) do U.text(x, y, fit(line, bw - 2 * L.pad), U.TEXT); y = y + L.rh end
-  -- пульс трекера: кадр / отрисовка / пересборка / куча
-  local fr = hb and hb:match('(%d+fps)') or ''
-  local dr = hb and hb:match('draw ([%d%.]+)') or '?'
-  local rb = hb and hb:match('rebuild ([%d%.]+)') or '?'
-  local lua = hb and hb:match('lua (%d+KB)') or ''
-  U.text(x, y, fit(('tracker %s draw %s ms rebuild %s ms %s'):format(fr, dr, rb, lua), bw - 2 * L.pad), U.GREY)
+  U.text(x, y, fit(('tracker %.0f fps, draw %.1f ms, rebuild %.1f ms; CPU / RAM of REAPER: n'):format(fps, dr, rb), bw - 2 * L.pad), U.GREY)
   y = y + L.rh + 4
   -- треки как процессы htop; колонки — по ширине
   local wide = bw > L.cw * 60
