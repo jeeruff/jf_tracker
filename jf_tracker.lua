@@ -39,6 +39,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
+MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
 edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
@@ -149,6 +150,9 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
+  ssbars = tonumber(ext('ssbars', 8)) or 8,
+  ssbsync = flag('ssbsync', true),                  -- аудио-клип в сессию — с beatsync (6 окт)
+  mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
@@ -407,13 +411,14 @@ local function save_win()
   -- PT-mode не сохраняется (3 окт): пишется раскладка, бывшая до него
   if state.ptmode and state.pt_saved then for k, v in pairs(state.pt_saved) do state[k] = v end; state.ptmode = false end
   if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
+  if state.ss_big and state.ss_saved then for k, v in pairs(state.ss_saved) do state[k] = v end; state.ss_big = false end   -- session big тоже
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
+  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -756,6 +761,7 @@ ctx = {
     items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
     if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
+    items[#items + 1] = { key = 'S', label = 'session - clips over the whole window (zz in the matrix)', fn = function() ctx.ss_big() end }
     items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
@@ -2356,7 +2362,7 @@ ctx = {
     if seq_cache.key == key then return seq_cache.seq end
     local out, real = {}, {}
     for _, rg in ipairs(regions) do
-      if not rg.lib and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6) then real[#real + 1] = rg end
+      if not rg.lib and not rg.session and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6) then real[#real + 1] = rg end
     end
     local function bars(t0, t1)
       local t, n = t0, 0
@@ -2400,7 +2406,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'scopes', 'master' }
+    local t = { 'retro', 'sample', 'clips', 'modulation', 'midi', 'scopes', 'master' }   -- clips (6 окт): сессия вкладкой после item
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -3762,6 +3768,161 @@ ctx = {
     return ctx.PM
   end,
   pm_cards = function() return state.pmgrid and state.pm_ok or false end,
+  -- ── session (6 окт): клипы как в Ableton — модуль SS, REAPER здесь ──────
+  alias = alias,
+  ss_big = function()
+    if state.ss_big then
+      for k, v in pairs(state.ss_saved or {}) do state[k] = v end
+      state.ss_big, state.ss_saved = false, nil
+      relayout(); ctx.set_focus('matrix')
+      vim.msg = MX.SS.playing_any() and 'session keeps playing (Q in the view or :session off stops it)' or 'session: back to the matrix'
+    else
+      state.ss_saved = {}
+      for _, k in ipairs({ 'top', 'dsp', 'mx_hidden', 'side', 'khelp' }) do state.ss_saved[k] = state[k] end
+      state.top, state.dsp, state.mx_hidden, state.side, state.khelp = false, false, false, false, false
+      state.ss_big = true
+      MX.SS.cur.ri, MX.SS.cur.ci = math.max(1, MX.cur.ri), math.max(1, MX.cur.ci)
+      relayout(); ctx.set_focus('matrix')
+      vim.msg = 'session: Enter launch, O / F scene, x stop, X stop all, q quantize, Space transport, Q off, zz / Esc back'
+    end
+  end,
+  -- зона сессии: регион =SESSION за =END (трекер его не показывает); нет —
+  -- создаётся через такт после всего проекта, длиной ssbars тактов
+  ss_zone = function()
+    -- маркеры читаются напрямую, не из regions: таблица обновляется снимком,
+    -- и два вызова подряд создавали две зоны (6 окт, песочница)
+    local i = 0
+    while true do
+      local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isrgn and name == model.SESSION_REGION then return { pos = pos, rgnend = rgnend, session = true, name = name } end
+      i = i + 1
+    end
+    -- только что созданный регион в этом же кадре через Enum ещё не виден —
+    -- иначе второй вызов создавал вторую зону (6 окт)
+    local c = state.ss_zone_new
+    if c and reaper.time_precise() - c.t < 5 then return c end
+    if not reaper.AddProjectMarker2 then return nil end
+    local t = math.max(reaper.GetProjectLength(0), regions.end_pos or 0)
+    for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
+    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
+    local z0 = reaper.TimeMap2_beatsToTime(0, 0, meas + 2)
+    local z1 = reaper.TimeMap2_beatsToTime(0, 0, meas + 2 + (state.ssbars or 8))
+    reaper.AddProjectMarker2(0, true, z0, z1, model.SESSION_REGION, -1, 0)
+    model.invalidate()
+    state.ss_zone_new = { pos = z0, rgnend = z1, session = true, name = model.SESSION_REGION, t = reaper.time_precise() }
+    return state.ss_zone_new
+  end,
+  ss_bar_after = function(t)
+    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
+    local n = reaper.TimeMap2_beatsToTime(0, 0, meas + 1)
+    if n <= t + 1e-6 then n = reaper.TimeMap2_beatsToTime(0, 0, meas + 2) end
+    return n
+  end,
+  ss_beat_after = function(t) return reaper.TimeMap2_QNToTime(0, math.floor(reaper.TimeMap2_timeToQN(0, t) + 1e-6) + 1) end,
+  ss_playpos = function() return reaper.GetPlayPosition(), playing() end,
+  ss_play = function(z)
+    reaper.GetSet_LoopTimeRange(true, true, z.pos, z.rgnend, false)
+    reaper.GetSetRepeat(1)
+    reaper.SetEditCurPos(z.pos, true, true)
+    if not playing() then reaper.OnPlayButton() end
+  end,
+  ss_apply = function(desc, fn)
+    local ok, e = pcall(edit.run, desc, fn)
+    if not ok then vim.msg = 'session: ' .. tostring(e):match('[^\n]*$') end
+    model.invalidate()
+  end,
+  ss_transport = function() edit.play_stop() end,
+  ss_quit = function()
+    local z = ctx.ss_zone()
+    reaper.OnStopButton()
+    edit.run('session off', function()
+      if z and snap then for _, col in ipairs(snap.cols) do alias.session_clear(col.track, z.pos, z.rgnend) end end
+      -- страховка: всё с меткой jf_session где бы ни лежало
+      for ti = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, ti)
+        for k = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+          local it = reaper.GetTrackMediaItem(tr, k)
+          local _, t = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+          if t ~= '' then reaper.DeleteTrackMediaItem(tr, it) end
+        end
+      end
+    end)
+    reaper.GetSetRepeat(0)
+    model.invalidate()
+  end,
+  ss_colname = function(ci) local c = snap and snap.cols[ci]; return c and c.name or ('track ' .. ci) end,
+  ss_is_big = function() return state.ss_big and true or false end,
+  -- сетка сессии в панели матрицы (кнопка clips)
+  ss_draw = function(Lx, x, y, w, h)
+    if not snap then return {} end
+    return MX.SS.draw_grid(Lx, x, y, w, h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), {}, true)
+  end,
+  mx_clips_toggle = function()
+    MX.clips = not MX.clips; state.mxclips = MX.clips
+    if MX.clips then MX.SS.cur.ri, MX.SS.cur.ci = math.max(1, MX.cur.ri), math.max(1, MX.cur.ci) end
+    relayout(); vim.msg = MX.clips and 'clips: Enter launch, O scene, x / X stop, q quantize, zz - over the whole window' or 'matrix of slots'
+  end,
+  -- файлы, брошенные на окно (Media Explorer, Finder): gfx.getdropfile
+  os_drop = function(files, hv)
+    if #files == 0 then return end
+    if hv.sess then
+      -- на клетку сессии: первый файл — в неё, следующие — в сцены ниже
+      for k, f in ipairs(files) do if seq[hv.sess.ri + k - 1] then ctx.ss_drop(hv.sess.ri + k - 1, hv.sess.ci, f) end end
+    elseif hv.pool then for _, f in ipairs(files) do ctx.add_to_depot(f) end
+    elseif hv.fi and hv.row then
+      for k, f in ipairs(files) do ctx.drop_to(hv.fi, hv.row.row + k - 1, f) end
+    else vim.msg = ('%d file(s): drop onto a track column, a session cell or the instruments'):format(#files) end
+  end,
+  -- бросок файла / карточки pm на клетку: в слот трека (как на колонку)
+  ss_drop = function(ri, ci, path)
+    local col, rg = snap and snap.cols[ci], seq[ri]
+    if not (col and rg) then return end
+    for i, f in ipairs(L.flat) do
+      if f.col == col and not f.folded then
+        local it = ctx.drop_to(i, rg.r0, path)
+        -- аудио-клип — с beatsync по умолчанию (6 окт): ближайшая степень
+        -- двойки долей по темпу слота, как B на инструменте; option session beatsync
+        local bs = ''
+        if it and state.ssbsync ~= false and reaper.ValidatePtr(it, 'MediaItem*') then
+          local tk = reaper.GetActiveTake(it)
+          if tk and not reaper.TakeIsMIDI(tk) and not path:lower():match('%.rpp$') then
+            local span = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') * reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+            local nb = edit.bsync_guess(span, rg.pos)
+            edit.bsync_set({ it }, it, nb); model.invalidate()
+            bs = (' beatsync %d'):format(nb)
+          end
+        end
+        vim.msg = 'clip: ' .. (path:match('[^/]+$') or path) .. ' → ' .. col.name .. ' / ' .. MX.SS.slot_name(rg, ri) .. bs
+        return
+      end
+    end
+    vim.msg = 'session: the track column is folded'
+  end,
+  -- :session [big | stop | quant bar|beat|now | bars N | off]
+  ss_cmd = function(arg)
+    arg = (arg or ''):match('^%s*(.-)%s*$')
+    local w1, w2 = arg:match('^(%S+)%s*(%S*)'); w1, w2 = w1 or '', w2 or ''
+    if w1 == '' or w1 == 'big' then if not state.ss_big then ctx.ss_big() end
+    elseif w1 == 'stop' and w2 == '' then MX.SS.stop_all(snap and #snap.cols or 0)
+    elseif w1 == 'stop' and tonumber(w2) then MX.SS.stop(math.floor(tonumber(w2)))
+    elseif w1 == 'launch' then
+      local ri, ci = arg:match('^launch%s+(%d+)%s+(%d+)')
+      if ri then MX.SS.launch(tonumber(ri), tonumber(ci), seq) else vim.msg = ':session launch <scene> <track>' end
+    elseif w1 == 'scene' and tonumber(w2) then MX.SS.scene(math.floor(tonumber(w2)), seq, MX.grid(snap, seq), #snap.cols)
+    elseif w1 == 'quant' and (w2 == 'bar' or w2 == 'beat' or w2 == 'now') then MX.SS.quant = w2; vim.msg = 'session quantize: ' .. w2
+    elseif w1 == 'bars' and tonumber(w2) then state.ssbars = math.max(1, math.min(64, math.floor(tonumber(w2)))); vim.msg = 'session zone: ' .. state.ssbars .. ' bars (applies to a new zone; delete the =SESSION region to rebuild)'
+    elseif w1 == 'off' then MX.SS.quit()
+    elseif w1 == 'clips' then ctx.mx_clips_toggle()
+    elseif w1 == 'dump' then   -- тест: зона / live / pend
+      local z = ctx.ss_zone(); local parts = { z and ('zone %.2f..%.2f'):format(z.pos, z.rgnend) or 'zone nil' }
+      for ci, l in pairs(MX.SS.live) do parts[#parts + 1] = ('live[%d]=ri%d ph%.2f len%.2f'):format(ci, l.ri, l.phase, l.len) end
+      for ci, p in pairs(MX.SS.pend) do parts[#parts + 1] = ('pend[%d]=%s at%.2f'):format(ci, tostring(p.ri), p.at) end
+      local i = 0
+      while true do local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i); if not ret or ret == 0 then break end; if isrgn then parts[#parts + 1] = ('rg[%s]%.1f-%.1f'):format(name, pos, rgnend) end; i = i + 1 end
+      reaper.SetExtState(EXT, 'ssdump', table.concat(parts, ' | '), false)
+    else vim.msg = 'session: big | stop | quant bar|beat|now | bars N | off' end
+  end,
   pm_big_on = function() return state.pm_big and true or false end,
   -- big (6 окт): карточки на всё окно — оверлей после draw.frame, раскладка
   -- сохраняется как в PT-mode и возвращается по Esc / b / :pm big
@@ -4343,6 +4504,7 @@ ctx = {
     local function inr(r) return r and x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
     local f
     if state.pm_big then f = 'browser' end
+    if state.ss_big then f = 'matrix' end
     if f then
     elseif inr(L.inst_rect) then f = 'inst'
     elseif inr(L.slices_rect) then f = 'slices'
@@ -4373,6 +4535,8 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
+      flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
+      { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -5133,6 +5297,7 @@ ctx = {
     end
     local it = edit.drop(f.col.track, f.col.fixed and f.lane and f.lane.idx or nil, state.lpb, row, path)
     vim.msg = it and ('dropped ' .. (path:match('[^/]+$') or path) .. ' → ' .. f.col.name) or 'drop failed'
+    return it
   end,
   drop_at_cursor = function(path) ctx.drop_to(vim.cur.fi, vim.cur.row, path) end,
   file_peaks = function(path, npix) return model.file_peaks(path, npix) end,
@@ -5411,6 +5576,7 @@ ctx = {
   toggle_focus = function(dir)
     dir = dir or 1
     if state.pm_big then ctx.set_focus('browser'); return end                -- big: фокус только у карточек
+    if state.ss_big then ctx.set_focus('matrix'); return end
     -- по часовой (2 окт): трекер → инструменты → браузер → DSP → матрица → верхний док → трекер
     local order = { 'tracker' }
     if state.slices_on then order[#order + 1] = 'slices' end          -- модуль слайсов перед lib (4 окт)
@@ -5612,7 +5778,7 @@ edit.after = function(desc)
     local covered = false
     local next_pos
     for _, rg in ipairs(regions or {}) do
-      if not rg.lib then
+      if not rg.lib and not rg.session then
         if t >= rg.pos - 1e-6 and t < rg.rgnend - 1e-6 then covered = true end
         if rg.pos > t + 1e-6 and (not next_pos or rg.pos < next_pos) then next_pos = rg.pos end
       end
@@ -5719,6 +5885,14 @@ MMX.init(U, ctx)
 MMX.PP.init(U, ctx)
 draw.macro.init(U)
 GD.init(U, ctx)
+MX.SS.init(U, ctx)
+MX.clips = state.mxclips and true or false
+-- инструмент ноты (6 окт): item-представитель из снимка — база транспоза
+edit.inst_ref = function(it)
+  local i = snap and snap.inst_of and snap.inst_of[it]
+  local e = i and snap.pool and snap.pool[i]
+  return e and e.item or nil
+end
 SPROP.init(U, ctx)
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
@@ -5794,6 +5968,11 @@ local function hint_go(t)
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d
   elseif t.kind == 'browserbtn' then B.click(d)
+  elseif t.kind == 'sess' then
+    -- session (6 окт): f + метка — клип; после F — вся сцена ряда
+    if MX.SS.scene_mode then MX.SS.scene(d.ri, seq, MX.grid(snap, seq), #snap.cols) else MX.SS.launch(d.ri, d.ci, seq) end
+    MX.SS.scene_mode = false; MX.SS.cur.ri, MX.SS.cur.ci = d.ri, d.ci
+  elseif t.kind == 'sessrow' then MX.SS.scene_mode = false; MX.SS.cur.ri = d; MX.SS.scene(d, seq, MX.grid(snap, seq), #snap.cols)
   end
 end
 
@@ -5962,11 +6141,12 @@ end
 ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
                     sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
+  if state.ss_big then return 'session' end
   if hover.matrix then return 'matrix' elseif hover.pool then return 'inst' elseif hover.dsp then return 'dsp'
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus
-  if f == 'top' then local t = state.toptab; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
+  if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
   if f == 'slices' then return 'sample' end
   if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
   if f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm' end
@@ -6101,6 +6281,8 @@ function ctx.context_items(hover)
     add('Clear all points', function() edit.env_clear(e.env); vim.msg = 'envelope cleared: ' .. (e.name or '') end, 'c')
   elseif hover.header_col then
     for _, a in ipairs(track_actions(hover.header_col)) do add(a[1], a.fn, a.key) end
+  elseif hover.ssbig and snap then
+    MX.SS.menu_items(hover, seq, snap, MX.grid(snap, seq), add)
   elseif hover.dsp then
     -- DSP: модуляция параметра (нативные свойства REAPER) и действия с FX
     -- (модуляция — только у FX трека; у take FX меню без неё)
@@ -7073,6 +7255,8 @@ local function poll_cmd()
   elseif name == 'dev' then ctx.dev_set(v:match('^dev%s+(%a+)') or '')   -- тест: :dev on|off
   elseif name == 'logo' then ctx.logo_show(v:match('^logo%s+([%a_]+)') or '')   -- тест: :logo имя
   elseif name == 'esc' then vim.picker, vim.hydra = nil, nil; state.khelp_big = false   -- тест: закрыть всплывашки
+  elseif name == 'ex' then vim.run_cmd((v:match('^ex%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^ex%s+(.*)$') or ''):gsub('_', ' '))   -- тест: любая :команда (пробелы — _)
+  elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
   elseif name == 'slicedump' then
     -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
@@ -7361,6 +7545,7 @@ local function frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
+  if snap and seq then MX.SS.tick(seq, snap) end                           -- session: границы квантизации (6 окт)
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
   if state.hold then
@@ -7844,6 +8029,10 @@ local function frame()
       local hv = MM.draw(U, Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'midi', ctx.fit)
       return hv
     end,
+    clips_draw = function(Lx, x, y, w, h)
+      if not snap then return {} end
+      return MX.SS.draw_top(Lx, x, y, w, h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition())
+    end,
     -- вкладка modulate (2 окт): нативная матрица модуляции + генератор кривых
     -- (lfo / podkat = Anticipate / follow). Широко — рядом, узко — страницы
     -- [matrix] [curves] (L переключает)
@@ -8020,6 +8209,11 @@ local function frame()
     hover = ctx.PM.draw_big(L, B, 0, 0, gfx.w, gfx.h - L.status_h)
     hover.pmbig = true
   end
+  -- session big (6 окт): клипы поверх всего
+  if state.ss_big and not idle_skip and snap then
+    HN.reset()
+    hover = MX.SS.draw_big(L, 0, 0, gfx.w, gfx.h - L.status_h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition())
+  end
   idle.hover = hover
   -- debug: нажатия мыши — что под ней (6 окт)
   if state.debug then
@@ -8147,6 +8341,7 @@ local function frame()
     local dt = db <= -60 and '-inf' or ('%.1f dB'):format(db)
     state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
+  elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
@@ -8173,15 +8368,20 @@ local function frame()
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', lib = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
-  elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
+  elseif hover.sess then state.status = ('clip: %s / %s - click: cursor, dblclick / Enter: launch at %s, rclick: menu, drop a file or a pm card here'):format(ctx.ss_colname(hover.sess.ci), MX.SS.slot_name(seq[hover.sess.ri], hover.sess.ri), MX.SS.quant)
+  elseif hover.sessrow then state.status = 'scene: click / Enter / O - launch every clip of the row (empty cells stop their tracks)'
+  elseif hover.sesscol then state.status = 'track: click - stop its clip at the next boundary'
+  elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
+  elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
@@ -8422,8 +8622,19 @@ local function frame()
       ctx.vbar_scroll(d.key, math.floor(math.max(0, math.min(1, f)) * (r.total - r.nvis) + 0.5))
     else draw.vbar_drag = nil end
   end
+  -- файлы на окно (6 окт): Media Explorer / Finder → клетка сессии, колонка, инструменты
+  if gfx.getdropfile then
+    local got, first = gfx.getdropfile(0)
+    if got and got ~= 0 then
+      local files, i = { first }, 1
+      while true do local ok2, fn = gfx.getdropfile(i); if not ok2 or ok2 == 0 then break end; files[#files + 1] = fn; i = i + 1 end
+      gfx.getdropfile(-1)
+      local ok, e = pcall(ctx.os_drop, files, hover); if not ok then vim.msg = 'drop: ' .. tostring(e):match('[^\n]*$') end
+    end
+  end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
+  if U.click and hover.ssbig and snap then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()); U.click = false end   -- session: клетка / сцена / кнопки
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
     if bpm_menu.hover then
@@ -8727,6 +8938,7 @@ local function frame()
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
       elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
+      elseif hover.matrix.btn == 'clips' then ctx.mx_clips_toggle()
       elseif hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend' then
         -- поле Start / End: клик — ввод такта, Shift+клик — строка курсора
         local w = hover.matrix.btn == 'mkstart' and 'start' or 'end'
@@ -8818,7 +9030,11 @@ local function frame()
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
       elseif hover.dspbtn.what == 'preset' then ctx.dsp_preset(hover.dspbtn.fx, 'pick')
-      elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx) end   -- двойной клик не удаляет второй
+      elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx)   -- двойной клик не удаляет второй
+      elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
+        local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
+      elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
+        local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
@@ -9396,6 +9612,8 @@ local function frame()
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
       elseif bd.active and hover.pool and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
         ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
+      elseif bd.active and hover.sess and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
+        ctx.ss_drop(hover.sess.ri, hover.sess.ci, bd.e.pm and bd.e.path or B.full(bd.e))   -- session: файл / карточка pm — клипом в слот (6 окт)
       elseif bd.active and hover.fi and hover.row then
         local e = bd.e
         if e.trk then ctx.drop_track(e, B.pmproj and B.pmproj.e)
@@ -9741,7 +9959,8 @@ local function frame()
   end
   if gfx.mouse_wheel ~= 0 then
     local step = gfx.mouse_wheel > 0 and -3 or 3
-    if hover.khelp_big and ctx.DOC then ctx.DOC.wheel(gfx.mouse_wheel)        -- справка F1: прокрутка
+    if hover.ssbig then MX.SS.wheel(gfx.mouse_wheel, #seq)                        -- session: ряды сцен
+    elseif hover.khelp_big and ctx.DOC then ctx.DOC.wheel(gfx.mouse_wheel)        -- справка F1: прокрутка
     elseif hover.dsp and hover.dsp.param then
       local col = dsp_target(); local p = col and hover.dsp.f.params[hover.dsp.param]
       if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
@@ -10028,6 +10247,10 @@ local function frame()
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
     c = 0
+  elseif c == ('F'):byte() and state.ss_big and vim.mode == 'normal' and not vim.hydra and not vim.picker then
+    MX.SS.scene_mode = true
+    if HN.start() then vim.msg = 'scene: type the label of any cell in the row, Esc' else MX.SS.scene_mode = false; vim.msg = 'no targets' end
+    c = 0
   elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
     if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
@@ -10123,6 +10346,7 @@ local function frame()
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if (state.ss_big or MX.clips) and MX.SS.key(c, seq, snap, MX.grid(snap, seq), ctx.mods()) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and state.side then
         if not B.key(c) then return vim.key(c) end
@@ -10228,6 +10452,10 @@ local function frame()
           if not GD.key(c, snap, seq) then
             if c == 27 then ctx.set_focus('tracker')
             elseif vim.mode ~= 'insert' then return vim.key(c) end   -- INSERT не пишет ноты из вкладки
+          end
+        elseif state.toptab == 'clips' then
+          if not MX.SS.key(c, seq, snap, MX.grid(snap, seq), ctx.mods()) then
+            if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
         elseif state.toptab == 'midi' then
           local r = MM.key(c)

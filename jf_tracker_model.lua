@@ -574,6 +574,29 @@ function M.build(lpb)
   snap.nroots = num
   snap.inst_num = {}
   for it, i in pairs(snap.inst_of) do snap.inst_num[it] = all[i] and all[i].num end
+  -- нота относительно инструмента (6 окт): transpose инструмента (D_PITCH /
+  -- rate его item в lib) — база, C-4 = как звучит инструмент; раньше нота
+  -- была абсолютной и q / вставка играли без транспоза, а клик в lib — с ним
+  snap.inst_semis = {}
+  for i, e in ipairs(all) do snap.inst_semis[i] = M.take_semitones(e.pitch, e.rate, e.ppitch) end
+  for _, col in ipairs(snap.cols) do
+    for _, lane in ipairs(col.lanes) do
+      for _, sub in ipairs(lane.subs) do
+        for _, cell in pairs(sub) do
+          if cell.kind == 'audio' and cell.item then
+            local i = snap.inst_of[cell.item]
+            local base = i and all[i] and all[i].item ~= cell.item and snap.inst_semis[i] or 0
+            if base ~= 0 then
+              cell.semis_abs = cell.semis
+              cell.semis = cell.semis - base
+              cell.note = M.note_name(M.BASE_NOTE + cell.semis)
+              cell.frac = math.abs(cell.semis - math.floor(cell.semis + 0.5)) > 0.01
+            end
+          end
+        end
+      end
+    end
+  end
   return snap
 end
 
@@ -1391,7 +1414,8 @@ function M.regions(lpb)
                         qn0 = qn0, qn1 = qn1, r0 = r0, r1 = r1, color = color,
                         -- библиотека — после =LIB И после =END (2 окт: =LIB, поставленный
                         -- раньше =END, прятал регионы последовательности)
-                        lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6) }
+                        lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6),
+                        session = name == '=SESSION' }
     end
     i = i + 1
   end
@@ -1403,6 +1427,7 @@ function M.regions(lpb)
   return out
 end
 M.LIB_MARKER = '=LIB'
+M.SESSION_REGION = '=SESSION'   -- зона сессии (6 окт): не слот, не паттерн
 
 -- Паттерны: уникальные имена регионов; номер — минимальный idx экземпляра,
 -- источник — первый экземпляр в последовательности (иначе в библиотеке).
@@ -1414,7 +1439,7 @@ function M.patterns(regions)
       local p = by[rg.name]
       if not p then p = { name = rg.name, num = rg.idx, src = nil, n = 0 }; by[rg.name] = p; list[#list + 1] = p end
       if rg.idx < p.num then p.num = rg.idx end
-      if not rg.lib then p.n = p.n + 1 end
+      if not rg.lib and not rg.session then p.n = p.n + 1 end
       if not p.src or (p.src.lib and not rg.lib) then p.src = rg end
     end
   end

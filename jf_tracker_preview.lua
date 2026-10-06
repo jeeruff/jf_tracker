@@ -58,7 +58,8 @@ function P.audio(track, depot_item, semis, max_sec)
   audio_stop_at = max_sec and (R.time_precise() + max_sec) or nil
   local pv = R.CF_CreatePreview(src)
   if not pv then return false end
-  R.CF_Preview_SetValue(pv, 'D_PITCH', semis or 0)
+  local base = take and R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') or 0
+  R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0))      -- нота поверх transpose инструмента (6 окт)
   R.CF_Preview_SetValue(pv, 'D_VOLUME', take and R.GetMediaItemTakeInfo_Value(take, 'D_VOL') or 1)
   local offs = take and R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') or 0
   local rate = take and R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE') or 1
@@ -70,7 +71,7 @@ function P.audio(track, depot_item, semis, max_sec)
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
-  P.cur_semis_add = (semis or 0) - (take and R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') or 0)   -- нота поверх питча take
+  P.cur_semis_add = semis or 0                                   -- нота поверх питча take
   return true
 end
 
@@ -157,7 +158,11 @@ function P.slice(track, entry, t0, t1, semis)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
   R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
-  if semis and semis ~= 0 then R.CF_Preview_SetValue(pv, 'B_PPITCH', 1); R.CF_Preview_SetValue(pv, 'D_PITCH', semis) end   -- Option+нота: слайс с питчем (4 окт)
+  -- transpose инструмента — база слайса (6 окт: слайс звучал без него); Option+нота — поверх
+  local base = entry.take and R.GetMediaItemTakeInfo_Value(entry.take, 'D_PITCH') or 0
+  local pp = entry.take and R.GetMediaItemTakeInfo_Value(entry.take, 'B_PPITCH') or 0
+  if semis and semis ~= 0 then pp = 1 end
+  if base + (semis or 0) ~= 0 then R.CF_Preview_SetValue(pv, 'B_PPITCH', pp); R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0)) end
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   cur = pv

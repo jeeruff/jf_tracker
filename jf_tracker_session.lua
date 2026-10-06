@@ -1,0 +1,386 @@
+-- jf_tracker_session.lua — session: клипы как в Ableton поверх линейного
+-- таймлайна REAPER (6 окт). Большой вид матрицы (zz): ряды — слоты
+-- последовательности (сцены), колонки — треки, клетка — клип (items трека
+-- в слоте). Запуск клипа сажает его items впереди плейхеда в ЗОНУ СЕССИИ —
+-- регион =SESSION за =END (трекер его не показывает), транспорт крутит зону
+-- лупом; у каждого трека своя фаза и длина цикла (= длина слота). Смена
+-- клипа — на границе квантизации (такт / доля / сразу): то, что доигрывает
+-- до границы, остаётся, дальше — новый клип; остаток старого убирается,
+-- когда граница пройдена (SS.todo), и окно досаживается новым.
+--
+-- Клавиши (Vim): h j k l — клетка, Enter / o — запустить клип, x — стоп
+-- трека, X — стоп всех, f + метка — клип, F + метка — вся сцена (ряд),
+-- Enter на заголовке ряда — сцена, q — квантизация, Space — транспорт,
+-- Q — выход из сессии: транспорт стоп, зона очищена, Esc / zz — закрыть вид.
+-- Бросок файла / карточки pm на клетку — в слот трека (ctx.ss_drop).
+--
+-- Без reaper.* и gfx в логике: REAPER — через ctx.ss_* (main); рисование —
+-- SS.draw_big (gfx). Логика тестируется tests/test_session.lua.
+
+local SS = {}
+local U, ctx
+
+SS.cur = { ri = 1, ci = 1 }
+SS.live = {}          -- [ci] = { ri, phase, len }   — играет
+SS.pend = {}          -- [ci] = { ri | 'stop', at }   — ждёт границы
+SS.todo = {}          -- [ci] = { from, to, ri, phase } — досадить окно после границы
+SS.quant = 'bar'      -- 'bar' | 'beat' | 'now'
+SS.scroll, SS.hs = 0, 0
+SS.scene_mode = false -- F: следующая метка f запускает сцену ряда
+SS.last_pos = nil
+SS.BLINK = 0.25
+SS.LOOK = 0.08        -- с, упреждение границы (2-3 кадра)
+
+function SS.init(u, c) U, ctx = u, c end
+
+SS.QUANTS = { 'bar', 'beat', 'now' }
+function SS.next_quant()
+  for i, q in ipairs(SS.QUANTS) do if q == SS.quant then SS.quant = SS.QUANTS[i % #SS.QUANTS + 1]; return SS.quant end end
+  SS.quant = 'bar'; return SS.quant
+end
+
+-- ── раскладка (чистая) ───────────────────────────────────────────────────
+-- hdr_w — колонка имён сцен; top — шапка (строка кнопок + имена треков);
+-- клетки не уже 8 знаков и не ниже 3 строк; влезают все — тянутся (до 6
+-- строк / 24 знаков), иначе прокрутка
+function SS.layout(w, h, ncols, nrows, cw, rh, pad, compact)
+  local hdr_w = compact and math.max(cw * 6, math.min(cw * 10, math.floor(w * 0.3))) or math.max(cw * 10, math.min(cw * 16, math.floor(w * 0.18)))
+  local top = compact and (rh + 2 * pad) or (2 * rh + 3 * pad)
+  local avail_w, avail_h = w - hdr_w - 2 * pad, h - top - pad
+  local min_w, min_h = cw * (compact and 6 or 8), rh * (compact and 2 or 3)
+  local cell_w = ncols > 0 and math.floor(avail_w / ncols) or avail_w
+  cell_w = math.max(min_w, math.min(cw * 20, cell_w))
+  local cell_h = nrows > 0 and math.floor(avail_h / nrows) or avail_h
+  cell_h = math.max(min_h, math.min(rh * 4, cell_h))
+  return { hdr_w = hdr_w, top = top, cell_w = cell_w, cell_h = cell_h,
+           cols_fit = math.max(1, math.floor(avail_w / cell_w)), rows_fit = math.max(1, math.floor(avail_h / cell_h)) }
+end
+
+-- ── границы ──────────────────────────────────────────────────────────────
+-- следующая граница квантизации после pos внутри зоны; за концом зоны —
+-- z1 (= момент прыжка лупа, фаза тогда z0). bar_after / beat_after — ctx
+function SS.next_boundary(pos, zone, quant)
+  if quant == 'now' then return pos end
+  local t = quant == 'beat' and ctx.ss_beat_after(pos) or ctx.ss_bar_after(pos)
+  if t >= zone.rgnend - 1e-6 then return zone.rgnend end
+  return t
+end
+-- доля прохода клипа 0..1 (прогресс в клетке)
+function SS.progress(live, pos)
+  if not live or live.len <= 0 then return 0 end
+  local d = (pos - live.phase) % live.len
+  return d / live.len
+end
+
+-- ── очередь ──────────────────────────────────────────────────────────────
+local function clamp(seq, ncols)
+  SS.cur.ri = math.max(1, math.min(#seq, SS.cur.ri))
+  SS.cur.ci = math.max(1, math.min(math.max(1, ncols), SS.cur.ci))
+end
+local function arm(ci, what)
+  local zone = ctx.ss_zone(); if not zone then ctx.msg('session: no zone'); return end
+  local pos, playing = ctx.ss_playpos()
+  local inside = playing and pos >= zone.pos - 1e-6 and pos < zone.rgnend + 1e-6
+  if not inside then
+    -- транспорт стоит или играет аранжировку: в зону, с её начала, сразу
+    ctx.ss_play(zone)
+    SS.pend[ci] = { ri = what, at = zone.pos, now = true }
+    SS.last_pos = nil
+  else
+    SS.pend[ci] = { ri = what, at = SS.next_boundary(pos, zone, SS.quant) }
+  end
+end
+function SS.launch(ri, ci, seq)
+  local rg = seq[ri]; if not rg then return end
+  if SS.live[ci] and SS.live[ci].ri == ri and not SS.pend[ci] then ctx.msg('already playing: ' .. SS.slot_name(rg, ri)); return end
+  arm(ci, ri)
+  ctx.msg(('launch %s on %s at %s'):format(SS.slot_name(rg, ri), ctx.ss_colname(ci), SS.quant))
+end
+function SS.stop(ci)
+  if not SS.live[ci] and not SS.pend[ci] then ctx.msg('nothing plays on ' .. ctx.ss_colname(ci)); return end
+  arm(ci, 'stop')
+end
+-- сцена: клип каждого трека, у кого в ряду что-то есть; пустая клетка — стоп трека
+function SS.scene(ri, seq, grid, ncols)
+  if not seq[ri] then return end
+  local n = 0
+  for ci = 1, ncols do
+    local cell = grid[ri] and grid[ri][ci]
+    if cell and cell.state ~= 'empty' then arm(ci, ri); n = n + 1
+    elseif SS.live[ci] or SS.pend[ci] then arm(ci, 'stop') end
+  end
+  ctx.msg(('scene %s: %d clips'):format(SS.slot_name(seq[ri], ri), n))
+end
+function SS.stop_all(ncols)
+  local n = 0
+  for ci = 1, ncols do if SS.live[ci] or SS.pend[ci] then arm(ci, 'stop'); n = n + 1 end end
+  ctx.msg(n > 0 and ('stop all: %d tracks at %s'):format(n, SS.quant) or 'nothing plays')
+end
+-- выход: транспорт стоп, зона чистая, состояние сброшено
+function SS.quit()
+  SS.live, SS.pend, SS.todo = {}, {}, {}
+  ctx.ss_quit()
+  ctx.msg('session off: zone cleared')
+end
+function SS.playing_any()
+  for _ in pairs(SS.live) do return true end
+  for _ in pairs(SS.pend) do return true end
+  return false
+end
+
+-- каждый кадр: границы пройдены — выполнить. seq / snap — текущие
+function SS.tick(seq, snap)
+  if not next(SS.pend) and not next(SS.todo) then return end
+  local zone = ctx.ss_zone(); if not zone then return end
+  local pos, playing = ctx.ss_playpos()
+  if not playing then return end
+  local wrapped = SS.last_pos and pos < SS.last_pos - 0.05
+  SS.last_pos = pos
+  for ci, p in pairs(SS.pend) do
+    -- стреляем на SS.LOOK раньше границы: старое режется ровно на границе,
+    -- новое уже стоит за ней — без щелчка и без опоздания на кадр
+    local at_end = p.at >= zone.rgnend - 1e-6
+    local fire = p.now or pos >= p.at - SS.LOOK or (at_end and wrapped)
+    if fire then
+      local phase = (at_end or p.now) and zone.pos or p.at
+      local keep0, keep1 = nil, nil
+      if not p.now and not wrapped then
+        if phase > pos + 1e-4 then keep0, keep1 = pos, phase
+        elseif at_end and pos < zone.rgnend - 1e-4 then keep0, keep1 = pos, zone.rgnend end   -- до прыжка лупа доигрывает старое
+      end
+      local col = snap.cols[ci]
+      local src = p.ri ~= 'stop' and seq[p.ri] or nil
+      if col then
+        ctx.ss_apply(src and 'session launch' or 'session stop', function()
+          ctx.alias.session_clear(col.track, zone.pos, zone.rgnend, keep0, keep1)
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci) end
+        end)
+      end
+      if src then SS.live[ci] = { ri = p.ri, phase = phase, len = src.rgnend - src.pos } else SS.live[ci] = nil end
+      if keep0 then SS.todo[ci] = { from = keep0, to = keep1, ri = src and p.ri or nil, phase = phase } end
+      SS.pend[ci] = nil
+    end
+  end
+  for ci, t in pairs(SS.todo) do
+    if pos >= t.to + 0.02 or wrapped then
+      local col = snap.cols[ci]
+      local src = t.ri and seq[t.ri]
+      if col then
+        ctx.ss_apply('session fill', function()
+          ctx.alias.session_clear(col.track, t.from, t.to)
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }) end
+        end)
+      end
+      SS.todo[ci] = nil
+    end
+  end
+end
+
+function SS.slot_name(rg, ri)
+  if rg and rg.name and rg.name ~= '' then return rg.name end
+  return ('slot %d'):format(ri)
+end
+
+-- ── клавиши ──────────────────────────────────────────────────────────────
+-- true — съедена. seq, snap, grid — текущие; mods — ctx.mods()
+function SS.key(c, seq, snap, grid, mods)
+  local ch = c < 256 and string.char(c) or ''
+  local ncols = #snap.cols
+  if SS.pending_z then
+    SS.pending_z = nil
+    if ch == 'z' then ctx.ss_big(); return true end
+    return c == 27
+  end
+  if ch == 'j' or c == 1685026670 then SS.cur.ri = SS.cur.ri + 1; clamp(seq, ncols); SS.follow(seq)
+  elseif ch == 'k' or c == 30064 then SS.cur.ri = SS.cur.ri - 1; clamp(seq, ncols); SS.follow(seq)
+  elseif ch == 'h' or c == 1818584692 then SS.cur.ci = SS.cur.ci - 1; clamp(seq, ncols)
+  elseif ch == 'l' or c == 1919379572 then SS.cur.ci = SS.cur.ci + 1; clamp(seq, ncols)
+  elseif ch == 'g' then SS.cur.ri = 1; SS.scroll = 0
+  elseif ch == 'G' then SS.cur.ri = #seq; SS.follow(seq)
+  elseif c == 13 or ch == 'o' then
+    if SS.cur.ci == 0 then SS.scene(SS.cur.ri, seq, grid, ncols) else SS.launch(SS.cur.ri, SS.cur.ci, seq) end
+  elseif ch == 'O' then SS.scene(SS.cur.ri, seq, grid, ncols)
+  elseif ch == 'x' then SS.stop(SS.cur.ci)
+  elseif ch == 'X' then SS.stop_all(ncols)
+  elseif ch == 'q' then ctx.msg('session quantize: ' .. SS.next_quant())
+  elseif ch == 'Q' then SS.quit()
+  elseif ch == ' ' then ctx.ss_transport()
+  elseif ch == 'z' then SS.pending_z = true; ctx.msg(ctx.ss_is_big() and 'z: z - back to the matrix' or 'z: z - clips over the whole window')
+  elseif c == 27 then if ctx.ss_is_big() then ctx.ss_big() else return false end
+  else return false end
+  return true
+end
+function SS.follow(seq)
+  if SS.rows_fit then
+    if SS.cur.ri - 1 < SS.scroll then SS.scroll = SS.cur.ri - 1 end
+    if SS.cur.ri - 1 >= SS.scroll + SS.rows_fit then SS.scroll = SS.cur.ri - SS.rows_fit end
+  end
+end
+function SS.wheel(dir, nrows)
+  SS.scroll = math.max(0, math.min(math.max(0, nrows - (SS.rows_fit or 1)), SS.scroll - (dir > 0 and 1 or -1)))
+end
+-- клик: клетка — курсор, повторный по той же в 0.35 с — запуск; заголовок
+-- ряда — сцена; заголовок трека — стоп трека
+function SS.click(hv, seq, snap, grid, now)
+  local ncols = #snap.cols
+  if hv.sessrow then SS.cur.ri = hv.sessrow; SS.scene(hv.sessrow, seq, grid, ncols)
+  elseif hv.sesscol then SS.stop(hv.sesscol)
+  elseif hv.sess then
+    local d = hv.sess
+    local again = SS.last_click and SS.last_click.ri == d.ri and SS.last_click.ci == d.ci and now - SS.last_click.t < 0.35
+    SS.cur.ri, SS.cur.ci = d.ri, d.ci
+    SS.last_click = { ri = d.ri, ci = d.ci, t = now }
+    if again then SS.launch(d.ri, d.ci, seq); SS.last_click = nil end
+  elseif hv.sessbtn == 'quant' then ctx.msg('session quantize: ' .. SS.next_quant())
+  elseif hv.sessbtn == 'stopall' then SS.stop_all(ncols)
+  elseif hv.sessbtn == 'quit' then SS.quit()
+  elseif hv.sessbtn == 'back' or hv.sessbtn == 'big' then ctx.ss_big()
+  end
+end
+-- пункты ПКМ по клетке
+function SS.menu_items(hv, seq, snap, grid, add)
+  local ncols = #snap.cols
+  local d = hv.sess
+  if d then
+    local rg = seq[d.ri]
+    add('launch ' .. SS.slot_name(rg, d.ri) .. ' on ' .. ctx.ss_colname(d.ci), function() SS.launch(d.ri, d.ci, seq) end, 'l')
+    add('scene: the whole row', function() SS.scene(d.ri, seq, grid, ncols) end, 's')
+    add('stop this track', function() SS.stop(d.ci) end, 'x')
+  end
+  add('stop all tracks', function() SS.stop_all(ncols) end, 'X')
+  add('quantize: ' .. SS.quant .. ' (next)', function() ctx.msg('session quantize: ' .. SS.next_quant()) end, 'q')
+  add('session off: stop, clear the zone', function() SS.quit() end, 'Q')
+end
+
+-- ── рисование ────────────────────────────────────────────────────────────
+-- grid — MX.grid(snap, seq); hover: sess {ri, ci}, sessrow ri, sesscol ci, sessbtn
+-- Сетка одна на два вида: big (на всё окно, с кнопками) и compact — в панели
+-- матрицы (кнопка clips), без строки кнопок, клетки от 2 строк
+function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compact)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local ncols, nrows = #snap.cols, #seq
+  local lay = SS.layout(w, h, ncols, nrows, L.cw, L.rh, L.pad, compact)
+  SS.rows_fit, SS.cols_fit = lay.rows_fit, lay.cols_fit
+  local gx0, gy0 = x + lay.hdr_w + L.pad, y + lay.top
+  local cy = y + L.pad
+  SS.hs = math.max(0, math.min(math.max(0, ncols - lay.cols_fit), SS.cur.ci - lay.cols_fit, SS.hs))
+  if SS.cur.ci - 1 < SS.hs then SS.hs = SS.cur.ci - 1 end
+  SS.scroll = math.max(0, math.min(math.max(0, nrows - lay.rows_fit), SS.scroll))
+  -- имена треков
+  for k = 1, lay.cols_fit do
+    local ci = SS.hs + k
+    local col = snap.cols[ci]; if not col then break end
+    local cx = gx0 + (k - 1) * lay.cell_w
+    local hot = mx >= cx and mx < cx + lay.cell_w and my >= cy and my < cy + L.rh
+    local live = SS.live[ci]
+    if col.rgb then U.set(U.tint(col.rgb, 0.35)); gfx.rect(cx, cy, lay.cell_w - 1, L.rh, 1) end
+    if hot then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(cx, cy, lay.cell_w - 1, L.rh, 1) end
+    U.text(cx + L.pad, cy + 1, ctx.fit(col.name, lay.cell_w - 2 * L.pad - (live and U.measure(' x') or 0)), ci == SS.cur.ci and U.AMBER or U.TEXT)
+    if live then U.text(cx + lay.cell_w - L.pad - U.measure('x'), cy + 1, 'x', hot and U.AMBER or U.GREY) end
+    if hot then hover.sesscol = ci end
+  end
+  local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
+  for r = 1, lay.rows_fit do
+    local ri = SS.scroll + r
+    local rg = seq[ri]; if not rg then break end
+    local ry = gy0 + (r - 1) * lay.cell_h
+    -- заголовок сцены
+    local hot = mx >= x and mx < gx0 - L.pad and my >= ry and my < ry + lay.cell_h
+    local rgb = rg.color and rg.color ~= 0 and U.rgb_of_native and U.rgb_of_native(rg.color) or nil
+    U.set(hot and U.tint(U.AMBER, 0.25) or (rgb and U.tint(rgb, 0.25) or U.PANEL)); gfx.rect(x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, 1)
+    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, 0)
+    local nm = SS.slot_name(rg, ri)
+    U.text(x + 2 * L.pad, ry + L.pad, ctx.fit(nm, lay.hdr_w - 4 * L.pad), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
+    if lay.cell_h >= 2 * L.rh + L.pad and rg.qn1 and rg.qn0 then U.text(x + 2 * L.pad, ry + L.pad + L.rh, ('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', U.GREY) end
+    if hot then hover.sessrow = ri end
+    if ctx.hint then ctx.hint('sessrow', x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, ri) end
+    -- клетки
+    for k = 1, lay.cols_fit do
+      local ci = SS.hs + k
+      local col = snap.cols[ci]; if not col then break end
+      local cx = gx0 + (k - 1) * lay.cell_w
+      local cell = grid[ri] and grid[ri][ci]
+      local cw, chh = lay.cell_w - 2, lay.cell_h - 2
+      local live, pend = SS.live[ci], SS.pend[ci]
+      local is_live = live and live.ri == ri
+      local is_pend = pend and pend.ri == ri
+      local is_stop = pend and pend.ri == 'stop' and live and live.ri == ri
+      local is_cur = ri == SS.cur.ri and ci == SS.cur.ci
+      local hot2 = mx >= cx and mx < cx + cw and my >= ry and my < ry + chh
+      U.set(is_live and U.tint(U.AMBER, 0.12) or (hot2 and U.tint(U.TEXT, 0.06) or U.BG)); gfx.rect(cx, ry, cw, chh, 1)
+      -- содержимое: блоки событий по времени, цвет item / трека
+      if cell and cell.state ~= 'empty' then
+        local ih = math.max(2, chh - 2 * L.pad - 3)
+        for _, e in ipairs(cell.ev or {}) do
+          local ex = cx + L.pad + math.floor(e.pos * (cw - 2 * L.pad))
+          local ew = math.max(2, math.floor(e.len * (cw - 2 * L.pad)))
+          U.set(e.muted and U.DIM or (e.rgb or col.rgb or U.CYAN)); gfx.rect(ex, ry + L.pad, ew, ih, 1)
+        end
+        if cell.state == 'muted' and chh >= 2 * L.rh then U.text(cx + L.pad, ry + chh - L.rh - 3, 'muted', U.GREY) end
+      else
+        U.text(cx + math.floor((cw - U.measure('.')) / 2), ry + math.floor((chh - L.rh) / 2), '.', U.DIM)
+      end
+      if is_live then
+        local pr = SS.progress(live, playpos or 0)
+        U.set(U.tint(U.AMBER, 0.5)); gfx.rect(cx, ry + chh - 3, cw, 3, 1)
+        U.set(U.AMBER); gfx.rect(cx, ry + chh - 3, math.floor(cw * pr), 3, 1)
+      end
+      -- рамки: живой — янтарная, в очереди — голубая мигающая, стоп — красная мигающая, курсор — белая
+      if is_pend and blink then U.set(U.CYAN); gfx.rect(cx, ry, cw, chh, 0); gfx.rect(cx + 1, ry + 1, cw - 2, chh - 2, 0)
+      elseif is_stop and blink then U.set(U.RED); gfx.rect(cx, ry, cw, chh, 0)
+      elseif is_live then U.set(U.AMBER); gfx.rect(cx, ry, cw, chh, 0)
+      else U.set(U.LINE); gfx.rect(cx, ry, cw, chh, 0) end
+      if is_cur then U.set(U.TEXT); gfx.rect(cx - 1, ry - 1, cw + 2, chh + 2, 0) end
+      if hot2 then hover.sess = { ri = ri, ci = ci } end
+      if ctx.hint then ctx.hint('sess', cx, ry, cw, chh, { ri = ri, ci = ci }) end
+    end
+  end
+  -- за краями
+  if SS.scroll > 0 then U.text(x + L.pad, gy0 - L.rh, ('^ %d'):format(SS.scroll), U.GREY) end
+  if SS.scroll + lay.rows_fit < nrows then U.text(x + L.pad, y + h - L.rh - L.pad, ('v %d'):format(nrows - SS.scroll - lay.rows_fit), U.GREY) end
+  if SS.hs + lay.cols_fit < ncols then U.text(x + w - L.pad - U.measure('> 9'), cy + 1, ('> %d'):format(ncols - SS.hs - lay.cols_fit), U.GREY) end
+  return hover
+end
+
+-- строка кнопок сессии (big и вкладка clips); возвращает x после кнопок
+function SS.draw_buttons(L, bx, by, right, hover, big)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local function btn(label, what, on)
+    local bw = U.measure(label) + 2 * L.pad
+    if bx + bw > right then return end
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hover.sessbtn = what end
+    bx = bx + bw + L.pad
+  end
+  if big then U.text(bx, by + 1, 'session', U.AMBER); bx = bx + U.measure('session') + 2 * L.pad end
+  btn('quant: ' .. SS.quant, 'quant', false)
+  btn('X stop all', 'stopall', SS.playing_any())
+  btn('Q off', 'quit', false)
+  btn(big and 'zz back' or 'zz big', big and 'back' or 'big', false)
+  local hint = 'Enter launch  O / F scene  x stop  f labels  Space transport  drop files (browser, Media Explorer) or a pm card onto a cell'
+  if bx + U.measure(hint) < right then U.text(bx, by + 1, hint, U.GREY) end
+  return bx
+end
+
+function SS.draw_big(L, x, y, w, h, seq, snap, grid, now, playpos)
+  local hover = { ssbig = true }
+  U.set(U.BG); gfx.rect(x, y, w, h, 1)
+  SS.draw_buttons(L, x + L.pad, y + L.pad, x + w - L.pad, hover, true)
+  local top = L.rh + 2 * L.pad
+  SS.draw_grid(L, x, y + top, w, h - top, seq, snap, grid, now, playpos, hover, false)
+  U.set(U.AMBER); gfx.rect(x, y, w, h, 0)
+  return hover
+end
+-- вкладка clips верхней панели: кнопки + сетка (компактная раскладка)
+function SS.draw_top(L, x, y, w, h, seq, snap, grid, now, playpos)
+  local hover = {}
+  SS.draw_buttons(L, x + L.pad, y + 1, x + w - L.pad, hover, false)
+  local top = L.rh + 2 * L.pad
+  SS.draw_grid(L, x, y + top, w, h - top, seq, snap, grid, now, playpos, hover, true)
+  return hover
+end
+
+return SS

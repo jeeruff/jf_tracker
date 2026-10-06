@@ -150,7 +150,8 @@ KH.PAGES = {
     { k = 'v HJKL', d = 'block select; in block: y copy, d x cut, M mute', t = { 'v', 'H', 'J', 'K', 'L' } },
     { k = '^C ^X ^V ^N', d = 'block copy / cut / paste / mute' },
     { k = 'u ⌘⇧Z', d = 'undo / redo' },
-    { k = 'z f t', d = 'zoom detail / fill / trim items to regions' },
+    { k = 'zz zi', d = 'session: clips over the whole window / zoom detail', t = { 'z' } },
+    { k = 'f t', d = 'fill / trim items to regions' },
     { k = 'R', d = 'ruler of bars on the left on / off (button ruler)' },
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Tab', d = 'next module' },
@@ -177,6 +178,19 @@ KH.PAGES = {
     { k = '..', d = 'empty slot: retro p / Enter puts the capture here; drop a retro / sample selection or a file' },
     { k = 'u', d = 'undo' },
     { k = 'Esc', d = 'back to tracker' },
+  } },
+  session = { title = 'session: clips over the whole window (zz in the matrix)', e = {
+    { k = 'h j k l', d = 'cell (scene row x track column)' },
+    { k = 'Enter o', d = 'launch the clip at the next quantize boundary (its items loop in the =SESSION zone with their own phase)' },
+    { k = 'O F', d = 'scene: launch every clip of the row; F + label - the row of any labelled cell; empty cells stop their tracks' },
+    { k = 'f', d = 'labels: f + letters launches that clip' },
+    { k = 'x X', d = 'stop this track / all tracks at the boundary' },
+    { k = 'q', d = 'quantize: bar / beat / now (:session quant ...)' },
+    { k = 'Space', d = 'transport play / stop' },
+    { k = 'Q', d = 'session off: transport stop, zone cleared, repeat off (:session off)' },
+    { k = 'drop', t = {}, d = 'a file or a pm card dropped on a cell becomes its clip (goes into the slot of that track)' },
+    { k = 'rclick', t = {}, d = 'menu: launch / scene / stop / quantize / off' },
+    { k = 'zz Esc', d = 'back to the matrix - the clips keep playing' },
   } },
   pm = { title = 'pm cards (jf_pm, experimental)', e = {
     { k = 'h j k l', d = 'move over the cards (also arrows); g G - first / last' },
@@ -376,6 +390,7 @@ KH.BARS = {
              { '< >', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
            { 'Space', 'listen' }, { '/', 'find' }, { '?', 'help' } },
+  session = { { 'Enter', 'launch' }, { 'O F', 'scene' }, { 'x X', 'stop' }, { 'q', 'quant' }, { 'f', 'labels' }, { 'Q', 'off' }, { 'zz', 'back' } },
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
@@ -396,7 +411,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

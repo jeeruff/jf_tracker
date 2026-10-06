@@ -125,6 +125,76 @@ local function copy_span(tr, src, dst, tag, link)
 end
 
 A.copy_span = copy_span          -- заполнение долей последней долей (:sig, 5 окт)
+A.items_in = items_in
+
+-- ── session (6 окт): посадка клипа в зону сессии ─────────────────────────
+-- Клип = items трека на [src.pos, src.rgnend) (ячейка матрицы: трек × слот).
+-- Копии ставятся с фазой phase с шагом len (длина клипа) так, чтобы покрыть
+-- зону [z0, z1) — и ПЕРЕД фазой тоже (k < 0): луп зоны крутится, фаза должна
+-- сходиться на любом проходе. skip = { a, b } — окно, куда не сажать (там
+-- ещё доигрывает прошлый клип; досаживается потом с win = только это окно).
+-- Копии независимые (unlink), помечены P_EXT:jf_session = "<ri>:<ci>".
+function A.session_plant(tr, src, z0, z1, phase, skip, tag, win)
+  local len = src.rgnend - src.pos
+  if len <= 1e-6 then return 0 end
+  local chunks = {}
+  for _, it in ipairs(items_in(tr, src.pos, src.rgnend)) do
+    local ok, c = R.GetItemStateChunk(it, '', false)
+    if ok then
+      chunks[#chunks + 1] = { chunk = unlink_chunk(strip_guids(c)), rel = R.GetMediaItemInfo_Value(it, 'D_POSITION') - src.pos,
+                              len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') }
+    end
+  end
+  if #chunks == 0 then return 0 end
+  local fixed = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+  local n = 0
+  local k0 = math.floor((z0 - phase) / len) - 1
+  for k = k0, k0 + math.ceil((z1 - z0) / len) + 2 do
+    local base = phase + k * len
+    if base >= z1 - EPS then break end
+    if base + len > z0 + EPS then
+      for _, c in ipairs(chunks) do
+        local pos = base + c.rel
+        local inside = pos >= z0 - EPS and pos < z1 - EPS
+        local skipped = skip and pos >= skip[1] - EPS and pos < skip[2] - EPS
+        if win and not (pos >= win[1] - EPS and pos < win[2] - EPS) then skipped = true end   -- win: только это окно (досадка)
+        if inside and not skipped then
+          local it = R.AddMediaItemToTrack(tr)
+          R.SetItemStateChunk(it, c.chunk, false)
+          R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
+          R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+          -- хвост за концом зоны обрезается: луп прыгнет, хвост не нужен
+          if pos + c.len > z1 + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', z1 - pos) end
+          if fixed then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
+          R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', tag or '1', true)
+          n = n + 1
+        end
+      end
+    end
+  end
+  return n
+end
+-- убрать items трека в зоне [z0, z1), кроме окна [keep0, keep1) — там
+-- доигрывает прошлый клип (плейхед → граница квантизации): item, что
+-- пересекает keep1, режется, правая часть долой. Без keep — чистит всё.
+function A.session_clear(tr, z0, z1, keep0, keep1)
+  local n = 0
+  for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if fin > z0 + EPS and pos < z1 - EPS then
+      local keep = keep0 and fin > keep0 + EPS and pos < keep1 - EPS
+      if not keep then R.DeleteTrackMediaItem(tr, it); n = n + 1
+      elseif fin > keep1 + EPS then
+        local right = R.SplitMediaItem(it, keep1)
+        if right then R.DeleteTrackMediaItem(tr, right); n = n + 1 end
+      end
+    end
+  end
+  return n
+end
+
 
 -- Переписать все одноимённые регионы содержимым src. Без своего undo-блока:
 -- зовётся из edit.run (хук) или из A.append (свой блок).

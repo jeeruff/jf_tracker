@@ -345,7 +345,7 @@ function D.layout(snap, state, nregions)
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
   if state.mx_hidden then L.matrix_w = L.mx_strip_w
-  elseif MX and MX.fold and state.mx_fold_px then L.matrix_w = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), state.mx_fold_px))   -- fold: своя ширина мышью
+  elseif MX and MX.fold and not MX.clips and state.mx_fold_px then L.matrix_w = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), state.mx_fold_px))   -- fold: своя ширина мышью
   elseif state.mx_px and MX and not MX.fold then L.matrix_w = math.max((MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
@@ -1843,6 +1843,15 @@ local function draw_topbar(L, info)
   elseif tab == 'grid' then
     -- monome (jf_grid): шина, владелец, мини-грид, легенда
     draw_mono(L, info, sx0, cy0, sx1 - sx0, H - 2, hover)
+  elseif tab == 'clips' then
+    -- clips (6 окт): сессия вкладкой — сцены × треки; поля hover наверх для клика / колеса / меню
+    if info.clips_draw then
+      local hv = info.clips_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2)
+      if mx >= sx0 and mx < sx1 and my >= cy0 and my < H - 2 then   -- только над вкладкой
+        hover.ssbig, hover.topclips = true, true
+        hover.sess, hover.sessrow, hover.sesscol, hover.sessbtn = hv.sess, hv.sessrow, hv.sesscol, hv.sessbtn
+      end
+    end
   elseif tab == 'midi' then
     -- MIDI learn (jf_tracker_midimap.lua): цели слайсера и их CC / ноты
     if info.midi_draw then hover.midimap = info.midi_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
@@ -3604,6 +3613,9 @@ function D.frame(L, snap, rows, state, info)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden then
     hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
+    -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
+    -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)
+    if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
   end
   -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,
   -- над ней = — ручка ширины (тянуть, двойной клик — авто)
@@ -3917,8 +3929,20 @@ function D.frame(L, snap, rows, state, info)
             if c >= ncol then break end
             local cx = bx + c * bw1
             if c > 0 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - 2 * L.rh - 4, 1) end
-            local hot = not drag and mx >= cx and mx < cx + bw1 and my >= hy and my < by + bh - L.rh - 2
-            text(cx + L.pad, hy, kid_label(kid, bw1 - 2 * L.pad), kid.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
+            -- B / x у каждого плагина внутри (6 окт): bypass / удалить без выбора блока
+            local kb2 = ms('x') + 2 * L.pad
+            local kbx = { { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }
+            local onb = false
+            for _, b in ipairs(kbx) do
+              local hb = not drag and mx >= b[3] and mx < b[3] + kb2 and my >= hy and my < hy + L.rh
+              local lit = b[2] == 'kbypass' and not kid.enabled
+              set(hb and U.tint(b[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b[3], hy, kb2, L.rh - 1, 1)
+              set(hb and (b[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b[3], hy, kb2, L.rh - 1, 0)
+              text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+              if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid }; onb = true end
+            end
+            local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < by + bh - L.rh - 2
+            text(cx + L.pad, hy, kid_label(kid, bw1 - 2 * L.pad - 2 * kb2 - 4), kid.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
             if hot then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
           end
           cl = {}
@@ -3938,8 +3962,15 @@ function D.frame(L, snap, rows, state, info)
             local kx = bx + L.pad
             set(kid.parallel > 0 and U.CYAN or U.LINE); gfx.rect(kx + L.cw // 2, ky, 2, L.rh, 1)
             if kid.parallel > 0 then gfx.rect(kx + L.cw // 2 + 4, ky, 2, L.rh, 1) end
-            local hot = not drag and mx >= bx and mx < bx + bw and my >= ky and my < ky + L.rh
-            text(kx + L.cw + L.pad, ky, kid_label(kid, pw - L.cw - 2 * L.pad), kid.enabled and (hot and U.AMBER or U.TEXT) or U.GREY)
+            local kb2 = ms('x') + 2 * L.pad
+            local xb = bx + bw - kb2 - L.pad
+            local hb = not drag and mx >= xb and mx < xb + kb2 and my >= ky and my < ky + L.rh
+            set(hb and U.tint(U.RED, 0.35) or U.BG); gfx.rect(xb, ky, kb2, L.rh - 1, 1)
+            set(hb and U.RED or U.LINE); gfx.rect(xb, ky, kb2, L.rh - 1, 0)
+            text(xb + L.pad, ky, 'x', hb and U.RED or U.GREY)
+            if hb then hover.dspbtn = { fx = k, f = f, what = 'kdel', kid = kid } end
+            local hot = not drag and not hb and mx >= bx and mx < bx + bw and my >= ky and my < ky + L.rh
+            text(kx + L.cw + L.pad, ky, kid_label(kid, pw - L.cw - 3 * L.pad - kb2), kid.enabled and (hot and U.AMBER or U.TEXT) or U.GREY)
             if hot then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
             ky = ky + L.rh
           end
@@ -4181,7 +4212,7 @@ function D.frame(L, snap, rows, state, info)
         ::next_param::
       end
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
-      if not drag and not hover.dsp and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
+      if not drag and not hover.dsp and not hover.dspbtn and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       bx = bx + bw + L.pad
       end
       ::next_block::

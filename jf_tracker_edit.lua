@@ -375,8 +375,20 @@ end
 -- длина и кусок слайса те же
 function E.slice_pitch(it, semis)
   local tk = R.GetActiveTake(it)
-  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', semis) end
+  local ref = E.inst_ref and E.inst_ref(it)
+  local rtk = ref and ref ~= it and R.GetActiveTake(ref)
+  local base = rtk and R.GetMediaItemTakeInfo_Value(rtk, 'D_PITCH') or 0   -- transpose инструмента — база (6 окт)
+  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', base + semis) end
 end
+-- полутоны инструмента ноты (его item в lib: D_PITCH / rate); 0 — нет / сам
+E.inst_ref = nil                      -- ставит main: item → item-инструмент из снимка
+local function inst_base(it)
+  local ref = E.inst_ref and E.inst_ref(it)
+  local tk = ref and ref ~= it and R.GetActiveTake(ref)
+  if not tk then return 0 end
+  return model.take_semitones(R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH'), R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH') == 1)
+end
+E.inst_base = inst_base
 
 function E.transpose(heads, lpb, semis)
   if #heads == 0 or semis == 0 then return end
@@ -405,7 +417,7 @@ function E.set_pitch(heads, lpb, pitch)
         -- слайс (4 окт, вечер): нота — его высота (слайс — Sxx)
         E.slice_pitch(h.item, pitch - model.BASE_NOTE)
       elseif h.kind == 'audio' and h.take then
-        audio_set_semis(h, pitch - model.BASE_NOTE)
+        audio_set_semis(h, inst_base(h.item) + pitch - model.BASE_NOTE)   -- от транспоза инструмента (6 окт)
       elseif h.kind == 'midi' then
         local i, n = midi_note(h, lpb)
         if i then R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, n.eppq, n.ch, pitch, n.vel, false) end
@@ -1625,7 +1637,8 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         local it = insert_chunk(track, lane_idx, t0, strip_guids(chunk))
         R.SetMediaItemInfo_Value(it, 'B_MUTE', 0)
         local tk = R.GetActiveTake(it)
-        if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', pitch - model.BASE_NOTE) end
+        -- копия несёт transpose инструмента (D_PITCH / rate чанка) — нота поверх него (6 окт)
+        if tk then local h = { item = it, take = tk }; audio_set_semis(h, audio_semis(h) + pitch - model.BASE_NOTE) end
         finish_insert(track, lane_idx, it)
         made = it
       end
