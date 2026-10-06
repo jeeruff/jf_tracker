@@ -208,6 +208,15 @@ local function row_time(row, lpb, delay)
   return R.TimeMap2_QNToTime(0, (row + (delay or 0) / 256) / lpb)
 end
 E.row_time = row_time
+-- свинг (6 окт, глобальный): E.swing — % в духе MPC, 50 = ровно, 66 ≈ триоль,
+-- 75 — предел. Сдвигается только ВСТАВКА на нечётные строки (вторая из пары):
+-- на (2·swing − 1) строки. Уже стоящие события не трогаются — перенос и
+-- правка берут их реальное время (иначе свинг накладывался бы дважды)
+E.swing = 50
+function E.swing_time(row, lpb)
+  local off = (row % 2 == 1) and math.max(0, 2 * (E.swing or 50) / 100 - 1) or 0
+  return row_time(row, lpb, off * 256)
+end
 -- время → строка и задержка xx/256 (3 окт: точный стык слайсов при шаге auto)
 function E.row_of_time(t, lpb)
   local rf = R.TimeMap2_timeToQN(0, t) * lpb
@@ -1361,7 +1370,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local slices, base = E.item_slices(inst_item)
   if #slices == 0 then return end
   k = math.max(1, math.min(#slices, k))
-  local t0 = t_exact or row_time(row, lpb, 0)            -- t_exact: стык с концом предыдущего слайса
+  local t0 = t_exact or E.swing_time(row, lpb)           -- t_exact: стык с концом предыдущего слайса; свинг (6 окт)
   local made
   run('insert slice ' .. k, function()
     local root = iid_base(E.ensure_iid(inst_item))
@@ -1398,7 +1407,7 @@ end
 -- новый item из источника. pos — явная позиция вместо строки (депо).
 function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
   if not entry or t1 <= t0 then return end
-  local t = pos or row_time(row, lpb, 0)
+  local t = pos or E.swing_time(row, lpb)
   local it
   run(('insert span %.2fs'):format(t1 - t0), function()
     if entry.item then
@@ -1471,7 +1480,7 @@ end
 -- len_rows. Иначе — копия item из DEPOT (instrument = item депо) с
 -- D_PITCH = pitch − BASE_NOTE; длина item — как у образца.
 function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_item)
-  local t0 = row_time(row, lpb, 0)
+  local t0 = E.swing_time(row, lpb)                       -- свинг (6 окт)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   local made
   run('insert note', function()
@@ -1618,7 +1627,7 @@ end
 -- ── запись с MIDI-входа (INSERT + R на треке) ───────────────────────────
 -- нота всегда MIDI (даже на треке с аудио): в MIDI-item строки или новый на такт
 function E.rec_note(track, lane_idx, lpb, row, pitch, vel, len_rows)
-  local t0 = row_time(row, lpb, 0)
+  local t0 = E.swing_time(row, lpb)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   run('rec note', function() insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false) end)
 end

@@ -1585,7 +1585,9 @@ function V.key_impl(c)
   elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == 'V' then V.mode = 'vline'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.count = nil; return
-  elseif ch == '/' then V.mode = 'search'; V.searchline = ''; V.count = nil; return
+  -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
+  -- :команды); поиск по содержимому — f (метки прыжка)
+  elseif ch == '/' then V.count = nil; if ctx.command_search then ctx.command_search() else V.mode = 'search'; V.searchline = '' end; return
   elseif ch == 'n' then for _ = 1, n do V.find_next(1) end
   elseif ch == 'N' then for _ = 1, n do V.find_next(-1) end
   elseif ch == '*' then

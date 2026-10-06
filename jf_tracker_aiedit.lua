@@ -14,7 +14,8 @@
 local A = { drag = nil, prev = 0, tool = 'free', grid = 0.25, corner = nil, painted = false }
 local R = reaper
 A.TOOLS = { 'free', 'step', 'sin', 'tri', 'saw+', 'saw-', 'sqr' }
-A.GRIDS = { { '1/2', 2 }, { '1/4', 1 }, { '1/8', 0.5 }, { '1/16', 0.25 }, { '1/32', 0.125 }, { 'off', 0 } }
+A.GRIDS = { { '1/2', 2 }, { '1/4', 1 }, { '1/8', 0.5 }, { '1/16', 0.25 }, { '1/32', 0.125 }, { '1/64', 0.0625 }, { '1/128', 0.03125 }, { 'off', 0 } }   -- до 1/128 (6 окт)
+A.swing = 50                 -- свинг трекера (main): нечётные ячейки сетки сдвигаются
 
 local function shape01(name, x)
   if name == 'sin' then return 0.5 - 0.5 * math.cos(2 * math.pi * x)
@@ -64,7 +65,9 @@ end
 local function snap_t(tm, g)
   if not g or g <= 0 then return tm end
   local q = R.TimeMap2_timeToQN(0, tm)
-  return R.TimeMap2_QNToTime(0, math.floor(q / g + 0.5) * g)
+  local k = math.floor(q / g + 0.5)
+  local off = (k % 2 == 1) and math.max(0, 2 * (A.swing or 50) / 100 - 1) * g or 0   -- свинг (6 окт)
+  return R.TimeMap2_QNToTime(0, k * g + off)
 end
 local function cell_of(tm, g, t0, t1)
   if not g or g <= 0 then return t0, t1 end
