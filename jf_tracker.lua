@@ -4181,6 +4181,7 @@ ctx = {
     return items
   end,
   -- панель item (2 окт) правит ИНСТРУМЕНТ (3 окт): все его копии, см. edit.inst_prop
+  playthru_of = function(e) return e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.playthru(e.item) or false end,
   sp_adjust = function(e, k, d)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
@@ -7257,6 +7258,9 @@ local function poll_cmd()
   elseif name == 'dev' then ctx.dev_set(v:match('^dev%s+(%a+)') or '')   -- тест: :dev on|off
   elseif name == 'logo' then ctx.logo_show(v:match('^logo%s+([%a_]+)') or '')   -- тест: :logo имя
   elseif name == 'esc' then vim.picker, vim.hydra = nil, nil; state.khelp_big = false   -- тест: закрыть всплывашки
+  elseif name == 'flag' then   -- тест: flag <ключ> on|off — опция-флаг, с сохранением
+    local k, v2 = v:match('^flag%s+([%w_]+)%s+(%a+)')
+    if k and state[k] ~= nil then state[k] = v2 == 'on'; reaper.SetExtState(EXT, k, v2 == 'on' and '1' or '0', true); B.pm = nil; vim.msg = k .. ' ' .. v2; relayout() end
   elseif name == 'ex' then vim.run_cmd((v:match('^ex%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^ex%s+(.*)$') or ''):gsub('_', ' '))   -- тест: любая :команда (пробелы — _)
   elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]

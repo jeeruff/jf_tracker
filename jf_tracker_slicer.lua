@@ -359,7 +359,8 @@ function S.button(id)
   elseif id == 'clear' then S.clear()
   elseif id == 'quant' then S.smart_quantize()
   elseif id == 'autotrim' then S.autotrim()
-  elseif id == 'scram' and ctx.scramble then ctx.scramble() end
+  elseif id == 'scram' and ctx.scramble then ctx.scramble()
+  elseif id == 'pthru' and ctx.sp_adjust then ctx.sp_adjust(S.entry, 'pthru', 1) end   -- slice playthru кнопкой (6 окт)
 end
 
 -- smart quantize (2 окт; 5 окт — все к шестнадцатым): транзиенты → stretch-маркеры; было: сильные к
@@ -486,12 +487,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local bx = x
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' }, { 'playthru', 'pthru' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
-      local on = b[2] == 'snap' and S.snap
+      local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e))   -- playthru (6 окт): горит, когда включён
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, y + rh, bw, rh, 1)
       U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y + rh, bw, rh, 0)
       U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
