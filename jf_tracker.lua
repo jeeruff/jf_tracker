@@ -145,7 +145,9 @@ local state = {
   bigstatus = flag('bigstatus', true),
   tpbuttons = flag('tpbuttons', false),
   tintmute = flag('tintmute', true),
-  aifill = flag('aifill', false),                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
+  aifill = flag('aifill', false),
+  oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
+  autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
   transpos = reaper.GetExtState(EXT, 'transpos') ~= '' and reaper.GetExtState(EXT, 'transpos') or 'tracker',   -- полоса транспорта: tracker | top | bottom (5 окт)
   reclib = flag('reclib', true),                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
@@ -394,7 +396,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2298,6 +2300,30 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- показать модуль элемента (6 окт): нота / слайс — его сэмпл во вкладке item,
+  -- automation item — редактор во вкладке modulation; фокус не уводится
+  show_element = function(fi, row)
+    local f = L and L.flat[fi]
+    if not f then return end
+    local foc = state.focus
+    if f.env then
+      if ctx.ai_pick_at(fi, row) then
+        local a = ctx.ai_list()[ctx.ai_sel]
+        if a then ctx.ai_edit_open(a); ctx.set_focus(foc) end
+      end
+      return
+    end
+    local cell = f.sub and f.sub[row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    local n = cell and cell.item and snap and snap.inst_of and snap.inst_of[cell.item]
+    if n and (n ~= vim.inst or state.toptab ~= 'sample' or not state.top) then
+      local pp = state.poolprev; state.poolprev = false
+      pool_select(n)
+      state.poolprev = pp
+      state.top = true; state.toptab = 'sample'
+      ctx.set_focus(foc)
+    end
+  end,
   -- редактор automation item (5 окт): вкладка modulation, страница item
   ai_edit_open = function(a)
     state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool }
@@ -3771,6 +3797,8 @@ ctx = {
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
+      flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
+      flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
       flag('tpbuttons', 'transport buttons', 'big << > || o >> loop in the transport bar; off - only [rec] and [loop], the keys do the rest (Space play, Opt+R rec)'),
@@ -6224,6 +6252,8 @@ function ctrl_action(name, delta)
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  elseif name == 'oneclick' then state.oneclick = not state.oneclick; vim.msg = 'one click focus ' .. (state.oneclick and 'on' or 'off')
+  elseif name == 'autofocus' then state.autofocus = not state.autofocus; vim.msg = 'autofocus ' .. (state.autofocus and 'on' or 'off')
   -- блок записи (5 окт): rec, punch (авто-панч по time selection), pre-roll, rec→lib
   elseif name == 'rec' then
     if reaper.GetPlayState() & 4 == 4 then if state.rec_sess then ctx.rec_stop(32) else reaper.Main_OnCommand(1016, 0) end
@@ -6997,6 +7027,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
+      oneclick = state.oneclick, autofocus = state.autofocus,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpbuttons, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -8141,6 +8172,15 @@ local function frame()
       local grab = 0
       if a.edge == 'move' and hover.row then grab = edit.row_time(hover.row.row, state.lpb, 0) - a.pos end
       ai_drag = { env = a.e.env, idx = a.idx, edge = a.edge, pos0 = a.pos, len0 = a.len, grab = grab, y0 = gfx.mouse_y, active = false, name = a.e.name }
+      -- one click focus (6 окт): выделить item (как в REAPER) и открыть его в modulation
+      if state.oneclick then
+        for k = 0, reaper.CountAutomationItems(a.e.env) - 1 do reaper.GetSetAutomationItemInfo(a.e.env, k, 'D_UISEL', k == a.idx and 1 or 0, true) end
+        reaper.UpdateArrange()
+        for i, f in ipairs(L.flat) do if f.env and f.env.env == a.e.env then vim.cur.fi = i end end
+        if hover.row then vim.cur.row = hover.row.row end
+        ctx.show_element(vim.cur.fi, vim.cur.row)
+        model.invalidate()
+      end
       if gfx.mouse_cap & 16 == 16 and a.edge ~= 'move' then ai_drag.rate0 = reaper.GetSetAutomationItemInfo(a.e.env, a.idx, 'D_PLAYRATE', 0, false) end
       click = { t = now2, zone = 'aiedge' }
     elseif hover.itemedge and hover.itemedge.edge ~= 'move' and gfx.mouse_cap & 8 ~= 8 then
@@ -8170,6 +8210,7 @@ local function frame()
         body_drag = true
         click = { t = now2, zone = 'bodysel', fi = hover.fi, row = hover.row.row }
       else
+        if state.oneclick then ctx.show_element(hover.fi, hover.row.row) end   -- one click focus (6 окт)
         -- протяжка события (2 окт): в любом режиме; внутри VISUAL-блока — весь блок.
         -- Блок запоминается ДО того, как клик сдвинет курсор (угол блока)
         local vis_heads, vis_o
@@ -8894,6 +8935,11 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
+  -- autofocus (6 окт): курсор клавиатуры сменил ячейку — показать её модуль
+  if state.autofocus and state.focus == 'tracker' and L and L.flat then
+    local k = vim.cur.fi .. ':' .. vim.cur.row
+    if ctx.af_last ~= k then ctx.af_last = k; ctx.show_element(vim.cur.fi, vim.cur.row) end
+  end
   if SL.qpreview and not (OPT.active and OPT.compact and (OPT.compact.title or ''):match('^quantize')) then SL.qpreview = false end   -- панель закрыта — без превью
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры

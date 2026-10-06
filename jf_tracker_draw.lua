@@ -1556,6 +1556,7 @@ local function draw_ctrl(L, info, H, hover)
         { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
           q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
         { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }),
+          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus),
           -- тоглы из полосы транспорта (5 окт)
           q('follow', 'follow', c.follow), q('lock', 'lock', c.lock), q('fixed', 'fixed', c.fixed), q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade) },
       }
@@ -3010,7 +3011,9 @@ function D.frame(L, snap, rows, state, info)
               -- заливка, рамка; слева полоса потолще — ручка (тянуть = сдвиг,
               -- как шапка item в REAPER), край сверху / снизу — начало / длина;
               -- стыки лупа — срезами поперёк
-              local col = env_colour(ev.e)
+              -- как в REAPER по умолчанию (6 окт): не выделен — серый (рамка и
+              -- ручка с подписью), выделен — цветом огибающей
+              local col = ai.sel and env_colour(ev.e) or U.mix(U.GREY, U.BG, 0.2)
               -- заливка — опцией (6 окт): по умолчанию прозрачная, как в REAPER — только рамка
               if state.aifill then
                 set(col); gfx.a = ai.sel and 0.16 or 0.08
