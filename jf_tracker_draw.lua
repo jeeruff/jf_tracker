@@ -2268,7 +2268,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         local on = b[3] ~= nil
         set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
         set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
-        text(bx + math.floor((bw - ms(b[2])) / 2), by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))
+        -- 6 окт: буквы по центру своей высоты (L.th), без отступа строки D.SPACE —
+        -- раньше низ букв вылезал за рамку
+        text(bx + math.floor((bw - ms(b[2])) / 2), by + math.max(0, math.floor((bh - L.th) / 2)) - (D.SPACE or 0), b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))
         if hot then hover.ctrl = b[1] end
         hint('ctrl', bx, by, bw, bh, b[1])
       end
