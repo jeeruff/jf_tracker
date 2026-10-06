@@ -288,8 +288,10 @@ function D.layout(snap, state, nregions)
   -- форма сегмента (2 окт, правка): не отдельной колонкой, а под значением точки
   -- и только если не lin — правая часть колонки шириной в «bez»
   L.env_shape_w = ms('bez')
-  L.env_w = L.pad + L.env_bar_w + L.pad + math.max(L.env_hex_w, L.env_shape_w) + L.pad
-  L.env_cw = L.pad + L.cw + L.pad + L.env_hex_w + L.pad
+  -- дорожка кривой — за ручкой automation item (6 окт: минимум кривой падал в ручку)
+  L.env_bx = L.th + 6
+  L.env_w = L.env_bx + L.env_bar_w + L.pad + math.max(L.env_hex_w, L.env_shape_w) + L.pad
+  L.env_cw = L.env_bx + L.cw + L.pad + L.env_hex_w + L.pad
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
@@ -933,7 +935,7 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   -- ломаная по подточкам строки (M.ENV_SUB) и дальше до первого значения
   -- следующей строки — линия сплошная, в 1 px, как в аранжировке (2 окт: без
   -- разрывов на границах строк); цвет — тот же, что у этой огибающей (ключ темы)
-  local function px_of(v) return x + L.pad + math.floor(v * (L.env_bar_w - 1) + 0.5) end
+  local function px_of(v) return x + L.env_bx + math.floor(v * (L.env_bar_w - 1) + 0.5) end
   set(env_colour(e))
   local pts = { { px_of(ev.v), y } }
   local sub = ev.sub or {}
@@ -942,7 +944,7 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   pts[#pts + 1] = { px_of(nxt and nxt.v or (sub[#sub] or ev.v)), y + L.rh }
   for k = 2, #pts do gfx.line(pts[k - 1][1], pts[k - 1][2], pts[k][1], pts[k][2]) end
   local ex, cy = pts[1][1], y + 1
-  local tx = x + L.pad + L.env_bar_w + L.pad
+  local tx = x + L.env_bx + L.env_bar_w + L.pad
   if ev.pt then
     gfx.rect(ex - 2, cy - 2, L.env_compact and 3 or 5, L.env_compact and 3 or 5, 1)
     text(tx, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
@@ -2182,13 +2184,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- масштабом без сглаживания (big_text); плотно, зазор 2 px
   local blist = D.transport_buttons(c)
   local bws, tws, btot = {}, {}, 0
-  local bk = c.tpbuttons and 2 or 1                     -- полный набор — ×2; rec / loop — обычного размера
-  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], D.ttf and 1.7 or 2) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  local bk = c.tpbuttons and 2 or 1                     -- полный набор — крупно (×1.5, 6 окт); rec / loop — обычного размера
+  local BK = D.ttf and 1.5 or 1.5
+  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], BK) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
     -- крупные (5 окт, правка): кнопка на всю высоту полосы (+2 px сверху и снизу),
     -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
     local bx, by, bh = bx0, (bk == 2) and (ly - 2) or (ly + math.floor(L.rh / 2)), (bk == 2) and (2 * L.rh + 4) or L.rh
-    local ty = by + 2 + math.max(1, math.floor((2 * L.rh - 2 * L.th) / 2) + 1) - (D.SPACE or 0) - (D.ttf and 0 or math.floor(0.08 * L.rh + 0.5))
+    local ty = by + math.max(1, math.floor((bh - BK * L.th) / 2)) - (D.SPACE or 0)
     -- скруглённый угол (5 окт: «ещё чуть подрезать»): срезать треугольник
     -- i + j < R - 1 и провести рамку по диагонали i + j = R - 1
     local R = 4
@@ -2207,7 +2210,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local frame = hot and U.AMBER or (on and b[3] or U.LINE)
       if i == 1 then round_corner(bx, by, 1, 1, frame); round_corner(bx, by + bh - 1, 1, -1, frame) end
       if i == #blist then round_corner(bx + bw - 1, by, -1, 1, frame); round_corner(bx + bw - 1, by + bh - 1, -1, -1, frame) end
-      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), D.ttf and 1.7 or 2)   -- b[4]: свой цвет (o — красная)
+      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), BK)   -- b[4]: свой цвет (o — красная)
       else text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
@@ -3164,18 +3167,18 @@ function D.frame(L, snap, rows, state, info)
         -- курсор поля формы — под значением точки (строка ниже курсора)
         if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
-          gfx.rect(ev.x + L.pad + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
+          gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
         draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1])
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
-          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.pad) / (EG.env_bar_w - 1)))
+          hover.envx = math.max(0, math.min(1, (mx - ev.x - L.env_bx) / (EG.env_bar_w - 1)))
           -- поле формы — с клавиатуры (l, буквы в INSERT); мышь — всегда значение
           hover.field = 1
           -- точный клик по точке (±4 px) — её можно тянуть в любом режиме (2 окт)
           local ev0 = env_vals[ev][i]
           if ev0 and ev0.pt then
-            local px = ev.x + EG.pad + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
+            local px = ev.x + EG.env_bx + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
             if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row } end
           end
         end

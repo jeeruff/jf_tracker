@@ -2314,14 +2314,19 @@ ctx = {
         local key = tostring(e.env) .. ':' .. pid
         if not seen[key] then
           seen[key] = true
+          -- превью (6 окт): один материнский проход пула, значения в шкале
+          -- огибающей (громкость — фейдерная), как в редакторе и в REAPER
           local pts = {}
           local mode = reaper.GetEnvelopeScalingMode(e.env)
-          for p = 0, reaper.CountEnvelopePointsEx(e.env, ai.idx) - 1 do
-            local _, t, v = reaper.GetEnvelopePointEx(e.env, ai.idx, p)
-            pts[#pts + 1] = { t, reaper.ScaleFromEnvelopeMode(mode, v) }
+          local FI = ai.idx | 0x10000000
+          for p = 0, reaper.CountEnvelopePointsEx(e.env, FI) - 1 do
+            local _, t, v = reaper.GetEnvelopePointEx(e.env, FI, p)
+            pts[#pts + 1] = { t, v }
           end
+          local smin, smax = e.min or 0, e.max or 1
+          if mode ~= 0 then smin, smax = reaper.ScaleToEnvelopeMode(mode, smin), reaper.ScaleToEnvelopeMode(mode, smax) end
           list[#list + 1] = { env = e.env, envname = e.name, idx = ai.idx, pool = pid, len = ai.len, pos = ai.pos,
-            rate = reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_PLAYRATE', 0, false) or 1, label = ai.label, pts = pts, min = e.min, max = e.max }
+            rate = reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_PLAYRATE', 0, false) or 1, label = ai.label, pts = pts, min = e.min, max = e.max, smin = smin, smax = smax }
         end
       end
     end

@@ -269,9 +269,8 @@ function SP.draw_ai(L, x, y, w, h, list, sel)
     else px0, pw, py0, ph = x + lw, w - lw - U.measure(lt) - 3 * L.pad, ry + 3, L.rh - 6 end
     local pts = a.pts or {}
     if pw > 8 and ph > 2 and #pts > 0 then
-      local t0, t1, v0, v1 = math.huge, -math.huge, a.min or math.huge, a.max or -math.huge
+      local t0, t1, v0, v1 = math.huge, -math.huge, a.smin or a.min or math.huge, a.smax or a.max or -math.huge
       for _, p in ipairs(pts) do t0 = math.min(t0, p[1]); t1 = math.max(t1, p[1]); if not a.min then v0 = math.min(v0, p[2]); v1 = math.max(v1, p[2]) end end
-      if a.pos and a.len and a.len > 0 then t0, t1 = a.pos, a.pos + a.len end
       if t1 - t0 < 1e-9 then t1 = t0 + 1 end
       if v1 - v0 < 1e-9 then v1 = v0 + 1 end
       U.set(on and U.AMBER or U.CYAN)
