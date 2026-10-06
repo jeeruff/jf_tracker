@@ -103,14 +103,29 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   -- строка инструментов и сетки
   local tl = {}
   for _, n in ipairs(A.TOOLS) do tl[#tl + 1] = { n, n } end
-  local pick, bx = buttons(U, L, x + L.pad, y, tl, A.tool, mx, my, press)
+  -- 6 окт: строка кнопок — ниже, над ней скобка с подписью группы envelope
+  local by = y + L.rh
+  local pick, bx = buttons(U, L, x + L.pad, by, tl, A.tool, mx, my, press)
   if pick then A.tool = pick; press = false end
   local gl = {}
   for _, g in ipairs(A.GRIDS) do gl[#gl + 1] = { g[1], g[2] } end
-  local gpick, gx2 = buttons(U, L, bx + 3 * L.pad, y, gl, A.grid, mx, my, press)
+  local gpick, gx2 = buttons(U, L, bx + 3 * L.pad, by, gl, A.grid, mx, my, press)
   if gpick then A.grid = gpick; press = false end
   -- clear envelope (6 окт): все точки пула долой
-  local cpick = buttons(U, L, gx2 + 3 * L.pad, y, { { 'clear envelope', 'clear' }, { 'save envelope', 'save' }, { 'load envelope', 'load' } }, nil, mx, my, press)
+  local ex0 = gx2 + 3 * L.pad
+  local cpick, ex1 = buttons(U, L, ex0, by, { { 'clear', 'clear' }, { 'save', 'save' }, { 'load', 'load' } }, nil, mx, my, press)
+  -- скобка над группой: ┌── envelope ──┐ (линия с усами, подпись посередине)
+  do
+    local lbl = 'envelope'
+    local lw = U.measure(lbl)
+    local x1 = (cpick and (ex0 + U.measure('clear') + U.measure('save') + U.measure('load') + 6 * L.pad + 4)) or ex1 - 2
+    local cy = y + math.floor(L.rh / 2)
+    local mid = math.floor((ex0 + x1 - lw) / 2)
+    U.set(U.LINE)
+    gfx.rect(ex0, cy, math.max(0, mid - L.pad - ex0), 1, 1); gfx.rect(mid + lw + L.pad, cy, math.max(0, x1 - mid - lw - L.pad), 1, 1)
+    gfx.rect(ex0, cy, 1, L.rh - math.floor(L.rh / 2), 1); gfx.rect(x1 - 1, cy, 1, L.rh - math.floor(L.rh / 2), 1)
+    U.text(mid, y, lbl, U.GREY)
+  end
   if cpick == 'save' then if A.on_save then A.on_save() end; cpick = nil; press = false
   elseif cpick == 'load' then if A.on_load then A.on_load() end; cpick = nil; press = false end
   if cpick then
@@ -120,7 +135,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
     R.Undo_OnStateChange('automation item clear'); R.UpdateArrange()
     press = false
   end
-  local gx, gy, gw, gh = x + L.pad + 4, y + L.rh + 6, w - 2 * L.pad - 8, h - L.rh - 10
+  local gx, gy, gw, gh = x + L.pad + 4, y + 2 * L.rh + 6, w - 2 * L.pad - 8, h - 2 * L.rh - 10
   if gw < 20 or gh < 12 then return nil end
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
   local pos0, one = A.span(t)
@@ -157,7 +172,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
     local nv = (p.v - lo) / (hi - lo)
     return lo + (bot + nv * (top - bot)) * (hi - lo)
   end
-  U.set(U.CYAN)
+  U.set(t.col or U.CYAN)                 -- цвет огибающей (как в REAPER), 6 окт
   local px, py
   for _, p in ipairs(cs and cs.snap or pts) do
     local qx, qy = X(p.t), Y(tf(p))
@@ -170,7 +185,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
       local qx, qy = X(p.t), Y(p.v)
       local near = math.abs(mx - qx) <= 4 and math.abs(my - qy) <= 4
       if near then hot = p end
-      U.set((near or (A.drag and A.drag.i == p.i)) and U.AMBER or U.CYAN); gfx.rect(qx - 2, qy - 2, 5, 5, 1)
+      U.set((near or (A.drag and A.drag.i == p.i)) and U.AMBER or (t.col or U.CYAN)); gfx.circle(qx, qy, (near or (A.drag and A.drag.i == p.i)) and 4 or 3, 0, 1)   -- кружок, как в REAPER
     end
   end
   -- ручки углов

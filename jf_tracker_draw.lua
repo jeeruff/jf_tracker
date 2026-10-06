@@ -289,7 +289,7 @@ function D.layout(snap, state, nregions)
   -- и только если не lin — правая часть колонки шириной в «bez»
   L.env_shape_w = ms('bez')
   -- дорожка кривой — за ручкой automation item (6 окт: минимум кривой падал в ручку)
-  L.env_bx = L.th + 6
+  L.env_bx = L.th + 5             -- 6 окт: на пиксель ближе к ручке
   L.env_w = L.env_bx + L.env_bar_w + L.pad + math.max(L.env_hex_w, L.env_shape_w) + L.pad
   L.env_cw = L.env_bx + L.cw + L.pad + L.env_hex_w + L.pad
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
@@ -957,7 +957,8 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   local ex, cy = pts[1][1], y + 1
   local tx = x + L.env_bx + L.env_bar_w + L.pad
   if ev.pt then
-    gfx.rect(ex - 2, cy - 2, L.env_compact and 3 or 5, L.env_compact and 3 or 5, 1)
+    -- точки кружочками, как в REAPER (6 окт); опция envelope points
+    if D.envpoints ~= false then gfx.circle(ex, cy, L.env_compact and 1 or 2, 0, 1) end
     text(tx, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
   elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
     -- форма сегмента точки строкой выше — под её значением, только если не lin
@@ -3245,8 +3246,11 @@ function D.frame(L, snap, rows, state, info)
   -- ручки automation items (6 окт): поверх линий строк, непрозрачные; имя
   -- вертикально; швы лупа — вырезы цвета фона в ручке
   for _, hd in ipairs(D.ai_handles or {}) do
-    set(hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45)); gfx.rect(hd.x, hd.y, hd.w, hd.h, 1)
-    if hd.h > L.th * 2 and hd.label then D.vtext(hd.x + 2, hd.y + 2, hd.h - 4, hd.label, U.BG, hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45), true) end
+    -- цвет ручки = цвет огибающей как есть (6 окт: как полоса с именем в REAPER,
+    -- без притемнения); под мышью — чуть светлее
+    local hc = hd.hot and U.mix(hd.col, U.TEXT, 0.25) or hd.col
+    set(hc); gfx.rect(hd.x, hd.y, hd.w, hd.h, 1)
+    if hd.h > L.th * 2 and hd.label then D.vtext(hd.x + 2, hd.y + 2, hd.h - 4, hd.label, U.BG, hc, true) end
     -- вырез шва на ручке (6 окт: «жёсткие»): мельче и тоном ручки, не чёрным
     local tz = math.max(2, math.floor(L.rh / 5))
     set(U.mix(hd.col, U.BG, 0.75))

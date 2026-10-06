@@ -276,7 +276,7 @@ function SP.draw_ai(L, x, y, w, h, list, sel)
       for _, p in ipairs(pts) do t0 = math.min(t0, p[1]); t1 = math.max(t1, p[1]); if not a.min then v0 = math.min(v0, p[2]); v1 = math.max(v1, p[2]) end end
       if t1 - t0 < 1e-9 then t1 = t0 + 1 end
       if v1 - v0 < 1e-9 then v1 = v0 + 1 end
-      U.set(on and U.AMBER or U.CYAN)
+      U.set(on and U.AMBER or (a.col or U.CYAN))          -- цвет огибающей, как в REAPER
       local lx, ly
       for _, p in ipairs(pts) do
         local qx = px0 + math.floor(math.max(0, math.min(1, (p[1] - t0) / (t1 - t0))) * (pw - 1))
