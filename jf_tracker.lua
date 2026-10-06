@@ -2301,6 +2301,35 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- кривые automation (6 окт): Data/jf_tracker_curves/*.jfcurve
+  curve_dir = function()
+    local d = reaper.GetResourcePath() .. '/Data/jf_tracker_curves'
+    reaper.RecursiveCreateDirectory(d, 0)
+    return d
+  end,
+  curve_save = function(name)
+    local ae = state.ai_edit
+    if not ae then vim.msg = 'curve: open an automation item first (double click in the automation list)'; return end
+    name = (name or ''):gsub('[/\\:]', '_')
+    if name == '' then vim.msg = 'curve: :curvesave name'; return end
+    ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
+    local path = ctx.curve_dir() .. '/' .. name .. '.jfcurve'
+    vim.msg = ctx.AIE.save(ae, path) and ('curve saved: ' .. name) or 'curve: cannot write'
+  end,
+  curve_load = function(path)
+    local ae = state.ai_edit
+    if not ae then vim.msg = 'curve: open an automation item first (double click in the automation list)'; return end
+    ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
+    local n = ctx.AIE.load(ae, path)
+    model.invalidate()
+    vim.msg = ('curve loaded: %s, %d points'):format(path:match('([^/]+)%.jfcurve$') or path, n)
+  end,
+  curve_browse = function()
+    state.side = true
+    ctx.browse(ctx.curve_dir())
+    ctx.set_focus('browser')
+    vim.msg = 'curves: Enter loads one into the open automation item (save: the save envelope button / :curvesave name)'
+  end,
   -- MIDI-лейны (6 окт): пустой лейн :cc N / :pc, правка событий строки
   ml_add = function(x)
     local col = cur_col(); if not col then return end
@@ -2420,6 +2449,9 @@ ctx = {
   end,
   -- редактор automation item (5 окт): вкладка modulation, страница item
   ai_edit_open = function(a)
+    ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
+    ctx.AIE.on_save = function() vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'curvesave ' end
+    ctx.AIE.on_load = function() ctx.curve_browse() end
     state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool }
     state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
     vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'

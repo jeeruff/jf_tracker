@@ -110,7 +110,9 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   local gpick, gx2 = buttons(U, L, bx + 3 * L.pad, y, gl, A.grid, mx, my, press)
   if gpick then A.grid = gpick; press = false end
   -- clear envelope (6 окт): все точки пула долой
-  local cpick = buttons(U, L, gx2 + 3 * L.pad, y, { { 'clear envelope', 'clear' } }, nil, mx, my, press)
+  local cpick = buttons(U, L, gx2 + 3 * L.pad, y, { { 'clear envelope', 'clear' }, { 'save envelope', 'save' }, { 'load envelope', 'load' } }, nil, mx, my, press)
+  if cpick == 'save' then if A.on_save then A.on_save() end; cpick = nil; press = false
+  elseif cpick == 'load' then if A.on_load then A.on_load() end; cpick = nil; press = false end
   if cpick then
     local p0, one = A.span(t)
     R.DeleteEnvelopePointRangeEx(t.env, t.idx, p0 - 1, p0 + one + 1)
@@ -325,6 +327,39 @@ function A.props(U, L, x, y, w, h, t, fit)
   end
   A.pprev = cap
   return hover
+end
+
+-- файл кривой (6 окт): .jfcurve — строки «pt доля_времени значение форма натяжение»,
+-- время и значение 0..1 (значение — в шкале огибающей между min и max), так
+-- кривая ложится на item любой длины и любую огибающую
+function A.save(t, path)
+  local pos, one = A.span(t)
+  local lo, hi = A.range(t)
+  local f = io.open(path, 'w'); if not f then return false end
+  f:write('# jf_tracker curve\n')
+  for _, p in ipairs(pts_of(t)) do
+    f:write(('pt %.6f %.6f %d %.4f\n'):format((p.t - pos) / one, (p.v - lo) / (hi - lo), p.sh or 0, p.ten or 0))
+  end
+  f:close()
+  return true
+end
+function A.load(t, path)
+  local f = io.open(path, 'r'); if not f then return 0 end
+  local pos, one = A.span(t)
+  local lo, hi = A.range(t)
+  local list = {}
+  for line in f:lines() do
+    local a, b, sh, ten = line:match('^pt%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)')
+    if a then list[#list + 1] = { tonumber(a), tonumber(b), tonumber(sh) or 0, tonumber(ten) or 0 } end
+  end
+  f:close()
+  R.DeleteEnvelopePointRangeEx(t.env, t.idx, pos - 1, pos + one + 1)
+  for _, p in ipairs(list) do
+    R.InsertEnvelopePointEx(t.env, t.idx, pos + p[1] * one, lo + math.max(0, math.min(1, p[2])) * (hi - lo), p[3], p[4], false, true)
+  end
+  R.Envelope_SortPointsEx(t.env, t.idx)
+  R.Undo_OnStateChange('automation item load curve'); R.UpdateArrange()
+  return #list
 end
 
 return A

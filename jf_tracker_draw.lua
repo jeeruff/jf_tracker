@@ -201,7 +201,7 @@ local function txt_img(str, col, bg)
   if e then return e end
   if next_img > IMG_LAST then tcache, next_img = {}, IMG_FIRST end
   gfx.setfont(D.font_id)
-  local w, h = measure_raw(str) + 1, gfx.texth
+  local w, h = measure_raw(str) + 2, gfx.texth            -- +2 (6 окт): при ×1.5 правый столбец буквы (O) срезался
   local id = next_img; next_img = next_img + 1
   -- строка с глифами: картинка на 2 px ниже — хвосты р у щ не срезаются
   local hi = (D.hybrid and str:find('[\128-\255]')) and (h + 2) or h

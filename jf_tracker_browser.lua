@@ -69,7 +69,7 @@ local function load_marks()
 end
 
 local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true,
-                rx2 = true, rex = true, xrni = true }   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
+                rx2 = true, rex = true, xrni = true, jfcurve = true }   -- jfcurve — кривые automation (6 окт)   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
 local function shown(name) return B.hidden or name:sub(1, 1) ~= '.' end
 local function wanted(name)
   local ext = name:match('%.([%w]+)$')
@@ -639,6 +639,7 @@ function B.enter()
   elseif e.dir then B.go(B.full(e))
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
+  elseif (e.name or ''):lower():match('%.jfcurve$') then if ctx.curve_load then ctx.curve_load(B.full(e)) end   -- кривая → открытый automation item (6 окт)
   elseif e.empty then return
   elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
   elseif e.rgn then if ctx.drop_region_at_cursor then ctx.drop_region_at_cursor(B.pmproj.e.path, e) end
@@ -652,6 +653,7 @@ end
 function B.preview_path(e)
   if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
   if (e.name or ''):lower():match('%.xrni$') then return nil end       -- архив инструмента, не звук
+  if (e.name or ''):lower():match('%.jfcurve$') then return nil end    -- кривая — не звук
   if e.other then return nil end                                      -- не звук (*.*): не слушаем
   if e.pm then return B.pm_preview(e) end
   return B.full(e)
