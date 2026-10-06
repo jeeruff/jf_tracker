@@ -57,11 +57,17 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   -- трекера на работу и память Lua; CPU / RAM самого REAPER — n (его метр)
   local fps = tonumber(hb and hb:match('([%d%.]+)fps') or '') or 0
   local dr = tonumber(hb and hb:match('draw ([%d%.]+)') or '') or 0
-  local rb = tonumber(hb and hb:match('rebuild ([%d%.]+)') or '') or 0
+  local rb = tonumber(hb and hb:match('rebuild ([%d%.]+)') or '') or 0      -- последняя пересборка модели (не каждый кадр)
+  -- работа каждого кадра: снимок + раскладка + отрисовка + обновление (6 окт:
+  -- пересборка в полосу не входит — она только при изменении проекта)
+  local sn = tonumber(hb and hb:match('snap ([%d%.]+)') or '') or 0
+  local lo = tonumber(hb and hb:match('layout ([%d%.]+)') or '') or 0
+  local up = tonumber(hb and hb:match('upd ([%d%.]+)') or '') or 0
+  local work = sn + lo + dr + up
   local frame_ms = fps > 0 and 1000 / fps or 33.3
   local kb = collectgarbage('count')
   local lw = U.measure('frame ') + L.pad
-  U.text(x, y, 'frame', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (dr + rb) / frame_ms, ('%.1f / %.0f ms'):format(dr + rb, frame_ms)); y = y + L.rh + 2
+  U.text(x, y, 'frame', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, work / frame_ms, ('%.1f / %.0f ms'):format(work, frame_ms)); y = y + L.rh + 2
   U.text(x, y, 'Lua', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, kb / (64 * 1024), ('%.1f MB'):format(kb / 1024)); y = y + L.rh + 2
   local a = P.audio or {}
   local nfx, maxpdc = 0, 0
@@ -71,7 +77,7 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
     ('output latency %.1f ms'):format(a.lat or 0),
     ('%d tracks, %d fx, longest PDC %.1f ms'):format(#P.tracks, nfx, (a.sr or 0) > 0 and maxpdc / a.sr * 1000 or 0),
   }) do U.text(x, y, fit(line, bw - 2 * L.pad), U.TEXT); y = y + L.rh end
-  U.text(x, y, fit(('tracker %.0f fps, draw %.1f ms, rebuild %.1f ms; CPU / RAM of REAPER: n'):format(fps, dr, rb), bw - 2 * L.pad), U.GREY)
+  U.text(x, y, fit(('tracker %.0f fps, ~%.0f%% of one core; last rebuild %.1f ms (on project changes); REAPER CPU / RAM: n'):format(fps, work * fps / 10, rb), bw - 2 * L.pad), U.GREY)
   y = y + L.rh + 4
   -- треки как процессы htop; колонки — по ширине
   local wide = bw > L.cw * 60
