@@ -3871,6 +3871,23 @@ ctx = {
   ss_height = function(w, cap) return MX.SS.height(w, cap, snap and #snap.cols or 1, #seq, L.cw, L.rh, L.pad) end,
   ss_peaks = function(head, n) return model.peaks(head, n) end,
   ss_px = function() return state.ss_px end,
+  -- луп / кроссфейд клипа (6 окт): один аудио-item в слоте с jf_cliploop или jf_clipxf
+  ss_clip_opts = function(tr, rg)
+    local items = alias.items_in(tr, rg.pos, rg.rgnend)
+    if #items ~= 1 then return nil end
+    local it = items[1]
+    local tk = reaper.GetActiveTake(it)
+    if not tk or reaper.TakeIsMIDI(tk) then return nil end
+    local _, lp = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cliploop', '', false)
+    local _, xs = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_clipxf', '', false)
+    local la, lb = (lp or ''):match('^([%-%d%.]+);([%-%d%.]+)$')
+    local xf = (tonumber(xs) or 0) / 1000
+    if not la and xf <= 0 then return nil end
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+    la, lb = tonumber(la) or offs, tonumber(lb) or (offs + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') * rate)
+    return { item = it, la = la, lb = lb, rate = rate, xf = xf }
+  end,
   -- R на клипе (6 окт): нативная запись в слот — arm трека, time selection =
   -- слот, режим auto-punch, пре-ролл такт, 1013; стоп — за концом слота
   -- (ctx.ss_rec_tick). Повторное R — стоп. Прежние arm / режим / выделение
@@ -3940,7 +3957,7 @@ ctx = {
     if n then
       local foc, pp = state.focus, state.poolprev
       state.poolprev = false; pool_select(n); state.poolprev = pp
-      state.top = true; state.toptab = 'sample'
+      if not (state.top and state.toptab == 'clips') then state.top = true; state.toptab = 'sample' end   -- со вкладки clips не уводить
       ctx.set_focus(foc)
     end
   end,
@@ -8245,30 +8262,44 @@ local function frame()
         else sel_e = root; zone = nil end
         lw = 0                                       -- список — отдельный модуль справа (4 окт)
       end
-      -- клип сессии в фокусе (6 окт): начало / конец клипа зоной, L — точки лупа источника
+      -- клип сессии в фокусе (6 окт): начало / конец клипа — зона (тянется),
+      -- L — отрезок лупа (P_EXT:jf_cliploop, секунды источника; нет — весь клип),
+      -- xf — кроссфейд шва; вид — клип во всю ширину, без панели свойств
       local cl = state.ss_clip
-      if cl and e and not e.file and (MX.clips or state.ss_big) and reaper.ValidatePtr(cl.item, 'MediaItem*') then
+      if cl and e and not e.file and (MX.clips or state.ss_big or state.clipsview) and reaper.ValidatePtr(cl.item, 'MediaItem*') then
         local tk = reaper.GetActiveTake(cl.item)
         if tk and not reaper.TakeIsMIDI(tk) then
           local er = (e.rate and e.rate ~= 0) and e.rate or 1
+          local eo = e.offs or 0
           local co = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
           local cr = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
           local clen = reaper.GetMediaItemInfo_Value(cl.item, 'D_LENGTH')
-          local a = (co - (e.offs or 0)) / er
-          zone = { a, a + clen * cr / er, nil, clip = true }
-          if reaper.GetMediaItemInfo_Value(cl.item, 'B_LOOPSRC') == 1 then
-            local src = reaper.GetMediaItemTake_Source(tk)
-            local sl = src and reaper.GetMediaSourceLength(src) or 0
-            if sl > 0 and clen * cr > sl - co + 1e-4 then zone.loop = { (0 - (e.offs or 0)) / er, (sl - (e.offs or 0)) / er } end
+          local a = (co - eo) / er
+          local b = a + clen * cr / er
+          local _, lp = reaper.GetSetMediaItemInfo_String(cl.item, 'P_EXT:jf_cliploop', '', false)
+          local la, lb = (lp or ''):match('^([%-%d%.]+);([%-%d%.]+)$')
+          la, lb = tonumber(la), tonumber(lb)
+          local _, xs = reaper.GetSetMediaItemInfo_String(cl.item, 'P_EXT:jf_clipxf', '', false)
+          zone = { a, b, nil, clip = true, item = cl.item, er = er, eo = eo, cr = cr,
+                   loop = la and { (la - eo) / er, (lb - eo) / er } or { a, b }, xf = (tonumber(xs) or 0) / 1000 }
+          local zd = SL.zone_drag
+          if zd and zd.clip and zd.item == cl.item then zone[1], zone[2], zone.loop = zd.a, zd.b, { zd.la, zd.lb } end
+          state.ss_zone = zone
+          -- вид: клип во всю ширину (один раз на клип — дальше зум свой)
+          if cl.viewed ~= cl.item then
+            cl.viewed = cl.item
+            local m = math.max(0.02, (b - a) * 0.05)
+            SL.zoom_e, SL.va, SL.vb = e.item, math.max(0, a - m), b + m
           end
         end
-      end
+      else state.ss_zone = nil end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       ctx.sprops_maxw = pw
       if sel_e and not sel_e.file then pw = SPROP.fit_w(L, pw, h) end           -- только занятые колонки, остаток — волне
       -- свойства семпла слева от волны (4 окт, опция props position)
       local pleft = state.propspos == 'left'
       local px = pleft and x or (x + w - lw - (lw > 0 and L.pad or 0) - pw)
+      if zone and zone.clip then pw = 0 end                            -- клип — во всю ширину (6 окт)
       if pw > L.cw * 12 then
         if sel_e.file then
           -- файл браузера: информация о файле (> — играет сейчас)
@@ -8617,6 +8648,7 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
+  elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then state.status = ({ a = 'clip start - drag (offset of the clip item)', b = 'clip end - drag (its length)', move = 'clip - drag the strip: the whole clip in the source', la = 'loop start L - drag: the part the session loops', lb = 'loop end L - drag', xf = 'loop crossfade at the seam - click: 0 / 10 / 30 / 60 / 120 ms (default off)' })[SL.zone_hot] or ''
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
@@ -8757,6 +8789,11 @@ local function frame()
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
+  -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
+  if hover.sess and snap then
+    local k = hover.sess.ri .. ':' .. hover.sess.ci
+    if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, MX.grid(snap, seq)) end
+  else state.ss_hkey = nil end
   if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
@@ -8912,6 +8949,24 @@ local function frame()
       ctx.set_focus('top')
       if hover.sample.view == 'big' then ctx.sample_big() else SL.view = hover.sample.view end
       click = { t = now2, zone = 'sampleview' }
+    elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then
+      -- клип сессии (6 окт): начало / конец / перенос / метки лупа L / xf
+      ctx.set_focus('top')
+      local z = state.ss_zone
+      if SL.zone_hot == 'xf' then
+        local steps = { 0, 10, 30, 60, 120 }
+        local cur = math.floor((z.xf or 0) * 1000 + 0.5)
+        local nxt = steps[1]
+        for i, v in ipairs(steps) do if v == cur then nxt = steps[i % #steps + 1] end end
+        edit.run('clip loop crossfade', function() reaper.GetSetMediaItemInfo_String(z.item, 'P_EXT:jf_clipxf', tostring(nxt), true) end)
+        vim.msg = ('clip loop crossfade: %d ms (applies at the next launch)'):format(nxt)
+      else
+        local wv = SL.wave
+        local grab = (wv and wv.w > 0) and SL.x_to_t(gfx.mouse_x) or z[1]
+        SL.zone_drag = { clip = true, edge = SL.zone_hot, item = z.item, er = z.er, eo = z.eo, cr = z.cr, p = { name = 'clip' },
+                         a = z[1], b = z[2], a0 = z[1], b0 = z[2], la = z.loop[1], lb = z.loop[2], la0 = z.loop[1], lb0 = z.loop[2], grab = grab }
+      end
+      click = { t = now2, zone = 'slicezone' }
     elseif hover.sample and SL.zone_hot then
       -- край зоны слайса: тянуть начало / конец слайса по большому сэмплу (2 окт)
       ctx.set_focus('top')
@@ -9760,15 +9815,35 @@ local function frame()
           local w = zd.b0 - zd.a0
           local na = SL.snap_t(math.max(0, math.min(wv.len - w, zd.a0 + (raw - zd.grab))))
           zd.a, zd.b = na, na + w
+        elseif zd.edge == 'la' or zd.edge == 'lb' then
+          local t = SL.snap_t(raw)
+          if zd.edge == 'la' then zd.la = math.min(t, zd.lb - 0.005) else zd.lb = math.max(t, zd.la + 0.005) end
         else
           local t = SL.snap_t(raw)
           if zd.edge == 'a' then zd.a = math.min(t, zd.b - 0.005) else zd.b = math.max(t, zd.a + 0.005) end
         end
-        state.status = ('slice: %.3f - %.3fs of %s (%.3fs) - release to apply'):format(zd.a, zd.b, zd.p.name or 'sample', zd.b - zd.a)
+        if zd.clip and (zd.edge == 'la' or zd.edge == 'lb') then state.status = ('clip loop: %.3f - %.3fs (%.3fs) - release to apply'):format(zd.la, zd.lb, zd.lb - zd.la)
+        else state.status = ('%s: %.3f - %.3fs of %s (%.3fs) - release to apply'):format(zd.clip and 'clip' or 'slice', zd.a, zd.b, zd.p.name or 'sample', zd.b - zd.a) end
       end
     else
       -- простой клик без сдвига — не правка (без undo-точки)
-      if math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6 then
+      if zd.clip then
+        -- клип (6 окт): начало / конец → offset / длина item клипа; L → jf_cliploop
+        local moved = math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6
+        local lmoved = math.abs((zd.la or 0) - (zd.la0 or 0)) > 1e-6 or math.abs((zd.lb or 0) - (zd.lb0 or 0)) > 1e-6
+        if (moved or lmoved) and reaper.ValidatePtr(zd.item, 'MediaItem*') then
+          edit.run('clip markers', function()
+            local tk = reaper.GetActiveTake(zd.item)
+            if moved and tk then
+              reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', zd.eo + zd.a * zd.er)
+              reaper.SetMediaItemInfo_Value(zd.item, 'D_LENGTH', (zd.b - zd.a) * zd.er / ((zd.cr and zd.cr > 0) and zd.cr or 1))
+            end
+            if lmoved then reaper.GetSetMediaItemInfo_String(zd.item, 'P_EXT:jf_cliploop', ('%.6f;%.6f'):format(zd.eo + zd.la * zd.er, zd.eo + zd.lb * zd.er), true) end
+          end)
+          model.invalidate()
+          vim.msg = lmoved and ('clip loop %.3f - %.3fs (applies at the next launch)'):format(zd.la, zd.lb) or ('clip %.3f - %.3fs'):format(zd.a, zd.b)
+        end
+      elseif math.abs(zd.a - zd.a0) > 1e-6 or math.abs(zd.b - zd.b0) > 1e-6 then
         if zd.marks then
           -- слайс без нот: границы k и k+1 нарезки сэмпла (5 окт)
           local sl = {}

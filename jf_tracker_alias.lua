@@ -134,7 +134,48 @@ A.items_in = items_in
 -- сходиться на любом проходе. skip = { a, b } — окно, куда не сажать (там
 -- ещё доигрывает прошлый клип; досаживается потом с win = только это окно).
 -- Копии независимые (unlink), помечены P_EXT:jf_session = "<ri>:<ci>".
-function A.session_plant(tr, src, z0, z1, phase, skip, tag, win)
+-- луп клипа (6 окт): opt = { item, la, lb (секунды источника), rate, xf (с) } —
+-- сажается только отрезок лупа шагом (lb − la) / rate; xf > 0 — каждая копия
+-- длиннее на xf с затуханием, следующая — с нарастанием (нахлёст на шве)
+local function plant_loop(tr, opt, z0, z1, phase, skip, tag, win)
+  local ok, c = R.GetItemStateChunk(opt.item, '', false)
+  if not ok then return 0 end
+  local chunk = unlink_chunk(strip_guids(c))
+  local rate = (opt.rate and opt.rate > 0) and opt.rate or 1
+  local step = (opt.lb - opt.la) / rate
+  if step <= 1e-4 then return 0 end
+  local xf = math.max(0, math.min(step * 0.5, opt.xf or 0))
+  local fixed = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+  local lane = R.GetMediaItemInfo_Value(opt.item, 'I_FIXEDLANE')
+  local n = 0
+  local k0 = math.floor((z0 - phase) / step) - 1
+  for k = k0, k0 + math.ceil((z1 - z0) / step) + 2 do
+    local pos = phase + k * step
+    if pos >= z1 - EPS then break end
+    local inside = pos >= z0 - EPS
+    local skipped = skip and pos >= skip[1] - EPS and pos < skip[2] - EPS
+    if win and not (pos >= win[1] - EPS and pos < win[2] - EPS) then skipped = true end
+    if inside and not skipped then
+      local it = R.AddMediaItemToTrack(tr)
+      R.SetItemStateChunk(it, chunk, false)
+      local tk = R.GetActiveTake(it)
+      if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', opt.la) end
+      R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
+      R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(step + xf, z1 - pos))
+      R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 0)
+      R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', xf); R.SetMediaItemInfo_Value(it, 'D_FADEOUTLEN', xf)
+      R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+      if fixed then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane) end
+      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', tag or '1', true)
+      n = n + 1
+    end
+  end
+  return n
+end
+A.plant_loop = plant_loop
+
+function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
+  if opt and opt.item and opt.lb and opt.la and R.ValidatePtr(opt.item, 'MediaItem*') then return plant_loop(tr, opt, z0, z1, phase, skip, tag, win) end
   local len = src.rgnend - src.pos
   if len <= 1e-6 then return 0 end
   local chunks = {}

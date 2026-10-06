@@ -162,7 +162,7 @@ function SS.tick(seq, snap)
       if col then
         ctx.ss_apply(src and 'session launch' or 'session stop', function()
           ctx.alias.session_clear(col.track, zone.pos, zone.rgnend, keep0, keep1)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci) end
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, ctx.ss_clip_opts and ctx.ss_clip_opts(col.track, src)) end
         end)
       end
       if src then SS.live[ci] = { ri = p.ri, phase = phase, len = src.rgnend - src.pos } else SS.live[ci] = nil end
@@ -179,7 +179,7 @@ function SS.tick(seq, snap)
       if col then
         ctx.ss_apply('session fill', function()
           ctx.alias.session_clear(col.track, t.from, t.to)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }) end
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }, ctx.ss_clip_opts and ctx.ss_clip_opts(col.track, src)) end
         end)
       end
       SS.todo[ci] = nil

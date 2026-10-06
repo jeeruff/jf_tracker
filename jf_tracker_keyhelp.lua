@@ -191,6 +191,10 @@ KH.PAGES = {
     { k = 'drop', t = {}, d = 'a file or a pm card dropped on a cell becomes its clip (goes into the slot of that track)' },
     { k = 'rclick', t = {}, d = 'menu: launch / scene / stop / quantize / off' },
     { k = 'zz Esc', d = 'back to the matrix - the clips keep playing' },
+    { k = 'zs', d = 'clips in the tracker body: scenes x tracker columns, headers / inputs / arms stay live (quick option clips)' },
+    { k = 'R', d = 'record into the clip: arms the track, the slot as the auto-punch selection, a bar of count-in, stops at the slot end' },
+    { k = 'dd Del', d = 'delete the clip (its items in the slot)' },
+    { k = 'item tab', t = {}, d = 'the clip under the mouse / cursor fills the wave: drag its start / end, the loop marks L; xf - loop crossfade 0 / 10 / 30 / 60 / 120 ms (off by default)' },
   } },
   pm = { title = 'pm cards (jf_pm, experimental)', e = {
     { k = 'h j k l', d = 'move over the cards (also arrows); g G - first / last' },

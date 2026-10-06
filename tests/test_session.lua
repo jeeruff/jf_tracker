@@ -176,5 +176,24 @@ eq('clear keep: kept and trimmed', table.concat(got, ' '), '101+1 50+1'); eq('cl
 items = { { pos = 100, len = 1 }, { pos = 107.5, len = 2 }, { pos = 50, len = 1 } }
 eq('clear all in zone', A.session_clear('tr', 100, 108), 2); eq('clear all: outside stays', #items == 1 and items[1].pos, 50)
 
+-- луп клипа с кроссфейдом (A.plant_loop): шаг (lb − la) / rate, копия длиннее на xf, фейды
+reaper.GetActiveTake = function(it) return it end
+reaper.SetMediaItemTakeInfo_Value = function(it, k, v) it['take:' .. k] = v end
+local _sv = reaper.SetMediaItemInfo_Value
+reaper.SetMediaItemInfo_Value = function(it, k, v) if k == 'D_POSITION' or k == 'D_LENGTH' then return _sv(it, k, v) end; it[k] = v end
+items = {}
+local src_it = { pos = 0, len = 4, chunk = '<ITEM\n>' }
+local nl = A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 1, xf = 0.05 }, 100, 108, 100, nil, 't')
+local ps, lens = {}, {}
+for _, it in ipairs(items) do ps[#ps + 1] = ('%g'):format(it.pos); lens[#lens + 1] = it.len end
+table.sort(ps)
+eq('loop plant count', nl, 4); eq('loop plant step 2s', table.concat(ps, ','), '100,102,104,106')
+near('loop copy offs = la', items[1]['take:D_STARTOFFS'], 1.0); near('loop copy len = step + xf', items[1].len, 2.05)
+near('loop fade in', items[1].D_FADEINLEN, 0.05); near('loop fade out', items[1].D_FADEOUTLEN, 0.05)
+near('last copy trimmed by zone end', items[4].len, 2.0)
+items = {}
+A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 2, xf = 0 }, 100, 104, 100, nil, 't')
+eq('rate 2: step 1s', #items, 4); near('rate 2: no xf len', items[1].len, 1.0)
+
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

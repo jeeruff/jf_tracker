@@ -658,14 +658,31 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(mhot and U.AMBER or U.mix(U.AMBER, U.BG, 0.45))
     gfx.rect(px0, BY, math.max(2, px1 - px0), 5, 1)
   end
-  -- клип сессии (6 окт): точки лупа источника — голубые линии с буквой L
+  -- клип сессии (6 окт): метки лупа L (тянутся: S.zone_hot 'la' / 'lb'),
+  -- кнопка xf — кроссфейд шва лупа (клик — 0 / 10 / 30 / 60 / 120 мс)
   if zone and zone.loop then
-    for _, t in ipairs(zone.loop) do
+    local mxw, myw = gfx.mouse_x, gfx.mouse_y
+    local dragging = S.zone_drag and S.zone_drag.edge
+    for i, t in ipairs(zone.loop) do
       if t >= va and t <= vb then
         local lx = tx(t)
-        U.set(U.CYAN); gfx.rect(lx, wy, 1, wh, 1)
-        U.text(lx + 2, wy + 1, 'L', U.CYAN)
+        local nm = i == 1 and 'la' or 'lb'
+        local hot0 = not S.drag and not S.zone_hot and myw >= wy + 10 and myw < wy + wh - 8 and math.abs(mxw - lx) <= 4
+        if hot0 then S.zone_hot = nm end
+        local hot = S.zone_hot == nm or dragging == nm
+        U.set(U.CYAN); gfx.rect(hot and lx - 1 or lx, wy, hot and 3 or 1, wh, 1)
+        U.text(lx + 3, wy + wh - L.rh - 7, 'L', hot and U.AMBER or U.CYAN)
       end
+    end
+    if zone.clip then
+      local lbl = ('xf %d ms'):format(math.floor((zone.xf or 0) * 1000 + 0.5))
+      local bw = U.measure(lbl) + 2 * L.pad
+      local bx, by = x + w - bw - 2, wy + 2
+      local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
+      if hot and not S.drag then S.zone_hot = 'xf' end
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
+      U.set((zone.xf or 0) > 0 and U.CYAN or U.LINE); gfx.rect(bx, by, bw, rh, 0)
+      U.text(bx + L.pad, by + 1, lbl, (zone.xf or 0) > 0 and U.CYAN or U.GREY)
     end
   end
   local slices = editing and S.slices or (e.slices or {})
