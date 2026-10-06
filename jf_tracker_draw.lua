@@ -105,6 +105,23 @@ local tcache, next_img = {}, 100
 -- вертикальный текст, 960..1019 спектрограммы анализатора, 1022 логотип about, 1023 черновик поворота
 -- 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 799
+-- кольцо картинок текста (6 окт): по половинам — при входе в половину
+-- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
+-- сбрасывало весь кэш, и экран из сотен строк (pm cards) перезапекался
+-- целиком каждые пару секунд — пики кадра 20 мс
+local IMG_MID = IMG_FIRST + (IMG_LAST - IMG_FIRST + 1) // 2
+local function tc_alloc()
+  if next_img > IMG_LAST then next_img = IMG_FIRST end
+  if next_img == IMG_FIRST or next_img == IMG_MID then
+    local lo, hi = next_img, (next_img == IMG_FIRST) and (IMG_MID - 1) or IMG_LAST
+    for k, v in pairs(tcache) do
+      if v.id >= lo and v.id <= hi then tcache[k] = nil
+      elseif v.ov and v.ov >= lo and v.ov <= hi then v.ov = nil end
+    end
+  end
+  local id = next_img; next_img = next_img + 1
+  return id
+end
 
 -- пиксельные TTF (5 окт, опция font): кириллица, греческий, блоки, рамки —
 -- без гибрида; px — родной размер (кегль = px × масштаб — чётко)
@@ -221,10 +238,9 @@ local function txt_img(str, col, bg)
     .. '|' .. (bg and (math.floor(bg[1] * 255) .. ',' .. math.floor(bg[2] * 255) .. ',' .. math.floor(bg[3] * 255)) or '')
   local e = tcache[key]
   if e then return e end
-  if next_img > IMG_LAST then tcache, next_img = {}, IMG_FIRST end
   gfx.setfont(D.font_id)
   local w, h = measure_raw(str) + 2, gfx.texth            -- +2 (6 окт): при ×1.5 правый столбец буквы (O) срезался
-  local id = next_img; next_img = next_img + 1
+  local id = tc_alloc()
   -- строка с глифами: картинка на 2 px ниже — хвосты р у щ не срезаются
   local hi = (D.hybrid and str:find('[\128-\255]')) and (h + 2) or h
   gfx.setimgdim(id, w, hi)
@@ -566,8 +582,7 @@ local function text(x, y, s, col, bg)
     -- все штрихи одной толщины, край мягкий
     local k = math.floor(D.SCALE * 2 + 0.5)
     if not e.ov or e.ovk ~= k then
-      if next_img > IMG_LAST then tcache, next_img = {}, IMG_FIRST end
-      local id = next_img; next_img = next_img + 1
+      local id = tc_alloc()
       local d0 = gfx.dest
       gfx.setimgdim(id, e.w * k, e.h * k)
       gfx.dest = id

@@ -81,14 +81,21 @@ s = PM.sort(PM.entries(PM.idx, {}), 'status'); eq('sort status: no status last',
 -- ── сетка и курсор ────────────────────────────────────────────────────────
 for _, cw in ipairs({ 8, 12, 16 }) do
   for _, w in ipairs({ 20 * cw, 36 * cw, 1600 }) do
-    local G = PM.grid(w, cw, 4, cw + 2)
+    local G = PM.grid(w, cw, 4, cw + 2, 'square')
     eq(('grid cols>=1 w%d cw%d'):format(w, cw), G.cols >= 1, true)
     eq(('grid fits w%d cw%d'):format(w, cw), G.cols * G.card_w + (G.cols + 1) * 4 <= w, true)
     eq(('grid thumb>0 w%d cw%d'):format(w, cw), G.thumb > 0, true)
   end
 end
-eq('narrow sidebar 2 cols', PM.grid(20 * 8, 8, 4, 10).cols, 2); eq('wide sidebar 3 cols', PM.grid(36 * 8, 8, 4, 10).cols, 3)
-eq('big 10 cols', PM.grid(1600, 16, 4, 18).cols, 10)
+eq('square: narrow sidebar 2 cols', PM.grid(20 * 8, 8, 4, 10, 'square').cols, 2); eq('square: wide sidebar 3 cols', PM.grid(36 * 8, 8, 4, 10, 'square').cols, 3)
+eq('square: big 10 cols', PM.grid(1600, 16, 4, 18, 'square').cols, 10)
+-- wide (по умолчанию): высота три строки, превью квадрат слева, ширина >= превью + 9 символов
+local Gw = PM.grid(36 * 8, 8, 4, 10)
+eq('wide default shape', Gw.shape, 'wide'); eq('wide height 4 rows', Gw.card_h, 4 * 10 + 12); eq('wide thumb = height', Gw.thumb, Gw.card_h - 8)
+eq('wide sidebar 2 cols at 36cw', Gw.cols, 2); eq('wide narrow sidebar 1 col', PM.grid(20 * 8, 8, 4, 10).cols, 1); eq('wide 1600: many cols', PM.grid(1600, 8, 4, 10).cols >= 8, true)
+local Gc = PM.grid(36 * 8, 8, 4, 10, 'compact'); eq('compact 3 rows', Gc.card_h, 3 * 10 + 12); eq('compact side text', Gc.side, true)
+eq('shape cycle', PM.next_shape('wide') .. PM.next_shape('compact') .. PM.next_shape('square'), 'compactsquarewide')
+eq('wide no thumb: narrower cards', PM.grid(36 * 8, 8, 4, 10, 'wide', false).cols >= Gw.cols, true); eq('wide no thumb: thumb 0', PM.grid(36 * 8, 8, 4, 10, 'wide', false).thumb, 0)
 eq('move l', PM.move(1, 10, 3, 'l'), 2); eq('move h clamp', PM.move(1, 10, 3, 'h'), 1); eq('move j', PM.move(1, 10, 3, 'j'), 4)
 eq('move j past end stays', PM.move(9, 10, 3, 'j'), 9); eq('move k top stays', PM.move(2, 10, 3, 'k'), 2); eq('move l clamp', PM.move(10, 10, 3, 'l'), 10)
 eq('move cols 1', PM.move(3, 10, 1, 'j'), 4); eq('move empty', PM.move(1, 0, 3, 'l'), 1)

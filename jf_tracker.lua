@@ -191,6 +191,7 @@ local state = {
   -- pm cards (6 окт, экспериментально как grid / orca): вкладка pm браузера —
   -- сетка карточек jf_pm с превью, big — на всё окно (jf_tracker_pm.lua)
   pmgrid = reaper.file_exists(DIR .. '/.dev') and flag('pmgrid', true) or false,
+  pmthumb = flag('pmthumb', true), pmicon = flag('pmicon', true),   -- превью / метка DAW на карточках pm
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
@@ -409,7 +410,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'pmgrid', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3660,7 +3661,11 @@ ctx = {
   -- большой редактор сэмпла (3 окт, :big / кнопка big): вкладка item на всё окно
   -- проект-менеджер jf_pm (6 окт): модуль карточек лениво; pm_cards — опция
   pm_mod = function()
-    if not ctx.PM then ctx.PM = dofile(DIR .. '/jf_tracker_pm.lua'); ctx.PM.init(U, ctx) end
+    if not ctx.PM then
+      ctx.PM = dofile(DIR .. '/jf_tracker_pm.lua'); ctx.PM.init(U, ctx)
+      local sh = reaper.GetExtState(EXT, 'pmshape'); ctx.PM.shape = (sh == 'square' or sh == 'compact') and sh or 'wide'
+      ctx.PM.show_thumb, ctx.PM.show_icon = state.pmthumb ~= false, state.pmicon ~= false
+    end
     return ctx.PM
   end,
   pm_cards = function() return state.pmgrid and true or false end,
@@ -4283,6 +4288,9 @@ ctx = {
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
       flag('envpoints', 'envelope points', 'envelope points as small circles in the envelope columns and the item editor, as REAPER draws them'),
       flag('pmgrid', 'pm cards (jf_pm)', 'experimental: the pm tab of the browser as a grid of project cards with thumbnails (image / DAW mark / preview wave / mini arrangement); b or :pm big - over the whole window'),
+      { key = 'pmshape', label = 'pm card shape', kind = 'cycle', values = { 'wide', 'compact', 'square' }, desc = 'wide - thumbnail left, name, preview wave, bpm / date, status; compact - three rows, the wave inside the thumbnail; square - thumbnail on top (w in the pm grid)', get = function() return ctx.pm_mod().shape end, set = function(v) ctx.pm_mod().shape = v; ctx.PM.invalidate(); reaper.SetExtState(EXT, 'pmshape', v, true) end },
+      { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
+      { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
@@ -4336,7 +4344,7 @@ ctx = {
   end,
   options = function()
     local items = {}
-    for _, it in ipairs(ctx.option_items()) do if state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid') then items[#items + 1] = it end end
+    for _, it in ipairs(ctx.option_items()) do if state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon') then items[#items + 1] = it end end
     -- hotkeys (5 окт): все клавиши со страниц ? — клавиша, модуль, описание;
     -- / ищет по клавише, описанию и модулю
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
@@ -6916,6 +6924,7 @@ local function poll_cmd()
     reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
   elseif name == 'perf' then ctrl_action('perf', 0)
   elseif name == 'jftop' then ctrl_action('jftop', 0)
+  elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
   elseif name == 'slicedump' then
     -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
     local col = cur_col(); local e = col and col.pool and col.pool[vim.inst or 1]

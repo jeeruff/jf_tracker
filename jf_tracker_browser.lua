@@ -673,6 +673,8 @@ function B.click(what)
     B.pm = nil; B.cur = 1; B.set_all(B.read_pm())
     if ctx.msg then ctx.msg('pm: ' .. ({ all = 'all projects', rpp = 'REAPER projects only', other = 'other DAWs only' })[B.pm_daw]) end
   elseif what == 'pmbig' then if ctx.pm_big then ctx.pm_big() end
+  elseif what == 'pmshape' then
+    local PM = PMm(); if PM then PM.shape = PM.next_shape(PM.shape); B.pm_scroll.v = 0; PM.invalidate(); if ctx.msg then ctx.msg('pm cards: ' .. PM.shape) end; if R.SetExtState then R.SetExtState('jf_tracker', 'pmshape', PM.shape, true) end end
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
   elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
 end
@@ -979,6 +981,7 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, y, B.pm_sort or 'date', 'pmsort', false)
       bx = btn(bx, y, B.pm_daw or 'all', 'pmdaw', false)
       if bx + U.measure('big') + 2 * L.pad <= x + w then bx = btn(bx, y, 'big', 'pmbig', ctx.pm_big_on and ctx.pm_big_on()) end
+      if bx + U.measure('sq') + 2 * L.pad <= x + w then bx = btn(bx, y, ({ wide = 'wd', compact = 'cp', square = 'sq' })[B.pm_mod().shape] or 'wd', 'pmshape', false) end
       tx0 = bx
       if B.pm_loading then where = ('jf_pm: loading %d %%'):format(math.floor(((B.pm_mod().loading or {}).frac or 0) * 100)) end
     end

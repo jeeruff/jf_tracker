@@ -39,6 +39,9 @@ PM.STATUS_COLORS = {
 PM.STATUS_EN = {
   ['зерно'] = 'seed', ['джем'] = 'jam', ['ритм'] = 'beat', ['луп'] = 'loop', ['аранжировка'] = 'arrangement', ['микс'] = 'mix',
   ['мастер'] = 'master', ['издано'] = 'out', ['на расслоение'] = 'to harvest', ['семплпак'] = 'samplepack', ['покой'] = 'rest',
+  -- легаси-статусы пользователя без класса jf_pm (6 окт): латиницей — кириллица
+  -- в подписи шла бы через медленный шрифт-фолбэк на каждой карточке
+  ['семпл'] = 'sample', ['тест'] = 'test', ['скетч'] = 'sketch',
 }
 PM.STATUS_ALIASES = {
   ['набросок'] = 'зерно', ['идея'] = 'зерно', ['в работе'] = 'аранжировка', ['доделать'] = 'аранжировка', ['к миксу'] = 'микс',
@@ -214,6 +217,7 @@ function PM.load_step(budget)
       PM.loading = nil
       if type(r) ~= 'table' or type(r.projects) ~= 'table' then PM.error = 'jf_pm: bad index'; r = { version = 1, projects = {} } end
       PM.idx = r; PM.ready = true
+      PM.reset_caches()
       -- правки, сделанные пока индекс перечитывался — заново на свежий
       for _, op in ipairs(PM.ops) do local c = r.projects[op[1]]; if c then op[2](c) end end
       if PM.on_ready then PM.on_ready() end
@@ -342,14 +346,30 @@ function PM.sort(list, mode)
 end
 
 -- ── сетка: раскладка и курсор (чисто) ─────────────────────────────────────
--- cols по ширине: карточка не уже 9 символов; card_w / thumb / card_h
-function PM.grid(w, cw, pad, rh)
-  local cols = math.max(1, math.floor((w - pad) / (9 * cw + pad)))
+-- cols по ширине; shape 'wide' (по умолчанию, 6 окт: карточка шириной в два
+-- квадрата и вдвое ниже — превью слева, имя / мета / метка справа) или
+-- 'square' (превью сверху, текст под ним). thumb = false — без превью
+function PM.grid(w, cw, pad, rh, shape, thumb_on)
+  shape = shape or 'wide'
+  if shape == 'square' then
+    local cols = math.max(1, math.floor((w - pad) / (9 * cw + pad)))
+    local card_w = math.floor((w - (cols + 1) * pad) / cols)
+    local thumb = thumb_on ~= false and math.max(4, card_w - 2 * pad) or 0
+    local rows_txt = card_w >= 14 * cw and 3 or 2
+    return { shape = shape, cols = cols, card_w = card_w, thumb = thumb, rows_txt = rows_txt, card_h = thumb + rows_txt * rh + 3 * pad }
+  end
+  -- wide: четыре строки (имя, волна, bpm / дата, статус); compact (прежний
+  -- вид, 6 окт): три строки, волна — в квадрате превью; превью — квадрат слева
+  local rows_txt = shape == 'compact' and 3 or 4
+  local card_h = rows_txt * rh + 3 * pad
+  local thumb = thumb_on ~= false and (card_h - 2 * pad) or 0
+  local min_w = thumb + (thumb > 0 and pad or 0) + 9 * cw + 2 * pad
+  local cols = math.max(1, math.floor((w - pad) / (min_w + pad)))
   local card_w = math.floor((w - (cols + 1) * pad) / cols)
-  local thumb = math.max(4, card_w - 2 * pad)
-  local rows_txt = card_w >= 14 * cw and 3 or 2
-  return { cols = cols, card_w = card_w, thumb = thumb, rows_txt = rows_txt, card_h = thumb + rows_txt * rh + 3 * pad }
+  return { shape = shape, side = true, cols = cols, card_w = card_w, thumb = thumb, rows_txt = rows_txt, card_h = card_h }
 end
+PM.SHAPES = { 'wide', 'compact', 'square' }
+function PM.next_shape(s) for i, v in ipairs(PM.SHAPES) do if v == s then return PM.SHAPES[i % #PM.SHAPES + 1] end end return 'wide' end
 -- курсор: dir 'h' 'j' 'k' 'l', n — число карточек
 function PM.move(cur, n, cols, dir)
   if n < 1 then return 1 end
@@ -384,12 +404,13 @@ function PM.find_audio(c)
   if c.preview_found then cands[#cands + 1] = c.preview_found end
   cands[#cands + 1] = dir .. '/' .. name .. '_preview.wav'
   if c.daw then for _, e in ipairs({ 'wav', 'mp3', 'aiff', 'aif', 'flac', 'm4a', 'ogg' }) do cands[#cands + 1] = dir .. '/' .. name .. '.' .. e end end
-  local n = dircount[dir]
-  if not n then
-    n = 0
-    for p in pairs(PM.idx and PM.idx.projects or {}) do if (p:match('^(.*)[/\\]') or '.') == dir then n = n + 1 end end
-    dircount[dir] = n
+  -- проектов в папке: один проход по индексу для ВСЕХ папок (6 окт: обход
+  -- на каждую новую папку давал ~1 мс на карточку — пики кадра)
+  if not dircount.ready then
+    for p in pairs(PM.idx and PM.idx.projects or {}) do local d = p:match('^(.*)[/\\]') or '.'; dircount[d] = (dircount[d] or 0) + 1 end
+    dircount.ready = true
   end
+  local n = dircount[dir] or 0
   if n <= 1 then cands[#cands + 1] = dir .. '/jf_preview.wav' end
   cands[#cands + 1] = c.path .. '-PROX.wav'
   local rf = c.render_file or ''
@@ -465,6 +486,8 @@ function PM.slot(key)
   return best.id, false
 end
 function PM.invalidate() slot_of = {}; slots = {}; PM.gen = PM.gen + 1; exists_cache = {} end
+-- новый индекс — счётчики папок и аудио заново
+function PM.reset_caches() dircount = {}; audio_cache = {} end
 
 -- запечь превью в слот; возвращает false, если пока нельзя (волна строится)
 function PM.bake(id, kind, c, arg, size)
@@ -490,7 +513,8 @@ function PM.bake(id, kind, c, arg, size)
     local lbl = dt.label or (c.daw or '?'):sub(1, 2)
     local tw, th = gfx.measurestr(lbl)
     U.text(math.floor((size - tw) / 2), math.floor((size - th) / 2), lbl, col)
-  elseif kind == 'wave' then
+  end
+  if kind == 'wave' then
     local pk = ctx.file_peaks and ctx.file_peaks(arg, size)
     if pk and pk.n > 0 then
       local cy, hh = math.floor(size / 2), math.floor(size / 2) - 1
@@ -505,7 +529,8 @@ function PM.bake(id, kind, c, arg, size)
       PM.paint_nav(c, size, function(x, y, w, h, rgb) U.set(rgb); gfx.rect(x, y, w, h, 1) end)
       done = false                                                  -- пики строятся: перепечь позже
     end
-  elseif kind == 'nav' then
+  end
+  if kind == 'nav' then
     PM.paint_nav(c, size, function(x, y, w, h, rgb) U.set(rgb); gfx.rect(x, y, w, h, 1) end)
   end
   if c.daw then local dt = PM.DAW_TYPES[c.daw_ext or ''] or {}; U.set(dt.color and PM.rgb(dt.color) or U.GREY); gfx.rect(0, 0, size, size, 0) end
@@ -529,6 +554,7 @@ function PM.bake_pending()
     local c = q.e.card
     local audio = PM.find_audio(c)
     local kind, arg = PM.thumb_kind(c, audio)
+    if kind == 'wave' and PM.shape == 'wide' then kind = 'nav'; arg = nil end   -- wide: волна под именем, квадрат — навигатор
     if kind == 'image' then loads = loads + 1; if loads > 1 then enqueue(q.e, q.size); break end end
     local key = q.e.path .. '|' .. q.size .. '|' .. kind .. '|' .. PM.gen
     local id, have = PM.slot(key)
@@ -544,6 +570,7 @@ function PM.thumb(e, size)
   local c = e.card
   local audio = audio_cache[c.path]
   local kind = PM.thumb_kind(c, audio or nil)
+  if kind == 'wave' and PM.shape == 'wide' then kind = 'nav' end
   local key = e.path .. '|' .. size .. '|' .. kind .. '|' .. PM.gen
   local s = slot_of[key]
   if s then s.used = PM.frame; if not s.done or audio == nil then enqueue(e, size) end; return s.id end
@@ -561,9 +588,10 @@ end
 -- ── отрисовка сетки ───────────────────────────────────────────────────────
 local function daw_col(e) local dt = PM.DAW_TYPES[e.daw_ext or ''] or {}; return dt.color and PM.rgb(dt.color) or U.GREY end
 -- возвращает hover (индекс карточки) и число колонок
+PM.shape, PM.show_thumb, PM.show_icon = 'wide', true, true   -- вид карточек (опции pm)
 function PM.draw_grid(L, x, y, w, h, entries, cur, focus, scroll_ref)
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local G = PM.grid(w, L.cw, L.pad, L.rh)
+  local G = PM.grid(w, L.cw, L.pad, L.rh, PM.shape, PM.show_thumb)
   local cols, cw, ch = G.cols, G.card_w, G.card_h
   local nrows = math.ceil(#entries / cols)
   local nvis = math.max(1, math.floor(h / ch))
@@ -590,38 +618,67 @@ function PM.draw_grid(L, x, y, w, h, entries, cur, focus, scroll_ref)
       if hot then hover = i end
       U.set(is_cur and (focus and U.tint(U.AMBER, 0.25) or U.PANEL) or (hot and U.tint(U.TEXT, 0.06) or U.BG)); gfx.rect(cx, cy, cw, ch - L.pad, 1)
       U.set(is_cur and (focus and U.AMBER or U.TEXT) or U.LINE); gfx.rect(cx, cy, cw, ch - L.pad, 0)
-      -- превью
+      -- превью (квадрат: сверху в square, слева в wide)
       local tx, ty, ts = cx + L.pad, cy + L.pad, G.thumb
       shown = shown + 1
-      local id = shown <= 80 and PM.thumb(e, ts) or nil
-      if id then gfx.blit(id, 1, 0, 0, 0, ts, ts, tx, ty, ts, ts)
+      local id = ts > 0 and shown <= 80 and PM.thumb(e, ts) or nil
+      if ts <= 0 then
+      elseif id then gfx.blit(id, 1, 0, 0, 0, ts, ts, tx, ty, ts, ts)
       else
         -- заглушка: хэш-цвет и две буквы имени
         U.set(PM.hsv(PM.fnv1a(e.path) % 360, 0.3, 0.3)); gfx.rect(tx, ty, ts, ts, 1)
-        local lbl = (e.name or '?'):sub(1, 2)
+        -- чужая DAW: её две буквы её цветом (как на запечённой метке), иначе первые буквы имени
+        local dt = PM.DAW_TYPES[e.daw_ext or ''] or {}
+        local lbl = e.daw and (dt.label or e.daw:sub(1, 2)) or (e.name or '?'):sub(1, 2)
         local lw, lh = gfx.measurestr(lbl)
-        if lw < ts then U.text(tx + math.floor((ts - lw) / 2), ty + math.floor((ts - lh) / 2), lbl, U.GREY) end
+        if lw < ts then U.text(tx + math.floor((ts - lw) / 2), ty + math.floor((ts - lh) / 2), lbl, e.daw and daw_col(e) or U.GREY) end
         if e.daw then U.set(daw_col(e)); gfx.rect(tx, ty, ts, ts, 0) end
       end
-      -- строки текста
-      local ly = ty + ts + 1
-      local tw = cw - 2 * L.pad
-      U.text(tx, ly, ctx.fit(e.name, tw), e.pinned and U.AMBER or (is_cur and focus and U.TEXT or U.TEXT))
+      -- строки текста: square — под превью, wide — справа от него
+      local ly, tx2, tw
+      if G.side then tx2 = tx + (ts > 0 and (ts + L.pad) or 0); ly = cy + L.pad; tw = cx + cw - L.pad - tx2
+      else tx2 = tx; ly = ty + ts + 1; tw = cw - 2 * L.pad end
+      -- иконка (6 окт): метка DAW её цветом справа от имени (reaper — без метки)
+      local icon = PM.show_icon and e.daw and ((PM.DAW_TYPES[e.daw_ext or ''] or {}).label or e.daw:sub(1, 2)) or nil
+      local iw = icon and (U.measure(icon) + L.pad) or 0
+      U.text(tx2, ly, ctx.fit(e.name, tw - iw), e.pinned and U.AMBER or U.TEXT)
+      if icon and iw < tw then U.text(tx2 + tw - U.measure(icon), ly, icon, daw_col(e)) end
       ly = ly + L.rh
+      -- wide (6 окт, просьба): превью-волна под именем во всю ширину текста;
+      -- пики по бюджету model (nil, пока строятся — тонкая линия)
+      if G.shape == 'wide' and PM.show_thumb and ctx.file_peaks then
+        local audio = audio_cache[e.card.path]
+        if audio == nil and shown <= 80 then audio = PM.find_audio(e.card) end
+        if audio then
+          local wh = L.rh - 2
+          local pk = tw > 8 and ctx.file_peaks(audio, tw)
+          local cyy, hh = ly + math.floor(wh / 2) + 1, math.floor(wh / 2)
+          U.set(U.readable(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 4.0))
+          if pk and pk.n > 0 then
+            for px = 0, tw - 1 do
+              local i = math.floor(px / tw * pk.n) + 1
+              local a, b = pk.min[i] or 0, pk.max[i] or 0
+              if b - a < 0.03 then a, b = -0.015, 0.015 end
+              gfx.line(tx2 + px, cyy - b * hh, tx2 + px, cyy - a * hh)
+            end
+          else gfx.line(tx2, cyy, tx2 + tw - 1, cyy) end
+          ly = ly + L.rh
+        end
+      end
       local left = (e.bpm and (math.floor(e.bpm + 0.5) .. 'bpm ') or '') .. (e.keystr or '')
       local date = e.mtime > 0 and os.date('%d.%m.%y', e.mtime) or ''
-      if left ~= '' then U.text(tx, ly, ctx.fit(left, tw), U.CYAN) end
-      if date ~= '' and U.measure(left) + U.measure(date) + L.pad <= tw then U.text(tx + tw - U.measure(date), ly, date, U.GREY) end
+      if left ~= '' then U.text(tx2, ly, ctx.fit(left, tw), U.CYAN) end
+      if date ~= '' and U.measure(left) + U.measure(date) + L.pad <= tw then U.text(tx2 + tw - U.measure(date), ly, date, U.GREY) end
       if G.rows_txt >= 3 then
         ly = ly + L.rh
-        local sx = tx
+        local sx = tx2
         if e.status ~= '' then
           local scol = PM.STATUS_COLORS[e.status] and PM.rgb(PM.STATUS_COLORS[e.status]) or U.GREY
-          U.set(scol); gfx.rect(tx, ly + L.rh - 2, math.min(tw, U.measure(e.st_en) + 2), 2, 1)
-          U.text(tx, ly, ctx.fit(e.st_en, tw), scol)
-          sx = tx + U.measure(e.st_en) + L.pad
+          U.set(scol); gfx.rect(tx2, ly + L.rh - 2, math.min(tw, U.measure(e.st_en) + 2), 2, 1)
+          U.text(tx2, ly, ctx.fit(e.st_en, tw), scol)
+          sx = tx2 + U.measure(e.st_en) + L.pad
         end
-        if e.tagstr and sx < tx + tw - L.cw * 3 then U.text(sx, ly, ctx.fit(e.tagstr, tx + tw - sx), U.GREY) end
+        if e.tagstr and sx < tx2 + tw - L.cw * 3 then U.text(sx, ly, ctx.fit(e.tagstr, tx2 + tw - sx), U.GREY) end
       end
       if ctx.hint then ctx.hint('browser', cx, cy, cw, ch - L.pad, i) end
     end
@@ -648,6 +705,7 @@ function PM.draw_big(L, B, x, y, w, h)
   U.text(bx, by + 1, 'pm', U.AMBER); bx = bx + U.measure('pm') + 2 * L.pad
   btn('grid', 'pmgrid', B.grid); btn('list', 'pmlist', not B.grid)
   btn('sort ' .. (B.pm_sort or 'date'), 'pmsort', false); btn('daw ' .. (B.pm_daw or 'all'), 'pmdaw', false)
+  btn(PM.shape, 'pmshape', false)
   btn('x', 'pmbig', true)
   local info = ('/%s%s  %d of %d'):format(B.filter or '', B.filtering and '_' or '', #B.entries, #B.all)
   U.text(bx + L.pad, by + 1, ctx.fit(info, x + w - bx - 2 * L.pad), B.filtering and U.AMBER or U.GREY)
@@ -716,6 +774,7 @@ function PM.key(c, B, mods)
   if ch == 'S' then B.click('pmsort'); return true end
   if ch == 'd' then B.click('pmdaw'); return true end
   if ch == 'b' then B.click('pmbig'); return true end
+  if ch == 'w' then B.click('pmshape'); return true end
   if ch == 'r' then PM.reload(); B.pm = nil; B.set_all({}); if ctx.msg then ctx.msg('jf_pm: reloading the index') end; return true end
   return false
 end
