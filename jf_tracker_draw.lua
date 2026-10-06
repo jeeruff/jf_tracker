@@ -1567,7 +1567,7 @@ local function draw_ctrl(L, info, H, hover)
         { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
           q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
         { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }),
-          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus),
+          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus), q('perf', 'perf', c.perf),
           -- тоглы из полосы транспорта (5 окт)
           q('follow', 'follow', c.follow), q('lock', 'lock', c.lock), q('fixed', 'fixed', c.fixed), q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade) },
       }
@@ -3448,7 +3448,12 @@ function D.frame(L, snap, rows, state, info)
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
-  if MX and L.matrix_w > 0 and not state.mx_hidden then
+  if MX and L.matrix_w > 0 and not state.mx_hidden and info.perf_draw then
+    -- производительность (6 окт): на месте матрицы, пока открыта
+    local y0 = L.mx_top or L.header_y
+    local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
+    info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
+  elseif MX and L.matrix_w > 0 and not state.mx_hidden then
     hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
   end
@@ -3978,8 +3983,18 @@ function D.frame(L, snap, rows, state, info)
     local bot = gfx.h - L.status_h
     local lx = L.side_x or L.win_w                   -- левый край правой панели / полосы
     if not state.side then
-      set(U.PANEL); gfx.rect(lx, L.header_y, L.rstrip_w, bot - L.header_y, 1)
-      set(D.SEP); gfx.rect(lx, L.header_y, D.SEPW, bot - L.header_y, 1)
+      -- свёрнутый браузер (6 окт): полоса во всю высоту (раньше с шапки — верх
+      -- выглядел рваным) и кнопка «<» посередине — развернуть
+      local y0 = math.min(L.header_y, L.top_y or 0)
+      set(U.PANEL); gfx.rect(lx, y0, L.rstrip_w, bot - y0, 1)
+      set(D.SEP); gfx.rect(lx, y0, D.SEPW, bot - y0, 1)
+      local obw, obh = L.rstrip_w - 6, 3 * L.rh
+      local obx, oby = lx + 3, math.floor((y0 + bot - obh) / 2)
+      local ohot = mx >= lx and mx < lx + L.rstrip_w and my >= oby and my < oby + obh
+      set(ohot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(obx, oby, obw, obh, 1)
+      set(ohot and U.AMBER or U.LINE); gfx.rect(obx, oby, obw, obh, 0)
+      text(obx + math.floor((obw - ms('<')) / 2), oby + L.rh, '<', ohot and U.AMBER or U.TEXT)
+      hint('sidectl', obx, oby, obw, obh, 'open')
     end
     local function knob(y, lbl, what)
       local bx = lx - math.floor(bw / 2)               -- на линии модуля (4 окт), по центру
@@ -3998,7 +4013,7 @@ function D.frame(L, snap, rows, state, info)
     if mx >= lx - 3 and mx <= lx + 3 and my >= L.header_y and my < bot then
       for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = state.side and 'grip' or 'open'
       set(U.AMBER); gfx.rect(lx - 1, L.header_y, 2, bot - L.header_y, 1)
-    elseif not state.side and mx > lx + 3 and mx < lx + L.rstrip_w and my >= L.header_y and my < bot then
+    elseif not state.side and mx > lx + 3 and mx < lx + L.rstrip_w and my >= math.min(L.header_y, L.top_y or 0) and my < bot then
       hover.sidectl = 'open'
     end
   end

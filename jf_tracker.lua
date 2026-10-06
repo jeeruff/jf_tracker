@@ -6450,6 +6450,11 @@ function ctrl_action(name, delta)
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  elseif name == 'perf' then
+    ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
+    ctx.PERF.active = not ctx.PERF.active
+    if ctx.PERF.active then state.mx_hidden = false; ctx.PERF.t = 0 end
+    vim.msg = ctx.PERF.active and 'performance in the matrix: n - REAPER performance meter, j k scroll, Esc (matrix focused) closes' or 'performance closed'
   elseif name == 'swing' then
     if delta == 0 then state.swing = 50 else state.swing = math.max(50, math.min(75, (state.swing or 50) + delta)) end
     vim.msg = ('swing %d%%: odd rows of new notes / points shift %s'):format(state.swing, state.swing > 50 and ('by %.2f row'):format(2 * state.swing / 100 - 1) or '- straight')
@@ -6547,6 +6552,7 @@ local function poll_cmd()
       local _, t, v = reaper.GetEnvelopePointEx(ae.env, FI, p); out[#out + 1] = ('%.3f:%.3f'):format(t, v)
     end
     reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
+  elseif name == 'perf' then ctrl_action('perf', 0)
   elseif name == 'notesfile' then
     -- 6 окт: дописать в project notes текст из .pending_notes.txt (файл удаляется)
     local f = io.open(DIR .. '/.pending_notes.txt', 'r')
@@ -7037,10 +7043,11 @@ local function frame()
     fps.v = fps.n / (now - fps.t); fps.n = 0; fps.t = now
     local n = math.max(1, prof.n)
     -- лайв (2 окт): кроме средних — худший кадр секунды и последняя правка
-    reaper.SetExtState(EXT, 'hb', string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
+    ctx.hb_last = string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count'))), false)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count')))
+    reaper.SetExtState(EXT, 'hb', ctx.hb_last, false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
@@ -7199,6 +7206,7 @@ local function frame()
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
+    perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
@@ -7235,7 +7243,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50,
+      oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50, perf = ctx.PERF and ctx.PERF.active,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'symbols', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -9471,7 +9479,8 @@ local function frame()
         if mr == 'leave' then state.macro = false; vim.msg = 'macro off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end
         if mr then vim.cur.row = mr; return end
       end
-      if state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
+      if state.focus == 'matrix' and ctx.PERF and ctx.PERF.active and ctx.PERF.key(c) then   -- производительность на месте матрицы (6 окт)
+      elseif state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
       elseif state.focus == 'matrix' and MX.mkedit then
         -- поле такта маркера на линии =START / =END (5 окт)
         local me = MX.mkedit
