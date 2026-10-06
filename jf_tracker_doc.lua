@@ -159,7 +159,8 @@ local function draw_marked(x, y, s, maxx)
   while i <= #s and px < maxx do
     local j = s:find('[\1-\4]', i) or (#s + 1)
     local seg = s:sub(i, j - 1)
-    if seg ~= '' then U.text(px, y, ctx.fit(seg, maxx - px), col); px = px + U.measure(seg) end
+    -- ширина с хвостовыми пробелами (measure битмапа их не считает — слипалось «;\\»)
+    if seg ~= '' then U.text(px, y, ctx.fit(seg, maxx - px), col); px = px + U.measure(seg .. '.') - U.measure('.') end
     local m = s:sub(j, j)
     col = (m == '\1' and U.AMBER) or (m == '\3' and U.CYAN) or U.TEXT
     i = j + 1

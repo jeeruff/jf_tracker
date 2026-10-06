@@ -7004,6 +7004,9 @@ local function poll_cmd()
     reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
   elseif name == 'perf' then ctrl_action('perf', 0)
   elseif name == 'jftop' then ctrl_action('jftop', 0)
+  elseif name == 'helpbig' then ctx.help_big()                          -- тест: F1
+  elseif name == 'actions' then ctx.actions_picker()                -- тест: ?
+  elseif name == 'esc' then vim.picker, vim.hydra = nil, nil; state.khelp_big = false   -- тест: закрыть всплывашки
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
   elseif name == 'slicedump' then
     -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
