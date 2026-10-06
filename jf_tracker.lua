@@ -6759,6 +6759,20 @@ local function poll_cmd()
     end
     reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
   elseif name == 'perf' then ctrl_action('perf', 0)
+  elseif name == 'slicedump' then
+    -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
+    local col = cur_col(); local e = col and col.pool and col.pool[vim.inst or 1]
+    local it = e and e.item
+    if it and reaper.ValidatePtr(it, 'MediaItem*') then
+      local tk = reaper.GetActiveTake(it)
+      local _, raw = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', false)
+      local _, base = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', '', false)
+      local _, bs = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)
+      local sl = edit.item_slices(it)
+      reaper.SetExtState(EXT, 'dbg', ('rate %.4f len %.4f offs %.4f | base %s | bsync %s | raw %s | now %s | model %s'):format(
+        reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'),
+        base, bs, (raw or ''):sub(1, 60), table.concat({ sl[2] or '', sl[3] or '', sl[4] or '' }, ','), table.concat({ (e.slices or {})[2] or '', (e.slices or {})[3] or '' }, ',')), false)
+    else reaper.SetExtState(EXT, 'dbg', 'slicedump: no instrument', false) end
   elseif name == 'notesfile' then
     -- 6 окт: дописать в project notes текст из .pending_notes.txt (файл удаляется)
     local f = io.open(DIR .. '/.pending_notes.txt', 'r')

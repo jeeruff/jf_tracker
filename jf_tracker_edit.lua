@@ -592,7 +592,10 @@ function E.item_slices(it)
     local r0 = base.rate0
     if not r0 and base.len and base.len > 0 then
       local ln = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if math.abs(ln - base.len) > 1e-3 then r0 = rn * ln / base.len end
+      r0 = math.abs(ln - base.len) > 1e-3 and (rn * ln / base.len) or rn
+      -- старую базу дописать rate0 (6 окт): дальше нарезка не зависит от длины
+      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', ('%.6f;%.6f;%.6f'):format(base.offs or 0, base.len, r0), true)
+      base.rate0 = r0
     end
     local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
     if math.abs(f - 1) > 1e-9 then

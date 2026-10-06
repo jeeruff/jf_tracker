@@ -672,6 +672,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
   end
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
+  local lab_end = -1e9            -- 6 окт: подписи не налезают — только если влезает до следующей линии и после прошлой подписи
   for k, t in ipairs(slices) do
     local px = tx(t)
     -- только в рамках волны (3 окт: слайсы исходника за концом показанного куска лезли на свойства)
@@ -682,7 +683,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(hot and U.TEXT or (onkey and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
     local lbl = key_of[k] or tostring(k)
     if zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3 then lbl = '' end   -- там подпись ноты зоны
-    if lbl ~= '' and px + 3 + U.measure(lbl) <= x + w then U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (onkey and U.AMBER or U.CYAN)) end
+    local lw = lbl ~= '' and U.measure(lbl) or 0
+    local nx = slices[k + 1] and math.min(x + w, tx(slices[k + 1])) or (x + w)
+    if lbl ~= '' and px + 3 + lw <= nx - 1 and px + 3 >= lab_end + 2 then
+      U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (onkey and U.AMBER or U.CYAN))
+      lab_end = px + 3 + lw
+    end
     ::next_slice::
   end
   -- выделение (общее для правки и просмотра: S.entry совпадает с e)
