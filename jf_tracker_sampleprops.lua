@@ -119,8 +119,11 @@ function SP.draw(L, x, y, w, h, e, focused)
     local x, w = x0 + ci * colw, colw - L.pad
     local ry = y + ((j - 1) % per + 1) * L.rh
     local sel = focused and i == SP.sel
-    if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
-    U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), sel and U.AMBER or U.GREY)
+    local hot0 = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    local foc = sel or hot0                                   -- 6 окт: фокус / мышь — имя, значение, дорожка жёлтым
+    if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1)
+    elseif hot0 then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
+    U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), foc and U.AMBER or U.GREY)
     -- слайдер (5 окт): у чисел — дорожка между подписью и значением, тянуть мышью
     local vt = SP.value(e, r.k)
     local fr, centered = nil, false
@@ -133,7 +136,7 @@ function SP.draw(L, x, y, w, h, e, focused)
       local cy = ry + math.floor(L.rh / 2)
       local onbar = hot and mx >= sx - 2 and mx < sx + sw + 2
       U.set(U.DIM); gfx.rect(sx, cy - 1, sw, 2, 1)
-      U.set((onbar or (SP.drag and SP.drag.k == r.k)) and U.AMBER or U.TEXT)
+      U.set((foc or onbar or (SP.drag and SP.drag.k == r.k)) and U.AMBER or U.TEXT)
       fr = math.max(0, math.min(1, fr))
       if centered then
         local mid, px = sx + math.floor(sw / 2), sx + math.floor(fr * sw + 0.5)
@@ -145,10 +148,10 @@ function SP.draw(L, x, y, w, h, e, focused)
         U.set(U.GREY)
         for _, mf in ipairs(ctx.sp_marks(r.k) or {}) do gfx.rect(sx + math.floor(mf * sw + 0.5), ry + L.rh - 3, 1, 2, 1) end
       end
-      U.text(x + lw, ry, vt, U.TEXT)
+      U.text(x + lw, ry, vt, foc and U.AMBER or U.TEXT)
       if onbar then SP.slider = { k = r.k, x = sx, w = sw } end
     else
-      U.text(x + lw, ry, ctx.fit(vt, w - lw - L.pad), U.TEXT)
+      U.text(x + lw, ry, ctx.fit(vt, w - lw - L.pad), foc and U.AMBER or U.TEXT)
     end
     if hot then SP.hover = { row = i, k = r.k, bar = SP.slider and SP.slider.k == r.k and SP.slider or nil } end
     if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end

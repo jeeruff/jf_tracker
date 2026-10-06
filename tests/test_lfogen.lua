@@ -109,7 +109,7 @@ LG.fsrc = 'env'; for i, f in ipairs(LG.FIELDS) do if f.key == 'src' then LG.sel 
 eq('Enter on env source -> pick', LG.key(13), 'pick')
 LG.type = 'lfo'; LG.FIELDS = LG.fields()
 eq('g -> ai', LG.key(('g'):byte()), 'ai'); eq('p -> points', LG.key(('p'):byte()), 'points')
-eq('L leaves', LG.key(('L'):byte()), 'leave')
+eq('Esc leaves', LG.key(27), 'leave'); eq('L is a fine step (not leave)', LG.key(('L'):byte()), true)
 
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

@@ -291,11 +291,14 @@ local UP, DOWN, LEFT, RIGHT = 30064, 1685026670, 1818584692, 1919379572
 function LG.key(c, mult)
   local ch = c < 256 and string.char(c) or ''
   mult = mult or 1
-  if c == 27 or ch == 'L' then return 'leave' end
+  -- 6 окт: h l — шаг, Shift (H L) — мелкий шаг; назад — Esc
+  if c == 27 then return 'leave' end
   if ch == 'j' or c == DOWN then LG.sel = math.min(#LG.FIELDS, LG.sel + 1)
   elseif ch == 'k' or c == UP then LG.sel = math.max(1, LG.sel - 1)
   elseif ch == 'l' or c == RIGHT or ch == '+' or ch == '=' then LG.adjust(LG.sel, mult)
   elseif ch == 'h' or c == LEFT or ch == '-' then LG.adjust(LG.sel, -mult)
+  elseif ch == 'L' then LG.adjust(LG.sel, 0.1)
+  elseif ch == 'H' then LG.adjust(LG.sel, -0.1)
   elseif c == 13 or ch == ' ' then
     local f = LG.FIELDS[LG.sel]
     if f.button then return f.key end
@@ -344,8 +347,8 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
     if f.button then
       button(x, f.label, sel, { field = i })
     else
-      if sel then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
-      U.text(x, ry + 1, f.label, sel and U.AMBER or U.GREY)
+      if sel or hot then U.set(U.tint(U.AMBER, sel and 0.12 or 0.07)); gfx.rect(x, ry, w, L.rh, 1) end
+      U.text(x, ry + 1, f.label, (sel or hot) and U.AMBER or U.GREY)
       local x0, aw = x + lw, w - lw
       if f.enum then
         local list = type(f.enum) == 'string' and LG[f.enum] or f.enum
@@ -370,8 +373,8 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
         local fr = (LG[f.key] - f.min) / math.max(1e-9, f.max - f.min)
         local cy = ry + math.floor(L.rh / 2)
         U.set(U.DIM); gfx.rect(x0, cy - 1, sw, 2, 1)
-        U.set(sel and U.AMBER or U.TEXT); gfx.rect(x0, ry + 3, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 6, 1)
-        U.text(x0 + sw + L.pad, ry + 1, fit(vt, vw), U.TEXT)
+        U.set((sel or hot) and U.AMBER or U.TEXT); gfx.rect(x0, ry + 3, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 6, 1)
+        U.text(x0 + sw + L.pad, ry + 1, fit(vt, vw), (sel or hot) and U.AMBER or U.TEXT)
         if hot and mx >= x0 - 2 and mx < x0 + sw + 2 then hover = { field = i, slider = true, x = x0, w = sw } end
       end
       if hot and not hover then hover = { field = i } end

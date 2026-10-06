@@ -2839,8 +2839,8 @@ ctx = {
     local v
     if what == 'vol' then
       local db = cur > 1e-6 and 20 * math.log(cur, 10) or -60
-      v = 10 ^ (math.max(-60, math.min(12, db + d * (coarse and 3 or 0.5))) / 20)
-    else v = math.max(-1, math.min(1, cur + d * (coarse and 0.1 or 0.02))) end
+      v = 10 ^ (math.max(-60, math.min(12, db + d * (coarse and 0.1 or 0.5))) / 20)   -- 6 окт: Shift — мелкий шаг
+    else v = math.max(-1, math.min(1, cur + d * (coarse and 0.005 or 0.02))) end
     edit.track_value(col.track, key, v); edit.track_undo('track ' .. what); model.invalidate()
     vim.msg = what == 'vol' and ('%s vol %+.1f dB'):format(col.name, v > 1e-6 and 20 * math.log(v, 10) or -150) or ('%s %s %+.2f'):format(col.name, what, v)
   end,
@@ -2850,7 +2850,7 @@ ctx = {
     local ks = state.kslider
     local ch = c > 0 and c < 256 and string.char(c) or ''
     if c == 1818584692 then ch = 'h' elseif c == 1919379572 then ch = 'l' elseif c == 1685026670 then ch = 'j' elseif c == 30064 then ch = 'k' end   -- стрелки
-    -- горизонтальный слайдер (5 окт): h l — значение (H L — крупно), j k —
+    -- горизонтальный слайдер (5 окт): h l — значение (H L — мелкий шаг, 6 окт), j k —
     -- соседний слайдер шапки сверху вниз: громкость, панорама, ширина / L R
     if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' then
       ctx.trs_nudge(ks.col, ks.what, (ch == 'h' or ch == 'H') and -1 or 1, ch == 'H' or ch == 'L'); return true
@@ -8823,7 +8823,7 @@ local function frame()
   end
   if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'modulation' then
     LG.sel = lfo_hover.field
-    LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 10 or 1))
+    LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 0.1 or 1))
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.pane == 'params' and state.top and state.toptab == 'modulation' then
@@ -9331,7 +9331,7 @@ local function frame()
           elseif r == 'save' then mm_save()
           elseif not r then return vim.key(c) end
         elseif state.toptab == 'modulation' and mod_pane == 'lfo' then
-          local r = LG.key(c, ctx.mods().shift and 10 or 1)
+          local r = LG.key(c, ctx.mods().shift and 0.1 or 1)   -- Shift — мелкий шаг (6 окт)
           if r == 'leave' then mod_pane = 'matrix'
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
           elseif r == 'pick' then ctx.lfo_pick_env()

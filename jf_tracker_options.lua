@@ -109,7 +109,7 @@ function O.adjust(it, d)
     local v = it.get(); local k = 1
     for i, x in ipairs(it.values) do if x == v then k = i end end
     local n = #it.values
-    k = ((k - 1 + (d == 0 and 1 or d)) % n) + 1
+    k = ((k - 1 + (d == 0 and 1 or (d > 0 and 1 or -1))) % n) + 1
     it.set(it.values[k])
   elseif it.kind == 'num' then
     if d == 0 then return end
@@ -173,8 +173,9 @@ function O.key(c)
   elseif ch == 'g' then O.sel = 1
   elseif ch == 'G' then O.sel = n
   elseif c == 13 or ch == ' ' then O.adjust(it, 0)
-  elseif ch == 'l' or ch == '+' or ch == '=' or c == 1919379572 then O.adjust(it, shift and 10 or 1)
-  elseif ch == 'h' or ch == '-' or c == 1818584692 then O.adjust(it, shift and -10 or -1)
+  -- 6 окт: h l — шаг, Shift (H L) — мелкий шаг (десятая)
+  elseif ch == 'l' or ch == 'L' or ch == '+' or ch == '=' or c == 1919379572 then O.adjust(it, (shift or ch == 'L') and 0.1 or 1)
+  elseif ch == 'h' or ch == 'H' or ch == '-' or c == 1818584692 then O.adjust(it, (shift or ch == 'H') and -0.1 or -1)
   elseif ch == '0' and it and it.kind == 'num' and it.min then it.set(it.min)
   end
   return true
@@ -520,7 +521,7 @@ function O.draw(L, W, H)
       if i == O.sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(bx + 1, y, bw - 2, rh, 1)
       elseif hot then U.set(U.PANEL); gfx.rect(bx + 1, y, bw - 2, rh, 1) end
       local masked = it.masked and it.masked()
-      U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), masked and U.DIM or (i == O.sel and U.AMBER or U.TEXT))
+      U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), masked and U.DIM or ((i == O.sel or hot) and U.AMBER or U.TEXT))   -- 6 окт: фокус / мышь — имя жёлтым
       local vt = val_text(it)
       local on = it.kind == 'toggle' and it.get()
       local vx = bx + L.pad + lw
@@ -536,9 +537,10 @@ function O.draw(L, W, H)
         local cy = y + math.floor(rh / 2)
         local shot = (hot and mx < vx + tw + 2 and mx >= vx - 2) or (O.drag and O.drag.i == i)
         U.set(U.DIM); gfx.rect(vx, cy - 1, tw, 2, 1)
-        U.set(shot and U.AMBER or U.TEXT); gfx.rect(vx, y + 4, math.max(1, math.floor(fr * tw + 0.5)), rh - 8, 1)
+        local foc = shot or hot or i == O.sel                  -- 6 окт: фокус — дорожка, значение, имя жёлтым
+        U.set(foc and U.AMBER or U.TEXT); gfx.rect(vx, y + 4, math.max(1, math.floor(fr * tw + 0.5)), rh - 8, 1)
         if O.numbuf and i == O.sel then vt = O.numbuf .. '_' end
-        U.text(vx + tw + L.pad, y + 1, vt, (O.numbuf and i == O.sel) and U.AMBER or U.TEXT)
+        U.text(vx + tw + L.pad, y + 1, vt, foc and U.AMBER or U.TEXT)
       elseif it.kind == 'cycle' then
         -- все значения кнопками в ряд до правого края (описание — внизу при наведении)
         local room = bx + bw - L.pad - vx
