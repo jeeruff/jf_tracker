@@ -185,7 +185,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
       local qx, qy = X(p.t), Y(p.v)
       local near = math.abs(mx - qx) <= 4 and math.abs(my - qy) <= 4
       if near then hot = p end
-      U.set((near or (A.drag and A.drag.i == p.i)) and U.AMBER or (t.col or U.CYAN)); gfx.circle(qx, qy, (near or (A.drag and A.drag.i == p.i)) and 4 or 3, 0, 1)   -- кружок, как в REAPER
+      U.set((near or (A.drag and A.drag.i == p.i)) and U.AMBER or (t.col or U.CYAN)); gfx.circle(qx, qy, (near or (A.drag and A.drag.i == p.i)) and 4 or 3, (A.selpt == p.i) and 1 or 0, 1)   -- кружок, как в REAPER; выбранная — залита
     end
   end
   -- ручки углов
@@ -225,7 +225,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
         A.drag.i = best or A.drag.i
       else A.drag = nil; commit('automation item point') end
     elseif inside and press then
-      if hot then A.drag = { i = hot.i }
+      if hot then A.drag = { i = hot.i }; A.selpt = hot.i                   -- выбранная точка: её форма — в свойствах (6 окт)
       else
         R.InsertEnvelopePointEx(t.env, t.idx, snap_t(T(mx), A.grid), V(my), 0, 0, false, true)
         R.Envelope_SortPointsEx(t.env, t.idx)
@@ -338,6 +338,51 @@ function A.props(U, L, x, y, w, h, t, fit)
         end
       end
       hover = { status = ('%s: wheel - step, click the slider - value'):format(p.label) }
+    end
+  end
+  -- выбранная точка (6 окт): форма сегмента до следующей и натяжение (bez)
+  local FI = t.idx | 0x10000000
+  local np = R.CountEnvelopePointsEx(t.env, FI)
+  if A.selpt and A.selpt < np then
+    local _, pt, pv, psh, pten = R.GetEnvelopePointEx(t.env, FI, A.selpt)
+    local ry = y + (#PROPS + 1) * L.rh + 4
+    if ry + 3 * L.rh <= y + h then
+      local lo, hi = A.range(t)
+      U.set(U.LINE); gfx.rect(x, ry - 3, w, 1, 1)
+      U.text(x + L.pad, ry, fit(('point %d  %.0f%%'):format(A.selpt + 1, (pv - lo) / (hi - lo) * 100), w - L.pad), U.AMBER)
+      -- формы REAPER: 0 lin 1 square 2 slow 3 fast start 4 fast end 5 bezier
+      local SH = { 'lin', 'sqr', 'slo', 'fas', 'fae', 'bez' }
+      local bx, sy = x + L.pad, ry + L.rh
+      local press = cap & 1 == 1 and (A.pprev or 0) & 1 == 0
+      for k, nm in ipairs(SH) do
+        local bw = U.measure(nm) + 2 * L.pad
+        if bx + bw > x + w then bx = x + L.pad; sy = sy + L.rh end
+        local on = (psh or 0) == k - 1
+        local hot = mx >= bx and mx < bx + bw and my >= sy and my < sy + L.rh
+        U.set(on and U.tint(U.AMBER, 0.3) or (hot and U.PANEL or U.BG)); gfx.rect(bx, sy, bw, L.rh - 1, 1)
+        U.set((on or hot) and U.AMBER or U.LINE); gfx.rect(bx, sy, bw, L.rh - 1, 0)
+        U.text(bx + L.pad, sy, nm, (on or hot) and U.AMBER or U.GREY)
+        if hot and press then R.SetEnvelopePointEx(t.env, FI, A.selpt, nil, nil, k - 1, nil, nil, false); R.Undo_OnStateChange('envelope point shape'); R.UpdateArrange() end
+        if hot then hover = { status = 'segment shape from this point to the next (as in REAPER)' } end
+        bx = bx + bw + 2
+      end
+      -- натяжение (bezier): колесо / клик по дорожке
+      if (psh or 0) == 5 then
+        local ty2 = sy + L.rh
+        U.text(x + L.pad, ty2, 'tension', U.GREY)
+        local tx0 = x + lw; local tw = math.max(8, w - lw - L.pad)
+        local fr = ((pten or 0) + 1) / 2
+        U.set(U.DIM); gfx.rect(tx0, ty2 + math.floor(L.rh / 2) - 1, tw, 2, 1)
+        U.set(U.AMBER); gfx.rect(tx0 + math.floor(fr * (tw - 1)), ty2 + 3, 2, L.rh - 6, 1)
+        local hot = mx >= x and mx < x + w and my >= ty2 and my < ty2 + L.rh
+        if hot then
+          local nt
+          if cap & 1 == 1 and mx >= tx0 then nt = math.max(-1, math.min(1, (mx - tx0) / tw * 2 - 1)) end
+          if gfx.mouse_wheel ~= 0 then nt = math.max(-1, math.min(1, (pten or 0) + (gfx.mouse_wheel > 0 and 0.05 or -0.05))); gfx.mouse_wheel = 0 end
+          if nt then R.SetEnvelopePointEx(t.env, FI, A.selpt, nil, nil, nil, nt, nil, false); R.UpdateArrange() end
+          hover = { status = 'bezier tension: drag / wheel' }
+        end
+      end
     end
   end
   A.pprev = cap

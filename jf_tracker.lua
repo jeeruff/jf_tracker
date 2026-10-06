@@ -741,7 +741,7 @@ ctx = {
     -- user1..3 — загрузить, пустой — сохранить в него текущий вид
     items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
-    items[#items + 1] = { key = 'm', label = 'macro - bird view, a row is a bar', fn = function() vim.run_cmd('macro') end }
+    items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
     for i, k in ipairs({ 'z', 'x', 'c' }) do
@@ -787,6 +787,12 @@ ctx = {
     vim.msg = 'opened ' .. url
   end,
   set_lpb = set_lpb,
+  -- зум-аут (6 окт, вместо птичьего вида): LPB 1, повтор — прежний LPB
+  zoom_out_toggle = function()
+    state.macro = false
+    if state.lpb_before_zoom then set_lpb(state.lpb_before_zoom); state.lpb_before_zoom = nil; vim.msg = 'zoom back: LPB ' .. state.lpb
+    else state.lpb_before_zoom = state.lpb; set_lpb(1); vim.msg = 'zoom out: a row is a beat (:macro again - back)' end
+  end,
   fold = function(col, v) state.folds[col.guid] = v or nil end,
   fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil end end,
   -- папка: свернуть/развернуть (дети прячутся); на не-папке — ищем родителя
