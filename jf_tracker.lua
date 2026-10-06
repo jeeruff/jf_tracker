@@ -2086,6 +2086,7 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  jftop = function() ctrl_action('jftop', 0) end,                  -- :jftop (6 окт)
   -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
   -- swing на транспорте открывает выпадашку, колесо ±1 %, :swing N | on | off
   swing_label = function()
@@ -6649,9 +6650,14 @@ function ctrl_action(name, delta)
     state.debug = not state.debug
     vim.msg = state.debug and ('debug on: log -> ' .. ctx.dlog_path) or 'debug off'
     if state.debug then ctx.dlog(('--- debug on, jf_tracker, window %dx%d, focus %s, mode %s'):format(gfx.w, gfx.h, state.focus, vim.mode)) end
-  elseif name == 'perf' then
+  elseif name == 'perf' or name == 'jftop' then
     ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
-    ctx.PERF.active = not ctx.PERF.active
+    local want = name == 'jftop'
+    -- одно окно, два вида: performance (REAPER) и jftop (кадр трекера по частям)
+    if ctx.PERF.active and (ctx.PERF.jftop or false) ~= want then ctx.PERF.jftop = want
+    else ctx.PERF.active = not ctx.PERF.active; ctx.PERF.jftop = want end
+    ctx.PERF.prof = draw.prof
+    ctx.PERF.reset = function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
     if ctx.PERF.active then state.mx_hidden = false; ctx.PERF.t = 0 end
     vim.msg = ctx.PERF.active and 'performance in the matrix: n - REAPER performance meter, j k scroll, Esc (matrix focused) closes' or 'performance closed'
   elseif name == 'swing' then
@@ -6759,6 +6765,7 @@ local function poll_cmd()
     end
     reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
   elseif name == 'perf' then ctrl_action('perf', 0)
+  elseif name == 'jftop' then ctrl_action('jftop', 0)
   elseif name == 'slicedump' then
     -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
     local col = cur_col(); local e = col and col.pool and col.pool[vim.inst or 1]
@@ -7039,6 +7046,8 @@ local function frame()
   end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.khelp and state.focus ~= 'dsp' then KH.pinned = false; KH.page = ctx.help_page() end
+  draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop) or false
+  draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
   U.begin_frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
@@ -7161,6 +7170,7 @@ local function frame()
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
+  draw.pmark('layout, status, info')
   local t_1 = reaper.time_precise()
   if changed then
     prof.rebuild = (t_1 - t_0) * 1000                              -- пересборка снимка (пульс hb)
@@ -7993,6 +8003,7 @@ local function frame()
   end
 
   -- мышь
+  draw.pmark('mouse, hover status, drags')
   local t_3 = reaper.time_precise()
   -- перетаскивание токена на Orca: нажатие на инструмент / имя региона
   if U.click and not tok_drag then
@@ -9388,6 +9399,7 @@ local function frame()
     gfx.mouse_wheel = 0
   end
 
+  draw.pmark('blit, gfx.update')
   if tonumber(state.fps) then
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
     gfx.dest = -1
@@ -9400,6 +9412,7 @@ local function frame()
   prof.draw = prof.draw + (t_3 - t_2); prof.upd = prof.upd + (t_4 - t_3); prof.n = prof.n + 1
   if t_4 - t_0 > prof.max then prof.max = t_4 - t_0 end
 
+  draw.pmark('keys, commands, polls')
   local c = gfx.getchar()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
@@ -9915,6 +9928,17 @@ local function frame()
     reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
   inject_cap = nil
+  draw.pmark(nil)                                  -- jftop: конец кадра, ожидание defer не считается
+  if state.debug and ctx.dlog and reaper.time_precise() - (ctx.jftop_logt or 0) > 5 then
+    -- debug: раз в 5 с — сводка jftop в лог (средние мс за кадр, по убыванию)
+    ctx.jftop_logt = reaper.time_precise()
+    local list = {}
+    for k, p in pairs(draw.prof) do list[#list + 1] = { k, p.ema, p.max } end
+    table.sort(list, function(a, b) return a[2] > b[2] end)
+    local parts = {}
+    for i = 1, math.min(8, #list) do parts[#parts + 1] = ('%s %.2f (max %.1f)'):format(list[i][1], list[i][2], list[i][3]) end
+    ctx.dlog('jftop ms/frame: ' .. table.concat(parts, ' | '))
+  end
   local owner = reaper.GetExtState(EXT, 'owner')
   local taken = owner ~= '' and owner ~= MY_ID
   if c ~= -1 and not quit and not taken and reaper.GetExtState(EXT, 'quit') ~= '1' then

@@ -46,8 +46,51 @@ local function bar(U, x, y, w, h, frac, label)
 end
 
 -- рисуется на месте матрицы (6 окт): x, y, w, h — её прямоугольник
+-- jftop (6 окт): кадр трекера по частям, как top — средние мс за кадр
+-- (сглаженные), максимум, доля кадра; самое тяжёлое сверху
+local function draw_jftop(U, L, bx, by, bw, bh, hb, fit)
+  U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
+  local x, y = bx + L.pad, by + 2
+  U.text(x, y, fit('jftop  r: reset  t: performance  Esc: close', bw - 2 * L.pad), U.AMBER)
+  y = y + L.rh + 4
+  local list, total = {}, 0
+  for k, p in pairs(P.prof or {}) do list[#list + 1] = { name = k, p = p }; total = total + p.ema end
+  table.sort(list, function(a, b) return a.p.ema > b.p.ema end)
+  local fps = tonumber(hb and hb:match('([%d%.]+)fps') or '') or 0
+  local budget = fps > 0 and 1000 / fps or 33.3
+  local lw = U.measure('frame ') + L.pad
+  local function bar(frac, label)
+    frac = math.max(0, math.min(1, frac))
+    local w = bw - lw - 2 * L.pad
+    U.set(U.LINE); gfx.rect(x + lw, y, w, L.rh, 0)
+    U.set(frac > 0.8 and U.RED or (frac > 0.5 and U.AMBER or U.GREEN)); gfx.rect(x + lw + 1, y + 1, math.floor((w - 2) * frac), L.rh - 2, 1)
+    U.text(x + lw + w - U.measure(label) - 4, y, label, U.TEXT)
+  end
+  U.text(x, y, 'frame', U.CYAN); bar(total / budget, ('%.2f / %.0f ms, %.0f fps'):format(total, budget, fps)); y = y + L.rh + 4
+  if #list == 0 then U.text(x, y, fit('collecting - the parts appear after a few frames', bw - 2 * L.pad), U.GREY); return end
+  local c_ms, c_max, c_pc = bx + bw - L.pad - L.cw * 18, bx + bw - L.pad - L.cw * 11, bx + bw - L.pad - L.cw * 5
+  local wide = c_ms > x + L.cw * 14
+  U.set(U.tint(U.CYAN, 0.25)); gfx.rect(bx + 1, y, bw - 2, L.rh, 1)
+  U.text(x, y, 'PART', U.BG)
+  if wide then U.text(c_ms, y, 'ms', U.BG); U.text(c_max, y, 'max', U.BG); U.text(c_pc, y, '%', U.BG) end
+  y = y + L.rh
+  for _, it in ipairs(list) do
+    if y + L.rh > by + bh then break end
+    local pc = total > 0 and it.p.ema / total * 100 or 0
+    local col = pc > 40 and U.AMBER or U.TEXT
+    U.text(x, y, fit(it.name, (wide and c_ms or bx + bw) - x - 2 * L.pad), col)   -- зазор до чисел
+    if wide then
+      U.text(c_ms, y, ('%.2f'):format(it.p.ema), col)
+      U.text(c_max, y, ('%.1f'):format(it.p.max), U.GREY)
+      U.text(c_pc, y, ('%.0f'):format(pc), col)
+    end
+    y = y + L.rh
+  end
+end
+
 function P.draw(U, L, bx, by, bw, bh, hb, fit)
   if not P.active then return end
+  if P.jftop then return draw_jftop(U, L, bx, by, bw, bh, hb, fit) end
   P.refresh()
   U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
   local x, y = bx + L.pad, by + 2
@@ -110,6 +153,8 @@ function P.key(c)
   if not P.active then return false end
   local ch = c < 256 and string.char(c) or ''
   if c == 27 or ch == 'q' then P.active = false
+  elseif ch == 'r' and P.jftop then if P.reset then P.reset() end
+  elseif ch == 't' then P.jftop = not P.jftop
   elseif ch == 'n' then R.Main_OnCommand(40240, 0)              -- View: Show performance meter window
   elseif ch == 'j' then P.scroll = P.scroll + 1
   elseif ch == 'k' then P.scroll = math.max(0, P.scroll - 1) end

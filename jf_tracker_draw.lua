@@ -2631,7 +2631,27 @@ end
 -- info: ph_row, cur_row, playing, status_left/right, vcur, vis, focus,
 --       regions, env_values(e), pool_col, inst, browser_draw(L,x,y,w,h)
 -- hover: row, fi, field, cell, col, header_col, matrix={ri,ci}, pool, browser
+-- jftop (6 окт): профайлер кадра на метках — pmark(имя) закрывает прошлый
+-- участок и открывает новый, кадр делится на куски без пропусков; nil — закрыть.
+-- Пишет только при D.prof_on (открыт jftop или опция debug)
+D.prof, D.prof_on, D.prof_ord = {}, false, 0
+local pm_name, pm_t
+function D.pmark(name)
+  if not D.prof_on then pm_name = nil; return end
+  local t = reaper.time_precise()
+  if pm_name then
+    local p = D.prof[pm_name]
+    if not p then D.prof_ord = D.prof_ord + 1; p = { n = 0, sum = 0, max = 0, ema = 0, ord = D.prof_ord }; D.prof[pm_name] = p end
+    local dt = (t - pm_t) * 1000
+    p.n = p.n + 1; p.sum = p.sum + dt; p.last = dt
+    p.ema = p.n == 1 and dt or (p.ema * 0.95 + dt * 0.05)
+    if dt > p.max then p.max = dt end
+  end
+  pm_name, pm_t = name, t
+end
+
 function D.frame(L, snap, rows, state, info)
+  D.pmark('draw: top module')
   local W = L.win_w
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover = {}
@@ -2678,6 +2698,7 @@ function D.frame(L, snap, rows, state, info)
     hover.garden = th.garden
   end
 
+  D.pmark('draw: track headers')
   -- заголовок
   local hy = L.header_y
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
@@ -3214,6 +3235,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.vis_box = nil
+  D.pmark('draw: rows')
   -- граница регионов (5 окт): тонкие линии цвета регионов у линии такта —
   -- уходящий над ней, следующий под ней; фоном, items рисуются поверх
   local rgedge = {}
@@ -3379,6 +3401,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  D.pmark('draw: ai handles, tint, cursor')
   -- ручки automation items (6 окт): поверх линий строк, непрозрачные; имя
   -- вертикально; швы лупа — вырезы цвета фона в ручке
   for _, hd in ipairs(D.ai_handles or {}) do
@@ -3549,6 +3572,7 @@ function D.frame(L, snap, rows, state, info)
   if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
+  D.pmark('draw: matrix / performance')
   if MX and L.matrix_w > 0 and not state.mx_hidden and info.perf_draw then
     -- производительность (6 окт): на месте матрицы, пока открыта
     local y0 = L.mx_top or L.header_y
@@ -3588,6 +3612,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
 
+  D.pmark('draw: browser')
   if L.side_w > 0 and info.browser_draw then
     -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу)
     local sy0 = 0
@@ -3641,6 +3666,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   -- режим справки (?): то же место внизу занимает контекстная справка
+  D.pmark('draw: dsp, help, keyboard strip')
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     local xo = L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0     -- главный модуль слева в полосе DSP (3 окт)
@@ -4167,6 +4193,7 @@ function D.frame(L, snap, rows, state, info)
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect((L.side_x or L.win_w) - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end
   -- модуль слайсов (4 окт): своя колонка, линия слева
+  D.pmark('draw: slices list')
   if (L.slices_w or 0) > 0 and L.top_h > 0 and info.slices_draw then
     local sx, sy, sh = L.win_w - L.slices_w, L.top_y or 0, L.top_h - 2
     set(U.PANEL); gfx.rect(sx, sy, L.slices_w, sh, 1)
@@ -4185,6 +4212,7 @@ function D.frame(L, snap, rows, state, info)
   -- браузер эффектов в фокусе (3 окт): во всю левую колонку — от верха матрицы
   -- до низа окна (матрица и главный модуль под ним), рисуется последним, мышь
   -- над ним не достаёт до того, что под ним
+  D.pmark('draw: popups, focus frame')
   if D.fxb_popup and info.fxb_draw then
     local p = D.fxb_popup
     D.fxb_popup = nil
