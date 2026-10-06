@@ -141,6 +141,7 @@ local function reset()
     repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
+    envfmt = function() return TEST_ENVFMT or 'midi' end,
     env_points = function(e, r0, r1) calls[#calls + 1] = ('envpts:%s@%d-%d'):format(e.name, r0, r1); return { { dq = 0, v = 0.5 } } end,
     env_del_range = function(e, r0, r1) calls[#calls + 1] = ('envdelr:%s@%d-%d'):format(e.name, r0, r1) end,
     env_paste = function(e, row, reg) calls[#calls + 1] = ('envpaste:%s@%d:%d'):format(e.name, row, #reg.pts) end,
@@ -400,12 +401,25 @@ reset()
 L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Volume' }, sub = {} }
 local efi = #L.flat
 V.cur = { fi = efi, row = 4, field = 1 }
+TEST_ENVFMT = 'hex'
 keysin('i80');     eq('hex on env → point 0x80', last(), 'envset:Volume@4:0.502'); eq('step after point', V.cur.row, 5)
+TEST_ENVFMT = nil                                  -- по умолчанию midi 0..127 (6 окт)
 keysin('/');       eq('/ → ramp to max over 1 beat', last(), 'envramp:Volume@5-9:cur>1.00'); eq('cursor at ramp end', V.cur.row, 9)
 keysin('\\');      eq('\\ → ramp to min', last(), 'envramp:Volume@9-13:cur>0.00')
 V.key(8);          eq('BS deletes point', last(), 'envdel:Volume@13')
 V.key(27)
 keysin('x');       eq('NORMAL x on env → del', last(), 'envdel:Volume@13')
+-- midi-формат и Vim-клавиши в INSERT на лейне (6 окт)
+V.cur.row = 20
+keysin('i64');     eq('midi 64 → point', last(), 'envset:Volume@20:0.504'); eq('step after midi point', V.cur.row, 21)
+keysin('005');     eq('midi 005 → 5', last(), 'envset:Volume@21:0.039')
+keysin('12'); V.key(13); eq('midi 12 + Enter', last(), 'envset:Volume@22:0.094')
+keysin('k');       eq('k moves up in INSERT on env', V.cur.row, 22)
+keysin('j');       eq('j moves down in INSERT on env', V.cur.row, 23)
+keysin('+');       eq('+ nudges one midi step', last(), 'envnudge:Volume@23:+0.0079')
+keysin('-');       eq('- nudges back', last(), 'envnudge:Volume@23:-0.0079')
+V.key(27)
+V.cur.row = 13
 V.key(1);          eq('^A nudges +1/64', last(), 'envnudge:Volume@13:+0.0156')
 keysin('2'); V.key(24); eq('2^X nudges −2/64', last(), 'envnudge:Volume@13:-0.0312')
 keysin(':ramp 40 2b'); V.key(13); eq(':ramp 40 2b → 8 rows', last(), 'envramp:Volume@13-21:cur>0.25')

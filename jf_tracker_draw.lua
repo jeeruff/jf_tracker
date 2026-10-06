@@ -304,7 +304,7 @@ function D.layout(snap, state, nregions)
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
-  L.env_hex_w = ms('FF')
+  L.env_hex_w = ms(state.envfmt == 'hex' and 'FF' or '127')   -- формат значений (6 окт)
   L.env_bar_w = ms('WWWW')
   -- поле формы сегмента (2 окт): lin sqr slo fas fae bez — справа от значения
   -- форма сегмента (2 окт, правка): не отдельной колонкой, а под значением точки
@@ -496,7 +496,7 @@ function D.layout(snap, state, nregions)
       c.mls = {}
       if not hidden and state.midilanes ~= false and not c.compact and not state.ptmode then
         for _, ml in ipairs(col.mlanes or {}) do
-          local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms('FF')) + L.pad + ms('W')
+          local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms(state.envfmt == 'hex' and 'FF' or '127')) + L.pad + ms('W')
           L.flat[#L.flat + 1] = { ci = ci, col = col, ml = ml, sub = {}, x = vis and lx or nil, w = mw }
           c.mls[#c.mls + 1] = { ml = ml, x = lx, w = mw, fi = #L.flat }
           lx = lx + mw + 1
@@ -981,7 +981,7 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   if ev.pt then
     -- точки кружочками, как в REAPER (6 окт); опция envelope points
     if D.envpoints ~= false then gfx.circle(ex, cy, L.env_compact and 1 or 2, 0, 1) end
-    text(tx, ty, string.format('%02X', math.floor(ev.v * 255 + 0.5)), U.TEXT)
+    text(tx, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)), U.TEXT)
   elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
     -- форма сегмента точки строкой выше — под её значением, только если не lin
     text(tx, ty, D.ENV_SHAPES[prev.shape] or '?', U.CYAN)
@@ -3300,7 +3300,7 @@ function D.frame(L, snap, rows, state, info)
             end
           end
           if e then
-            local t = ml.kind == 'tx' and (e.text or '') or (ml.kind == 'sx' and 'SX' or ('%02X'):format(e.v or 0))
+            local t = ml.kind == 'tx' and (e.text or '') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
             text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN)
           else text(m.x + L.pad, ty, ml.kind == 'tx' and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end

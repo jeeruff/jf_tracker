@@ -523,6 +523,31 @@ local function finish_edit()
 end
 local function finish_move() V.cmdbuf = {} end
 
+-- значение цифрами (6 окт), опция values: midi — 0..127 десятичными (ввод
+-- кончается сам, когда следующая цифра уже не влезет; 005 = 5; Enter — сразу),
+-- hex — две hex-цифры. → 'wait' | v01, raw (целое: 0..127 / 0..255) | nil
+local function num_key(c)
+  local ch = (c < 256) and string.char(c):upper() or ''
+  if (ctx.envfmt and ctx.envfmt() or 'midi') == 'hex' then
+    if not ch:match('^[0-9A-F]$') then return nil end
+    local buf = (V.hexbuf or '') .. ch
+    if #buf < 2 then V.hexbuf = buf; return 'wait' end
+    V.hexbuf = nil
+    return tonumber(buf, 16) / 255, tonumber(buf, 16)
+  end
+  local buf = V.hexbuf
+  if c == 13 and buf then
+    V.hexbuf = nil
+    local n = math.min(127, tonumber(buf) or 0); return n / 127, n
+  end
+  if not ch:match('^[0-9]$') then return nil end
+  buf = (buf or '') .. ch
+  local n = tonumber(buf)
+  if #buf < 3 and n * 10 <= 127 then V.hexbuf = buf; return 'wait' end
+  V.hexbuf = nil
+  n = math.min(127, n); return n / 127, n
+end
+
 local function replay(keys)
   if V.replaying > 8 then return end
   V.replaying = V.replaying + 1
@@ -1114,12 +1139,13 @@ function V.key_impl(c)
       local ml = mlf.ml
       local hx = (c < 256) and string.char(c):upper() or ''
       if c == BS or c == DEL then ctx.ml_del(mlf, V.cur.row); V.hexbuf = nil; return end
-      if (ml.kind == 'cc' or ml.kind == 'pc') and hx:match('^[0-9A-F]$') then
-        local buf = (V.hexbuf or '') .. hx
-        if #buf < 2 then V.hexbuf = buf; return end
-        V.hexbuf = nil
-        ctx.ml_set(mlf, V.cur.row, math.min(127, tonumber(buf, 16)))
-        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      if ml.kind == 'cc' or ml.kind == 'pc' then
+        local v, raw = num_key(c)
+        if v == 'wait' then return end
+        if v then
+          ctx.ml_set(mlf, V.cur.row, math.min(127, raw))
+          V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+        end
       end
       if V.hexbuf then return end
       keys_control(c); return
@@ -1148,12 +1174,37 @@ function V.key_impl(c)
         ctx.env_ramp(env, V.cur.row, V.cur.row + lpb(), nil, ch == '/' and 1 or 0)
         V.cur.row = V.cur.row + lpb(); ensure_visible(); V.hexbuf = nil; return
       end
-      if ch:match('^[0-9A-F]$') then
-        local buf = (V.hexbuf or '') .. ch
-        if #buf < 2 then V.hexbuf = buf; return end
-        V.hexbuf = nil
-        ctx.env_set(env, V.cur.row, tonumber(buf, 16) / 255)
-        V.cur.row = V.cur.row + step_rows(); ensure_visible()
+      local v = num_key(c)
+      if v == 'wait' then return end
+      if v then
+        ctx.env_set(env, V.cur.row, v)
+        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      end
+      -- 6 окт: буквы на лейне не ноты — Vim-клавиши: h j k l курсор, + / -
+      -- шаг значения точки строки (1/127 или 1/255), x вырезать точку, y
+      -- копировать, p вставить, dw / dd удалить (в hex d — цифра, там x)
+      local lk = (c < 256) and string.char(c) or ''
+      if V.hexbuf then return end
+      if V.env_d then
+        V.env_d = nil
+        if lk == 'w' or lk == 'd' then if apply('d', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() end; return end
+      end
+      local hexm = (ctx.envfmt and ctx.envfmt() or 'midi') == 'hex'
+      if lk == 'h' or lk == 'j' or lk == 'k' or lk == 'l' then
+        local m = motion(c, 1)
+        if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
+      elseif lk == '+' or lk == '=' or lk == '-' then
+        ctx.env_nudge(env, V.cur.row, (lk == '-' and -1 or 1) / (hexm and 255 or 127))
+      elseif lk == 'x' then
+        if apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() end
+      elseif lk == 'y' then
+        V.regs['"'] = { kind = 'env', pts = ctx.env_points(env, V.cur.row, V.cur.row), rows = 1 }
+        V.msg = ('yank %d point(s)'):format(#V.regs['"'].pts)
+      elseif lk == 'p' then
+        local reg = V.regs['"']
+        if reg and reg.kind == 'env' then ctx.env_paste(env, V.cur.row, reg); V.cur.row = V.cur.row + (reg.rows or 1); ensure_visible()
+        else V.msg = 'register has no envelope points (y / x on a point)' end
+      elseif lk == 'd' and not hexm then V.env_d = true; V.msg = 'd - w / d deletes the point'
       end
       return
     end
@@ -1512,7 +1563,14 @@ function V.key_impl(c)
         local f0, f1, r0, r1 = range_or_event(p, t)
         local e = apply(p, f0, f1, r0, r1)
         if e then finish_edit() else finish_move() end
-      else finish_move() end
+      else
+        -- 6 окт: dw на последней точке огибающей (дальше точек нет, движение
+        -- не нашло цели) — сама точка курсора
+        local ft = flat()[V.cur.fi]
+        if ft and ft.env and (c == ('w'):byte() or c == ('e'):byte()) and env_has(ft, V.cur.row) then
+          if apply(p, V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() else finish_move() end
+        else finish_move() end
+      end
       V.count = nil; return
     end
     return

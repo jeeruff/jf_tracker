@@ -182,6 +182,7 @@ local state = {
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
   statpos = ({ tracker = 'tracker', keyboard = 'keyboard' })[reaper.GetExtState(EXT, 'statpos')] or 'bottom',
+  envfmt = reaper.GetExtState(EXT, 'envfmt') == 'hex' and 'hex' or 'midi',   -- значения огибающих / CC: midi 0..127 или hex (6 окт)
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
   gridtab = reaper.file_exists(DIR .. '/.dev') and flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')) or false,
@@ -406,7 +407,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('swing', tostring(state.swing or 50)); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2084,6 +2085,7 @@ ctx = {
     if not cur then vim.msg = 'no point in this row'; return end
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
+  envfmt = function() return state.envfmt or 'midi' end,
   env_nudge = function(e, row, d)
     local t = edit.row_time(row, state.lpb, 0)
     edit.env_nudge(e, t, d, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
@@ -4010,6 +4012,7 @@ ctx = {
       flag('top', 'top panel', 'control / item / modulate / midi'),
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
+      { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
@@ -7155,6 +7158,7 @@ local function frame()
   edit.swing = state.swing or 50
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
+  draw.envfmt = state.envfmt or 'midi'
   draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
   local hover
   if idle_skip then hover = idle.hover else
@@ -9371,7 +9375,9 @@ local function frame()
                     [keys.left] = 'left', [keys.right] = 'right', [6579564] = 'del', [1752132965] = 'home', [6647396] = 'end' }
     local nm = NAMES[c_raw]
     if not nm then
-      if c_raw >= 1 and c_raw <= 26 then nm = 'ctrl+' .. string.char(c_raw + 96)
+      -- 6 окт: Cmd+буква на macOS приходит тем же кодом 1..26, что Ctrl+буква —
+      -- ctrl пишем, только если Ctrl зажат (или Cmd не зажат)
+      if c_raw >= 1 and c_raw <= 26 then nm = ((m.cmd and not m.ctrl) and '' or 'ctrl+') .. string.char(c_raw + 96)
       elseif c_raw < 127 then nm = string.char(c_raw)
       elseif c_raw >= 26161 and c_raw <= 26169 then nm = 'f' .. (c_raw - 26160)
       elseif c_raw >= 0x75000000 and c_raw < 0x75110000 then nm = utf8.char(c_raw - 0x75000000)   -- кириллица и Option-символы: префикс 'u' (5 окт)
