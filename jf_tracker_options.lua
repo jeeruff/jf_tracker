@@ -386,7 +386,8 @@ local function draw_about(L, W, H)
     if not l then break end
     local ly = y + (r - 1) * rh
     -- ссылка (4 окт): https://… — кликабельна, под мышью подчёркнута
-    local url = l[1]:match('(https?://%S+)')
+    -- e-mail (6 окт) — тоже ссылка: клик открывает mailto:
+    local url = l[1]:match('(https?://%S+)') or l[1]:match('([%w%._%-]+@[%w%-]+%.[%w%.%-]+)')
     if url then
       local pre = l[1]:sub(1, l[1]:find(url, 1, true) - 1)
       local ux, uw = bx + L.pad + U.measure(pre), U.measure(url)
@@ -394,7 +395,7 @@ local function draw_about(L, W, H)
       U.text(bx + L.pad, ly, pre, l[2])
       U.text(ux, ly, url, hot and U.AMBER or U.CYAN)
       U.set(hot and U.AMBER or U.CYAN); gfx.rect(ux, ly + rh - 2, uw, 1, 1)
-      if hot then O.link_hot = url end
+      if hot then O.link_hot = url:find('://', 1, true) and url or ('mailto:' .. url) end
     else
       U.text(bx + L.pad, ly, ctx.fit(l[1], tw), l[2])
     end
