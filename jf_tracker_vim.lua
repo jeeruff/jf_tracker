@@ -1076,6 +1076,23 @@ function V.key_impl(c)
     V.count = nil; return
   end
 
+  -- форма сегмента прямо на лейне (6 окт): Ctrl+Opt+1..6 = lin sqr slo fas
+  -- fae bez, в любом поле и режиме; голые цифры — значение точки
+  do
+    local mods = ctx.mods and ctx.mods() or {}
+    local env = env_of(V.cur.fi)
+    if env and mods.ctrl and mods.alt and not mods.cmd then
+      -- Opt+цифра на US-раскладке даёт символ: ¡ ™ £ ¢ ∞ §
+      local OPTD = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6 }
+      local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+      local k = (cp >= 49 and cp <= 54) and (cp - 48) or OPTD[cp]
+      if k then
+        ctx.env_shape(env, V.cur.row, k - 1)
+        V.msg = 'segment shape: ' .. ({ 'lin', 'sqr', 'slo', 'fas', 'fae', 'bez' })[k]
+        V.count = nil; return
+      end
+    end
+  end
   -- Shift+hjkl (5 окт): выделение, как Shift+стрелки — не в VISUAL войти с
   -- якорем на курсоре и шагнуть; из INSERT после операции — обратно в INSERT.
   -- s в INSERT — то же выделение без шага; Option+s (ß) — шаг (:step)
@@ -1158,17 +1175,14 @@ function V.key_impl(c)
       local raw = (c < 256) and string.char(c) or ''
       if c == ESC then V.shapebuf = nil
       -- 6 окт: h j k l — курсор и здесь (раньше съедались вводом формы и
-      -- курсор не уходил с лейна); lin — цифрой 0, все формы — цифрами 0..5
-      -- как номера REAPER (0 lin 1 sqr 2 slo 3 fas 4 fae 5 bez)
+      -- курсор не уходил с лейна); все формы, и lin, — Ctrl+Opt+1..6 на лейне
       elseif not V.shapebuf and (raw == 'h' or raw == 'j' or raw == 'k' or raw == 'l') then
         local m = motion(c, 1)
         if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
-      elseif raw:match('^[0-5]$') then
-        V.shapebuf = nil; ctx.env_shape(env, V.cur.row, tonumber(raw)); V.cur.row = V.cur.row + step_rows(); ensure_visible()
       elseif lc:match('^[a-z]$') then
         local buf = (V.shapebuf or '') .. lc
         local m = V.shape_match(buf)
-        if m == false then V.shapebuf = nil; V.msg = 'shape: sqr slo fas fae bez, or 0..5 (0 lin)'
+        if m == false then V.shapebuf = nil; V.msg = 'shape: sqr slo fas fae bez; any shape: Ctrl+Opt+1..6 (1 lin)'
         elseif m == nil then V.shapebuf = buf; V.msg = 'shape ' .. buf .. '…'
         else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       end

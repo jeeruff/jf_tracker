@@ -421,6 +421,10 @@ keysin('-');       eq('- nudges back', last(), 'envnudge:Volume@23:-0.0079')
 V.cur.field = 2
 keysin('k');       eq('k moves up from the shape field', V.cur.row, 22)
 keysin('j');       eq('j moves down from the shape field', V.cur.row, 23)
+ctrl_down, alt_down = true, true
+keysin('4');       eq('Ctrl+Opt+4 → shape fas', last(), 'envshape:Volume@23:3')
+V.key(8734);       eq('Ctrl+Opt+5 as ∞ → shape fae', last(), 'envshape:Volume@23:4')
+ctrl_down, alt_down = false, false
 V.key(27)
 V.cur.field = 1
 V.cur.row = 13
