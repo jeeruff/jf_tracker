@@ -2501,6 +2501,55 @@ ctx = {
     state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
     vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'
   end,
+  -- VISUAL = ПКМ-рамка REAPER (6 окт): блок выделяет items треков своих
+  -- колонок нот и точки огибающих (и automation items) своих лейнов в
+  -- диапазоне строк; прежнее выделение REAPER заменяется. Только при смене блока
+  vis_sync = function(vis)
+    local key = ('%d|%d|%d|%d'):format(vis.f0, vis.f1, vis.r0, vis.r1)
+    if key == ctx.vis_key or not L then return end
+    ctx.vis_key = key
+    local t0 = edit.row_time(vis.r0, state.lpb, 0)
+    local t1 = edit.row_time(vis.r1 + 1, state.lpb, 0)
+    local tracks, envs = {}, {}
+    for fi = vis.f0, vis.f1 do
+      local f = L.flat[fi]
+      if f and f.env then envs[f.env.env] = f.env
+      elseif f and not f.ml and f.col and f.col.track then tracks[f.col.track] = true end
+    end
+    reaper.PreventUIRefresh(1)
+    reaper.SelectAllMediaItems(0, false)
+    for tr in pairs(tracks) do
+      if reaper.ValidatePtr(tr, 'MediaTrack*') then
+        for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+          local it = reaper.GetTrackMediaItem(tr, k)
+          local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local l = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+          if p < t1 - 1e-9 and p + l > t0 + 1e-9 then reaper.SetMediaItemSelected(it, true) end
+        end
+      end
+    end
+    for env in pairs(envs) do
+      if reaper.ValidatePtr(env, 'TrackEnvelope*') then
+        for ai = -1, reaper.CountAutomationItems(env) - 1 do
+          -- точка пула повторяется в каждом проходе лупа: сперва снять весь
+          -- пул (0x10000000), потом выделить попавшие проходы
+          if ai >= 0 then
+            local FI = ai | 0x10000000
+            for p = 0, reaper.CountEnvelopePointsEx(env, FI) - 1 do
+              reaper.SetEnvelopePointEx(env, FI, p, nil, nil, nil, nil, false, true)
+            end
+          end
+          for p = 0, reaper.CountEnvelopePointsEx(env, ai) - 1 do
+            local _, tm, _, _, _, was = reaper.GetEnvelopePointEx(env, ai, p)
+            local on = tm >= t0 - 1e-9 and tm < t1 - 1e-9
+            if on ~= was and (ai < 0 or on) then reaper.SetEnvelopePointEx(env, ai, p, nil, nil, nil, nil, on, true) end
+          end
+        end
+      end
+    end
+    reaper.PreventUIRefresh(-1)
+    reaper.UpdateArrange()
+  end,
   ai_list = function()
     local col = cur_col(); if not col then return {} end
     local c = ctx.ai_cache
@@ -7073,7 +7122,8 @@ local function frame()
   if vim.mode == 'visual' or vim.mode == 'vline' then
     local f0, f1, r0, r1 = vim.visual_range()
     vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1 }
-  end
+    ctx.vis_sync(vis)
+  else ctx.vis_key = nil end
   -- простой (3 окт): 1.5 с без мыши / клавиш / правок проекта, не играет,
   -- нет превью — рисуем каждый третий кадр (~10 fps); любое действие сразу
   -- возвращает полную частоту. Пропущенный кадр берёт hover прошлого.

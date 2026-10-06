@@ -66,6 +66,28 @@ function D.init(u, peaks_fn, matrix)
   -- цвета кнопок как в REAPER (3 окт): запись — фиолетовая, FX трека — зелёная;
   -- во всех темах, в mono тоже (исключения серого фильтра)
   D.ARM, D.FXG = { 0.66, 0.36, 0.90 }, { 0.40, 0.66, 0.30 }
+  -- 6 окт: тинт Theme Tweaker — сдвиг по опорным цветам темы (с правками /
+  -- без, флаги 0 / 1) переносится и на запись, и на FX; своих ключей у
+  -- кнопок в теме нет (у REAPER это картинки)
+  do
+    local s0, s1 = { 0, 0, 0 }, { 0, 0, 0 }
+    for _, k in ipairs({ 'col_tr1_bg', 'col_tr2_bg', 'col_seltrack', 'col_env1', 'col_main_bg2', 'col_main_text2' }) do
+      local ok0, a = pcall(reaper.GetThemeColor, k, 1)
+      local ok1, b = pcall(reaper.GetThemeColor, k, 0)
+      if ok0 and ok1 and a and b and a >= 0 and b >= 0 then
+        local r0, g0, b0 = reaper.ColorFromNative(a)
+        local r1, g1, b1 = reaper.ColorFromNative(b)
+        s0[1], s0[2], s0[3] = s0[1] + r0, s0[2] + g0, s0[3] + b0
+        s1[1], s1[2], s1[3] = s1[1] + r1, s1[2] + g1, s1[3] + b1
+      end
+    end
+    local function tw(c)
+      local o = {}
+      for i = 1, 3 do o[i] = math.max(0, math.min(1, c[i] * math.max(0.25, math.min(4, (s1[i] + 8) / (s0[i] + 8))))) end
+      return o
+    end
+    D.ARM, D.FXG = tw(D.ARM), tw(D.FXG)
+  end
   D.ARM_T, D.FXG_T = U.mix(U.PANEL, D.ARM, 0.55), U.mix(U.PANEL, D.FXG, 0.85)
   D.FXTXT = { 0.94, 1.0, 0.90 }                -- светлый текст на зелёном, как FX в REAPER
   D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true }

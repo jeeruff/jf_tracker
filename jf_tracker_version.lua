@@ -693,6 +693,7 @@ V.TUTORIAL = {
 function V.lines()
   -- ссылки (5 окт): каждая — своей строкой, кликабельна
   local out = { 'https://jeeruff.com', 'itch.io   https://jeeruff.itch.io/jftracker', 'github    https://github.com/jeeruff',
+                'youtube   https://youtube.com/@jeerufff',
                 'bandcamp  https://jeeruff.bandcamp.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
   out[#out + 1] = ''
