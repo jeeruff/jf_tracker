@@ -321,6 +321,34 @@ local function next_any(fi, row, dir)
   return nil
 end
 
+-- w / b (6 окт): события ТРЕКА курсора — все его подколонки и лейны
+-- огибающих (точки — тоже события), как слова текста в Vim: строка трека —
+-- строка текста, колонки — слева направо; курсор переходит в колонку события
+local function track_event(f, r)
+  if f.env then return env_has(f, r) end
+  if f.ml or f.folded then return false end
+  for _, sub in ipairs(subs_of(f)) do if is_head(sub[r]) then return true end end
+  return false
+end
+local function next_track(fi, row, dir)
+  local F = flat()
+  local f0 = F[fi]
+  if not f0 then return nil end
+  local cols = {}
+  for i, g in ipairs(F) do if g.ci == f0.ci then cols[#cols + 1] = i end end
+  local last = ctx.snap().last_row or 0
+  local r, first = row, true
+  while r >= 0 and r <= last + 1 do
+    if dir > 0 then
+      for _, i in ipairs(cols) do if (not first or i > fi) and track_event(F[i], r) then return i, r end end
+    else
+      for k = #cols, 1, -1 do local i = cols[k]; if (not first or i < fi) and track_event(F[i], r) then return i, r end end
+    end
+    first = false; r = r + dir
+  end
+  return nil
+end
+
 -- `e` — на ГРАНИЦУ после события: верхняя кромка строки курсора совпадает с
 -- концом item/ноты (а не последняя строка события)
 local function event_end(fi, row)
@@ -335,7 +363,7 @@ local function event_end(fi, row)
 end
 
 -- Возвращает цель {fi=, row=, exclusive=, linewise=} или nil.
-local function motion(c, n)
+local function motion(c, n, op)
   local cur = V.cur
   local last = ctx.snap().last_row or 0
   local L = ctx.layout()
@@ -355,12 +383,23 @@ local function motion(c, n)
     local ci = f.ci + (c == ('H'):byte() and -n or n)
     for i, g in ipairs(F) do if g.ci == ci then return { fi = i, row = cur.row } end end
     return { fi = c == ('H'):byte() and 1 or nflat(), row = cur.row }
-  elseif c == ('w'):byte() or c == ('b'):byte() then
-    -- w / b — только своя подколонка
+  elseif (c == ('w'):byte() or c == ('b'):byte()) and op then
+    -- оператор (dw yw cw …) — своя подколонка: прямоугольник через колонки
+    -- трека удалял бы лишнее
     local r = cur.row
     local dir = c == ('w'):byte() and 1 or -1
     for _ = 1, n do r = next_head(cur.fi, r, dir, false) or r end
     return { fi = cur.fi, row = r, exclusive = dir > 0 or nil, linewise = true }
+  elseif c == ('w'):byte() or c == ('b'):byte() then
+    -- движение w / b — по всем колонкам трека, точки огибающих тоже (6 окт)
+    local fi, r = cur.fi, cur.row
+    local dir = c == ('w'):byte() and 1 or -1
+    for _ = 1, n do
+      local nfi, nr = next_track(fi, r, dir)
+      if not nfi then break end
+      fi, r = nfi, nr
+    end
+    return { fi = fi, row = r, field = 1, linewise = true }
   elseif c == ('W'):byte() or c == ('B'):byte() then
     local fi, r = cur.fi, cur.row
     local dir = c == ('W'):byte() and 1 or -1
@@ -1581,7 +1620,7 @@ function V.key_impl(c)
         V.count = nil; return
       end
       if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
-      local t = motion(c, n)
+      local t = motion(c, n, p)
       if t then
         local f0, f1, r0, r1 = range_or_event(p, t)
         local e = apply(p, f0, f1, r0, r1)

@@ -169,7 +169,9 @@ local function last() return calls[#calls] or '' end
 
 -- ── движения ──────────────────────────────────────────────────────────────
 reset()
-keysin('w');   eq('w → snare', V.cur.row, 8)
+-- 6 окт: w / b — события всего трека (подколонки и лейны), как слова в Vim
+keysin('w');   eq('w → ov in the 2nd subcolumn', V.cur.fi * 100 + V.cur.row, 202)
+keysin('w');   eq('w → snare', V.cur.row, 8); eq('w back in sub 1', V.cur.fi, 1)
 keysin('w');   eq('w → hat', V.cur.row, 16)
 keysin('w');   eq('w stays at last', V.cur.row, 16)
 keysin('b');   eq('b → snare', V.cur.row, 8)
@@ -305,8 +307,8 @@ keysin('x');  keysin('8j.');  eq('. repeats x', last(), 'delete:snare')
 reset()
 keysin('qa'); eq('recording', V.macro and V.macro.name, 'a')
 keysin('Mwq'); eq('macro stored', #V.regs['@a'], 2); eq('rec mute kick', calls[1], 'mute:kick')
-keysin('@a'); eq('@a replays mute', last(), 'mute:snare'); eq('@a moved', V.cur.row, 16)
-keysin('@@'); eq('@@', last(), 'mute:hat')
+keysin('@a'); eq('@a replays mute', last(), 'mute:ov'); eq('@a moved', V.cur.row, 8)
+keysin('@@'); eq('@@', last(), 'mute:snare')
 
 -- ── свёртка ───────────────────────────────────────────────────────────────
 reset()
@@ -320,7 +322,7 @@ keysin('zR');  eq('zR', #L.flat, 3)
 -- ── русская раскладка ─────────────────────────────────────────────────────
 reset()
 local function ru(str) for _, cp in utf8.codes(str) do V.key(keys.translate(cp)) end end
-ru('ц');   eq('ц = w → snare', V.cur.row, 8)
+ru('ц');   eq('ц = w → ov', V.cur.row, 2)
 ru('цци'); eq('цци = wwb → snare', V.cur.row, 8)
 ru('пп');  eq('пп = gg', V.cur.row, 0)
 ru('ч');   eq('ч = x deletes', last(), 'delete:kick')
@@ -522,9 +524,12 @@ reset()
 L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Vol', prows = { 3, 9, 20 } }, sub = {} }
 local efi3 = #L.flat
 V.cur = { fi = efi3, row = 0, field = 1 }
-keysin('w'); eq('w → env point 3', V.cur.row, 3)
-keysin('w'); eq('w → env point 9', V.cur.row, 9)
-keysin('b'); eq('b → env point 3', V.cur.row, 3)
+keysin('w'); eq('w from env → ov 2 (track-wide)', V.cur.row, 2)
+keysin('w'); eq('w → env point 3', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 3)
+keysin('w'); eq('w → snare 8 (note column)', V.cur.fi * 100 + V.cur.row, 108)
+keysin('w'); eq('w → env point 9', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 9)
+keysin('b'); eq('b → snare 8', V.cur.row, 8)
+keysin('b'); eq('b → env point 3', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 3)
 keysin('e'); eq('e → next point', V.cur.row, 9)
 keysin('dd'); eq('dd in NORMAL deletes the track', last(), 'deltrack')
 V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')

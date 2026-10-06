@@ -42,7 +42,7 @@ KH.PAGES = {
   tracker = { title = 'tracker NORMAL / VISUAL', e = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
     { k = 'H L', d = 'previous / next track' },
-    { k = 'w b e', d = 'next / previous event in this column, end of event' },
+    { k = 'w b e', d = 'next / previous event of the track (all its columns and envelope points, like words in Vim), end of event; dw yw cw - this column' },
     { k = 'W B', d = 'next / previous event in any column (cursor jumps there)' },
     { k = 'env: w b e dd y p', d = 'envelope points are events: motions, delete / yank / paste points (value + shape)', t = {} },
     { k = 'gg G', d = 'first row / last row' },
