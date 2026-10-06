@@ -2087,6 +2087,54 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  -- :logo (6 окт): артворк по центру трекера, каждый раз другой (:logo имя —
+  -- конкретный); любая клавиша или клик закрывает. Рисуется один раз в
+  -- картинку 98 (дизеринг попиксельный), дальше только blit
+  logo_show = function(name)
+    local list = {}
+    for i, lg in ipairs(LOGO.LOGOS) do if not lg.scroll then list[#list + 1] = i end end
+    local pick
+    if name and name ~= '' then for _, i in ipairs(list) do if LOGO.LOGOS[i].name:find(name, 1, true) then pick = i; break end end end
+    if not pick then
+      repeat pick = list[math.random(1, #list)] until #list < 2 or pick ~= (ctx.LOGOPOP_last or 0)
+    end
+    ctx.LOGOPOP_last = pick
+    ctx.LOGOPOP = { lg = LOGO.LOGOS[pick], key = nil, cap = gfx.mouse_cap }
+    vim.msg = 'logo ' .. LOGO.LOGOS[pick].name .. ' - any key closes'
+  end,
+  logo_draw = function()
+    local P = ctx.LOGOPOP
+    local r = draw.module_rects and draw.module_rects.tracker
+    if not (P and r) then return end
+    local rx, ry, rw, rh = r[1], r[2], r[3], r[4]
+    local lw, lh = LOGO.size(P.lg)
+    local cw, ch = LOGO.cell(P.lg, math.floor(rw * 0.85), L.cw * 2, L.rh * 2)
+    if not cw then ctx.LOGOPOP = nil; return end
+    if lh * ch > rh * 0.8 then
+      cw, ch = LOGO.cell(P.lg, math.floor(rw * 0.85 * (rh * 0.8) / (lh * ch)), L.cw * 2, L.rh * 2)
+      if not cw then ctx.LOGOPOP = nil; return end
+    end
+    local pad = 2 * cw
+    local iw, ih = lw * cw + 2 * pad, lh * ch + 2 * pad + (P.lg.drip and 4 * ch or 0)
+    local key = P.lg.name .. cw .. 'x' .. ch
+    if P.key ~= key then
+      local dest = gfx.dest
+      gfx.setimgdim(98, -1, -1); gfx.setimgdim(98, iw, ih)
+      gfx.dest = 98
+      gfx.set(0, 0, 0, 1); gfx.rect(0, 0, iw, ih, 1)
+      LOGO.draw(P.lg, pad, pad, cw, ch, U.AMBER, { text = U.TEXT, accent = U.AMBER, line = U.LINE })
+      gfx.dest = dest
+      P.key = key
+    end
+    local x = rx + math.floor((rw - iw) / 2)
+    local y = ry + math.floor((rh - ih) / 2)
+    gfx.blit(98, 1, 0, 0, 0, iw, ih, x, y, iw, ih)
+    U.set(U.AMBER); gfx.rect(x - 1, y - 1, iw + 2, ih + 2, 0)
+    -- клик (новый, не тот, что открыл) — закрыть
+    local cap = gfx.mouse_cap
+    if (cap & 3) ~= 0 and (P.cap & 3) == 0 then ctx.LOGOPOP = nil end
+    if ctx.LOGOPOP then P.cap = cap end
+  end,
   -- отладка (6 окт): опция debug — всё, что происходит, строками в файл
   -- <REAPER>/jf_tracker_debug.log: клавиши (режим, фокус, поле, где съедена —
   -- файл:строка возврата обработчика key), клики (что под мышью), действия
@@ -7635,6 +7683,7 @@ local function frame()
   end
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
+  if ctx.LOGOPOP then ctx.logo_draw() end
   if bpm_menu then
     local r = draw.ctrl_rect and draw.ctrl_rect.bpm
     if r then
@@ -9539,6 +9588,7 @@ local function frame()
     else vim.msg = 'no instrument selected (empty slot)' end
     c = 0
   end
+  if c > 0 and ctx.LOGOPOP then ctx.LOGOPOP = nil; c = 0 end   -- :logo — любая клавиша закрывает
   -- справка (2 окт): ? включает / выключает; фокус на справке — поиск и
   -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
   if c > 0 then
