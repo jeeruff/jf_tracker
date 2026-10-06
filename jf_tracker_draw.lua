@@ -1732,15 +1732,16 @@ local function draw_topbar(L, info)
     local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'automation') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
-    local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
+    -- 6 окт: вкладки с y = 2, как кнопки главного модуля — пиксель фона под кромкой
+    local hot = mx >= tx and mx < tx + tw and my >= 2 and my < 2 + L.rh
     -- rec — оттенок кнопки записи (фиолетовый, как R), остальные — янтарь
     local acc, acc_t = U.AMBER, U.tint(U.AMBER, 0.35)
     if t == 'retro' then acc, acc_t = D.ARM, D.ARM_T end
-    set(on and acc_t or (hot and D.CURROW or (t == 'retro' and U.mix(U.BG, D.ARM, 0.15) or U.BG))); gfx.rect(tx, 1, tw, L.rh, 1)
-    set((on or t == 'retro') and acc or U.LINE); gfx.rect(tx, 1, tw, L.rh, 0)
-    text(tx + L.pad, 1, lbl, on and (t == 'retro' and U.TEXT or acc) or (t == 'retro' and D.ARM or U.GREY))
+    set(on and acc_t or (hot and D.CURROW or (t == 'retro' and U.mix(U.BG, D.ARM, 0.15) or U.BG))); gfx.rect(tx, 2, tw, L.rh, 1)
+    set((on or t == 'retro') and acc or U.LINE); gfx.rect(tx, 2, tw, L.rh, 0)
+    text(tx + L.pad, 3, lbl, on and (t == 'retro' and U.TEXT or acc) or (t == 'retro' and D.ARM or U.GREY))
     if hot then hover.tab = t end
-    hint('tab', tx, 1, tw, L.rh, t)
+    hint('tab', tx, 2, tw, L.rh, t)
     tx = tx + tw + 2
   end
   -- режим анализатора (scope / spec / sgram) — для вкладок scope и master, как
@@ -1752,12 +1753,12 @@ local function draw_topbar(L, info)
       local bw = ms(m) + 2 * L.pad
       bx = bx - bw
       local on = m == amode
-      local hot = mx >= bx and mx < bx + bw and my >= 1 and my < 1 + L.rh
-      set(on and U.tint(U.CYAN, 0.3) or (hot and D.CURROW or U.BG)); gfx.rect(bx, 1, bw, L.rh, 1)
-      set(on and U.CYAN or U.LINE); gfx.rect(bx, 1, bw, L.rh, 0)
-      text(bx + L.pad, 1, m, on and U.CYAN or (hot and U.TEXT or U.GREY))
+      local hot = mx >= bx and mx < bx + bw and my >= 2 and my < 2 + L.rh
+      set(on and U.tint(U.CYAN, 0.3) or (hot and D.CURROW or U.BG)); gfx.rect(bx, 2, bw, L.rh, 1)
+      set(on and U.CYAN or U.LINE); gfx.rect(bx, 2, bw, L.rh, 0)
+      text(bx + L.pad, 3, m, on and U.CYAN or (hot and U.TEXT or U.GREY))
       if hot then hover.scopemode = m end
-      hint('scopemode', bx, 1, bw, L.rh, m)
+      hint('scopemode', bx, 2, bw, L.rh, m)
       bx = bx - 2
     end
   end

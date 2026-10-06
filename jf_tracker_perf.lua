@@ -11,24 +11,34 @@
 local P = { active = false, t = 0, proc = nil, tracks = {}, scroll = 0 }
 local R = reaper
 
--- 6 окт: команда — файлом .sh, без кавычек в строке ExecProcess (через
--- sh -c "…" с $pid и %cpu= вывод приходил пустым: CPU 0 %, Mem 0 MB)
-local SCRIPT = R.GetResourcePath() .. '/jf_tracker_perf.sh'
-local function sh(cmd)
-  local f = io.open(SCRIPT, 'w'); if not f then return '' end
-  f:write('#!/bin/sh\n', cmd, '\n'); f:close()
-  local ok, out = pcall(R.ExecProcess, '/bin/sh "' .. SCRIPT .. '"', 1500)
+-- 6 окт, безопасность: никакого шелла и никаких файлов-скриптов — только
+-- /bin/ps напрямую с постоянными аргументами (pid — число из его же вывода).
+-- Через sh -c "…" вывод приходил пустым (CPU 0 %, Mem 0 MB)
+local function run(cmd)
+  local ok, out = pcall(R.ExecProcess, cmd, 1500)
   if not ok or not out then return '' end
   return (out:gsub('^%-?%d+\n', ''))
 end
+pcall(os.remove, R.GetResourcePath() .. '/jf_tracker_perf.sh')   -- след прежней версии
 
 function P.refresh()
   local now = R.time_precise()
   if now - P.t < 2 and P.proc then return end
   P.t = now
-  local out = sh("pid=$(/usr/bin/pgrep -xn REAPER); /bin/ps -o %cpu=,rss=,%mem= -p $pid; /bin/ps -M -p $pid | /usr/bin/wc -l")
-  local cpu, rss, mem, thr = out:match('([%d%.]+)%s+(%d+)%s+([%d%.]+)%s+(%d+)')
-  P.raw = (not cpu) and out:gsub('%s+', ' '):sub(1, 80) or nil       -- не разобрали — сырой вывод в окно
+  -- процесс REAPER: строка ps, чья команда кончается на /REAPER (сам бинарник)
+  local out = run('/bin/ps -A -o pid=,%cpu=,rss=,%mem=,comm=')
+  local pid, cpu, rss, mem
+  for line in out:gmatch('[^\n]+') do
+    local a, b, c, d, cm = line:match('^%s*(%d+)%s+([%d%.]+)%s+(%d+)%s+([%d%.]+)%s+(.+)$')
+    if cm and cm:match('/REAPER$') then pid, cpu, rss, mem = a, b, c, d; break end
+  end
+  local thr
+  if pid then
+    local n = 0
+    for _ in run('/bin/ps -M -p ' .. math.floor(tonumber(pid))):gmatch('[^\n]+') do n = n + 1 end
+    thr = n
+  end
+  P.raw = (not cpu) and (out:gsub('%s+', ' '):sub(1, 80)) or nil   -- не разобрали — сырой вывод в окно
   P.proc = { cpu = tonumber(cpu) or 0, rss = (tonumber(rss) or 0) / 1024, mem = tonumber(mem) or 0, thr = math.max(0, (tonumber(thr) or 1) - 1) }
   local _, sr = R.GetAudioDeviceInfo('SRATE', '')
   local _, bs = R.GetAudioDeviceInfo('BSIZE', '')

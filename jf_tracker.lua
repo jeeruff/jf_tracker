@@ -2897,7 +2897,8 @@ ctx = {
     vim.msg = ('profile %s: %d options loaded'):format(name, n)
   end,
   opt_del = function(name)
-    local ok = os.remove(ctx.profile_dir() .. '/' .. (name or '') .. '.txt')
+    if not (name or ''):match('^[%w _%-%.]+$') or name:find('%.%.') then vim.msg = 'profile: bad name'; return end   -- без путей (6 окт)
+    local ok = os.remove(ctx.profile_dir() .. '/' .. name .. '.txt')
     vim.msg = ok and ('profile %s deleted'):format(name) or ('no profile ' .. tostring(name))
   end,
   opt_tab = function(t) state.opt_tab = t end,
@@ -4681,6 +4682,11 @@ ctx = {
     local MEDIA = { mid = true, midi = true, mp4 = true, mov = true, m4v = true, mkv = true, avi = true, webm = true, wmv = true,
                     gif = true, png = true, jpg = true, jpeg = true }
     if MEDIA[ext] then ctx.drop_at_cursor(path); return end
+    -- безопасность (6 окт): программой по умолчанию — только документы;
+    -- .app / .command / .sh / .pkg и прочее исполняемое не запускается
+    local DOCS = { pdf = true, txt = true, md = true, rtf = true, nfo = true, html = true, htm = true, xml = true, json = true, csv = true,
+                   doc = true, docx = true, odt = true, pages = true, svg = true, webp = true, tif = true, tiff = true, bmp = true, heic = true }
+    if not DOCS[ext] then vim.msg = ('not opened: .%s - only documents open with the default app'):format(ext); return end
     if reaper.CF_ShellExecute then reaper.CF_ShellExecute(path)
     else reaper.ExecProcess("/usr/bin/open '" .. path:gsub("'", "'\\''") .. "'", -1) end
     vim.msg = 'opened with the default app: ' .. (path:match('[^/]+$') or path)
@@ -4713,7 +4719,8 @@ ctx = {
     local dir = base .. '/xrni/' .. name:gsub('[/:]', '-')
     reaper.RecursiveCreateDirectory(dir, 0)
     local q = function(x) return "'" .. x:gsub("'", "'\\''") .. "'" end
-    reaper.ExecProcess('/usr/bin/unzip -o -q ' .. q(path) .. ' -d ' .. q(dir), 20000)
+    -- только описание и сэмплы (6 окт): unzip сам отбрасывает ../ и абсолютные пути
+    reaper.ExecProcess('/usr/bin/unzip -o -q ' .. q(path) .. " 'Instrument.xml' 'SampleData/*' -d " .. q(dir), 20000)
     local fx = io.open(dir .. '/Instrument.xml', 'rb')
     if not fx then vim.msg = 'XRNI: cannot unpack ' .. name; return end
     local xml = fx:read('*a'); fx:close()
@@ -9752,8 +9759,13 @@ local function frame()
     if not ok then vim.msg = tostring(r):match('[^\n]*$') or tostring(r) elseif r == 'quit' then quit = true end
     if trace then
       ctx.last_trace = table.concat(trace, '>')
+      -- набранный текст (заметки, командная строка, поиск, пикер) — без самих
+      -- символов: в логе только «text», код клавиши скрыт (6 окт)
+      local typing = state.focus == 'notes' or vim.mode == 'cmd' or vim.mode == 'search' or vim.picker
+      local lc, lraw = c, c_raw
+      if typing and c >= 32 and c < 0x110000 and c ~= 127 then lc, lraw = 0, 0 end
       ctx.dlog(('key %d (raw %d) mode %s%s focus %s%s fi %d row %d field %s%s piano %s pending %s op %s buf %s -> %s @ %s%s'):format(
-        c, c_raw, vim.mode, (vim.hydra and ' hydra' or '') .. (vim.picker and ' picker' or ''), state.focus, state.focus == 'top' and (':' .. tostring(state.toptab)) or '',
+        lc, lraw, vim.mode, (vim.hydra and ' hydra' or '') .. (vim.picker and ' picker' or ''), state.focus, state.focus == 'top' and (':' .. tostring(state.toptab)) or '',
         vim.cur.fi, vim.cur.row, tostring(vim.cur.field), vim.cur.sub and ('/' .. vim.cur.sub) or '', tostring(vim.piano), tostring(vim.pending), tostring(vim.op),
         tostring(vim.hexbuf or vim.shapebuf), tostring(vim.msg or ''), ctx.last_trace, ok and '' or (' ERROR ' .. tostring(r))))
     end
