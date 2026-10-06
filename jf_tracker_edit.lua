@@ -1997,6 +1997,36 @@ function E.fx_pack(track, i0, i1)
   if model then model.invalidate() end
   return ok
 end
+-- бросок в контейнер (6 окт): новый эффект / эффект верхнего уровня — в конец
+-- контейнера c. Перенос — копия внутрь + удаление оригинала: копия внутрь не
+-- сдвигает индексы верхнего уровня, поэтому src остаётся верным при любом
+-- порядке src / c (у move внутрь со сдвигом такой гарантии нет)
+local function cont_count(obj, c)
+  local ok, n = FA(obj).GetNamedConfigParm(obj, c, 'container_count')
+  return ok and tonumber(n) or nil
+end
+function E.fx_add_into(track, c, name)
+  local ok = false
+  run('fx add into container', function()
+    local k = cont_count(track, c); if not k then return end
+    local idx = add_fx(track, name, -1000 - child_addr(track, c, k))
+    ok = idx ~= nil and idx >= 0
+    if ok and E.open_on_add then FA(track).Show(track, idx, 3) end
+  end)
+  if model then model.invalidate() end
+  return ok
+end
+function E.fx_move_into(track, src, c)
+  if src == c then return false end
+  local ok = false
+  run('fx move into container', function()
+    local k = cont_count(track, c); if not k then return end
+    copy_fx(track, src, track, child_addr(track, c, k), false)
+    if (cont_count(track, c) or k) > k then FA(track).Delete(track, src); ok = true end
+  end)
+  if model then model.invalidate() end
+  return ok
+end
 -- контейнер c (верхний уровень) → его дети в цепочку сразу за ним, контейнер долой
 function E.fx_unpack(track, c)
   local ok = false

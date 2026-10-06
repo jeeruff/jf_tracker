@@ -3770,21 +3770,57 @@ function D.frame(L, snap, rows, state, info)
     local blocks = {}
     local bw = L.cw * 22
     local sel = info.dsp_sel or {}
+    -- 6 окт: блоки, что не влезли, молча пропадали (контейнер в 2 колонки —
+    -- первым). Теперь: не влезает — одна колонка; цепочка длиннее панели —
+    -- сдвиг так, чтобы выбранный блок был виден; по краям «<N» / «N>» —
+    -- сколько блоков за краем (клик — выбрать ближний скрытый)
+    local right = L.win_w - (lvl and (mw + L.pad) or 0)
+    local stubw = ms('99>') + 2 * L.pad
+    local bh0 = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+    local function ncol_of(f)
+      if f.auto then
+        local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2) / L.rh))
+        return math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
+      end
+      return f.cols or 1
+    end
+    local first = 1
+    if sel.fx and sel.fx > 1 and sel.fx <= #fxs then
+      local sum = 0
+      for k = 1, sel.fx do sum = sum + L.cw * 14 + L.pad end      -- по самой узкой колонке
+      while first < sel.fx and bx + stubw + sum > right - stubw do sum = sum - L.cw * 14 - L.pad; first = first + 1 end
+    end
+    local function stub(x, label, k, at_right)
+      local sy = dy + 3 + L.rh
+      local hot = not drag and mx >= x and mx < x + stubw and my >= sy and my < sy + bh0
+      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, sy, stubw, bh0, 1)
+      set(hot and U.AMBER or U.LINE); gfx.rect(x, sy, stubw, bh0, 0)
+      text(x + math.floor((stubw - ms(label)) / 2), sy + math.floor((bh0 - L.rh) / 2), label, hot and U.AMBER or U.GREY)
+      if hot then hover.dsp = { fx = k, f = fxs[k] } end
+      hint('dsp', x, sy, stubw, L.rh, { fx = k })
+    end
+    if first > 1 then stub(bx, '<' .. (first - 1), first - 1); bx = bx + stubw + L.pad end
     for k, f in ipairs(fxs) do
-      local ncol = f.cols or 1
-      local bw1 = L.cw * 22
+      if k < first then goto next_block end
+      do
+      local ncol = ncol_of(f)
+      -- ширина колонки: 22 знака; тесно — оставшиеся блоки делят место
+      -- поровну, но не уже 14 знаков (имя и значения режет fit)
+      local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
+      local bw1 = math.max(L.cw * 14, math.min(L.cw * 22, share))
       local by = dy + 3 + L.rh
-      local bh = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+      local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
-      if f.auto then
-        local rows_fit = math.max(1, math.floor((bh - L.rh - 2) / L.rh))
-        ncol = math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
-      end
+      local room = right - ((k < #fxs) and (stubw + L.pad) or 0)
+      if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = 1 end
       local bw = bw1 * ncol
-      if bx + bw > L.win_w - (lvl and (mw + L.pad) or 0) then break end
+      if bx + bw > room then
+        if bx + stubw <= right then stub(bx, (#fxs - k + 1) .. '>', k, true); bx = bx + stubw + L.pad end
+        break
+      end
       local is_sel = sel.fx == k
-      blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k }
+      blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
       set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
@@ -3795,6 +3831,8 @@ function D.frame(L, snap, rows, state, info)
       local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 4 * kb - 9
+      -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
+      if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - 2 * kb - 5 end
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
       local pre = info.fx_preset and not f.container and info.fx_preset(f)
@@ -3858,6 +3896,14 @@ function D.frame(L, snap, rows, state, info)
           if kid.parallel > 0 then gfx.rect(kx + L.cw // 2 + 4, ky, 2, L.rh, 1) end
           text(kx + L.cw + L.pad, ky, fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), pw - L.cw - 2 * L.pad), kid.enabled and U.TEXT or U.GREY)
           ky = ky + L.rh
+        end
+        -- рамка (6 окт): сюда бросают эффекты — из списка fx или блок с панели
+        if ky + L.rh <= by + bh - 2 then
+          set(U.tint(U.AMBER, 0.45)); gfx.rect(bx + L.pad, ky + 1, pw, L.rh, 0)
+          local lbl = #f.kids == 0 and 'empty: drop fx here' or 'drop fx here'
+          if ms(lbl) > pw - 4 then lbl = 'drop fx here' end
+          if ms(lbl) > pw - 4 then lbl = 'drop fx' end
+          text(bx + L.pad + math.max(2, math.floor((pw - ms(lbl)) / 2)), ky + 1, fit(lbl, pw - 4), U.DIM)
         end
       end
       if f.view == 'grain' then
@@ -4087,6 +4133,8 @@ function D.frame(L, snap, rows, state, info)
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
       end
       bx = bx + bw + L.pad
+      end
+      ::next_block::
     end
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
     if lvl then
@@ -4103,7 +4151,17 @@ function D.frame(L, snap, rows, state, info)
     end
     -- перетаскивание (блок или FX из списка): куда встанет — янтарная черта
     -- между блоками; половина блока под мышью решает «до» или «после»
+    -- бросок внутрь контейнера (6 окт): средняя половина блока-контейнера —
+    -- двойная голубая рамка вместо черты; края блока — как раньше, до / после
     if drag and my >= dy and my < dy + L.dsp_h and mx >= fbw then
+      for _, b in ipairs(blocks) do
+        if b.cont and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
+          set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
+          hover.dsp_into = b.k
+        end
+      end
+    end
+    if drag and not hover.dsp_into and my >= dy and my < dy + L.dsp_h and mx >= fbw then
       local gap, gx = #blocks, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
       for _, b in ipairs(blocks) do
         if mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end

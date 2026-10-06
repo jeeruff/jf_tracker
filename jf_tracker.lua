@@ -9474,10 +9474,19 @@ local function frame()
       if not dsp_drag.active and (math.abs(gfx.mouse_x - dsp_drag.x0) > 6 or math.abs(gfx.mouse_y - dsp_drag.y0) > 6) then dsp_drag.active = true end
       if dsp_drag.active then
         local g = hover.dsp_gap
-        state.status = g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)') or ('move ' .. dsp_drag.f.name .. ' - drop between blocks')
+        state.status = hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container (cyan frame)')
+          or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)') or ('move ' .. dsp_drag.f.name .. ' - drop between blocks or into a container'))
       end
     else
       local g, s = hover.dsp_gap, dsp_drag.fx
+      local col = dsp_drag.active and hover.dsp_into and dsp_target()
+      local cf = col and (col.fx or {})[hover.dsp_into]
+      if cf then
+        -- в контейнер (6 окт): копия внутрь + удаление оригинала
+        if edit.fx_move_into(col.track, dsp_drag.f.i, cf.i) then vim.msg = dsp_drag.f.name .. ' → container ' .. cf.name
+        else vim.msg = 'could not move ' .. dsp_drag.f.name .. ' into the container' end
+        g = nil
+      end
       if dsp_drag.active and g and g ~= s and g ~= s - 1 then
         local col = dsp_target()
         local fxs = col and col.fx or {}
@@ -9496,10 +9505,18 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if not fxb_drag.active and (math.abs(gfx.mouse_x - fxb_drag.x0) > 6 or math.abs(gfx.mouse_y - fxb_drag.y0) > 6) then fxb_drag.active = true end
       if fxb_drag.active then
-        state.status = hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1)) or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel')
+        state.status = hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container (cyan frame)')
+          or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1)) or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
       end
     else
-      if fxb_drag.active and hover.dsp_gap then ctx.fxb_add(fxb_drag.it, hover.dsp_gap) end
+      local col = fxb_drag.active and hover.dsp_into and dsp_target()
+      local cf = col and (col.fx or {})[hover.dsp_into]
+      if cf then
+        if edit.fx_add_into(col.track, cf.i, fxb_drag.it.data) then
+          FB.push_recent(fxb_drag.it); ctx.fxb_save()
+          vim.msg = '+ ' .. FB.short(fxb_drag.it.label) .. ' → container ' .. cf.name
+        else vim.msg = 'could not add into the container' end
+      elseif fxb_drag.active and hover.dsp_gap then ctx.fxb_add(fxb_drag.it, hover.dsp_gap) end
       fxb_drag = nil
     end
   end

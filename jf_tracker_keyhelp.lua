@@ -232,6 +232,7 @@ KH.PAGES = {
     { k = 'dc', d = 'unpack container: children into the chain' },
     { k = 'yy p P', d = 'copy fx, paste after / before (any track)', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'cc', d = 'pack fx (v: range) into a new container', t = { 'cc', 'c' } },
+    { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame); the edges of a block - before / after it' },
     { k = 'aa', d = 'automate the selected parameter (envelope)', t = { 'aa', 'a' } },
     { k = 'ap A', d = 'pick a parameter to automate (fzf; also click trim in the track header, rclick trim: all parameters)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
