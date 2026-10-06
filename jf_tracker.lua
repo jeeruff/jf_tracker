@@ -149,6 +149,7 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
+  quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
@@ -407,7 +408,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2086,6 +2087,60 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
+  -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
+  -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug|q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
+    wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
+    tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
+  quick_str = function() return state.quick or ctx.QUICK_DEFAULT end,
+  quick_has = function(key)
+    local id = ctx.QUICK_ALIAS[key] or key
+    for x in ctx.quick_str():gmatch('[^,|]+') do if x == id then return true end end
+    return false
+  end,
+  quick_toggle = function(key, label)
+    local id = ctx.QUICK_ALIAS[key] or key
+    local cols = {}
+    for part in (ctx.quick_str() .. '|'):gmatch('([^|]*)|') do
+      local col = {}
+      for x in part:gmatch('[^,]+') do if x ~= id then col[#col + 1] = x end end
+      cols[#cols + 1] = col
+    end
+    while #cols > 3 do table.remove(cols) end
+    for k = #cols + 1, 3 do cols[k] = {} end
+    local had = ctx.quick_has(key)
+    if not had then                                  -- добавить в самую короткую колонку
+      local best = 1
+      for k = 2, 3 do if #cols[k] < #cols[best] then best = k end end
+      table.insert(cols[best], id)
+    end
+    local parts = {}
+    for k = 1, 3 do parts[k] = table.concat(cols[k], ',') end
+    state.quick = table.concat(parts, '|')
+    vim.msg = (label or key) .. (had and ' removed from' or ' added to') .. ' the quick options'
+  end,
+  -- клетки быстрых опций, которых нет среди встроенных: подпись и вкл из списка Options
+  quick_generic = function()
+    local out, BUILT = {}, { q_mx = 1, q_ruler = 1, q_hints = 1, q_listen = 1, debug = 1, q_scopes = 1, q_input = 1, q_captions = 1, q_names = 1, q_wave = 1,
+      q_colors = 1, q_envs = 1, q_meters = 1, q_dsp = 1, q_side = 1, q_preview = 1, q_keys = 1, oneclick = 1, autofocus = 1, perf = 1, follow = 1, lock = 1, fixed = 1, xfade = 1, q_endstop = 1 }
+    local need = {}
+    for x in ctx.quick_str():gmatch('[^,|]+') do if not BUILT[x] then need[x] = true end end
+    if next(need) == nil then return out end
+    local now = reaper.time_precise()                -- список Options — не каждый кадр (2 Гц)
+    if ctx.qgen_cache and now - ctx.qgen_t < 0.5 and ctx.qgen_key == ctx.quick_str() then return ctx.qgen_cache end
+    ctx.qgen_t, ctx.qgen_key, ctx.qgen_cache = now, ctx.quick_str(), out
+    ctx.qitems = ctx.qitems or {}
+    for _, it in ipairs(ctx.option_items()) do
+      if it.key and need[it.key] then
+        ctx.qitems[it.key] = it
+        local v = it.get and it.get()
+        out[it.key] = { label = it.label, on = it.kind == 'toggle' and v and true or (it.kind ~= 'toggle' and v ~= nil and v ~= 'off' and v ~= false) }
+      end
+    end
+    return out
+  end,
   jftop = function() ctrl_action('jftop', 0) end,                  -- :jftop (6 окт)
   -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
   -- swing на транспорте открывает выпадашку, колесо ±1 %, :swing N | on | off
@@ -6572,6 +6627,18 @@ end
 -- клик / колесо по контролу верхней панели
 function ctrl_action(name, delta)
   ctx.dlog(('ctrl %s %s'):format(tostring(name), tostring(delta)))
+  -- общая клетка быстрых опций (6 окт): тумблер — переключить, выбор — следующее значение
+  local qi = ctx.qitems and ctx.qitems[name]
+  if qi then
+    if qi.kind == 'toggle' then qi.set(not qi.get())
+    elseif qi.kind == 'cycle' and qi.values then
+      local cur, k = qi.get(), 1
+      for i, v in ipairs(qi.values) do if v == cur then k = i end end
+      qi.set(qi.values[(k + ((delta or 0) < 0 and -2 or 0)) % #qi.values + 1])
+    end
+    relayout(); vim.msg = qi.label .. ': ' .. tostring(qi.get())
+    return
+  end
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'about' then if delta == 0 then ctx.about() end
@@ -7476,7 +7543,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -8092,6 +8159,7 @@ local function frame()
     else draw.vbar_drag = nil end
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
     if bpm_menu.hover then
       local it = BPM_LIST[bpm_menu.hover]

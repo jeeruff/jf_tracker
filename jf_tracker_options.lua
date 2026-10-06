@@ -205,6 +205,14 @@ local function num_from_x(it, r, mx)
   it.set(math.max(it.min or v, math.min(it.max or v, v)))
 end
 
+-- ПКМ по строке опции (6 окт): добавить в быстрые опции / убрать оттуда
+function O.rclick()
+  local it = O.hover and O.items[O.hover]
+  if not (it and it.key and not it.sep and (it.kind == 'toggle' or it.kind == 'cycle') and ctx.quick_toggle) then return false end
+  ctx.quick_toggle(it.key, it.label)
+  return true
+end
+
 function O.click(mx, my)
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
@@ -523,6 +531,8 @@ function O.draw(L, W, H)
       elseif hot then U.set(U.PANEL); gfx.rect(bx + 1, y, bw - 2, rh, 1) end
       local masked = it.masked and it.masked()
       U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), masked and U.DIM or ((i == O.sel or hot) and U.AMBER or U.TEXT))   -- 6 окт: фокус / мышь — имя жёлтым
+      -- 6 окт: точка слева от имени — опция есть в быстрых опциях (ПКМ по имени)
+      if it.key and ctx.quick_has and ctx.quick_has(it.key) then U.set(U.LINE); gfx.rect(bx + math.floor(L.pad / 2) - 1, y + math.floor(rh / 2) - 1, 2, 2, 1) end
       local vt = val_text(it)
       local on = it.kind == 'toggle' and it.get()
       local vx = bx + L.pad + lw

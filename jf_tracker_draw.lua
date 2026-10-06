@@ -1578,15 +1578,25 @@ local function draw_ctrl(L, info, H, hover)
     -- (сверху вниз, как на экране) / справа; пустые клетки — { false }
     { name = 'quick', items = (function()
       local function q(id, label, on, extra) local t = { id, label, on and U.CYAN or U.GREY }; if extra then for k, v in pairs(extra) do t[k] = v end end; return t end
-      local cols = {
-        { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen), q('debug', 'debug', c.debug) },
-        { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
-          q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
-        { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }),
-          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus), q('perf', 'performance', c.perf),
-          -- тоглы из полосы транспорта (5 окт)
-          q('follow', 'follow', c.follow), q('lock', 'lock', c.lock), q('fixed', 'fixed', c.fixed), q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade) },
-      }
+      -- 6 окт: набор и порядок — c.quick («id,id|id,…|…», три колонки; правка —
+      -- ПКМ по имени опции в окне Options). Встроенные — свои подписи и флаги,
+      -- остальные опции — c.qgen[id] = { label, on }
+      local QL = { q_mx = 'matrix', q_ruler = 'ruler', q_hints = 'hints', q_listen = 'listen', debug = 'debug', q_scopes = 'scopes',
+        q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
+        q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
+        autofocus = 'autofocus', perf = 'performance', follow = 'follow', lock = 'lock', fixed = 'fixed', q_endstop = 'end stop' }
+      local cols = {}
+      for part in ((c.quick or '') .. '|'):gmatch('([^|]*)|') do
+        local col = {}
+        for id in part:gmatch('[^,]+') do
+          if id == 'xfade' then col[#col + 1] = q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade)
+          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], id == 'q_keys' and { sizer = true } or nil)
+          elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on) end
+        end
+        cols[#cols + 1] = col
+        if #cols == 3 then break end
+      end
+      for k = #cols + 1, 3 do cols[k] = {} end
       local out, n = {}, math.max(#cols[1], #cols[2], #cols[3])
       for r = 1, n do for k = 1, 3 do out[#out + 1] = cols[k][r] or { false } end end
       return out
