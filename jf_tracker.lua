@@ -6297,6 +6297,18 @@ local function poll_cmd()
   elseif name == 'oct+' then vim.octave = math.min(8, vim.octave + 1) elseif name == 'oct-' then vim.octave = math.max(0, vim.octave - 1)
   elseif name == 'step+' then vim.step = vim.step + 1 elseif name == 'step-' then vim.step = math.max(0, vim.step - 1)
   elseif name == 'inst+' then pool_select(vim.inst + 1) elseif name == 'inst-' then pool_select(vim.inst - 1)
+  elseif name == 'aidump' and (state.ai_edit or ctx.ai_list()[1]) then
+    -- отладка (6 окт): точки открытого automation item, шкала и границы -> ExtState dbg
+    local ae = state.ai_edit or ctx.ai_list()[1]
+    local mode = reaper.GetEnvelopeScalingMode(ae.env)
+    local out = { ('mode %d min %s max %s pos %.3f'):format(mode, tostring(ae.min), tostring(ae.max), reaper.GetSetAutomationItemInfo(ae.env, ae.idx, 'D_POSITION', 0, false)),
+      ('len %.3f pqn %.3f rate %.3f loop %d'):format(reaper.GetSetAutomationItemInfo(ae.env, ae.idx, 'D_LENGTH', 0, false), reaper.GetSetAutomationItemInfo(ae.env, ae.idx, 'D_POOL_QNLEN', 0, false),
+        reaper.GetSetAutomationItemInfo(ae.env, ae.idx, 'D_PLAYRATE', 0, false), reaper.GetSetAutomationItemInfo(ae.env, ae.idx, 'D_LOOPSRC', 0, false)) }
+    local FI = ae.idx | 0x10000000
+    for p = 0, math.min(12, reaper.CountEnvelopePointsEx(ae.env, FI)) - 1 do
+      local _, t, v = reaper.GetEnvelopePointEx(ae.env, FI, p); out[#out + 1] = ('%.3f:%.3f'):format(t, v)
+    end
+    reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
   elseif name == 'notesfile' then
     -- 6 окт: дописать в project notes текст из .pending_notes.txt (файл удаляется)
     local f = io.open(DIR .. '/.pending_notes.txt', 'r')
