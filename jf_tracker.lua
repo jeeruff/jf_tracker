@@ -914,7 +914,7 @@ ctx = {
     local text = ''
     if kind == 'project' then text = reaper.GetSetProjectNotes(0, false, '')
     elseif kind == 'item' then local _, t = reaper.GetSetMediaItemInfo_String(obj, 'P_NOTES', '', false); text = t or ''
-    elseif kind == 'track' then text = reaper.NF_GetSWSTrackNotes(obj) or '' end
+    elseif kind == 'track' then text = reaper.NF_GetSWSTrackNotes and reaper.NF_GetSWSTrackNotes(obj) or '' end
     NT.set(text); NT.owner = obj; NT.kind = kind; NT.title = title
   end,
   notes_save = function()
@@ -2238,7 +2238,8 @@ ctx = {
     local list = {}
     for i, lg in ipairs(LOGO.LOGOS) do if not lg.scroll then list[#list + 1] = i end end
     local pick
-    if name and name ~= '' then for _, i in ipairs(list) do if LOGO.LOGOS[i].name:find(name, 1, true) then pick = i; break end end end
+    -- по имени — любой, в т.ч. бегущая строка (в случайный выбор она не идёт)
+    if name and name ~= '' then for i, lg in ipairs(LOGO.LOGOS) do if lg.name:find(name, 1, true) then pick = i; break end end end
     if not pick then
       repeat pick = list[math.random(1, #list)] until #list < 2 or pick ~= (ctx.LOGOPOP_last or 0)
     end

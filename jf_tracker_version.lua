@@ -16,6 +16,9 @@ V.CHANGES = {
     'quick options are configurable: right click an option name in Options adds / removes it (a faint dot marks it); option sync track header size; quick option columns sized by their words',
     'security: no shell or helper scripts, the browser opens only documents with the default app, XRNI unzip takes only the instrument and samples',
     ':logo, about: youtube and e-mail; keycaster shows Cmd+letter as cmd; text transport buttons centred; many smaller fixes',
+    'F1 is the whole help inside the tracker (sections on the left, / finds anything, n N hits), Shift+F1 the tutorial; ? picks any REAPER action (recent first); \\ is the main menu, \\\\ the context menu of what is under the cursor; arrows work as h j k l everywhere, with Shift too',
+    'transpose and rate of an item or slice are heard while dragging; slice playthru - a slice plays on into the next slices until the next note (item tab row pthru)',
+    'four new logos: tall cyan, thin box, glitch tiles and a marquee; :logo name shows any of them',
     'experimental (dev): pm cards - the browser pm tab as a grid of jf_pm project cards with thumbnails, big view over the whole window',
   } },
   { v = '0.7.0', d = '2026-10-05', items = {
