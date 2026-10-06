@@ -208,14 +208,51 @@ local function row_time(row, lpb, delay)
   return R.TimeMap2_QNToTime(0, (row + (delay or 0) / 256) / lpb)
 end
 E.row_time = row_time
--- свинг (6 окт, глобальный): E.swing — % в духе MPC, 50 = ровно, 66 ≈ триоль,
--- 75 — предел. Сдвигается только ВСТАВКА на нечётные строки (вторая из пары):
--- на (2·swing − 1) строки. Уже стоящие события не трогаются — перенос и
--- правка берут их реальное время (иначе свинг накладывался бы дважды)
-E.swing = 50
-function E.swing_time(row, lpb)
-  local off = (row % 2 == 1) and math.max(0, 2 * (E.swing or 50) / 100 - 1) or 0
-  return row_time(row, lpb, off * 256)
+-- свинг (6 окт): глобальный = свинг сетки проекта REAPER (GetSetProjectGrid:
+-- swingmode 1, swingamt −1..1), единица — деление сетки g. Как в REAPER,
+-- второе деление пары сдвинуто на amt·g (33 % ≈ триоль, MPC 66 %); строки
+-- между делениями — кусочно-линейно внутри пары [2kg, 2kg + 2g). Свинг
+-- применяется к ВСТАВКЕ и квантизации (точки, ноты, слайсы, item); стоящие
+-- события не трогаются. У item флаг swing (P_EXT:jf_noswing, по умолчанию вкл)
+E.sw = { on = false, amt = 0, div = 0.25 }        -- div — в QN
+function E.swing_read()
+  if not R.GetSetProjectGrid then return end
+  local _, div, mode, amt = R.GetSetProjectGrid(0, false)
+  E.sw.amt = math.max(-1, math.min(1, amt or 0))
+  E.sw.on = (mode or 0) == 1 and math.abs(E.sw.amt) > 1e-6
+  E.sw.div = (div or 0.0625) * 4
+end
+-- on / amt (−1..1) / div (доля целой ноты, как у REAPER: 1/16 = 0.0625); nil — как есть
+function E.swing_set(on, amt, div)
+  if not R.GetSetProjectGrid then return end
+  local _, d0, m0, a0 = R.GetSetProjectGrid(0, false)
+  if on == nil then on = (m0 or 0) == 1 end
+  R.GetSetProjectGrid(0, true, div or d0, on and 1 or 0, math.max(-1, math.min(1, amt or a0 or 0)))
+  R.UpdateTimeline()
+  E.swing_read()
+end
+function E.swing_qn(q)
+  local s = E.sw
+  if not s.on or s.div <= 0 then return q end
+  local g = s.div
+  local p0 = math.floor(q / (2 * g) + 1e-9) * 2 * g
+  local x = q - p0
+  local m = g * (1 + math.max(-0.99, math.min(0.99, s.amt)))   -- сдвинутая середина пары
+  if x <= g then return p0 + x * m / g end
+  return p0 + m + (x - g) * (2 * g - m) / g
+end
+function E.item_swing(it)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return true end
+  local _, v = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_noswing', '', false)
+  return v ~= '1'
+end
+function E.set_item_swing(it, on)
+  if it and R.ValidatePtr(it, 'MediaItem*') then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_noswing', on and '' or '1', true) end
+end
+-- время строки со свингом; item со свингом off — ровно
+function E.swing_time(row, lpb, item)
+  if item and not E.item_swing(item) then return row_time(row, lpb, 0) end
+  return R.TimeMap2_QNToTime(0, E.swing_qn(row / lpb))
 end
 -- время → строка и задержка xx/256 (3 окт: точный стык слайсов при шаге auto)
 function E.row_of_time(t, lpb)
@@ -1485,6 +1522,7 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
   local made
   run('insert note', function()
     local mit = midi_item_at(track, lane_idx, t0)
+    if mit and not E.item_swing(mit) then t0 = row_time(row, lpb, 0) end   -- у MIDI item свинг выключен (6 окт)
     local has_audio = false
     if not mit then
       for i = 0, R.CountTrackMediaItems(track) - 1 do
@@ -2761,6 +2799,7 @@ function E.quant_plan(item, hits, prm)
     if h.t > 0.005 and h.t < len - 0.005 then
       local q = R.TimeMap2_timeToQN(0, pos + h.t)
       local tq = math.floor(q / step + 0.5) * step
+      if E.item_swing(item) then tq = E.swing_qn(tq) end          -- свинг сетки проекта (6 окт)
       if tq <= qn0 + 1e-6 then skipped[#skipped + 1] = { t = h.t, why = 'start' }; tq = nil
       elseif math.abs(tq - q) > step * window then skipped[#skipped + 1] = { t = h.t, why = 'far' }; tq = nil end
       if tq then

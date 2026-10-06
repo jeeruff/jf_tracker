@@ -2073,7 +2073,7 @@ function D.transport_groups(c)
   -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
   g[#g + 1] = { { { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) }, { 'swing', ('swing %d%%'):format(c.swing or 50), (c.swing or 50) > 50 and U.CYAN or U.GREY } },
+  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) }, { 'swing', c.swing_txt or 'swing off', c.swing_on and U.CYAN or U.GREY } },
                 { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,

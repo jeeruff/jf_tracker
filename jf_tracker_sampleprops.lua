@@ -23,7 +23,7 @@ SP.ROWS = {
   { k = 'finshape', label = 'fade in shape' }, { k = 'foutshape', label = 'fade out shape' },
   { k = 'tvol', label = 'take volume' }, { k = 'offs', label = 'start offset' }, { k = 'len', label = 'length' },
   { k = 'snap', label = 'snap offset' }, { k = 'chan', label = 'channels' },
-  { k = 'mute', label = 'mute' }, { k = 'lock', label = 'lock' },
+  { k = 'mute', label = 'mute' }, { k = 'lock', label = 'lock' }, { k = 'swing', label = 'swing' },   -- 6 окт: свинг сетки для этого item
   { k = 'fx', label = 'take fx' }, { k = 'norm', label = 'normalize' },
 }
 

@@ -148,7 +148,6 @@ local state = {
   tintmute = flag('tintmute', true),
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
-  swing = tonumber(reaper.GetExtState(EXT, 'swing')) or 50,   -- свинг вставки, % (50 = ровно), 6 окт
   aipoints = flag('aipoints', true),
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
@@ -406,7 +405,7 @@ local function save_win()
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
-  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('swing', tostring(state.swing or 50)); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
+  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
@@ -2087,6 +2086,50 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
+  -- swing на транспорте открывает выпадашку, колесо ±1 %, :swing N | on | off
+  swing_label = function()
+    local s = edit.sw
+    if not s.on then return 'swing off' end
+    local d = s.div / 4
+    local dv = d > 0 and ('1/%g'):format(math.floor(1 / d * 100 + 0.5) / 100) or '?'
+    return ('swing %d%% %s'):format(math.floor(s.amt * 100 + 0.5), dv)
+  end,
+  swing_text = function()
+    local s = edit.sw
+    if not s.on then return 'swing off - grid straight' end
+    return ('%s (MPC %d%%): new notes, points and quantize follow the REAPER grid swing; items with swing off stay straight'):format(ctx.swing_label(), math.floor(50 + s.amt * 50 + 0.5))
+  end,
+  swing_menu = function()
+    edit.swing_read()
+    local s = edit.sw
+    local cur = s.on and math.floor(s.amt * 100 + 0.5) or 0
+    local items = {
+      { key = 't', label = (s.on and 'turn off' or 'turn on') .. ' (REAPER grid swing)', fn = function() edit.swing_set(not s.on, (not s.on and math.abs(s.amt) < 0.01) and 0.33 or nil); vim.msg = ctx.swing_text() end },
+    }
+    for _, p in ipairs({ { '0', 0, 'straight' }, { '1', 10 }, { '2', 20 }, { '3', 33, 'triplet, MPC 66' }, { '4', 40 }, { '5', 50, 'MPC 75' }, { '6', 66 }, { '7', 75 }, { '-', -25, 'early' } }) do
+      items[#items + 1] = { key = p[1], label = ('%d%%%s%s'):format(p[2], p[3] and ('  ' .. p[3]) or '', (s.on and cur == p[2]) and '  *' or ''),
+        fn = function() edit.swing_set(p[2] ~= 0, p[2] / 100); vim.msg = ctx.swing_text() end }
+    end
+    local d = s.div / 4
+    for _, g in ipairs({ { 'q', '1/4', 0.25 }, { 'w', '1/8', 0.125 }, { 'e', '1/16', 0.0625 }, { 'r', '1/32', 0.03125 } }) do
+      items[#items + 1] = { key = g[1], label = 'grid ' .. g[2] .. (math.abs(d - g[3]) < 1e-6 and '  *' or ''), fn = function() edit.swing_set(nil, nil, g[3]); vim.msg = ctx.swing_text() end }
+    end
+    items[#items + 1] = { key = 'c', label = 'custom … (:swing N, -100..100)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'swing ' end }
+    vim.open_hydra({ title = 'swing - ' .. ctx.swing_label(), items = items })
+    state.popup_at = { kind = 'strip', id = 'swing' }
+  end,
+  swing_cmd = function(arg)
+    arg = (arg or ''):lower()
+    local n = tonumber(arg:match('^%s*(%-?%d+%.?%d*)'))
+    local g = arg:match('1/(%d+)')
+    if arg:match('off') then edit.swing_set(false)
+    elseif n then edit.swing_set(n ~= 0, n / 100)
+    elseif arg:match('on') then edit.swing_set(true, math.abs(edit.sw.amt) < 0.01 and 0.33 or nil)
+    elseif not g then ctx.swing_menu(); return end
+    if g then edit.swing_set(nil, nil, 1 / tonumber(g)) end
+    vim.msg = ctx.swing_text()
+  end,
   -- спрятать лейн огибающей (6 окт, − в шапке лейна): огибающая и точки
   -- остаются, + / a+ показывает снова
   env_hide = function(e)
@@ -2990,6 +3033,8 @@ ctx = {
       { label = 'keep pitch', kind = 'toggle', get = function() return tv('B_PPITCH') >= 0.5 end,
         set = function(v) if tk then put('keep pitch', function() reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', v and 1 or 0) end) end end },
       itog('B_LOOPSRC', 'loop'), itog('B_MUTE', 'mute'),
+      { label = 'swing', kind = 'toggle', get = function() return edit.item_swing(item) end,   -- 6 окт: свинг сетки для вставки / квантизации в этот item
+        set = function(v) put('swing', function() edit.set_item_swing(item, v) end) end },
       { label = 'fade in', kind = 'num', min = 0, max = 5000, step = 5, fmt = '%d ms',
         get = function() return math.floor(iv('D_FADEINLEN') * 1000 + 0.5) end,
         set = function(v) put('fade in', function() reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', v / 1000) end) end },
@@ -3785,6 +3830,10 @@ ctx = {
     elseif k == 'chan' then P('take:I_CHANMODE', (math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE')) + d) % 5, 'abs', 'channel mode')
     elseif k == 'mute' then P('B_MUTE', reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 0 or 1, 'abs', 'mute')
     elseif k == 'lock' then P('C_LOCK', reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 0 or 1, 'abs', 'lock')
+    elseif k == 'swing' then
+      local on = not edit.item_swing(it)
+      edit.run('instrument swing', function() for _, x in ipairs(items) do edit.set_item_swing(x, on) end end)
+      vim.msg = 'swing ' .. (on and 'on' or 'off') .. (' for %d note(s) of the instrument'):format(#items)
     elseif k == 'fx' then ctx.take_fx_focus(e)                          -- DSP показывает take FX (2 окт)
     elseif k == 'norm' then
       -- нормализация по представителю, остальным — то же отношение громкости
@@ -3814,6 +3863,7 @@ ctx = {
     if k == 'chan' then return CH[math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE'))] or 'channel' end
     if k == 'mute' then return reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 'on' or 'off' end
     if k == 'lock' then return reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 'on' or 'off' end
+    if k == 'swing' then return edit.item_swing(it) and ('on - ' .. ctx.swing_label()) or 'off - straight' end
     return ''
   end,
   -- доля слайдера и «от центра»; nil — строка без слайдера
@@ -6605,8 +6655,13 @@ function ctrl_action(name, delta)
     if ctx.PERF.active then state.mx_hidden = false; ctx.PERF.t = 0 end
     vim.msg = ctx.PERF.active and 'performance in the matrix: n - REAPER performance meter, j k scroll, Esc (matrix focused) closes' or 'performance closed'
   elseif name == 'swing' then
-    if delta == 0 then state.swing = 50 else state.swing = math.max(50, math.min(75, (state.swing or 50) + delta)) end
-    vim.msg = ('swing %d%%: odd rows of new notes / points shift %s'):format(state.swing, state.swing > 50 and ('by %.2f row'):format(2 * state.swing / 100 - 1) or '- straight')
+    -- 6 окт: свинг сетки проекта REAPER; клик — выпадашка, колесо — ±1 %
+    if delta == 0 then ctx.swing_menu()
+    else
+      local s = edit.sw
+      edit.swing_set(true, (s.on and s.amt or 0) + delta / 100)
+      vim.msg = ctx.swing_text()
+    end
   elseif name == 'oneclick' then state.oneclick = not state.oneclick; vim.msg = 'one click focus ' .. (state.oneclick and 'on' or 'off')
   elseif name == 'autofocus' then state.autofocus = not state.autofocus; vim.msg = 'autofocus ' .. (state.autofocus and 'on' or 'off')
   -- блок записи (5 окт): rec, punch (авто-панч по time selection), pre-roll, rec→lib
@@ -7247,7 +7302,7 @@ local function frame()
   if not idle_skip then HN.reset() end
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
-  edit.swing = state.swing or 50
+  edit.swing_read()                                    -- свинг сетки проекта REAPER (6 окт)
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
   draw.envfmt = state.envfmt or 'midi'
@@ -7397,7 +7452,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -7484,7 +7539,7 @@ local function frame()
       local function left(lx, ly, lw2, lh)
         if mod_pane == 'ai' then
           ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
-          ctx.AIE.swing = state.swing or 50
+          ctx.AIE.swing_qn = edit.swing_qn
           -- справа узкий блок свойств item (6 окт): loop, повторы, playrate …
           local pw = math.min(Lx.cw * 26, math.floor(lw2 * 0.3))
           ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2 - pw - Lx.pad, lh, state.ai_edit, ctx.fit,
@@ -7802,6 +7857,7 @@ local function frame()
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
+  elseif hover.ctrl == 'swing' then state.status = ctx.swing_text() .. ' - click: menu, wheel: +-1 %'
   elseif hover.ctrl == 'tp_rew' then state.status = 'rewind a little'
   elseif hover.ctrl == 'tp_fwd' then state.status = 'fast forward a little'
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
@@ -8258,7 +8314,7 @@ local function frame()
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
       elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
-      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'swing') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
     elseif hover.dspcomp then
