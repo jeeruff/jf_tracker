@@ -3038,9 +3038,15 @@ function D.frame(L, snap, rows, state, info)
                   if ly > cy0 and ly < cy1 then
                     -- стык лупа (6 окт): как у обычных items — треугольные вырезы
                     -- на обеих границах, остриём внутрь (без косой палки)
+                    -- как в REAPER (6 окт): вырез прозрачный — внутри фон, по краям V рамки
                     local tz = math.max(3, math.floor(L.rh / 3))
+                    local fc = { gfx.r, gfx.g, gfx.b }
+                    set(U.BG)
                     gfx.triangle(ev.x, ly - tz, ev.x, ly + tz, ev.x + tz, ly)
                     gfx.triangle(ev.x + ev.w - 1, ly - tz, ev.x + ev.w - 1, ly + tz, ev.x + ev.w - 1 - tz, ly)
+                    gfx.set(fc[1], fc[2], fc[3], 1)
+                    gfx.line(ev.x, ly - tz, ev.x + tz, ly); gfx.line(ev.x + tz, ly, ev.x, ly + tz)
+                    gfx.line(ev.x + ev.w - 1, ly - tz, ev.x + ev.w - 1 - tz, ly); gfx.line(ev.x + ev.w - 1 - tz, ly, ev.x + ev.w - 1, ly + tz)
                     if mx >= ev.x and mx < ev.x + ev.w and math.abs(my - ly) <= 3 then
                       hover.seam = { kind = 'ai', env = ev.e.env, idx = ai.idx, k = guard + 1, r0 = ai.r0, per = ai.loop_rows,
                                      first = (ai.loop_first or (ai.r0 + ai.loop_rows)) - ai.r0, x0 = ev.x, w = ev.w, name = ev.e.name }
