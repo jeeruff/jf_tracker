@@ -2234,6 +2234,19 @@ ctx = {
   -- :logo (6 окт): артворк по центру трекера, каждый раз другой (:logo имя —
   -- конкретный); любая клавиша или клик закрывает. Рисуется один раз в
   -- картинку 98 (дизеринг попиксельный), дальше только blit
+  -- :dev (6 окт): вид разработчика вкл / выкл — переименование .dev <-> .dev-off
+  -- рядом со скриптом (без шелла). off = трекер как у пользователей релиза.
+  -- Флаги читаются при старте, поэтому — перезапуск трекера. В копии без
+  -- обоих файлов (релиз) команда ничего не делает
+  dev_set = function(arg)
+    local on, off = DIR .. '/.dev', DIR .. '/.dev-off'
+    local has_on, has_off = reaper.file_exists(on), reaper.file_exists(off)
+    if not (has_on or has_off) then vim.msg = 'dev: not a developer copy'; return end
+    local want = arg == 'on' or (arg ~= 'off' and not has_on)
+    if want == has_on then vim.msg = 'dev is already ' .. (want and 'on' or 'off'); return end
+    local ok = want and os.rename(off, on) or os.rename(on, off)
+    vim.msg = ok and ('dev ' .. (want and 'on' or 'off - the user view') .. ': close and open the tracker') or 'dev: could not rename the file'
+  end,
   logo_show = function(name)
     local list = {}
     for i, lg in ipairs(LOGO.LOGOS) do if not lg.scroll then list[#list + 1] = i end end
@@ -7014,6 +7027,7 @@ local function poll_cmd()
   elseif name == 'jftop' then ctrl_action('jftop', 0)
   elseif name == 'helpbig' then ctx.help_big()                          -- тест: F1
   elseif name == 'actions' then ctx.actions_picker()                -- тест: ?
+  elseif name == 'dev' then ctx.dev_set(v:match('^dev%s+(%a+)') or '')   -- тест: :dev on|off
   elseif name == 'logo' then ctx.logo_show(v:match('^logo%s+([%a_]+)') or '')   -- тест: :logo имя
   elseif name == 'esc' then vim.picker, vim.hydra = nil, nil; state.khelp_big = false   -- тест: закрыть всплывашки
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]

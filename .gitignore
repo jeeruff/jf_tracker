@@ -6,3 +6,4 @@ tests/shots/
 luac.out
 .dev
 .pending_notes.txt
+.dev-off
