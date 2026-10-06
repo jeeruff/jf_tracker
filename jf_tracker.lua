@@ -5230,6 +5230,35 @@ function event_actions(hover)
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local out = {}
   local function add(label, fn, key) out[#out + 1] = { label, fn = fn, key = key } end
+  -- automation item под курсором (6 окт): открыть, удалить, пуловая копия
+  do
+    local f = L and L.flat[vim.cur.fi]
+    if f and f.env and f.env.ais then
+      for _, ai in ipairs(f.env.ais) do
+        if vim.cur.row >= math.floor(ai.r0 + 1e-6) and vim.cur.row < ai.r1 - 1e-6 then
+          local env, idx = f.env.env, ai.idx
+          add('Open the automation item (Enter)', function() if ctx.ai_pick_at(vim.cur.fi, vim.cur.row) then ctx.ai_edit_open(ctx.ai_list()[ctx.ai_sel]) end end, 'o')
+          add('Pooled copy right after it', function()
+            local pid = reaper.GetSetAutomationItemInfo(env, idx, 'D_POOL_ID', 0, false)
+            edit.run('pooled automation item copy', function()
+              local i = reaper.InsertAutomationItem(env, math.floor(pid + 0.5), ai.pos + ai.len, ai.len)
+              if i and i >= 0 then reaper.GetSetAutomationItemInfo(env, i, 'D_PLAYRATE', reaper.GetSetAutomationItemInfo(env, idx, 'D_PLAYRATE', 0, false), true) end
+            end)
+            model.invalidate()
+          end, 'c')
+          add('Delete the automation item', function()
+            edit.run('delete automation item', function()
+              for k = 0, reaper.CountAutomationItems(env) - 1 do reaper.GetSetAutomationItemInfo(env, k, 'D_UISEL', k == idx and 1 or 0, true) end
+              local cmd = ctx.cmd_by_text('delete automation items') or 42086   -- Envelope: Delete automation items (по тексту — номер мог смениться)
+              reaper.Main_OnCommand(cmd, 0)
+            end)
+            model.invalidate()
+          end, 'd')
+          break
+        end
+      end
+    end
+  end
   local f0, f1, r0, r1 = vim.cur.fi, vim.cur.fi, vim.cur.row, vim.cur.row
   if sel then f0, f1, r0, r1 = vim.visual_range() end
   local heads = vim.heads_in(f0, f1, r0, r1)
@@ -9010,6 +9039,14 @@ local function frame()
       vim.msg = ('peak moved to row %04d'):format(vim.cur.row)
     else vim.msg = 'peak move cancelled' end
     c = 0
+  end
+  -- Enter на automation item под курсором (6 окт): открыть его в modulation и туда фокус
+  if c == 13 and state.focus == 'tracker' and vim.mode == 'normal' and not vim.picker and not vim.hydra and not ctx.mods().cmd and not ctx.mods().alt and not ctx.mods().shift then
+    local f = L and L.flat[vim.cur.fi]
+    if f and f.env and ctx.ai_pick_at(vim.cur.fi, vim.cur.row) then
+      local a = ctx.ai_list()[ctx.ai_sel]
+      if a then ctx.ai_edit_open(a); c = 0 end
+    end
   end
   -- Shift+Esc (5 окт): снять time selection REAPER — в любом модуле, вне ввода
   if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
