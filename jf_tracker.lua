@@ -5899,7 +5899,8 @@ local function context_menu(hover, anchor)
   end
   -- 6 окт: меню отдельной кнопки (preview, имя лейна огибающей) — только её
   -- пункты, без хоткеев модуля в фокусе (ПКМ на preview давал всё меню матрицы)
-  local own = hover.prevbtn and 'preview' or (hover.header_env and (hover.header_env.e.name or 'envelope')) or nil
+  local pmcard = type(hover.browser) == 'number' and B.mode == 'pm' and B.entries[hover.browser] and B.entries[hover.browser].pm and B.entries[hover.browser] or nil
+  local own = hover.prevbtn and 'preview' or (hover.header_env and (hover.header_env.e.name or 'envelope')) or (pmcard and pmcard.name) or nil
   local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
   if P then
@@ -5962,6 +5963,18 @@ function ctx.context_items(hover)
   elseif hover.matrix and hover.matrix.ri then
     MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci or MX.cur.ci)
     for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key) end
+  elseif type(hover.browser) == 'number' and B.mode == 'pm' and B.entries[hover.browser] and B.entries[hover.browser].pm then
+    -- карточка / строка проекта pm (6 окт): своё меню
+    local e = B.entries[hover.browser]
+    B.cur = hover.browser
+    add('Open in REAPER (Enter)', function() ctx.pm_open_project(e.path, e.name) end, 'o')
+    if not e.daw then add('Inside: tracks / samples / regions (Shift+Enter)', function() B.pm_open(e) end, 'i') end
+    add('Listen (Space)', function() local pth = B.pm_preview(e); if pth then ctx.preview_file(pth) else vim.msg = 'pm: no preview audio for ' .. e.name end end, 'l')
+    if not e.daw then add('Add as subproject at the cursor (a)', function() ctx.pm_add(e) end, 'a') end
+    add('Tags (T)', function() ctx.pm_tags(e) end, 't')
+    add('Status (s)', function() ctx.pm_status(e) end, 's')
+    if B.pm_mod() then add((e.pinned and '!' or '') .. 'Pin on top (p)', function() B.pm_mod().key(('p'):byte(), B, {}) end, 'p') end
+    add('Show in Finder', function() if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(e.path) else vim.msg = 'pm: needs SWS' end end, 'f')
   elseif hover.prevbtn then
     -- кнопка preview (3 окт): режим прослушивания
     local function radio(m, label) add((state.prevmode == m and '!' or '') .. label, function() state.prevmode = m; vim.msg = 'preview: ' .. label end) end
