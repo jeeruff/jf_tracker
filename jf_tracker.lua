@@ -152,7 +152,8 @@ local state = {
   aipoints = flag('aipoints', true),
   ssbars = tonumber(ext('ssbars', 8)) or 8,
   ss_px = tonumber(reaper.GetExtState(EXT, 'ss_px')),   -- высота clips над матрицей (тянется мышью)
-  ssbsync = flag('ssbsync', true),                  -- аудио-клип в сессию — с beatsync (6 окт)
+  ssbsync = flag('ssbsync', true),
+  clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
@@ -419,7 +420,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2146,7 +2147,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug|q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,clipsview,q_ruler,q_hints,q_listen,debug|q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -3855,9 +3856,68 @@ ctx = {
   end,
   ss_colname = function(ci) local c = snap and snap.cols[ci]; return c and c.name or ('track ' .. ci) end,
   ss_is_big = function() return state.ss_big and true or false end,
+  -- zs / быстрая опция clips: тело трекера ↔ клипы сессии
+  clips_toggle = function()
+    state.clipsview = not state.clipsview
+    reaper.SetExtState(EXT, 'clipsview', state.clipsview and '1' or '0', true)
+    if state.clipsview then
+      local f = L and L.flat and L.flat[vim.cur.fi]
+      MX.SS.cur.ci = 1
+      if f and snap then for i, c in ipairs(snap.cols) do if c == f.col then MX.SS.cur.ci = i end end end
+      MX.SS.cur.ri = math.max(1, MX.cur.ri)
+    end
+    vim.msg = state.clipsview and 'clips: Enter launch, O scene, x / X stop, R record into the clip, dd delete, q quantize, zs - rows' or 'tracker rows'
+  end,
   ss_height = function(w, cap) return MX.SS.height(w, cap, snap and #snap.cols or 1, #seq, L.cw, L.rh, L.pad) end,
   ss_peaks = function(head, n) return model.peaks(head, n) end,
   ss_px = function() return state.ss_px end,
+  -- R на клипе (6 окт): нативная запись в слот — arm трека, time selection =
+  -- слот, режим auto-punch, пре-ролл такт, 1013; стоп — за концом слота
+  -- (ctx.ss_rec_tick). Повторное R — стоп. Прежние arm / режим / выделение
+  -- возвращаются после записи
+  ss_record = function(ri, ci)
+    if MX.SS.rec then ctx.ss_rec_stop('stopped'); return end
+    local col, rg = snap and snap.cols[ci], seq[ri]
+    if not (col and rg) then return end
+    if rg.gap then vim.msg = 'record: name the slot first (n) - empty bars are not clips yet'; return end
+    local tr = col.track
+    local prev = { arm = reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM'), mode = nil }
+    prev.t0, prev.t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    local punch
+    for id = 40070, 40080 do
+      local txt = reaper.kbd_getTextFromCmd(id, 0) or ''
+      if txt:match('^Record: Set record mode to') and reaper.GetToggleCommandState(id) == 1 then prev.mode = id end
+      if txt:match('^Record: Set record mode to time selection auto%-punch') then punch = id end
+    end
+    if not punch then vim.msg = 'record: no auto-punch record mode action found'; return end
+    if playing() then reaper.OnStopButton() end
+    reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', 1)
+    reaper.GetSet_LoopTimeRange(true, false, rg.pos, rg.rgnend, false)
+    reaper.Main_OnCommand(punch, 0)
+    local _, meas = reaper.TimeMap2_timeToBeats(0, rg.pos)
+    local pre = math.max(0, reaper.TimeMap2_beatsToTime(0, 0, math.max(0, meas - 1)))   -- такт пре-ролла
+    reaper.SetEditCurPos(pre, true, false)
+    MX.SS.rec = { ri = ri, ci = ci, track = tr, t1 = rg.rgnend, prev = prev, t = reaper.time_precise() }
+    reaper.Main_OnCommand(1013, 0)
+    vim.msg = ('record into %s / %s: count-in 1 bar, stops at the slot end (R - stop now)'):format(col.name, MX.SS.slot_name(rg, ri))
+  end,
+  ss_rec_stop = function(why)
+    local r = MX.SS.rec; if not r then return end
+    MX.SS.rec = nil
+    if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(40667, 0) elseif playing() then reaper.OnStopButton() end   -- стоп, записанное сохранить
+    if reaper.ValidatePtr(r.track, 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(r.track, 'I_RECARM', r.prev.arm) end
+    if r.prev.mode then reaper.Main_OnCommand(r.prev.mode, 0) end
+    reaper.GetSet_LoopTimeRange(true, false, r.prev.t0, r.prev.t1, false)
+    model.invalidate()
+    vim.msg = 'record into the clip: ' .. (why or 'done') .. ' - Enter launches it'
+  end,
+  -- каждый кадр: запись дошла до конца слота / остановлена снаружи
+  ss_rec_tick = function()
+    local r = MX.SS.rec; if not r then return end
+    local st = reaper.GetPlayState()
+    if reaper.time_precise() - r.t > 0.5 and st & 4 == 0 then ctx.ss_rec_stop('stopped outside'); return end
+    if st & 4 == 4 and reaper.GetPlayPosition() >= r.t1 + 0.05 then ctx.ss_rec_stop('slot recorded') end
+  end,
   -- dd в clips (6 окт): клип = items трека в слоте — удаляются (undo); играет — стоп
   ss_delete = function(ri, ci)
     local col, rg = snap and snap.cols[ci], seq[ri]
@@ -4568,6 +4628,7 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
+      flag('clipsview', 'clips', 'the tracker body shows the session: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
@@ -7582,6 +7643,7 @@ local function frame()
   PV.tick()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
   if snap and seq then MX.SS.tick(seq, snap) end                           -- session: границы квантизации (6 окт)
+  if MX.SS.rec then ctx.ss_rec_tick() end                                -- запись в клип: стоп за концом слота
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
   if state.hold then
@@ -8294,6 +8356,11 @@ local function frame()
   if ev_drag and ev_drag.active then draw.ghost(('%d event(s) %+d'):format(#ev_drag.heads, ev_drag.drow or 0)) end
   SL.draw_drag(U, L)
   -- макро-вид (3 окт, :macro): поверх тела трекера; клики по скрытым ячейкам не идут
+  -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
+  if state.clipsview and not state.ss_big and L.body_h > 0 and snap and L.cols then
+    hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
+    MX.SS.draw_body(L, L.matrix_w, L.label_w, L.body_y, L.body_h, L.cols, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), hover)
+  end
   if state.macro and L.body_h > 0 then
     draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,
       beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
@@ -10387,6 +10454,17 @@ local function frame()
         ctx.main_menu(); return                          -- \ — главное меню, в нём \ — контекст
       end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
+      -- clips в теле: клавиши сессии; колонка курсора трекера = трек клетки
+      if state.clipsview and not state.ss_big and state.focus == 'tracker' and vim.mode == 'normal' and snap then
+        if c == ('s'):byte() and state.ss_zpend then state.ss_zpend = nil; ctx.clips_toggle(); return end
+        state.ss_zpend = nil
+        if c == ('z'):byte() then state.ss_zpend = true; vim.msg = 'z: s - clips off (back to the rows)'; return end
+        if MX.SS.key(c, seq, snap, MX.grid(snap, seq), ctx.mods()) then
+          local col = snap.cols[MX.SS.cur.ci]
+          for i, f in ipairs(L.flat or {}) do if f.col == col then vim.cur.fi = i; break end end
+          return
+        end
+      end
       if state.macro and state.focus == 'tracker' and vim.mode == 'normal' then
         local mr = draw.macro.key(c, vim.cur.row, beat_info.rows_bar or (state.lpb * 4), snap and snap.last_row)
         if mr == 'leave' then state.macro = false; vim.msg = 'macro off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end

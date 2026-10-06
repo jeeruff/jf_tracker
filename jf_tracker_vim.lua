@@ -1545,6 +1545,7 @@ function V.key_impl(c)
     elseif p == 'z' then
       local L = ctx.layout()
       if c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
+      elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('t'):byte() then st.row0 = V.cur.row
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
@@ -1969,7 +1970,7 @@ local PENDING_HINT = {
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | Esc',
-  z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom',
+  z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom | s clips (session)',
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: w all items of the track (the lib after =LIB stays) | Esc',
