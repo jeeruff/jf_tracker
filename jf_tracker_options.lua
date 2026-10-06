@@ -298,6 +298,27 @@ local function draw_about(L, W, H)
             local off = math.floor(amp * (0.25 + 0.75 * depth) * math.sin(t * 2.4 + py * 0.45) + 0.5)
             gfx.blit(1022, 1, 0, 0, py, iw, 1, lx0 + off, y + py, iw, 1)
           end
+        elseif O.logo.glitch then
+          -- глитч (6 окт): короткие вспышки — ряды клеток рывком сдвигаются по
+          -- горизонтали на 1..3 клетки, иногда с цветной полосой; между — покой
+          local t = ctx.now and ctx.now() or os.clock()
+          local cyc = t % 2.2
+          local burst = cyc < 0.22 or (cyc > 1.1 and cyc < 1.2)
+          gfx.set(0, 0, 0, 1); gfx.rect(lx0 - 3 * cw, y, iw + 6 * cw, ih, 1)
+          if not burst then gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
+          else
+            local fr = math.floor(t * 24)
+            local y0 = math.floor(ch / 2)
+            gfx.blit(1022, 1, 0, 0, 0, iw, y0, lx0, y, iw, y0)
+            local rows = math.ceil((ih - y0) / ch)
+            for r = 0, rows - 1 do
+              local h0 = math.min(ch, ih - y0 - r * ch)
+              local rnd = (math.sin((fr + 1) * 12.9898 + r * 78.233) * 43758.5453) % 1
+              local off = rnd < 0.45 and math.floor((rnd * 14 - 3) + 0.5) * cw or 0
+              gfx.blit(1022, 1, 0, 0, y0 + r * ch, iw, h0, lx0 + off, y + y0 + r * ch, iw, h0)
+              if rnd > 0.9 then gfx.set(0.37, 0.72, 0.77, 0.35); gfx.rect(lx0 + off, y + y0 + r * ch, iw, math.max(1, math.floor(h0 / 3)), 1); gfx.a = 1 end
+            end
+          end
         else
           gfx.blit(1022, 1, 0, 0, 0, iw, ih, lx0, y, iw, ih)
         end
