@@ -2188,7 +2188,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local bws, tws, btot = {}, {}, 0
   local bk = c.tpbuttons and 2 or 1                     -- полный набор — крупно (×1.5, 6 окт); rec / loop — обычного размера
   local BK = D.ttf and 1.5 or 1.5
-  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], BK) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad; btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], BK) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad + (b[1] == 'rec' and 3 * L.pad or 0); btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
     -- крупные (5 окт, правка): кнопка на всю высоту полосы (+2 px сверху и снизу),
     -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
@@ -2213,7 +2213,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if i == 1 then round_corner(bx, by, 1, 1, frame); round_corner(bx, by + bh - 1, 1, -1, frame) end
       if i == #blist then round_corner(bx + bw - 1, by, -1, 1, frame); round_corner(bx + bw - 1, by + bh - 1, -1, -1, frame) end
       if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), BK)   -- b[4]: свой цвет (o — красная)
-      else text(bx + L.pad, by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
+      else text(bx + math.floor((bw - tws[i]) / 2), by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
