@@ -643,6 +643,7 @@ V.COMMANDS = {
   { 'beatsync', '[beat|bar|N]', 'stretch event end to the nearest beat / bar / N rows (= key, N=)' },
   { 'quantize', '', 'smart quantize the instrument: loud transients to beats, soft to 16ths, length to whole bars / beats (stretch markers)' },
   { 'tname', 'text', 'rename the cursor track (dblclick on the track name)' },
+  { 'fxname', 'text', 'rename the selected fx or container in the chain (empty - its own name back)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
   { '!', 'text', 'REAPER actions (all, incl. scripts / custom): fzf, recent first - kept apart from tracker commands; also \\ a' },
@@ -746,6 +747,7 @@ local function run_cmd(line)
   elseif cmd == 'trim' then if ctx.mx_trim then ctx.mx_trim() end
   elseif cmd == 'quantize' or cmd == 'squant' then ctx.smart_quantize()
   elseif cmd == 'tname' then ctx.rename_track(arg)
+  elseif cmd == 'fxname' then if ctx.fx_rename then ctx.fx_rename(arg) end
   elseif cmd == 'iname' then ctx.rename_inst(arg)
   elseif cmd == 'garden' or cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
   elseif cmd == 'midi' then st.top = true; st.toptab = 'midi'; if ctx.set_focus then ctx.set_focus('top') end

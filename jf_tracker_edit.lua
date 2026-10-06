@@ -2035,6 +2035,21 @@ function E.fx_move_into(track, src, c, par)
   if model then model.invalidate() end
   return ok
 end
+-- меню контейнера (6 окт): маршрутизация ребёнка, вынос наружу, имя
+function E.fx_parallel(track, addr, v)
+  run('fx parallel', function() FA(track).SetNamedConfigParm(track, addr, 'parallel', tostring(v or 0)) end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
+-- ребёнок addr контейнера c → на верхний уровень сразу за контейнером
+-- (перенос со сдвигом, как в fx_unpack — REAPER сам пересчитывает адрес)
+function E.fx_move_out(track, addr, c)
+  run('fx move out of container', function() copy_fx(track, addr, track, c + 1, true) end)
+  if model then model.invalidate() end
+end
+function E.fx_rename(track, addr, name)
+  run('fx rename', function() FA(track).SetNamedConfigParm(track, addr, 'renamed_name', name or '') end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
 -- контейнер c (верхний уровень) → его дети в цепочку сразу за ним, контейнер долой
 function E.fx_unpack(track, c)
   local ok = false

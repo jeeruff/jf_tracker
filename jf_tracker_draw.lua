@@ -3760,7 +3760,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + mw + L.pad
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
-    if info.pool_col and info.trk_io then
+    if info.pool_col and info.trk_io and info.dsptrack then
       local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
       local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, L.dsp_h - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
@@ -3883,38 +3883,67 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       local pcol0 = 0
+      local cl                                     -- развёрнутый контейнер: pi → { колонка, ряд }
       if f.container and f.kids then
-        -- контейнер: левая колонка — дети и маршрутизация (| за предыдущим,
-        -- = параллельно, + параллельно с суммой), параметры — правее
-        pcol0 = 1
-        local ky = by + L.rh + 1
-        for ki, kid in ipairs(f.kids) do
-          if ki > nfit then break end
-          local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
-          local kx = bx + L.pad
-          set(kid.parallel > 0 and U.CYAN or U.LINE); gfx.rect(kx + L.cw // 2, ky, 2, L.rh, 1)
-          if kid.parallel > 0 then gfx.rect(kx + L.cw // 2 + 4, ky, 2, L.rh, 1) end
-          text(kx + L.cw + L.pad, ky, fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), pw - L.cw - 2 * L.pad), kid.enabled and U.TEXT or U.GREY)
-          ky = ky + L.rh
-        end
-        -- рамка (6 окт): сюда бросают эффекты — из списка fx или блок с панели
-        -- (6 окт, просьба) строкой, как дети: та же черта цепочки, читаемый серый
-        -- две половины (6 окт): «| serial» — за предыдущим, «= parallel» —
+        -- строка броска (6 окт): «| serial» — за предыдущим, «= parallel» —
         -- параллельно ему; при броске половина под мышью горит голубым
-        if ky + L.rh <= by + bh - 2 then
-          local kx = bx + L.pad
-          local hw = math.floor(pw / 2)
+        local function drop_row(x0, y0, w0)
+          local hw = math.floor(w0 / 2)
           local grey = U.readable(U.GREY, is_sel and U.tint(U.AMBER, 0.18) or U.BG, 4.5)
           local lit = drag and my >= by and my < by + bh and mx >= bx + bw / 4 and mx < bx + bw * 3 / 4
+          local short = ms('= parallel') > hw - 2 * L.pad      -- тесно — обе половины коротко
           for hi, part in ipairs({ { '|', 'serial' }, { '=', 'parallel' } }) do
-            local px = kx + (hi - 1) * hw
+            local px = x0 + (hi - 1) * hw
             local on = lit and ((hi == 2) == (mx >= bx + bw / 2))
-            if on then set(U.tint(U.CYAN, 0.3)); gfx.rect(px, ky, hw - 1, L.rh, 1) end
-            -- тесно — обе половины коротко (| ser  = par), чтобы не вразнобой
-            local short = ms('= parallel') > hw - 2 * L.pad
-            local lbl = part[1] .. ' ' .. (short and part[2]:sub(1, 3) or part[2])
-            text(px + L.pad, ky, fit(lbl, hw - 2 * L.pad), on and U.CYAN or grey)
+            if on then set(U.tint(U.CYAN, 0.3)); gfx.rect(px, y0, hw - 1, L.rh, 1) end
+            text(px + L.pad, y0, fit(part[1] .. ' ' .. (short and part[2]:sub(1, 3) or part[2]), hw - 2 * L.pad), on and U.CYAN or grey)
           end
+        end
+        local function kid_label(kid, w0)
+          local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
+          return fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), w0)
+        end
+        if #f.kids > 0 and ncol >= (f.cols or 1) then
+          -- развёрнут (6 окт): контейнер — рамка, внутри колонка на каждый
+          -- плагин: имя (| за предыдущим, = параллельно, + с суммой) и его
+          -- параметры тем же модулем, что на верхнем уровне; макросы — первой
+          -- колонкой; низ — строка броска
+          local base = f.has_macros and 1 or 0
+          set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
+          local hy = by + L.rh + 1
+          if base == 1 then text(bx + L.pad, hy, fit('macros', bw1 - 2 * L.pad), U.GREY) end
+          for ki, kid in ipairs(f.kids) do
+            local c = base + ki - 1
+            if c >= ncol then break end
+            local cx = bx + c * bw1
+            if c > 0 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - 2 * L.rh - 4, 1) end
+            local hot = not drag and mx >= cx and mx < cx + bw1 and my >= hy and my < by + bh - L.rh - 2
+            text(cx + L.pad, hy, kid_label(kid, bw1 - 2 * L.pad), kid.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
+            if hot then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+          end
+          cl = {}
+          local cnt = {}
+          for pi, p in ipairs(f.params) do
+            local c = p.macro and 0 or (base + (p.kid or 1) - 1)
+            cnt[c] = (cnt[c] or 0) + 1
+            cl[pi] = { c, cnt[c] - 1 }
+          end
+          if nfit >= 3 then drop_row(bx + L.pad, by + bh - L.rh - 2, bw - 2 * L.pad) end
+        else
+          -- свёрнут (не влез / пустой): список детей и строка броска
+          pcol0 = 1
+          local ky = by + L.rh + 1
+          for ki, kid in ipairs(f.kids) do
+            if ki > nfit - 1 then break end
+            local kx = bx + L.pad
+            set(kid.parallel > 0 and U.CYAN or U.LINE); gfx.rect(kx + L.cw // 2, ky, 2, L.rh, 1)
+            if kid.parallel > 0 then gfx.rect(kx + L.cw // 2 + 4, ky, 2, L.rh, 1) end
+            local hot = not drag and mx >= bx and mx < bx + bw and my >= ky and my < ky + L.rh
+            text(kx + L.cw + L.pad, ky, kid_label(kid, pw - L.cw - 2 * L.pad), kid.enabled and (hot and U.AMBER or U.TEXT) or U.GREY)
+            if hot then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+            ky = ky + L.rh
+          end
+          if ky + L.rh <= by + bh - 2 then drop_row(bx + L.pad, ky, pw) end
         end
       end
       if f.view == 'grain' then
@@ -4079,10 +4108,17 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.dspab = { f = f, x = tx0, w = tw0 } end
       end
       for pi, p in ipairs(f.params) do
-        if pi > nfit * (ncol - pcol0) then break end
+        if not cl and pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)
-        local bxc = bx + colk * bw1
         local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh
+        if cl then
+          -- развёрнутый контейнер: своя колонка у каждого плагина, под именем;
+          -- последняя строка — строка броска
+          local c = cl[pi]
+          if c[1] >= ncol or c[2] >= nfit - 2 then goto next_param end
+          colk, py = c[1], by + 2 * L.rh + 2 + c[2] * L.rh
+        end
+        local bxc = bx + colk * bw1
         -- rec (4 окт): параметры — снизу справа, под волной, последней строкой вверх
         if f.view == 'rec' then bxc = bx + bw - bw1; py = by + bh - (#f.params - pi + 2) * L.rh - 3 end   -- строка статуса, справа
         local v = vals[pi] or { n = 0, s = '' }
@@ -4142,7 +4178,10 @@ function D.frame(L, snap, rows, state, info)
           elseif p.kind == 'steps' and p.nsteps then hover.dsp.steplist = true end   -- клик — список (5 окт)
         end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
+        ::next_param::
       end
+      -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
+      if not drag and not hover.dsp and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       bx = bx + bw + L.pad
       end
       ::next_block::
@@ -4319,6 +4358,9 @@ function D.frame(L, snap, rows, state, info)
     local hv = info.fxb_draw(L, 0, py + 1, pw, pb - py - 2)
     if inside then hover.fxb = hv or true end
     set(U.AMBER); gfx.rect(0, py, pw, pb - py, 0)
+    -- рамка фокуса — по раскрытому списку (6 окт: рисовалась по прежнему месту
+    -- и резала список линией поперёк)
+    if D.module_rects then D.module_rects.fxb = { 0, py, pw, pb - py } end
   else D.fxb_popup = nil end
   -- keycaster (4 окт): последние нажатия в пустой правой части тела трекера —
   -- новое снизу, старое поднимается и гаснет (info.keycast: { label, t, n })

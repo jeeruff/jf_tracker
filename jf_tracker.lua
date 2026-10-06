@@ -149,6 +149,7 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
+  dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
@@ -412,7 +413,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -1063,6 +1064,18 @@ ctx = {
     if not (fxs[k0] and fxs[k1]) then vim.msg = 'dsp: no fx'; return end
     if edit.fx_pack(col.track, fxs[k0].i, fxs[k1].i) then dsp_sel.fx = k0; vim.msg = ('packed %d fx into a container'):format(k1 - k0 + 1)
     else vim.msg = 'pack failed (REAPER 7 containers)' end
+  end,
+  -- :fxname (6 окт): имя эффекта / контейнера в цепочке (renamed_name); цель —
+  -- из меню (плагин внутри контейнера) или выбранный блок DSP
+  fx_rename = function(name)
+    local t = state.fxname_target; state.fxname_target = nil
+    if not t then
+      local col, f = ctx.dsp_fx(dsp_sel.fx)
+      if f then t = { track = col.track, addr = f.i } end
+    end
+    if not t then vim.msg = 'fxname: no fx selected'; return end
+    edit.fx_rename(t.track, t.addr, name)
+    vim.msg = name ~= '' and ('fx renamed: ' .. name) or 'fx name reset'
   end,
   dsp_unpack = function(k)
     local col, f = ctx.dsp_fx(k)
@@ -4379,6 +4392,7 @@ ctx = {
       { key = 'pmshape', label = 'pm card shape', kind = 'cycle', values = { 'wide', 'compact', 'square' }, desc = 'wide - thumbnail left, name, preview wave, bpm / date, status; compact - three rows, the wave inside the thumbnail; square - thumbnail on top (w in the pm grid)', get = function() return ctx.pm_mod().shape end, set = function(v) ctx.pm_mod().shape = v; ctx.PM.invalidate(); reaper.SetExtState(EXT, 'pmshape', v, true) end },
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
+      flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
@@ -6119,6 +6133,32 @@ function ctx.context_items(hover)
       add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end)
       add('--', function() end)
     end
+    -- плагин внутри контейнера (6 окт): ПКМ по его колонке / строке
+    local kd = col and hover.dspkid and hover.dspkid.kid
+    if kd then
+      add((kd.enabled and 'Bypass ' or 'Enable ') .. kd.name, function() edit.fx_bypass(col.track, kd.i) end, 'b')
+      add('Open ' .. kd.name .. ' window', function() edit.fx_show(col.track, kd.i) end, 'o')
+      if kd.parallel > 0 then add('Serial: after the previous plugin', function() edit.fx_parallel(col.track, kd.i, 0) end, 's')
+      else add('Parallel to the previous plugin', function() edit.fx_parallel(col.track, kd.i, 1) end, 'p') end
+      add('Move out of the container', function() edit.fx_move_out(col.track, kd.i, f.i); vim.msg = kd.name .. ' moved out of ' .. f.name end, 'm')
+      add('Rename ' .. kd.name .. ' … (:fxname)', function() state.fxname_target = { track = col.track, addr = kd.i }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end, 'n')
+      add('Remove ' .. kd.name, function() edit.fx_remove(col.track, kd.i) end, 'x')
+      add('--', function() end)
+    end
+    if col and f and f.container then
+      local k = hover.dsp.fx
+      add('Unpack: plugins into the chain (dc)', function() ctx.dsp_unpack(k) end, 'u')
+      add('Add fx inside … (fzf)', function()
+        vim.open_picker('add fx into ' .. f.name, ctx.fx_list(), function(it)
+          if edit.fx_add_into(col.track, f.i, it.data) then vim.msg = '+ ' .. it.label .. ' → ' .. f.name end
+        end)
+      end, 'a')
+      add('Preset … (container presets)', function() ctx.dsp_preset(k, 'pick') end, 'r')
+      add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
+      add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
+      add('Rename container … (:fxname)', function() state.fxname_target = { track = col.track, addr = f.i }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end, 'n')
+      add('--', function() end)
+    end
     if col and f then
       add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name, function() edit.fx_bypass(col.track, f.i) end)
       add('Open FX window', function() edit.fx_show(col.track, f.i) end)
@@ -7639,6 +7679,7 @@ local function frame()
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
     smart_ok = reaper.file_exists(ctx.smart_input_path),
+    dsptrack = state.dsptrack,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
@@ -9345,17 +9386,18 @@ local function frame()
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column' end
       end
     else
-      if B.drag.active and hover.garden and hover.garden.ox and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
+      local bd = B.drag; B.drag = nil       -- снять ДО действия (6 окт): ошибка не повторит бросок каждый кадр
+      if bd.active and hover.garden and hover.garden.ox and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         -- файл на клетку Orca: в библиотеку трека курсора, затем — инструментом в поле
         local c = cur_col()
-        local it = c and edit.depot_add(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e), c.track)
+        local it = c and edit.depot_add(bd.e.pm and bd.e.path or B.full(bd.e), c.track)
         if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
-      elseif B.drag.active and hover.dspwave and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark and not B.drag.e.dir then
-        ctx.rs5k_file(hover.dspwave.f, B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))   -- файл на волну RS5K — его сэмпл
-      elseif B.drag.active and hover.pool and not B.drag.e.trk and not B.drag.e.rgn and not B.drag.e.mark then
-        ctx.add_to_depot(B.drag.e.pm and B.drag.e.path or B.full(B.drag.e))       -- бросок на инструменты — в библиотеку трека
-      elseif B.drag.active and hover.fi and hover.row then
-        local e = B.drag.e
+      elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
+        ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
+      elseif bd.active and hover.pool and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
+        ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
+      elseif bd.active and hover.fi and hover.row then
+        local e = bd.e
         if e.trk then ctx.drop_track(e, B.pmproj and B.pmproj.e)
         elseif e.rgn and B.pmproj then ctx.drop_region_to(hover.fi, hover.row.row, B.pmproj.e.path, e)
         elseif not e.mark then ctx.drop_to(hover.fi, hover.row.row, e.pm and e.path or B.full(e)) end
@@ -9478,23 +9520,24 @@ local function frame()
           or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)') or ('move ' .. dsp_drag.f.name .. ' - drop between blocks or into a container'))
       end
     else
-      local g, s = hover.dsp_gap, dsp_drag.fx
-      local col = dsp_drag.active and hover.dsp_into and dsp_target()
+      local dd = dsp_drag; dsp_drag = nil       -- снять ДО действия (6 окт): ошибка не повторит перенос
+      local g, s = hover.dsp_gap, dd.fx
+      local col = dd.active and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]
       if cf then
         -- в контейнер (6 окт): копия внутрь + удаление оригинала
-        if edit.fx_move_into(col.track, dsp_drag.f.i, cf.i, hover.dsp_into_par) then vim.msg = dsp_drag.f.name .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
-        else vim.msg = 'could not move ' .. dsp_drag.f.name .. ' into the container' end
+        if edit.fx_move_into(col.track, dd.f.i, cf.i, hover.dsp_into_par) then vim.msg = dd.f.name .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
+        else vim.msg = 'could not move ' .. dd.f.name .. ' into the container' end
         g = nil
       end
-      if dsp_drag.active and g and g ~= s and g ~= s - 1 then
+      if dd.active and g and g ~= s and g ~= s - 1 then
         local col = dsp_target()
         local fxs = col and col.fx or {}
         local dst = (g < s - 1) and fxs[g + 1] or fxs[g]
         if col and dst then
-          edit.fx_move(col.track, dsp_drag.f.i, dst.i)
+          edit.fx_move(col.track, dd.f.i, dst.i)
           dsp_sel.fx = (g < s - 1) and (g + 1) or g
-          vim.msg = 'fx moved: ' .. dsp_drag.f.name
+          vim.msg = 'fx moved: ' .. dd.f.name
         end
       end
       dsp_drag = nil
@@ -9509,14 +9552,17 @@ local function frame()
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1)) or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
       end
     else
-      local col = fxb_drag.active and hover.dsp_into and dsp_target()
+      -- состояние броска снимается ДО действия (6 окт): ошибка в действии
+      -- иначе оставляла бросок «висеть», и он повторялся каждый кадр (34 Air4)
+      local drop = fxb_drag; fxb_drag = nil
+      local col = drop.active and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]
       if cf then
-        if edit.fx_add_into(col.track, cf.i, fxb_drag.it.data, hover.dsp_into_par) then
-          FB.push_recent(fxb_drag.it); ctx.fxb_save()
-          vim.msg = '+ ' .. FB.short(fxb_drag.it.label) .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
+        if edit.fx_add_into(col.track, cf.i, drop.it.data, hover.dsp_into_par) then
+          FB.push_recent(drop.it); ctx.fxb_save()
+          vim.msg = '+ ' .. FB.short(drop.it.label) .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
         else vim.msg = 'could not add into the container' end
-      elseif fxb_drag.active and hover.dsp_gap then ctx.fxb_add(fxb_drag.it, hover.dsp_gap) end
+      elseif drop.active and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap) end
       fxb_drag = nil
     end
   end
@@ -9529,12 +9575,13 @@ local function frame()
           or ((hover.fi and hover.row) and ('drop: capture at row %04d'):format(hover.row.row) or 'drag the retro selection onto an instrument slot or a track row')
       end
     else
-      if retro.out.active then
+      local ro = retro.out; retro.out = nil      -- снять ДО действия (6 окт)
+      if ro.active then
         if hover.pool then retro_put('depot')
         elseif hover.fi and hover.row then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row; retro_put('cursor', true) end
-      elseif retro.out.at then
+      elseif ro.at then
         -- клик внутри выделения без протяжки — новое начало, как раньше
-        retro.sel.a = retro.out.at; retro.sel.b = math.min(1, retro.out.at + 0.05)
+        retro.sel.a = ro.at; retro.sel.b = math.min(1, ro.at + 0.05)
       end
       retro.out = nil
     end

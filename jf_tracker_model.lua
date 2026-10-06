@@ -859,7 +859,7 @@ M.dspmods = nil      -- реестр кураторских модулей (jf_t
 -- только AddByName, огибающая и копирование — их разбирает edit.
 local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
   'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
-  'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent' }
+  'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent', 'SetNamedConfigParm' }   -- Set… (6 окт): parallel / имя в контейнере
 local function fx_table(prefix)
   local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
   for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end
@@ -995,7 +995,18 @@ function M.track_fx(tr)
     parts[#parts + 1] = A.GetEnabled(tr, fx) and 1 or 0
     if A.GetNamedConfigParm then
       local ok, cc = A.GetNamedConfigParm(tr, fx, 'container_count')
-      if ok then parts[#parts + 1] = 'c' .. tostring(cc) end
+      if ok then
+        parts[#parts + 1] = 'c' .. tostring(cc)
+        -- дети (6 окт): bypass / parallel / порядок видны в рамке — в ключ кэша
+        for k = 0, (tonumber(cc) or 0) - 1 do
+          local ok2, id = A.GetNamedConfigParm(tr, fx, 'container_item.' .. k)
+          id = ok2 and tonumber(id)
+          if id then
+            local _, par = A.GetNamedConfigParm(tr, id, 'parallel')
+            parts[#parts + 1] = (A.GetFXGUID and A.GetFXGUID(tr, id) or id) .. (A.GetEnabled(tr, id) and '+' or '-') .. (par or '')
+          end
+        end
+      end
     end
   end
   local key = table.concat(parts, '|')
@@ -1014,11 +1025,19 @@ function M.track_fx(tr)
   return out
 end
 
+-- один эффект по адресу fx (верхний уровень или ребёнок контейнера) → в out;
+-- 6 окт: вынесено из цикла, чтобы дети контейнера строились тем же модулем
+local build_one
 function build_track_fx(tr)
   local out = {}
   local A = M.fxapi(tr)
   if not A.GetCount then return out end
-  for fx = 0, A.GetCount(tr) - 1 do
+  for fx = 0, A.GetCount(tr) - 1 do build_one(tr, fx, out) end
+  return out
+end
+function build_one(tr, fx, out)
+  local A = M.fxapi(tr)
+  do
     local _, name = A.GetFXName(tr, fx, '')
     local np = A.GetNumParams(tr, fx)
     local params = {}
@@ -1039,16 +1058,23 @@ function build_track_fx(tr)
           params[#params + 1] = e
         end
       end
-      for _, kid in ipairs(kids) do
-        for pi = 0, math.min(4, kid.np) - 1 do
-          local e = param_entry(tr, kid.i, pi)
-          e.name = kid.name:sub(1, 6) .. '.' .. e.name
-          e.fx = kid.i              -- адрес ребёнка: fx_values / fx_param идут по нему
+      -- 6 окт: дети — полным модулем (кураторский / свой / автомодуль), как на
+      -- верхнем уровне; e.kid — колонка ребёнка в развёрнутой рамке
+      local has_m = #params > 0
+      for ki, kid in ipairs(kids) do
+        local one = {}
+        build_one(tr, kid.i, one)
+        kid.entry = one[1]
+        for _, e0 in ipairs(one[1] and one[1].params or {}) do
+          local e = {}
+          for k2, v2 in pairs(e0) do e[k2] = v2 end
+          e.fx = e0.fx or kid.i      -- адрес ребёнка (внука — свой): fx_values / fx_param идут по нему
+          e.kid = ki
           params[#params + 1] = e
         end
       end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
-                        cols = 2, container = true, kids = kids }
+                        cols = math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m }
     elseif um then
       -- пользовательский модуль (learn касанием): параметры по номерам
       for _, sp in ipairs(um.params or {}) do
@@ -1110,7 +1136,6 @@ function build_track_fx(tr)
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw }
     end
   end
-  return out
 end
 
 function M.fx_values(tr, f)

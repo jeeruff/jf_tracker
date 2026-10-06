@@ -47,8 +47,10 @@ reaper = {
     local c, k = decode(fx); top[c + 1].kids[k + 1][key] = v; return true
   end,
 }
-local A = setmetatable({}, { __index = function(_, k) return reaper['TrackFX_' .. k] end })
-local model = { fxapi = function() return A end, is_take = function() return false end, invalidate = function() end }
+-- FX-таблица — НАСТОЯЩАЯ из модели (белый список имён): 6 окт стаб отдавал
+-- любую функцию и спрятал, что SetNamedConfigParm в список не входит
+local M = dofile('jf_tracker_model.lua')
+local model = { fxapi = M.fxapi, is_take = function() return false end, invalidate = function() end }
 local E = dofile('jf_tracker_edit.lua')
 E.init(model)
 local TR = {}
