@@ -1602,9 +1602,11 @@ local function draw_ctrl(L, info, H, hover)
   L.ctrl_area = { 0, 0, L.ctrl_w, H - 2 }                 -- главный модуль: фокус ctrl (3 окт)
   D.ctrl_rect = D.ctrl_rect or {}
   local y = 2
+  local qx, qw                                   -- колонки группы quick (6 окт): ширина по словам
   local function cell(it, ci)
     if not it[1] then return end                   -- пустая клетка колонки
-    local x = L.pad + ci * colw
+    local x = L.pad + (qx and qx[ci] or ci * colw)
+    local colw = qw and qw[ci] or colw
     if y + L.rh > H - 2 then return end
     local hot = mx >= x and mx < x + colw and my >= y and my < y + L.rh
     local kbd = info.focus == 'ctrl' and info.ctrl_sel == it[1]       -- курсор клавиатуры (3 окт)
@@ -1677,6 +1679,23 @@ local function draw_ctrl(L, info, H, hover)
   local function thin(yy) set(D.SEP); gfx.rect(L.pad, yy, L.ctrl_w - 2 * L.pad, 1, 1) end
   for gi, g in ipairs(groups) do
     local ci = 0
+    -- 6 окт: быстрые опции — ширина колонок по самому длинному слову колонки
+    -- (одинаковые обрезали performance); не влезает — поровну, как раньше
+    qx, qw = nil, nil
+    if g.name == 'quick' then
+      local need = { 0, 0, 0 }
+      for i, it in ipairs(g.items) do
+        local k = (i - 1) % 3 + 1
+        if it[1] then need[k] = math.max(need[k], ms(it[2] or '') + (it.sizer and ms(' - +') or 0) + 6) end
+      end
+      local total = L.ctrl_w - 2 * L.pad
+      local sum = need[1] + need[2] + need[3]
+      if sum <= total then
+        local extra = math.floor((total - sum) / 3)
+        qw = { [0] = need[1] + extra, need[2] + extra, need[3] + extra }
+        qx = { [0] = 0, qw[0], qw[0] + qw[1] }
+      end
+    end
     if gi > 1 then
       local gap = 3
       -- 4 окт: пустого места нет — транспорт сразу под кнопками окон, под ним
@@ -2865,6 +2884,18 @@ function D.frame(L, snap, rows, state, info)
         local fx0 = ln.x + ln.w - bw2 - 1
         if li == #c.lanes and fx0 > nx + bw2 + L.pad then
           pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = d end)
+          -- 6 окт: лейнов огибающих нет — a+ (добавить лейн автоматизации) левее
+          local aw = ms('a+') + 4
+          local ax = fx0 - aw - L.pad
+          if #c.envs == 0 and not state.ptmode and ax > nx + bw2 + L.pad then
+            local by = hy + L.lane_row * L.rh + 1
+            local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
+            set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
+            set(U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
+            text(ax + 2, by, 'a+', ahot and U.AMBER or U.GREY)
+            if ahot then hover.envpm = { col = col, d = 1 } end
+            hint('envpm', ax, by, aw, L.rh, { col = col, d = 1 })
+          end
         end
       end
       if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1) end
@@ -2874,10 +2905,29 @@ function D.frame(L, snap, rows, state, info)
       set(U.DIM); gfx.rect(m.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
       hint('mlane', m.x, hy + L.lane_row * L.rh, m.w, L.rh, m.fi)
     end
-    for _, ev in ipairs(c.envs) do
-      text(ev.x + L.pad, hy + L.lane_row * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
+    for ei, ev in ipairs(c.envs) do
+      -- 6 окт: справа в шапке лейна − (спрятать лейн; огибающая и точки
+      -- остаются), у последнего лейна ещё + (добавить: выбор параметра);
+      -- имя — до кнопок, не под ними
+      local ly2 = hy + L.lane_row * L.rh
+      local nb = (ei == #c.envs) and 2 or 1
+      local bx0 = ev.x + ev.w - nb * (L.btn_w + 2) - 1
+      local room = not c.compact and (bx0 - ev.x - 2 * L.pad) >= ms('WW')
+      text(ev.x + L.pad, ly2 + 2, fit(ev.e.name, room and (bx0 - ev.x - 2 * L.pad) or (ev.w - 2 * L.pad)), env_colour(ev.e))
+      local on_btn = false
+      if room then
+        for k, b in ipairs(nb == 2 and { { '+', 1 }, { '-', -1 } } or { { '-', -1 } }) do
+          local bx, by = bx0 + (k - 1) * (L.btn_w + 2), ly2 + 1
+          local bhot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
+          set(bhot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
+          set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
+          text(bx + 2, by, b[1], bhot and U.AMBER or U.GREY)
+          if bhot then hover.envpm = { col = c.col, e = ev.e, d = b[2] }; on_btn = true end
+          hint('envpm', bx, by, L.btn_w, L.rh, { col = c.col, e = ev.e, d = b[2] })
+        end
+      end
       -- имя огибающей — своё меню (клик: удалить кривую / очистить точки), 2 окт
-      if mx >= ev.x and mx < ev.x + ev.w and my >= hy + L.lane_row * L.rh and my < hy + (L.lane_row + 1) * L.rh then hover.header_env = { e = ev.e, col = c.col } end
+      if not on_btn and mx >= ev.x and mx < ev.x + ev.w and my >= hy + L.lane_row * L.rh and my < hy + (L.lane_row + 1) * L.rh then hover.header_env = { e = ev.e, col = c.col } end
       hint('env', ev.x, hy + L.lane_row * L.rh, ev.w, L.rh, ev.fi)
       set(U.DIM); gfx.rect(ev.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
     end
@@ -3077,6 +3127,21 @@ function D.frame(L, snap, rows, state, info)
         -- automation items в колонках огибающих: полупрозрачная заливка
         -- цветом темы (env_item_vol/pan/mute/pitch) + кайма, как в аранжировке
         for _, ev in ipairs(c.envs) do
+          -- 6 окт: наложенные automation items — по слотам: у каждого своя
+          -- узкая ручка рядом, рамка — от неё; подпись только на широкой
+          -- ручке (на узкой имя — в статусе), чтобы ничего не наслаивалось
+          local slot, nslot = {}, 1
+          if #(ev.e.ais or {}) > 1 then
+            local order, ends = {}, {}
+            for _, ai in ipairs(ev.e.ais) do order[#order + 1] = ai end
+            table.sort(order, function(a, b) return a.r0 < b.r0 end)
+            for _, ai in ipairs(order) do
+              local s = 1
+              while ends[s] and ends[s] > ai.r0 + 1e-6 do s = s + 1 end
+              ends[s] = ai.r1; slot[ai] = s
+              if s > nslot then nslot = s end
+            end
+          end
           for _, ai in ipairs(ev.e.ais or {}) do
             local y0, y1 = yr(ai.r0), yr(ai.r1)
             if y1 > by0 and y0 < by1 then
@@ -3094,14 +3159,16 @@ function D.frame(L, snap, rows, state, info)
                 gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
                 gfx.a = 1
               end
-              set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
+              local sw = L.th + 4
+              local hw = nslot > 1 and math.max(3, math.floor(sw / nslot)) or sw
+              local hx = ev.x + ((slot[ai] or 1) - 1) * hw
+              set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(hx, cy0, ev.x + ev.w - hx, cy1 - cy0, 0)
               local hot = hover.aiedge and hover.aiedge.e == ev.e and hover.aiedge.idx == ai.idx
               -- ручка слева — полоса в строку текста шириной, в ней имя вертикально (2 окт)
-              local sw = L.th + 4
               -- ручка (6 окт): рисуется ПОСЛЕ строк, непрозрачной — линии тактов
               -- её не режут, как полосу с именем в REAPER; здесь — только запись
               D.ai_handles = D.ai_handles or {}
-              local hd = { x = ev.x, y = cy0, w = sw, h = cy1 - cy0, col = col, hot = hot and hover.aiedge.edge == 'move', label = ai.label, seams = {} }
+              local hd = { x = hx, y = cy0, w = hw, h = cy1 - cy0, col = col, hot = hot and hover.aiedge.edge == 'move', label = hw >= L.th + 2 and ai.label or nil, seams = {} }
               D.ai_handles[#D.ai_handles + 1] = hd
               set(col)
               if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, (hot and hover.aiedge.edge == 'start') and 3 or 2, 1) end
@@ -3135,8 +3202,8 @@ function D.frame(L, snap, rows, state, info)
               if mx >= ev.x and mx < ev.x + ev.w and my >= y0 - 3 and my <= y1 + 3 then
                 local edge
                 if math.abs(my - y0) <= 3 then edge = 'start' elseif math.abs(my - y1) <= 3 then edge = 'end'
-                elseif mx < ev.x + L.th + 4 then edge = 'move' end
-                if edge then hover.aiedge = { e = ev.e, idx = ai.idx, edge = edge, pos = ai.pos, len = ai.len, col = c.col } end
+                elseif mx >= hx and mx < hx + hw then edge = 'move' end
+                if edge then hover.aiedge = { e = ev.e, idx = ai.idx, edge = edge, pos = ai.pos, len = ai.len, col = c.col, label = ai.label } end
               end
             end
           end

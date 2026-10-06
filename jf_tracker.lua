@@ -2087,6 +2087,17 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  -- спрятать лейн огибающей (6 окт, − в шапке лейна): огибающая и точки
+  -- остаются, + / a+ показывает снова
+  env_hide = function(e)
+    if not (e and reaper.ValidatePtr(e.env, 'TrackEnvelope*')) then return end
+    edit.run('hide envelope ' .. (e.name or ''), function()
+      reaper.GetSetEnvelopeInfo_String(e.env, 'VISIBLE', '0', true)
+      reaper.TrackList_AdjustWindows(false)
+    end)
+    model.invalidate()
+    vim.msg = (e.name or 'envelope') .. ' lane hidden - + shows it again'
+  end,
   -- :logo (6 окт): артворк по центру трекера, каждый раз другой (:logo имя —
   -- конкретный); любая клавиша или клик закрывает. Рисуется один раз в
   -- картинку 98 (дизеринг попиксельный), дальше только blit
@@ -5448,6 +5459,7 @@ local function hint_go(t)
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
+  elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
@@ -5687,7 +5699,10 @@ local function context_menu(hover, anchor)
       if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2], hk = hk } end
     end
   end
-  local page = ctx.ctx_page(hover)
+  -- 6 окт: меню отдельной кнопки (preview, имя лейна огибающей) — только её
+  -- пункты, без хоткеев модуля в фокусе (ПКМ на preview давал всё меню матрицы)
+  local own = hover.prevbtn and 'preview' or (hover.header_env and (hover.header_env.e.name or 'envelope')) or nil
+  local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
   if P then
     for _, e in ipairs(P.e) do
@@ -5711,7 +5726,7 @@ local function context_menu(hover, anchor)
   if #hitems == 0 then return end
   -- 5 окт: двойные хоткеи — нет; пока только жёлтые буквы, без колонки клавиш
   for _, it in ipairs(hitems) do it.hk = nil end
-  vim.open_hydra({ title = page and ('menu: ' .. (P and P.title or page)) or 'menu', items = hitems })
+  vim.open_hydra({ title = own or (page and ('menu: ' .. (P and P.title or page))) or 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
 ctx.open_context = context_menu          -- для \ из ctx.context_key (объявлен выше этого места)
@@ -7842,6 +7857,8 @@ local function frame()
       or (math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5))))
     state.status = ('%s %s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what, vs)
   elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
+  elseif hover.envpm then state.status = hover.envpm.d > 0 and 'add an automation lane: pick a parameter of the track or its fx'
+    or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
   elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
@@ -8281,6 +8298,9 @@ local function frame()
     elseif hover.fxcolbtn then
       ctrl_action('fx', hover.fxcolbtn); vim.msg = ('fx columns: %d'):format(state.fxcols)
       click = { t = now2, zone = 'fxcolbtn' }
+    elseif hover.envpm then
+      if hover.envpm.d > 0 then ctx.automation_picker(hover.envpm.col) else ctx.env_hide(hover.envpm.e) end
+      click = { t = now2, zone = 'envpm' }
     elseif hover.lanebtn then
       ctx.lane_subs(hover.lanebtn.col, hover.lanebtn.lane, hover.lanebtn.d, hover.lanebtn.n)
       click = { t = now2, zone = 'lanebtn' }
@@ -8715,7 +8735,7 @@ local function frame()
       ai_drag = nil
     end
   elseif hover.aiedge then
-    state.status = ('automation item %s: %s'):format(hover.aiedge.e.name or '', ({ move = 'drag the left strip to move it', start = 'drag the top edge: start (trim)', ['end'] = 'drag the bottom edge: length (loops repeat)' })[hover.aiedge.edge])
+    state.status = ('automation item %s%s: %s'):format(hover.aiedge.e.name or '', hover.aiedge.label and (' / ' .. hover.aiedge.label) or '', ({ move = 'drag the left strip to move it', start = 'drag the top edge: start (trim)', ['end'] = 'drag the bottom edge: length (loops repeat)' })[hover.aiedge.edge])
   end
   -- стык лупа мышью: item — на отпускании (правка секции через чанк), automation item — сразу
   if seam_drag then
