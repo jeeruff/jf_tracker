@@ -92,6 +92,7 @@ local function arm(ci, what)
 end
 function SS.launch(ri, ci, seq)
   local rg = seq[ri]; if not rg then return end
+  SS.halt = nil
   if SS.live[ci] and SS.live[ci].ri == ri and not SS.pend[ci] then ctx.msg('already playing: ' .. SS.slot_name(rg, ri)); return end
   arm(ci, ri)
   ctx.msg(('launch %s on %s at %s'):format(SS.slot_name(rg, ri), ctx.ss_colname(ci), SS.quant))
@@ -114,7 +115,9 @@ end
 function SS.stop_all(ncols)
   local n = 0
   for ci = 1, ncols do if SS.live[ci] or SS.pend[ci] then arm(ci, 'stop'); n = n + 1 end end
-  ctx.msg(n > 0 and ('stop all: %d tracks at %s'):format(n, SS.quant) or 'nothing plays')
+  -- транспорт встаёт вместе с последним клипом (6 окт: иначе пустая зона крутилась дальше)
+  SS.halt = true
+  if n == 0 then SS.halt = nil; ctx.ss_stop_transport(); ctx.msg('nothing plays - transport stopped') else ctx.msg(('stop all: %d tracks at %s, then the transport stops'):format(n, SS.quant)) end
 end
 -- выход: транспорт стоп, зона чистая, состояние сброшено
 function SS.quit()
@@ -161,6 +164,8 @@ function SS.tick(seq, snap)
       SS.pend[ci] = nil
     end
   end
+  -- X: все остановлены — транспорт стоп (клипы уже убраны на границе)
+  if SS.halt and not next(SS.live) and not next(SS.pend) then SS.halt = nil; SS.todo = {}; ctx.ss_stop_transport() end
   for ci, t in pairs(SS.todo) do
     if pos >= t.to + 0.02 or wrapped then
       local col = snap.cols[ci]
@@ -223,6 +228,7 @@ end
 -- ряда — сцена; заголовок трека — стоп трека
 function SS.click(hv, seq, snap, grid, now)
   local ncols = #snap.cols
+  if not (hv.sess or hv.sessrow or hv.sesscol or hv.sessbtn) then return false end   -- не наше — клик идёт дальше (кнопки матрицы)
   if hv.sessrow then SS.cur.ri = hv.sessrow; SS.scene(hv.sessrow, seq, grid, ncols)
   elseif hv.sesscol then SS.stop(hv.sesscol)
   elseif hv.sess then
@@ -236,6 +242,7 @@ function SS.click(hv, seq, snap, grid, now)
   elseif hv.sessbtn == 'quit' then SS.quit()
   elseif hv.sessbtn == 'back' or hv.sessbtn == 'big' then ctx.ss_big()
   end
+  return true
 end
 -- пункты ПКМ по клетке
 function SS.menu_items(hv, seq, snap, grid, add)

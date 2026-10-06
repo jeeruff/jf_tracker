@@ -21,6 +21,7 @@ local ctx = {
   ss_colname = function(ci) return 'T' .. ci end,
   ss_transport = function() playing = not playing end,
   ss_quit = function() playing = false end,
+  ss_stop_transport = function() playing = false end,
   ss_big = function() big = big + 1 end,
   ss_is_big = function() return true end,
   msg = function(m) msgs[#msgs + 1] = m end,
@@ -100,6 +101,7 @@ calls = {}; pos = 100.02; SS.tick(seq, snap)   -- луп прыгнул → до
 eq('wrap fill', #calls, 2); near('wrap fill win from', calls[2][9][1], 115.95)
 -- ── stop all / quit ───────────────────────────────────────────────────────
 SS.stop_all(3); eq('stop all: pend on live', SS.pend[1] and SS.pend[1].ri == 'stop' and SS.pend[2].ri == 'stop' and SS.pend[3].ri == 'stop', true)
+pos = 101.95; SS.tick(seq, snap); eq('stop all: transport stops with the last clip', playing, false); playing = true
 SS.quit(); eq('quit clears', next(SS.live) == nil and next(SS.pend) == nil, true)
 
 -- ── клавиши ───────────────────────────────────────────────────────────────

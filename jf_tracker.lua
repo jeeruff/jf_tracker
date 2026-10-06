@@ -3833,6 +3833,7 @@ ctx = {
     model.invalidate()
   end,
   ss_transport = function() edit.play_stop() end,
+  ss_stop_transport = function() if playing() then reaper.OnStopButton() end end,
   ss_quit = function()
     local z = ctx.ss_zone()
     reaper.OnStopButton()
@@ -3866,9 +3867,10 @@ ctx = {
   -- файлы, брошенные на окно (Media Explorer, Finder): gfx.getdropfile
   os_drop = function(files, hv)
     if #files == 0 then return end
-    if hv.sess then
-      -- на клетку сессии: первый файл — в неё, следующие — в сцены ниже
-      for k, f in ipairs(files) do if seq[hv.sess.ri + k - 1] then ctx.ss_drop(hv.sess.ri + k - 1, hv.sess.ci, f) end end
+    local cell = hv.sess or (hv.matrix and hv.matrix.ri and hv.matrix.ci and hv.matrix) or nil
+    if cell then
+      -- на клетку сессии / ячейку матрицы: первый файл — в неё, следующие — в сцены ниже
+      for k, f in ipairs(files) do if seq[cell.ri + k - 1] then ctx.ss_drop(cell.ri + k - 1, cell.ci, f) end end
     elseif hv.pool then for _, f in ipairs(files) do ctx.add_to_depot(f) end
     elseif hv.fi and hv.row then
       for k, f in ipairs(files) do ctx.drop_to(hv.fi, hv.row.row + k - 1, f) end
@@ -8634,7 +8636,7 @@ local function frame()
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
-  if U.click and hover.ssbig and snap then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()); U.click = false end   -- session: клетка / сцена / кнопки
+  if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
     if bpm_menu.hover then
@@ -9612,6 +9614,8 @@ local function frame()
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
       elseif bd.active and hover.pool and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
         ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
+      elseif bd.active and hover.matrix and hover.matrix.ri and hover.matrix.ci and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
+        ctx.ss_drop(hover.matrix.ri, hover.matrix.ci, bd.e.pm and bd.e.path or B.full(bd.e))   -- на ячейку матрицы — клипом в слот (6 окт)
       elseif bd.active and hover.sess and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.ss_drop(hover.sess.ri, hover.sess.ci, bd.e.pm and bd.e.path or B.full(bd.e))   -- session: файл / карточка pm — клипом в слот (6 окт)
       elseif bd.active and hover.fi and hover.row then
