@@ -3277,7 +3277,7 @@ function D.frame(L, snap, rows, state, info)
           local ev0 = env_vals[ev][i]
           if ev0 and ev0.pt then
             local px = ev.x + EG.env_bx + math.floor(ev0.v * (EG.env_bar_w - 1) + 0.5)
-            if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row } end
+            if math.abs(mx - px) <= 4 and math.abs(my - (y + 1)) <= 4 then hover.envpt = { e = ev.e, row = r.row, bx = ev.x + EG.env_bx, bw = EG.env_bar_w } end
           end
         end
         ::env_next::

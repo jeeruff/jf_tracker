@@ -8432,11 +8432,17 @@ local function frame()
       -- точка огибающей: тянуть в любом режиме (по строкам и по значению), один undo
       local e, row = hover.envpt.e, hover.envpt.row
       local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
-      local idx = reaper.GetEnvelopePointByTime(e.env, t1 - 1e-6)
+      -- 6 окт: точка под automation item — его пула (видимый проход)
+      local ai = -1
+      for _, a in ipairs(e.ais or {}) do if t0 >= a.pos - 1e-9 and t0 < a.pos + a.len then ai = a.idx end end
+      local idx = reaper.GetEnvelopePointByTimeEx(e.env, ai, t1 - 1e-6)
       local ok, pt_t = false, nil
-      if idx and idx >= 0 then ok, pt_t = reaper.GetEnvelopePoint(e.env, idx) end
+      if idx and idx >= 0 then ok, pt_t = reaper.GetEnvelopePointEx(e.env, ai, idx) end
       if ok and pt_t >= t0 - 1e-6 then
-        pt_drag = { e = e, idx = idx, t0 = pt_t, y0 = gfx.mouse_y, x0 = gfx.mouse_x, active = false }
+        -- значение — от x мыши по дорожке колонки, запомненной на старте:
+        -- раньше бралось из hover и залипало, когда мышь уходила с колонки
+        pt_drag = { e = e, ai = ai, idx = idx, t0 = pt_t, y0 = gfx.mouse_y, x0 = gfx.mouse_x, active = false,
+                    bx = hover.envpt.bx, bw = hover.envpt.bw }
         if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, row, 1 end
       end
       click = { t = now2, zone = 'envpt' }
@@ -8561,15 +8567,17 @@ local function frame()
         if gfx.mouse_cap & 4 ~= 4 then rowf = math.floor(rowf + 1e-6) end
         local t = reaper.TimeMap2_QNToTime(0, math.max(0, rowf) / state.lpb)
         local e = pt_drag.e
-        local _, _, raw = reaper.GetEnvelopePoint(e.env, pt_drag.idx)
-        if hover.env == e and hover.envx then raw = e.min + math.max(0, math.min(1, hover.envx)) * (e.max - e.min) end
-        reaper.SetEnvelopePoint(e.env, pt_drag.idx, t, raw, nil, nil, nil, true)
+        local raw
+        if pt_drag.bx and (pt_drag.bw or 0) > 1 then
+          raw = e.min + math.max(0, math.min(1, (gfx.mouse_x - pt_drag.bx) / (pt_drag.bw - 1))) * (e.max - e.min)
+        else _, _, raw = reaper.GetEnvelopePointEx(e.env, pt_drag.ai, pt_drag.idx) end
+        reaper.SetEnvelopePointEx(e.env, pt_drag.ai, pt_drag.idx, t, raw, nil, nil, nil, true)
         pt_drag.moved = true
         state.status = ('%s point → row %.2f, value %.3f (Cmd: free)'):format(e.name or 'envelope', rowf, raw or 0)
         model.invalidate()
       end
     else
-      if pt_drag.active then reaper.Envelope_SortPoints(pt_drag.e.env); edit.item_drag_end() end
+      if pt_drag.active then reaper.Envelope_SortPointsEx(pt_drag.e.env, pt_drag.ai); edit.item_drag_end() end
       pt_drag = nil
     end
   elseif hover.envpt then
