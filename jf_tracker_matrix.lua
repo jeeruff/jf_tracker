@@ -41,12 +41,13 @@ function MX.init(u, c) U, ctx = u, c end
 local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
-local BTNS = { { 'fold', 'fold' }, { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'clips', 'clips' }, { 'add', '+' } }
-local FOLD_BTNS = { { 'fold', 'fold' } }        -- свёрнутая: одна кнопка — развернуть
+-- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
+local BTNS = { { 'fold', 'fold' }, { 'clips', 'clips' }, { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
+local FOLD_BTNS = { { 'fold', 'fold' }, { 'clips', 'clips' } }        -- свёрнутая: одна кнопка — развернуть
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
 local function btns()
-  if MX.fold and not MX.clips then return FOLD_BTNS end   -- clips поверх fold: нужен весь ряд, чтобы выключить
+  if MX.fold and not MX.clips then return FOLD_BTNS end   -- свёрнутая: fold и clips   -- clips поверх fold: нужен весь ряд, чтобы выключить
   local out = {}
   for _, b in ipairs(BTNS) do
     local hide = (b[1] == 'sync' and ctx and ctx.autosync_on and ctx.autosync_on()) or (b[1] == 'loops' and not (ctx and ctx.dev_on and ctx.dev_on()))
@@ -155,7 +156,7 @@ function MX.width(L, nregions, ncols)
   L.mx_head_h = L.rh + 2 + MX.name_h + 4
   -- справа — колонка кнопок < > = у линии раздела: ячейки под неё не уходят
   local knob_w = U.measure('>') + 2 * L.pad + 6
-  local w = math.max(L.mx_label_w + ncols * L.mx_cell_w + L.pad + knob_w, MX.btns_w + L.pad)
+  local w = math.max(L.mx_label_w + ncols * L.mx_cell_w + L.pad + knob_w, MX.btns_w + L.pad + knob_w)   -- ряд кнопок не под ручками
   if MX.clips then w = math.max(w, L.cw * 8 + math.min(ncols, 6) * L.cw * 8 + 3 * L.pad + knob_w) end   -- clips: клетки не уже 8 знаков (до 6 треков без прокрутки)
   return w
 end
