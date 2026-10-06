@@ -190,7 +190,9 @@ local state = {
   gridtab = reaper.file_exists(DIR .. '/.dev') and flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')) or false,
   -- pm cards (6 окт, экспериментально как grid / orca): вкладка pm браузера —
   -- сетка карточек jf_pm с превью, big — на всё окно (jf_tracker_pm.lua)
-  pmgrid = reaper.file_exists(DIR .. '/.dev') and flag('pmgrid', true) or false,
+  -- модуля карточек нет в релизе (не отгружается) — без файла опции нет и с .dev
+  pm_ok = reaper.file_exists(DIR .. '/jf_tracker_pm.lua'),
+  pmgrid = reaper.file_exists(DIR .. '/.dev') and reaper.file_exists(DIR .. '/jf_tracker_pm.lua') and flag('pmgrid', true) or false,
   pmthumb = flag('pmthumb', true), pmicon = flag('pmicon', true),   -- превью / метка DAW на карточках pm
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
@@ -3746,7 +3748,7 @@ ctx = {
     end
     return ctx.PM
   end,
-  pm_cards = function() return state.pmgrid and true or false end,
+  pm_cards = function() return state.pmgrid and state.pm_ok or false end,
   pm_big_on = function() return state.pm_big and true or false end,
   -- big (6 окт): карточки на всё окно — оверлей после draw.frame, раскладка
   -- сохраняется как в PT-mode и возвращается по Esc / b / :pm big
@@ -3757,7 +3759,7 @@ ctx = {
       relayout(); ctx.set_focus('browser')
       vim.msg = 'pm: back to the sidebar'
     else
-      if not state.pmgrid then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
+      if not ctx.pm_cards() then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
       state.pm_saved = {}
       for _, k in ipairs({ 'top', 'dsp', 'mx_hidden', 'side', 'khelp' }) do state.pm_saved[k] = state[k] end
       state.top, state.dsp, state.mx_hidden, state.side, state.khelp = false, false, true, true, false
@@ -3771,7 +3773,8 @@ ctx = {
   pm_cmd = function(arg)
     arg = (arg or ''):match('^%s*(.-)%s*$')
     local w1, w2 = arg:match('^(%S+)%s*(%S*)')
-    if not state.pmgrid and w1 ~= '' then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
+    w1, w2 = w1 or '', w2 or ''                  -- :pm без слова — просто вкладка (nil ломал проверку ниже)
+    if not ctx.pm_cards() and w1 ~= '' then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
     if w1 == 'big' then ctx.pm_big(); return end
     state.side = true; B.set_mode('pm'); ctx.set_focus('browser')
     if w1 == 'grid' or w1 == 'list' then B.click(w1 == 'grid' and 'pmgrid' or 'pmlist')

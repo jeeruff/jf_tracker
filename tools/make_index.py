@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 NAME = 'jf_tracker'
 RAW = 'https://github.com/jeeruff/jf_tracker-release/raw'
 # not shipped: development files
-SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$)')
+SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$|jf_tracker_pm\.lua$|daemon_tracker\.lua$)')  # pm-карточки и демон jf_grid — только dev
 
 
 def git(*a, raw=False):
