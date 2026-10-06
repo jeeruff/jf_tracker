@@ -3010,9 +3010,12 @@ function D.frame(L, snap, rows, state, info)
               -- как шапка item в REAPER), край сверху / снизу — начало / длина;
               -- стыки лупа — срезами поперёк
               local col = env_colour(ev.e)
-              set(col); gfx.a = ai.sel and 0.16 or 0.08
-              gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
-              gfx.a = 1
+              -- заливка — опцией (6 окт): по умолчанию прозрачная, как в REAPER — только рамка
+              if state.aifill then
+                set(col); gfx.a = ai.sel and 0.16 or 0.08
+                gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
+                gfx.a = 1
+              end
               set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(ev.x, cy0, ev.w, cy1 - cy0, 0)
               local hot = hover.aiedge and hover.aiedge.e == ev.e and hover.aiedge.idx == ai.idx
               -- ручка слева — полоса в строку текста шириной, в ней имя вертикально (2 окт)
