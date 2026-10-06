@@ -1292,10 +1292,26 @@ function M.env_values(e, rows)
       sub[j] = norm(rv)
     end
     local pt, shape = false, nil
-    local idx = R.GetEnvelopePointByTime(e.env, nxt - 1e-6)
-    if idx and idx >= 0 then
-      local ok, pt_t, _, shp = R.GetEnvelopePoint(e.env, idx)
-      if ok and pt_t >= r.t - 1e-6 then pt = true; shape = shp end
+    -- 6 окт: под automation item — точки его пула (все проходы лупа, как
+    -- видны в аранжировке; опция aipoints), точки огибающей под ним скрыты
+    local ai
+    for _, a in ipairs(e.ais or {}) do
+      if a.pos and r.t >= a.pos - 1e-9 and r.t < a.pos + a.len then ai = a end
+    end
+    if ai then
+      if M.aipoints ~= false and R.GetEnvelopePointByTimeEx then
+        local idx = R.GetEnvelopePointByTimeEx(e.env, ai.idx, nxt - 1e-6)
+        if idx and idx >= 0 then
+          local ok, pt_t, _, shp = R.GetEnvelopePointEx(e.env, ai.idx, idx)
+          if ok and pt_t >= r.t - 1e-6 and pt_t < nxt - 1e-9 then pt = true; shape = shp end
+        end
+      end
+    else
+      local idx = R.GetEnvelopePointByTime(e.env, nxt - 1e-6)
+      if idx and idx >= 0 then
+        local ok, pt_t, _, shp = R.GetEnvelopePoint(e.env, idx)
+        if ok and pt_t >= r.t - 1e-6 then pt = true; shape = shp end
+      end
     end
     out[i] = { v = v, pt = pt, raw = raw, sub = sub, shape = shape }
   end

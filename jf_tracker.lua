@@ -149,6 +149,7 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   swing = tonumber(reaper.GetExtState(EXT, 'swing')) or 50,   -- свинг вставки, % (50 = ровно), 6 окт
+  aipoints = flag('aipoints', true),               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
@@ -400,7 +401,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('swing', tostring(state.swing or 50)); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2492,6 +2493,10 @@ ctx = {
     ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
     ctx.AIE.on_save = function() vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'curvesave ' end
     ctx.AIE.on_load = function() ctx.curve_browse() end
+    ctx.AIE.on_pick = function(b)                                  -- другой лейн пула (6 окт)
+      for i, c in ipairs(ctx.ai_list()) do if c == b then ctx.ai_sel = i end end
+      ctx.ai_edit_open(b)
+    end
     state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool, col = a.col }
     state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
     vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'
@@ -3964,6 +3969,7 @@ ctx = {
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
       flag('envpoints', 'envelope points', 'envelope points as small circles in the envelope columns and the item editor, as REAPER draws them'),
+      flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
@@ -6484,7 +6490,8 @@ local env_cache = {}
 -- только когда сменились проект (state change count), вид или LPB; раньше
 -- пересчитывались все видимые огибающие каждый кадр
 local function env_values(e)
-  local k = ('%d|%d|%d|%d'):format(reaper.GetProjectStateChangeCount(0), rows[1] and rows[1].row or 0, #rows, state.lpb)
+  model.aipoints = state.aipoints ~= false
+  local k = ('%d|%d|%d|%d|%s'):format(reaper.GetProjectStateChangeCount(0), rows[1] and rows[1].row or 0, #rows, state.lpb, tostring(model.aipoints))
   if k ~= ctx.env_cache_key then env_cache, ctx.env_cache_key = {}, k end
   local v = env_cache[e]
   if not v then v = model.env_values(e, rows); env_cache[e] = v end
@@ -7112,10 +7119,11 @@ local function frame()
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
     swap_state = function() return (ctx.swap_info()) end,
     -- пианинка (4 окт): октава, держимые клавиши (JS_VKeys), последняя сыгранная
-    piano = state.piano_show and (function()
+    piano = (function()
       -- клавиши идут в пианинку только из трекера / вкладки сэмпла (5 окт):
-      -- в другом модуле — без подсветки нажатий, полоса блёклая
-      local active = state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample')
+      -- в другом модуле — без подсветки нажатий, полоса блёклая; m off
+      -- (6 окт) — клавиатура не прячется, тоже блёклая
+      local active = state.piano_show and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
       local held = {}
       if active and reaper.JS_VKeys_GetState then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
@@ -7124,8 +7132,8 @@ local function frame()
           if ks and ks:byte(vk) ~= 0 then held[off] = true end
         end
       end
-      return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active }
-    end)() or nil,
+      return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active and true or false }
+    end)(),
     zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,
     in_open = function(col) return vim.picker and vim.picker.inp == col.guid end,
@@ -7334,7 +7342,7 @@ local function frame()
           -- справа узкий блок свойств item (6 окт): loop, повторы, playrate …
           local pw = math.min(Lx.cw * 26, math.floor(lw2 * 0.3))
           ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2 - pw - Lx.pad, lh, state.ai_edit, ctx.fit,
-            function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end)
+            function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end, ctx.ai_list())
           local ph = ctx.AIE.props(U, Lx, lx + lw2 - pw, ly, pw, lh, state.ai_edit, ctx.fit)
           if ph then ctx.aied_hover = ph end
           return nil
@@ -7347,7 +7355,7 @@ local function frame()
         return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'item', 'ai' }, { 'curves', 'lfo' } } or { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'curves', 'lfo' } })
+        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curves', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -7360,7 +7368,7 @@ local function frame()
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      pages(x, state.ai_edit and { { 'matrix', 'matrix' }, { 'params', 'params' }, { 'item', 'ai' } } or { { 'matrix', 'matrix' }, { 'params', 'params' } })
+      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' } } or { { 'params', 'params' }, { 'matrix', 'matrix' } })
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
     end,
     sample_draw = function(x, y, w, h)

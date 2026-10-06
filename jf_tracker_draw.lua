@@ -3227,6 +3227,15 @@ function D.frame(L, snap, rows, state, info)
       for _, ev in ipairs(c.envs) do
         local EG = ev.G or L
         if r.clip then goto env_next end
+        -- выделение на лейне огибающей (6 окт): Shift+j/k, мышь — лёгкое
+        -- высветление фона, линия и точки под ним видны
+        if vis and ev.fi >= vis.f0 and ev.fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
+          set(U.TEXT, 0.10); gfx.rect(ev.x, y, ev.w, L.rh, 1); gfx.a = 1
+          local vb = D.vis_box
+          if not vb then vb = {}; D.vis_box = vb end
+          vb.x0 = math.min(vb.x0 or ev.x, ev.x); vb.x1 = math.max(vb.x1 or (ev.x + ev.w), ev.x + ev.w)
+          vb.y0 = math.min(vb.y0 or y, y); vb.y1 = math.max(vb.y1 or (y + L.rh), y + L.rh)
+        end
         if vc and vc.fi == ev.fi and vc.row == r.row then
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
           if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end

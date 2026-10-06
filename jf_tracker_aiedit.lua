@@ -2,7 +2,7 @@
 --
 -- Вкладка modulation, страница item: кривая пула во всю ширину.
 -- Строка инструментов: free (точки: клик — новая, тянуть — двигать, правый
--- клик — удалить) | step sin tri saw+ saw- sqr — рисование протяжкой по
+-- клик — удалить; Opt+клик / протяжка — ластик, Cmd+протяжка — от руки) | step sin tri saw+ saw- sqr — рисование протяжкой по
 -- ячейкам сетки, как в Ableton: ячейка под мышью заполняется формой, высота
 -- мыши — уровень. Сетка 1/2 … 1/32 (доли такта по 4/4: 1/4 = доля) или off;
 -- точки прилипают к ней. Углы графика — ручки скалирования: правый верхний
@@ -93,7 +93,7 @@ local function buttons(U, L, x, y, list, cur, mx, my, press)
   return nil, bx
 end
 
-function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
+function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
   local mx, my, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
   local press = cap & 1 == 1 and A.prev & 1 == 0
   local rpress = cap & 2 == 2 and A.prev & 2 == 0
@@ -140,6 +140,45 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   end
   local gx, gy, gw, gh = x + L.pad + 4, y + 2 * L.rh + 6, w - 2 * L.pad - 8, h - 2 * L.rh - 10
   if gw < 20 or gh < 12 then return nil end
+  -- несколько пулов (6 окт): стопка узких лейнов; правится активный,
+  -- клик по другому делает активным его (A.on_pick)
+  local act_label
+  if lanes and #lanes > 1 then
+    local act
+    for i, a in ipairs(lanes) do if a.env == t.env and a.pool == t.pool then act = i end end
+    if act then
+      local gap = 3
+      local n = math.max(1, math.min(#lanes, math.floor((gh + gap) / (3 * L.rh + gap))))
+      local i0 = math.max(1, math.min(act - math.floor(n / 2), #lanes - n + 1))
+      local lh = math.floor((gh - (n - 1) * gap) / n)
+      local agy
+      for k = 0, n - 1 do
+        local i = i0 + k
+        local a = lanes[i]
+        local ly = gy + k * (lh + gap)
+        local name = ('%d/%d %s %s'):format(i, #lanes, a.envname or '', a.label or '')
+        if i == act then agy = ly; act_label = name
+        else
+          U.set(U.BG); gfx.rect(gx, ly, gw, lh, 1)
+          local lo, hi = a.min or 0, a.max or 1; if hi - lo < 1e-9 then hi = lo + 1 end
+          local p0, one = A.span(a)
+          U.set(U.tint(a.col or U.CYAN, 0.45))
+          local px, py
+          for _, q in ipairs(a.pts or {}) do
+            local qx = gx + math.floor(math.max(0, math.min(1, (q[1] - p0) / one)) * (gw - 1) + 0.5)
+            local qy = ly + lh - 1 - math.floor(math.max(0, math.min(1, (q[2] - lo) / (hi - lo))) * (lh - 1) + 0.5)
+            if px then gfx.line(px, py, qx, qy) end
+            px, py = qx, qy
+          end
+          local hot = mx >= gx and mx < gx + gw and my >= ly and my < ly + lh
+          U.set(hot and U.TEXT or U.LINE); gfx.rect(gx, ly, gw, lh, 0)
+          U.text(gx + 3, ly + 1, fit(name, gw - 6), hot and U.TEXT or U.GREY)
+          if hot and press and A.on_pick then A.on_pick(a); return nil end
+        end
+      end
+      gy, gh = agy, lh
+    end
+  end
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
   local pos0, one = A.span(t)
   local t0, t1 = pos0, pos0 + one
@@ -164,7 +203,9 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
     end
   end
   U.set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
+  if act_label then U.text(gx + 3, gy + 1, fit(act_label, gw - 6), U.AMBER) end
   local pts = pts_of(t)
+  local opt, cmdk = cap & 16 == 16, cap & 4 == 4
   -- скалирование углами: во время протяжки — превью преобразования
   local cs = A.corner
   local function tf(p)
@@ -183,7 +224,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
     px, py = qx, qy
   end
   local hot
-  if A.tool == 'free' and not cs then
+  if (A.tool == 'free' or opt) and not cs then
     for _, p in ipairs(pts) do
       local qx, qy = X(p.t), Y(p.v)
       local near = math.abs(mx - qx) <= 4 and math.abs(my - qy) <= 4
@@ -213,6 +254,48 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
       commit('automation item scale')
     end
     return { status = 'scale: drag the corner - the edge ramps from the other corner' }
+  end
+  -- 6 окт: модификаторы поверх любого инструмента. Opt — ластик: клик или
+  -- протяжка стирает точки в пройденной полосе времени; Cmd — рисование от
+  -- руки (точка на каждые 3 px, старые в пройденной полосе заменяются).
+  -- Режим виден по курсору REAPER (eraser / env_pencil / env_addpt / pencil)
+  if inside or A.erase or A.free then
+    gfx.setcursor(0, (opt or A.erase) and 'eraser' or ((cmdk or A.free) and 'env_pencil'
+      or (A.tool == 'free' and (hot and 'hand' or 'env_addpt') or 'pencil')))
+    A.cursor = true
+  elseif A.cursor then gfx.setcursor(32512); A.cursor = nil end
+  if A.erase or (inside and press and opt) then
+    if cap & 1 == 1 then
+      local xa = A.erase and A.erase.x or mx
+      local ta, tb = T(math.min(xa, mx) - 3), T(math.max(xa, mx) + 3)
+      local n = A.erase and A.erase.n or 0
+      for k = #pts, 1, -1 do
+        local p = pts[k]
+        if p.t >= ta and p.t <= tb then R.DeleteEnvelopePointEx(t.env, FI, p.i); n = n + 1 end
+      end
+      R.Envelope_SortPointsEx(t.env, t.idx)
+      A.erase = { x = mx, n = n }; A.selpt = nil
+    else
+      if A.erase.n > 0 then commit('automation item erase') end
+      A.erase = nil
+    end
+    return { status = 'erase: Opt+click / drag removes the points it passes' }
+  end
+  if A.free or (inside and press and cmdk) then
+    if cap & 1 == 1 then
+      local tm, v = T(mx), V(my)
+      local last = A.free and A.free.t
+      if not last or math.abs(X(tm) - X(last)) >= 3 then
+        local e = 1e-7
+        if not last then R.DeleteEnvelopePointRangeEx(t.env, t.idx, tm - e, tm + e)
+        elseif tm > last then R.DeleteEnvelopePointRangeEx(t.env, t.idx, last + e, tm + e)
+        else R.DeleteEnvelopePointRangeEx(t.env, t.idx, tm - e, last - e) end
+        R.InsertEnvelopePointEx(t.env, t.idx, tm, v, 0, 0, false, true)
+        R.Envelope_SortPointsEx(t.env, t.idx)
+        A.free = { t = tm }
+      end
+    else A.free = nil; commit('automation item freehand') end
+    return { status = 'freehand: Cmd+drag draws the curve' }
   end
   if press and chot then
     A.corner = { which = chot, tl = 1, tr = 1, bl = 0, br = 0, snap = pts }
@@ -266,7 +349,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   end
   if inside then
     return { status = ('%s  %.3f s  %.0f%%  -  %s; corners scale, grid %s'):format(A.tool, snap_t(T(mx), A.grid) - t0, N(my) * 100,
-      A.tool == 'free' and 'click add, drag move, right click delete' or 'drag paints the grid cells, the mouse height is the level',
+      (A.tool == 'free' and 'click add, drag move, right click delete' or 'drag paints the grid cells, the mouse height is the level') .. ', Opt erase, Cmd freehand',
       A.grid > 0 and ('%g QN'):format(A.grid) or 'off') }
   end
   return nil

@@ -327,7 +327,10 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
   local hover
   U.text(x, y, fit(LG.type .. ' -> ' .. (target or 'envelope at the cursor'), w), focused and U.AMBER or U.GREY)
   local fy = y + L.rh + 2
-  local lw = U.measure('points ') + L.pad
+  -- ширина подписей — по самой длинной видимой (6 окт: release налезал на слайдер)
+  local lw = U.measure('points ')
+  for _, f in ipairs(LG.FIELDS) do if not f.button then lw = math.max(lw, U.measure(f.label .. ' ')) end end
+  lw = lw + L.pad
   -- поля (3 окт): перечисления — кнопками (форма волны, тип, хиты…), числа —
   -- горизонтальными слайдерами (тянуть по горизонтали), тумблеры — кнопкой
   for i, f in ipairs(LG.FIELDS) do
