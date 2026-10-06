@@ -149,6 +149,7 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
+  synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
@@ -403,7 +404,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -797,8 +798,33 @@ ctx = {
     if state.lpb_before_zoom then set_lpb(state.lpb_before_zoom); state.lpb_before_zoom = nil; vim.msg = 'zoom back: LPB ' .. state.lpb
     else state.lpb_before_zoom = state.lpb; set_lpb(1); vim.msg = 'zoom out: a row is a beat (:macro again - back)' end
   end,
-  fold = function(col, v) state.folds[col.guid] = v or nil end,
-  fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil end end,
+  fold = function(col, v) state.folds[col.guid] = v or nil; ctx.hdr_push(col) end,
+  fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil; ctx.hdr_push(c) end end,
+  -- sync track header size (6 окт): высота трека REAPER (I_TCPH) ↔ свёртка
+  -- колонки: < 36 px — свёрнута (mini), < 80 — компактная, выше — полная;
+  -- свёртка в трекере ставит высоту 24 / 56 / 96 (I_HEIGHTOVERRIDE)
+  HDR_H = { mini = 24, compact = 56, full = 96 },
+  hdr_want = function(h) return h < 36 and 'mini' or (h < 80 and true or nil) end,
+  hdr_push = function(col)
+    if not (state.synchdr and col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
+    local f = state.folds[col.guid]
+    local h = f == 'mini' and ctx.HDR_H.mini or (f and ctx.HDR_H.compact or ctx.HDR_H.full)
+    reaper.SetMediaTrackInfo_Value(col.track, 'I_HEIGHTOVERRIDE', h)
+    reaper.TrackList_AdjustWindows(false)
+    ctx.hdr_t = reaper.time_precise() + 0.5           -- REAPER применит высоту не сразу — опрос чуть позже
+  end,
+  hdr_poll = function()
+    if not state.synchdr then return end
+    local now = reaper.time_precise()
+    if now < (ctx.hdr_t or 0) + 0.25 then return end
+    ctx.hdr_t = now
+    for _, c in ipairs(snap.cols or {}) do
+      if c.track and c.guid and reaper.ValidatePtr(c.track, 'MediaTrack*') then
+        local want = ctx.hdr_want(reaper.GetMediaTrackInfo_Value(c.track, 'I_TCPH'))
+        if state.folds[c.guid] ~= want then state.folds[c.guid] = want end
+      end
+    end
+  end,
   -- папка: свернуть/развернуть (дети прячутся); на не-папке — ищем родителя
   fold_folder = function(col)
     local target = col
@@ -4203,6 +4229,7 @@ ctx = {
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
       flag('envpoints', 'envelope points', 'envelope points as small circles in the envelope columns and the item editor, as REAPER draws them'),
+      flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
@@ -7246,6 +7273,7 @@ local function frame()
   end
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
   do local sr = ctx.slice_root(); state.slices_on = (sr and not sr.file and sr.slices and #sr.slices > 0) and true or false end
+  ctx.hdr_poll()                                       -- sync track header size (6 окт)
   relayout()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
