@@ -144,7 +144,7 @@ local state = {
   bigbpm = flag('bigbpm2', false),
   bigstatus = flag('bigstatus', true),
   tpbuttons = flag('tpbuttons', false),
-  tpstyle = reaper.GetExtState(EXT, 'tpstyle') ~= '' and reaper.GetExtState(EXT, 'tpstyle') or (flag('tpbuttons', false) and 'symbols' or 'min'),   -- кнопки транспорта: min | symbols | text (6 окт)
+  tpstyle = ({ symbols = 'big', big = 'big', text = 'text', min = 'min' })[reaper.GetExtState(EXT, 'tpstyle')] or (flag('tpbuttons', false) and 'big' or 'min'),   -- кнопки транспорта: min | big | text (6 окт; symbols → big)
   tintmute = flag('tintmute', true),
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
@@ -4043,7 +4043,7 @@ ctx = {
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
-      { key = 'tpstyle', label = 'transport buttons', kind = 'cycle', values = { 'min', 'symbols', 'text' }, desc = 'min - only [rec] and [loop] (Space plays, Opt+R records); symbols - big << > || O >> loop; text - two rows of small word buttons, rec red', get = function() return state.tpstyle or 'min' end, set = function(v) state.tpstyle = v end },
+      { key = 'tpstyle', label = 'transport buttons', kind = 'cycle', values = { 'min', 'big', 'text' }, desc = 'min - only [rec] and [loop] (Space plays, Opt+R records); big - big << > || O >> loop; text - two rows of small word buttons, rec red', get = function() return state.tpstyle or 'min' end, set = function(v) state.tpstyle = v end },
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
@@ -7328,7 +7328,7 @@ local function frame()
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'symbols', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
