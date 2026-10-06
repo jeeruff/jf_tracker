@@ -534,7 +534,7 @@ local function apply_fx(h, lpb, cmd, xx)
       if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
       local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
       local t0 = slices[k]
-      local t1 = slices[k + 1] or (base.len or len)
+      local t1 = (not E.playthru(it) and slices[k + 1]) or (base.len or len)   -- playthru: до конца сэмпла (6 окт)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + t0 * rate)
       R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
       R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
@@ -1434,6 +1434,61 @@ function E.fix_slices()
   return n
 end
 
+-- slice playthru (6 окт): свойство инструмента — слайс играет от своей метки
+-- до КОНЦА сэмпла (не до следующей метки); следующая нота колонки его режет
+-- (cut_covering), уже стоящая позже — ограничивает. P_EXT:jf_playthru у корня
+function E.playthru(it)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return false end
+  local _, v = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_playthru', '', false)
+  return v == '1'
+end
+-- начало ближайшего item той же колонки после t (nil — нет)
+local function next_start(track, lane_idx, t, keep)
+  local best
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local o = R.GetTrackMediaItem(track, i)
+    if o ~= keep and same_lane(track, o, lane_idx) then
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      if op > t + 1e-4 and (not best or op < best) then best = op end
+    end
+  end
+  return best
+end
+-- длина слайса k: до следующей метки или (playthru) до конца сэмпла,
+-- но не дальше следующей ноты колонки
+function E.slice_len(inst_item, slices, base, k, track, lane_idx, pos, keep)
+  local a = slices[k]
+  local full = base.len or R.GetMediaItemInfo_Value(inst_item, 'D_LENGTH')
+  local b = E.playthru(inst_item) and full or (slices[k + 1] or full)
+  local len = b - a
+  if E.playthru(inst_item) and track then
+    local nx = next_start(track, lane_idx, pos, keep)
+    if nx then len = math.min(len, nx - pos) end
+  end
+  return math.max(0.001, len), b
+end
+-- переключить playthru у инструмента: флаг на корне и копиях, длины уже
+-- стоящих нот-слайсов пересчитаны (один undo)
+function E.set_playthru(root, items, on)
+  local slices, base = E.item_slices(root)
+  run('slice playthru ' .. (on and 'on' or 'off'), function()
+    for _, it in ipairs(items) do
+      if R.ValidatePtr(it, 'MediaItem*') then
+        R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_playthru', on and '1' or '', true)
+        local _, ks = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+        local k = tonumber(ks)
+        if k and it ~= root and slices[k] then
+          local tr = R.GetMediaItem_Track(it)
+          local lane = math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE'))
+          local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local len = E.slice_len(root, slices, base, k, tr, lane, pos, it)
+          R.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
+        end
+      end
+    end
+  end)
+end
+
 function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local slices, base = E.item_slices(inst_item)
   if #slices == 0 then return end
@@ -1453,9 +1508,9 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
       if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
       local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
       local a = slices[k]
-      local b = slices[k + 1] or base.len or R.GetMediaItemInfo_Value(inst_item, 'D_LENGTH')
+      local len, b = E.slice_len(inst_item, slices, base, k, track, lane_idx, t0, it)   -- playthru: до конца сэмпла (6 окт)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
-      R.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
+      R.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
       R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0)
       -- корень растянут маркерами (smart quantize): свой кусок источника
       local rtk = R.GetActiveTake(inst_item)
@@ -2968,7 +3023,7 @@ function E.plant(o)
         if #slices > 0 then
           local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
           local a = slices[k]
-          local b = slices[k + 1] or base.len or R.GetMediaItemInfo_Value(o.item, 'D_LENGTH')
+          local b = (not E.playthru(it) and slices[k + 1]) or base.len or R.GetMediaItemInfo_Value(o.item, 'D_LENGTH')   -- playthru (6 окт)
           R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
           R.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
         end

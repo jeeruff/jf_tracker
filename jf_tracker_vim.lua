@@ -1387,7 +1387,7 @@ function V.key_impl(c)
         return
       end
       if how == 'audition' or how == 'capture' then
-        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len, semis) end
+        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, semis) end
         if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
         return
       end
@@ -1407,7 +1407,7 @@ function V.key_impl(c)
       local it = E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
-      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, inst0.slices[k + 1] or inst0.len, semis) end
+      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, semis) end
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
@@ -1507,7 +1507,7 @@ function V.key_impl(c)
             if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch, slice = k,
               item = inst0 and inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
           elseif k then
-            if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], inst0.slices[k + 1] or inst0.len, psemis) end
+            if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, psemis) end
           elseif ctx.preview then ctx.preview(f0.col.track, pitch, inst0 and inst0.item, V.cur.row, 1) end
         end
         return

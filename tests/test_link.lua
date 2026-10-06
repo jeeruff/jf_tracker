@@ -239,5 +239,18 @@ do
   local old = item(0, 4 * 1.5 / 1.309, 0.5, 1.309, { ['P_EXT:jf_slices'] = '0.000000,1.000000', ['P_EXT:jf_slice_base'] = '0.500000;4.000000' })
   near('legacy slices recover the wave point', 0.5 + E.item_slices(old)[2] * 1.309, 0.5 + 1 * 1.5)
 end
+-- slice playthru (6 окт): до конца сэмпла, но не дальше следующей ноты колонки
+do
+  local root = item(100, 4, 0, 1)
+  E.set_slices(root, { 0, 1, 2 })
+  local sl, base = E.item_slices(root)
+  near('normal: slice 2 to the next slice', E.slice_len(root, sl, base, 2), 1)
+  root.ext['P_EXT:jf_playthru'] = '1'
+  near('playthru: slice 2 to the end of the sample', E.slice_len(root, sl, base, 2), 3)
+  local tr = { items = {} }
+  local nxt = { pos = 51.5, len = 1, take = { offs = 0, rate = 1 }, ext = {} }
+  tr.items[1] = nxt
+  near('playthru: clipped by the next note', E.slice_len(root, sl, base, 2, tr, 0, 50), 1.5)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

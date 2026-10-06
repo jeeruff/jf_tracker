@@ -1386,7 +1386,7 @@ ctx = {
     ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell }
     if k > 0 then
       vim.last_slice = k
-      ctx.preview_slice(col.track, root, root.slices[k], root.slices[k + 1] or root.len)
+      ctx.preview_slice(col.track, root, root.slices[k], (not root.playthru and root.slices[k + 1]) or root.len)
       vim.msg = ('slice S%02X%s'):format(k, ctx.slice_child(col, root, k) and '' or ' (no notes yet - its properties work once it is inserted)')
     else vim.msg = 'whole sample' end
     return true
@@ -4032,6 +4032,10 @@ ctx = {
     elseif k == 'chan' then P('take:I_CHANMODE', (math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE')) + d) % 5, 'abs', 'channel mode')
     elseif k == 'mute' then P('B_MUTE', reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 0 or 1, 'abs', 'mute')
     elseif k == 'lock' then P('C_LOCK', reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 0 or 1, 'abs', 'lock')
+    elseif k == 'pthru' then
+      local on = not edit.playthru(it)
+      edit.set_playthru(it, items, on)
+      vim.msg = 'slice playthru ' .. (on and 'on: each slice plays on to the end of the sample (the next note cuts it)' or 'off: each slice stops at the next slice')
     elseif k == 'swing' then
       local on = not edit.item_swing(it)
       edit.run('instrument swing', function() for _, x in ipairs(items) do edit.set_item_swing(x, on) end end)
@@ -4067,6 +4071,7 @@ ctx = {
     if k == 'mute' then return reaper.GetMediaItemInfo_Value(it, 'B_MUTE') >= 0.5 and 'on' or 'off' end
     if k == 'lock' then return reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 'on' or 'off' end
     if k == 'swing' then return edit.item_swing(it) and ('on - ' .. ctx.swing_label()) or 'off - straight' end
+    if k == 'pthru' then return edit.playthru(it) and 'on - slices play to the end of the sample' or 'off - to the next slice' end
     return ''
   end,
   -- доля слайдера и «от центра»; nil — строка без слайдера
@@ -4239,7 +4244,7 @@ ctx = {
     a.last = reaper.time_precise()
     if a.entry and spec.slice then
       local e = a.entry
-      ctx.preview_slice(spec.track, e, e.slices[spec.slice], e.slices[spec.slice + 1] or e.len)
+      ctx.preview_slice(spec.track, e, e.slices[spec.slice], (not e.playthru and e.slices[spec.slice + 1]) or e.len)
     else ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 1) end
   end,
   preview_src_pos = function() return PV.src_position() end,
@@ -7344,7 +7349,7 @@ local function frame()
           local k = p - (model.SLICE_BASE or model.BASE_NOTE or 60) + 1
           if k >= 1 and k <= #(a.entry.slices or {}) then
             ok, it = pcall(edit.insert_slice, a.track, a.lane_idx, state.lpb, row, a.entry.item, k)
-            ctx.preview_slice(a.track, a.entry, a.entry.slices[k], a.entry.slices[k + 1] or a.entry.len)
+            ctx.preview_slice(a.track, a.entry, a.entry.slices[k], (not a.entry.playthru and a.entry.slices[k + 1]) or a.entry.len)
           end
         else
           ok, it = pcall(edit.insert_note, a.track, a.lane_idx, state.lpb, row, p, a.vel, a.step, a.item)
@@ -8607,7 +8612,7 @@ local function frame()
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
       elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
-      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'swing') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'swing' or SPROP.hover.k == 'pthru') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
     elseif hover.dspcomp then
