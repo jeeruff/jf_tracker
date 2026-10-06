@@ -418,7 +418,11 @@ keysin('k');       eq('k moves up in INSERT on env', V.cur.row, 22)
 keysin('j');       eq('j moves down in INSERT on env', V.cur.row, 23)
 keysin('+');       eq('+ nudges one midi step', last(), 'envnudge:Volume@23:+0.0079')
 keysin('-');       eq('- nudges back', last(), 'envnudge:Volume@23:-0.0079')
+V.cur.field = 2
+keysin('k');       eq('k moves up from the shape field', V.cur.row, 22)
+keysin('j');       eq('j moves down from the shape field', V.cur.row, 23)
 V.key(27)
+V.cur.field = 1
 V.cur.row = 13
 V.key(1);          eq('^A nudges +1/64', last(), 'envnudge:Volume@13:+0.0156')
 keysin('2'); V.key(24); eq('2^X nudges −2/64', last(), 'envnudge:Volume@13:-0.0312')

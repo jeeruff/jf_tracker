@@ -1585,11 +1585,11 @@ local function draw_ctrl(L, info, H, hover)
     { name = 'quick', items = (function()
       local function q(id, label, on, extra) local t = { id, label, on and U.CYAN or U.GREY }; if extra then for k, v in pairs(extra) do t[k] = v end end; return t end
       local cols = {
-        { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen) },
+        { q('q_mx', 'matrix', c.q_mx), q('q_ruler', 'ruler', c.q_ruler), q('q_hints', 'hints', c.q_hints), q('q_listen', 'listen', c.q_listen), q('debug', 'debug', c.debug) },
         { q('q_scopes', 'scopes', c.q_scopes), q('q_input', 'input', c.q_input), q('q_captions', 'col names', c.q_captions), q('q_names', 'names', c.q_names),
           q('q_wave', 'wave', c.q_wave), q('q_colors', 'colours', c.q_colors), q('q_envs', 'envs', c.q_envs), q('q_meters', 'meters', c.q_meters), q('q_dsp', 'dsp', c.q_dsp) },
         { q('q_side', 'browser', c.q_side), q('q_preview', 'preview', c.q_preview), q('q_keys', 'kcast', c.q_keys, { sizer = true }),
-          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus), q('perf', 'perf', c.perf),
+          q('oneclick', 'one click', c.oneclick), q('autofocus', 'autofocus', c.autofocus), q('perf', 'performance', c.perf),
           -- тоглы из полосы транспорта (5 окт)
           q('follow', 'follow', c.follow), q('lock', 'lock', c.lock), q('fixed', 'fixed', c.fixed), q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade) },
       }

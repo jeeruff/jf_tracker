@@ -149,7 +149,8 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   swing = tonumber(reaper.GetExtState(EXT, 'swing')) or 50,   -- свинг вставки, % (50 = ровно), 6 окт
-  aipoints = flag('aipoints', true),               -- точки automation item на лейне трекера (6 окт)
+  aipoints = flag('aipoints', true),
+  debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
@@ -402,7 +403,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('swing', tostring(state.swing or 50)); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2086,6 +2087,21 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  -- отладка (6 окт): опция debug — всё, что происходит, строками в файл
+  -- <REAPER>/jf_tracker_debug.log: клавиши (режим, фокус, поле, где съедена —
+  -- файл:строка возврата обработчика key), клики (что под мышью), действия
+  -- контролов, команды, ошибки. Файл > 1 MB — обрезается до последней половины
+  dlog_path = reaper.GetResourcePath() .. '/jf_tracker_debug.log',
+  dlog = function(s)
+    if not state.debug then return end
+    local f = io.open(ctx.dlog_path, 'a'); if not f then return end
+    f:write(os.date('%H:%M:%S'), ('.%03d '):format(math.floor(reaper.time_precise() * 1000) % 1000), s, '\n'); f:close()
+    ctx.dlog_n = (ctx.dlog_n or 0) + 1
+    if ctx.dlog_n % 200 == 0 then
+      local fr = io.open(ctx.dlog_path, 'r'); local all = fr and fr:read('a'); if fr then fr:close() end
+      if all and #all > 1000000 then local fw = io.open(ctx.dlog_path, 'w'); if fw then fw:write(all:sub(-500000)); fw:close() end end
+    end
+  end,
   env_nudge = function(e, row, d)
     local t = edit.row_time(row, state.lpb, 0)
     edit.env_nudge(e, t, d, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
@@ -6434,6 +6450,7 @@ end
 
 -- клик / колесо по контролу верхней панели
 function ctrl_action(name, delta)
+  ctx.dlog(('ctrl %s %s'):format(tostring(name), tostring(delta)))
   local col = cur_col()
   if name == 'options' then if delta == 0 then ctx.options() end
   elseif name == 'about' then if delta == 0 then ctx.about() end
@@ -6508,6 +6525,10 @@ function ctrl_action(name, delta)
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
   elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  elseif name == 'debug' then
+    state.debug = not state.debug
+    vim.msg = state.debug and ('debug on: log -> ' .. ctx.dlog_path) or 'debug off'
+    if state.debug then ctx.dlog(('--- debug on, jf_tracker, window %dx%d, focus %s, mode %s'):format(gfx.w, gfx.h, state.focus, vim.mode)) end
   elseif name == 'perf' then
     ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
     ctx.PERF.active = not ctx.PERF.active
@@ -6588,6 +6609,7 @@ local function poll_cmd()
   local v = reaper.GetExtState(EXT, 'cmd')
   if v == '' or v == cmd_last then return end
   cmd_last = v
+  ctx.dlog('cmd ' .. v)
   local name = v:match('^([%w%+%-]+)')
   if name == 'play' then edit.play_stop()
   elseif name == 'stop' then reaper.OnStopButton()
@@ -7118,7 +7140,7 @@ local function frame()
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
-    left = left .. string.format(' | %.0f fps | key %d | peaks %d', fps.v, state.last_key, model.peaks_cache_size())
+    left = left .. string.format(' | %.0f fps | key %d @%s | peaks %d', fps.v, state.last_key, ctx.last_trace or '-', model.peaks_cache_size())
   end
 
   local vis
@@ -7305,7 +7327,7 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50, perf = ctx.PERF and ctx.PERF.active,
+      oneclick = state.oneclick, autofocus = state.autofocus, swing = state.swing or 50, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'symbols', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -7525,6 +7547,22 @@ local function frame()
     end or nil,
   })
   idle.hover = hover
+  -- debug: нажатия мыши — что под ней (6 окт)
+  if state.debug then
+    local cap = gfx.mouse_cap
+    local was = ctx.dbg_cap or 0
+    if (cap & 3) ~= 0 and (was & 3) == 0 then
+      local parts = {}
+      for k, v in pairs(hover or {}) do
+        local tv = type(v)
+        if tv == 'number' or tv == 'string' or tv == 'boolean' then parts[#parts + 1] = k .. '=' .. tostring(v)
+        elseif tv == 'table' then parts[#parts + 1] = k .. '={}' end
+      end
+      table.sort(parts)
+      ctx.dlog(('mouse %s %d,%d cap %d focus %s | %s'):format(cap & 2 == 2 and 'R' or 'L', gfx.mouse_x, gfx.mouse_y, cap, state.focus, table.concat(parts, ' ')))
+    end
+    ctx.dbg_cap = cap
+  end
   end
 
   HN.draw(U, L)
@@ -9514,6 +9552,19 @@ local function frame()
   if c > 0 then
     state.last_key = c
     vim.msg = ''
+    -- debug (6 окт): return-хук на время обработки — где клавишу съели
+    -- (файл:строка возврата функций key модулей)
+    local trace
+    if state.debug then
+      trace = {}
+      local vk = vim.key
+      debug.sethook(function()
+        local i = debug.getinfo(2, 'fSl')
+        if i and (i.func == vk or (i.short_src or ''):find('jf_tracker') and debug.getinfo(2, 'n').name == 'key') then
+          trace[#trace + 1] = ((i.short_src or ''):match('jf_tracker_?([%w_]*)%.lua$') or '?'):gsub('^$', 'main') .. ':' .. (i.currentline or 0)
+        end
+      end, 'r')
+    end
     local ok, r = pcall(function()
       -- открытый пикер (fzf) / hydra-меню модальны: клавиши им, а не модулю в
       -- фокусе (2 окт: в модуляции a открывал выбор параметра, а набор и Enter
@@ -9697,10 +9748,18 @@ local function frame()
         return vim.key(c)
       end
     end)
+    if trace then debug.sethook() end
     if not ok then vim.msg = tostring(r):match('[^\n]*$') or tostring(r) elseif r == 'quit' then quit = true end
+    if trace then
+      ctx.last_trace = table.concat(trace, '>')
+      ctx.dlog(('key %d (raw %d) mode %s%s focus %s%s fi %d row %d field %s%s piano %s pending %s op %s buf %s -> %s @ %s%s'):format(
+        c, c_raw, vim.mode, (vim.hydra and ' hydra' or '') .. (vim.picker and ' picker' or ''), state.focus, state.focus == 'top' and (':' .. tostring(state.toptab)) or '',
+        vim.cur.fi, vim.cur.row, tostring(vim.cur.field), vim.cur.sub and ('/' .. vim.cur.sub) or '', tostring(vim.piano), tostring(vim.pending), tostring(vim.op),
+        tostring(vim.hexbuf or vim.shapebuf), tostring(vim.msg or ''), ctx.last_trace, ok and '' or (' ERROR ' .. tostring(r))))
+    end
   end
   if c_raw > 0 and ctx.keylog and #ctx.keylog > 0 then
-    ctx.keylog[#ctx.keylog] = ctx.keylog[#ctx.keylog] .. ' -> ' .. tostring(vim.msg or ''):sub(1, 50)
+    ctx.keylog[#ctx.keylog] = ctx.keylog[#ctx.keylog] .. ' -> ' .. tostring(vim.msg or ''):sub(1, 50) .. (ctx.last_trace and state.debug and (' @' .. ctx.last_trace) or '')
     reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
   inject_cap = nil
@@ -9742,7 +9801,7 @@ frame = (function(inner)
     if ok then err_streak = 0; return end
     err_streak = err_streak + 1
     local msg = tostring(e)
-    if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg end
+    if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg; pcall(ctx.dlog, 'ERROR ' .. msg) end
     vim.msg = 'error (tracker keeps running): ' .. (msg:match('^[^\n]*') or msg)
     if err_streak > 100 then save_win(); gfx.quit(); return end
     gfx.update()

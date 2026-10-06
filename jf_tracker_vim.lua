@@ -589,7 +589,7 @@ V.COMMANDS = {
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
-  { 'follow', '', 'view follows playhead' }, { 'lock', '', 'tracker cursor = REAPER edit cursor and selected track' }, { 'fixed', '', 'cursor fixed at screen centre (Impulse Tracker)' }, { 'debug', '', 'fps and key codes' },
+  { 'follow', '', 'view follows playhead' }, { 'lock', '', 'tracker cursor = REAPER edit cursor and selected track' }, { 'fixed', '', 'cursor fixed at screen centre (Impulse Tracker)' }, { 'debug', '', 'debug log (jf_tracker_debug.log in the REAPER folder): keys and where they were handled, clicks, actions, errors; fps in the status' },
   { 'fold', '', 'fold all tracks' }, { 'unfold', '', 'unfold all' },
   { 'trim', '', 'trim items to region bounds (strict patterns)' },
   { 'beatsync', '[beat|bar|N]', 'stretch event end to the nearest beat / bar / N rows (= key, N=)' },
@@ -1155,11 +1155,20 @@ function V.key_impl(c)
     if env and fld == 2 and nfields() >= 2 then
       -- поле формы: буквы сокращения (lin sqr slo fas fae bez) → форма точки строки
       local lc = (c < 256) and string.char(c):lower() or ''
+      local raw = (c < 256) and string.char(c) or ''
       if c == ESC then V.shapebuf = nil
+      -- 6 окт: h j k l — курсор и здесь (раньше съедались вводом формы и
+      -- курсор не уходил с лейна); lin — цифрой 0, все формы — цифрами 0..5
+      -- как номера REAPER (0 lin 1 sqr 2 slo 3 fas 4 fae 5 bez)
+      elseif not V.shapebuf and (raw == 'h' or raw == 'j' or raw == 'k' or raw == 'l') then
+        local m = motion(c, 1)
+        if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
+      elseif raw:match('^[0-5]$') then
+        V.shapebuf = nil; ctx.env_shape(env, V.cur.row, tonumber(raw)); V.cur.row = V.cur.row + step_rows(); ensure_visible()
       elseif lc:match('^[a-z]$') then
         local buf = (V.shapebuf or '') .. lc
         local m = V.shape_match(buf)
-        if m == false then V.shapebuf = nil; V.msg = 'shape: lin sqr slo fas fae bez'
+        if m == false then V.shapebuf = nil; V.msg = 'shape: sqr slo fas fae bez, or 0..5 (0 lin)'
         elseif m == nil then V.shapebuf = buf; V.msg = 'shape ' .. buf .. '…'
         else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       end

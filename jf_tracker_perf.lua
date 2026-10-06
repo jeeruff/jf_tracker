@@ -11,8 +11,13 @@
 local P = { active = false, t = 0, proc = nil, tracks = {}, scroll = 0 }
 local R = reaper
 
+-- 6 окт: команда — файлом .sh, без кавычек в строке ExecProcess (через
+-- sh -c "…" с $pid и %cpu= вывод приходил пустым: CPU 0 %, Mem 0 MB)
+local SCRIPT = R.GetResourcePath() .. '/jf_tracker_perf.sh'
 local function sh(cmd)
-  local ok, out = pcall(R.ExecProcess, '/bin/sh -c "' .. cmd:gsub('"', '\\"') .. '"', 1500)
+  local f = io.open(SCRIPT, 'w'); if not f then return '' end
+  f:write('#!/bin/sh\n', cmd, '\n'); f:close()
+  local ok, out = pcall(R.ExecProcess, '/bin/sh "' .. SCRIPT .. '"', 1500)
   if not ok or not out then return '' end
   return (out:gsub('^%-?%d+\n', ''))
 end
@@ -23,6 +28,7 @@ function P.refresh()
   P.t = now
   local out = sh("pid=$(/usr/bin/pgrep -xn REAPER); /bin/ps -o %cpu=,rss=,%mem= -p $pid; /bin/ps -M -p $pid | /usr/bin/wc -l")
   local cpu, rss, mem, thr = out:match('([%d%.]+)%s+(%d+)%s+([%d%.]+)%s+(%d+)')
+  P.raw = (not cpu) and out:gsub('%s+', ' '):sub(1, 80) or nil       -- не разобрали — сырой вывод в окно
   P.proc = { cpu = tonumber(cpu) or 0, rss = (tonumber(rss) or 0) / 1024, mem = tonumber(mem) or 0, thr = math.max(0, (tonumber(thr) or 1) - 1) }
   local _, sr = R.GetAudioDeviceInfo('SRATE', '')
   local _, bs = R.GetAudioDeviceInfo('BSIZE', '')
@@ -65,7 +71,7 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   U.text(x, y, 'Mem', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (pr.mem or 0) / 100, ('%.0f MB'):format(pr.rss or 0)); y = y + L.rh + 2
   local a = P.audio or {}
   for _, line in ipairs({
-    ('threads %d'):format(pr.thr or 0),
+    P.raw and ('ps: ' .. (P.raw ~= '' and P.raw or '(no output)')) or ('threads %d'):format(pr.thr or 0),
     ('audio %d Hz, block %d (%.1f ms)'):format(a.sr or 0, a.bs or 0, (a.sr or 0) > 0 and (a.bs or 0) / a.sr * 1000 or 0),
     ('output latency %.1f ms'):format(a.lat or 0),
   }) do U.text(x, y, fit(line, bw - 2 * L.pad), U.TEXT); y = y + L.rh end
