@@ -113,6 +113,7 @@ V.parse_len = parse_len
 local function nfields(fi)
   local f = flat()[fi or V.cur.fi]
   if not f or f.folded then return 1 end
+  if f.ml then return 1 end                 -- MIDI-лейн (CC / PC / артикуляции / SysEx): одно поле
   if f.env then return f.compact and 1 or 2 end   -- огибающая: значение, форма сегмента (свёрнутый — только значение)
   if f.compact then return 1 end           -- свёрнутый трек: только нота
   if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
@@ -559,7 +560,7 @@ V.COMMANDS = {
   { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
   { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'fxa', '', 'store all parameters of the selected DSP fx as A' }, { 'fxb', '', 'store them as B' }, { 'morph', 'N', 'morph the selected fx from A (0) to B (100)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in ten points' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'bird view: a row is a bar, density and first note per track (Enter back)' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'start', '[bar[.beat]]', '=START marker of the sequence (empty = cursor row)' }, { 'end', '[bar[.beat]]', '=END marker of the sequence' },
-  { 'cc', '', 'CC lane: ReaControlMIDI on the cursor track, its parameter as an envelope column (set the CC numbers in its window)' },
+  { 'cc', '[N]', 'CC lane: N - a MIDI-item CC column (events of the MIDI items of the track); empty - ReaControlMIDI on the track, its parameter as an envelope column' }, { 'pc', '', 'program change column of the MIDI items of the cursor track' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
@@ -636,7 +637,8 @@ local function run_cmd(line)
   elseif cmd == 'fold' then ctx.fold_all(true)
   elseif cmd == 'unfold' then ctx.fold_all(false)
   elseif cmd == 'fx' and n then st.fxcols = math.max(0, math.min(4, math.floor(n)))
-  elseif cmd == 'cc' then if ctx.cc_lane then ctx.cc_lane() end
+  elseif cmd == 'cc' then if ctx.cc_lane then ctx.cc_lane(arg) end
+  elseif cmd == 'pc' then if ctx.ml_add then ctx.ml_add('pc') end
   elseif cmd == 'env' then st.envs = not st.envs
   elseif cmd == 'preview' then st.preview = not st.preview; V.msg = 'preview ' .. (st.preview and 'on' or 'off')
   elseif cmd == 'pitchmode' then
@@ -651,7 +653,7 @@ local function run_cmd(line)
   elseif cmd == 'tab' then
     -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden
     if arg == 'sample' then V.msg = 'tab: item (the old sample tab)'; return end
-    local a = (arg == 'mod' or arg == 'modulate') and 'modulation' or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
+    local a = (arg == 'mod' or arg == 'modulate' or arg == 'automation' or arg == 'auto') and 'modulation' or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
     st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
@@ -1102,6 +1104,23 @@ function V.key_impl(c)
     end
     if c == 32 then E.play_stop(); return end
     local fld = V.cur.field or 1
+    -- MIDI-лейн (6 окт): две hex-цифры — CC / PC в строку (в MIDI item под ней),
+    -- BS / Del — события лейна в строке долой; остальное — управление KEYS
+    local mlf = flat()[V.cur.fi]
+    if mlf and mlf.ml then
+      local ml = mlf.ml
+      local hx = (c < 256) and string.char(c):upper() or ''
+      if c == BS or c == DEL then ctx.ml_del(mlf, V.cur.row); V.hexbuf = nil; return end
+      if (ml.kind == 'cc' or ml.kind == 'pc') and hx:match('^[0-9A-F]$') then
+        local buf = (V.hexbuf or '') .. hx
+        if #buf < 2 then V.hexbuf = buf; return end
+        V.hexbuf = nil
+        ctx.ml_set(mlf, V.cur.row, math.min(127, tonumber(buf, 16)))
+        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      end
+      if V.hexbuf then return end
+      keys_control(c); return
+    end
     local env = env_of(V.cur.fi)
     if (c == 62 or c == 60) and fld == 1 and not env then ctx.loop(c == 62 and 'item' or 'region'); return end
     if env and fld == 2 and nfields() >= 2 then
@@ -1593,6 +1612,8 @@ function V.key_impl(c)
     elseif c == ctrl('x') then ctx.env_nudge(env, V.cur.row, -n / 64)
     else for r = V.cur.row, V.cur.row + n - 1 do ctx.env_del(env, r) end end
     finish_edit()
+  elseif ch == 'x' and (flat()[V.cur.fi] or {}).ml then
+    for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
   elseif ch == 'x' then
     apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
   elseif ch == 'M' then                                  -- mute — Shift+m; m — слой пианино (3 окт)

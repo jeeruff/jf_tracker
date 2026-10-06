@@ -65,6 +65,11 @@ _G.reaper = {
     return 0
   end,
   GetTakeName = function(tk) return tk.name or '' end,
+  -- MIDI-лейны (6 окт): tk.ccs = { {ppq, chanmsg, m2, m3} }, время = ppq / 960 QN от начала item
+  MIDI_CountEvts = function(tk) return true, 0, #(tk.ccs or {}), 0 end,
+  MIDI_GetCC = function(tk, i) local c = tk.ccs[i + 1]; return true, false, false, c[1], c[2], 0, c[3], c[4] end,
+  MIDI_GetTextSysexEvt = function() return false end,
+  MIDI_GetProjTimeFromPPQPos = function(tk, ppq) return tk.item.pos + qn2t(ppq / 960) end,
   -- огибающая громкости take (5 окт): tk.venv = { {t, v}, … }, режим 0 (амплитуда)
   GetTakeEnvelopeByName = function(tk, nm) return nm == 'Volume' and tk.venv or nil end,
   CountEnvelopePoints = function(env) return #env end,
@@ -358,6 +363,22 @@ do
   eq('env point 0.5 at row 8 shows 40', sub[8] and sub[8].vol, '40')
   eq('env point 0 at row 12 shows 00', sub[12] and sub[12].vol, '00')
   eq('rows without points stay empty', sub[9] and sub[9].vol, nil)
+end
+-- MIDI-лейны (6 окт): CC 74 и PC из событий MIDI item по строкам
+do
+  for k in pairs(tracks) do tracks[k] = nil end
+  local tk = { name = 'm', midi = midi_stream({}), ccs = { { 0, 0xB0, 74, 64 }, { 960, 0xB0, 74, 127 }, { 960, 0xC0, 5, 0 } } }
+  local it = { pos = 0, len = 2, take = tk }
+  tk.item = it
+  tracks[1] = { name = 'M', items = { it } }
+  state_count = state_count + 1
+  local snap = M.build(4)
+  local ls = snap.cols[1].mlanes or {}
+  eq('two midi lanes (CC74, PC)', #ls, 2)
+  eq('CC74 first', ls[1] and ls[1].name, 'CC74')
+  eq('CC74 row 0 = 64', ls[1] and ls[1].ev[0] and ls[1].ev[0].v, 64)
+  eq('CC74 row 4 = 127 (1 QN at LPB 4)', ls[1] and ls[1].ev[4] and ls[1].ev[4].v, 127)
+  eq('PC row 4 = 5', ls[2] and ls[2].ev[4] and ls[2].ev[4].v, 5)
 end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

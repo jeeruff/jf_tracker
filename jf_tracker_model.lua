@@ -455,6 +455,7 @@ function M.build(lpb)
       -- части пересборки — в M.bprof (пульс hb: что дорого на большом проекте)
       local t0 = R.time_precise()
       col.envs = M.track_envs(tr, lpb)
+      col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
       local t1 = R.time_precise()
       col.pool = M.track_pool(tr, depot_tr, snap.lib_pos, snap.end_pos)
       local t2 = R.time_precise()
@@ -1137,6 +1138,62 @@ function M.env_key(name, nfx)
   if nm:find('playrate') then return 'col_env5' end
   if nm:find('tempo') then return 'col_env6' end
   return 'col_env' .. (13 + (nfx or 0) % 4)
+end
+
+-- MIDI-лейны трека (6 окт): события MIDI items, не огибающие. Лейн — CC по
+-- номеру, pc (program change), tx (текст / нотация REAPER: артикуляции), sx
+-- (SysEx). ev[row] = { v = значение, text = подпись, n = событий в строке }.
+-- M.extra_lanes[guid] = { 74, 'pc', … } — пустые лейны, добавленные :cc N / :pc
+M.extra_lanes = {}
+function M.track_midilanes(tr, lpb, guid)
+  local by = {}
+  local function lane(key, kind, num)
+    local l = by[key]
+    if not l then l = { key = key, kind = kind, num = num, ev = {} }; by[key] = l end
+    return l
+  end
+  local function put(l, row, v, text)
+    local e = l.ev[row]
+    if e then e.n = e.n + 1; e.v = v; e.text = text or e.text else l.ev[row] = { v = v, text = text, n = 1 } end
+  end
+  for i = 0, R.CountTrackMediaItems(tr) - 1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local tk = R.GetActiveTake(it)
+    if tk and R.TakeIsMIDI(tk) then
+      local _, _, ccn, txn = R.MIDI_CountEvts(tk)
+      for k = 0, (ccn or 0) - 1 do
+        local _, _, _, ppq, chanmsg, _, m2, m3 = R.MIDI_GetCC(tk, k)
+        local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
+        if chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)
+        elseif chanmsg == 0xC0 then put(lane('pc', 'pc'), row, m2) end
+      end
+      for k = 0, (txn or 0) - 1 do
+        local _, _, _, ppq, typ, msg = R.MIDI_GetTextSysexEvt(tk, k)
+        local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
+        if typ == -1 then put(lane('sx', 'sx'), row, #(msg or ''), ('%02X'):format((msg or ''):byte(1) or 0))
+        elseif typ and typ >= 1 then
+          -- нотация REAPER: «NOTE ch pitch articulation staccato …» — слово после articulation
+          local t = msg or ''
+          t = t:match('articulation%s+(%S+)') or t:match('text%s+(%S+)') or t
+          put(lane('tx', 'tx'), row, 0, t)
+        end
+      end
+    end
+  end
+  for _, x in ipairs(M.extra_lanes[guid] or {}) do
+    if type(x) == 'number' then lane('cc' .. x, 'cc', x) elseif x == 'pc' then lane('pc', 'pc') end
+  end
+  local out = {}
+  for _, l in pairs(by) do out[#out + 1] = l end
+  local ORD = { cc = 1, pc = 2, tx = 3, sx = 4 }
+  table.sort(out, function(a, b) if ORD[a.kind] ~= ORD[b.kind] then return ORD[a.kind] < ORD[b.kind] end return (a.num or 0) < (b.num or 0) end)
+  for _, l in ipairs(out) do
+    l.name = l.kind == 'cc' and ('CC' .. l.num) or (l.kind == 'pc' and 'PC' or (l.kind == 'tx' and 'art' or 'SX'))
+    l.rows = {}
+    for r in pairs(l.ev) do l.rows[#l.rows + 1] = r end
+    table.sort(l.rows)
+  end
+  return out
 end
 
 function M.track_envs(tr, lpb)

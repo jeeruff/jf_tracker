@@ -146,6 +146,7 @@ local state = {
   tpbuttons = flag('tpbuttons', false),
   tintmute = flag('tintmute', true),
   aifill = flag('aifill', false),
+  midilanes = flag('midilanes', true),            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
@@ -396,7 +397,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2300,10 +2301,74 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- MIDI-лейны (6 окт): пустой лейн :cc N / :pc, правка событий строки
+  ml_add = function(x)
+    local col = cur_col(); if not col then return end
+    local t = model.extra_lanes[col.guid] or {}
+    for _, y in ipairs(t) do if y == x then vim.msg = 'lane exists'; return end end
+    t[#t + 1] = x; model.extra_lanes[col.guid] = t
+    state.midilanes = true; model.invalidate()
+    vim.msg = (x == 'pc' and 'PC' or ('CC' .. x)) .. ' lane on ' .. (col.name or '') .. ' - type hex per row (INSERT), x deletes'
+  end,
+  -- MIDI take трека, покрывающий время t
+  ml_take = function(tr, t)
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, i)
+      local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local tk = reaper.GetActiveTake(it)
+      if tk and reaper.TakeIsMIDI(tk) and t >= p - 1e-6 and t < p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') - 1e-6 then return tk, it end
+    end
+  end,
+  ml_clear = function(tk, ml, p0, p1)
+    local _, _, ccn, txn = reaper.MIDI_CountEvts(tk)
+    if ml.kind == 'cc' or ml.kind == 'pc' then
+      for k = ccn - 1, 0, -1 do
+        local _, _, _, ppq, cm, _, m2 = reaper.MIDI_GetCC(tk, k)
+        if ppq >= p0 and ppq < p1 and ((ml.kind == 'cc' and cm == 0xB0 and m2 == ml.num) or (ml.kind == 'pc' and cm == 0xC0)) then reaper.MIDI_DeleteCC(tk, k) end
+      end
+    else
+      for k = txn - 1, 0, -1 do
+        local _, _, _, ppq, typ = reaper.MIDI_GetTextSysexEvt(tk, k)
+        if ppq >= p0 and ppq < p1 and ((ml.kind == 'sx' and typ == -1) or (ml.kind == 'tx' and typ and typ >= 1)) then reaper.MIDI_DeleteTextSysexEvt(tk, k) end
+      end
+    end
+  end,
+  ml_set = function(f, row, v)
+    local tr = f.col.track
+    local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    local tk = ctx.ml_take(tr, t0)
+    if not tk then vim.msg = 'midi lane: no MIDI item under this row (make one: \\ n)'; return end
+    local ml = f.ml
+    edit.run(ml.name .. ' value', function()
+      local p0, p1 = reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1)
+      ctx.ml_clear(tk, ml, p0, p1)
+      if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
+      else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
+      reaper.MIDI_Sort(tk)
+    end)
+    model.invalidate()
+    vim.msg = ('%s %02X at %04d'):format(ml.name, v, row)
+  end,
+  ml_del = function(f, row)
+    local tr = f.col.track
+    local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    edit.run(f.ml.name .. ' delete', function()
+      for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, i)
+        local tk = reaper.GetActiveTake(it)
+        if tk and reaper.TakeIsMIDI(tk) then
+          ctx.ml_clear(tk, f.ml, reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1))
+          reaper.MIDI_Sort(tk)
+        end
+      end
+    end)
+    model.invalidate()
+  end,
   -- CC-лейны (6 окт, вариант A): ReaControlMIDI на треке курсора; номер CC
   -- каждой строки выставляется в окне плагина (он в его двоичном состоянии),
   -- значение строки — параметр: его огибающая становится колонкой трекера
-  cc_lane = function()
+  cc_lane = function(arg)
+    if tonumber(arg) then return ctx.ml_add(math.max(0, math.min(127, math.floor(tonumber(arg))))) end
     local col = cur_col()
     if not col or col.take then vim.msg = 'cc: put the cursor on a track'; return end
     local tr = col.track
@@ -3826,6 +3891,7 @@ ctx = {
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
+      flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),

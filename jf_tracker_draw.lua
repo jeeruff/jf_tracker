@@ -470,6 +470,16 @@ function D.layout(snap, state, nregions)
         end
       end
     end
+      -- MIDI-лейны (6 окт, опция midi lanes): узкие колонки после огибающих
+      c.mls = {}
+      if not hidden and state.midilanes ~= false and not c.compact and not state.ptmode then
+        for _, ml in ipairs(col.mlanes or {}) do
+          local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms('FF')) + L.pad + ms('W')
+          L.flat[#L.flat + 1] = { ci = ci, col = col, ml = ml, sub = {}, x = vis and lx or nil, w = mw }
+          c.mls[#c.mls + 1] = { ml = ml, x = lx, w = mw, fi = #L.flat }
+          lx = lx + mw + 1
+        end
+      end
     c.w = lx - (c.x or 0)
     if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
     if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
@@ -1696,7 +1706,7 @@ local function draw_topbar(L, info)
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
   for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
-    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'modulate') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or t)
+    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'automation') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
     local hot = mx >= tx and mx < tx + tw and my >= 1 and my < 1 + L.rh
@@ -2800,6 +2810,11 @@ function D.frame(L, snap, rows, state, info)
       end
       if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1) end
     end
+    for _, m in ipairs(c.mls or {}) do
+      text(m.x + L.pad, hy + L.lane_row * L.rh + 2, fit(m.ml.name, m.w - L.pad), U.CYAN)
+      set(U.DIM); gfx.rect(m.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
+      hint('mlane', m.x, hy + L.lane_row * L.rh, m.w, L.rh, m.fi)
+    end
     for _, ev in ipairs(c.envs) do
       text(ev.x + L.pad, hy + L.lane_row * L.rh + 2, fit(ev.e.name, ev.w - 2 * L.pad), env_colour(ev.e))
       -- имя огибающей — своё меню (клик: удалить кривую / очистить точки), 2 окт
@@ -3024,9 +3039,11 @@ function D.frame(L, snap, rows, state, info)
               local hot = hover.aiedge and hover.aiedge.e == ev.e and hover.aiedge.idx == ai.idx
               -- ручка слева — полоса в строку текста шириной, в ней имя вертикально (2 окт)
               local sw = L.th + 4
-              set(col); gfx.a = (hot and hover.aiedge.edge == 'move') and 0.85 or 0.55
-              gfx.rect(ev.x, cy0, sw, cy1 - cy0, 1); gfx.a = 1
-              if cy1 - cy0 > L.th * 2 and ai.label then D.vtext(ev.x + 2, cy0 + 2, cy1 - cy0 - 4, ai.label, U.BG, U.mix(col, U.BG, 0.45), true) end
+              -- ручка (6 окт): рисуется ПОСЛЕ строк, непрозрачной — линии тактов
+              -- её не режут, как полосу с именем в REAPER; здесь — только запись
+              D.ai_handles = D.ai_handles or {}
+              local hd = { x = ev.x, y = cy0, w = sw, h = cy1 - cy0, col = col, hot = hot and hover.aiedge.edge == 'move', label = ai.label, seams = {} }
+              D.ai_handles[#D.ai_handles + 1] = hd
               set(col)
               if y0 >= by0 then gfx.rect(ev.x, y0, ev.w, (hot and hover.aiedge.edge == 'start') and 3 or 2, 1) end
               if hot and hover.aiedge.edge == 'end' and y1 <= by1 then gfx.rect(ev.x, y1 - 2, ev.w, 3, 1) end
@@ -3045,8 +3062,8 @@ function D.frame(L, snap, rows, state, info)
                     gfx.triangle(ev.x, ly - tz, ev.x, ly + tz, ev.x + tz, ly)
                     gfx.triangle(ev.x + ev.w - 1, ly - tz, ev.x + ev.w - 1, ly + tz, ev.x + ev.w - 1 - tz, ly)
                     gfx.set(fc[1], fc[2], fc[3], 1)
-                    gfx.line(ev.x, ly - tz, ev.x + tz, ly); gfx.line(ev.x + tz, ly, ev.x, ly + tz)
                     gfx.line(ev.x + ev.w - 1, ly - tz, ev.x + ev.w - 1 - tz, ly); gfx.line(ev.x + ev.w - 1 - tz, ly, ev.x + ev.w - 1, ly + tz)
+                    hd.seams[#hd.seams + 1] = ly                  -- вырез на ручке — поверх неё, после строк
                     if mx >= ev.x and mx < ev.x + ev.w and math.abs(my - ly) <= 3 then
                       hover.seam = { kind = 'ai', env = ev.e.env, idx = ai.idx, k = guard + 1, r0 = ai.r0, per = ai.loop_rows,
                                      first = (ai.loop_first or (ai.r0 + ai.loop_rows)) - ai.r0, x0 = ev.x, w = ev.w, name = ev.e.name }
@@ -3198,8 +3215,43 @@ function D.frame(L, snap, rows, state, info)
         end
         ::env_next::
       end
+      -- MIDI-лейны: значение на строке события; CC / PC держатся тусклой
+      -- полоской до следующего события; пусто — точки поля
+      for _, m in ipairs(c.mls or {}) do
+        if r.clip then goto ml_next end
+        do
+          local ml = m.ml
+          local e = ml.ev[r.row]
+          local foc = vc and vc.fi == m.fi and vc.row == r.row
+          if foc then set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(m.x, y, m.w, L.rh, 0) end
+          if (ml.kind == 'cc' or ml.kind == 'pc') then
+            -- держится ли значение: последнее событие до строки
+            local held
+            for k = #ml.rows, 1, -1 do if ml.rows[k] <= r.row then held = ml.ev[ml.rows[k]].v; break end end
+            if held and ml.kind == 'cc' then
+              set(U.mix(U.CYAN, U.BG, 0.75)); gfx.rect(m.x + 1, y + L.rh - 3, math.max(1, math.floor(held / 127 * (m.w - 2))), 2, 1)
+            end
+          end
+          if e then
+            local t = ml.kind == 'tx' and (e.text or '') or (ml.kind == 'sx' and 'SX' or ('%02X'):format(e.v or 0))
+            text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN)
+          else text(m.x + L.pad, ty, ml.kind == 'tx' and '....' or '..', D.EMPTY) end
+          if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
+        end
+        ::ml_next::
+      end
     end
   end
+  -- ручки automation items (6 окт): поверх линий строк, непрозрачные; имя
+  -- вертикально; швы лупа — вырезы цвета фона в ручке
+  for _, hd in ipairs(D.ai_handles or {}) do
+    set(hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45)); gfx.rect(hd.x, hd.y, hd.w, hd.h, 1)
+    if hd.h > L.th * 2 and hd.label then D.vtext(hd.x + 2, hd.y + 2, hd.h - 4, hd.label, U.BG, hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45), true) end
+    local tz = math.max(3, math.floor(L.rh / 3))
+    set(U.BG)
+    for _, ly in ipairs(hd.seams) do gfx.triangle(hd.x, ly - tz, hd.x, ly + tz, hd.x + tz, ly) end
+  end
+  D.ai_handles = nil
   -- контур выделения (5 окт): видно границу блока, содержимое не закрыто
   if D.vis_box then local b = D.vis_box; set(U.CYAN); gfx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 0); D.vis_box = nil end
   -- каналы при mute / solo (5 окт, как во всех трекерах; опция tint channels):
@@ -3283,6 +3335,7 @@ function D.frame(L, snap, rows, state, info)
       for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), L.body_y, 1, L.body_h, 1) end
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
+    for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
   if L.ruler_w > 0 and info.ruler and #rows > 0 then

@@ -107,8 +107,17 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   if pick then A.tool = pick; press = false end
   local gl = {}
   for _, g in ipairs(A.GRIDS) do gl[#gl + 1] = { g[1], g[2] } end
-  local gpick = buttons(U, L, bx + 3 * L.pad, y, gl, A.grid, mx, my, press)
+  local gpick, gx2 = buttons(U, L, bx + 3 * L.pad, y, gl, A.grid, mx, my, press)
   if gpick then A.grid = gpick; press = false end
+  -- clear envelope (6 окт): все точки пула долой
+  local cpick = buttons(U, L, gx2 + 3 * L.pad, y, { { 'clear envelope', 'clear' } }, nil, mx, my, press)
+  if cpick then
+    local p0, one = A.span(t)
+    R.DeleteEnvelopePointRangeEx(t.env, t.idx, p0 - 1, p0 + one + 1)
+    R.Envelope_SortPointsEx(t.env, t.idx)
+    R.Undo_OnStateChange('automation item clear'); R.UpdateArrange()
+    press = false
+  end
   local gx, gy, gw, gh = x + L.pad + 4, y + L.rh + 6, w - 2 * L.pad - 8, h - L.rh - 10
   if gw < 20 or gh < 12 then return nil end
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
