@@ -2300,6 +2300,35 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- CC-лейны (6 окт, вариант A): ReaControlMIDI на треке курсора; номер CC
+  -- каждой строки выставляется в окне плагина (он в его двоичном состоянии),
+  -- значение строки — параметр: его огибающая становится колонкой трекера
+  cc_lane = function()
+    local col = cur_col()
+    if not col or col.take then vim.msg = 'cc: put the cursor on a track'; return end
+    local tr = col.track
+    local fx = reaper.TrackFX_AddByName(tr, 'ReaControlMIDI', false, 0)
+    local added = false
+    if fx < 0 then
+      edit.run('add ReaControlMIDI', function() fx = reaper.TrackFX_AddByName(tr, 'ReaControlMIDI', false, 1) end)
+      added = true
+    end
+    if not fx or fx < 0 then vim.msg = 'cc: ReaControlMIDI not found'; return end
+    if added then reaper.TrackFX_Show(tr, fx, 3) end
+    local items = {}
+    for p = 0, reaper.TrackFX_GetNumParams(tr, fx) - 1 do
+      local _, pn = reaper.TrackFX_GetParamName(tr, fx, p, '')
+      local has = reaper.GetFXEnvelope(tr, fx, p, false) ~= nil
+      items[#items + 1] = { label = (pn ~= '' and pn or ('param ' .. p)) .. (has and '  (lane)' or ''), data = p }
+    end
+    vim.open_picker('CC lane: ReaControlMIDI parameter' .. (added and ' - set the CC numbers in its window' or ''), items, function(it)
+      if edit.fx_envelope(tr, fx, it.data) then
+        state.envs = true
+        state.trackenvs = state.trackenvs or {}; state.trackenvs[col.guid] = true
+        vim.msg = 'CC lane: ' .. it.label .. ' - a column of the track (type hex values per row, curves, automation items)'
+      end
+    end)
+  end,
   -- показать модуль элемента (6 окт): нота / слайс — его сэмпл во вкладке item,
   -- automation item — редактор во вкладке modulation; фокус не уводится
   show_element = function(fi, row)
@@ -5199,6 +5228,7 @@ function track_actions(col)
     { 'Solo track', key = 's', fn = function() edit.run('track solo', function() reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0 and 0 or 1) end) end },
     { (state.folds[col.guid] and 'Unfold' or 'Fold') .. ' track (za)', key = 'f', fn = function() ctx.fold(col, not state.folds[col.guid]) end },
     { 'Select track in REAPER', key = 'l', fn = function() reaper.SetOnlyTrackSelected(tr) end },
+    { 'CC lane (ReaControlMIDI, :cc)', key = 'c', fn = function() ctx.cc_lane() end },
     { (state.pitchmodes[col.guid] == 'resample' and '!' or '') .. 'Pitch mode: resample', key = 'r', fn = function() ctx.set_pitchmode(col, 'resample') end },
     { (state.pitchmodes[col.guid] ~= 'resample' and '!' or '') .. 'Pitch mode: shift', key = 'h', fn = function() ctx.set_pitchmode(col, 'shift') end },
   }

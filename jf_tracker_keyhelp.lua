@@ -88,6 +88,7 @@ KH.PAGES = {
     { k = 'BS Ins', d = 'delete / insert time in region (Shift: all tracks)' },
     { k = 'Tab S-Tab', d = 'focus next / previous module; Option-Tab: dock tabs' },
     { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
+    { k = ':cc', t = {}, d = 'CC lane: ReaControlMIDI on the cursor track (its window opens the first time - set the CC numbers there), pick its parameter - the envelope becomes a column: hex per row, curves, automation items' },
     { k = 'S-Esc', t = {}, d = 'remove the REAPER time selection (any module)' },
     { k = 'Opt-Enter', d = 'select the instrument of the note under the cursor in the lib' },
     { k = '\\q \\Q', t = {}, d = 'context menu on a sample: q - the nearest peak onto the row grid; Q - pick the peak, j k to a row, Enter moves it there (stretch marker)' },
