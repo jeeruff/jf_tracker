@@ -1757,7 +1757,10 @@ ctx = {
         pts = LG.follow_points(fn, r0, r1)
       end
     end
+    -- 6 окт: шкала огибающей — громкость фейдерная; 0..1 — между min и max в шкале
     local lo, hi = e.min or 0, e.max or 1
+    local smode = reaper.GetEnvelopeScalingMode(e.env)
+    if smode ~= 0 then lo, hi = reaper.ScaleToEnvelopeMode(smode, lo), reaper.ScaleToEnvelopeMode(smode, hi) end
     local function raw(v) return lo + math.max(0, math.min(1, v)) * (hi - lo) end
     local n = 0
     edit.run(mode == 'ai' and 'LFO automation item' or 'LFO points', function()
@@ -7051,8 +7054,12 @@ local function frame()
       local function left(lx, ly, lw2, lh)
         if mod_pane == 'ai' then
           ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
-          ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2, lh, state.ai_edit, ctx.fit,
+          -- справа узкий блок свойств item (6 окт): loop, повторы, playrate …
+          local pw = math.min(Lx.cw * 26, math.floor(lw2 * 0.3))
+          ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2 - pw - Lx.pad, lh, state.ai_edit, ctx.fit,
             function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end)
+          local ph = ctx.AIE.props(U, Lx, lx + lw2 - pw, ly, pw, lh, state.ai_edit, ctx.fit)
+          if ph then ctx.aied_hover = ph end
           return nil
         end
         if mod_pane == 'params' then

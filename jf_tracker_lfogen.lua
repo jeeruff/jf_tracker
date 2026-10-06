@@ -366,7 +366,7 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
         -- слайдер: дорожка, заливка до значения, число справа
         local vt = field_text(f)
         local vw = math.min(U.measure(vt) + L.pad, math.floor(aw * 0.45))
-        local sw = math.max(8, aw - vw - L.pad)
+        local sw = math.max(8, math.min(L.cw * 12, aw - vw - L.pad))   -- 6 окт: слайдеры уже
         local fr = (LG[f.key] - f.min) / math.max(1e-9, f.max - f.min)
         local cy = ry + math.floor(L.rh / 2)
         U.set(U.DIM); gfx.rect(x0, cy - 1, sw, 2, 1)

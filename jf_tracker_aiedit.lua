@@ -25,13 +25,39 @@ local function shape01(name, x)
   return 1
 end
 
+-- 6 окт: точки одного полного прохода пула (флаг 0x10000000) — не всех
+-- повторов лупа; иначе кривая уезжала за график
+local FULL = 0x10000000
 local function pts_of(t)
   local out = {}
-  for p = 0, R.CountEnvelopePointsEx(t.env, t.idx) - 1 do
-    local _, tm, v, sh, ten = R.GetEnvelopePointEx(t.env, t.idx, p)
+  local ai = t.idx | FULL
+  for p = 0, R.CountEnvelopePointsEx(t.env, ai) - 1 do
+    local _, tm, v, sh, ten = R.GetEnvelopePointEx(t.env, ai, p)
     out[#out + 1] = { i = p, t = tm, v = v, sh = sh, ten = ten }
   end
   return out
+end
+-- один проход пула в секундах проекта (луп / playrate), иначе длина item
+function A.span(t)
+  local pos = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_POSITION', 0, false)
+  local len = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_LENGTH', 0, false)
+  local pq = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_POOL_QNLEN', 0, false) or 0
+  local rate = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_PLAYRATE', 0, false) or 1
+  local one = len
+  if pq > 1e-6 and rate > 1e-6 then
+    local q0 = R.TimeMap2_timeToQN(0, pos)
+    one = R.TimeMap2_QNToTime(0, q0 + pq / rate) - pos
+  end
+  return pos, math.max(1e-3, math.min(len, one)), len
+end
+-- шкала огибающей (6 окт): громкость — фейдерная; правка идёт в сырых
+-- значениях между min и max, переведёнными в шкалу (как рисует REAPER)
+function A.range(t)
+  local mode = R.GetEnvelopeScalingMode(t.env)
+  local lo, hi = t.min or 0, t.max or 1
+  if mode ~= 0 then lo, hi = R.ScaleToEnvelopeMode(mode, lo), R.ScaleToEnvelopeMode(mode, hi) end
+  if hi - lo < 1e-9 then hi = lo + 1 end
+  return lo, hi
 end
 
 -- время ↔ сетка (в QN)
@@ -86,10 +112,11 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   local gx, gy, gw, gh = x + L.pad + 4, y + L.rh + 6, w - 2 * L.pad - 8, h - L.rh - 10
   if gw < 20 or gh < 12 then return nil end
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
-  local t0, t1 = t.pos, t.pos + t.len
-  local lo, hi = t.min or 0, t.max or 1
-  if hi - lo < 1e-9 then hi = lo + 1 end
-  local function X(tm) return gx + math.floor((tm - t0) / (t1 - t0) * (gw - 1) + 0.5) end
+  local pos0, one = A.span(t)
+  local t0, t1 = pos0, pos0 + one
+  local lo, hi = A.range(t)
+  local FI = t.idx | FULL
+  local function X(tm) return gx + math.max(0, math.min(gw - 1, math.floor((tm - t0) / (t1 - t0) * (gw - 1) + 0.5))) end   -- по рамке графика
   local function Y(v) return gy + gh - 1 - math.floor(math.max(0, math.min(1, (v - lo) / (hi - lo))) * (gh - 1) + 0.5) end
   local function T(px) return t0 + math.max(0, math.min(1, (px - gx) / math.max(1, gw - 1))) * (t1 - t0) end
   local function N(py) return math.max(0, math.min(1, (gy + gh - 1 - py) / math.max(1, gh - 1))) end
@@ -151,7 +178,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   if cs then
     if cap & 1 == 1 then cs[cs.which] = N(my)
     else
-      for _, p in ipairs(cs.snap) do R.SetEnvelopePointEx(t.env, t.idx, p.i, p.t, tf(p), nil, nil, nil, true) end
+      for _, p in ipairs(cs.snap) do R.SetEnvelopePointEx(t.env, FI, p.i, p.t, tf(p), nil, nil, nil, true) end
       R.Envelope_SortPointsEx(t.env, t.idx)
       A.corner = nil
       commit('automation item scale')
@@ -165,7 +192,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
   if A.tool == 'free' then
     if A.drag then
       if cap & 1 == 1 then
-        R.SetEnvelopePointEx(t.env, t.idx, A.drag.i, snap_t(T(mx), A.grid), V(my), nil, nil, nil, true)
+        R.SetEnvelopePointEx(t.env, FI, A.drag.i, snap_t(T(mx), A.grid), V(my), nil, nil, nil, true)
         R.Envelope_SortPointsEx(t.env, t.idx)
         local best, bd
         for _, p in ipairs(pts_of(t)) do local d = math.abs(X(p.t) - mx) + math.abs(Y(p.v) - my); if not bd or d < bd then best, bd = p.i, d end end
@@ -180,7 +207,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
         for _, p in ipairs(pts_of(t)) do if math.abs(X(p.t) - X(snap_t(T(mx), A.grid))) <= 1 then A.drag = { i = p.i } end end
       end
     elseif inside and rpress and hot then
-      R.DeleteEnvelopePointEx(t.env, t.idx, hot.i)
+      R.DeleteEnvelopePointEx(t.env, FI, hot.i)
       R.Envelope_SortPointsEx(t.env, t.idx)
       commit('automation item point delete')
     end
@@ -214,6 +241,81 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of)
       A.grid > 0 and ('%g QN'):format(A.grid) or 'off') }
   end
   return nil
+end
+
+-- свойства item (6 окт): loop, повторы пула, playrate, offset, baseline,
+-- amplitude. Колесо по строке — шаг, клик по слайдеру — значение
+local PROPS = {
+  { k = 'loop', label = 'loop' },
+  { k = 'rep', label = 'repeats', min = 1, max = 32 },
+  { k = 'D_PLAYRATE', label = 'rate', min = 0.25, max = 4 },
+  { k = 'D_STARTOFFS', label = 'offset', min = 0, max = 4 },
+  { k = 'D_BASELINE', label = 'baseline', min = 0, max = 1 },
+  { k = 'D_AMPLITUDE', label = 'amplitude', min = -1, max = 1 },
+}
+function A.props(U, L, x, y, w, h, t, fit)
+  if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then return nil end
+  local function get(k) return R.GetSetAutomationItemInfo(t.env, t.idx, k, 0, false) end
+  local function put(k, v) R.GetSetAutomationItemInfo(t.env, t.idx, k, v, true) end
+  local pos, one, len = A.span(t)
+  local mx, my, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
+  U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
+  U.text(x + L.pad, y, fit('item properties', w - L.pad), U.GREY)
+  local lw = U.measure('amplitude ') + L.pad
+  local hover
+  for i, p in ipairs(PROPS) do
+    local ry = y + i * L.rh
+    if ry + L.rh > y + h then break end
+    local v, vt
+    if p.k == 'loop' then v = get('D_LOOPSRC') ~= 0; vt = v and 'on' or 'off'
+    elseif p.k == 'rep' then v = math.max(1, math.floor(len / one + 0.5)); vt = tostring(v)
+    else v = get(p.k); vt = ('%.2f'):format(v) end
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if hot then U.set(U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    U.text(x + L.pad, ry, p.label, hot and U.AMBER or U.GREY)
+    U.text(x + lw, ry, vt, U.TEXT)
+    local sx = x + lw + U.measure('-0.00') + L.pad
+    local sw = math.max(0, w - (sx - x) - L.pad)
+    if p.min and sw > 8 then
+      local fr = (p.k == 'rep' and (v - p.min) or (v - p.min)) / (p.max - p.min)
+      U.set(U.DIM); gfx.rect(sx, ry + math.floor(L.rh / 2) - 1, sw, 2, 1)
+      U.set(U.TEXT); gfx.rect(sx, ry + 4, math.max(1, math.floor(math.max(0, math.min(1, fr)) * sw + 0.5)), L.rh - 8, 1)
+    end
+    -- ввод: колесо — шаг; клик по слайдеру — значение; loop — клик
+    local function apply(nv)
+      if p.k == 'loop' then put('D_LOOPSRC', nv and 1 or 0)
+      elseif p.k == 'rep' then put('D_LOOPSRC', 1); put('D_LENGTH', one * nv)
+      elseif p.k == 'D_PLAYRATE' then
+        local n = math.max(1, math.floor(len / one + 0.5))
+        put('D_PLAYRATE', nv); local _, one2 = A.span(t); put('D_LENGTH', one2 * n)   -- повторы сохраняются
+      else put(p.k, nv) end
+      R.UpdateArrange(); R.Undo_OnStateChange('automation item ' .. p.label)
+    end
+    if hot then
+      local wv = gfx.mouse_wheel
+      if wv ~= 0 then
+        local d = wv > 0 and 1 or -1
+        if p.k == 'loop' then apply(not v)
+        elseif p.k == 'rep' then apply(math.max(p.min, math.min(p.max, v + d)))
+        elseif p.k == 'D_PLAYRATE' then apply(math.max(p.min, math.min(p.max, v * 2 ^ (d / 12))))
+        else apply(math.max(p.min, math.min(p.max, v + d * (p.max - p.min) / 50))) end
+        gfx.mouse_wheel = 0
+      end
+      local press = cap & 1 == 1 and (A.pprev or 0) & 1 == 0
+      if press then
+        if p.k == 'loop' then apply(not v)
+        elseif p.min and mx >= sx and sw > 8 then
+          local fr = math.max(0, math.min(1, (mx - sx) / sw))
+          local nv = p.min + fr * (p.max - p.min)
+          if p.k == 'rep' then nv = math.floor(nv + 0.5) end
+          apply(nv)
+        end
+      end
+      hover = { status = ('%s: wheel - step, click the slider - value'):format(p.label) }
+    end
+  end
+  A.pprev = cap
+  return hover
 end
 
 return A
