@@ -2009,7 +2009,7 @@ function D.transport_buttons(c)
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
   end
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', playing and U.GREEN or nil },
-           { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'o', c.recording and U.RED or nil, U.RED },
+           { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'O', c.recording and U.RED or nil, U.RED },
            { 'tp_fwd', '>>' }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
 end
 function D.transport_groups(c)
