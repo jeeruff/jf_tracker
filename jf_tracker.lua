@@ -6292,6 +6292,16 @@ local function poll_cmd()
   elseif name == 'oct+' then vim.octave = math.min(8, vim.octave + 1) elseif name == 'oct-' then vim.octave = math.max(0, vim.octave - 1)
   elseif name == 'step+' then vim.step = vim.step + 1 elseif name == 'step-' then vim.step = math.max(0, vim.step - 1)
   elseif name == 'inst+' then pool_select(vim.inst + 1) elseif name == 'inst-' then pool_select(vim.inst - 1)
+  elseif name == 'notesfile' then
+    -- 6 окт: дописать в project notes текст из .pending_notes.txt (файл удаляется)
+    local f = io.open(DIR .. '/.pending_notes.txt', 'r')
+    if f then
+      local add = f:read('a'); f:close(); os.remove(DIR .. '/.pending_notes.txt')
+      local cur = reaper.GetSetProjectNotes(0, false, '')
+      reaper.GetSetProjectNotes(0, true, (cur ~= '' and (cur .. '\n\n') or '') .. add)
+      if NT and NT.kind == 'project' and ctx.notes_load then ctx.notes_load() end
+      vim.msg = 'notes: test list added'
+    end
   end
 end
 
