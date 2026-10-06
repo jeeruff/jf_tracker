@@ -2198,7 +2198,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local bws, tws, btot = {}, {}, 0
   local bk = c.tpbuttons and 2 or 1                     -- полный набор — крупно (×1.5, 6 окт); rec / loop — обычного размера
   local BK = D.ttf and 1.5 or 1.5
-  for i, b in ipairs(blist) do tws[i] = bk == 2 and D.big_measure(b[2], BK) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad + (b[1] == 'rec' and 3 * L.pad or 0); btot = btot + bws[i] + (i > 1 and 2 or 0) end
+  for i, b in ipairs(blist) do local kk = (b[1] == 'rec' and bk == 2 and not D.ttf and (D.SCALE * BK) % 1 ~= 0) and 2 or BK; b.k = kk; tws[i] = bk == 2 and D.big_measure(b[2], kk) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad + (b[1] == 'rec' and 3 * L.pad or 0); btot = btot + bws[i] + (i > 1 and 2 or 0) end
   local function draw_buttons(bx0)
     -- крупные (5 окт, правка): кнопка на всю высоту полосы (+2 px сверху и снизу),
     -- символ ниже прежнего — по центру чернил; TTF — кегль ×1.7 (чуть мельче)
@@ -2222,7 +2222,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local frame = hot and U.AMBER or (on and b[3] or U.LINE)
       if i == 1 then round_corner(bx, by, 1, 1, frame); round_corner(bx, by + bh - 1, 1, -1, frame) end
       if i == #blist then round_corner(bx + bw - 1, by, -1, 1, frame); round_corner(bx + bw - 1, by + bh - 1, -1, -1, frame) end
-      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), ty, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), BK)   -- b[4]: свой цвет (o — красная)
+      if bk == 2 then D.big_text(bx + math.floor((bw - tws[i]) / 2), (b.k or BK) == BK and ty or (by + math.max(1, math.floor((bh - (b.k or BK) * L.th) / 2)) - (D.SPACE or 0)), b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT), b.k or BK)   -- запись ×2 целым масштабом: при ×1.5 O рубилась   -- b[4]: свой цвет (o — красная)
       else text(bx + math.floor((bw - tws[i]) / 2), by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
@@ -3247,8 +3247,9 @@ function D.frame(L, snap, rows, state, info)
   for _, hd in ipairs(D.ai_handles or {}) do
     set(hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45)); gfx.rect(hd.x, hd.y, hd.w, hd.h, 1)
     if hd.h > L.th * 2 and hd.label then D.vtext(hd.x + 2, hd.y + 2, hd.h - 4, hd.label, U.BG, hd.hot and U.mix(hd.col, U.BG, 0.15) or U.mix(hd.col, U.BG, 0.45), true) end
-    local tz = math.max(3, math.floor(L.rh / 3))
-    set(U.BG)
+    -- вырез шва на ручке (6 окт: «жёсткие»): мельче и тоном ручки, не чёрным
+    local tz = math.max(2, math.floor(L.rh / 5))
+    set(U.mix(hd.col, U.BG, 0.75))
     for _, ly in ipairs(hd.seams) do gfx.triangle(hd.x, ly - tz, hd.x, ly + tz, hd.x + tz, ly) end
   end
   D.ai_handles = nil

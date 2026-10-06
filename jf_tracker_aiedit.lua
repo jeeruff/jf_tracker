@@ -55,7 +55,7 @@ end
 function A.range(t)
   local mode = R.GetEnvelopeScalingMode(t.env)
   local lo, hi = t.min or 0, t.max or 1
-  if mode ~= 0 then lo, hi = R.ScaleToEnvelopeMode(mode, lo), R.ScaleToEnvelopeMode(mode, hi) end
+  -- t.min / t.max уже в шкале огибающей (модель, 6 окт)
   if hi - lo < 1e-9 then hi = lo + 1 end
   return lo, hi
 end

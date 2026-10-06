@@ -1764,7 +1764,7 @@ ctx = {
     -- 6 окт: шкала огибающей — громкость фейдерная; 0..1 — между min и max в шкале
     local lo, hi = e.min or 0, e.max or 1
     local smode = reaper.GetEnvelopeScalingMode(e.env)
-    if smode ~= 0 then lo, hi = reaper.ScaleToEnvelopeMode(smode, lo), reaper.ScaleToEnvelopeMode(smode, hi) end
+    -- e.min / e.max уже в шкале огибающей (модель, 6 окт)
     local function raw(v) return lo + math.max(0, math.min(1, v)) * (hi - lo) end
     local n = 0
     edit.run(mode == 'ai' and 'LFO automation item' or 'LFO points', function()
@@ -2477,7 +2477,7 @@ ctx = {
             pts[#pts + 1] = { t, v }
           end
           local smin, smax = e.min or 0, e.max or 1
-          if mode ~= 0 then smin, smax = reaper.ScaleToEnvelopeMode(mode, smin), reaper.ScaleToEnvelopeMode(mode, smax) end
+          -- e.min / e.max уже в шкале огибающей (модель)
           list[#list + 1] = { env = e.env, envname = e.name, idx = ai.idx, pool = pid, len = ai.len, pos = ai.pos,
             rate = reaper.GetSetAutomationItemInfo(e.env, ai.idx, 'D_PLAYRATE', 0, false) or 1, label = ai.label, pts = pts, min = e.min, max = e.max, smin = smin, smax = smax }
         end
@@ -6431,7 +6431,12 @@ function ctrl_action(name, delta)
 end
 
 local env_cache = {}
+-- значения огибающих по строкам вида (6 окт): кэш между кадрами — заново
+-- только когда сменились проект (state change count), вид или LPB; раньше
+-- пересчитывались все видимые огибающие каждый кадр
 local function env_values(e)
+  local k = ('%d|%d|%d|%d'):format(reaper.GetProjectStateChangeCount(0), rows[1] and rows[1].row or 0, #rows, state.lpb)
+  if k ~= ctx.env_cache_key then env_cache, ctx.env_cache_key = {}, k end
   local v = env_cache[e]
   if not v then v = model.env_values(e, rows); env_cache[e] = v end
   return v
@@ -6843,7 +6848,7 @@ local function frame()
     })
   end
   if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
-  env_cache = {}; peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}
+  peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
   local is_playing = playing()
   -- упреждение курсора (3 окт, опция cursor lead): позиция читается в начале
   -- тика defer, а на экран кадр попадает позже (~полкадра при 30 Гц) — курсор

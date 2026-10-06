@@ -1218,7 +1218,13 @@ function M.track_envs(tr, lpb)
       local nm = (name or ''):lower()
       local key = M.env_key(name, nfx)
       if key:match('^col_env1[3-6]$') then nfx = nfx + 1 end
-      local e = { env = env, name = name or '', min = mn, max = mx, key = key, idx = i, ais = {} }
+      -- границы в шкале огибающей (6 окт): громкость фейдерная — сырые значения
+      -- точек лежат в ней; амплитудные границы BR давали зигзаг там, где REAPER
+      -- рисует плоско. amin / amax — исходные (амплитуда), для подписей
+      local smode = R.GetEnvelopeScalingMode and R.GetEnvelopeScalingMode(env) or 0
+      local smn, smx = mn, mx
+      if smode ~= 0 then smn, smx = R.ScaleToEnvelopeMode(smode, mn), R.ScaleToEnvelopeMode(smode, mx) end
+      local e = { env = env, name = name or '', min = smn, max = smx, amin = mn, amax = mx, smode = smode, key = key, idx = i, ais = {} }
       -- automation items: как в аранжировке — цвет темы по типу огибающей
       e.ai_key = (nm:find('volume') and 'env_item_vol') or (nm:find('pan') and 'env_item_pan')
                  or (nm:find('mute') and 'env_item_mute') or 'env_item_pitch'
