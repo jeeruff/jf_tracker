@@ -47,13 +47,19 @@ function SS.layout(w, h, ncols, nrows, cw, rh, pad, compact)
   local hdr_w = compact and math.max(cw * 6, math.min(cw * 10, math.floor(w * 0.3))) or math.max(cw * 10, math.min(cw * 16, math.floor(w * 0.18)))
   local top = compact and (rh + 2 * pad) or (2 * rh + 3 * pad)
   local avail_w, avail_h = w - hdr_w - 2 * pad, h - top - pad
-  local min_w, min_h = cw * (compact and 6 or 8), rh * (compact and 2 or 3)
+  local min_w, min_h = cw * (compact and 5 or 8), compact and (rh + 4) or rh * 3
   local cell_w = ncols > 0 and math.floor(avail_w / ncols) or avail_w
-  cell_w = math.max(min_w, math.min(cw * 20, cell_w))
+  cell_w = math.max(min_w, math.min(cw * (compact and 12 or 20), cell_w))
   local cell_h = nrows > 0 and math.floor(avail_h / nrows) or avail_h
-  cell_h = math.max(min_h, math.min(rh * 4, cell_h))
+  cell_h = math.max(min_h, math.min(compact and (rh * 2) or (rh * 4), cell_h))   -- компактные — до 2 строк (6 окт)
   return { hdr_w = hdr_w, top = top, cell_w = cell_w, cell_h = cell_h,
            cols_fit = math.max(1, math.floor(avail_w / cell_w)), rows_fit = math.max(1, math.floor(avail_h / cell_h)) }
+end
+
+-- высота компактной сетки под nrows рядов, не выше cap
+function SS.height(w, cap, ncols, nrows, cw, rh, pad)
+  local lay = SS.layout(w, cap, ncols, nrows, cw, rh, pad, true)
+  return math.min(cap, lay.top + math.max(1, nrows) * lay.cell_h + pad)
 end
 
 -- ── границы ──────────────────────────────────────────────────────────────
@@ -196,6 +202,12 @@ function SS.key(c, seq, snap, grid, mods)
     if ch == 'z' then ctx.ss_big(); return true end
     return c == 27
   end
+  local r0, c0 = SS.cur.ri, SS.cur.ci
+  local eaten = SS.key_body(c, ch, seq, snap, grid, ncols)
+  if eaten and (SS.cur.ri ~= r0 or SS.cur.ci ~= c0) and ctx.ss_focus then ctx.ss_focus(SS.cur.ri, SS.cur.ci, grid) end
+  return eaten
+end
+function SS.key_body(c, ch, seq, snap, grid, ncols)
   if ch == 'j' or c == 1685026670 then SS.cur.ri = SS.cur.ri + 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'k' or c == 30064 then SS.cur.ri = SS.cur.ri - 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'h' or c == 1818584692 then SS.cur.ci = SS.cur.ci - 1; clamp(seq, ncols)
@@ -235,6 +247,7 @@ function SS.click(hv, seq, snap, grid, now)
     local d = hv.sess
     local again = SS.last_click and SS.last_click.ri == d.ri and SS.last_click.ci == d.ci and now - SS.last_click.t < 0.35
     SS.cur.ri, SS.cur.ci = d.ri, d.ci
+    if ctx.ss_focus then ctx.ss_focus(d.ri, d.ci, grid) end
     SS.last_click = { ri = d.ri, ci = d.ci, t = now }
     if again then SS.launch(d.ri, d.ci, seq); SS.last_click = nil end
   elseif hv.sessbtn == 'quant' then ctx.msg('session quantize: ' .. SS.next_quant())
@@ -321,7 +334,21 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
         for _, e in ipairs(cell.ev or {}) do
           local ex = cx + L.pad + math.floor(e.pos * (cw - 2 * L.pad))
           local ew = math.max(2, math.floor(e.len * (cw - 2 * L.pad)))
-          U.set(e.muted and U.DIM or (e.rgb or col.rgb or U.CYAN)); gfx.rect(ex, ry + L.pad, ew, ih, 1)
+          local c = e.muted and U.DIM or (e.rgb or col.rgb or U.CYAN)
+          -- аудио-клип (6 окт): волна item'а, фон — тусклый цвет; MIDI / пока строится — блок
+          local pk = e.head and ew >= 4 and ctx.ss_peaks and ctx.ss_peaks(e.head, ew)
+          if pk and pk.n and pk.n > 0 then
+            U.set(U.tint(c, 0.25)); gfx.rect(ex, ry + L.pad, ew, ih, 1)
+            U.set(c)
+            local mid = ry + L.pad + ih / 2
+            for i = 1, math.min(ew, pk.n) do
+              local hi, lo = pk.max[i] or 0, pk.min[i] or 0
+              local y0 = math.floor(mid - hi * ih / 2); local y1 = math.floor(mid - lo * ih / 2)
+              gfx.rect(ex + i - 1, y0, 1, math.max(1, y1 - y0 + 1), 1)
+            end
+          else
+            U.set(c); gfx.rect(ex, ry + L.pad, ew, ih, 1)
+          end
         end
         if cell.state == 'muted' and chh >= 2 * L.rh then U.text(cx + L.pad, ry + chh - L.rh - 3, 'muted', U.GREY) end
       else

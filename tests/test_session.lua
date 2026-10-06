@@ -52,6 +52,10 @@ for _, w in ipairs({ 600, 1200, 2000 }) do
 end
 eq('few cols stretch (cap 20 chars)', SS.layout(2000, 900, 2, 3, 8, 10, 4).cell_w, 8 * 20)
 eq('many rows scroll', SS.layout(1200, 900, 4, 40, 8, 10, 4).rows_fit < 40, true)
+-- компактная (clips над матрицей): клетки до 2 строк, высота — по рядам, не выше cap
+local lc = SS.layout(400, 300, 4, 3, 8, 10, 4, true)
+eq('compact cell_h <= 2 rows', lc.cell_h <= 20, true); eq('compact cell_w <= 12 chars', lc.cell_w <= 96, true)
+eq('height fits rows', SS.height(400, 300, 4, 3, 8, 10, 4) <= 300, true); eq('height capped', SS.height(400, 120, 4, 40, 8, 10, 4), 120)
 
 -- ── границы ───────────────────────────────────────────────────────────────
 SS.quant = 'bar'; near('bar after 103', SS.next_boundary(103, ZONE, 'bar'), 104)

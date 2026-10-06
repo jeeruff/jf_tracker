@@ -88,7 +88,8 @@ function MX.grid(snap, regions)
                   if rgb == nil then rgb = model.item_rgb(cell.item) or false; rgb_of[cell.item] = rgb end
                   rgb = rgb or nil
                 end
-                ev[#ev + 1] = { pos = (a - rg.r0) / span, len = (b - a) / span, kind = cell.kind, muted = cell.muted, rgb = rgb or col.rgb }
+                ev[#ev + 1] = { pos = (a - rg.r0) / span, len = (b - a) / span, kind = cell.kind, muted = cell.muted, rgb = rgb or col.rgb,
+                                head = cell.kind == 'audio' and cell or nil, cut = (r < rg.r0) and (rg.r0 - r) / math.max(1, r1 - r + 1) or 0 }   -- head: волна в клипе (6 окт)
               end
             end
           end
@@ -196,11 +197,15 @@ function MX.draw(L, snap, regions, info)
     bx = bx + bw + L.pad
   end
   -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
+  -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
   if MX.clips and ctx.ss_draw then
-    local hv = ctx.ss_draw(L, 0, hy + L.rh + 2, W - 6, ybot - hy - L.rh - 2)
+    local avail = ybot - hy - L.rh - 2
+    local ch = ctx.ss_height and ctx.ss_height(W - 6, math.floor(avail * 0.45)) or math.floor(avail * 0.4)
+    local hv = ctx.ss_draw(L, 0, hy + L.rh + 2, W - 6, ch)
     for k, v in pairs(hv) do hover[k] = v end
     hover.sess_view = true
-    return hover
+    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ch, W - 4, 1, 1)
+    hy = hy + ch + 2
   end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3

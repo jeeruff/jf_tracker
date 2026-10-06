@@ -658,6 +658,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(mhot and U.AMBER or U.mix(U.AMBER, U.BG, 0.45))
     gfx.rect(px0, BY, math.max(2, px1 - px0), 5, 1)
   end
+  -- клип сессии (6 окт): точки лупа источника — голубые линии с буквой L
+  if zone and zone.loop then
+    for _, t in ipairs(zone.loop) do
+      if t >= va and t <= vb then
+        local lx = tx(t)
+        U.set(U.CYAN); gfx.rect(lx, wy, 1, wh, 1)
+        U.text(lx + 2, wy + 1, 'L', U.CYAN)
+      end
+    end
+  end
   local slices = editing and S.slices or (e.slices or {})
   local hover_slice
   -- подписи слайсов (4 окт): клавиша хроматической раскладки q 2 w 3 e r 5 t …,

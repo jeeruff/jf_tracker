@@ -3854,6 +3854,23 @@ ctx = {
   end,
   ss_colname = function(ci) local c = snap and snap.cols[ci]; return c and c.name or ('track ' .. ci) end,
   ss_is_big = function() return state.ss_big and true or false end,
+  ss_height = function(w, cap) return MX.SS.height(w, cap, snap and #snap.cols or 1, #seq, L.cw, L.rh, L.pad) end,
+  ss_peaks = function(head, n) return model.peaks(head, n) end,
+  -- клип под курсором (6 окт): его сэмпл — во вкладке item, зона = начало / конец клипа, L — точки лупа
+  ss_focus = function(ri, ci, grid)
+    local cell = grid and grid[ri] and grid[ri][ci]
+    local head
+    for _, e in ipairs(cell and cell.ev or {}) do if e.head then head = e.head; break end end
+    state.ss_clip = head and { item = head.item } or nil
+    if not head then return end
+    local n = snap and snap.inst_of and snap.inst_of[head.item]
+    if n then
+      local foc, pp = state.focus, state.poolprev
+      state.poolprev = false; pool_select(n); state.poolprev = pp
+      state.top = true; state.toptab = 'sample'
+      ctx.set_focus(foc)
+    end
+  end,
   -- сетка сессии в панели матрицы (кнопка clips)
   ss_draw = function(Lx, x, y, w, h)
     if not snap then return {} end
@@ -8152,6 +8169,24 @@ local function frame()
           draw.lib_zone = { root = root, a = zone[1], b = zone[2] }
         else sel_e = root; zone = nil end
         lw = 0                                       -- список — отдельный модуль справа (4 окт)
+      end
+      -- клип сессии в фокусе (6 окт): начало / конец клипа зоной, L — точки лупа источника
+      local cl = state.ss_clip
+      if cl and e and not e.file and (MX.clips or state.ss_big) and reaper.ValidatePtr(cl.item, 'MediaItem*') then
+        local tk = reaper.GetActiveTake(cl.item)
+        if tk and not reaper.TakeIsMIDI(tk) then
+          local er = (e.rate and e.rate ~= 0) and e.rate or 1
+          local co = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+          local cr = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+          local clen = reaper.GetMediaItemInfo_Value(cl.item, 'D_LENGTH')
+          local a = (co - (e.offs or 0)) / er
+          zone = { a, a + clen * cr / er, nil, clip = true }
+          if reaper.GetMediaItemInfo_Value(cl.item, 'B_LOOPSRC') == 1 then
+            local src = reaper.GetMediaItemTake_Source(tk)
+            local sl = src and reaper.GetMediaSourceLength(src) or 0
+            if sl > 0 and clen * cr > sl - co + 1e-4 then zone.loop = { (0 - (e.offs or 0)) / er, (sl - (e.offs or 0)) / er } end
+          end
+        end
       end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       ctx.sprops_maxw = pw
