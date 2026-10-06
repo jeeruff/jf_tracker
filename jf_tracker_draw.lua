@@ -907,10 +907,11 @@ end
 local env_col_cache = {}
 -- смена темы / Theme Adjuster (2 окт): сбросить кэши цветов огибающих
 function D.reset_colours() env_col_cache = {} end
--- цвет огибающих — исходный цвет темы (флаг 1), без обработки Theme Adjuster:
--- так их рисует аранжировка (2 окт: громкость зелёная, а не жёлтая после Tint)
+-- цвет огибающих (6 окт, правка): цвет темы С поправками Theme Tweaker
+-- (флаг 0) — яркость, насыщенность и оттенок меняются вместе с REAPER;
+-- раньше (2 окт) брался сырой цвет (флаг 1) и был тусклее аранжировки
 local function theme_orig(key, fb)
-  local ok, v = pcall(reaper.GetThemeColor, key, 1)
+  local ok, v = pcall(reaper.GetThemeColor, key, 0)
   if not ok or not v or v < 0 then return U.theme(key, fb) end
   local r, g, b = reaper.ColorFromNative(v)
   if r + g + b == 0 then return fb end
