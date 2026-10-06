@@ -723,12 +723,24 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   }
   -- виртуальная нарезка (jf_tracker_slicer): тайм-коды в P_EXT
   local _, sl = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', false)
+  local _, bs = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)
   if sl and sl ~= '' then
     local t = {}
     for v in sl:gmatch('[^,]+') do t[#t + 1] = tonumber(v) end
+    -- 6 окт: привязка к волне — как E.item_slices: t · rate0 / rate текущий
+    -- (beatsync — его rate0); старая нарезка без rate0 — оценка по длине
+    local _, b = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', '', false)
+    local _, l0, r0 = (b or ''):match('([^;]+);([^;]+);?([^;]*)')
+    l0, r0 = tonumber(l0), tonumber(r0)
+    local rn = tonumber(((bs or ''):match('^[^;]+;[^;]+;([^;]+)'))) or R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+    if not r0 and l0 and l0 > 0 then
+      local ln = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if math.abs(ln - l0) > 1e-3 then r0 = rn * ln / l0 end
+    end
+    local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
+    if math.abs(f - 1) > 1e-9 then for i = 1, #t do t[i] = t[i] * f end end
     pool[at].slices = t
   end
-  local _, bs = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)
   -- beatsync: «N;span;rate0;pp0» (edit.bsync_set) — долей = первое поле (5 окт:
   -- tonumber всей строки давал nil, lib и свойства показывали off)
   pool[at].bsync = bs and tonumber(bs:match('^%s*([^;]+)')) or nil

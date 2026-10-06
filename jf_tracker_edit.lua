@@ -563,6 +563,18 @@ end
 
 -- таблица слайсов item: { t1, t2, … } (секунды от начала item) и база
 -- { offs = D_STARTOFFS при нарезке, len = длина item при нарезке }
+-- 6 окт: слайсы привязаны к ВОЛНЕ, не ко времени item. В P_EXT лежат секунды
+-- item при rate нарезки (третье поле базы: offs;len;rate0); читаются в секундах
+-- item при ТЕКУЩЕМ rate (beatsync — его исходный rate0): t · rate0 / rate.
+-- Позиция в источнике = offs + t · rate — та же точка волны при любом rate
+-- (раньше смена rate сдвигала все слайсы). Старая нарезка без rate0: rate0
+-- оценивается по длине (rate менялся вместе с длиной item), иначе = текущий
+local function slice_rate_now(it)
+  local tk = R.GetActiveTake(it)
+  local bs = E.bsync_of and E.bsync_of(it)
+  if bs and bs.rate0 then return bs.rate0 end
+  return tk and R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') or 1
+end
 function E.item_slices(it)
   local ok, str = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', false)
   local out = {}
@@ -571,7 +583,23 @@ function E.item_slices(it)
   end
   local _, b = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', '', false)
   local base = {}
-  if b and b ~= '' then base.offs, base.len = b:match('([^;]+);([^;]+)'); base.offs = tonumber(base.offs); base.len = tonumber(base.len) end
+  if b and b ~= '' then
+    local o, l, r0 = b:match('([^;]+);([^;]+);?([^;]*)')
+    base.offs, base.len, base.rate0 = tonumber(o), tonumber(l), tonumber(r0)
+  end
+  if #out > 0 then
+    local rn = slice_rate_now(it)
+    local r0 = base.rate0
+    if not r0 and base.len and base.len > 0 then
+      local ln = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if math.abs(ln - base.len) > 1e-3 then r0 = rn * ln / base.len end
+    end
+    local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
+    if math.abs(f - 1) > 1e-9 then
+      for i = 1, #out do out[i] = out[i] * f end
+      if base.len then base.len = base.len * f end
+    end
+  end
   return out, base
 end
 
@@ -583,7 +611,7 @@ function E.set_slices(it, slices)
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', table.concat(parts, ','), true)
     local tk = R.GetActiveTake(it)
     local offs = tk and R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0
-    R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', #slices > 0 and ('%.6f;%.6f'):format(offs, R.GetMediaItemInfo_Value(it, 'D_LENGTH')) or '', true)
+    R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', #slices > 0 and ('%.6f;%.6f;%.6f'):format(offs, R.GetMediaItemInfo_Value(it, 'D_LENGTH'), slice_rate_now(it)) or '', true)
   end)
 end
 

@@ -226,5 +226,18 @@ do
   near('swap: s3 at s1 place', s3.pos, 0)
   eq('swap: midi refused', E.swap_events({ kind = 'midi', item = s1 }, b1), false)
 end
+-- слайсы привязаны к волне (6 окт): смена rate не сдвигает их в источнике
+do
+  local it = item(0, 4, 0.5, 1.5)
+  E.set_slices(it, { 0, 1, 2 })                 -- секунды item при rate 1.5
+  near('slices at the slicing rate', E.item_slices(it)[2], 1)
+  it.take.rate = 1.309                          -- rate сменили — та же точка волны
+  local sl = E.item_slices(it)
+  near('slice 2 follows the wave: offs + t * rate stays', 0.5 + sl[2] * 1.309, 0.5 + 1 * 1.5)
+  near('slice 3 too', 0.5 + sl[3] * 1.309, 0.5 + 2 * 1.5)
+  -- старая нарезка без rate0: оценка по длине (длина менялась вместе с rate)
+  local old = item(0, 4 * 1.5 / 1.309, 0.5, 1.309, { ['P_EXT:jf_slices'] = '0.000000,1.000000', ['P_EXT:jf_slice_base'] = '0.500000;4.000000' })
+  near('legacy slices recover the wave point', 0.5 + E.item_slices(old)[2] * 1.309, 0.5 + 1 * 1.5)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
