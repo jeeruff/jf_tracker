@@ -33,6 +33,11 @@ B.scroll = 0
 B.focus = false
 B.mode = 'files'    -- 'files' | 'db' | 'pm'
 B.pm = nil          -- карточки jf_pm (ленивое чтение индекса jf_pm_index.json)
+B.grid = true       -- pm как сетка карточек (jf_tracker_pm, 6 окт); false — список
+B.grid_cols = 1     -- колонок в сетке (ставит отрисовка, читают клавиши / колесо)
+B.pm_sort = (R.GetExtState and R.GetExtState('jf_tracker', 'pmsort') ~= '' and R.GetExtState('jf_tracker', 'pmsort')) or 'date'
+B.pm_daw = (R.GetExtState and R.GetExtState('jf_tracker', 'pmdaw') ~= '' and R.GetExtState('jf_tracker', 'pmdaw')) or 'all'
+B.pm_scroll = { v = 0 }   -- прокрутка сетки в рядах
 B.auto = true       -- автопревью: курсор на файле → слушаем (кнопка play; по умолчанию вкл, 5 окт)
 B.keys = false      -- клавиатура играет выбранный файл с высотой (кнопка keys, 5 окт)
 B.drag = nil        -- перетаскивание: { e=, x0=, y0=, active= }
@@ -331,8 +336,23 @@ end
 -- ── jf_pm: проекты из индекса менеджера проектов ─────────────────────────
 -- jf_pm_core.lua (Scripts/jf_pm) читает jf_pm_index.json; карточка: name,
 -- path, mtime, duration, render_file, track_names. Сортировка — по mtime (свежие сверху).
+-- модуль карточек (6 окт): есть, когда главный отдал ctx.pm_mod и опция pm cards
+local function PMm() return ctx and ctx.pm_mod and ctx.pm_cards and ctx.pm_cards() and ctx.pm_mod() or nil end
+B.pm_mod = PMm
 function B.read_pm()
   if B.pm then return B.pm end
+  local PM = PMm()
+  if PM then
+    -- индекс в памяти, читается по кускам; пока грузится — пустой список
+    PM.ensure()
+    PM.on_ready = function() B.pm = nil; if B.mode == 'pm' and not B.pmproj then B.set_all(B.read_pm()) end end
+    if not PM.ready then B.pm_loading = true; return {} end
+    B.pm_loading = nil
+    B.pm_folders = nil
+    B.pm = PM.sort(PM.entries(PM.idx, { daw = B.pm_daw }), B.pm_sort)
+    if #B.pm == 0 and PM.empty then B.pm_folders = true; B.pm = B.read_pm_folder() end
+    return B.pm
+  end
   local out = {}
   local dir = res_path() .. '/Scripts/jf_pm'
   local ok, core = pcall(dofile, dir .. '/jf_pm_core.lua')
@@ -352,7 +372,7 @@ function B.read_pm()
           if type(c.fs_tags) == 'table' then for t in pairs(c.fs_tags) do meta[#meta + 1] = '#' .. t end end
           if type(c.tags_extra) == 'table' then for _, t in ipairs(c.tags_extra) do meta[#meta + 1] = '#' .. t end
           elseif type(c.tags_extra) == 'string' and c.tags_extra ~= '' then meta[#meta + 1] = '#' .. c.tags_extra end
-          local st = c.status_over or c.status
+          local st = c.status_over or (c.ext or {}).STATUS   -- статус .rpp — в ext (6 окт)
           if st and st ~= '' then meta[#meta + 1] = '[' .. st .. ']' end
           local nm = c.name or (path:match('[^/]+$') or path)
           local ms = table.concat(meta, ' ')
@@ -420,6 +440,14 @@ function B.pm_core()
   return ok and type(core) == 'table' and core.load_index and core or nil
 end
 function B.pm_edit(path, fn)
+  local PM = PMm()
+  if PM and PM.ready then
+    -- индекс в памяти: правка сразу, запись отложенно (PM.flush)
+    if not PM.edit(path, fn) then return false end
+    for _, e in ipairs(B.pm or {}) do if e.path == path then local ne = PM.entry(path, e.card); for k, v in pairs(ne) do e[k] = v end end end
+    if B.mode == 'pm' and not B.pmproj then B.set_all(B.pm or B.read_pm()) end
+    return true
+  end
   local core = B.pm_core()
   if not core then return false end
   local idx = core.load_index()
@@ -442,6 +470,8 @@ function B.pm_edit(path, fn)
   return true
 end
 function B.pm_card(path)
+  local PM = PMm()
+  if PM and PM.ready then return PM.card(path), { STATUSES = PM.STATUSES, STATUS_EN = PM.STATUS_EN } end
   local core = B.pm_core()
   local idx = core and core.load_index()
   return idx and idx.projects and idx.projects[path], core
@@ -449,6 +479,8 @@ end
 
 -- файл для прослушивания проекта: рендер из карточки, иначе jf_preview.wav рядом
 function B.pm_preview(e)
+  local PM = PMm()
+  if PM and e.card then return PM.find_audio(e.card) end
   if e.render and e.render ~= '' then return e.render end
   local dir = e.path:match('^(.*)/[^/]+$')
   local f = dir and io.open(dir .. '/jf_preview.wav', 'rb')
@@ -583,6 +615,7 @@ function B.set_mode(m)
   if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'kits' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
+  B.pm_scroll.v = 0
   if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'kits' then B.set_all(B.read_kits()) else B.set_all(B.read_pm()) end
 end
 
@@ -621,6 +654,25 @@ function B.click(what)
   elseif what:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(what:match('%d+'))]
     if c then B.go(c.path) end
+  -- pm-сетка (6 окт): вид, сортировка, фильтр DAW, big
+  elseif what == 'pmgrid' or what == 'pmlist' then B.grid = what == 'pmgrid'; B.pm_scroll.v = 0; B.scroll = 0
+  elseif what == 'pmsort' then
+    local PM = PMm(); local L = PM and PM.SORTS or { 'date' }
+    local k = 1; for i, v in ipairs(L) do if v == B.pm_sort then k = i end end
+    B.pm_sort = L[k % #L + 1]
+    if R.SetExtState then R.SetExtState('jf_tracker', 'pmsort', B.pm_sort, true) end
+    local cur = B.entries[B.cur]
+    B.pm = nil; B.set_all(B.read_pm())
+    if cur then for i, e in ipairs(B.entries) do if e.path == cur.path then B.cur = i; break end end end
+    if ctx.msg then ctx.msg('pm: sort by ' .. B.pm_sort .. (B.pm_sort == 'date' and ' (newest first, pinned on top)' or '')) end
+  elseif what == 'pmdaw' then
+    local PM = PMm(); local L = PM and PM.DAWS or { 'all' }
+    local k = 1; for i, v in ipairs(L) do if v == B.pm_daw then k = i end end
+    B.pm_daw = L[k % #L + 1]
+    if R.SetExtState then R.SetExtState('jf_tracker', 'pmdaw', B.pm_daw, true) end
+    B.pm = nil; B.cur = 1; B.set_all(B.read_pm())
+    if ctx.msg then ctx.msg('pm: ' .. ({ all = 'all projects', rpp = 'REAPER projects only', other = 'other DAWs only' })[B.pm_daw]) end
+  elseif what == 'pmbig' then if ctx.pm_big then ctx.pm_big() end
   elseif what == 'size' then if ctx.side_toggle_width then ctx.side_toggle_width() end
   elseif what == 'hide' then if ctx.side_hide then ctx.side_hide() end end
 end
@@ -637,6 +689,7 @@ function B.enter()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
   elseif e.pmfolder then B.pmfolder = e.pmfolder; B.pm = nil; B.cur = 1; B.filter = ''; B.set_all(B.read_pm())   -- папка проектов (без jf_pm)
   elseif e.dir then B.go(B.full(e))
+  elseif e.pm and B.grid and PMm() then if ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end   -- сетка: Enter — открыть (внутрь — Shift+Enter)
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
   elseif (e.name or ''):lower():match('%.jfcurve$') then if ctx.curve_load then ctx.curve_load(B.full(e)) end   -- кривая → открытый automation item (6 окт)
@@ -686,6 +739,7 @@ function B.describe(idx)
   if not e then return '' end
   if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
   if e.dir then return '' end                                       -- 5 окт: без имени / пути папки
+  if e.pm and e.card and PMm() then return PMm().describe(e) end
   if e.pm then
     local len = e.len and e.len > 0 and (' %d:%02d'):format(math.floor(e.len / 60), math.floor(e.len % 60)) or ''
     return ('project %s%s - Enter: inside, o: open in REAPER, T: tags, s: status, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
@@ -721,6 +775,11 @@ function B.key(c)
     return true
   end
   if B.keys and ctx.browser_note and ctx.browser_note(c) then return true end   -- keys: q 2 w 3 e … — файл с высотой
+  -- pm-сетка (6 окт): свои клавиши (hjkl по сетке, Enter открыть, Space слушать, p pin …)
+  if B.mode == 'pm' and B.grid and not B.pmproj and not B.pm_folders and PMm() then
+    if c == 27 and ctx.pm_big_on and ctx.pm_big_on() and B.filter == '' then if ctx.pm_big then ctx.pm_big() end; return true end
+    if PMm().key(c, B, ctx.mods and ctx.mods() or {}) then return true end
+  end
   if ch:match('^%d$') then B.mark(ch == '0' and 10 or tonumber(ch))
   elseif MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
   elseif ch == 'H' then B.history(-1)
@@ -912,8 +971,27 @@ function B.draw(U, L, x, y, w, h)
     where = where .. ' /' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries)
   end
   if B.mode ~= 'files' then
-    U.text(x + L.pad + 2, y + 1, ctx.fit(where, w - 2 * L.pad), (B.filtering and U.AMBER or U.GREY))
+    local tx0 = x + L.pad + 2
+    -- pm (6 окт): кнопки вида / сортировки / DAW / big перед текстом
+    if B.mode == 'pm' and not B.pmproj and not B.pm_folders and B.pm_mod() then
+      local bx = tx0
+      bx = btn(bx, y, B.grid and 'list' or 'grid', B.grid and 'pmlist' or 'pmgrid', false)
+      bx = btn(bx, y, B.pm_sort or 'date', 'pmsort', false)
+      bx = btn(bx, y, B.pm_daw or 'all', 'pmdaw', false)
+      if bx + U.measure('big') + 2 * L.pad <= x + w then bx = btn(bx, y, 'big', 'pmbig', ctx.pm_big_on and ctx.pm_big_on()) end
+      tx0 = bx
+      if B.pm_loading then where = ('jf_pm: loading %d %%'):format(math.floor(((B.pm_mod().loading or {}).frac or 0) * 100)) end
+    end
+    if tx0 < x + w - 4 * L.cw then U.text(tx0, y + 1, ctx.fit(where, x + w - L.pad - tx0), (B.filtering and U.AMBER or U.GREY)) end
     y = y + L.rh; h = h - L.rh
+  end
+  -- pm-сетка карточек (6 окт): вместо строк списка
+  if B.mode == 'pm' and B.grid and not B.pmproj and not B.pm_folders and B.pm_mod() then
+    local PM = B.pm_mod()
+    local hv, cols = PM.draw_grid(L, x, y, w - 2, h, B.entries, B.cur, B.focus, B.pm_scroll)
+    B.grid_cols = cols
+    if hv then hover = hv end
+    return hover
   end
   local nvis = math.floor(h / L.rh)
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается

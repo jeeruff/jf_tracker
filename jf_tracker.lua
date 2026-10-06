@@ -188,6 +188,9 @@ local state = {
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
   gridtab = reaper.file_exists(DIR .. '/.dev') and flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')) or false,
+  -- pm cards (6 окт, экспериментально как grid / orca): вкладка pm браузера —
+  -- сетка карточек jf_pm с превью, big — на всё окно (jf_tracker_pm.lua)
+  pmgrid = reaper.file_exists(DIR .. '/.dev') and flag('pmgrid', true) or false,
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
@@ -399,12 +402,14 @@ local function save_win()
   local S = function(k, v) reaper.SetExtState(EXT, k, tostring(v), true) end
   -- PT-mode не сохраняется (3 окт): пишется раскладка, бывшая до него
   if state.ptmode and state.pt_saved then for k, v in pairs(state.pt_saved) do state[k] = v end; state.ptmode = false end
+  if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
+  if ctx.PM and ctx.PM.flush then pcall(ctx.PM.flush, true) end                                        -- правки индекса jf_pm — на диск
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font)
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'pmgrid', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -746,6 +751,7 @@ ctx = {
     -- user1..3 — загрузить, пустой — сохранить в него текущий вид
     items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
+    if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
     items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
@@ -1496,6 +1502,7 @@ ctx = {
   help_page = function()
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
+    elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
     elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
@@ -3651,6 +3658,50 @@ ctx = {
     vim.open_hydra({ title = 'status ' .. e.name, items = items })
   end,
   -- большой редактор сэмпла (3 окт, :big / кнопка big): вкладка item на всё окно
+  -- проект-менеджер jf_pm (6 окт): модуль карточек лениво; pm_cards — опция
+  pm_mod = function()
+    if not ctx.PM then ctx.PM = dofile(DIR .. '/jf_tracker_pm.lua'); ctx.PM.init(U, ctx) end
+    return ctx.PM
+  end,
+  pm_cards = function() return state.pmgrid and true or false end,
+  pm_big_on = function() return state.pm_big and true or false end,
+  -- big (6 окт): карточки на всё окно — оверлей после draw.frame, раскладка
+  -- сохраняется как в PT-mode и возвращается по Esc / b / :pm big
+  pm_big = function()
+    if state.pm_big then
+      for k, v in pairs(state.pm_saved or {}) do state[k] = v end
+      state.pm_big, state.pm_saved = false, nil
+      relayout(); ctx.set_focus('browser')
+      vim.msg = 'pm: back to the sidebar'
+    else
+      if not state.pmgrid then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
+      state.pm_saved = {}
+      for _, k in ipairs({ 'top', 'dsp', 'mx_hidden', 'side', 'khelp' }) do state.pm_saved[k] = state[k] end
+      state.top, state.dsp, state.mx_hidden, state.side, state.khelp = false, false, true, true, false
+      state.pm_big = true
+      B.set_mode('pm'); B.grid = true
+      relayout(); ctx.set_focus('browser')
+      vim.msg = 'pm big: Esc / b - back; Enter open, Shift+Enter inside, Space listen, T tags, s status, p pin, a add'
+    end
+  end,
+  -- :pm [big | grid | list | sort <mode> | daw <mode>] — без аргумента: вкладка pm
+  pm_cmd = function(arg)
+    arg = (arg or ''):match('^%s*(.-)%s*$')
+    local w1, w2 = arg:match('^(%S+)%s*(%S*)')
+    if not state.pmgrid and w1 ~= '' then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
+    if w1 == 'big' then ctx.pm_big(); return end
+    state.side = true; B.set_mode('pm'); ctx.set_focus('browser')
+    if w1 == 'grid' or w1 == 'list' then B.click(w1 == 'grid' and 'pmgrid' or 'pmlist')
+    elseif w1 == 'sort' and w2 ~= '' then B.pm_sort = w2; reaper.SetExtState(EXT, 'pmsort', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: sort by ' .. w2
+    elseif w1 == 'daw' and w2 ~= '' then B.pm_daw = w2; reaper.SetExtState(EXT, 'pmdaw', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: daw ' .. w2
+    elseif w1 ~= '' then vim.msg = 'pm: big | grid | list | sort date|name|bpm|status | daw all|rpp|other' end
+  end,
+  -- a в сетке: проект сабпроектом в ячейку курсора (как бросок карточки)
+  pm_add = function(e)
+    if not (e and e.path) then return end
+    ctx.drop_to(vim.cur.fi, vim.cur.row, e.path)
+  end,
+  preview_stop = function() PV.stop() end,
   sample_big = function()
     state.sample_big = not state.sample_big
     if state.sample_big then state.top = true; state.toptab = 'sample'; ctx.set_focus('top') end
@@ -4185,7 +4236,9 @@ ctx = {
   focus_at = function(x, y)
     local function inr(r) return r and x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
     local f
-    if inr(L.inst_rect) then f = 'inst'
+    if state.pm_big then f = 'browser' end
+    if f then
+    elseif inr(L.inst_rect) then f = 'inst'
     elseif inr(L.slices_rect) then f = 'slices'
     elseif state.side and x >= (L.side_x or L.win_w) and y > (L.side_y0 or 0) + (L.inst_side_h or 0) and y < gfx.h - L.status_h then f = 'browser'
     elseif inr(L.notes_rect) then f = 'notes'
@@ -4229,6 +4282,7 @@ ctx = {
       -- big status отключён (5 окт): места не хватает транспорту
       -- flag('bigstatus', 'big status', 'the mode big at the left of the transport bar (INSERT, KEYS, MATRIX ...); the transport buttons, keyboard and transport follow, the small info goes under them'),
       flag('envpoints', 'envelope points', 'envelope points as small circles in the envelope columns and the item editor, as REAPER draws them'),
+      flag('pmgrid', 'pm cards (jf_pm)', 'experimental: the pm tab of the browser as a grid of project cards with thumbnails (image / DAW mark / preview wave / mini arrangement); b or :pm big - over the whole window'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
@@ -4282,13 +4336,13 @@ ctx = {
   end,
   options = function()
     local items = {}
-    for _, it in ipairs(ctx.option_items()) do if state.dev or it.key ~= 'gridtab' then items[#items + 1] = it end end
+    for _, it in ipairs(ctx.option_items()) do if state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid') then items[#items + 1] = it end end
     -- hotkeys (5 окт): все клавиши со страниц ? — клавиша, модуль, описание;
     -- / ищет по клавише, описанию и модулю
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
       local page = KH.PAGES[pg]
-      if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca')) then
+      if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca' and pg ~= 'pm')) then
         local mod = (page.title or pg):gsub('%s*%-.*$', '')
         for _, en in ipairs(page.e or {}) do
           if en.k and en.d then items[#items + 1] = { label = en.k, kind = 'action', value = mod, key = mod, desc = en.d, hk = true } end
@@ -5246,6 +5300,7 @@ ctx = {
   -- Tab — вперёд по кругу, Shift-Tab — назад (dir = -1)
   toggle_focus = function(dir)
     dir = dir or 1
+    if state.pm_big then ctx.set_focus('browser'); return end                -- big: фокус только у карточек
     -- по часовой (2 окт): трекер → инструменты → браузер → DSP → матрица → верхний док → трекер
     local order = { 'tracker' }
     if state.slices_on then order[#order + 1] = 'slices' end          -- модуль слайсов перед lib (4 окт)
@@ -5792,7 +5847,7 @@ function ctx.tok_codes(t)
   if #t == 2 and t:match('^%a%a$') then return { t:byte(1), t:byte(2) } end
 end
 ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
-                    sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top' }
+                    sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
   if hover.matrix then return 'matrix' elseif hover.pool then return 'inst' elseif hover.dsp then return 'dsp'
   elseif type(hover.fxb) == 'table' then return 'fxb'
@@ -5801,6 +5856,7 @@ function ctx.ctx_page(hover)
   if f == 'top' then local t = state.toptab; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
   if f == 'slices' then return 'sample' end
   if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
+  if f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm' end
   return ctx.CTX_FOCUS[f] and f or nil
 end
 local function context_menu(hover, anchor)
@@ -7146,6 +7202,7 @@ local function frame()
   U.begin_frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
+  if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
   if state.hold then
@@ -7593,6 +7650,7 @@ local function frame()
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
     hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
+    browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale,
@@ -7790,6 +7848,12 @@ local function frame()
       return hv
     end or nil,
   })
+  -- pm big (6 окт): карточки поверх всего; hover целиком — только карточки
+  if state.pm_big and not idle_skip and ctx.PM then
+    HN.reset()
+    hover = ctx.PM.draw_big(L, B, 0, 0, gfx.w, gfx.h - L.status_h)
+    hover.pmbig = true
+  end
   idle.hover = hover
   -- debug: нажатия мыши — что под ней (6 окт)
   if state.debug then
@@ -8085,6 +8149,10 @@ local function frame()
     state.status = 'go to ' .. (c and c.path or '?')
   elseif type(hover.browser) == 'string' then
     state.status = ({ back = 'previous folder (H)', fwd = 'next folder (L)', mkdir = 'new folder here (*, :mkdir name)',  files = 'browser: files of :browse root', db = 'browser: REAPER Media Explorer databases', pm = 'browser: jf_pm projects (Enter: inside, drag: subproject)', proj = 'browser: audio sources used in this project (like Project Bay)', auto = 'play: listen to the selected row (p), on by default', keys = 'keys: the note keys play the selected file at their pitch (q = as is at octave 4)', wave = 'mini waveforms next to file names (native peaks)', pvvol = 'preview volume - drag, wheel: 1 dB, dblclick: 0 dB', pvwave = 'playing / selected file - click: play from here', find = 'find right in the list (fzf syntax: words, ^start, end$, \'exact, !not): folder - recursive from the current folder, open db - the db; also / or f', track = 'listen through the selected track and its FX (on) or direct to the output (off)', sync = 'sync: while the project plays, a file starts on the next bar (native measure align); stopped - at once', allfiles = 'show all file types (*.*)', hidden = 'show hidden files (.*)' })[hover.browser] or hover.browser
+  elseif hover.browser == 'pmgrid' or hover.browser == 'pmlist' then state.status = 'pm: cards with thumbnails / plain list'
+  elseif hover.browser == 'pmsort' then state.status = 'pm: sort - date (newest first, pinned on top) / name / bpm / status; S'
+  elseif hover.browser == 'pmdaw' then state.status = 'pm: all projects / REAPER only / other DAWs only; d'
+  elseif hover.browser == 'pmbig' then state.status = 'pm: the cards over the whole window (b, :pm big); Esc - back'
   elseif hover.browser then state.status = B.describe(hover.browser) .. ', wheel: scroll'
   elseif SPROP.hover and SPROP.hover.title then state.status = 'instrument name - click: rename (:iname text, all items of the instrument)'
   elseif hover.header_col or hover.col then
@@ -9486,6 +9554,7 @@ local function frame()
       if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
     -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
+    elseif type(hover.browser) == 'number' and B.mode == 'pm' and B.grid and not B.pmproj and state.pmgrid then B.pm_scroll.v = math.max(0, B.pm_scroll.v + (step > 0 and 1 or -1)); B.pm_scroll.wheel = true
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
@@ -10052,6 +10121,7 @@ local function frame()
   else
     reaper.SetExtState(EXT, 'exit', ('c=%d quit=%s taken=%s flag=%s at %s'):format(c, tostring(quit), tostring(taken), reaper.GetExtState(EXT, 'quit'), os.date('%H:%M:%S')), false)
     if not taken then reaper.DeleteExtState(EXT, 'quit', false); reaper.DeleteExtState(EXT, 'owner', false) end
+    if ctx.PM and ctx.PM.flush then pcall(ctx.PM.flush, true) end
     PV.stop(); save_win(); gfx.quit()
   end
 end

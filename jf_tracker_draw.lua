@@ -3652,7 +3652,7 @@ function D.frame(L, snap, rows, state, info)
     hover.browser = info.browser_draw(L, L.side_x, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
     if hh > 0 then
       D.hint_bar(L, W, sy0 + ih - hh, L.side_w - gw - 2 * L.pad, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
-      D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)('browser'), info.focus == 'browser')
+      D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)(info.browser_page or 'browser'), info.focus == 'browser')
     end
     -- линия раздела инструменты | браузер — той же толщины, что между модулями
     set(D.SEP); gfx.rect(W, sy0 + ih, L.side_w, D.SEPW, 1)

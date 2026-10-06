@@ -176,6 +176,18 @@ KH.PAGES = {
     { k = 'u', d = 'undo' },
     { k = 'Esc', d = 'back to tracker' },
   } },
+  pm = { title = 'pm cards (jf_pm, experimental)', e = {
+    { k = 'h j k l', d = 'move over the cards (also arrows); g G - first / last' },
+    { k = 'Enter o', d = 'open the project in a new REAPER tab (an open tab is just switched to)' },
+    { k = 'Shift+Enter', d = 'inside the project: tracks / samples / regions / markers (Enter inserts, h - back)' },
+    { k = 'Space', d = 'listen to the project preview (its _preview.wav, proxy or render); again - stop' },
+    { k = 'T s p', d = 'jf_pm tags (:pmtag), status (the kanban classes), pin on top - written into jf_pm_index.json' },
+    { k = 'a', d = 'add the project as a subproject at the tracker cursor (drag a card onto a track column does the same)' },
+    { k = 'S d', d = 'sort: date / name / bpm / status; daw filter: all / REAPER only / other DAWs' },
+    { k = 'b', d = 'big: the cards over the whole window (:pm big); Esc or b - back' },
+    { k = '/ f', d = 'filter the cards: name, #tags, bpm, key, [status], daw (ableton, flstudio ...)' },
+    { k = 'r', d = 'reload the jf_pm index' },
+  } },
   browser = { title = 'browser', e = {
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },
@@ -360,6 +372,7 @@ KH.BARS = {
              { '< >', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
            { 'Space', 'listen' }, { '/', 'find' }, { '?', 'help' } },
+  pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
@@ -379,7 +392,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
