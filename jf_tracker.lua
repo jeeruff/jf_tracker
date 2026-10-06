@@ -5967,14 +5967,14 @@ function ctx.context_items(hover)
     -- карточка / строка проекта pm (6 окт): своё меню
     local e = B.entries[hover.browser]
     B.cur = hover.browser
-    add('Open in REAPER (Enter)', function() ctx.pm_open_project(e.path, e.name) end, 'o')
-    if not e.daw then add('Inside: tracks / samples / regions (Shift+Enter)', function() B.pm_open(e) end, 'i') end
-    add('Listen (Space)', function() local pth = B.pm_preview(e); if pth then ctx.preview_file(pth) else vim.msg = 'pm: no preview audio for ' .. e.name end end, 'l')
-    if not e.daw then add('Add as subproject at the cursor (a)', function() ctx.pm_add(e) end, 'a') end
-    add('Tags (T)', function() ctx.pm_tags(e) end, 't')
-    add('Status (s)', function() ctx.pm_status(e) end, 's')
-    if B.pm_mod() then add((e.pinned and '!' or '') .. 'Pin on top (p)', function() B.pm_mod().key(('p'):byte(), B, {}) end, 'p') end
-    add('Show in Finder', function() if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(e.path) else vim.msg = 'pm: needs SWS' end end, 'f')
+    add('open in reaper (Enter)', function() ctx.pm_open_project(e.path, e.name) end, 'o')
+    if not e.daw then add('inside: tracks / samples / regions (Shift+Enter)', function() B.pm_open(e) end, 'i') end
+    add('listen (Space)', function() local pth = B.pm_preview(e); if pth then ctx.preview_file(pth) else vim.msg = 'pm: no preview audio for ' .. e.name end end, 'l')
+    if not e.daw then add('add as subproject at the cursor (a)', function() ctx.pm_add(e) end, 'a') end
+    add('tags (T)', function() ctx.pm_tags(e) end, 't')
+    add('status (s)', function() ctx.pm_status(e) end, 's')
+    if B.pm_mod() then add((e.pinned and '!' or '') .. 'pin on top (p)', function() B.pm_mod().key(('p'):byte(), B, {}) end, 'p') end
+    add('show in finder', function() if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(e.path) else vim.msg = 'pm: needs SWS' end end, 'f')
   elseif hover.prevbtn then
     -- кнопка preview (3 окт): режим прослушивания
     local function radio(m, label) add((state.prevmode == m and '!' or '') .. label, function() state.prevmode = m; vim.msg = 'preview: ' .. label end) end
