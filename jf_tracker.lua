@@ -3281,6 +3281,69 @@ ctx = {
     end)
   end,
   -- \ в трекере (5 окт): контекст ячейки под курсором — то же, что правая кнопка
+  -- 6 окт: \ — главное меню, \\ — контекст того, что под курсором / в фокусе
+  context_here = function()
+    if state.focus == 'tracker' then ctx.context_key(); return end
+    local hv = {}
+    if state.focus == 'dsp' then
+      local t = dsp_target(); local fx = t and t.fx[dsp_sel.fx]
+      if fx then hv.dsp = { fx = dsp_sel.fx, f = fx, param = dsp_sel.param } end
+    elseif state.focus == 'matrix' then hv.matrix = { ri = MX.cur.ri, ci = MX.cur.ci }
+    elseif state.focus == 'inst' then hv.pool = { i = vim.inst }
+    elseif state.focus == 'fxb' then hv.fxb = { row = FB.cur }
+    elseif state.focus == 'browser' then hv.browser = B.cur
+    end
+    local r = draw.module_rects and draw.module_rects[state.focus]
+    ctx.open_context(hv, r and { kind = 'xy', x = r[1] + 8, y = r[2] + 2 * L.rh } or nil)
+  end,
+  main_menu = function()
+    vim.open_hydra(ctx.hydra_root())
+    state.popup_at = state.focus == 'tracker' and ctx.cursor_anchor() or { kind = 'ctrlbtn', name = 'help' }
+  end,
+  -- F1 (6 окт): большая справка поверх окна — все страницы, поиск; учиться
+  -- трекеру, не выходя из REAPER (html — пунктом меню, потом станет зеркалом)
+  help_big = function()
+    if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end
+    state.khelp_big = not state.khelp_big
+    vim.msg = state.khelp_big and 'help: / search, j k scroll, J K section, Esc or F1 - close, Shift+F1 - tutorial' or ''
+  end,
+  -- ? (6 окт): действия REAPER в стиле трекера — fzf на всю матрицу,
+  -- недавние сверху (ExtState jf_tracker/act_recent)
+  actions_picker = function()
+    if not reaper.CF_EnumerateActions then vim.msg = 'actions: needs SWS (CF_EnumerateActions)'; return end
+    if not ctx.act_items then
+      local items, i = {}, 0
+      while true do
+        local id, name = reaper.CF_EnumerateActions(0, i, '')
+        if not id or id <= 0 then break end
+        if name and name ~= '' then items[#items + 1] = { label = name, data = id } end
+        i = i + 1
+      end
+      ctx.act_items = items
+    end
+    local by, list, seen = {}, {}, {}
+    for _, it in ipairs(ctx.act_items) do by[it.label] = it end
+    for nm in (reaper.GetExtState(EXT, 'act_recent') or ''):gmatch('[^\n]+') do local it = by[nm]; if it and not seen[it] then list[#list + 1] = it; seen[it] = true end end
+    for _, it in ipairs(ctx.act_items) do if not seen[it] then list[#list + 1] = it end end
+    vim.open_picker('reaper actions', list, function(it)
+      reaper.Main_OnCommand(it.data, 0)
+      local rec = { it.label }
+      for nm in (reaper.GetExtState(EXT, 'act_recent') or ''):gmatch('[^\n]+') do if nm ~= it.label and #rec < 30 then rec[#rec + 1] = nm end end
+      reaper.SetExtState(EXT, 'act_recent', table.concat(rec, '\n'), true)
+      vim.msg = 'action: ' .. it.label
+    end)
+    -- на всю матрицу (узкая / скрытая — на трекер)
+    local x, y, w, h
+    if not state.mx_hidden and L.matrix_w > L.cw * 40 then
+      x, y = 0, L.mx_top or L.header_y
+      w, h = L.matrix_w - draw.SEPW, (L.mx_bot or (L.body_y + L.body_h)) - y
+    else
+      local r = draw.module_rects and draw.module_rects.tracker or { L.matrix_w, L.header_y, L.win_w - L.matrix_w, L.body_h }
+      x, y, w, h = r[1], r[2], r[3], r[4]
+    end
+    vim.picker.rows = math.max(5, math.floor((h - 2 * L.pad) / L.rh) - 2)
+    state.popup_at = { kind = 'box', x = x, y = y, w = w, h = h }
+  end,
   context_key = function()
     local f = L.flat[vim.cur.fi]
     local hv = { fi = vim.cur.fi, row = { row = vim.cur.row }, field = vim.cur.field, fsub = vim.cur.sub,
@@ -5368,6 +5431,7 @@ ctx = {
     local hover = { fi = vim.cur.fi, cell = f and f.sub and f.sub[vim.cur.row], col = col }
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local items = {
+      { key = '\\', label = 'context: what is under the cursor', fn = function() ctx.context_here() end },
       { key = 'e', label = 'event / selection', sub = function() return group('event', event_actions(hover)) end },
       { key = 't', label = 'track' .. (col and (': ' .. col.name) or ''), sub = function() return col and group('track ' .. col.name, track_actions(col)) or { title = 'track', items = {} } end },
       { key = 'p', label = 'pattern' .. (rg and (': ' .. rg.name) or ''), sub = function() return group('pattern', region_actions(rg)) end },
@@ -5839,7 +5903,9 @@ function view_actions()
     { 'FX columns -1', key = 'X', fn = function() state.fxcols = math.max(0, state.fxcols - 1) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (F11)', key = 'd', fn = toggle_dock },
-    { 'Help (F1)', key = 'h', fn = open_help },
+    { 'Help (F1)', key = 'h', fn = function() ctx.help_big() end },
+    { 'Help in the browser (html)', key = 'H', fn = open_help },
+    { (state.khelp and '!' or '') .. 'Help panel of the focused module', key = 'K', fn = function() ctx.toggle_help() end },
   }
 end
 
@@ -7871,6 +7937,13 @@ local function frame()
       return hv
     end or nil,
   })
+  -- большая справка F1 (6 окт): поверх всего окна
+  if state.khelp_big and not idle_skip then
+    HN.reset()
+    hover = ctx.DOC.draw(L, 0, 0, gfx.w, gfx.h - L.status_h)
+    U.set(U.AMBER); gfx.rect(0, 0, gfx.w, gfx.h - L.status_h, 0)
+    hover.khelp_big = true
+  end
   -- pm big (6 окт): карточки поверх всего; hover целиком — только карточки
   if state.pm_big and not idle_skip and ctx.PM then
     HN.reset()
@@ -7919,6 +7992,8 @@ local function frame()
     elseif pa and pa.kind == 'in' then
       local r = draw.in_at and draw.in_at[pa.guid]
       if r then anchor = { x = r[1], y = r[2], right = r[3] } end
+    elseif pa and pa.kind == 'box' then
+      anchor = { box = { pa.x, pa.y, pa.w, pa.h } }
     elseif pa and pa.kind == 'xy' then
       anchor = { x = pa.x, y = pa.y }
     elseif pa and pa.kind == 'strip' then
@@ -7954,7 +8029,7 @@ local function frame()
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
     if OPT.tour.want_focus then ctx.set_focus(OPT.tour.want_focus); OPT.tour.want_focus = nil end
     OPT.tour.tick({ hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil,
-      hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
+      hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
@@ -8278,6 +8353,7 @@ local function frame()
     else draw.vbar_drag = nil end
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
     if bpm_menu.hover then
@@ -9572,7 +9648,8 @@ local function frame()
   end
   if gfx.mouse_wheel ~= 0 then
     local step = gfx.mouse_wheel > 0 and -3 or 3
-    if hover.dsp and hover.dsp.param then
+    if hover.khelp_big and ctx.DOC then ctx.DOC.wheel(gfx.mouse_wheel)        -- справка F1: прокрутка
+    elseif hover.dsp and hover.dsp.param then
       local col = dsp_target(); local p = col and hover.dsp.f.params[hover.dsp.param]
       if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
     -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
@@ -9625,7 +9702,7 @@ local function frame()
     end
   end
   local quit = false
-  if c == keys.f1 then open_help(); c = 0 end
+  if c == keys.f1 then if ctx.mods().shift then state.khelp_big = false; ctx.tutorial() else ctx.help_big() end; c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end
   -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
@@ -9885,14 +9962,19 @@ local function frame()
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
       or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
-    if state.khelp and state.focus == 'dsp' and not typing then
+    if state.khelp_big then
+      -- большая справка: клавиши — ей (поиск, страницы, прокрутка); Esc / Enter — закрыть
+      local r = ctx.DOC.key(c)
+      if r == 'leave' then state.khelp_big = false end
+      c = 0
+    elseif state.khelp and state.focus == 'dsp' and not typing then
       if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0
       else
         local r = KH.key(c)
         if r == 'leave' then ctx.set_focus(KH.from or 'tracker'); c = 0 elseif r then c = 0 end
       end
     elseif c == 63 and not typing then
-      ctx.toggle_help(); c = 0
+      ctx.actions_picker(); c = 0                          -- ? (6 окт): действия REAPER; справка — F1
     elseif state.khelp and not typing then
       KH.press(ctx.help_page(), c, reaper.time_precise())
     end
@@ -9921,28 +10003,14 @@ local function frame()
       -- 5 окт: две гидры — ` главная (у главного модуля слева сверху), \ —
       -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
       local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
-      if c == 96 and vim.mode ~= 'insert' and not typing then
-        -- на трекере — выпадает из блока курсора (5 окт), иначе у кнопки help
-        vim.open_hydra(ctx.hydra_root()); state.popup_at = state.focus == 'tracker' and ctx.cursor_anchor() or { kind = 'ctrlbtn', name = 'help' }
-        return
-      end
+      -- 6 окт: главное меню — \ (` больше не меню; в INSERT ` — note-off)
       local m0 = ctx.mods()
       if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты
       if not typing and (c == 1962934519 or (c == 47 and m0.alt)) then ctx.dsp_search(); return end     -- Option+/ (÷) — DSP
       if not typing and c == 47 and m0.cmd then ctx.file_search(); return end                           -- Cmd+/ — файлы
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
       if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-        local hv = {}
-        if state.focus == 'dsp' then
-          local t = dsp_target(); local fx = t and t.fx[dsp_sel.fx]
-          if fx then hv.dsp = { fx = dsp_sel.fx, f = fx, param = dsp_sel.param } end
-        elseif state.focus == 'matrix' then hv.matrix = { ri = MX.cur.ri, ci = MX.cur.ci }
-        elseif state.focus == 'inst' then hv.pool = { i = vim.inst }
-        elseif state.focus == 'fxb' then hv.fxb = { row = FB.cur }
-        end
-        local r = draw.module_rects and draw.module_rects[state.focus]
-        context_menu(hv, r and { kind = 'xy', x = r[1] + 8, y = r[2] + 2 * L.rh } or nil)
-        return
+        ctx.main_menu(); return                          -- \ — главное меню, в нём \ — контекст
       end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       if state.macro and state.focus == 'tracker' and vim.mode == 'normal' then

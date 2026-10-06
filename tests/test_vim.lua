@@ -678,5 +678,12 @@ reset(); keysin('L'); eq('L: visual from normal', V.mode, 'visual'); eq('L: anch
 keysin('J'); eq('J extends a row down', V.cur.row, 1); V.key(27); eq('Esc: back to normal', V.mode, 'normal')
 reset(); keysin('is'); eq('INSERT s: visual', V.mode, 'visual'); keysin('jy'); eq('y: back to INSERT', V.mode, 'insert'); V.key(27)
 reset(); V.key(223); eq('Option+s: step prompt', V.cmdline, 'step '); eq('Option+s: cmd mode', V.mode, 'cmd'); V.key(27)
+-- стрелки = hjkl во всех сочетаниях (6 окт)
+reset()
+shift_down = true; V.key(1685026670); shift_down = false
+eq('Shift+Down = Shift+j: VISUAL', V.mode, 'visual'); eq('Shift+Down moved a row', V.cur.row, 1)
+V.key(27); reset()
+ctrl_down = true; V.key(1919379572); ctrl_down = false
+eq('Ctrl+Right = Ctrl+l: matrix move', last(), 'mx:1,0')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

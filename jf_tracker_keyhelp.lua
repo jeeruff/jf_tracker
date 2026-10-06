@@ -78,8 +78,10 @@ KH.PAGES = {
     { k = '/', d = 'commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)' },
     { k = 'n N *', d = 'next / previous match of the last search, search the name under the cursor' },
     { k = ':', d = 'command line (Tab completes)' },
-    { k = '`', d = 'the main menu (all actions; at the main module); in INSERT ` is note-off' },
-    { k = '\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
+    { k = '\\', d = 'the main menu of everything (v view, P project, o options ...)' },
+    { k = '\\\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
+    { k = '?', d = 'any REAPER action in the tracker style (fuzzy, the recent ones on top)' },
+    { k = 'F1 Shift+F1', d = 'the help (all modules, / searches it) / the tutorial' },
     { k = '^/ ⌥/ ⌘/', d = 'search: all effects / the DSP chain of the track / files' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
@@ -93,14 +95,14 @@ KH.PAGES = {
     { k = ':cc', t = {}, d = 'CC lane: ReaControlMIDI on the cursor track (its window opens the first time - set the CC numbers there), pick its parameter - the envelope becomes a column: hex per row, curves, automation items' },
     { k = 'S-Esc', t = {}, d = 'remove the REAPER time selection (any module)' },
     { k = 'Opt-Enter', d = 'select the instrument of the note under the cursor in the lib' },
-    { k = '\\q \\Q', t = {}, d = 'context menu on a sample: q - the nearest peak onto the row grid; Q - pick the peak, j k to a row, Enter moves it there (stretch marker)' },
+    { k = '\\\\q \\\\Q', t = {}, d = 'context menu on a sample: q - the nearest peak onto the row grid; Q - pick the peak, j k to a row, Enter moves it there (stretch marker)' },
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
     { k = 'F2', d = 'tracker <-> item tab (from any tab - back to the tracker)' },
     { k = 'F3', d = 'modulate; again - the next tab in a circle' },
     { k = 'F4 F5 F6', d = 'midi / scopes / master; the same key again - back to the tracker' },
-    { k = '?', d = 'this help panel on / off' },
+    { k = 'help', d = 'this panel: the help button of the main module; F1 - the whole help' },
     { k = 'Ctrl+ Ctrl-', d = 'bitmap scale x1..x4' },
   } },
   insert = { title = 'tracker INSERT (keyboard)', e = {
@@ -123,7 +125,7 @@ KH.PAGES = {
     { k = 'f', d = 'next fx field (note > fx1 > fx2 ...)' },
     { k = '`', d = 'note-off' },
     { k = 'Esc', d = 'back to NORMAL' },
-    { k = '?', d = 'help panel on / off' },
+    { k = 'F1', d = 'the whole help' },
   } },
   matrix = { title = 'matrix of regions (slots)', e = {
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
@@ -358,14 +360,14 @@ KH.PAGES = {
     { k = 'Up Down', d = 'scroll' },
     { k = 'BS', d = 'erase search' },
     { k = 'Esc', d = 'clear search / back to module' },
-    { k = '?', d = 'help off' },
+    { k = 'F1', d = 'the whole help' },
   } },
 }
 -- строка подсказок под модулем (опция hints, 2 окт): самое нужное в одну
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'track' }, { 'yy p', 'copy' }, { 'v', 'select' },
-              { '/', 'find' }, { ':', 'cmd' }, { '`', 'menu' }, { '\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'help' } },
+              { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' }, { 'F1', 'help' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
@@ -512,7 +514,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local P = KH.PAGES[KH.page] or KH.PAGES.tracker
   -- шапка: ? HELP · страница · поиск
-  local head = ('? help: %s'):format(P.title)
+  local head = ('F1 help: %s'):format(P.title)
   U.text(x + L.pad, y + 3, head, U.AMBER)
   local qx = x + L.pad + U.measure(head) + 3 * L.pad
   local qs = KH.query ~= '' and ('/' .. KH.query .. (focused and '_' or '')) or (focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up')

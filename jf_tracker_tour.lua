@@ -40,14 +40,14 @@ T.STEPS = {
     text = ': opens the command line - :arp up 2, :legato, :macro, :pt, :big; Tab completes. Press :',
     check = function(e) return e.mode == 'cmd' end },
   { mod = 'tracker', focus = 'tracker', title = 'Leader menu',
-    text = '` opens the main menu of everything (v view, P project, o options); \\ - the menu of what is under the cursor, like the right click. Press `',
+    text = '\\ opens the main menu of everything (v view, P project, o options); \\\\ - the menu of what is under the cursor, like the right click. Press \\',
     check = function(e) return e.hydra end },
   { mod = 'ctrl', focus = 'tracker', title = 'Play',
     text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',
     check = function(e) return e.playing end },
   { mod = 'dsp', focus = 'tracker', title = 'Help',
-    text = '? shows the keys of the focused module; Tab in the help searches all pages. Press ?',
-    check = function(e) return e.khelp end },
+    text = 'F1 - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live. Press F1',
+    check = function(e) return e.khelp_big end },
 }
 
 function T.start() T.active, T.step, T.base, T.state, T.ok, T.finished = true, 1, nil, {}, false, false; T.want_focus = T.STEPS[1].focus end

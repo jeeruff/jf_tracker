@@ -1094,7 +1094,8 @@ function V.key_impl(c)
   -- Ctrl+H = 8 = Backspace, Option+h = «˙» и т.п. — различаем по битам.
   local mods = ctx.mods and ctx.mods() or {}
   local HJKL = { [104] = 'h', [106] = 'j', [107] = 'k', [108] = 'l', [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l',
-                 [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l' }
+                 [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l',
+                 [LEFT] = 'h', [DOWN] = 'j', [UP] = 'k', [RIGHT] = 'l' }   -- 6 окт: стрелки = hjkl во всех сочетаниях
   -- ⌘+цифра — слот пула (1..9, 0 = 10) в любом режиме
   if mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
      and not ((V.mode == 'insert' or V.piano) and ctx.piano[c]) then      -- в INSERT / слое пианино ⌘+цифра — нота с удержанием
@@ -1157,6 +1158,9 @@ function V.key_impl(c)
       if c == 223 or (chs == 's' and mods.alt) then
         V.cmd_from = V.mode == 'insert' and 'insert' or 'normal'; V.mode = 'cmd'; V.cmdline = 'step '; return
       end
+      -- Shift+стрелки = Shift+hjkl (6 окт)
+      local sha = mods.shift and ({ [LEFT] = 'h', [DOWN] = 'j', [UP] = 'k', [RIGHT] = 'l' })[c]
+      if sha then chs = sha:upper() end
       if SH[chs] or (chs == 's' and V.mode == 'insert') then
         if V.mode ~= 'visual' and V.mode ~= 'vline' then
           if V.mode == 'insert' then V.back_insert = true end
@@ -1172,7 +1176,7 @@ function V.key_impl(c)
   end
   -- лидер \ — hydra действий (контекстное меню с клавиатуры), ? — шпаргалка
   if c == ('\\'):byte() and not (V.mode == 'insert' and (env_of(V.cur.fi) or (V.cur.field or 1) == 2)) then
-    if ctx.context_key then ctx.context_key() else V.open_hydra(ctx.hydra_root()) end; return   -- 5 окт: \ — контекст; главная — `
+    if ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return   -- 6 окт: \ — главное меню, \\ — контекст
   end
 
   record(c)
@@ -1921,8 +1925,9 @@ function V.popup()
   if V.picker then
     local pk = V.picker
     local lines = {}
-    local first = math.max(1, pk.sel - 13)
-    for i = first, math.min(#pk.matches, first + 13) do
+    local nr = pk.rows or 14                      -- 6 окт: высота задаётся (действия REAPER — на всю матрицу)
+    local first = math.max(1, pk.sel - (nr - 1))
+    for i = first, math.min(#pk.matches, first + nr - 1) do
       lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = pk.matches[i].label }
     end
     return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', hl = pk.sel - first + 1 }

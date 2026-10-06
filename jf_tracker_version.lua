@@ -697,9 +697,9 @@ V.TUTORIAL = {
   '7. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '8. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '9. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
-  '10. Menus. ` - the main menu of everything (v view, P project, o options); \\ - the context menu of what is under the cursor, the same as the right click. Ctrl+/ - find an effect, Option+/ - inside the DSP chain, Cmd+/ - a file.',
+  '10. Menus. \\ - the main menu of everything (v view, P project, o options); \\\\ - the context menu of what is under the cursor, the same as the right click; ? - any REAPER action. Ctrl+/ - find an effect, Option+/ - inside the DSP chain, Cmd+/ - a file.',
   '11. Play. Space - play / stop, F - follow the playhead; =START and =END markers bound the song.',
-  '12. Help. ? shows the keys of the focused module; Tab in the help searches all pages.',
+  '12. Help. F1 - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live.',
   '',
   'Everything you write is plain REAPER: tracks, items, MIDI, regions - close the window and keep working in REAPER.',
 }

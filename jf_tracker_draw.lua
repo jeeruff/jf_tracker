@@ -4438,7 +4438,14 @@ function D.popup(L, p, anchor)
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2
-  if anchor then
+  if anchor and anchor.box then
+    -- 6 окт: всплывашка в заданный прямоугольник (действия REAPER на всю матрицу)
+    local b = anchor.box
+    x, y, w, h = b[1], b[2], b[3], b[4]
+    ncol, nrow = 1, math.min(n, math.max(1, math.floor((h - 2 * L.pad) / L.rh) - 1))
+    colw = w
+    tw = math.max(ms('WWWW'), w - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad))
+  elseif anchor then
     -- right: не влезает вправо — правый край меню у правого края кнопки
     local ax = anchor.x
     if anchor.right and ax + w > W - L.pad then ax = anchor.right - w end
