@@ -43,6 +43,9 @@ reaper = {
   end,
   TrackFX_Delete = function(_, fx) table.remove(top, fx + 1) end,
   TrackFX_Show = function() end,
+  TrackFX_SetNamedConfigParm = function(_, fx, key, v)
+    local c, k = decode(fx); top[c + 1].kids[k + 1][key] = v; return true
+  end,
 }
 local A = setmetatable({}, { __index = function(_, k) return reaper['TrackFX_' .. k] end })
 local model = { fxapi = function() return A end, is_take = function() return false end, invalidate = function() end }
@@ -65,6 +68,13 @@ top = { { name = 'eq' }, { name = 'C1', kids = {} }, { name = 'comp' } }
 eq('move after: ok', E.fx_move_into(TR, 2, 1), true)
 eq('move after: top', names(top), 'eq,C1'); eq('move after: kids', names(top[2].kids), 'comp')
 eq('move into itself refused', E.fx_move_into(TR, 1, 1), false)
+
+-- parallel: правая половина рамки — ребёнок с parallel = 1
+top = { { name = 'eq' }, { name = 'C1', kids = { { name = 'a' } } }, { name = 'comp' } }
+eq('add parallel: ok', E.fx_add_into(TR, 1, 'verb', 1), true); eq('add parallel: flag', top[2].kids[2].parallel, '1')
+eq('add serial: no flag', (E.fx_add_into(TR, 1, 'dly', 0) and top[2].kids[3].parallel), nil)
+eq('move parallel (before container): ok', E.fx_move_into(TR, 0, 1, 1), true)
+eq('move parallel: kids', names(top[1].kids), 'a,verb,dly,eq'); eq('move parallel: flag on the moved one', top[1].kids[4].parallel, '1')
 
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

@@ -3898,12 +3898,23 @@ function D.frame(L, snap, rows, state, info)
           ky = ky + L.rh
         end
         -- рамка (6 окт): сюда бросают эффекты — из списка fx или блок с панели
+        -- (6 окт, просьба) строкой, как дети: та же черта цепочки, читаемый серый
+        -- две половины (6 окт): «| serial» — за предыдущим, «= parallel» —
+        -- параллельно ему; при броске половина под мышью горит голубым
         if ky + L.rh <= by + bh - 2 then
-          set(U.tint(U.AMBER, 0.45)); gfx.rect(bx + L.pad, ky + 1, pw, L.rh, 0)
-          local lbl = #f.kids == 0 and 'empty: drop fx here' or 'drop fx here'
-          if ms(lbl) > pw - 4 then lbl = 'drop fx here' end
-          if ms(lbl) > pw - 4 then lbl = 'drop fx' end
-          text(bx + L.pad + math.max(2, math.floor((pw - ms(lbl)) / 2)), ky + 1, fit(lbl, pw - 4), U.DIM)
+          local kx = bx + L.pad
+          local hw = math.floor(pw / 2)
+          local grey = U.readable(U.GREY, is_sel and U.tint(U.AMBER, 0.18) or U.BG, 4.5)
+          local lit = drag and my >= by and my < by + bh and mx >= bx + bw / 4 and mx < bx + bw * 3 / 4
+          for hi, part in ipairs({ { '|', 'serial' }, { '=', 'parallel' } }) do
+            local px = kx + (hi - 1) * hw
+            local on = lit and ((hi == 2) == (mx >= bx + bw / 2))
+            if on then set(U.tint(U.CYAN, 0.3)); gfx.rect(px, ky, hw - 1, L.rh, 1) end
+            -- тесно — обе половины коротко (| ser  = par), чтобы не вразнобой
+            local short = ms('= parallel') > hw - 2 * L.pad
+            local lbl = part[1] .. ' ' .. (short and part[2]:sub(1, 3) or part[2])
+            text(px + L.pad, ky, fit(lbl, hw - 2 * L.pad), on and U.CYAN or grey)
+          end
         end
       end
       if f.view == 'grain' then
@@ -4158,6 +4169,7 @@ function D.frame(L, snap, rows, state, info)
         if b.cont and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
           set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
           hover.dsp_into = b.k
+          hover.dsp_into_par = mx >= b.x + b.w / 2 and 1 or 0     -- правая половина — parallel
         end
       end
     end

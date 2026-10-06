@@ -2005,24 +2005,32 @@ local function cont_count(obj, c)
   local ok, n = FA(obj).GetNamedConfigParm(obj, c, 'container_count')
   return ok and tonumber(n) or nil
 end
-function E.fx_add_into(track, c, name)
+-- par (6 окт): 1 — параллельно предыдущему (named parm 'parallel'), иначе за ним
+local function set_par(track, addr, par)
+  if par and par > 0 then FA(track).SetNamedConfigParm(track, addr, 'parallel', tostring(par)) end
+end
+function E.fx_add_into(track, c, name, par)
   local ok = false
   run('fx add into container', function()
     local k = cont_count(track, c); if not k then return end
-    local idx = add_fx(track, name, -1000 - child_addr(track, c, k))
+    local addr = child_addr(track, c, k)
+    local idx = add_fx(track, name, -1000 - addr)
     ok = idx ~= nil and idx >= 0
+    if ok then set_par(track, addr, par) end
     if ok and E.open_on_add then FA(track).Show(track, idx, 3) end
   end)
   if model then model.invalidate() end
   return ok
 end
-function E.fx_move_into(track, src, c)
+function E.fx_move_into(track, src, c, par)
   if src == c then return false end
   local ok = false
   run('fx move into container', function()
     local k = cont_count(track, c); if not k then return end
-    copy_fx(track, src, track, child_addr(track, c, k), false)
-    if (cont_count(track, c) or k) > k then FA(track).Delete(track, src); ok = true end
+    local addr = child_addr(track, c, k)
+    copy_fx(track, src, track, addr, false)
+    -- parallel — до удаления оригинала: адрес считан при нынешнем GetCount
+    if (cont_count(track, c) or k) > k then set_par(track, addr, par); FA(track).Delete(track, src); ok = true end
   end)
   if model then model.invalidate() end
   return ok
