@@ -8200,6 +8200,7 @@ local function frame()
     smart_ok = reaper.file_exists(ctx.smart_input_path),
     dsptrack = state.dsptrack,
     eqgraph = state.eqgraph,
+    clipsview = state.clipsview, dsp_big = state.dsp_big,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
@@ -8586,7 +8587,10 @@ local function frame()
   if state.dsp_big and not idle_skip and L.body_h > 0 then
     local root, _, title = ctx.db_tree()
     if root then
-      local x0, y0, w0, h0 = L.matrix_w, L.header_y, L.win_w - L.matrix_w, L.header_h + L.body_h
+      -- уголок (proj | region, session | router) остаётся: им роутер и закрывают;
+      -- номера строк под ним гаснут
+      local x0, y0, w0, h0 = L.matrix_w + L.label_w, L.header_y, L.win_w - L.matrix_w - L.label_w, L.header_h + L.body_h
+      U.set(U.BG); gfx.rect(L.matrix_w, L.body_y, L.label_w, L.body_h, 1)
       if not HN.active then
         local keep = {}
         for _, t in ipairs(HN.targets) do
@@ -8790,6 +8794,8 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.viewbtn == 'session' then state.status = 'session: clips instead of the rows - scenes x tracks, Enter launches (zs, quick option clips)'
+  elseif hover.viewbtn == 'router' then state.status = 'router: the fx chain of the cursor track with its routing in place of the tracker (zz in DSP)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
@@ -9284,6 +9290,8 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
+    elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | router (7 окт)
+    elseif hover.viewbtn == 'router' then ctx.dsp_big()
     elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
@@ -10363,7 +10371,7 @@ local function frame()
     end
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, L.win_w - L.matrix_w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
+  if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, L.win_w - L.matrix_w - L.label_w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
   if gfx.mouse_wheel ~= 0 and hover and hover.slices ~= nil then
     -- колесо над модулем слайсов (4 окт): листать список
     SPROP.slice_scroll = math.max(0, (SPROP.slice_scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))

@@ -3037,8 +3037,14 @@ function D.frame(L, snap, rows, state, info)
     local lb = (ms('proj') + ms('region') + 4 * L.pad + 6 <= bw) and 'region' or 'rgn'
     x0 = small(x0, hy + 1, 'proj', 'all', not info.view_reg, 'viewbtn')
     small(x0, hy + 1, lb, 'reg', info.view_reg, 'viewbtn')
-    -- ряд 1: номер + имя
-    local ny = hy + 1 + L.rh
+    -- ряд 1 (7 окт): session (клипы вместо строк) | router (цепочка FX вместо трекера)
+    do
+      local full = ms('session') + ms('router') + 6 <= bw
+      local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
+      small(x1, hy + 1 + L.rh, full and 'router' or 'rout', 'router', info.dsp_big, 'viewbtn')
+    end
+    -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
+    local ny = hy + 1 + 2 * L.rh
     if rg then
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
@@ -3056,7 +3062,7 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 2: /2 x2 dup
     if rg then
       local by2 = ny + L.rh
-      if by2 + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+      if by2 + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
         local x = bx
         for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' }, { 'clone', 'cln' } }) do
           if x + ms(bt[2]) + 2 > bx + bw then break end
@@ -3065,21 +3071,23 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
-  -- длина региона курсора в шагах — квадрат над номерами строк: число на
-  -- 2-й строке шапки, «<» «>» на 3-й (клик / колесо = ±1 шаг, ripple как :len)
+  -- длина региона курсора в шагах — последняя строка шапки: «<  24  >»
+  -- одной строкой (7 окт: стрелки рядом с числом, которым управляют;
+  -- клик / колесо = ±1 шаг, ripple как :len)
   if info.cur_region then
     local rg = info.cur_region
     local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
     local bx, bw = tx0 + 1, L.label_w - 2
-    local y2, y3 = hy + (L.header_rows - 2) * L.rh + 2, hy + (L.header_rows - 1) * L.rh + 2
-    set(U.LINE); gfx.rect(bx, y2 - 1, bw, 2 * L.rh + 1, 0)
-    text(bx + math.max(1, math.floor((bw - ms(s)) / 2)), y2, fit(s, bw - 2), U.TEXT)
-    local hl = mx >= bx and mx < bx + bw / 2 and my >= y3 and my < y3 + L.rh
-    local hr = mx >= bx + bw / 2 and mx < bx + bw and my >= y3 and my < y3 + L.rh
+    local y3 = hy + (L.header_rows - 1) * L.rh + 2
+    set(U.LINE); gfx.rect(bx, y3 - 1, bw, L.rh + 1, 0)
+    local aw = ms('<') + 2
+    text(bx + math.max(aw, math.floor((bw - ms(s)) / 2)), y3, fit(s, bw - 2 * aw), U.TEXT)
+    local hl = mx >= bx and mx < bx + bw / 3 and my >= y3 and my < y3 + L.rh
+    local hr = mx >= bx + bw * 2 / 3 and mx < bx + bw and my >= y3 and my < y3 + L.rh
     text(bx + 1, y3, '<', hl and U.AMBER or U.GREY)
     text(bx + bw - ms('>') - 1, y3, '>', hr and U.AMBER or U.GREY)
     if hl then hover.rglen = -1 elseif hr then hover.rglen = 1
-    elseif mx >= bx and mx < bx + bw and my >= y2 and my < y3 then hover.rglen = 0 end
+    elseif mx >= bx and mx < bx + bw and my >= y3 and my < y3 + L.rh then hover.rglen = 0 end
     hint('rglen', bx, y3, math.floor(bw / 2), L.rh, -1); hint('rglen', bx + math.floor(bw / 2), y3, math.floor(bw / 2), L.rh, 1)
   end
 
