@@ -1184,11 +1184,15 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       if py then gfx.line(x + px, py, x + 1 + px, yy) end
       py = yy
     end
+    -- точки полос (7 окт): тянутся мышью — D.eq_hit читает вызывающий
+    D.eq_hit = { x = x, y = y, w = w, h = h, sc = sc, cy = cy, pts = {} }
     for i, b in ipairs(bands) do
       if b.f and b.g and b.f > 0 then
         local bx2 = x + 1 + math.floor(lx(b.f) * (w - 3))
         local by2 = math.floor(cy - math.max(-18, math.min(18, b.g)) * sc + 0.5)
-        set(U.CYAN); gfx.rect(bx2 - 2, by2 - 2, 5, 5, 1)
+        D.eq_hit.pts[#D.eq_hit.pts + 1] = { i = i, x = bx2, y = by2 }
+        local hot = D.eq_hot == i and D.eq_hot_fx == f.i
+        set(hot and U.AMBER or U.CYAN); gfx.rect(bx2 - (hot and 3 or 2), by2 - (hot and 3 or 2), hot and 7 or 5, hot and 7 or 5, 1)
         if h > 3 * VRH then text(bx2 + 3, by2 - VRH, tostring(i), U.GREY) end
       end
     end
@@ -4013,7 +4017,15 @@ function D.frame(L, snap, rows, state, info)
         -- вид встроенного эффекта REAPER (4 окт) — первая колонка
         pcol0 = 1
         VRH = L.rh
+        D.eq_hit = nil
         D.fx_view(f.view, f, vals, bx + L.pad, by + L.rh + 1, pw, bh - L.rh - 4)
+        -- ReaEQ: щелчок в виде хватает ближайшую точку полосы (не блок)
+        local eh = f.view == 'eq' and D.eq_hit
+        if eh and not drag and mx >= eh.x and mx < eh.x + eh.w and my >= eh.y and my < eh.y + eh.h and #eh.pts > 0 then
+          local best, bd
+          for _, pt in ipairs(eh.pts) do local d = (pt.x - mx) ^ 2 + (pt.y - my) ^ 2; if not bd or d < bd then best, bd = pt, d end end
+          hover.dspeq = { fx = k, f = f, band = best.i, hit = eh }
+        end
       end
       if f.view == 'rec' then
         -- jf_rec (4 окт): волна кольца, выделение a..b, голова превью;

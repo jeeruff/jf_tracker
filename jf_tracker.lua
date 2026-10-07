@@ -5300,6 +5300,29 @@ ctx = {
   -- подписи шагов параметра (4 окт, «шаговые значения выбором»): текст плагина
   -- для каждого положения — FormatParamValueNormalized (параметр не трогается)
   steplab = {},
+  -- значение параметра по тексту плагина (7 окт, точки ReaEQ): двоичный
+  -- поиск нормализованного значения, чей текст даёт число target (Гц, дБ);
+  -- текст растёт вместе со значением
+  fx_set_display = function(f, p, target)
+    local t = dsp_target(); if not (t and f and p) then return end
+    local fx = p.fx or f.i
+    local fmt = model.is_take(t.track) and reaper.TakeFX_FormatParamValueNormalized or reaper.TrackFX_FormatParamValueNormalized
+    local function num(v)
+      local ok, s = fmt(t.track, fx, p.i, v, '')
+      if not ok then return nil end
+      if s:find('inf') then return s:find('%-') and -1e9 or 1e9 end
+      local n = tonumber((s:gsub(',', '.')):match('[-+]?%d*%.?%d+'))
+      return n and n * (s:lower():find('%dk') and 1000 or 1)
+    end
+    local lo, hi = 0, 1
+    for _ = 1, 22 do
+      local mid = (lo + hi) / 2
+      local n = num(mid)
+      if not n then break end
+      if n < target then lo = mid else hi = mid end
+    end
+    edit.fx_param(t.track, fx, p.i, (lo + hi) / 2)
+  end,
   step_labels = function(f, p)
     local t = dsp_target(); if not (t and f and p and p.nsteps) then return nil end
     local fx = p.fx or f.i
@@ -7509,6 +7532,20 @@ local function poll_cmd()
   elseif name == 'session' and (v:match('^session%s+launch') or v:match('^session%s+scene') or v:match('^session%s+stop') or v:match('^session%s+off') or v:match('^session%s+jump') or v:match('^session%s+loop')) and not ctx.is_sandbox() then
     reaper.SetExtState(EXT, 'ssdump', 'REFUSED: not a sandbox', false)   -- тест-команды, что меняют проект, — только в песочнице (6 окт)
   elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
+  elseif name == 'eqset' then   -- тест (7 окт): eqset <fx> <параметр-подпись_без_пробелов> <число> — только песочница
+    local fi, lab, val = v:match('^eqset%s+(%d+)%s+(%S+)%s+(%S+)')
+    local t = dsp_target(); local f = t and t.fx[tonumber(fi or 0)]
+    if not ctx.is_sandbox() or not f then reaper.SetExtState(EXT, 'dbg', 'eqset: REFUSED / no fx', false)
+    else
+      lab = lab:gsub('_', ' ')
+      for pi, p in ipairs(f.params or {}) do
+        if p.name == lab then
+          ctx.fx_set_display(f, p, tonumber(val))
+          local _, s2 = model.fxapi(t.track).GetFormattedParamValue(t.track, p.fx or f.i, p.i, '')
+          reaper.SetExtState(EXT, 'dbg', ('eqset %s -> %s'):format(lab, s2), false)
+        end
+      end
+    end
   elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
     if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
     else
@@ -8984,6 +9021,10 @@ local function frame()
     local k = hover.sess.ri .. ':' .. hover.sess.ci
     if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, MX.grid(snap, seq)) end
   else state.ss_hkey = nil end
+  do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
+    local e = ctx.eq_drag or hover.dspeq
+    draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
+  end
   if U.click and hover.dbig then MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
@@ -9408,6 +9449,11 @@ local function frame()
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
       click = { t = now2, zone = 'dsptarget' }
+    elseif hover.dspeq then
+      -- точка полосы ReaEQ (7 окт): протяжка — частота (x) и усиление (y)
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.dspeq.fx
+      ctx.eq_drag = { f = hover.dspeq.f, band = hover.dspeq.band, hit = hover.dspeq.hit, mx = gfx.mouse_x, my = gfx.mouse_y }
+      click = { t = now2, zone = 'dspeq' }
     elseif hover.dspview then
       -- живой вид модуля (гранулятор): клик / протяжка = нативный параметр вида
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
@@ -9873,6 +9919,24 @@ local function frame()
     else lfo_drag = nil end
   end
   -- протяжка по живому виду модуля DSP (гранулятор: Position)
+  if ctx.eq_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d = ctx.eq_drag
+      if gfx.mouse_x ~= d.mx or gfx.mouse_y ~= d.my then
+        d.mx, d.my = gfx.mouse_x, gfx.mouse_y
+        local h = d.hit
+        local LB = { { '1 lo f', '1 lo g' }, { '2 f', '2 g' }, { '3 f', '3 g' }, { '4 hi f', '4 hi g' } }
+        local lf, lg = LB[d.band][1], LB[d.band][2]
+        local pf, pg
+        for _, p in ipairs(d.f.params or {}) do if p.name == lf then pf = p elseif p.name == lg then pg = p end end
+        local fq = 20 * 1000 ^ math.max(0, math.min(1, (gfx.mouse_x - h.x - 1) / math.max(1, h.w - 3)))
+        local db = math.max(-18, math.min(18, (h.cy - gfx.mouse_y) / h.sc))
+        if pf then ctx.fx_set_display(d.f, pf, fq) end
+        if pg then ctx.fx_set_display(d.f, pg, db) end
+        state.status = ('%s band %d: %s Hz  %+.1f dB'):format(d.f.name, d.band, fq >= 1000 and ('%.2fk'):format(fq / 1000) or ('%d'):format(math.floor(fq + 0.5)), db)
+      end
+    else ctx.eq_drag = nil end
+  end
   if dspview_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspview_drag
@@ -10227,6 +10291,19 @@ local function frame()
     end
   end
 
+  if gfx.mouse_wheel ~= 0 and hover and hover.dspeq then   -- ReaEQ: колесо на виде — ширина ближайшей полосы
+    local d = hover.dspeq
+    local LQ = { '1 lo q', '2 q', '3 q', '4 hi q' }
+    local col = dsp_target()
+    for _, p in ipairs(d.f.params or {}) do
+      if p.name == LQ[d.band] and col then
+        local fx = p.fx or d.f.i
+        local v = model.fxapi(col.track).GetParamNormalized(col.track, fx, p.i)
+        edit.fx_param(col.track, fx, p.i, v + (gfx.mouse_wheel > 0 and 0.02 or -0.02))
+      end
+    end
+    gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, gfx.w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
   if gfx.mouse_wheel ~= 0 and hover and hover.slices ~= nil then
     -- колесо над модулем слайсов (4 окт): листать список
