@@ -5344,8 +5344,15 @@ ctx = {
     local _, ident = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'fx_ident')
     ident = ident or ''
     if ctx.preset_cache[ident] then return ctx.preset_cache[ident] end
-    local base = (ident:match('([^/\\]+)$') or ident):gsub('<.*$', ''):gsub('%.[%w]+$', '')
+    -- 7 окт: «reaeq.vst.dylib» — срезаются ВСЕ расширения (было только последнее:
+    -- ключ reaeqvst не совпадал с vst-reaeq.ini, список был пуст)
+    local base = (ident:match('([^/\\]+)$') or ident):gsub('<.*$', ''):gsub('%..*$', '')
     local key = base:lower():gsub('[^%w]', '')
+    -- файл: <формат>-<имя>[-builtin].ini; сначала точное совпадение имени
+    -- (ReaVerb не берёт пресеты ReaVerbate), иначе — вхождение (JS: путь в имени)
+    local function fkey(fn) return fn:lower():gsub('%.ini$', ''):gsub('^%w+%-', ''):gsub('%-builtin$', ''):gsub('[^%w]', '') end
+    local exact = false
+    do local j = 0; while true do local fn = reaper.EnumerateFiles(reaper.GetResourcePath() .. '/presets', j); if not fn then break end; j = j + 1; if fn:match('%.ini$') and fkey(fn) == key then exact = true; break end end end
     local dir = reaper.GetResourcePath() .. '/presets'
     local names, seen = {}, {}
     local i = 0
@@ -5353,8 +5360,8 @@ ctx = {
       local fn = reaper.EnumerateFiles(dir, i)
       if not fn then break end
       i = i + 1
-      local flat = fn:lower():gsub('[^%w]', '')
-      if fn:match('%.ini$') and flat:find(key, 1, true) then
+      local fk = fkey(fn)
+      if fn:match('%.ini$') and ((exact and fk == key) or (not exact and fk:find(key, 1, true))) then
         local h = io.open(dir .. '/' .. fn, 'r')
         if h then
           local sect
@@ -7548,6 +7555,10 @@ local function poll_cmd()
         end
       end
     end
+  elseif name == 'pnames' then   -- тест (7 окт): имена пресетов fx цели DSP (только чтение)
+    local t, f = ctx.dsp_fx(tonumber(v:match('^pnames%s+(%d+)') or '1'))
+    local nm = f and ctx.preset_names(t.track, f.i) or {}
+    reaper.SetExtState(EXT, 'dbg', ('pnames %s: %d | %s'):format(f and f.name or '?', #nm, table.concat(nm, ', '):sub(1, 300)), false)
   elseif name == 'pdef' then   -- тест (7 окт): pdef <fx> <подпись_параметра> — сброс к умолчанию, только песочница
     local fi, lab = v:match('^pdef%s+(%d+)%s+(%S+)')
     local t = dsp_target(); local f = t and t.fx[tonumber(fi or 0)]
