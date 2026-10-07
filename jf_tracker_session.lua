@@ -72,10 +72,18 @@ function SS.next_boundary(pos, zone, quant)
   return t
 end
 -- доля прохода клипа 0..1 (прогресс в клетке)
+-- live.a / live.full (7 окт, mlr): клип играет отрезок [a, a + len) из
+-- полной длины full — прогресс считается по всему клипу
 function SS.progress(live, pos)
   if not live or live.len <= 0 then return 0 end
   local d = (pos - live.phase) % live.len
-  return d / live.len
+  return ((live.a or 0) + d) / (live.full or live.len)
+end
+-- шаг клипа 0..STEPS-1 под плейхедом (колонка mlr на гриде)
+SS.STEPS = 8
+function SS.step_of(live, pos)
+  if not live then return nil end
+  return math.max(0, math.min(SS.STEPS - 1, math.floor(SS.progress(live, pos) * SS.STEPS + 1e-9)))
 end
 
 -- ── полиметрия (7 окт) ───────────────────────────────────────────────────
@@ -131,10 +139,36 @@ end
 function SS.launch(ri, ci, seq)
   local rg = seq[ri]; if not rg then return end
   SS.halt = nil
-  if SS.live[ci] and SS.live[ci].ri == ri and not SS.pend[ci] then ctx.msg('already playing: ' .. SS.slot_name(rg, ri)); return end
+  if SS.live[ci] and SS.live[ci].ri == ri and not SS.pend[ci] and not SS.live[ci].seg then ctx.msg('already playing: ' .. SS.slot_name(rg, ri)); return end
   arm(ci, ri, seq)
   ctx.msg(('launch %s on %s at %s'):format(SS.slot_name(rg, ri), ctx.ss_colname(ci), SS.quant))
 end
+-- ── mlr (7 окт): прыжок и луп отрезка играющего клипа ────────────────────
+-- Клип делится на SS.STEPS шагов. jump — с ближайшей доли (или сразу при
+-- quant = now) клип играет с шага k; loop k1..k2 — только этот отрезок
+-- (включительно), пока не прыгнешь снова. Клип должен играть в зоне.
+local function arm_mod(ci, extra, what)
+  local live = SS.live[ci]
+  if not live then ctx.msg('nothing plays on ' .. ctx.ss_colname(ci)); return false end
+  local pos, playing = ctx.ss_playpos()
+  local zone = ctx.ss_zone()
+  if not zone or not playing or pos < zone.pos - 1e-6 or pos >= zone.rgnend then return false end
+  local p = { ri = live.ri, at = SS.next_boundary(pos, zone, SS.quant == 'now' and 'now' or 'beat') }
+  for k, v in pairs(extra) do p[k] = v end
+  SS.pend[ci] = p
+  ctx.msg(('%s on %s'):format(what, ctx.ss_colname(ci)))
+  return true
+end
+function SS.jump(ci, k)
+  k = math.max(0, math.min(SS.STEPS - 1, k))
+  return arm_mod(ci, { step = k }, 'jump to step ' .. (k + 1))
+end
+function SS.loop(ci, k1, k2)
+  if k1 > k2 then k1, k2 = k2, k1 end
+  k1, k2 = math.max(0, k1), math.min(SS.STEPS - 1, k2)
+  return arm_mod(ci, { seg = { k1, k2 } }, ('loop steps %d-%d'):format(k1 + 1, k2 + 1))
+end
+
 function SS.stop(ci)
   if not SS.live[ci] and not SS.pend[ci] then ctx.msg('nothing plays on ' .. ctx.ss_colname(ci)); return end
   arm(ci, 'stop')
@@ -169,6 +203,27 @@ function SS.playing_any()
   return false
 end
 
+-- что играет после границы phase: весь клип, клип со сдвигом (jump: шаг
+-- step под границей) или отрезок шагов seg = { k1, k2 }. Фаза live — момент,
+-- когда клип стоит в начале отрезка (a секунд от начала слота)
+function SS.mod_live(p, src, phase)
+  local full = src.rgnend - src.pos
+  local lv = { ri = p.ri, phase = phase, len = full, full = full, a = 0 }
+  if p.seg then
+    lv.a = p.seg[1] * full / SS.STEPS
+    lv.len = (p.seg[2] - p.seg[1] + 1) * full / SS.STEPS
+    lv.seg = { p.seg[1], p.seg[2] }
+  elseif p.step then
+    lv.phase = phase - p.step * full / SS.STEPS
+  end
+  return lv
+end
+-- opt посадки: отрезок (секунды проекта внутри слота) или луп клипа из item
+function SS.plant_opt(lv, tr, src)
+  if lv and lv.seg then return { seg = { src.pos + lv.a, src.pos + lv.a + lv.len } } end
+  return ctx.ss_clip_opts and ctx.ss_clip_opts(tr, src)
+end
+
 -- каждый кадр: границы пройдены — выполнить. seq / snap — текущие
 function SS.tick(seq, snap)
   if not next(SS.pend) and not next(SS.todo) then return end
@@ -191,14 +246,15 @@ function SS.tick(seq, snap)
       end
       local col = snap.cols[ci]
       local src = p.ri ~= 'stop' and seq[p.ri] or nil
+      local lv = src and SS.mod_live(p, src, phase)
       if col then
         ctx.ss_apply(src and 'session launch' or 'session stop', function()
           ctx.alias.session_clear(col.track, zone.pos, zone.rgnend, keep0, keep1)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, ctx.ss_clip_opts and ctx.ss_clip_opts(col.track, src)) end
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, lv.phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, SS.plant_opt(lv, col.track, src)) end
         end)
       end
-      if src then SS.live[ci] = { ri = p.ri, phase = phase, len = src.rgnend - src.pos } else SS.live[ci] = nil end
-      if keep0 then SS.todo[ci] = { from = keep0, to = keep1, ri = src and p.ri or nil, phase = phase } end
+      SS.live[ci] = lv
+      if keep0 then SS.todo[ci] = { from = keep0, to = keep1, ri = src and p.ri or nil, phase = phase, lv = lv } end
       SS.pend[ci] = nil
     end
   end
@@ -211,7 +267,7 @@ function SS.tick(seq, snap)
       if col then
         ctx.ss_apply('session fill', function()
           ctx.alias.session_clear(col.track, t.from, t.to)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }, ctx.ss_clip_opts and ctx.ss_clip_opts(col.track, src)) end
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.lv and t.lv.phase or t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }, SS.plant_opt(t.lv, col.track, src)) end
         end)
       end
       SS.todo[ci] = nil
@@ -424,6 +480,10 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
     local pr = SS.progress(live, playpos or 0)
     U.set(U.tint(U.AMBER, 0.5)); gfx.rect(cx, ry + chh - 3, cw, 3, 1)
     U.set(U.AMBER); gfx.rect(cx, ry + chh - 3, math.floor(cw * pr), 3, 1)
+    if live.seg then   -- луп отрезка mlr (7 окт): рамка отрезка над полосой прогресса
+      local a = math.floor(cw * live.a / live.full)
+      U.set(U.CYAN); gfx.rect(cx + a, ry + chh - 6, math.max(2, math.floor(cw * live.len / live.full)), 2, 1)
+    end
   end
   if is_rec then
     U.set(U.RED); gfx.rect(cx, ry, cw, chh, 0); gfx.rect(cx + 1, ry + 1, cw - 2, chh - 2, 0)
@@ -517,6 +577,61 @@ function SS.draw_top(L, x, y, w, h, seq, snap, grid, now, playpos)
   local top = L.rh + 2 * L.pad
   SS.draw_grid(L, x, y + top, w, h - top, seq, snap, grid, now, playpos, hover, true)
   return hover
+end
+
+-- ── monome (7 окт): страница clips на гриде (daemon_tracker.lua) ─────────
+-- Трекер публикует ExtState jf_tracker/ss, демон шлёт jf_tracker/ssgrid.
+-- ss: «view,nr,nc,cur_ri,cur_ci,quant,playing;<клетки>;<треки>»
+--   view 1 — вид clips открыт (тело / матрица / big): грид сам на страницу clips
+--   клетки — nr*nc знаков по рядам: . пусто, o клип, m заглушено
+--   трек: «ri:step:k1:k2:pend:vol» через пробел; ri 0 — молчит; k1 k2 —
+--   отрезок лупа (−1 нет); pend 0 нет / 1 запуск / 2 стоп / 3 прыжок / 4 луп;
+--   vol 0..100 (ctx.ss_vol)
+-- ssgrid: «команда;команда;…,n» — launch ri ci · stop ci · stopall · scene ri ·
+--   jump ci k · loop ci k1 k2 · quant · clips · vol ci d (d — шаги)
+local QI = { bar = 0, beat = 1, now = 2 }
+function SS.grid_pub(seq, ncols, grid, pos, playing, view)
+  local cells = {}
+  for ri = 1, #seq do
+    for ci = 1, ncols do
+      local c = grid[ri] and grid[ri][ci]
+      cells[#cells + 1] = (not c or c.state == 'empty') and '.' or (c.state == 'muted' and 'm' or 'o')
+    end
+  end
+  local tr = {}
+  for ci = 1, ncols do
+    local l, p = SS.live[ci], SS.pend[ci]
+    local pend = 0
+    if p then pend = p.ri == 'stop' and 2 or (p.seg and 4 or (p.step and 3 or 1)) end
+    local k1, k2 = -1, -1
+    if l and l.seg then k1, k2 = l.seg[1], l.seg[2] end
+    local vol = ctx.ss_vol and ctx.ss_vol(ci) or 0
+    tr[ci] = ('%d:%d:%d:%d:%d:%d'):format(l and l.ri or 0, l and SS.step_of(l, pos) or -1, k1, k2, pend, math.floor(vol * 100 + 0.5))
+  end
+  return ('%d,%d,%d,%d,%d,%d,%d;%s;%s'):format(view and 1 or 0, #seq, ncols, SS.cur.ri, SS.cur.ci, QI[SS.quant] or 0, playing and 1 or 0,
+    table.concat(cells), table.concat(tr, ' '))
+end
+-- команды грида; возвращает число выполненных
+function SS.grid_cmd(str, seq, snap, grid)
+  local body = str:match('^(.*),%d+$') or str
+  local ncols = snap and #snap.cols or 0
+  local n = 0
+  for c in body:gmatch('[^;]+') do
+    local w = {}
+    for t in c:gmatch('%S+') do w[#w + 1] = tonumber(t) or t end
+    local k = w[1]
+    local function ok_ci(ci) return type(ci) == 'number' and ci >= 1 and ci <= ncols end
+    if k == 'launch' and seq[w[2]] and ok_ci(w[3]) then SS.cur.ri, SS.cur.ci = w[2], w[3]; SS.launch(w[2], w[3], seq); n = n + 1
+    elseif k == 'stop' and ok_ci(w[2]) then SS.cur.ci = w[2]; SS.stop(w[2]); n = n + 1
+    elseif k == 'stopall' then SS.stop_all(ncols); n = n + 1
+    elseif k == 'scene' and seq[w[2]] then SS.cur.ri = w[2]; SS.scene(w[2], seq, grid, ncols); n = n + 1
+    elseif k == 'jump' and ok_ci(w[2]) and type(w[3]) == 'number' then SS.cur.ci = w[2]; SS.jump(w[2], w[3]); n = n + 1
+    elseif k == 'loop' and ok_ci(w[2]) and type(w[3]) == 'number' and type(w[4]) == 'number' then SS.cur.ci = w[2]; SS.loop(w[2], w[3], w[4]); n = n + 1
+    elseif k == 'quant' then ctx.msg('session quantize: ' .. SS.next_quant()); n = n + 1
+    elseif k == 'clips' then if ctx.clips_toggle then ctx.clips_toggle() end; n = n + 1
+    elseif k == 'vol' and ok_ci(w[2]) and type(w[3]) == 'number' then SS.cur.ci = w[2]; if ctx.ss_vol_add then ctx.ss_vol_add(w[2], w[3]) end; n = n + 1 end
+  end
+  return n
 end
 
 return SS

@@ -3888,6 +3888,22 @@ ctx = {
     model.invalidate()
   end,
   ss_colname = function(ci) local c = snap and snap.cols[ci]; return c and c.name or ('track ' .. ci) end,
+  -- громкость трека для кольца arc на странице clips (7 окт): 0..1 = −60..+12 дБ
+  ss_vol = function(ci)
+    local c = snap and snap.cols[ci]
+    if not c or not c.track or not reaper.ValidatePtr(c.track, 'MediaTrack*') then return 0 end
+    local v = reaper.GetMediaTrackInfo_Value(c.track, 'D_VOL')
+    local db = v > 1e-6 and 20 * math.log(v, 10) or -60
+    return math.max(0, math.min(1, (db + 60) / 72))
+  end,
+  ss_vol_add = function(ci, d)   -- d шагов по 0.5 дБ
+    local c = snap and snap.cols[ci]
+    if not c or not c.track or not reaper.ValidatePtr(c.track, 'MediaTrack*') then return end
+    local v = reaper.GetMediaTrackInfo_Value(c.track, 'D_VOL')
+    local db = math.max(-60, math.min(12, (v > 1e-6 and 20 * math.log(v, 10) or -60) + d * 0.5))
+    reaper.SetMediaTrackInfo_Value(c.track, 'D_VOL', db <= -60 and 0 or 10 ^ (db / 20))
+    vim.msg = ('%s: %.1f dB'):format(c.name or ('track ' .. ci), db)
+  end,
   ss_is_big = function() return state.ss_big and true or false end,
   -- песочница тестов: проект без имени, треки sandbox_setup.lua
   is_sandbox = function()
@@ -4062,11 +4078,13 @@ ctx = {
     elseif w1 == 'scene' and tonumber(w2) then MX.SS.scene(math.floor(tonumber(w2)), seq, MX.grid(snap, seq), #snap.cols)
     elseif w1 == 'quant' and (w2 == 'bar' or w2 == 'beat' or w2 == 'now') then MX.SS.quant = w2; vim.msg = 'session quantize: ' .. w2
     elseif w1 == 'bars' and tonumber(w2) then state.ssbars = math.max(1, math.min(64, math.floor(tonumber(w2)))); vim.msg = 'session zone: ' .. state.ssbars .. ' bars (applies to a new zone; delete the =SESSION region to rebuild)'
+    elseif w1 == 'jump' then local ci, k = arg:match('^jump%s+(%d+)%s+(%d+)'); if ci then MX.SS.jump(tonumber(ci), tonumber(k) - 1) end
+    elseif w1 == 'loop' then local ci, a, b = arg:match('^loop%s+(%d+)%s+(%d+)%s+(%d+)'); if ci then MX.SS.loop(tonumber(ci), tonumber(a) - 1, tonumber(b) - 1) end
     elseif w1 == 'off' then MX.SS.quit()
     elseif w1 == 'clips' then ctx.mx_clips_toggle()
     elseif w1 == 'dump' then   -- тест: зона / live / pend
       local zz = model.session_zone(); local parts = { zz and ('zone %.2f..%.2f'):format(zz[1], zz[2]) or 'zone nil' }
-      for ci, l in pairs(MX.SS.live) do parts[#parts + 1] = ('live[%d]=ri%d ph%.2f len%.2f'):format(ci, l.ri, l.phase, l.len) end
+      for ci, l in pairs(MX.SS.live) do parts[#parts + 1] = ('live[%d]=ri%d ph%.2f len%.2f a%.2f%s'):format(ci, l.ri, l.phase, l.len, l.a or 0, l.seg and (' seg' .. l.seg[1] .. '-' .. l.seg[2]) or '') end
       for ci, p in pairs(MX.SS.pend) do parts[#parts + 1] = ('pend[%d]=%s at%.2f'):format(ci, tostring(p.ri), p.at) end
       local i = 0
       while true do local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i); if not ret or ret == 0 then break end; if isrgn then parts[#parts + 1] = ('rg[%s]%.1f-%.1f'):format(name, pos, rgnend) end; i = i + 1 end
@@ -7286,6 +7304,7 @@ function ctrl_action(name, delta)
   elseif name == 'wave' then ctx.wave_mode(nil, delta)
   elseif name == 'xfade' then if delta ~= 0 then ctx.xfade_len(delta) else ctx.xfade_toggle() end
   elseif name == 'loop' then reaper.GetSetRepeat(2)
+  elseif name == 'clips' then ctx.clips_toggle()                -- грид: страница clips (7 окт)
   elseif name == 'pitch' then
     if col then ctx.set_pitchmode(col, state.pitchmodes[col.guid] == 'resample' and 'shift' or 'resample') end
   elseif name == 'font' then
@@ -7362,6 +7381,13 @@ end
 -- стартовое значение gridkey не исполняем: оно от прошлого сеанса
 local mx_last, gridkey_last = '', reaper.GetExtState(EXT, 'gridkey')
 local function publish_matrix(playpos)
+  -- страница clips грида (7 окт): состояние сессии, команды — poll_gridkey
+  do
+    local SS = MX.SS
+    local pp, playing = ctx.ss_playpos()
+    local str = snap and SS.grid_pub(seq, #snap.cols, MX.grid(snap, seq), pp, playing, state.clipsview or state.ss_big or MX.clips) or ''
+    if str ~= SS.pub_last then reaper.SetExtState(EXT, 'ss', str, false); SS.pub_last = str end
+  end
   if #seq == 0 then if mx_last ~= '' then reaper.SetExtState(EXT, 'mx', '', false); mx_last = '' end return end
   local grid = MX.grid(snap, seq)
   local play_ri, queue_ri = 0, 0
@@ -7400,6 +7426,7 @@ local function poll_cmd()
   elseif name == 'follow' then state.follow = not state.follow
   elseif name == 'lock' then state.lock = not state.lock; lock_sync = {}; vim.msg = 'lock to REAPER cursor: ' .. (state.lock and 'on' or 'off')
   elseif name == 'loop' then reaper.GetSetRepeat(2)
+  elseif name == 'clips' then ctx.clips_toggle()                -- грид: страница clips (7 окт)
   elseif name == 'lpb+' then set_lpb(nil, 1) elseif name == 'lpb-' then set_lpb(nil, -1)
   elseif name == 'oct+' then vim.octave = math.min(8, vim.octave + 1) elseif name == 'oct-' then vim.octave = math.max(0, vim.octave - 1)
   elseif name == 'step+' then vim.step = vim.step + 1 elseif name == 'step-' then vim.step = math.max(0, vim.step - 1)
@@ -7427,7 +7454,7 @@ local function poll_cmd()
     local k, v2 = v:match('^flag%s+([%w_]+)%s+(%a+)')
     if k and state[k] ~= nil then state[k] = v2 == 'on'; reaper.SetExtState(EXT, k, v2 == 'on' and '1' or '0', true); B.pm = nil; vim.msg = k .. ' ' .. v2; relayout() end
   elseif name == 'ex' then vim.run_cmd((v:match('^ex%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^ex%s+(.*)$') or ''):gsub('_', ' '))   -- тест: любая :команда (пробелы — _)
-  elseif name == 'session' and (v:match('^session%s+launch') or v:match('^session%s+scene') or v:match('^session%s+stop') or v:match('^session%s+off')) and not ctx.is_sandbox() then
+  elseif name == 'session' and (v:match('^session%s+launch') or v:match('^session%s+scene') or v:match('^session%s+stop') or v:match('^session%s+off') or v:match('^session%s+jump') or v:match('^session%s+loop')) and not ctx.is_sandbox() then
     reaper.SetExtState(EXT, 'ssdump', 'REFUSED: not a sandbox', false)   -- тест-команды, что меняют проект, — только в песочнице (6 окт)
   elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
@@ -7459,6 +7486,11 @@ local function poll_cmd()
 end
 
 local function poll_gridkey()
+  do   -- команды страницы clips (7 окт); стартовое значение — от прошлого сеанса
+    local g = reaper.GetExtState(EXT, 'ssgrid')
+    if MX.SS.gk_last == nil then MX.SS.gk_last = g end
+    if g ~= '' and g ~= MX.SS.gk_last then MX.SS.gk_last = g; ctx.dlog('ssgrid ' .. g); MX.SS.grid_cmd(g, seq, snap, snap and MX.grid(snap, seq) or {}) end
+  end
   local v = reaper.GetExtState(EXT, 'gridkey')
   if v == '' or v == gridkey_last then return end
   gridkey_last = v

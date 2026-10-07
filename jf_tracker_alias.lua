@@ -176,16 +176,32 @@ local function plant_loop(tr, opt, z0, z1, phase, skip, tag, win)
 end
 A.plant_loop = plant_loop
 
+-- opt.seg = { s0, s1 } (7 окт, mlr): клип — только отрезок слота (секунды
+-- проекта), шаг посадки = длина отрезка; item, что начинается до s0, режется
+-- (сдвиг в источнике), что выходит за s1 — обрезается.
+-- Кусок, что начинается в окне skip (там доигрывает прошлый клип), но
+-- выходит за его конец, сажается с конца окна со сдвигом в источнике —
+-- длинный аудио item клипа звучит сразу с границы, а не со следующего
+-- повтора (прыжок mlr внутрь item). Досадка (win) такой кусок пропускает.
 function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
   if opt and opt.item and opt.lb and opt.la and R.ValidatePtr(opt.item, 'MediaItem*') then return plant_loop(tr, opt, z0, z1, phase, skip, tag, win) end
-  local len = src.rgnend - src.pos
+  local s0, s1 = src.pos, src.rgnend
+  local seg = opt and opt.seg
+  if seg then s0, s1 = seg[1], seg[2] end
+  local len = s1 - s0
   if len <= 1e-6 then return 0 end
   local chunks = {}
-  for _, it in ipairs(items_in(tr, src.pos, src.rgnend)) do
+  for _, it in ipairs(seg and A.items_over(tr, s0, s1) or items_in(tr, s0, s1)) do
     local ok, c = R.GetItemStateChunk(it, '', false)
     if ok then
-      chunks[#chunks + 1] = { chunk = unlink_chunk(strip_guids(c)), rel = R.GetMediaItemInfo_Value(it, 'D_POSITION') - src.pos,
-                              len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') }
+      local ipos, ilen = R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local pre = seg and math.max(0, s0 - ipos) or 0
+      ilen = ilen - pre
+      if seg then ilen = math.min(ilen, s1 - (ipos + pre)) end
+      if ilen > EPS then
+        chunks[#chunks + 1] = { chunk = unlink_chunk(strip_guids(c)), rel = ipos + pre - s0, pre = pre, len = ilen,
+                                trim = seg ~= nil, lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') }
+      end
     end
   end
   if #chunks == 0 then return 0 end
@@ -205,19 +221,23 @@ function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
         if pos < z0 - EPS and pos + c.len > z0 + EPS then cut = z0 - pos; pos = z0 end
         local inside = pos >= z0 - EPS and pos < z1 - EPS
         local skipped = skip and pos >= skip[1] - EPS and pos < skip[2] - EPS
-        if win and not (pos >= win[1] - EPS and pos < win[2] - EPS) then skipped = true end   -- win: только это окно (досадка)
+        if skipped and pos + c.len - cut > skip[2] + EPS then cut = cut + skip[2] - pos; pos = skip[2]; skipped = false end
+        if win then   -- win: только это окно (досадка); кусок за окном посажен при запуске
+          if not (pos >= win[1] - EPS and pos < win[2] - EPS) or pos + c.len - cut > win[2] + EPS then skipped = true end
+        end
         if inside and not skipped then
           local it = R.AddMediaItemToTrack(tr)
           R.SetItemStateChunk(it, c.chunk, false)
           R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
           R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
           local ilen = c.len - cut
-          if cut > 0 then
+          local shift = c.pre + cut
+          if shift > 0 then
             local tk = R.GetActiveTake(it)
-            if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + cut * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')) end
-            R.SetMediaItemInfo_Value(it, 'D_LENGTH', ilen)
+            if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + shift * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')) end
             R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', 0)
           end
+          if shift > 0 or c.trim then R.SetMediaItemInfo_Value(it, 'D_LENGTH', ilen) end
           -- хвост за концом зоны обрезается: луп прыгнет, хвост не нужен
           if pos + ilen > z1 + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', z1 - pos) end
           if fixed then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
@@ -228,6 +248,17 @@ function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
     end
   end
   return n
+end
+-- items трека, что ПЕРЕСЕКАЮТ [t0, t1) (не только начинаются в нём);
+-- (отрезок mlr берёт и item, что начался до него)
+function A.items_over(tr, t0, t1)
+  local out = {}
+  for i = 0, R.CountTrackMediaItems(tr) - 1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    if pos < t1 - EPS and pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') > t0 + EPS then out[#out + 1] = it end
+  end
+  return out
 end
 -- убрать items трека в зоне [z0, z1), кроме окна [keep0, keep1) — там
 -- доигрывает прошлый клип (плейхед → граница квантизации): item, что

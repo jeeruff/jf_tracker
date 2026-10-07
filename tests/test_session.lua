@@ -217,5 +217,45 @@ items = {}
 A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 2, xf = 0 }, 100, 104, 100, nil, 't')
 eq('rate 2: step 1s', #items, 4); near('rate 2: no xf len', items[1].len, 1.0)   -- без xf хвоста через шов нет
 
+-- ── mlr (7 окт): прыжок и луп отрезка ────────────────────────────────────
+-- слот intro 0..4 с = 8 шагов по 0.5 с; играет на треке 1 с фазой 104
+SS.live, SS.pend, SS.todo = { [1] = { ri = 1, phase = 104, len = 4, full = 4, a = 0 } }, {}, {}
+SS.quant = 'bar'; playing = true; pos = 105.2; calls = {}
+eq('step under playhead', SS.step_of(SS.live[1], 105.2), 2)
+eq('jump: nothing plays on 2', SS.jump(2, 3), false)
+eq('jump armed', SS.jump(1, 6), true)
+near('jump at next beat (not bar)', SS.pend[1].at, 105.5); eq('jump keeps the clip', SS.pend[1].ri, 1)
+pos = 105.45; SS.tick(seq, snap)
+eq('jump fired', SS.pend[1], nil); near('jump phase: step 6 at 105.5', SS.live[1].phase, 105.5 - 3)
+eq('jump step at boundary', SS.step_of(SS.live[1], 105.5), 6)
+near('jump plant phase', calls[2][6], 102.5)
+calls = {}; pos = 105.6
+eq('loop armed', SS.loop(1, 5, 2), true); eq('loop steps sorted', SS.pend[1].seg[1] .. '-' .. SS.pend[1].seg[2], '2-5')
+pos = 105.97; SS.tick(seq, snap)
+local lv = SS.live[1]
+near('loop: a = step 2', lv.a, 1); near('loop: len = 4 steps', lv.len, 2); near('loop: phase = boundary', lv.phase, 106)
+eq('loop: step at boundary', SS.step_of(lv, 106), 2); eq('loop: wraps inside', SS.step_of(lv, 107.9), 5); eq('loop: back to start', SS.step_of(lv, 108.1), 2)
+near('loop: progress over the whole clip', SS.progress(lv, 106), 0.25)
+local opt = SS.plant_opt(lv, 'tr1', seq[1]); near('loop opt seg start', opt.seg[1], 1); near('loop opt seg end', opt.seg[2], 3)
+eq('relaunch the same clip while looping is allowed', (function() SS.launch(1, 1, seq); return SS.pend[1] ~= nil end)(), true)
+SS.quant = 'now'; SS.pend = {}; eq('now: jump at once', SS.jump(1, 0) and SS.pend[1].at, 105.97)
+SS.live, SS.pend, SS.todo = {}, {}, {}; SS.quant = 'bar'
+
+-- посадка отрезка: item 0..4 (одно аудио на весь слот), отрезок 1..3
+items = { { pos = 0, len = 4, chunk = '<ITEM\n>' } }
+A.session_plant('tr', { pos = 0, rgnend = 4 }, 100, 106, 100, nil, 't', nil, { seg = { 1, 3 } })
+got = {}; for _, it in ipairs(items) do if it.pos >= 100 then got[#got + 1] = ('%g+%g@%g'):format(it.pos, it.len, it['take:D_STARTOFFS'] or 0) end end; table.sort(got)
+eq('seg: tiles cut from the long item', table.concat(got, ' '), '100+2@1 102+2@1 104+2@1')
+-- длинный item через окно skip: сажается с конца окна со сдвигом
+items = { { pos = 0, len = 4, chunk = '<ITEM\n>' } }
+A.session_plant('tr', { pos = 0, rgnend = 4 }, 100, 108, 102.5, { 101, 103 }, 't')
+got = {}; for _, it in ipairs(items) do if it.pos >= 100 then got[#got + 1] = ('%g+%g@%g'):format(it.pos, it.len, it['take:D_STARTOFFS'] or 0) end end; table.sort(got)
+eq('skip: crossing item planted from the window end', table.concat(got, ' '), '100+2.5@1.5 103+3.5@0.5 106.5+1.5@0')
+-- досадка того же окна этот кусок уже не сажает
+items = { { pos = 0, len = 4, chunk = '<ITEM\n>' } }
+A.session_plant('tr', { pos = 0, rgnend = 4 }, 100, 108, 102.5, nil, 't', { 101, 103 })
+got = {}; for _, it in ipairs(items) do if it.pos >= 100 then got[#got + 1] = it.pos end end
+eq('fill skips the piece crossing the window', #got, 0)
+
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
