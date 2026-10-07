@@ -190,9 +190,15 @@ function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
   if seg then s0, s1 = seg[1], seg[2] end
   local len = s1 - s0
   if len <= 1e-6 then return 0 end
+  local lane = opt and opt.lane                     -- клип лейна (7 окт): только его items
+  if lane and R.SetMediaTrackInfo_Value and R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+     and R.GetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. lane) ~= 2 then
+    R.SetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. lane, 2)   -- лейн играет вместе с другими (два клипа на треке)
+  end
   local chunks = {}
   for _, it in ipairs(seg and A.items_over(tr, s0, s1) or items_in(tr, s0, s1)) do
     local ok, c = R.GetItemStateChunk(it, '', false)
+    if ok and lane and R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') ~= lane then ok = false end
     if ok then
       local ipos, ilen = R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH')
       local pre = seg and math.max(0, s0 - ipos) or 0
@@ -263,12 +269,13 @@ end
 -- убрать items трека в зоне [z0, z1), кроме окна [keep0, keep1) — там
 -- доигрывает прошлый клип (плейхед → граница квантизации): item, что
 -- пересекает keep1, режется, правая часть долой. Без keep — чистит всё.
-function A.session_clear(tr, z0, z1, keep0, keep1)
+function A.session_clear(tr, z0, z1, keep0, keep1, lane)
   local n = 0
   for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
     local it = R.GetTrackMediaItem(tr, i)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if lane and R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') ~= lane then fin = -1 end   -- другой лейн не трогать (7 окт)
     if fin > z0 + EPS and pos < z1 - EPS then
       local keep = keep0 and fin > keep0 + EPS and pos < keep1 - EPS
       if not keep then R.DeleteTrackMediaItem(tr, it); n = n + 1

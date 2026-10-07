@@ -268,6 +268,15 @@ function SS.plant_opt(lv, tr, src)
   return ctx.ss_clip_opts and ctx.ss_clip_opts(tr, src)
 end
 
+-- лейн колонки сессии (7 окт): посадка только items этого лейна
+function SS.lane_opt(opt, col)
+  if not (col and col.lane) then return opt end
+  local o = {}
+  for k, v in pairs(opt or {}) do o[k] = v end
+  o.lane = col.lane
+  return o
+end
+
 -- каждый кадр: границы пройдены — выполнить. seq / snap — текущие
 function SS.tick(seq, snap, grid)
   if grid and not SS.halt then SS.follow_tick(seq, grid) end
@@ -294,8 +303,8 @@ function SS.tick(seq, snap, grid)
       local lv = src and SS.mod_live(p, src, phase)
       if col then
         ctx.ss_apply(src and 'session launch' or 'session stop', function()
-          ctx.alias.session_clear(col.track, zone.pos, zone.rgnend, keep0, keep1)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, lv.phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, SS.plant_opt(lv, col.track, src)) end
+          ctx.alias.session_clear(col.track, zone.pos, zone.rgnend, keep0, keep1, col.lane)
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, lv.phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, SS.lane_opt(SS.plant_opt(lv, col.track, src), col)) end
         end)
       end
       if lv then lv.fired = phase; lv.fa = ctx.ss_fa and ctx.ss_fa(ci, p.ri, seq) or 'l' end
@@ -312,8 +321,8 @@ function SS.tick(seq, snap, grid)
       local src = t.ri and seq[t.ri]
       if col then
         ctx.ss_apply('session fill', function()
-          ctx.alias.session_clear(col.track, t.from, t.to)
-          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.lv and t.lv.phase or t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }, SS.plant_opt(t.lv, col.track, src)) end
+          ctx.alias.session_clear(col.track, t.from, t.to, nil, nil, col.lane)
+          if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, t.lv and t.lv.phase or t.phase, nil, t.ri .. ':' .. ci, { t.from, t.to }, SS.lane_opt(SS.plant_opt(t.lv, col.track, src), col)) end
         end)
       end
       SS.todo[ci] = nil
@@ -552,8 +561,10 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
       if cell and cell.state ~= 'empty' then
         local ih = math.max(2, chh - 2 * L.pad - 3)
         for _, e in ipairs(cell.ev or {}) do
-          local ex = cx + L.pad + math.floor(e.pos * (cw - 2 * L.pad))
-          local ew = math.max(2, math.floor(e.len * (cw - 2 * L.pad)))
+          -- SS.cell_inset (7 окт): слева от волны — кнопка > / o, волна не под ней
+          local ix = SS.cell_inset or 0
+          local ex = cx + ix + L.pad + math.floor(e.pos * (cw - ix - 2 * L.pad))
+          local ew = math.max(2, math.floor(e.len * (cw - ix - 2 * L.pad)))
           ew = math.max(0, math.min(ew, cx + cw - L.pad - ex))      -- не за край клетки
           local c = e.muted and U.DIM or (e.rgb or col.rgb or U.CYAN)
           -- аудио-клип (6 окт): волна item'а, фон — тусклый цвет; MIDI / пока строится — блок
@@ -605,7 +616,8 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
   else U.set(U.LINE); gfx.rect(cx, ry, cw, chh, 0) end
   if is_cur then U.set(U.TEXT); gfx.rect(cx - 1, ry - 1, cw + 2, chh + 2, 0) end
   if hot2 then hover.sess = { ri = ri, ci = ci } end
-  if ctx.hint then ctx.hint('sess', cx, ry, cw, chh, { ri = ri, ci = ci }) end
+  -- метка прыжка — в строке над клипом (SS.hint_dy, 7 окт): не на волне
+  if ctx.hint then ctx.hint('sess', cx + (SS.hint_dx or 0), ry + (SS.hint_dy or 0), cw - (SS.hint_dx or 0), SS.hint_dy and L.rh or chh, { ri = ri, ci = ci }) end
 end
 
 -- тело трекера в виде clips (6 окт; 7 окт — в масштабе трекера): та же
@@ -627,23 +639,37 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   SS.scroll = math.max(0, math.min(math.max(0, nrows - fit), SS.scroll))
   local last = cols[#cols]
   local right = last and last.x and (last.x + last.w) or (x0 + lw)
+  -- колонки сессии — по лейнам (7 окт): snap.cols — виртуальные (MX.vcols),
+  -- клетка на каждый лейн трека шириной лейна; slots — видимые слева направо
+  local vmap = {}
+  for vi, v in ipairs(snap.cols or {}) do vmap[(v.ci or vi) .. ':' .. (v.li or 1)] = vi end
+  local slots = {}
+  for _, c in ipairs(cols) do
+    if c.x and c.col then
+      for li, ln in ipairs(c.lanes or {}) do
+        local vi = vmap[c.ci .. ':' .. li]
+        if vi then slots[#slots + 1] = { vi = vi, c = c, x = ln.x + 1, w = math.max(L.cw * 3, ln.w - 3) } end
+      end
+    end
+  end
   SS.vis_draw = {}
-  for _, c in ipairs(cols) do if c.x then SS.vis_draw[#SS.vis_draw + 1] = c.ci end end
+  for _, sl in ipairs(slots) do SS.vis_draw[#SS.vis_draw + 1] = sl.vi end
   -- последний клип в колонке: под ним — слот записи (красная o, 7 окт)
   local last_clip = {}
-  for _, c in ipairs(cols) do
-    for ri = 1, nrows do local cell = grid[ri] and grid[ri][c.ci]; if cell and cell.state ~= 'empty' then last_clip[c.ci] = ri end end
+  for _, sl in ipairs(slots) do
+    for ri = 1, nrows do local cell = grid[ri] and grid[ri][sl.vi]; if cell and cell.state ~= 'empty' then last_clip[sl.vi] = ri end end
   end
   -- кнопка-буква в левом верхнем углу клетки: > — запуск, o — запись
-  local function corner(x, y, lab, col, key, data)
+  local function corner(x, y, lab, col, key, data, hx, hy)
     local bw = U.measure(lab) + 4
     local hot = mx >= x and mx < x + bw and my >= y and my < y + L.rh
     U.set(hot and U.tint(col, 0.45) or U.BG); gfx.rect(x, y, bw, L.rh - 1, 1)
     U.set(col); gfx.rect(x, y, bw, L.rh - 1, 0)
     U.text(x + 2, y, lab, hot and U.TEXT or col)
     if hot then hover[key] = data end
-    if ctx.hint then ctx.hint(key, x, y, bw, L.rh, data) end
+    if ctx.hint then ctx.hint(key, hx or x, hy or y, bw, L.rh, data) end   -- метка — в строке над клипом (7 окт)
   end
+  local BTN = U.measure('>') + 4
   U.set(U.BG); gfx.rect(x0 + 2, y, right - x0 - 2, h, 1)   -- левый край — рамка трекера (7 окт)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
   -- сетка трекера: точки на каждой строке
@@ -658,40 +684,44 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     local bh = CR * L.rh
     U.set(U.LINE); gfx.rect(x0, by, right - x0, 1, 1)            -- граница сцены — как линия такта
     -- сцена: имя слота, длина; клик — вся сцена
-    local hot = mx >= x0 and mx < x0 + lw and my >= by and my < by + bh
-    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 1, by + 1, lw - 3, bh - 1, 1)
-    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 1, by + 1, lw - 3, bh - 1, 0)
+    local hot = mx >= x0 and mx < x0 + lw and my >= by and my < by + bh + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 1, by + 1, lw - 3, bh + L.rh - 2, 1)
+    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 1, by + 1, lw - 3, bh + L.rh - 2, 0)
     U.text(x0 + L.pad, by + 1, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 2), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
     if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad, by + 1 + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad), U.GREY) end
     if hot then hover.sessrow = ri end
     if ctx.hint then ctx.hint('sessrow', x0 + 1, by + 1, lw - 3, bh - 1, ri) end
-    for _, c in ipairs(cols) do
-      if c.x and c.col then
-        local cell = grid[ri] and grid[ri][c.ci]
-        -- 7 окт: клип шириной в лейн (первый лейн трека), не во всю колонку
-        local ln = c.lanes and c.lanes[1]
-        local cx = (ln and ln.x or c.x) + 1
-        local cw = math.max(L.cw * 3, (ln and ln.w or c.w) - 3)
-        if c.col.armed then U.set(U.RED, 0.10); gfx.rect(cx, by, cw, bh, 1) end   -- армирован — сюда пойдёт запись
-        local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == c.ci) or (SS.pend[c.ci] and SS.pend[c.ci].ri == ri)
+    for _, sl in ipairs(slots) do
+      do
+        -- 7 окт: строка над клипом — служебная (метки прыжков f, буква клип-мода);
+        -- клип — 3 строки: волна в 2 строки, слева во 2-й строке > / o, внизу имя
+        local c, vi = sl.c, sl.vi
+        local cell = grid[ri] and grid[ri][vi]
+        local cx, cw = sl.x, sl.w
+        local ky, cy = by, by + L.rh                 -- служебная строка, верх клипа
+        if c.col.armed then U.set(U.RED, 0.10); gfx.rect(cx, cy, cw, bh, 1) end   -- армирован — сюда пойдёт запись
+        local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == vi) or (SS.pend[vi] and SS.pend[vi].ri == ri)
+        local bx, byb = cx + 2, cy + L.rh            -- кнопка > / o: вторая строка клипа, слева от волны
         if busy then
-          SS.draw_cell(L, cx, by + 1, cw, bh - 1, cell, c.col, ri, c.ci, rg, blink, playpos, hover)
-          if cell and cell.state ~= 'empty' then corner(cx + 2, by + 2, '>', U.GREEN, 'ssplay', { ri = ri, ci = c.ci }) end
+          SS.cell_inset, SS.hint_dy, SS.hint_dx = BTN + 2, -L.rh, BTN + 4
+          SS.draw_cell(L, cx, cy, cw, bh - 1, cell, c.col, ri, vi, rg, blink, playpos, hover)
+          SS.cell_inset, SS.hint_dy, SS.hint_dx = nil, nil, nil
+          if cell and cell.state ~= 'empty' then corner(bx, byb, '>', U.GREEN, 'ssplay', { ri = ri, ci = vi }, cx, ky) end
         else
           -- пустой слот — сразу пустым клипом (7 окт): рамка; курсор / наведение — ярче
-          local hot2 = mx >= cx and mx < cx + cw and my >= by and my < by + bh
-          U.set(hot2 and U.tint(U.TEXT, 0.06) or U.BG); gfx.rect(cx, by + 1, cw, bh - 1, 1)
-          U.set((ri == SS.cur.ri and c.ci == SS.cur.ci) and U.TEXT or (hot2 and U.GREY or U.LINE)); gfx.rect(cx, by + 1, cw, bh - 1, 0)
-          if hot2 then hover.sess = { ri = ri, ci = c.ci } end
-          if ctx.hint then ctx.hint('sess', cx, by + 1, cw, bh - 1, { ri = ri, ci = c.ci }) end
-          if ri == (last_clip[c.ci] or 0) + 1 then corner(cx + 2, by + 2, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = c.ci }) end
+          local hot2 = mx >= cx and mx < cx + cw and my >= cy and my < cy + bh
+          U.set(hot2 and U.tint(U.TEXT, 0.06) or U.BG); gfx.rect(cx, cy, cw, bh - 1, 1)
+          U.set((ri == SS.cur.ri and vi == SS.cur.ci) and U.TEXT or (hot2 and U.GREY or U.LINE)); gfx.rect(cx, cy, cw, bh - 1, 0)
+          if hot2 then hover.sess = { ri = ri, ci = vi } end
+          if ctx.hint then ctx.hint('sess', cx + BTN + 4, ky, cw - BTN - 4, L.rh, { ri = ri, ci = vi }) end
+          if ri == (last_clip[vi] or 0) + 1 then corner(bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = vi }, cx, ky) end
         end
-        -- клип-мод: буква клавиши в правом верхнем углу клетки
-        local kl = SS.clip_mode and SS.key_of(ri, c.ci, SS.vis_draw)
+        -- клип-мод: буква клавиши — в служебной строке справа
+        local kl = SS.clip_mode and SS.key_of(ri, vi, SS.vis_draw)
         if kl then
           local kw = U.measure(kl) + 4
-          U.set(U.AMBER); gfx.rect(cx + cw - kw - 2, by + 2, kw, L.rh - 1, 1)
-          U.text(cx + cw - kw, by + 2, kl, U.BG)
+          U.set(U.AMBER); gfx.rect(cx + cw - kw - 2, ky + 1, kw, L.rh - 1, 1)
+          U.text(cx + cw - kw, ky + 1, kl, U.BG)
         end
       end
     end

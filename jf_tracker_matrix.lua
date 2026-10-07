@@ -61,17 +61,12 @@ MX.clips = false         -- вид clips (6 окт): сессия в панел�
 MX.fold = false          -- свёрнутая матрица (3 окт): номера, имена треков, ячейки — без имён / длин / линейки (кнопка fold, F)
 MX.ENV_PTS = 12          -- отсчётов огибающей на ячейку в детальном зуме
 
-function MX.grid(snap, regions)
-  if cache.snap == snap and cache.regs == regions then return cache.grid end
-  local grid = {}
-  local rgb_of = {}        -- item → цвет (один вызов на item)
-  local model = ctx and ctx.model
-  for ri, rg in ipairs(regions) do
-    local row = {}
-    local span = math.max(1, rg.r1 - rg.r0)
-    for ci, col in ipairs(snap.cols) do
+-- клетка: события трека col на лейнах lanes в регионе rg (MX.grid — все
+-- лейны трека, MX.vgrid — один лейн виртуальной колонки сессии)
+local function cell_of(col, lanes, rg, rgb_of, model)
+      local span = math.max(1, rg.r1 - rg.r0)
       local has, all_muted, covered, ev = false, true, 0, {}
-      for _, lane in ipairs(col.lanes) do
+      for _, lane in ipairs(lanes) do
         for _, sub in ipairs(lane.subs) do
           for r, cell in pairs(sub) do
             if cell.kind == 'audio' or cell.kind == 'midi' then
@@ -103,11 +98,56 @@ function MX.grid(snap, regions)
           envs[#envs + 1] = { e = e, pts = model.env_samples(e, rg.pos, rg.rgnend, MX.ENV_PTS) }
         end
       end
-      row[ci] = { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envs = envs }
-    end
+      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envs = envs }
+end
+
+function MX.grid(snap, regions)
+  if cache.snap == snap and cache.regs == regions then return cache.grid end
+  local grid = {}
+  local rgb_of = {}        -- item → цвет (один вызов на item)
+  local model = ctx and ctx.model
+  for ri, rg in ipairs(regions) do
+    local row = {}
+    for ci, col in ipairs(snap.cols) do row[ci] = cell_of(col, col.lanes, rg, rgb_of, model) end
     grid[ri] = row
   end
   cache.snap, cache.regs, cache.grid = snap, regions, grid
+  return grid
+end
+
+-- ── сессия по лейнам (7 окт): виртуальная колонка = лейн трека ──────────
+-- у трека с фиксированными лейнами — колонка на каждый лейн (два клипа на
+-- одном треке играют вместе: REAPER играет пересекающиеся items), у
+-- обычного — одна. { ci, li, col, track, lane (I_FIXEDLANE или nil), name, guid, rgb }
+local vcache = {}
+function MX.vcols(snap)
+  if vcache.snap == snap then return vcache.vs end
+  local V = {}
+  for ci, col in ipairs(snap.cols) do
+    local n = #(col.lanes or {})
+    if n <= 1 then
+      V[#V + 1] = { ci = ci, li = 1, col = col, track = col.track, name = col.name, guid = col.guid, rgb = col.rgb, lanes = col.lanes, armed = col.armed }
+    else
+      for li, lane in ipairs(col.lanes) do
+        local lname = (lane.name and lane.name ~= '') and lane.name or ('L' .. ((lane.idx or (li - 1)) + 1))
+        V[#V + 1] = { ci = ci, li = li, col = col, track = col.track, lane = lane.idx or (li - 1), name = col.name .. ' ' .. lname,
+                      guid = col.guid .. ':' .. li, rgb = col.rgb, lanes = { lane }, armed = col.armed }
+      end
+    end
+  end
+  vcache.snap, vcache.vs, vcache.grid, vcache.regs = snap, { cols = V }, nil, nil
+  return vcache.vs
+end
+function MX.vgrid(snap, regions)
+  local vs = MX.vcols(snap)
+  if vcache.grid and vcache.regs == regions then return vcache.grid end
+  local grid, rgb_of, model = {}, {}, ctx and ctx.model
+  for ri, rg in ipairs(regions) do
+    local row = {}
+    for vi, v in ipairs(vs.cols) do row[vi] = cell_of(v.col, v.lanes, rg, rgb_of, model) end
+    grid[ri] = row
+  end
+  vcache.grid, vcache.regs = grid, regions
   return grid
 end
 

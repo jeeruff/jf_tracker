@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'clips per lane: a track with fixed lanes gets a clip column per lane, two clips play on one track at once (the lane is set to play together with the others); a row above each clip for the jump labels and the clip-mode letter, > / o left of a 2-row wave',
+    'popups without an anchor (a hydra from the item tab) open at the focused module, not in the corner of the window',
     'whichkey (quick option, on): after a prefix (d y c g z r q @, z in DSP) a popup at the cursor lists the next keys',
     'browser left (option): lib + browser in the left column above the matrix, no sidebar on the right; the fx list becomes the fx tab of the browser',
     'session: a clips module under the track headers (30 rows by default, drag its bottom edge), the tracker stays under it; a clip is 3 rows with > (launch) in its corner, the first empty slot under the last clip of a track has a red o (record into it) (Tab): CLIP MODE - the keyboard launches clips, a letter in every cell; option header info - the track header lists its instruments, inserts and sends (click, dblclick window, f jump labels)',
