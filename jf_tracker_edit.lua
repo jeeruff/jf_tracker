@@ -1981,6 +1981,34 @@ function E.fx_param(track, fx, param, v01)
   A.SetParamNormalized(track, fx, param, math.max(0, math.min(1, v01)))
   if model then model.invalidate() end
 end
+-- значение по умолчанию (7 окт, двойной клик по параметру DSP): у REAPER
+-- нет API «default», поэтому один раз на тип плагина ставится свежий
+-- экземпляр в конец цепочки, его значения запоминаются, экземпляр удаляется
+-- (окно скрыто, всё в одном undo-блоке с самим сбросом). Кэш — по исходному
+-- имени плагина (original_name не меняется при переименовании)
+E.fx_defaults = {}
+function E.fx_param_default(track, fx, param)
+  local A = FA(track)
+  local okn, orig = A.GetNamedConfigParm(track, fx, 'original_name')
+  if not okn or orig == '' then local _, nm = A.GetFXName(track, fx, ''); orig = nm end
+  if not orig or orig == '' then return nil end
+  local done
+  run('fx param default', function()
+    local d = E.fx_defaults[orig]
+    if not d then
+      local tmp = add_fx(track, orig, -1)
+      if not tmp or tmp < 0 then return end
+      A.Show(track, tmp, 2)
+      d = {}
+      for i = 0, A.GetNumParams(track, tmp) - 1 do d[i] = A.GetParamNormalized(track, tmp, i) end
+      A.Delete(track, tmp)
+      E.fx_defaults[orig] = d
+    end
+    if d[param] then A.SetParamNormalized(track, fx, param, d[param]); done = d[param] end
+  end)
+  if model then model.invalidate() end
+  return done
+end
 -- переставить FX: src → позиция dst (как drag в цепи REAPER; в трекере слева направо)
 function E.fx_move(track, src, dst)
   if src == dst then return end

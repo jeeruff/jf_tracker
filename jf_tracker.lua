@@ -7548,6 +7548,21 @@ local function poll_cmd()
         end
       end
     end
+  elseif name == 'pdef' then   -- тест (7 окт): pdef <fx> <подпись_параметра> — сброс к умолчанию, только песочница
+    local fi, lab = v:match('^pdef%s+(%d+)%s+(%S+)')
+    local t = dsp_target(); local f = t and t.fx[tonumber(fi or 0)]
+    if not ctx.is_sandbox() or not f then reaper.SetExtState(EXT, 'dbg', 'pdef: REFUSED / no fx', false)
+    else
+      lab = lab:gsub('_', ' ')
+      for _, p in ipairs(f.params or {}) do
+        if p.name == lab then
+          local n0 = reaper.TrackFX_GetCount(t.track)
+          local dv = edit.fx_param_default(t.track, p.fx or f.i, p.i)
+          local _, s2 = model.fxapi(t.track).GetFormattedParamValue(t.track, p.fx or f.i, p.i, '')
+          reaper.SetExtState(EXT, 'dbg', ('pdef %s -> %s (%s) fx %d -> %d'):format(lab, s2, tostring(dv), n0, reaper.TrackFX_GetCount(t.track)), false)
+        end
+      end
+    end
   elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
     if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
     else
@@ -8729,7 +8744,7 @@ local function frame()
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
-  elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
+  elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
   elseif hover.garden and hover.garden.ri then
     local rg = seq[hover.garden.ri]; local col = snap.cols[hover.garden.ci]
@@ -8743,7 +8758,7 @@ local function frame()
   elseif hover.mm and hover.mm.strip then state.status = ({ shape = 'LFO shape (turns L1 on)', toggle = 'group on / off: L1 = LFO, ENV = audio follower, LNK = link', slider = 'drag: value (one undo on release)' })[hover.mm.strip]
   elseif hover.mm then
     local c = MMX.COLS[hover.mm.col]
-    local hints = { name = 'parameter - dblclick / o: FX window, w: native modulation window', num = 'value - wheel / + - (Shift ×10)', toggle = 'on/off - click twice / Enter', enum = 'LFO shape - Enter / wheel', link = 'link source - Enter: pick parameter (fzf)' }
+    local hints = { name = 'parameter - dblclick: default value, o: FX window, w: native modulation window', num = 'value - wheel / + - (Shift ×10)', toggle = 'on/off - click twice / Enter', enum = 'LFO shape - Enter / wheel', link = 'link source - Enter: pick parameter (fzf)' }
     state.status = (c and c.head or '') .. ': ' .. (c and hints[c.kind] or '') .. '   a: add parameter, x: remove'
   elseif hover.scopemode then state.status = ({ scope = 'oscilloscope (ring 256 samples, 8 kHz)', spec = 'spectrum analyzer: 48 log bands 30 Hz..Nyquist, -60..0 dB', sgram = 'spectrogram: time → right, 48 bands, heat = level' })[hover.scopemode] .. ' (:scopemode)'
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
@@ -9489,6 +9504,16 @@ local function frame()
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
+      if hover.dsp.param and col and dbl and click.zone == 'dsp' and click.param == hover.dsp.param and click.fx == hover.dsp.fx then
+        -- двойной клик по параметру (7 окт): сброс к значению по умолчанию
+        local p = hover.dsp.f.params[hover.dsp.param]
+        local v = p and edit.fx_param_default(col.track, p.fx or hover.dsp.f.i, p.i)
+        local _, s2 = '', ''
+        if v then _, s2 = model.fxapi(col.track).GetFormattedParamValue(col.track, p.fx or hover.dsp.f.i, p.i, '') end
+        vim.msg = p and (v and (p.name .. ': default ' .. (s2 or '')) or (p.name .. ': no default found')) or ''
+        click = { t = now2, zone = 'dspreset' }
+        goto dsp_click_done
+      end
       if hover.dsp.param and col then
         local p = hover.dsp.f.params[hover.dsp.param]
         if p and p.kind == 'toggle' then
@@ -9513,7 +9538,8 @@ local function frame()
       elseif dbl and click.zone == 'dsp' and col then
         edit.fx_show(col.track, hover.dsp.f.i)
       end
-      click = { t = now2, zone = 'dsp' }
+      click = { t = now2, zone = 'dsp', param = hover.dsp.param, fx = hover.dsp.fx }
+      ::dsp_click_done::
     elseif hover.ctrl == 'bpm' then
       if dbl and click.zone == 'bpm' then bpm_menu = nil; state.bpm_edit = ''
       else bpm_menu = bpm_menu and nil or { sel = 1 } end
