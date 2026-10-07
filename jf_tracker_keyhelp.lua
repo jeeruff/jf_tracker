@@ -403,7 +403,7 @@ KH.BARS = {
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
-          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'add' }, { 'zz', 'big' }, { '?', 'help' } },
+          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'find' }, { 'af', 'add' }, { 'zz', 'big' }, { '?', 'help' } },
   notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },

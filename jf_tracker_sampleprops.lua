@@ -229,8 +229,9 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
     if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, RH, 1) end
     local lbl = r.k == 0 and (('%s %s'):format(r.key or ' ', (r.name and r.name ~= '') and r.name or 'whole')) or (('%s S%02X'):format(r.key or ' ', r.k))
     local lt = r.len < 10 and ('%.2fs'):format(r.len) or ('%.1fs'):format(r.len)
-    U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
+    U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - (r.fx and (U.measure('fx') + L.pad) or 0) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
+    if r.fx then U.text(x + w - 2 * L.pad - U.measure(lt) - U.measure('fx'), ry, 'fx', U.GREEN) end   -- take FX на нотах слайса (7 окт)
     -- зум: волна куска строкой ниже подписи
     if SP.szoom > 1 and root and r.t0 then
       mini_wave(root, r.t0, r.t0 + r.len, x + L.pad, ry + L.rh, w - 2 * L.pad, RH - L.rh - 2, on and U.AMBER or U.mix(U.TEXT, U.BG, 0.3))

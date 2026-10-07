@@ -29,6 +29,13 @@ local T = {
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' } } },
   dsp_z = { title = 'z - router', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' } } },
+  dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
+        { 'a', 'automate the parameter' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
+        { 'm', 'map to a container macro' } } },
+  dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, { 'c', 'unpack the container' },
+        { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },
+  dsp_y = { title = 'y - copy', items = { { 'y', 'the fx' } } },
+  dsp_c = { title = 'c - container', items = { { 'c', 'pack the fx (v: range)' } } },
 }
 
 -- p — ожидающий префикс; op — оператор, если ждём g после него (dgg)

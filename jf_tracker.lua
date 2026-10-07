@@ -2035,6 +2035,49 @@ ctx = {
       vim.msg = '+ ' .. it.label
     end)
   end,
+  -- / в DSP (7 окт): поиск по уже добавленным эффектам и их параметрам;
+  -- Enter — фокус на найденном (эффект или параметр)
+  dsp_find = function()
+    local t = dsp_target(); if not t then return end
+    local items = {}
+    for k, f in ipairs(t.fx or {}) do
+      items[#items + 1] = { label = f.name, data = { k, 1 } }
+      for pi, p in ipairs(f.params or {}) do items[#items + 1] = { label = f.name .. ' > ' .. (p.name or '?'), data = { k, pi } } end
+    end
+    if #items == 0 then vim.msg = 'no fx yet - af adds one'; return end
+    vim.open_picker('find in the chain of ' .. (t.name or ''), items, function(it)
+      dsp_sel.fx, dsp_sel.param = it.data[1], it.data[2]
+      state.dsp = true; ctx.set_focus('dsp')
+      vim.msg = it.label
+    end)
+  end,
+  -- есть ли take FX у нот инструмента (7 окт, метка fx в колонке слайсов):
+  -- карта номер в пуле → true, раз на снимок
+  inst_has_fx = function(e)
+    if ctx.ihf_snap ~= snap then
+      ctx.ihf_snap, ctx.ihf = snap, {}
+      for it, i in pairs(snap and snap.inst_of or {}) do
+        local tk = reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+        if tk and reaper.TakeFX_GetCount(tk) > 0 then ctx.ihf[i] = true end
+      end
+    end
+    for i, pe in ipairs(snap and snap.pool or {}) do if pe == e then return ctx.ihf[i] or false end end
+    return false
+  end,
+  -- aF (7 окт): take FX на ноту / слайс под курсором трекера (её item)
+  dsp_take_slice = function()
+    local f = L.flat and L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    local it = cell and cell.item
+    local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+    if not tk then vim.msg = 'aF: put the tracker cursor on a note / slice first'; return end
+    vim.open_picker('take fx of the note under the cursor', ctx.fx_list(), function(x)
+      edit.run('take fx on the slice', function() reaper.TakeFX_AddByName(tk, x.data, -1) end)
+      model.invalidate()
+      vim.msg = '+ ' .. x.label .. ' (take fx of the note under the cursor)'
+    end)
+  end,
   fx_list = function()
     local items = {}
     if reaper.EnumInstalledFX then
@@ -8762,7 +8805,8 @@ local function frame()
       for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices) do
-        rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = ctx.slice_child(col, root, kk) ~= nil }
+        local child = ctx.slice_child(col, root, kk)
+        rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = child ~= nil, fx = child and ctx.inst_has_fx(child) }
       end
       local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k, root)
       local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
@@ -8942,7 +8986,7 @@ local function frame()
   local pop = vim.popup()
   if not pop and state.whichkey then
     local wk = (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
-      or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or nil
+      or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
       for _, e in ipairs(wk.items) do lines[#lines + 1] = { key = e[1], text = e[2] } end
