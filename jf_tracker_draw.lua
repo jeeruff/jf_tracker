@@ -271,6 +271,13 @@ end
 
 -- ── раскладка ─────────────────────────────────────────────────────────────
 function D.layout(snap, state, nregions)
+  -- зазор между модулями (7 окт, опция module gap 0..20 px, эксперимент):
+  -- ширина разделителей; шире 2 px — пустым фоном, без линии
+  do
+    local g = tonumber(state.modgap) or 2
+    D.SEPW = math.max(0, math.min(20, g))
+    D.SEP = g > 2 and U.mix(U.BG, U.PANEL, 0.5) or U.mix(U.BG, U.TEXT, 0.38)
+  end
   gfx.setfont(D.font_id)
   local L = {}
   L.th = TH()
