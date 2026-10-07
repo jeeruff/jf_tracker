@@ -3077,11 +3077,12 @@ function D.frame(L, snap, rows, state, info)
     local lb = (ms('proj') + ms('region') + 4 * L.pad + 6 <= bw) and 'region' or 'rgn'
     x0 = small(x0, hy + 1, 'proj', 'all', not info.view_reg, 'viewbtn')
     small(x0, hy + 1, lb, 'reg', info.view_reg, 'viewbtn')
-    -- ряд 1 (7 окт): session (клипы вместо строк) | router (цепочка FX вместо трекера)
+    -- ряд 1 (7 окт): session (док клипов) | mixer (микшер вместо трекера)
     do
-      local full = ms('session') + ms('router') + 6 <= bw
+      -- 7 окт: router живёт в DSP FX (одно место) — здесь session | mixer
+      local full = ms('session') + ms('mixer') + 6 <= bw
       local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
-      small(x1, hy + 1 + L.rh, full and 'router' or 'rout', 'router', info.dsp_big, 'viewbtn')
+      small(x1, hy + 1 + L.rh, full and 'mixer' or 'mix', 'mixer', info.mixer and not info.clipsview, 'viewbtn')
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh
@@ -3875,6 +3876,14 @@ function D.frame(L, snap, rows, state, info)
       hint('dsp', x, sy, stubw, L.rh, { fx = k })
     end
     if first > 1 then stub(bx, '<' .. (first - 1), first - 1); bx = bx + stubw + L.pad end
+    -- роутер (7 окт): в панели DSP FX вместо блоков — схема цепочки (имена и
+    -- кабели), прокрутка по горизонтали; метры in / out остаются по краям
+    if info.dsp_router and info.draw_router then
+      local hv = info.draw_router(bx, dy + L.rh + 4, right - bx - L.pad, bh0)
+      for k2, v2 in pairs(hv or {}) do hover[k2] = v2 end
+      bx = right
+      goto dsp_router_done
+    end
     for k, f in ipairs(fxs) do
       if k < first then goto next_block end
       do
@@ -4295,6 +4304,7 @@ function D.frame(L, snap, rows, state, info)
       end
       ::next_block::
     end
+    ::dsp_router_done::
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
     if lvl then
       local cbh = L.rh

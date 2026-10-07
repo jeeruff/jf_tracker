@@ -376,6 +376,54 @@ function SS.key_body(c, ch, seq, snap, grid, ncols)
   else return false end
   return true
 end
+-- ── клип-мод (7 окт): фокус на session — клавиатура QWERTY запускает клипы ──
+-- ряды клавиатуры — видимые сцены (q-ряд — верхняя), буква — видимый трек
+-- по порядку колонок; Shift — вся сцена ряда; 1..0 — стоп трека; Backspace —
+-- стоп всех; стрелки — сцены / курсор; . — follow action курсора;
+-- , — квантизация; / — запись в клип курсора; Space — транспорт; Enter —
+-- клип курсора. vis — ci видимых колонок слева направо
+SS.KEYROWS = { 'qwertyuiop', 'asdfghjkl', 'zxcvbnm' }
+function SS.key_of(ri, ci, vis)
+  local r = ri - SS.scroll
+  local row = SS.KEYROWS[r]
+  if not row then return nil end
+  for k, v in ipairs(vis or SS.vis or {}) do if v == ci then return k <= #row and row:sub(k, k) or nil end end
+end
+function SS.clip_key(c, seq, snap, grid, vis, mods)
+  SS.vis = vis
+  local ch = c < 256 and string.char(c) or ''
+  local ncols = #snap.cols
+  local low = ch:lower()
+  for r, row in ipairs(SS.KEYROWS) do
+    local k = low ~= '' and row:find(low, 1, true)
+    if k and low:match('%a') then
+      local ri = SS.scroll + r
+      if not seq[ri] then ctx.msg('no scene on this key row'); return true end
+      if ch ~= low then SS.cur.ri = ri; SS.scene(ri, seq, grid, ncols); return true end   -- Shift — вся сцена
+      local ci = vis[k]
+      if not ci then ctx.msg('no track on this key'); return true end
+      SS.cur.ri, SS.cur.ci = ri, ci
+      local cell = grid[ri] and grid[ri][ci]
+      if cell and cell.state ~= 'empty' then SS.launch(ri, ci, seq) else SS.stop(ci) end   -- пустой слот — стоп трека (как в Ableton)
+      if ctx.ss_focus then ctx.ss_focus(ri, ci, grid) end
+      return true
+    end
+  end
+  local d = tonumber(ch)
+  if d then local ci = vis[d == 0 and 10 or d]; if ci then SS.stop(ci) end; return true end
+  if c == 8 or c == 6579564 then SS.stop_all(ncols); return true end
+  if c == 30064 then SS.scroll = math.max(0, SS.scroll - 1); SS.cur.ri = math.max(1, SS.cur.ri - 1); return true end            -- ↑
+  if c == 1685026670 then SS.scroll = math.min(math.max(0, #seq - 1), SS.scroll + 1); SS.cur.ri = math.min(#seq, SS.cur.ri + 1); return true end   -- ↓
+  if c == 1818584692 then SS.cur.ci = math.max(1, SS.cur.ci - 1); return true end   -- ←
+  if c == 1919379572 then SS.cur.ci = math.min(math.max(1, ncols), SS.cur.ci + 1); return true end   -- →
+  if c == 13 then SS.launch(SS.cur.ri, SS.cur.ci, seq); return true end
+  if ch == ' ' then ctx.ss_transport(); return true end
+  if ch == ',' then ctx.msg('session quantize: ' .. SS.next_quant()); return true end
+  if ch == '.' then return SS.key_body(c, 'a', seq, snap, grid, ncols) end
+  if ch == '/' then if ctx.ss_record then ctx.ss_record(SS.cur.ri, SS.cur.ci) end; return true end
+  return false
+end
+
 function SS.follow(seq)
   if SS.rows_fit then
     if SS.cur.ri - 1 < SS.scroll then SS.scroll = SS.cur.ri - 1 end
@@ -579,6 +627,8 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   SS.scroll = math.max(0, math.min(math.max(0, nrows - fit), SS.scroll))
   local last = cols[#cols]
   local right = last and last.x and (last.x + last.w) or (x0 + lw)
+  SS.vis_draw = {}
+  for _, c in ipairs(cols) do if c.x then SS.vis_draw[#SS.vis_draw + 1] = c.ci end end
   U.set(U.BG); gfx.rect(x0, y, right - x0, h, 1)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
   -- сетка трекера: точки на каждой строке
@@ -614,6 +664,13 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           elseif hot2 then U.set(U.LINE); gfx.rect(c.x + 1, by + 1, c.w - 3, bh - 1, 0) end
           if hot2 then hover.sess = { ri = ri, ci = c.ci } end
           if ctx.hint then ctx.hint('sess', c.x + 1, by + 1, c.w - 3, bh - 1, { ri = ri, ci = c.ci }) end
+        end
+        -- клип-мод: буква клавиши в правом верхнем углу клетки
+        local kl = SS.clip_mode and SS.key_of(ri, c.ci, SS.vis_draw)
+        if kl then
+          local kw = U.measure(kl) + 4
+          U.set(U.AMBER); gfx.rect(c.x + c.w - kw - 3, by + 2, kw, L.rh - 1, 1)
+          U.text(c.x + c.w - kw - 1, by + 2, kl, U.BG)
         end
       end
     end

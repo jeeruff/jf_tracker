@@ -280,9 +280,16 @@ end
 -- big (7 окт, zR): узлы — устройства: имя и слайдеры параметров (ctx.db_params,
 -- значения — ctx.db_pval); протяжка по горизонтали, двойной клик — умолчание
 DB.MAXP = 8
-function DB.draw(L, x, y, w, h, root, title, glass, big)
+-- compact (7 окт): в панели DSP FX — без заголовка, узел в одну строку (имя),
+-- кабели; прокрутка по горизонтали
+function DB.draw(L, x, y, w, h, root, title, glass, big, compact)
   local hover = { dbig = true }
   local m = DB.metrics(L)
+  DB.view_w = w
+  if compact then
+    local cw = U.measure('m')
+    m.nw, m.nh, m.gap, m.bus, m.pad, m.th = cw * 14, L.rh + 4, cw * 2, cw, 3, L.rh
+  end
   if big then
     local cw = U.measure('m')
     m.nw = cw * 26
@@ -295,13 +302,17 @@ function DB.draw(L, x, y, w, h, root, title, glass, big)
   end
   U.set(U.BG, glass and 0.72 or nil); gfx.rect(x, y, w, h, 1)
   U.set(U.BG)
+  local top
+  if compact then top = y + 2
+  else
   -- шапка: что за цепочка и подсказка
   U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w // 2), U.AMBER)
   local help = big and 'h l signal  j k row  a A add  | join row  s solo  = unity  b bypass  x delete  o window  drag a slider  dblclick default  zR back'
     or 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'
   U.text(x + w - L.pad - U.measure(ctx.fit(help, w // 2)), y + L.pad, ctx.fit(help, w // 2), U.GREY)
-  local top = y + L.rh + 3 * L.pad
-  local bh = h - (top - y) - L.pad
+  top = y + L.rh + 3 * L.pad
+  end
+  local bh = h - (top - y) - (compact and 2 or L.pad)
   local io = U.measure('in') + 2 * L.pad
   local cw, ch = DB.layout(root, m, 0, 0, bh)
   DB.total = cw + 2 * io + 4 * L.pad
@@ -361,7 +372,11 @@ function DB.draw(L, x, y, w, h, root, title, glass, big)
     U.set(is_sel and U.AMBER or U.LINE); gfx.rect(n.x, n.y, n.w, n.h, 0)
     if is_sel then gfx.rect(n.x - 1, n.y - 1, n.w + 2, n.h + 2, 0) end
     local nm = (n.kids and '[' .. #n.kids .. '] ' or '') .. n.name
-    U.text(n.x + L.pad, n.y + L.pad, ctx.fit(nm, n.w - 2 * L.pad), is_sel and U.AMBER or col)
+    U.text(n.x + L.pad, n.y + (compact and 2 or L.pad), ctx.fit(nm, n.w - 2 * L.pad), is_sel and U.AMBER or col)
+    if compact then
+      if n.wet and n.wet < 0.999 then U.set(U.tint(U.AMBER, 0.6)); gfx.rect(n.x + 1, n.y + n.h - 2, math.floor((n.w - 2) * n.wet), 1, 1) end
+      return
+    end
     local info = {}
     if not n.on then info[#info + 1] = 'byp' end
     if n.wet and n.wet < 0.999 then info[#info + 1] = ('wet %d%%'):format(math.floor(n.wet * 100 + 0.5)) end
