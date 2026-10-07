@@ -2188,8 +2188,31 @@ function E.fx_add(track, name, pos)
   end)
   if model then model.invalidate() end
 end
-function E.fx_remove(track, fx)
-  run('fx remove', function() FA(track).Delete(track, fx) end)
+-- unpar (7 окт, DSP big): адрес следующего звена — снять у него parallel
+-- до удаления, иначе оно прилипнет к прошлому ряду
+function E.fx_remove(track, fx, unpar)
+  run('fx remove', function()
+    if unpar then FA(track).SetNamedConfigParm(track, unpar, 'parallel', '0') end
+    FA(track).Delete(track, fx)
+  end)
+  if model and unpar then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
+function E.fx_set_enabled(track, fx, on)
+  run(on and 'fx on' or 'fx bypass', function() FA(track).SetEnabled(track, fx, on and true or false) end)
+end
+-- вставка в позицию pos (7 окт, DSP big): c = nil — верх цепочки, иначе
+-- индекс контейнера верхнего уровня; par 1 — в ряд к предыдущему
+function E.fx_insert(track, c, pos, name, par)
+  local ok = false
+  run('fx insert', function()
+    local addr = c and child_addr(track, c, pos) or pos
+    local idx = add_fx(track, name, -1000 - addr)
+    ok = idx ~= nil and idx >= 0
+    if ok then set_par(track, addr, par) end
+    if ok and E.open_on_add then FA(track).Show(track, idx, 3) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
 end
 
 -- ── осциллоскопы: JSFX-мост jf_tracker_scope на треках ───────────────────

@@ -39,6 +39,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
+MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
@@ -3772,6 +3773,33 @@ ctx = {
   pm_cards = function() return state.pmgrid and state.pm_ok or false end,
   -- ── session (6 окт): клипы как в Ableton — модуль SS, REAPER здесь ──────
   alias = alias,
+  -- DSP big (7 окт): цепочка FX на всё окно (MX.DB); панель DSP держится
+  -- открытой, пока вид открыт (фокус dsp), на выходе — как было
+  dsp_big = function()
+    if state.dsp_big then
+      state.dsp_big = false
+      if state.dsp_big_saved ~= nil then state.dsp = state.dsp_big_saved; state.dsp_big_saved = nil end
+      relayout(); ctx.set_focus(state.dsp and 'dsp' or 'tracker')
+      vim.msg = 'dsp big: back'
+    else
+      state.dsp_big_saved = state.dsp
+      state.dsp, state.dsp_big = true, true
+      ctx.db_cache = nil
+      relayout(); ctx.set_focus('dsp')
+      vim.msg = 'dsp big: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, x delete, zz back'
+    end
+  end,
+  -- дерево цепочки цели DSP; перечитывается 4 раза в секунду и после правки
+  db_tree = function()
+    local t = dsp_target(); if not t then return nil end
+    local c = ctx.db_cache
+    local now = reaper.time_precise()
+    if not c or c.obj ~= t.track or now - c.t > 0.25 or c.gen ~= model.fx_gen then
+      c = { obj = t.track, t = now, gen = model.fx_gen, root = MX.DB.read(t.track, model.fxapi(t.track)), title = (t.take and 'take fx of ' or '') .. (t.name or '') }
+      ctx.db_cache = c
+    end
+    return c.root, c.obj, c.title
+  end,
   ss_big = function()
     if state.ss_big then
       for k, v in pairs(state.ss_saved or {}) do state[k] = v end
@@ -6072,6 +6100,30 @@ MMX.PP.init(U, ctx)
 draw.macro.init(U)
 GD.init(U, ctx)
 MX.SS.init(U, ctx)
+do   -- правки DSP big — через edit (undo), дерево после правки перечитывается
+  local function obj() local t = dsp_target(); return t and t.track end
+  local function after() ctx.db_cache = nil end
+  MX.DB.init(U, ctx, {
+    close = function() ctx.dsp_big() end,
+    msg = function(m) vim.msg = m end,
+    show = function(a) local o = obj(); if o then edit.fx_show(o, a) end end,
+    bypass = function(a) local o = obj(); if o then edit.fx_bypass(o, a); after() end end,
+    enable = function(a, on) local o = obj(); if o then edit.fx_set_enabled(o, a, on); after() end end,
+    parallel = function(a, v) local o = obj(); if o then edit.fx_parallel(o, a, v); after(); vim.msg = v > 0 and 'fx joins the row (parallel)' or 'fx leaves the row (serial)' end end,
+    param = function(a, i, v) local o = obj(); if o then edit.fx_param(o, a, i, v); after() end end,
+    remove = function(a, unpar) local o = obj(); if o then edit.fx_remove(o, a, unpar); after() end end,
+    add = function(n, par)
+      local o = obj(); if not o then return end
+      local parent, pos, pv = MX.DB.insert_point(n, par)
+      if parent and not parent.parent.root then vim.msg = 'dsp big: adding inside a nested container is not supported yet'; return end
+      if not n then local root = ctx.db_tree(); pos = root and #root.kids or 0 end
+      vim.open_picker(par and 'add fx in parallel' or 'add fx after', ctx.fx_list(), function(it)
+        if edit.fx_insert(o, parent and parent.k or nil, pos, it.data, pv) then vim.msg = '+ ' .. it.label .. (par and ' (parallel)' or '') end
+        after()
+      end)
+    end,
+  })
+end
 MX.clips = state.mxclips and true or false
 -- инструмент ноты (6 окт): item-представитель из снимка — база транспоза
 edit.inst_ref = function(it)
@@ -7457,6 +7509,16 @@ local function poll_cmd()
   elseif name == 'session' and (v:match('^session%s+launch') or v:match('^session%s+scene') or v:match('^session%s+stop') or v:match('^session%s+off') or v:match('^session%s+jump') or v:match('^session%s+loop')) and not ctx.is_sandbox() then
     reaper.SetExtState(EXT, 'ssdump', 'REFUSED: not a sandbox', false)   -- тест-команды, что меняют проект, — только в песочнице (6 окт)
   elseif name == 'session' then ctx.ss_cmd(v:match('^session%s+(.-)%s*%d%d%d%d%d%d%d%d%d+$') or v:match('^session%s+(.*)$') or '')   -- тест: :session …
+  elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
+    if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
+    else
+      for ch in (v:match('^dbkey%s+(%S+)') or ''):gmatch('.') do ctx.db_cache = nil; local root, o = ctx.db_tree(); if root then MX.DB.layout(root, MX.DB.metrics(L), 0, 0, 100); MX.DB.key(ch:byte(), root, o) end end
+      ctx.db_cache = nil
+      local root = ctx.db_tree(); local sel = root and MX.DB.find(root, MX.DB.sel)
+      local out = {}
+      for _, n in ipairs(root and MX.DB.walk(root) or {}) do out[#out + 1] = n.name .. (n.on and '' or '(off)') .. ((n.par or 0) > 0 and '=' or '') end
+      reaper.SetExtState(EXT, 'dbg', 'sel ' .. (sel and sel.name or 'nil') .. ' | ' .. table.concat(out, ' '), false)
+    end
   elseif name == 'pm' then ctx.pm_cmd(v:match('^pm%s+(%a+)') or '')      -- тест: :pm [big|grid|list]
   elseif name == 'slicedump' then
     -- 6 окт: слайсы выбранного инструмента lib — сырые и пересчитанные, rate, база
@@ -8453,6 +8515,11 @@ local function frame()
     HN.reset()
     hover = MX.SS.draw_big(L, 0, 0, gfx.w, gfx.h - L.status_h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition())
   end
+  -- DSP big (7 окт): цепочка FX поверх всего
+  if state.dsp_big and not idle_skip then
+    local root, _, title = ctx.db_tree()
+    if root then HN.reset(); hover = MX.DB.draw(L, 0, 0, gfx.w, gfx.h - L.status_h, root, title) end
+  end
   idle.hover = hover
   -- debug: нажатия мыши — что под ней (6 окт)
   if state.debug then
@@ -8917,6 +8984,7 @@ local function frame()
     local k = hover.sess.ri .. ':' .. hover.sess.ci
     if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, MX.grid(snap, seq)) end
   else state.ss_hkey = nil end
+  if U.click and hover.dbig then MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
@@ -10159,6 +10227,7 @@ local function frame()
     end
   end
 
+  if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, gfx.w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
   if gfx.mouse_wheel ~= 0 and hover and hover.slices ~= nil then
     -- колесо над модулем слайсов (4 окт): листать список
     SPROP.slice_scroll = math.max(0, (SPROP.slice_scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
@@ -10736,6 +10805,14 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
+        if state.dsp_big then   -- DSP big (7 окт): свои клавиши; чужие — в vim
+          local root, o = ctx.db_tree()
+          if root and MX.DB.key(c, root, o) then return end
+          return vim.key(c)
+        end
+        -- zz — DSP big
+        if ch == 'z' and not DK.pending then if state.dsp_z then state.dsp_z = nil; ctx.dsp_big() else state.dsp_z = true end; return end
+        state.dsp_z = nil
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

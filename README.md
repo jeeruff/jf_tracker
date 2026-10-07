@@ -114,6 +114,9 @@ for Renoise and are used with his permission. Support his work:
 The Orca field is an own implementation of [Orca](https://github.com/hundredrabbits/Orca)
 by Hundred Rabbits (MIT), the esoteric livecoding language - no code copied.
 
+The dsp big routing view follows the idea of Sexan's ParaNormal FX Router
+for REAPER - an own implementation, no code copied.
+
 The DSP module texts use descriptions from Chris Johnson's
 [Airwindopedia](https://www.airwindows.com/) when it is installed.
 

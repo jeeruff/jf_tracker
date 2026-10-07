@@ -244,6 +244,7 @@ KH.PAGES = {
   } },
   dsp = { title = 'DSP (track fx)', e = {
     { k = 'h l', d = 'fx left / right' },
+    { k = 'zz', d = 'dsp big: the chain with its routing on the whole window - h l signal (l enters a container), j k parallel row, a add after the row, A add in parallel, | join / leave the row, s solo in the row, = branches to unity, b bypass, x / dd delete, za fold a container, o window, zz / Esc back (:dsp big)', t = { 'zz', 'z' } },
     { k = 'j k g G', d = 'parameter down / up / first / last' },
     { k = '+ - ^A ^X', d = 'value up / down (Shift: coarse)', t = { '+', '-', '=', '^A', '^X' } },
     { k = 'dd x', d = 'delete fx (v: range)', t = { 'dd', 'd', 'x' } },
@@ -399,7 +400,7 @@ KH.BARS = {
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
-          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'add' }, { '?', 'help' } },
+          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'add' }, { 'zz', 'big' }, { '?', 'help' } },
   notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
