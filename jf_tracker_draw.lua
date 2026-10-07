@@ -1395,7 +1395,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     local on = b[2]
     set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
     set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
-    text(bx + math.floor((bw - ms(b[1])) / 2), yy, b[1], on and b[3] or U.GREY)
+    text(bx + math.floor((bw - ms(b[1])) / 2), yy, b[1], on and b[3] or U.readable(G0, U.PANEL, 4.5))   -- на заливке кнопки (7 окт)
     if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
       if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
     end
@@ -2809,6 +2809,9 @@ function D.frame(L, snap, rows, state, info)
     -- фон светлее панели: текст шапки подтянуть по контрасту (на колонку)
     local T0, G0 = U.TEXT, U.GREY
     U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
+    -- подписи кнопок (7 окт): читаемы на заливке КНОПКИ (панель), не шапки —
+    -- на светлой шапке серый темнел и на тёмной кнопке пропадал (R I M S, + −)
+    local BTXT = U.readable(G0, U.PANEL, 4.5)
     -- папки: вложенные треки сдвинуты и приглушены, папка помечена «+»
     local indent = (col.depth or 0) * L.cw
     local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or '- ') or '') .. (col.name ~= '' and col.name or '-')
@@ -2854,7 +2857,7 @@ function D.frame(L, snap, rows, state, info)
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
         set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, L.rh - 2, 1)
         set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, L.rh - 2, 0)
-        text(x + 2, by, b[1], on and b[3] or U.GREY)
+        text(x + 2, by, b[1], on and b[3] or BTXT)
         if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
         hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
@@ -2978,7 +2981,7 @@ function D.frame(L, snap, rows, state, info)
           local hot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
           set(hot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
           set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
-          text(bx + 2, by, b[1], hot and U.AMBER or U.GREY)
+          text(bx + 2, by, b[1], hot and U.AMBER or BTXT)
           if hot then onhot(b[2]) end
           hint(kind, bx, by, L.btn_w, L.rh, kind == 'lanebtn' and { col = col, lane = ln.lane, d = b[2], n = ln.nsub } or { d = b[2] })
         end
@@ -3003,7 +3006,7 @@ function D.frame(L, snap, rows, state, info)
             local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
             set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
             set(U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
-            text(ax + 2, by, 'a+', ahot and U.AMBER or U.GREY)
+            text(ax + 2, by, 'a+', ahot and U.AMBER or BTXT)
             if ahot then hover.envpm = { col = col, d = 1 } end
             hint('envpm', ax, by, aw, L.rh, { col = col, d = 1 })
           end
@@ -3032,7 +3035,7 @@ function D.frame(L, snap, rows, state, info)
           local bhot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
           set(bhot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
           set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
-          text(bx + 2, by, b[1], bhot and U.AMBER or U.GREY)
+          text(bx + 2, by, b[1], bhot and U.AMBER or BTXT)
           if bhot then hover.envpm = { col = c.col, e = ev.e, d = b[2] }; on_btn = true end
           hint('envpm', bx, by, L.btn_w, L.rh, { col = c.col, e = ev.e, d = b[2] })
         end
