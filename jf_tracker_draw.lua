@@ -1203,7 +1203,7 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     local ox, oy = x + math.floor((w - side) / 2), y + 2
     set(U.LINE); gfx.line(ox, oy + side, ox + side, oy)
     local function out(i) return i < thr and i or thr + (i - thr) / ratio end
-    local function pt(i, o) return ox + (i + 60) / 60 * side, oy + side - (o + 60) / 60 * side end
+    local function pt(i, o) o = math.max(-60, math.min(0, o)); return ox + (i + 60) / 60 * side, oy + side - (o + 60) / 60 * side end   -- в рамке (порог ниже −60)
     set(U.AMBER)
     local px0, py0 = pt(-60, out(-60))
     for k = 1, 30 do local i = -60 + k * 2; local px1, py1 = pt(i, out(i)); gfx.line(px0, py0, px1, py1); px0, py0 = px1, py1 end
@@ -1251,9 +1251,10 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     for k = 1, 32 do
       local px = x + 2 + math.floor(k * len / span * (w - 6))
       if px > x + w - 3 then break end
-      local hh = math.floor(a * (h - 4))
+      -- feedback ≥ 0 дБ: повторы не затухают (растут) — высота по рамке, красным (7 окт: линии уходили за вид)
+      local hh = math.min(h - 4, math.floor(a * (h - 4)))
       if hh < 1 then break end
-      set(U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
+      set(g >= 1 and U.RED or U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
       a = a * g
     end
   elseif kind == 'ir' then
@@ -1294,8 +1295,8 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       text(x + 3, by3 + VRH + 1, fit('sr ' .. srs, w - 6), U.GREY)
     end
   elseif kind == 'verb' then
-    local room = (pnum(f, vals, 'room') or 50) / 100
-    local damp = (pnum(f, vals, 'damp') or 50) / 100
+    local room = math.max(0, math.min(1, (pnum(f, vals, 'room') or 50) / 100))
+    local damp = math.max(0, math.min(1, (pnum(f, vals, 'damp') or 50) / 100))
     local wd = math.max(0.1, math.min(1, (pnum(f, vals, 'width') or 1)))
     local cx, cy = x + w / 2, y + h / 2
     for r = 1, 5 do
