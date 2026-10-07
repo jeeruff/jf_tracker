@@ -1746,6 +1746,30 @@ local function draw_ctrl(L, info, H, hover)
     -- 6 окт: быстрые опции — ширина колонок по самому длинному слову колонки
     -- (одинаковые обрезали performance); не влезает — поровну, как раньше
     qx, qw = nil, nil
+    -- which-key (7 окт): ждём вторую клавишу — вместо быстрых опций список,
+    -- что можно нажать (клавиша голубым, действие — текстом), 2 колонки
+    if info.whichkey then
+      if gi > 1 then goto next_group end            -- весь модуль — под подсказку
+      local wk = info.whichkey
+      -- одна колонка, если строк хватает (описания не режутся), иначе две
+      U.set(U.PANEL); gfx.rect(0, y, L.ctrl_w, H - y, 1)
+      local ncol = (#wk.items <= math.floor((H - y - L.rh - 6) / L.rh)) and 1 or 2
+      local cw2 = math.floor((L.ctrl_w - 2 * L.pad) / ncol)
+      y = y + 3
+      text(L.pad, y, fit(wk.title, L.ctrl_w - 2 * L.pad), U.AMBER); y = y + L.rh
+      local kw = 0
+      for _, e in ipairs(wk.items) do kw = math.max(kw, ms(e[1])) end
+      kw = kw + 2 * L.pad                          -- колонка ключей одной ширины (пробел битмапа узкий)
+      for i, e in ipairs(wk.items) do
+        local col = (i - 1) % ncol
+        local xx = L.pad + col * cw2
+        text(xx, y, e[1], U.CYAN)
+        text(xx + kw, y, fit(e[2], cw2 - kw - 4), U.TEXT)
+        if col == ncol - 1 then y = y + L.rh end
+      end
+      if #wk.items % ncol ~= 0 then y = y + L.rh end
+      goto next_group
+    end
     if g.name == 'quick' then
       local need = { 0, 0, 0 }
       for i, it in ipairs(g.items) do
@@ -1778,6 +1802,7 @@ local function draw_ctrl(L, info, H, hover)
     end
     if ci > 0 then y = y + L.rh end
     if g.name == 'help' then D.ctrl_help_bottom = y + 1 end
+    ::next_group::
   end
   -- заметки — всплывашкой от низа кнопок окон (D.notes_popup), тур — в
   -- оставшемся месте под быстрыми кнопками

@@ -180,7 +180,7 @@ function DB.key(c, root, obj)
   if not n and root.kids[1] then n = root.kids[1]; DB.sel = n.guid end
   local pend = DB.pend; DB.pend = nil
   if pend == 'z' then
-    if ch == 'z' then ops.close() elseif ch == 'a' and n and n.kids then DB.fold[n.guid] = not DB.fold[n.guid] or nil end
+    if ch == 'z' or ch == 'r' then ops.close() elseif ch == 'R' and ops.big then ops.big() elseif ch == 'a' and n and n.kids then DB.fold[n.guid] = not DB.fold[n.guid] or nil end
     return true
   elseif pend == 'd' then
     if ch == 'd' and n then DB.delete(n, obj) end

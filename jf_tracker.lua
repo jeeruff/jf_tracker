@@ -40,6 +40,7 @@ MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкл
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
+MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.MIX = dofile(DIR .. '/jf_tracker_mixer.lua')          -- микшер: под session и один вместо трекера (Shift+Tab), 7 окт
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
@@ -6296,6 +6297,7 @@ do   -- правки DSP big — через edit (undo), дерево после
   local function after() ctx.db_cache = nil end
   MX.DB.init(U, ctx, {
     close = function() if state.router_big then ctx.router_big() else ctx.dsp_big() end end,
+    big = function() ctx.router_big() end,
     msg = function(m) vim.msg = m end,
     show = function(a) local o = obj(); if o then edit.fx_show(o, a) end end,
     bypass = function(a) local o = obj(); if o then edit.fx_bypass(o, a); after() end end,
@@ -7750,6 +7752,7 @@ local function poll_cmd()
     local t = dsp_target(); local out = {}
     for _, f in ipairs(t and t.fx or {}) do if f.i == addr then for _, p in ipairs(f.params or {}) do out[#out + 1] = tostring(p.name) .. ':' .. tostring(p.i) .. ':' .. tostring(p.fx) end end end
     reaper.SetExtState(EXT, 'dbg', 'dbp ' .. #out .. ' | ' .. table.concat(out, ' '), false)
+  elseif name == 'st' then reaper.SetExtState(EXT, 'dbg', ('focus %s mode %s pending %s op %s mixer %s clips %s'):format(state.focus, vim.mode, tostring(vim.pending), tostring(vim.op), tostring(state.mixer), tostring(state.clipsview)), false)   -- тест: состояние фокуса (только чтение)
   elseif name == 'rbig' then ctx.router_big()                   -- тест (7 окт): zR
   elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
     if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
@@ -8380,6 +8383,7 @@ local function frame()
     smart_ok = reaper.file_exists(ctx.smart_input_path),
     dsptrack = state.dsptrack,
     eqgraph = state.eqgraph,
+    whichkey = (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op)) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or nil,
     clipsview = state.clipsview, dsp_big = state.dsp_big,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
@@ -9766,7 +9770,8 @@ local function frame()
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
     elseif hover.dsprouter then
-      ctx.dsp_big()                                          -- router: DSP big (7 окт)
+      -- router (7 окт): щелчок — вкл / выкл в DSP FX, Shift+щелчок — большой роутер
+      if gfx.mouse_cap & 8 == 8 then ctx.router_big() else ctx.dsp_big() end
       click = { t = now2, zone = 'dsprouter' }
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
@@ -11250,9 +11255,13 @@ local function frame()
           if root and MX.DB.key(c, root, o) then return end
           return vim.key(c)
         end
-        -- zz — DSP big
-        if ch == 'z' and not DK.pending then if state.dsp_z then state.dsp_z = nil; ctx.dsp_big() else state.dsp_z = true end; return end
-        state.dsp_z = nil
+        -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
+        if state.dsp_z and not DK.pending then
+          state.dsp_z = nil
+          if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big() end
+          return
+        end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
