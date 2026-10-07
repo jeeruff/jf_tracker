@@ -629,6 +629,21 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   local right = last and last.x and (last.x + last.w) or (x0 + lw)
   SS.vis_draw = {}
   for _, c in ipairs(cols) do if c.x then SS.vis_draw[#SS.vis_draw + 1] = c.ci end end
+  -- последний клип в колонке: под ним — слот записи (красная o, 7 окт)
+  local last_clip = {}
+  for _, c in ipairs(cols) do
+    for ri = 1, nrows do local cell = grid[ri] and grid[ri][c.ci]; if cell and cell.state ~= 'empty' then last_clip[c.ci] = ri end end
+  end
+  -- кнопка-буква в левом верхнем углу клетки: > — запуск, o — запись
+  local function corner(x, y, lab, col, key, data)
+    local bw = U.measure(lab) + 4
+    local hot = mx >= x and mx < x + bw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(col, 0.45) or U.BG); gfx.rect(x, y, bw, L.rh - 1, 1)
+    U.set(col); gfx.rect(x, y, bw, L.rh - 1, 0)
+    U.text(x + 2, y, lab, hot and U.TEXT or col)
+    if hot then hover[key] = data end
+    if ctx.hint then ctx.hint(key, x, y, bw, L.rh, data) end
+  end
   U.set(U.BG); gfx.rect(x0, y, right - x0, h, 1)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
   -- сетка трекера: точки на каждой строке
@@ -657,6 +672,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
         local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == c.ci) or (SS.pend[c.ci] and SS.pend[c.ci].ri == ri)
         if busy then
           SS.draw_cell(L, c.x + 1, by + 1, c.w - 3, bh - 1, cell, c.col, ri, c.ci, rg, blink, playpos, hover)
+          if cell and cell.state ~= 'empty' then corner(c.x + 3, by + 2, '>', U.GREEN, 'ssplay', { ri = ri, ci = c.ci }) end
         else
           -- пустой слот: точки трекера; наведение / курсор — рамка (клик, бросок, R — запись)
           local hot2 = mx >= c.x and mx < c.x + c.w and my >= by and my < by + bh
@@ -664,6 +680,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           elseif hot2 then U.set(U.LINE); gfx.rect(c.x + 1, by + 1, c.w - 3, bh - 1, 0) end
           if hot2 then hover.sess = { ri = ri, ci = c.ci } end
           if ctx.hint then ctx.hint('sess', c.x + 1, by + 1, c.w - 3, bh - 1, { ri = ri, ci = c.ci }) end
+          if ri == (last_clip[c.ci] or 0) + 1 then corner(c.x + 3, by + 2, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = c.ci }) end
         end
         -- клип-мод: буква клавиши в правом верхнем углу клетки
         local kl = SS.clip_mode and SS.key_of(ri, c.ci, SS.vis_draw)

@@ -7,7 +7,7 @@ V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'whichkey (quick option, on): after a prefix (d y c g z r q @, z in DSP) a popup at the cursor lists the next keys',
     'browser left (option): lib + browser in the left column above the matrix, no sidebar on the right; the fx list becomes the fx tab of the browser',
-    'session: 7 rows under the track headers, the tracker stays under the clips (Tab): CLIP MODE - the keyboard launches clips, a letter in every cell; option header info - the track header lists its instruments, inserts and sends (click, dblclick window, f jump labels)',
+    'session: a clips module under the track headers (30 rows by default, drag its bottom edge), the tracker stays under it; a clip is 3 rows with > (launch) in its corner, the first empty slot under the last clip of a track has a red o (record into it) (Tab): CLIP MODE - the keyboard launches clips, a letter in every cell; option header info - the track header lists its instruments, inserts and sends (click, dblclick window, f jump labels)',
     'router lives in the DSP FX panel (names and cables, zr / router button / quick option); zR - big router under the track headers with the automation tab on top; Option+Tab cycles the focus, Ctrl+Tab the top tabs',
     'fixes: inserting slices in INSERT jumped to another instrument; ReaEQ presets with any band count',
     'big router (zR): the fx chain with its routing over the whole window, every fx is a device with its parameter sliders (drag, wheel, dblclick - default); ReaEQ bands come from the plugin itself - any number and type (an 11-band preset shows all 11, cuts and notches on the curve)',

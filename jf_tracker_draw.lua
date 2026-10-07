@@ -419,8 +419,10 @@ function D.layout(snap, state, nregions)
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
   -- session (7 окт): 7 строк под шапками треков — клипы; трекер под ними
-  L.sess_h = state.clipsview and (7 * L.rh) or 0
+  -- 7 окт: модуль клипов — по умолчанию 30 строк, не больше половины места
+  -- под шапками; высоту тянут мышью за нижнюю границу (state.ss_px)
   L.sess_y = L.header_y + L.header_h
+  L.sess_h = state.clipsview and math.max(5 * L.rh, math.min(state.ss_px or (30 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.5))) or 0
   L.body_y = L.header_y + L.header_h + L.sess_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0

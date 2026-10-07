@@ -4048,7 +4048,7 @@ ctx = {
   end,
   -- session в масштабе трекера (7 окт): строка точек, метр, follow actions
   empty_row = function(y) draw.empty_row(L, y) end,
-  ss_clip_rows = function() return tonumber(state.ssrows) or 2 end,   -- 7 окт: в 7 строках под шапками — по 2 строки (волна, имя)
+  ss_clip_rows = function() return tonumber(state.ssrows) or 3 end,   -- 7 окт: клип — 3 строки
   -- follow actions: P_EXT:jf_ssfa трека = «idx=a,idx=a» (idx — номер региона-слота)
   ss_fa_cache = {},
   ss_fa = function(ci, ri, sq)
@@ -6394,6 +6394,8 @@ local function hint_go(t)
     if MX.SS.scene_mode then MX.SS.scene(d.ri, seq, MX.grid(snap, seq), #snap.cols) else MX.SS.launch(d.ri, d.ci, seq) end
     MX.SS.scene_mode = false; MX.SS.cur.ri, MX.SS.cur.ci = d.ri, d.ci
   elseif t.kind == 'sessrow' then MX.SS.scene_mode = false; MX.SS.cur.ri = d; MX.SS.scene(d, seq, MX.grid(snap, seq), #snap.cols)
+  elseif t.kind == 'ssplay' then MX.SS.launch(d.ri, d.ci, seq)
+  elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
 end
@@ -9232,7 +9234,7 @@ local function frame()
     elseif L.fxb_rect and math.abs(gfx.mouse_x - (L.fxb_rect[1] + L.fxb_rect[3])) <= 3 and gfx.mouse_y >= L.fxb_rect[2] and gfx.mouse_y < L.fxb_rect[2] + L.fxb_rect[4] then edge = 'fxb'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
     elseif state.top and math.abs(gfx.mouse_y - (L.top_first and ((L.top_y or 0) + L.top_h) or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top'
-    elseif MX.clips and MX.ss_split_y and gfx.mouse_x < L.matrix_w and math.abs(gfx.mouse_y - MX.ss_split_y) <= 3 then edge = 'clips' end
+    elseif state.clipsview and (L.sess_h or 0) > 0 and gfx.mouse_x >= L.matrix_w and gfx.mouse_x < L.win_w and math.abs(gfx.mouse_y - (L.sess_y + L.sess_h)) <= 3 then edge = 'clips' end   -- 7 окт: высота модуля клипов
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
         if resize_drag == 'mx' and MX.fold then state.mx_fold_px = math.max(L.cw * 6, math.min(math.floor(gfx.w * 0.6), gfx.mouse_x)); state.status = ('folded matrix width %d px'):format(state.mx_fold_px)
@@ -9240,7 +9242,7 @@ local function frame()
         elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x - (L.fxb_rect and L.fxb_rect[1] or 0))); state.status = ('fx list width %d px'):format(state.fxb_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
-        elseif resize_drag == 'clips' then state.ss_px = math.max(3 * L.rh, gfx.mouse_y - (MX.ss_top or 0)); state.status = ('clips height %d px'):format(state.ss_px)
+        elseif resize_drag == 'clips' then state.ss_px = math.max(5 * L.rh, gfx.mouse_y - (L.sess_y or 0)); state.status = ('clips height %d rows'):format(math.floor(state.ss_px / L.rh))
         else
           -- наверху — тянется нижний край; mid / bottom — верхний (растёт вверх)
           local want = L.top_first and (gfx.mouse_y - (L.top_y or 0)) or ((L.top_y + L.top_h) - gfx.mouse_y)
@@ -9372,6 +9374,13 @@ local function frame()
     local dbl = lc and lc.kind == kind and lc.col == h2.col and lc.k == h2.k and now3 - lc.t < 0.35
     ctx.hdr_last = { kind = kind, col = h2.col, k = h2.k, t = now3 }
     ctx.hdr_pick(kind, h2.col, h2.k, dbl)
+    U.click = false
+  end
+  -- клип (7 окт): > в углу — запуск, o под последним клипом — запись в слот
+  if U.click and (hover.ssplay or hover.ssrecbtn) and snap then
+    local h2 = hover.ssplay or hover.ssrecbtn
+    MX.SS.cur.ri, MX.SS.cur.ci = h2.ri, h2.ci
+    if hover.ssplay then MX.SS.launch(h2.ri, h2.ci, seq) elseif ctx.ss_record then ctx.ss_record(h2.ri, h2.ci) end
     U.click = false
   end
   if U.click and hover.ssfa and snap then   -- буква follow action клипа (7 окт): клик — следующее действие
