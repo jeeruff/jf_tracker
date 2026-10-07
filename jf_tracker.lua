@@ -4099,7 +4099,7 @@ ctx = {
   end,
   -- session в масштабе трекера (7 окт): строка точек, метр, follow actions
   empty_row = function(y) draw.empty_row(L, y) end,
-  ss_clip_rows = function() return tonumber(state.ssrows) or 3 end,   -- 7 окт: клип — 3 строки
+  ss_clip_rows = function() return tonumber(state.ssrows) or 2 end,   -- 7 окт: клип — 2 строки (волна, имя поверх)
   -- follow actions: P_EXT:jf_ssfa трека = «idx=a,idx=a» (idx — номер региона-слота)
   ss_fa_cache = {},
   ss_fa = function(ci, ri, sq)
@@ -6012,7 +6012,7 @@ ctx = {
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
-    if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.browserleft and state.side and B.mode == 'fx')) then f = 'tracker' end
+    if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.browserleft and state.side and B.mode == 'fx') or state.router_big) then f = 'tracker' end
     if f == 'notes' and not (state.top and state.notes_open) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
@@ -8918,20 +8918,29 @@ local function frame()
   if state.router_big and not idle_skip then
     local root, _, title = ctx.db_tree()
     if root then
-      local x0, y0, w0 = 0, L.body_y, gfx.w
+      -- 7 окт: слева — список эффектов (бросать в роутер / af), браузер файлов
+      -- и сайдбар остаются (роутер — до L.win_w); при браузере слева — правее него
+      local lx = L.browser_left and L.matrix_w or 0
+      local y0 = L.body_y
       local h0 = gfx.h - L.status_h - y0
-      U.set(U.BG); gfx.rect(0, L.header_y, L.matrix_w, L.body_y - L.header_y, 1)   -- колонка матрицы над телом
+      local fxw = math.min(L.cw * 26, math.floor((L.win_w - lx) * 0.25))
+      local x0, w0 = lx + fxw, L.win_w - lx - fxw
+      if not L.browser_left then U.set(U.BG); gfx.rect(0, L.header_y, L.matrix_w, L.body_y - L.header_y, 1) end   -- колонка матрицы над телом
       if not HN.active then
         local keep = {}
         for _, t in ipairs(HN.targets) do
-          local under = t.y and t.y >= y0 or (t.x and t.x < L.matrix_w and t.y and t.y >= L.header_y)
+          local under = t.y and t.y >= y0 and t.x and t.x >= lx and t.x < L.win_w
           if not under then keep[#keep + 1] = t end
         end
         HN.targets = keep
       end
+      if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
+      U.set(U.PANEL); gfx.rect(lx, y0, fxw, h0, 1)
+      local fh = FB.draw(U, L, lx, y0, fxw - 2, h0, state.focus == 'fxb', ctx.fit)
       local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title, false, true)
       local mx, my = gfx.mouse_x, gfx.mouse_y
-      if my >= y0 and my < y0 + h0 then hover = hv; idle.hover = hover end
+      if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover
+      elseif my >= y0 and my < y0 + h0 and mx >= lx and mx < x0 then hover = { fxb = fh or true }; idle.hover = hover end
     end
   end
   if state.macro and L.body_h > 0 then
@@ -10683,6 +10692,7 @@ local function frame()
       if fxb_drag.active then
         state.status = hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
+          or (hover.dbig and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbnode and (' after the row of ' .. hover.dbnode.name .. ' (Shift - parallel to it)') or ' at the end of the chain')))
           or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
       end
     else
@@ -10696,7 +10706,22 @@ local function frame()
           FB.push_recent(drop.it); ctx.fxb_save()
           vim.msg = '+ ' .. FB.short(drop.it.label) .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
         else vim.msg = 'could not add into the container' end
-      elseif drop.active and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap) end
+      elseif drop.active and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap)
+      elseif drop.active and hover.dbig then
+        -- роутер (7 окт): на узел — после его ряда (Shift — параллельно узлу), мимо узлов — в конец
+        local t = dsp_target()
+        if t then
+          local n = hover.dbnode
+          local par = n and (gfx.mouse_cap & 8 == 8) or false
+          local parent, pos, pv = MX.DB.insert_point(n, par)
+          if not n then local root = ctx.db_tree(); pos = root and #root.kids or 0 end
+          if parent and not parent.parent.root then vim.msg = 'router: adding inside a nested container is not supported yet'
+          elseif edit.fx_insert(t.track, parent and parent.k or nil, pos, drop.it.data, pv) then
+            FB.push_recent(drop.it); ctx.fxb_save(); ctx.db_cache = nil
+            vim.msg = '+ ' .. FB.short(drop.it.label) .. (par and ' (parallel)' or '')
+          end
+        end
+      end
       fxb_drag = nil
     end
   end

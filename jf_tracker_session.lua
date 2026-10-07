@@ -554,7 +554,8 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
   local hot2 = mx >= cx and mx < cx + cw and my >= ry and my < ry + chh
   U.set(is_live and U.tint(U.AMBER, 0.12) or (hot2 and U.tint(U.TEXT, 0.06) or U.BG)); gfx.rect(cx, ry, cw, chh, 1)
   -- подпись снизу (6 окт): имя клипа = имя слота, если клетка выше 2 строк
-  local label_h = (cell and cell.state ~= 'empty' and chh >= 2 * L.rh + 2) and L.rh or 0
+  -- SS.name_over (7 окт): имя — поверх волны, правее кнопки >; волна на всю высоту
+  local label_h = (not SS.name_over and cell and cell.state ~= 'empty' and chh >= 2 * L.rh + 2) and L.rh or 0
   do
       local chh = chh - label_h
       -- содержимое: блоки событий по времени, цвет item / трека
@@ -587,14 +588,18 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
         U.text(cx + math.floor((cw - U.measure('.')) / 2), ry + math.floor((chh - L.rh) / 2), '.', U.DIM)
       end
   end
-  if label_h > 0 then
+  if label_h > 0 or (SS.name_over and cell and cell.state ~= 'empty') then
     -- справа от имени — буква follow action (7 окт): клик — следующая, ПКМ… — a / A с клавиатуры
     local fa = ctx.ss_fa and ctx.ss_fa(ci, ri) or 'l'
     local fl = fa:upper()
     local fw = U.measure(fl) + 2 * L.pad
     local fx, fy = cx + cw - fw, ry + chh - label_h - 2
+    if SS.name_over then fy = ry + chh - L.rh end           -- нижняя строка, поверх волны
     local hotfa = mx >= fx and mx < fx + fw and my >= fy and my < fy + L.rh
-    U.text(cx + L.pad, fy, ctx.fit(SS.slot_name(rg, ri), cw - 2 * L.pad - fw), is_live and U.AMBER or U.TEXT)
+    local nx = cx + L.pad + (SS.cell_inset or 0)
+    local nm = ctx.fit(SS.slot_name(rg, ri), cx + cw - fw - nx - L.pad)
+    if SS.name_over then U.set(U.BG, 0.55); gfx.rect(nx - 1, fy, U.measure(nm) + 2, L.rh - 1, 1) end   -- подложка: имя читается на волне
+    U.text(nx, fy, nm, is_live and U.AMBER or U.TEXT)
     if hotfa then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(fx, fy, fw, L.rh, 1); hover.ssfa = { ri = ri, ci = ci } end
     U.text(fx + L.pad, fy, fl, hotfa and U.AMBER or (fa == 'l' and U.GREY or U.CYAN))
   end
@@ -672,11 +677,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   local BTN = U.measure('>') + 4
   U.set(U.BG); gfx.rect(x0 + 2, y, right - x0 - 2, h, 1)   -- левый край — рамка трекера (7 окт)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
-  -- сетка трекера: точки на каждой строке
-  for r = 0, nvis - 1 do
-    local ry = y + r * L.rh
-    if ctx.empty_row then ctx.empty_row(ry) end
-  end
+  -- 7 окт: без точек трекера — у клипов свои рамки
   for b = 0, fit - 1 do
     local ri = SS.scroll + b + 1
     local rg = seq[ri]; if not rg then break end
@@ -684,28 +685,30 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     local bh = CR * L.rh
     U.set(U.LINE); gfx.rect(x0, by, right - x0, 1, 1)            -- граница сцены — как линия такта
     -- сцена: имя слота, длина; клик — вся сцена
-    local hot = mx >= x0 and mx < x0 + lw and my >= by and my < by + bh + L.rh
-    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 1, by + 1, lw - 3, bh + L.rh - 2, 1)
-    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 1, by + 1, lw - 3, bh + L.rh - 2, 0)
-    U.text(x0 + L.pad, by + 1, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 2), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
-    if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad, by + 1 + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad), U.GREY) end
+    -- кнопка сцены — той же высоты, что клипы (7 окт): строки клипа, не служебная
+    local sy = by + L.rh
+    local hot = mx >= x0 and mx < x0 + lw and my >= sy and my < sy + bh
+    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 1)
+    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 0)
+    U.text(x0 + L.pad + 2, sy, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 4), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
+    if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad + 2, sy + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad - 4), U.GREY) end
     if hot then hover.sessrow = ri end
-    if ctx.hint then ctx.hint('sessrow', x0 + 1, by + 1, lw - 3, bh - 1, ri) end
+    if ctx.hint then ctx.hint('sessrow', x0 + 3, by, lw - 5, L.rh, ri) end
     for _, sl in ipairs(slots) do
       do
         -- 7 окт: строка над клипом — служебная (метки прыжков f, буква клип-мода);
-        -- клип — 3 строки: волна в 2 строки, слева во 2-й строке > / o, внизу имя
+        -- клип — 2 строки: волна на всю высоту, внизу слева > / o, правее — имя поверх волны
         local c, vi = sl.c, sl.vi
         local cell = grid[ri] and grid[ri][vi]
         local cx, cw = sl.x, sl.w
         local ky, cy = by, by + L.rh                 -- служебная строка, верх клипа
         if c.col.armed then U.set(U.RED, 0.10); gfx.rect(cx, cy, cw, bh, 1) end   -- армирован — сюда пойдёт запись
         local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == vi) or (SS.pend[vi] and SS.pend[vi].ri == ri)
-        local bx, byb = cx + 2, cy + L.rh            -- кнопка > / o: вторая строка клипа, слева от волны
+        local bx, byb = cx + 2, cy + bh - L.rh - 1    -- кнопка > / o: нижняя строка клипа, слева от волны и имени
         if busy then
-          SS.cell_inset, SS.hint_dy, SS.hint_dx = BTN + 2, -L.rh, BTN + 4
+          SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = BTN + 2, -L.rh, BTN + 4, true
           SS.draw_cell(L, cx, cy, cw, bh - 1, cell, c.col, ri, vi, rg, blink, playpos, hover)
-          SS.cell_inset, SS.hint_dy, SS.hint_dx = nil, nil, nil
+          SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = nil, nil, nil, nil
           if cell and cell.state ~= 'empty' then corner(bx, byb, '>', U.GREEN, 'ssplay', { ri = ri, ci = vi }, cx, ky) end
         else
           -- пустой слот — сразу пустым клипом (7 окт): рамка; курсор / наведение — ярче
