@@ -644,7 +644,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     if hot then hover[key] = data end
     if ctx.hint then ctx.hint(key, x, y, bw, L.rh, data) end
   end
-  U.set(U.BG); gfx.rect(x0, y, right - x0, h, 1)
+  U.set(U.BG); gfx.rect(x0 + 2, y, right - x0 - 2, h, 1)   -- левый край — рамка трекера (7 окт)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
   -- сетка трекера: точки на каждой строке
   for r = 0, nvis - 1 do
