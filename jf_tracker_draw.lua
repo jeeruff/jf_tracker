@@ -3016,9 +3016,9 @@ function D.frame(L, snap, rows, state, info)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
-  -- уголок над номерами строк (2 окт): ряд 0 — вид all | reg (весь трек /
-  -- только регион курсора), ряд 1 — номер и имя региона в его цвете, ряд 2 —
-  -- /2 x2 dup одной строкой (узкие кнопки: влезают на x1..x4, проверено расчётом)
+  -- уголок над номерами строк (2 окт; 7 окт): ряд 0 — proj | region, ряд 1 —
+  -- session | router, ряд 2 — номер и имя региона в его цвете, ряд 3 — /2 x2
+  -- слева и als cln парой справа, последний — длина «< N >»
   do
     local rg = info.cur_region_full
     local bx, bw = tx0 + 1, L.label_w - 2
@@ -3052,10 +3052,7 @@ function D.frame(L, snap, rows, state, info)
       -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»;
       -- справа cln — независимая копия паттерна (3 окт), имя — до неё
       -- справа als — связанный повтор (alias, как в Renoise), имя — до неё
-      local cw1 = ms('als') + 2
-      local cx = bx + bw - cw1
-      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), cx - bx - 7), U.TEXT)
-      small(cx, ny, 'als', 'alias', false, 'rgbtn')
+      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
     else
       text(bx + 5, ny, fit('no region', bw - 7), U.DIM)
     end
@@ -3063,11 +3060,13 @@ function D.frame(L, snap, rows, state, info)
     if rg then
       local by2 = ny + L.rh
       if by2 + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
+        -- 7 окт: /2 x2 слева, als cln — парой справа (копии паттерна рядом)
         local x = bx
-        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' }, { 'clone', 'cln' } }) do
-          if x + ms(bt[2]) + 2 > bx + bw then break end
-          x = small(x, by2, bt[2], bt[1], false, 'rgbtn')
-        end
+        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
+        local pw = ms('als') + ms('cln') + 6
+        local px = bx + bw - pw
+        if px >= x then px = small(px, by2, 'als', 'alias', false, 'rgbtn'); small(px, by2, 'cln', 'clone', false, 'rgbtn')
+        elseif x + ms('cln') + 2 <= bx + bw then small(x, by2, 'cln', 'clone', false, 'rgbtn') end
       end
     end
   end
