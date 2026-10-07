@@ -428,9 +428,13 @@ function D.layout(snap, state, nregions)
   -- session (7 окт): 7 строк под шапками треков — клипы; трекер под ними
   -- 7 окт: модуль клипов — по умолчанию 30 строк, не больше половины места
   -- под шапками; высоту тянут мышью за нижнюю границу (state.ss_px)
-  L.sess_y = L.header_y + L.header_h
-  L.sess_h = state.clipsview and math.max(5 * L.rh, math.min(state.ss_px or (30 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.5))) or 0
-  L.body_y = L.header_y + L.header_h + L.sess_h
+  -- строка effects (7 окт): эффекты и сенды трека — под шапками, над клипами
+  L.fxrow_h = state.fxrow and (L.rh + 2) or 0
+  L.fxrow_y = L.header_y + L.header_h
+  L.sess_y = L.fxrow_y + L.fxrow_h
+  -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места
+  L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.33))) or 0
+  L.body_y = L.sess_y + L.sess_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
@@ -3162,7 +3166,9 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 1 (7 окт): session (клипы вместо строк трекера)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
-      small(bx, hy + 1 + L.rh, ms('session') + 2 <= bw and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
+      local full = ms('session') + ms('effects') + 6 <= bw
+      local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
+      small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh

@@ -159,6 +159,7 @@ local state = {
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
+  fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
   whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
   browserleft = flag('browserleft', false),       -- браузер слева над матрицей, вкладка fx (7 окт)
@@ -3876,10 +3877,12 @@ ctx = {
       state.rb_saved = state.dsp; state.dsp = true            -- клавиши DSP-ветки требуют панель
       state.rb_top = { state.top, state.toptab }
       state.top, state.toptab = true, 'modulation'           -- наверху — автоматизация (7 окт)
+      state.rb_bmode = B.mode; B.mode = 'fx'; state.side = true   -- браузер — на вкладку fx (эффекты бросать в роутер)
       ctx.db_cache = nil; relayout(); ctx.set_focus('dsp'); vim.msg = 'router big: drag the sliders, dblclick - default, h l j k walk, zR / Esc back'
     else
       if state.rb_saved ~= nil and not state.dsp_big then state.dsp = state.rb_saved end
       if state.rb_top then state.top, state.toptab = state.rb_top[1], state.rb_top[2] end
+      if state.rb_bmode then B.mode = state.rb_bmode; state.rb_bmode = nil end
       state.rb_saved, state.rb_top = nil, nil
       relayout(); ctx.set_focus(state.dsp and 'dsp' or 'tracker'); vim.msg = 'router big: back'
     end
@@ -6012,7 +6015,7 @@ ctx = {
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
-    if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.browserleft and state.side and B.mode == 'fx') or state.router_big) then f = 'tracker' end
+    if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.side and B.mode == 'fx' and (state.browserleft or state.router_big))) then f = 'tracker' end
     if f == 'notes' and not (state.top and state.notes_open) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
@@ -8433,7 +8436,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     draw_router = function(x, y, w, h)
@@ -8780,7 +8783,7 @@ local function frame()
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     browser_draw = state.side and function(Lx, x, y, w, h)
       -- вкладка fx (браузер слева): список эффектов внутри браузера
-      B.fx_draw = state.browserleft and function(fx, fy, fw, fh)
+      B.fx_draw = (state.browserleft or state.router_big) and function(fx, fy, fw, fh)
         if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
         return FB.draw(U, Lx, fx, fy, fw, fh, state.focus == 'fxb', ctx.fit)
       end or nil
@@ -8859,6 +8862,35 @@ local function frame()
   SL.draw_drag(U, L)
   -- макро-вид (3 окт, :macro): поверх тела трекера; клики по скрытым ячейкам не идут
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
+  -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
+  -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
+  if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
+    local y0 = L.fxrow_y
+    U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
+    U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    for _, c in ipairs(L.cols) do
+      if c.x and c.col then
+        local hi = ctx.hdr_info(c.col)
+        local cx, right = c.x + 2, c.x + c.w - 2
+        local list = {}
+        for k, it in ipairs(hi.fx or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrfx' } end
+        for k, it in ipairs(hi.sends or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrsend' } end
+        for n, e in ipairs(list) do
+          local lab = ctx.fit(e.it.name or '', L.cw * 9)
+          local w2 = U.measure(lab) + 2 * L.pad
+          local more = #list - n + 1
+          if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0 + 1, '+' .. more, U.CYAN); break end
+          local hot = mx >= cx and mx < cx + w2 and my >= y0 and my < y0 + L.rh
+          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y0 + 1, w2, L.rh - 1, 1)
+          U.text(cx + L.pad, y0 + 1, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
+          if hot then hover[e.kind] = { col = c.col, k = e.k, it = e.it } end
+          ctx.hint(e.kind, cx, y0 + 1, w2, L.rh, { col = c.col, k = e.k })
+          cx = cx + w2 + 2
+        end
+      end
+    end
+  end
   -- session (7 окт) — 7 строк под шапками треков (шапки живые, тот же масштаб
   -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔
   -- session; в фокусе session — клип-мод: клавиатура QWERTY запускает клипы
@@ -8940,8 +8972,7 @@ local function frame()
       local lx = L.browser_left and L.matrix_w or 0
       local y0 = L.body_y
       local h0 = gfx.h - L.status_h - y0
-      local fxw = math.min(L.cw * 26, math.floor((L.win_w - lx) * 0.25))
-      local x0, w0 = lx + fxw, L.win_w - lx - fxw
+      local x0, w0 = lx, L.win_w - lx            -- эффекты — во вкладке fx браузера (7 окт), не отдельным списком
       if not L.browser_left then U.set(U.BG); gfx.rect(0, L.header_y, L.matrix_w, L.body_y - L.header_y, 1) end   -- колонка матрицы над телом
       if not HN.active then
         local keep = {}
@@ -8951,13 +8982,9 @@ local function frame()
         end
         HN.targets = keep
       end
-      if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
-      U.set(U.PANEL); gfx.rect(lx, y0, fxw, h0, 1)
-      local fh = FB.draw(U, L, lx, y0, fxw - 2, h0, state.focus == 'fxb', ctx.fit)
       local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title, false, true)
       local mx, my = gfx.mouse_x, gfx.mouse_y
-      if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover
-      elseif my >= y0 and my < y0 + h0 and mx >= lx and mx < x0 then hover = { fxb = fh or true }; idle.hover = hover end
+      if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end
     end
   end
   if state.macro and L.body_h > 0 then
@@ -9135,6 +9162,7 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'session' then state.status = 'session: clips instead of the rows - scenes x tracks, Enter launches (zs, quick option clips)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
@@ -9705,7 +9733,8 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
-    elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | router (7 окт)
+    elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
+    elseif hover.viewbtn == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
     elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then

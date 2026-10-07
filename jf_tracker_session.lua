@@ -637,7 +637,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local nrows = #seq
   local CR = math.max(2, (ctx.ss_clip_rows and ctx.ss_clip_rows()) or SS.CLIP_ROWS)
-  local BR = CR + 1
+  local BR = CR            -- 7 окт: клипы вплотную, без служебной строки между ними
   local nvis = math.max(1, math.floor(h / L.rh))
   local fit = math.max(1, math.floor(nvis / BR))
   SS.rows_fit = fit
@@ -683,17 +683,16 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     local rg = seq[ri]; if not rg then break end
     local by = y + b * BR * L.rh
     local bh = CR * L.rh
-    U.set(U.LINE); gfx.rect(x0, by, right - x0, 1, 1)            -- граница сцены — как линия такта
     -- сцена: имя слота, длина; клик — вся сцена
     -- кнопка сцены — той же высоты, что клипы (7 окт): строки клипа, не служебная
-    local sy = by + L.rh
+    local sy = by
     local hot = mx >= x0 and mx < x0 + lw and my >= sy and my < sy + bh
     U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 1)
     U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 0)
     U.text(x0 + L.pad + 2, sy, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 4), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
     if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad + 2, sy + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad - 4), U.GREY) end
     if hot then hover.sessrow = ri end
-    if ctx.hint then ctx.hint('sessrow', x0 + 3, by, lw - 5, L.rh, ri) end
+    if ctx.hint then ctx.hint('sessrow', x0 + 3, sy, lw - 5, L.rh, ri) end
     for _, sl in ipairs(slots) do
       do
         -- 7 окт: строка над клипом — служебная (метки прыжков f, буква клип-мода);
@@ -701,23 +700,23 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
         local c, vi = sl.c, sl.vi
         local cell = grid[ri] and grid[ri][vi]
         local cx, cw = sl.x, sl.w
-        local ky, cy = by, by + L.rh                 -- служебная строка, верх клипа
+        local ky, cy = by, by                       -- 7 окт: метки — в левом верхнем углу клипа (над > / o), буква клип-мода — справа сверху
         if c.col.armed then U.set(U.RED, 0.10); gfx.rect(cx, cy, cw, bh, 1) end   -- армирован — сюда пойдёт запись
         local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == vi) or (SS.pend[vi] and SS.pend[vi].ri == ri)
         local bx, byb = cx + 2, cy + bh - L.rh - 1    -- кнопка > / o: нижняя строка клипа, слева от волны и имени
         if busy then
-          SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = BTN + 2, -L.rh, BTN + 4, true
+          SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = BTN + 2, 0, 0, true
           SS.draw_cell(L, cx, cy, cw, bh - 1, cell, c.col, ri, vi, rg, blink, playpos, hover)
           SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = nil, nil, nil, nil
-          if cell and cell.state ~= 'empty' then corner(bx, byb, '>', U.GREEN, 'ssplay', { ri = ri, ci = vi }, cx, ky) end
+          if cell and cell.state ~= 'empty' then corner(bx, byb, '>', U.GREEN, 'ssplay', { ri = ri, ci = vi }) end
         else
           -- пустой слот — сразу пустым клипом (7 окт): рамка; курсор / наведение — ярче
           local hot2 = mx >= cx and mx < cx + cw and my >= cy and my < cy + bh
           U.set(hot2 and U.tint(U.TEXT, 0.06) or U.BG); gfx.rect(cx, cy, cw, bh - 1, 1)
           U.set((ri == SS.cur.ri and vi == SS.cur.ci) and U.TEXT or (hot2 and U.GREY or U.LINE)); gfx.rect(cx, cy, cw, bh - 1, 0)
           if hot2 then hover.sess = { ri = ri, ci = vi } end
-          if ctx.hint then ctx.hint('sess', cx + BTN + 4, ky, cw - BTN - 4, L.rh, { ri = ri, ci = vi }) end
-          if ri == (last_clip[vi] or 0) + 1 then corner(bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = vi }, cx, ky) end
+          if ctx.hint then ctx.hint('sess', cx, ky, cw, L.rh, { ri = ri, ci = vi }) end
+          if ri == (last_clip[vi] or 0) + 1 then corner(bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = vi }) end
         end
         -- клип-мод: буква клавиши — в служебной строке справа
         local kl = SS.clip_mode and SS.key_of(ri, vi, SS.vis_draw)
