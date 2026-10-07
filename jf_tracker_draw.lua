@@ -333,6 +333,11 @@ function D.layout(snap, state, nregions)
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
+  -- браузер слева (7 окт, опция browserleft): lib + браузер — в левой колонке
+  -- над матрицей, справа сайдбара нет (трекер шире)
+  L.browser_left = state.browserleft and L.side_w > 0 or false
+  L.lside_w = L.browser_left and L.side_w or 0
+  if L.browser_left then L.side_w = 0 end
   -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
   L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
   -- модуль слайсов (4 окт): колонка в верхней панели справа (у lib), по её
@@ -342,6 +347,7 @@ function D.layout(snap, state, nregions)
   L.win_w = gfx.w - L.side_w - L.rstrip_w
   L.side_x = L.win_w                               -- левый край сайдбара / полосы
   L.matrix_w = MX and MX.width(L, nregions or 0, #snap.cols) or 0
+  if L.browser_left then L.matrix_w = math.max(L.matrix_w, L.lside_w + D.SEPW) end
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
   if state.mx_hidden then L.matrix_w = L.mx_strip_w
@@ -443,6 +449,15 @@ function D.layout(snap, state, nregions)
       if state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
     end
     L.ctrl_w = L.ctrl_box[3]
+  end
+  -- браузер слева: верх колонки — lib + браузер (60 %), ниже — матрица
+  L.lside_rect = nil
+  if L.browser_left then
+    local y0 = L.mx_top or L.header_y
+    local y1 = L.mx_bot or L.trk_bot
+    local split = y0 + math.max(8 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.6)))
+    L.lside_rect = { 0, y0, L.matrix_w - D.SEPW, split - y0 }
+    L.mx_top = split + D.SEPW
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
@@ -1746,30 +1761,6 @@ local function draw_ctrl(L, info, H, hover)
     -- 6 окт: быстрые опции — ширина колонок по самому длинному слову колонки
     -- (одинаковые обрезали performance); не влезает — поровну, как раньше
     qx, qw = nil, nil
-    -- which-key (7 окт): ждём вторую клавишу — вместо быстрых опций список,
-    -- что можно нажать (клавиша голубым, действие — текстом), 2 колонки
-    if info.whichkey then
-      if gi > 1 then goto next_group end            -- весь модуль — под подсказку
-      local wk = info.whichkey
-      -- одна колонка, если строк хватает (описания не режутся), иначе две
-      U.set(U.PANEL); gfx.rect(0, y, L.ctrl_w, H - y, 1)
-      local ncol = (#wk.items <= math.floor((H - y - L.rh - 6) / L.rh)) and 1 or 2
-      local cw2 = math.floor((L.ctrl_w - 2 * L.pad) / ncol)
-      y = y + 3
-      text(L.pad, y, fit(wk.title, L.ctrl_w - 2 * L.pad), U.AMBER); y = y + L.rh
-      local kw = 0
-      for _, e in ipairs(wk.items) do kw = math.max(kw, ms(e[1])) end
-      kw = kw + 2 * L.pad                          -- колонка ключей одной ширины (пробел битмапа узкий)
-      for i, e in ipairs(wk.items) do
-        local col = (i - 1) % ncol
-        local xx = L.pad + col * cw2
-        text(xx, y, e[1], U.CYAN)
-        text(xx + kw, y, fit(e[2], cw2 - kw - 4), U.TEXT)
-        if col == ncol - 1 then y = y + L.rh end
-      end
-      if #wk.items % ncol ~= 0 then y = y + L.rh end
-      goto next_group
-    end
     if g.name == 'quick' then
       local need = { 0, 0, 0 }
       for i, it in ipairs(g.items) do
@@ -1802,7 +1793,6 @@ local function draw_ctrl(L, info, H, hover)
     end
     if ci > 0 then y = y + L.rh end
     if g.name == 'help' then D.ctrl_help_bottom = y + 1 end
-    ::next_group::
   end
   -- заметки — всплывашкой от низа кнопок окон (D.notes_popup), тур — в
   -- оставшемся месте под быстрыми кнопками
@@ -3726,10 +3716,16 @@ function D.frame(L, snap, rows, state, info)
   end
 
   D.pmark('draw: browser')
-  if L.side_w > 0 and info.browser_draw then
-    -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу)
+  if (L.side_w > 0 or L.lside_rect) and info.browser_draw then
+    -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу);
+    -- браузер слева (7 окт) — прямоугольник над матрицей
+    local SX0, SW0 = L.side_x, L.side_w
     local sy0 = 0
     local total = gfx.h - L.status_h - sy0
+    if L.lside_rect then
+      L.side_x, L.side_w = L.lside_rect[1], L.lside_rect[3]
+      sy0, total = L.lside_rect[2], L.lside_rect[4]
+    end
     local W = L.side_x                                -- сайдбар правее модуля слайсов (4 окт)
     set(U.PANEL); gfx.rect(W, sy0, L.side_w, total, 1)
     local ih = math.max(4 * L.rh, math.min(total - 6 * L.rh, state.inst_px or math.floor(total * 0.40)))
@@ -3755,6 +3751,7 @@ function D.frame(L, snap, rows, state, info)
       D.draw_instruments(L, info, L.side_x, sy0, L.side_w, ih - hh, hover)
     end
     hover.browser = info.browser_draw(L, L.side_x, sy0 + ih + 2, L.side_w, total - ih - 2 - hh)
+    if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end   -- вкладка fx браузера (7 окт)
     if hh > 0 then
       D.hint_bar(L, W, sy0 + ih - hh, L.side_w - gw - 2 * L.pad, (info.hint_bars or function() end)('inst'), info.focus == 'inst')
       D.hint_bar(L, W, sy0 + total - hh, L.side_w, (info.hint_bars or function() end)(info.browser_page or 'browser'), info.focus == 'browser')
@@ -3766,6 +3763,7 @@ function D.frame(L, snap, rows, state, info)
       for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = 'instgrip'
       set(U.AMBER); gfx.rect(W, sy0 + ih - 1, L.side_w, 2, 1)
     end
+    if L.lside_rect then set(D.SEP); gfx.rect(0, sy0 + total, L.lside_rect[3], D.SEPW, 1); L.side_x, L.side_w = SX0, SW0 end
   end
 
   -- нижняя DSP-панель: FX трека курсора блоками, параметры мини-слайдерами

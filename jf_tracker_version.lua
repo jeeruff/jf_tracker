@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'whichkey (quick option, on): after a prefix (d y c g z r q @, z in DSP) a popup at the cursor lists the next keys',
+    'browser left (option): lib + browser in the left column above the matrix, no sidebar on the right; the fx list becomes the fx tab of the browser',
     'session in place of the tracker with the mixer under it (Tab; Shift+Tab - the mixer alone): CLIP MODE - the keyboard launches clips, a letter in every cell; mixer strips at the column width - fx inserts (click, dblclick window, + fx, drop from the fx list), pan, fader with meter, M S R; every control is an f jump label',
     'router lives in the DSP FX panel (names and cables, zr / router button / quick option); zR - big router under the track headers with the automation tab on top; Option+Tab cycles the focus, Ctrl+Tab the top tabs',
     'fixes: inserting slices in INSERT jumped to another instrument; ReaEQ presets with any band count',

@@ -611,7 +611,11 @@ function B.read_proj()
   return out
 end
 
+-- вкладка fx (7 окт, опция browser left): список эффектов внутри браузера —
+-- рисует main (B.fx_draw), hover — в B.fx_hover
+B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
+  if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
   if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'kits' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
@@ -621,7 +625,7 @@ end
 
 -- кнопки шапки: files | db | size | hide
 function B.click(what)
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'pvvol' then B.vol_drag = true
@@ -843,10 +847,15 @@ function B.draw(U, L, x, y, w, h)
   local wrap_marks = false
   do
     local bx = x + L.pad + 2
-    for _, t in ipairs({ 'files', 'db', 'pm', 'proj', 'kits' }) do
+    for _, t in ipairs(B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' }) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
+    if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
+      B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
+      return hover
+    end
+    B.fx_hover = nil
     -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
     local mw = B.NMARKS * (U.measure('5') + 3 * L.pad)
     if bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end

@@ -158,6 +158,8 @@ local state = {
   ssbsync = flag('ssbsync', true),
   clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
+  whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
+  browserleft = flag('browserleft', false),       -- браузер слева над матрицей, вкладка fx (7 окт)
   eqgraph = flag('eqgraph', true),               -- ReaEQ в DSP: только график (кнопка P — только параметры), 7 окт
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
@@ -424,7 +426,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2151,13 +2153,17 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug|clipsview,dsp_big,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug|clipsview,dsp_big,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
   quick_str = function()
     local q = state.quick
     -- 7 окт: session и router — в начале средней колонки (и в своей раскладке)
+    if q and q:find('dsp_big', 1, true) and not q:find('whichkey', 1, true) then   -- whichkey — в начало третьей колонки
+      local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
+      if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
+    end
     if q and not q:find('dsp_big', 1, true) then
       q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
       local a, b = q:match('^([^|]*)|(.*)$')
@@ -4928,6 +4934,8 @@ ctx = {
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
+      flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
+      flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
@@ -5963,7 +5971,7 @@ ctx = {
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
-    if f == 'fxb' and not (state.dsp and state.fxb and not state.khelp) then f = 'tracker' end
+    if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.browserleft and state.side and B.mode == 'fx')) then f = 'tracker' end
     if f == 'notes' and not (state.top and state.notes_open) then f = 'tracker' end
     if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
@@ -8383,7 +8391,6 @@ local function frame()
     smart_ok = reaper.file_exists(ctx.smart_input_path),
     dsptrack = state.dsptrack,
     eqgraph = state.eqgraph,
-    whichkey = (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op)) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or nil,
     clipsview = state.clipsview, dsp_big = state.dsp_big,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
@@ -8540,7 +8547,7 @@ local function frame()
     -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
     fxb_expand = state.focus == 'fxb',                          -- фокус (клик / Tab) — раскрыт
     fxb_px = state.fxb_px,
-    fxb_draw = (state.dsp and state.fxb and not state.khelp) and function(Lx, x, y, w, h)
+    fxb_draw = (state.dsp and state.fxb and not state.khelp and not state.browserleft) and function(Lx, x, y, w, h)
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
     end or nil,
@@ -8728,7 +8735,16 @@ local function frame()
       end
       return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
-    browser_draw = state.side and function(Lx, x, y, w, h) return B.draw(U, Lx, x, y, w, h) end or nil,
+    browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
+    browser_draw = state.side and function(Lx, x, y, w, h)
+      -- вкладка fx (браузер слева): список эффектов внутри браузера
+      B.fx_draw = state.browserleft and function(fx, fy, fw, fh)
+        if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
+        return FB.draw(U, Lx, fx, fy, fw, fh, state.focus == 'fxb', ctx.fit)
+      end or nil
+      if not B.fx_draw and B.mode == 'fx' then B.mode = 'files' end
+      return B.draw(U, Lx, x, y, w, h)
+    end or nil,
     -- модуль слайсов (4 окт): список слайсов выбранного инструмента + скролл-бар
     slices_draw = state.slices_on and function(Lx, x, y, w, h)
       -- automation (5 окт): список пулов automation items трека с мини-линиями
@@ -8929,7 +8945,20 @@ local function frame()
       if f and f.x and r >= 0 and r < L.nrows then anchor = { x = f.x, y = L.body_y + (r + 1) * L.rh } end
     end
   end
-  draw.popup(L, vim.popup(), anchor)
+  -- which-key (7 окт, быстрая опция whichkey): ждём вторую клавишу — у курсора
+  -- (там, куда уже смотрят глаза) список того, что можно нажать дальше
+  local pop = vim.popup()
+  if not pop and state.whichkey then
+    local wk = (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
+      or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or nil
+    if wk then
+      local lines = {}
+      for _, e in ipairs(wk.items) do lines[#lines + 1] = { key = e[1], text = e[2] } end
+      pop = { title = wk.title, lines = lines, kind = 'hydra' }
+      if state.focus == 'dsp' and not anchor then anchor = { x = L.matrix_w + 4 * L.pad, y = (L.dsp_y or 0) + L.rh + 4 } end
+    end
+  end
+  draw.popup(L, pop, anchor)
   -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
