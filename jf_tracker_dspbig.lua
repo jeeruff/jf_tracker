@@ -279,7 +279,7 @@ function DB.draw(L, x, y, w, h, root, title)
   local m = DB.metrics(L)
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
   -- шапка: что за цепочка и подсказка
-  U.text(x + L.pad, y + L.pad, ctx.fit('dsp big - ' .. (title or ''), w // 2), U.AMBER)
+  U.text(x + L.pad, y + L.pad, ctx.fit('router - ' .. (title or ''), w // 2), U.AMBER)
   local help = 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'
   U.text(x + w - L.pad - U.measure(ctx.fit(help, w // 2)), y + L.pad, ctx.fit(help, w // 2), U.GREY)
   local top = y + L.rh + 3 * L.pad

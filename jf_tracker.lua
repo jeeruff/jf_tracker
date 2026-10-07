@@ -3781,13 +3781,13 @@ ctx = {
       state.dsp_big = false
       if state.dsp_big_saved ~= nil then state.dsp = state.dsp_big_saved; state.dsp_big_saved = nil end
       relayout(); ctx.set_focus(state.dsp and 'dsp' or 'tracker')
-      vim.msg = 'dsp big: back'
+      vim.msg = 'router: back to the tracker'
     else
       state.dsp_big_saved = state.dsp
       state.dsp, state.dsp_big = true, true
       ctx.db_cache = nil
       relayout(); ctx.set_focus('dsp')
-      vim.msg = 'dsp big: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, x delete, zz back'
+      vim.msg = 'router: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, x delete, zz back'
     end
   end,
   -- дерево цепочки цели DSP; перечитывается 4 раза в секунду и после правки
@@ -8571,9 +8571,22 @@ local function frame()
     hover = MX.SS.draw_big(L, 0, 0, gfx.w, gfx.h - L.status_h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition())
   end
   -- DSP big (7 окт): цепочка FX поверх всего
-  if state.dsp_big and not idle_skip then
+  -- роутер — на месте трекера (шапки + тело), остальные модули живые (7 окт)
+  if state.dsp_big and not idle_skip and L.body_h > 0 then
     local root, _, title = ctx.db_tree()
-    if root then HN.reset(); hover = MX.DB.draw(L, 0, 0, gfx.w, gfx.h - L.status_h, root, title) end
+    if root then
+      local x0, y0, w0, h0 = L.matrix_w, L.header_y, L.win_w - L.matrix_w, L.header_h + L.body_h
+      if not HN.active then
+        local keep = {}
+        for _, t in ipairs(HN.targets) do
+          if not (t.y and t.y >= y0 and t.y < y0 + h0 and t.x and t.x >= x0 and t.x < x0 + w0) then keep[#keep + 1] = t end
+        end
+        HN.targets = keep
+      end
+      local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title)
+      local mx, my = gfx.mouse_x, gfx.mouse_y
+      if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then hover = hv end
+    end
   end
   idle.hover = hover
   -- debug: нажатия мыши — что под ней (6 окт)
@@ -9043,7 +9056,7 @@ local function frame()
     local e = ctx.eq_drag or hover.dspeq
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
   end
-  if U.click and hover.dbig then MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
+  if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
@@ -10339,7 +10352,7 @@ local function frame()
     end
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, gfx.w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
+  if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, L.win_w - L.matrix_w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
   if gfx.mouse_wheel ~= 0 and hover and hover.slices ~= nil then
     -- колесо над модулем слайсов (4 окт): листать список
     SPROP.slice_scroll = math.max(0, (SPROP.slice_scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
