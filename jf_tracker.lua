@@ -8400,6 +8400,14 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   if state.clipsview and not state.ss_big and L.body_h > 0 and snap and L.cols then
     hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
+    -- f-метки (7 окт): цели ячеек трекера под оверлеем — долой, остаются шапки и прочие модули
+    if not HN.active then
+      local keep, y0, y1 = {}, L.body_y, L.body_y + L.body_h
+      for _, t in ipairs(HN.targets) do
+        if not (t.y and t.y >= y0 and t.y < y1 and t.x and t.x >= L.matrix_w) then keep[#keep + 1] = t end
+      end
+      HN.targets = keep
+    end
     MX.SS.draw_body(L, L.matrix_w, L.label_w, L.body_y, L.body_h, L.cols, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), hover)
   end
   if state.macro and L.body_h > 0 then
@@ -10457,7 +10465,7 @@ local function frame()
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
     c = 0
-  elseif c == ('F'):byte() and state.ss_big and vim.mode == 'normal' and not vim.hydra and not vim.picker then
+  elseif c == ('F'):byte() and (state.ss_big or (state.clipsview and state.focus == 'tracker') or (MX.clips and state.focus == 'matrix') or (state.top and state.toptab == 'clips' and state.focus == 'top')) and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     MX.SS.scene_mode = true
     if HN.start() then vim.msg = 'scene: type the label of any cell in the row, Esc' else MX.SS.scene_mode = false; vim.msg = 'no targets' end
     c = 0
