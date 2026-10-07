@@ -1174,21 +1174,43 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     freq_grid()
     local cy = y + h / 2
     hline(cy, U.LINE)
-    local bands = {
-      { t = 'ls', f = pnum(f, vals, '1 lo f'), g = pnum(f, vals, '1 lo g'), q = pnum(f, vals, '1 lo q') },
-      { t = 'pk', f = pnum(f, vals, '2 f'), g = pnum(f, vals, '2 g'), q = pnum(f, vals, '2 q') },
-      { t = 'pk', f = pnum(f, vals, '3 f'), g = pnum(f, vals, '3 g'), q = pnum(f, vals, '3 q') },
-      { t = 'hs', f = pnum(f, vals, '4 hi f'), g = pnum(f, vals, '4 hi g'), q = pnum(f, vals, '4 hi q') },
-    }
+    -- полосы (7 окт): из параметров с p.band (модель берёт их из имён — любое
+    -- число и тип); старый модуль без band — 4 полосы по подписям
+    local bands = {}
+    for i, p in ipairs(f.params or {}) do
+      if p.band then
+        local b = bands[p.band] or { t = p.btype }
+        bands[p.band] = b
+        local s = vals[i] and vals[i].s or ''
+        local mult = s:lower():find('%dk') and 1000 or 1
+        local v = tonumber((s:gsub(',', '.')):match('[-+]?%d*%.?%d+'))
+        if s:find('inf') then v = s:find('%-') and -150 or 150 end
+        b[p.bk] = v and v * mult or nil
+      end
+    end
+    if #bands == 0 then
+      bands = {
+        { t = 'ls', f = pnum(f, vals, '1 lo f'), g = pnum(f, vals, '1 lo g'), q = pnum(f, vals, '1 lo q') },
+        { t = 'pk', f = pnum(f, vals, '2 f'), g = pnum(f, vals, '2 g'), q = pnum(f, vals, '2 q') },
+        { t = 'pk', f = pnum(f, vals, '3 f'), g = pnum(f, vals, '3 g'), q = pnum(f, vals, '3 q') },
+        { t = 'hs', f = pnum(f, vals, '4 hi f'), g = pnum(f, vals, '4 hi g'), q = pnum(f, vals, '4 hi q') },
+      }
+    end
     local gg = pnum(f, vals, 'gain') or 0
     local function resp(fq)
       local db = gg
       for _, b in ipairs(bands) do
-        if b.f and b.g and b.f > 0 then
+        if b.f and b.f > 0 then
           local o = math.log(fq / b.f, 2)
-          if b.t == 'pk' then local sg = math.max(0.05, (b.q or 2) / 2); db = db + b.g * math.exp(-0.5 * (o / sg) ^ 2)
-          elseif b.t == 'ls' then db = db + b.g / (1 + math.exp(o * 4))
-          else db = db + b.g / (1 + math.exp(-o * 4)) end
+          local g = b.g or 0
+          local sg = math.max(0.05, (b.q or 2) / 2)
+          if b.t == 'pk' then db = db + g * math.exp(-0.5 * (o / sg) ^ 2)
+          elseif b.t == 'ls' then db = db + g / (1 + math.exp(o * 4))
+          elseif b.t == 'hs' then db = db + g / (1 + math.exp(-o * 4))
+          elseif b.t == 'hp' then db = db - 18 / (1 + math.exp(o * 4))     -- срезы — без усиления
+          elseif b.t == 'lp' then db = db - 18 / (1 + math.exp(-o * 4))
+          elseif b.t == 'nt' then db = db - 18 * math.exp(-0.5 * (o / math.min(sg, 0.3)) ^ 2)
+          elseif b.t == 'bp' then db = db - 12 * (1 - math.exp(-0.5 * (o / sg) ^ 2)) end
         end
       end
       return db
@@ -1205,9 +1227,9 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     -- точки полос (7 окт): тянутся мышью — D.eq_hit читает вызывающий
     D.eq_hit = { x = x, y = y, w = w, h = h, sc = sc, cy = cy, pts = {} }
     for i, b in ipairs(bands) do
-      if b.f and b.g and b.f > 0 then
+      if b.f and b.f > 0 then
         local bx2 = x + 1 + math.floor(lx(b.f) * (w - 3))
-        local by2 = math.floor(cy - math.max(-18, math.min(18, b.g)) * sc + 0.5)
+        local by2 = math.floor(cy - math.max(-18, math.min(18, b.g or 0)) * sc + 0.5)
         D.eq_hit.pts[#D.eq_hit.pts + 1] = { i = i, x = bx2, y = by2 }
         local hot = D.eq_hot == i and D.eq_hot_fx == f.i
         set(hot and U.AMBER or U.CYAN); gfx.rect(bx2 - (hot and 3 or 2), by2 - (hot and 3 or 2), hot and 7 or 5, hot and 7 or 5, 1)

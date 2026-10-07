@@ -3791,6 +3791,42 @@ ctx = {
       vim.msg = 'router: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, x delete, zz back'
     end
   end,
+  -- большой роутер (7 окт, zR): на всё окно, узлы — устройства со слайдерами
+  router_big = function()
+    state.router_big = not state.router_big
+    if state.router_big then
+      state.rb_saved = state.dsp; state.dsp = true            -- клавиши DSP-ветки требуют панель
+      ctx.db_cache = nil; relayout(); ctx.set_focus('dsp'); vim.msg = 'router big: drag the sliders, dblclick - default, h l j k walk, zR / Esc back'
+    else
+      if state.rb_saved ~= nil and not state.dsp_big then state.dsp = state.rb_saved end
+      state.rb_saved = nil
+      relayout(); ctx.set_focus(state.dsp and 'dsp' or 'tracker'); vim.msg = 'router big: back'
+    end
+  end,
+  -- параметры узла: подобранные модулем DSP (кураторские), иначе первые 8 плагина
+  db_params = function(addr)
+    local t = dsp_target(); if not t then return {} end
+    local out = {}
+    for _, f in ipairs(t.fx or {}) do
+      for _, p in ipairs(f.params or {}) do
+        local pa = p.fx or f.i
+        if pa == addr and p.i then out[#out + 1] = { name = p.name, i = p.i, fx = addr } end
+      end
+      if #out > 0 then return out end
+    end
+    local A = model.fxapi(t.track)
+    for i = 0, math.min(8, A.GetNumParams(t.track, addr)) - 1 do
+      local _, nm = A.GetParamName(t.track, addr, i, '')
+      out[#out + 1] = { name = nm, i = i, fx = addr }
+    end
+    return out
+  end,
+  db_pval = function(addr, i)
+    local t = dsp_target(); if not t then return 0, '' end
+    local A = model.fxapi(t.track)
+    local _, s2 = A.GetFormattedParamValue(t.track, addr, i, '')
+    return A.GetParamNormalized(t.track, addr, i), s2
+  end,
   -- дерево цепочки цели DSP; перечитывается 4 раза в секунду и после правки
   db_tree = function()
     local t = dsp_target(); if not t then return nil end
@@ -6180,7 +6216,7 @@ do   -- правки DSP big — через edit (undo), дерево после
   local function obj() local t = dsp_target(); return t and t.track end
   local function after() ctx.db_cache = nil end
   MX.DB.init(U, ctx, {
-    close = function() ctx.dsp_big() end,
+    close = function() if state.router_big then ctx.router_big() else ctx.dsp_big() end end,
     msg = function(m) vim.msg = m end,
     show = function(a) local o = obj(); if o then edit.fx_show(o, a) end end,
     bypass = function(a) local o = obj(); if o then edit.fx_bypass(o, a); after() end end,
@@ -7618,6 +7654,16 @@ local function poll_cmd()
         end
       end
     end
+  elseif name == 'pnm' then   -- тест (7 окт): имена параметров fx addr (только чтение)
+    local addr = tonumber(v:match('^pnm%s+(%d+)') or '0'); local t = dsp_target(); local out = {}
+    if t then local A = model.fxapi(t.track); for i = 0, math.min(40, A.GetNumParams(t.track, addr)) - 1 do local _, nm = A.GetParamName(t.track, addr, i, ''); out[#out + 1] = i .. ':' .. nm end end
+    reaper.SetExtState(EXT, 'dbg', table.concat(out, ' | '), false)
+  elseif name == 'dbp' then   -- тест (7 окт): параметры узла addr для большого роутера (только чтение)
+    local addr = tonumber(v:match('^dbp%s+(%d+)') or '0')
+    local t = dsp_target(); local out = {}
+    for _, f in ipairs(t and t.fx or {}) do if f.i == addr then for _, p in ipairs(f.params or {}) do out[#out + 1] = tostring(p.name) .. ':' .. tostring(p.i) .. ':' .. tostring(p.fx) end end end
+    reaper.SetExtState(EXT, 'dbg', 'dbp ' .. #out .. ' | ' .. table.concat(out, ' '), false)
+  elseif name == 'rbig' then ctx.router_big()                   -- тест (7 окт): zR
   elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
     if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
     else
@@ -8709,6 +8755,11 @@ local function frame()
       if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then hover = hv; idle.hover = hover end
     end
   end
+  -- большой роутер (7 окт, zR): на всё окно поверх всего
+  if state.router_big and not idle_skip then
+    local root, _, title = ctx.db_tree()
+    if root then HN.reset(); hover = MX.DB.draw(L, 0, 0, gfx.w, gfx.h - L.status_h, root, title, false, true); idle.hover = hover end
+  end
   if state.macro and L.body_h > 0 then
     draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,
       beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
@@ -9116,6 +9167,26 @@ local function frame()
   do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
     local e = ctx.eq_drag or hover.dspeq
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
+  end
+  if U.click and hover.dbparam then   -- большой роутер: слайдер параметра (двойной клик — умолчание)
+    local hp, now3 = hover.dbparam, reaper.time_precise()
+    local t = dsp_target()
+    local lc = MX.DB.last_pclick
+    if t and lc and lc.addr == hp.addr and lc.i == hp.i and now3 - lc.t < 0.35 then
+      edit.fx_param_default(t.track, hp.addr, hp.i); MX.DB.pdrag = nil; MX.DB.last_pclick = nil
+      vim.msg = (hp.name or 'parameter') .. ': default'
+    else
+      MX.DB.last_pclick = { addr = hp.addr, i = hp.i, t = now3 }
+      MX.DB.pdrag = { addr = hp.addr, i = hp.i, x = hp.x, w = hp.w }
+    end
+    ctx.set_focus('dsp'); if hover.dbnode then MX.DB.sel = hover.dbnode.guid end
+    U.click = false
+  end
+  if MX.DB.pdrag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d, t = MX.DB.pdrag, dsp_target()
+      if t then edit.fx_param(t.track, d.addr, d.i, (gfx.mouse_x - d.x) / math.max(1, d.w)) end
+    else MX.DB.pdrag = nil end
   end
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   if U.click and hover.ssfa and snap then   -- буква follow action клипа (7 окт): клик — следующее действие
@@ -10041,10 +10112,14 @@ local function frame()
       if gfx.mouse_x ~= d.mx or gfx.mouse_y ~= d.my then
         d.mx, d.my = gfx.mouse_x, gfx.mouse_y
         local h = d.hit
+        -- полоса по номеру (7 окт): p.band / p.bk от модели; старый модуль — по подписям
         local LB = { { '1 lo f', '1 lo g' }, { '2 f', '2 g' }, { '3 f', '3 g' }, { '4 hi f', '4 hi g' } }
-        local lf, lg = LB[d.band][1], LB[d.band][2]
+        local lf, lg = (LB[d.band] or {})[1], (LB[d.band] or {})[2]
         local pf, pg
-        for _, p in ipairs(d.f.params or {}) do if p.name == lf then pf = p elseif p.name == lg then pg = p end end
+        for _, p in ipairs(d.f.params or {}) do
+          if p.band == d.band then if p.bk == 'f' then pf = p elseif p.bk == 'g' then pg = p end
+          elseif not p.band then if p.name == lf then pf = p elseif p.name == lg then pg = p end end
+        end
         local fq = 20 * 1000 ^ math.max(0, math.min(1, (gfx.mouse_x - h.x - 1) / math.max(1, h.w - 3)))
         local db = math.max(-18, math.min(18, (h.cy - gfx.mouse_y) / h.sc))
         if pf then ctx.fx_set_display(d.f, pf, fq) end
@@ -10412,12 +10487,17 @@ local function frame()
     local LQ = { '1 lo q', '2 q', '3 q', '4 hi q' }
     local col = dsp_target()
     for _, p in ipairs(d.f.params or {}) do
-      if p.name == LQ[d.band] and col then
+      if ((p.band == d.band and p.bk == 'q') or (not p.band and p.name == LQ[d.band])) and col then
         local fx = p.fx or d.f.i
         local v = model.fxapi(col.track).GetParamNormalized(col.track, fx, p.i)
         edit.fx_param(col.track, fx, p.i, v + (gfx.mouse_wheel > 0 and 0.02 or -0.02))
       end
     end
+    gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover and hover.dbparam then
+    local hp, t = hover.dbparam, dsp_target()
+    if t then local A = model.fxapi(t.track); edit.fx_param(t.track, hp.addr, hp.i, A.GetParamNormalized(t.track, hp.addr, hp.i) + (gfx.mouse_wheel > 0 and 0.01 or -0.01)) end
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.dbig then MX.DB.wheel(gfx.mouse_wheel > 0 and 60 or -60, L.win_w - L.matrix_w - L.label_w, MX.DB.total or 0); gfx.mouse_wheel = 0 end
@@ -10998,7 +11078,7 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
-        if state.dsp_big then   -- DSP big (7 окт): свои клавиши; чужие — в vim
+        if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()
           if root and MX.DB.key(c, root, o) then return end
           return vim.key(c)

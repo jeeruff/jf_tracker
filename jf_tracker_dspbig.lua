@@ -83,6 +83,7 @@ end
 local function open(n) return n.kids and not DB.fold[n.guid] end
 local size_chain
 local function size_node(n, m)
+  if m.dev and not n.kids then n.w, n.h = m.dev(n); return end   -- большой роутер: устройство со слайдерами
   if open(n) then
     local w, h = size_chain(n, m)
     n.w = math.max(m.nw, w + 2 * m.pad)
@@ -276,14 +277,28 @@ end
 
 -- glass (7 окт, опция routerglass): фон полупрозрачный — треки видны сквозь
 -- роутер, узлы плотные
-function DB.draw(L, x, y, w, h, root, title, glass)
+-- big (7 окт, zR): узлы — устройства: имя и слайдеры параметров (ctx.db_params,
+-- значения — ctx.db_pval); протяжка по горизонтали, двойной клик — умолчание
+DB.MAXP = 8
+function DB.draw(L, x, y, w, h, root, title, glass, big)
   local hover = { dbig = true }
   local m = DB.metrics(L)
+  if big then
+    local cw = U.measure('m')
+    m.nw = cw * 26
+    m.gap = cw * 4
+    m.dev = function(n)
+      n.params = n.params or (ctx.db_params and ctx.db_params(n.addr)) or {}
+      local np = math.min(DB.MAXP, #n.params)
+      return m.nw, (np + 1) * L.rh + 2 * L.pad + 4
+    end
+  end
   U.set(U.BG, glass and 0.72 or nil); gfx.rect(x, y, w, h, 1)
   U.set(U.BG)
   -- шапка: что за цепочка и подсказка
-  U.text(x + L.pad, y + L.pad, ctx.fit('router - ' .. (title or ''), w // 2), U.AMBER)
-  local help = 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'
+  U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w // 2), U.AMBER)
+  local help = big and 'h l signal  j k row  a A add  | join row  s solo  = unity  b bypass  x delete  o window  drag a slider  dblclick default  zR back'
+    or 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'
   U.text(x + w - L.pad - U.measure(ctx.fit(help, w // 2)), y + L.pad, ctx.fit(help, w // 2), U.GREY)
   local top = y + L.rh + 3 * L.pad
   local bh = h - (top - y) - L.pad
@@ -354,6 +369,25 @@ function DB.draw(L, x, y, w, h, root, title, glass)
     if #info > 0 then U.text(n.x + L.pad, n.y + L.pad + L.rh, ctx.fit(table.concat(info, '  '), n.w - 2 * L.pad), U.GREY) end
     -- полоса wet снизу узла (только если wet < 100 %)
     if n.wet and n.wet < 0.999 then U.set(U.tint(U.AMBER, 0.6)); gfx.rect(n.x + 1, n.y + n.h - 3, math.floor((n.w - 2) * n.wet), 2, 1) end
+    if big and n.params then
+      -- устройство: строка параметра — имя, слайдер, значение (тянется по горизонтали)
+      local nw = U.measure('mmmmmmmm')
+      local vw = U.measure('-00.0 dB')
+      for i = 1, math.min(DB.MAXP, #n.params) do
+        local p = n.params[i]
+        local py = n.y + L.pad + i * L.rh + 2
+        local sx, sw = n.x + L.pad + nw + L.pad, n.w - 4 * L.pad - nw - vw
+        local v, txt = 0, ''
+        if ctx.db_pval then v, txt = ctx.db_pval(p.fx or n.addr, p.i) end
+        local hot = mx >= sx and mx < sx + sw and my >= py and my < py + L.rh
+        local dragging = DB.pdrag and DB.pdrag.addr == (p.fx or n.addr) and DB.pdrag.i == p.i
+        U.text(n.x + L.pad, py, ctx.fit(p.name or '', nw), (hot or dragging) and U.AMBER or U.GREY)
+        U.set(U.DIM or U.LINE); gfx.rect(sx, py + math.floor(L.rh / 2) - 1, sw, 2, 1)
+        U.set((hot or dragging) and U.AMBER or (n.on and U.CYAN or U.GREY)); gfx.rect(sx, py + 3, math.max(1, math.floor(sw * (v or 0))), L.rh - 6, 1)
+        U.text(n.x + n.w - L.pad - vw, py, ctx.fit(txt or '', vw), U.TEXT)
+        if hot then hover.dbparam = { addr = p.fx or n.addr, i = p.i, x = sx, w = sw, name = p.name }; hover.dbnode = n end
+      end
+    end
   end
   local empty_msg = 'no fx - a adds one'
   local xin, xout = x + L.pad - DB.scroll, ox + (#root.kids == 0 and (U.measure(empty_msg) + 2 * L.pad) or root.cw) + io - L.pad

@@ -1127,7 +1127,39 @@ function build_one(tr, fx, out)
       local names = {}
       for pi = 0, np - 1 do local _, pn = A.GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
       local wa, wb, e_xy_x, e_xy_y, e_view_p
-      for _, spec in ipairs(lay.params) do
+      -- ReaEQ (7 окт): полосы по именам параметров, в порядке появления
+      local dyn = {}
+      if lay.dyn_eq then
+        local order, by = {}, {}
+        for pi = 0, np - 1 do
+          local _, raw = A.GetParamName(tr, fx, pi, '')
+          local kind, band = (raw or ''):match('^(%a+)%-(.+)$')
+          local bk = ({ Freq = 'f', Gain = 'g', BW = 'q' })[kind or '']
+          if bk then
+            if not by[band] then by[band] = {}; order[#order + 1] = band end
+            by[band][bk] = pi
+          end
+        end
+        for k, band in ipairs(order) do
+          local lb = band:lower()
+          local bt = lb:find('low shelf') and 'ls' or (lb:find('high shelf') and 'hs') or (lb:find('low pass') and 'lp') or (lb:find('high pass') and 'hp')
+            or (lb:find('notch') and 'nt') or (lb:find('band pass') and 'bp') or 'pk'
+          for _, bk in ipairs({ 'f', 'g', 'q' }) do
+            local pi = by[band][bk]
+            if pi then
+              local e = param_entry(tr, fx, pi, k .. ' ' .. bk)
+              e.band, e.bk, e.btype = k, bk, bt
+              e.cat = M.param_cat(tr, fx, short, pi, names[pi], e.kind)
+              params[#params + 1] = e
+            end
+          end
+        end
+        if #params > 0 then
+          for pi = 0, np - 1 do if names[pi] == 'global gain' then params[#params + 1] = param_entry(tr, fx, pi, 'gain') end end
+          dyn = { done = true }
+        end
+      end
+      for _, spec in ipairs(dyn.done and {} or lay.params) do
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
           -- exact (5 окт): имя целиком (Amigo: «Loop» иначе находит «Loop Start»)
