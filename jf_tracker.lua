@@ -3790,14 +3790,17 @@ ctx = {
   end,
   -- зона сессии: регион =SESSION за =END (трекер его не показывает); нет —
   -- создаётся через такт после всего проекта, длиной ssbars тактов
-  ss_zone = function()
+  ss_zone = function(qn)
     -- маркеры читаются напрямую, не из regions: таблица обновляется снимком,
     -- и два вызова подряд создавали две зоны (6 окт, песочница)
     local i = 0
     while true do
       local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i)
       if not ret or ret == 0 then break end
-      if isrgn and name == model.SESSION_REGION then return { pos = pos, rgnend = rgnend, session = true, name = name } end
+      if isrgn and name == model.SESSION_REGION then
+        local _, _, _, _, _, idx = reaper.EnumProjectMarkers3(0, i)
+        return { pos = pos, rgnend = rgnend, session = true, name = name, idx = idx }
+      end
       i = i + 1
     end
     -- только что созданный регион в этом же кадре через Enum ещё не виден —
@@ -3809,11 +3812,41 @@ ctx = {
     for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
     local _, meas = reaper.TimeMap2_timeToBeats(0, t)
     local z0 = reaper.TimeMap2_beatsToTime(0, 0, meas + 2)
-    local z1 = reaper.TimeMap2_beatsToTime(0, 0, meas + 2 + (state.ssbars or 8))
-    reaper.AddProjectMarker2(0, true, z0, z1, model.SESSION_REGION, -1, 0)
+    -- длина: НОК клипов (qn, 7 окт) или session bars
+    local z1 = qn and reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, z0) + qn) or reaper.TimeMap2_beatsToTime(0, 0, meas + 2 + (state.ssbars or 8))
+    local idx = reaper.AddProjectMarker2(0, true, z0, z1, model.SESSION_REGION, -1, 0)
     model.invalidate()
-    state.ss_zone_new = { pos = z0, rgnend = z1, session = true, name = model.SESSION_REGION, t = reaper.time_precise() }
+    state.ss_zone_new = { pos = z0, rgnend = z1, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = idx }
     return state.ss_zone_new
+  end,
+  -- зона под need долей (7 окт, полиметрия): длиннее — регион растёт, луп
+  -- транспорта следом, играющим клипам досаживается хвост [старый конец,
+  -- новый) их фазой (он впереди плейхеда — не щёлкнет); shrink — можно и
+  -- укоротить (никто не играет)
+  ss_zone_fit = function(z, need, sq, shrink)
+    if not (z and z.idx and need) then return z end
+    local q0 = reaper.TimeMap2_timeToQN(0, z.pos)
+    local cur = reaper.TimeMap2_timeToQN(0, z.rgnend) - q0
+    if math.abs(need - cur) < 1e-4 or (need < cur and not shrink) then return z end
+    local old_end, new_end = z.rgnend, reaper.TimeMap2_QNToTime(0, q0 + need)
+    reaper.SetProjectMarker3(0, z.idx, true, z.pos, new_end, model.SESSION_REGION, 0)
+    z.rgnend = new_end
+    state.ss_zone_new = { pos = z.pos, rgnend = new_end, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = z.idx }
+    local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
+    if math.abs(l0 - z.pos) < 1e-4 then reaper.GetSet_LoopTimeRange(true, true, z.pos, new_end, false) end
+    if new_end > old_end and snap then
+      edit.run('session zone ' .. need .. ' beats', function()
+        for ci, l in pairs(MX.SS.live) do
+          local col, src = snap.cols[ci], sq[l.ri]
+          if col and src then alias.session_plant(col.track, src, z.pos, new_end, l.phase, nil, l.ri .. ':' .. ci, { old_end, new_end }, ctx.ss_clip_opts(col.track, src)) end
+        end
+      end)
+    elseif new_end < old_end and snap then
+      edit.run('session zone ' .. need .. ' beats', function() for _, col in ipairs(snap.cols) do alias.session_clear(col.track, new_end, old_end) end end)
+    end
+    model.invalidate()
+    vim.msg = ('session zone: %g beats (common length of the clips)'):format(need)
+    return z
   end,
   ss_bar_after = function(t)
     local _, meas = reaper.TimeMap2_timeToBeats(0, t)
@@ -4032,11 +4065,27 @@ ctx = {
     elseif w1 == 'off' then MX.SS.quit()
     elseif w1 == 'clips' then ctx.mx_clips_toggle()
     elseif w1 == 'dump' then   -- тест: зона / live / pend
-      local z = ctx.ss_zone(); local parts = { z and ('zone %.2f..%.2f'):format(z.pos, z.rgnend) or 'zone nil' }
+      local zz = model.session_zone(); local parts = { zz and ('zone %.2f..%.2f'):format(zz[1], zz[2]) or 'zone nil' }
       for ci, l in pairs(MX.SS.live) do parts[#parts + 1] = ('live[%d]=ri%d ph%.2f len%.2f'):format(ci, l.ri, l.phase, l.len) end
       for ci, p in pairs(MX.SS.pend) do parts[#parts + 1] = ('pend[%d]=%s at%.2f'):format(ci, tostring(p.ri), p.at) end
       local i = 0
       while true do local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i); if not ret or ret == 0 then break end; if isrgn then parts[#parts + 1] = ('rg[%s]%.1f-%.1f'):format(name, pos, rgnend) end; i = i + 1 end
+      local g = snap and MX.grid(snap, seq) or {}
+      local cells = {}
+      for ri, row in pairs(g) do for ci, c in pairs(row) do if c.state ~= 'empty' then cells[#cells + 1] = ri .. ':' .. ci end end end
+      table.sort(cells); parts[#parts + 1] = 'cells ' .. table.concat(cells, ',')
+      -- зона в снимке: головы в строках зоны по колонкам
+      if zz and snap then
+        local r0z, r1z = model.row_of_time(zz[1], state.lpb), model.row_of_time(zz[2], state.lpb)
+        local hs = {}
+        for ci, col in ipairs(snap.cols) do
+          local n = 0
+          for _, lane in ipairs(col.lanes) do for _, sub in ipairs(lane.subs) do for r, cell in pairs(sub) do if r >= r0z and r < r1z and (cell.kind == 'audio' or cell.kind == 'midi') then n = n + 1 end end end end
+          hs[#hs + 1] = n
+        end
+        parts[#parts + 1] = ('snapzone rows %d-%d heads %s show=%s end=%s'):format(math.floor(r0z), math.floor(r1z), table.concat(hs, '/'), tostring(model.SHOW_ZONE), tostring(snap.end_pos))
+      end
+      parts[#parts + 1] = 'msg=' .. tostring(vim.msg)
       reaper.SetExtState(EXT, 'ssdump', table.concat(parts, ' | '), false)
     else vim.msg = 'session: big | stop | quant bar|beat|now | bars N | off' end
   end,
@@ -7670,6 +7719,7 @@ local function frame()
   PV.tick()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
   if snap and seq then MX.SS.tick(seq, snap) end                           -- session: границы квантизации (6 окт)
+  do local sz = MX.SS.playing_any(); if sz ~= model.SHOW_ZONE then model.SHOW_ZONE = sz; model.invalidate() end end   -- строки трекера видят зону, пока клипы играют (7 окт)
   if MX.SS.rec then ctx.ss_rec_tick() end                                -- запись в клип: стоп за концом слота
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
@@ -8409,6 +8459,29 @@ local function frame()
       HN.targets = keep
     end
     MX.SS.draw_body(L, L.matrix_w, L.label_w, L.body_y, L.body_h, L.cols, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), hover)
+  end
+  -- полиметрия в строках (7 окт): зона сессии видна — в колонке каждого играющего
+  -- клипа янтарная линия на начале его цикла (у 4/4 и 5/4 — свои швы)
+  if model.SHOW_ZONE and not state.clipsview and not state.ss_big and L.body_h > 0 and snap and L.cols then
+    local r0 = state.row0 or 0
+    local t_top, t_bot = edit.row_time(r0, state.lpb, 0), edit.row_time(r0 + (L.nrows or 0), state.lpb, 0)
+    for _, c in ipairs(L.cols) do
+      local l = c.x and MX.SS.live[c.ci]
+      if l and l.len and l.len > 0.01 then
+        local k = math.ceil((t_top - l.phase) / l.len)
+        local t = l.phase + k * l.len
+        local guard = 0
+        while t < t_bot and guard < 64 do
+          local row = model.row_of_time(t, state.lpb)
+          local y = L.body_y + math.floor((row - r0) * L.rh)
+          if y >= L.body_y and y < L.body_y + L.body_h then
+            U.set(U.AMBER); gfx.rect(c.x, y, c.w - 1, 1, 1)
+            U.text(c.x + c.w - L.pad - U.measure('L'), y + 1, 'L', U.AMBER)
+          end
+          t = t + l.len; guard = guard + 1
+        end
+      end
+    end
   end
   if state.macro and L.body_h > 0 then
     draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,

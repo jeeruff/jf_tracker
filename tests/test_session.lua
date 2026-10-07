@@ -57,6 +57,11 @@ local lc = SS.layout(400, 300, 4, 3, 8, 10, 4, true)
 eq('compact cell_h <= 2 rows', lc.cell_h <= 20, true); eq('compact cell_w <= 12 chars', lc.cell_w <= 96, true)
 eq('height fits rows', SS.height(400, 300, 4, 3, 8, 10, 4) <= 300, true); eq('height capped', SS.height(400, 120, 4, 40, 8, 10, 4), 120)
 
+-- ── полиметрия: НОК ───────────────────────────────────────────────────────
+near('lcm 4 and 5 beats', (SS.lcm_qn({ 4, 5 })), 20); near('lcm 4 and 4', (SS.lcm_qn({ 4, 4 })), 4)
+near('lcm 3 and 4 and 2', (SS.lcm_qn({ 3, 4, 2 })), 12); near('lcm 1.5 and 2', (SS.lcm_qn({ 1.5, 2 })), 6)
+local capq, capped = SS.lcm_qn({ 7, 11, 13, 17 }, 64); eq('lcm capped', capped, true); near('lcm cap value', capq, 64)
+
 -- ── границы ───────────────────────────────────────────────────────────────
 SS.quant = 'bar'; near('bar after 103', SS.next_boundary(103, ZONE, 'bar'), 104)
 near('bar exactly on 104 -> 106', SS.next_boundary(104, ZONE, 'bar'), 106)
@@ -140,6 +145,9 @@ reaper = {
   SplitMediaItem = function(it, t) local r = { pos = t, len = it.pos + it.len - t, chunk = it.chunk }; it.len = t - it.pos; items[#items + 1] = r; return r end,
   GetSetMediaItemInfo_String = function(it, k, v) it[k] = v; return true, v end,
   ValidatePtr = function() return false end, genGuid = function() return '{g}' end,
+  GetActiveTake = function(it) return it end,
+  SetMediaItemTakeInfo_Value = function(it, k, v) it['take:' .. k] = v end,
+  GetMediaItemTakeInfo_Value = function(it, k) return it['take:' .. k] or (k == 'D_PLAYRATE' and 1 or 0) end,
   GetTrackName = function() return true, '' end, GetTrack = function() end,
   TimeMap2_timeToQN = function(_, t) return t end, TimeMap2_QNToTime = function(_, q) return q end,
 }
@@ -158,6 +166,13 @@ eq('plant tag', items[3]['P_EXT:jf_session'], 't')
 items = { { pos = 0, len = 4, chunk = '<ITEM\n>' } }
 A.session_plant('tr', { pos = 0, rgnend = 4 }, 100, 116, 114, nil, 't')
 local last = items[#items]; near('tail trimmed', last.pos + last.len <= 116 and last.len or -1, 2)
+-- хвост через шов: клип 2.5 с, item 0..2 с, фаза 102, зона 100..110 — повтор k=-1 (99.5) пересекает 100
+items = { { pos = 0, len = 2, chunk = '<ITEM\n>' } }
+A.session_plant('tr', { pos = 0, rgnend = 2.5 }, 100, 110, 102, nil, 't')
+local seam
+for _, it in ipairs(items) do if it.pos == 100 then seam = it end end
+eq('seam piece planted at z0', seam ~= nil, true)
+if seam then near('seam piece len = rest of the item', seam.len, 1.5); near('seam piece source offset', seam['take:D_STARTOFFS'] or -1, 0.5) end
 -- skip: окно [102, 104) пропускается
 items = { { pos = 0, len = 1, chunk = '<ITEM\n>' } }
 A.session_plant('tr', { pos = 0, rgnend = 2 }, 100, 108, 104, { 102, 104 }, 't')
@@ -187,13 +202,20 @@ local nl = A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 1, xf 
 local ps, lens = {}, {}
 for _, it in ipairs(items) do ps[#ps + 1] = ('%g'):format(it.pos); lens[#lens + 1] = it.len end
 table.sort(ps)
-eq('loop plant count', nl, 4); eq('loop plant step 2s', table.concat(ps, ','), '100,102,104,106')
-near('loop copy offs = la', items[1]['take:D_STARTOFFS'], 1.0); near('loop copy len = step + xf', items[1].len, 2.05)
-near('loop fade in', items[1].D_FADEINLEN, 0.05); near('loop fade out', items[1].D_FADEOUTLEN, 0.05)
-near('last copy trimmed by zone end', items[4].len, 2.0)
+-- 4 повтора + хвост кроссфейда прошлого повтора через шов (0.05 с в начале зоны)
+eq('loop plant count', nl, 5); eq('loop plant step 2s (+ seam xf tail)', table.concat(ps, ','), '100,100,102,104,106')
+local full, tail, last
+for _, it in ipairs(items) do
+  if it.pos == 100 and it.len > 1 then full = it elseif it.pos == 100 then tail = it end
+  if it.pos == 106 then last = it end
+end
+near('loop copy offs = la', full['take:D_STARTOFFS'], 1.0); near('loop copy len = step + xf', full.len, 2.05)
+near('loop fade in', full.D_FADEINLEN, 0.05); near('loop fade out', full.D_FADEOUTLEN, 0.05)
+near('seam tail = xf', tail.len, 0.05); near('seam tail source offs', tail['take:D_STARTOFFS'], 3.0)
+near('last copy trimmed by zone end', last.len, 2.0)
 items = {}
 A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 2, xf = 0 }, 100, 104, 100, nil, 't')
-eq('rate 2: step 1s', #items, 4); near('rate 2: no xf len', items[1].len, 1.0)
+eq('rate 2: step 1s', #items, 4); near('rate 2: no xf len', items[1].len, 1.0)   -- без xf хвоста через шов нет
 
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

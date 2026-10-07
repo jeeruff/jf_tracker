@@ -370,6 +370,7 @@ function M.build(lpb)
   snap.depot = depot_tr
   snap.lib_pos = M.lib_pos()
   snap.end_pos = M.marker_pos(M.END_MARKER)
+  snap.zone = M.session_zone()                -- зона сессии (7 окт): её items — не библиотека
   -- мастер: для вкладки master (скоп слот 31, цепь FX)
   if R.GetMasterTrack then
     local mt = R.GetMasterTrack(0)
@@ -416,7 +417,12 @@ function M.build(lpb)
         local lane = col.lanes[lane_i + 1]
         -- items на невидимой lane (C_LANEPLAYS = -1) в колонки не попадают;
         -- items за маркером =END (склад сэмплов, =LIB) трекер не показывает (2 окт)
-        if lane and snap.end_pos and R.GetMediaItemInfo_Value(it, 'D_POSITION') >= snap.end_pos - 1e-6 then lane = nil end
+        if lane and snap.end_pos then
+          local ip = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+          -- зона сессии видна, когда сессия играет (M.SHOW_ZONE, 7 окт): каждый канал — свой клип
+          local in_zone = M.SHOW_ZONE and snap.zone and ip >= snap.zone[1] - 1e-6 and ip < snap.zone[2] - 1e-6
+          if ip >= snap.end_pos - 1e-6 and not in_zone then lane = nil end
+        end
         if lane then
           local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
           local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
@@ -457,7 +463,7 @@ function M.build(lpb)
       col.envs = M.track_envs(tr, lpb)
       col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
       local t1 = R.time_precise()
-      col.pool = M.track_pool(tr, depot_tr, snap.lib_pos, snap.end_pos)
+      col.pool = M.track_pool(tr, depot_tr, snap.lib_pos, snap.end_pos, snap.zone)
       local t2 = R.time_precise()
       col.mods = M.track_mods(tr)
       local t3 = R.time_precise()
@@ -789,14 +795,16 @@ M.START_MARKER = '=START'
 -- Пул трека: items до маркера =END (последовательность) и после =LIB
 -- (библиотека). Всё между =END и =LIB — не читается (просьба 1 окт: путаница;
 -- сэмплы библиотеки реально лежат на треках за =LIB).
-function M.track_pool(tr, depot_tr, lib_pos, end_pos)
+function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone)
   local pool, seen = {}, {}
   for i = 0, R.CountTrackMediaItems(tr) - 1 do
     local it = R.GetTrackMediaItem(tr, i)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    if zone and pos >= zone[1] - 1e-6 and pos < zone[2] - 1e-6 then goto skip_item end   -- копии клипов сессии — не инструменты
     local in_lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6)
     local after_end = end_pos ~= nil and pos >= end_pos - 1e-6
     if in_lib or not after_end then pool_add(pool, seen, it, in_lib) end
+    ::skip_item::
   end
   if depot_tr then
     for i = 0, R.CountTrackMediaItems(depot_tr) - 1 do pool_add(pool, seen, R.GetTrackMediaItem(depot_tr, i), true) end
@@ -1428,6 +1436,17 @@ function M.regions(lpb)
 end
 M.LIB_MARKER = '=LIB'
 M.SESSION_REGION = '=SESSION'   -- зона сессии (6 окт): не слот, не паттерн
+M.SHOW_ZONE = false             -- трекер показывает зону (сессия играет), ставит main
+function M.session_zone()
+  if not R.EnumProjectMarkers3 then return nil end
+  local i = 0
+  while true do
+    local ret, isrgn, pos, rgnend, name = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then return nil end
+    if isrgn and name == M.SESSION_REGION then return { pos, rgnend } end
+    i = i + 1
+  end
+end
 
 -- Паттерны: уникальные имена регионов; номер — минимальный idx экземпляра,
 -- источник — первый экземпляр в последовательности (иначе в библиотеке).

@@ -78,15 +78,47 @@ function SS.progress(live, pos)
   return d / live.len
 end
 
+-- ── полиметрия (7 окт) ───────────────────────────────────────────────────
+-- длина зоны в долях = НОК длин клипов (в шестнадцатых): клип 4/4 и 5/4 —
+-- зона 20 долей, на прыжке лупа фаза каждого сходится. Больше cap долей —
+-- cap (фаза сбрасывается на шве), второй результат true
+SS.CAP_QN = 256
+function SS.lcm_qn(lens, cap)
+  cap = cap or SS.CAP_QN
+  local function gcd(a, b) while b ~= 0 do a, b = b, a % b end return a end
+  local l = 1
+  for _, q in ipairs(lens) do
+    local n = math.max(1, math.floor(q * 4 + 0.5))
+    l = l // gcd(l, n) * n
+    if l > cap * 4 then return cap, true end
+  end
+  return l / 4, false
+end
+-- доли клипов, что играют / ждут, плюс новый (extra — слот seq)
+function SS.need_qn(seq, extra)
+  local lens = {}
+  local function add(ri) local rg = ri and seq[ri]; if rg and rg.qn1 and rg.qn0 and rg.qn1 > rg.qn0 then lens[#lens + 1] = rg.qn1 - rg.qn0 end end
+  for _, l in pairs(SS.live) do add(l.ri) end
+  for _, p in pairs(SS.pend) do if p.ri ~= 'stop' then add(p.ri) end end
+  add(extra)
+  if #lens == 0 then return nil end
+  return SS.lcm_qn(lens)
+end
+
 -- ── очередь ──────────────────────────────────────────────────────────────
 local function clamp(seq, ncols)
   SS.cur.ri = math.max(1, math.min(#seq, SS.cur.ri))
   SS.cur.ci = math.max(1, math.min(math.max(1, ncols), SS.cur.ci))
 end
-local function arm(ci, what)
-  local zone = ctx.ss_zone(); if not zone then ctx.msg('session: no zone'); return end
+local function arm(ci, what, seq)
+  local need, capped = seq and what ~= 'stop' and SS.need_qn(seq, what)
   local pos, playing = ctx.ss_playpos()
+  local zone = ctx.ss_zone(need); if not zone then ctx.msg('session: no zone'); return end
   local inside = playing and pos >= zone.pos - 1e-6 and pos < zone.rgnend + 1e-6
+  -- зона под НОК длин: растёт на лету (хвост впереди плейхеда досаживается);
+  -- без играющих клипов — подгоняется и вниз
+  if need and ctx.ss_zone_fit then zone = ctx.ss_zone_fit(zone, need, seq, not inside or not next(SS.live)) or zone end
+  if capped then ctx.msg(('session zone capped at %d beats - this clip loses its phase at the seam'):format(SS.CAP_QN)) end
   if not inside then
     -- транспорт стоит или играет аранжировку: в зону, с её начала, сразу
     ctx.ss_play(zone)
@@ -100,7 +132,7 @@ function SS.launch(ri, ci, seq)
   local rg = seq[ri]; if not rg then return end
   SS.halt = nil
   if SS.live[ci] and SS.live[ci].ri == ri and not SS.pend[ci] then ctx.msg('already playing: ' .. SS.slot_name(rg, ri)); return end
-  arm(ci, ri)
+  arm(ci, ri, seq)
   ctx.msg(('launch %s on %s at %s'):format(SS.slot_name(rg, ri), ctx.ss_colname(ci), SS.quant))
 end
 function SS.stop(ci)
@@ -113,7 +145,7 @@ function SS.scene(ri, seq, grid, ncols)
   local n = 0
   for ci = 1, ncols do
     local cell = grid[ri] and grid[ri][ci]
-    if cell and cell.state ~= 'empty' then arm(ci, ri); n = n + 1
+    if cell and cell.state ~= 'empty' then arm(ci, ri, seq); n = n + 1
     elseif SS.live[ci] or SS.pend[ci] then arm(ci, 'stop') end
   end
   ctx.msg(('scene %s: %d clips'):format(SS.slot_name(seq[ri], ri), n))

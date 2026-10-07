@@ -152,6 +152,8 @@ local function plant_loop(tr, opt, z0, z1, phase, skip, tag, win)
   for k = k0, k0 + math.ceil((z1 - z0) / step) + 2 do
     local pos = phase + k * step
     if pos >= z1 - EPS then break end
+    local cut = 0
+    if pos < z0 - EPS and pos + step + xf > z0 + EPS then cut = z0 - pos; pos = z0 end   -- хвост через шов
     local inside = pos >= z0 - EPS
     local skipped = skip and pos >= skip[1] - EPS and pos < skip[2] - EPS
     if win and not (pos >= win[1] - EPS and pos < win[2] - EPS) then skipped = true end
@@ -159,11 +161,11 @@ local function plant_loop(tr, opt, z0, z1, phase, skip, tag, win)
       local it = R.AddMediaItemToTrack(tr)
       R.SetItemStateChunk(it, chunk, false)
       local tk = R.GetActiveTake(it)
-      if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', opt.la) end
+      if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', opt.la + cut * rate) end
       R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
-      R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(step + xf, z1 - pos))
+      R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(step + xf - cut, z1 - pos))
       R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 0)
-      R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', xf); R.SetMediaItemInfo_Value(it, 'D_FADEOUTLEN', xf)
+      R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', cut > 0 and 0 or xf); R.SetMediaItemInfo_Value(it, 'D_FADEOUTLEN', xf)
       R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
       if fixed then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane) end
       R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', tag or '1', true)
@@ -196,6 +198,11 @@ function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
     if base + len > z0 + EPS then
       for _, c in ipairs(chunks) do
         local pos = base + c.rel
+        -- 7 окт: item пересекает начало зоны (хвост повтора из-за шва лупа) —
+        -- сажается с начала зоны, со сдвигом в источнике; иначе после прыжка
+        -- лупа до следующего повтора тишина (полиметрия 4/4 + 5/4)
+        local cut = 0
+        if pos < z0 - EPS and pos + c.len > z0 + EPS then cut = z0 - pos; pos = z0 end
         local inside = pos >= z0 - EPS and pos < z1 - EPS
         local skipped = skip and pos >= skip[1] - EPS and pos < skip[2] - EPS
         if win and not (pos >= win[1] - EPS and pos < win[2] - EPS) then skipped = true end   -- win: только это окно (досадка)
@@ -204,8 +211,15 @@ function A.session_plant(tr, src, z0, z1, phase, skip, tag, win, opt)
           R.SetItemStateChunk(it, c.chunk, false)
           R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
           R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+          local ilen = c.len - cut
+          if cut > 0 then
+            local tk = R.GetActiveTake(it)
+            if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + cut * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')) end
+            R.SetMediaItemInfo_Value(it, 'D_LENGTH', ilen)
+            R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', 0)
+          end
           -- хвост за концом зоны обрезается: луп прыгнет, хвост не нужен
-          if pos + c.len > z1 + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', z1 - pos) end
+          if pos + ilen > z1 + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', z1 - pos) end
           if fixed then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
           R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', tag or '1', true)
           n = n + 1
