@@ -8918,12 +8918,11 @@ local function frame()
     -- заливка с отступом 2 px: рамка фокуса трекера (вокруг шапок, клипов и
     -- строк) идёт непрерывно — клипы её не прерывают (7 окт)
     U.set(U.BG); gfx.rect(x0 + 2, y0, w0 - 4, h0, 1)
-    U.set(foc and U.tint(U.AMBER, 0.18) or U.PANEL); gfx.rect(x0 + 2, y0, w0 - 4, L.rh + 1, 1)
-    local hb = foc and 'CLIP MODE  q..p a..l z..m - the clip under the letter (Shift - the whole scene)  1..0 stop track  Bksp stop all  arrows scenes  . follow  , quantize  / record  Space play  ; jump labels  Tab tracker'
-      or 'session  Tab - clip mode (the keyboard launches clips)  click a clip: launch  drop a file on a slot  wheel - scenes'
-    U.text(x0 + L.pad, y0, ctx.fit(hb, w0 - 2 * L.pad), foc and U.AMBER or U.GREY)
-    local hv = MX.SS.draw_body(L, x0, L.label_w, y0 + L.rh + 1, h0 - L.rh - 1, L.cols, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise(), reaper.GetPlayPosition(), {})
-    U.set(foc and U.AMBER or U.LINE); gfx.rect(x0 + 2, y0 + h0 - 1, w0 - 4, 1, 1)
+    -- 7 окт: подсказки — обычным серым хинт-баром внизу модуля (клавиши жёлтым),
+    -- как у остальных модулей; в фокусе — клип-мод
+    local hb = L.rh + 1
+    local hv = MX.SS.draw_body(L, x0, L.label_w, y0, h0 - hb, L.cols, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise(), reaper.GetPlayPosition(), {})
+    draw.hint_bar(setmetatable({ hint_h = hb }, { __index = L }), x0 + 2, y0 + h0 - hb, w0 - 4, KH.BARS[foc and 'clipmode' or 'session'], foc)
     if foc then U.set(U.AMBER); gfx.rect(x0 + 2, y0, w0 - 4, h0, 0) end   -- свой модуль в фокусе — своя рамка внутри
     local mx, my = gfx.mouse_x, gfx.mouse_y
     if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then
