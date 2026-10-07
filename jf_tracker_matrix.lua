@@ -42,8 +42,8 @@ local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
-local BTNS = { { 'fold', 'fold' }, { 'clips', 'clips' }, { 'zoom', 'zoom' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
-local FOLD_BTNS = { { 'fold', 'fold' }, { 'clips', 'clips' } }        -- свёрнутая: одна кнопка — развернуть
+local BTNS = { { 'fold', 'zoom' }, { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
+local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
 local function btns()
@@ -147,7 +147,7 @@ function MX.width(L, nregions, ncols)
   local bw = L.pad
   for _, b in ipairs(btns()) do
     local label = b[2]
-    if b[1] == 'zoom' then label = 'zoom' elseif b[1] == 'fill' then label = 'grid' end
+    if b[1] == 'fill' then label = 'grid' end
     if ctx and ctx.ic then label = ctx.ic(b[1], label) end
     bw = bw + U.measure(label) + 2 * L.pad + L.pad
   end
@@ -184,7 +184,6 @@ function MX.draw(L, snap, regions, info)
   local bx = L.pad
   for _, b in ipairs(btns()) do
     local label = b[2]
-    if b[1] == 'zoom' then label = 'zoom' end
     if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end
     if ctx.ic then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad

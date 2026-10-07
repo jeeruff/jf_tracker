@@ -730,7 +730,7 @@ local function run_cmd(line)
     -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden
     if arg == 'sample' then V.msg = 'tab: item (the old sample tab)'; return end
     local a = (arg == 'mod' or arg == 'modulate' or arg == 'automation' or arg == 'auto') and 'modulation' or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
-    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or a == 'clips' or (a == 'garden' and st.dev)) and a or 'master'
+    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
     st.top = true; st.toptab = 'retro'
@@ -1546,6 +1546,8 @@ function V.key_impl(c)
       local L = ctx.layout()
       if c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
+      elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
+      elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
       elseif c == ('t'):byte() then st.row0 = V.cur.row
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
@@ -1564,8 +1566,10 @@ function V.key_impl(c)
         -- zC — прежний fold: трек в полоску шириной в символ
         local f = flat()[V.cur.fi]
         if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
-      elseif c == ('M'):byte() then ctx.fold_all(true); ctx.relayout(); clamp_cur()
-      elseif c == ('R'):byte() then ctx.fold_all(false); ctx.relayout(); clamp_cur()
+      elseif c == ('M'):byte() then   -- zM (7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
+        local any = false
+        for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
+        ctx.fold_all(not any); ctx.relayout(); clamp_cur()
       end
       V.count = nil; finish_move(); return
     elseif p == 'r' then

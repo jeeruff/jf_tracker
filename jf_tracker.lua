@@ -99,7 +99,7 @@ local state = {
   fontscale = tonumber(ext('fontscale', 2)) or 2,
   poolsort = tostring(ext('poolsort', 'track')),
   fontspace = tonumber(ext('fontspace', 2)) or 2,
-  toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'modulation' elseif t == 'scope' then t = 'master' end; return t end)(),
+  toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'modulation' elseif t == 'scope' then t = 'master' elseif t == 'clips' then t = 'sample' end; return t end)(),   -- clips вкладкой убраны (7 окт)
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
   pool = flag('pool', true),                    -- (устар.) = top
@@ -173,7 +173,7 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
-  mxfold = flag('mxfold', false),
+  mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
   wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
@@ -2411,7 +2411,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'clips', 'modulation', 'midi', 'scopes', 'master' }   -- clips (6 окт): сессия вкладкой после item
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'scopes', 'master' }   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -4053,11 +4053,8 @@ ctx = {
     if not snap then return {} end
     return MX.SS.draw_grid(Lx, x, y, w, h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), {}, true)
   end,
-  mx_clips_toggle = function()
-    MX.clips = not MX.clips; state.mxclips = MX.clips
-    if MX.clips then MX.SS.cur.ri, MX.SS.cur.ci = math.max(1, MX.cur.ri), math.max(1, MX.cur.ci) end
-    relayout(); vim.msg = MX.clips and 'clips: Enter launch, O scene, x / X stop, q quantize, zz - over the whole window' or 'matrix of slots'
-  end,
+  -- 7 окт: вида clips в матрице нет — команда ведёт в тело трекера (zs)
+  mx_clips_toggle = function() ctx.clips_toggle() end,
   -- файлы, брошенные на окно (Media Explorer, Finder): gfx.getdropfile
   os_drop = function(files, hv)
     if #files == 0 then return end
@@ -6158,7 +6155,7 @@ do   -- правки DSP big — через edit (undo), дерево после
     end,
   })
 end
-MX.clips = state.mxclips and true or false
+MX.clips = false   -- 7 окт: вида clips в матрице больше нет (сессия — в теле трекера, zs; zz в матрице — на всё окно)
 -- инструмент ноты (6 окт): item-представитель из снимка — база транспоза
 edit.inst_ref = function(it)
   local i = snap and snap.inst_of and snap.inst_of[it]

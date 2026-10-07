@@ -319,7 +319,7 @@ keysin('x');   eq('x in folded → all subs at row', last(), 'delete:kick')
 keysin('2jx'); eq('folded row 2 → ov', last(), 'delete:ov')
 keysin('za');  eq('za unfolds', folds['A'], nil); eq('flat restored', #L.flat, 3)
 keysin('zM');  eq('zM', #L.flat, 2)
-keysin('zR');  eq('zR', #L.flat, 3)
+keysin('zM');  eq('zM again unfolds all (zR is the big router now)', #L.flat, 3)
 
 -- ── русская раскладка ─────────────────────────────────────────────────────
 reset()
