@@ -336,8 +336,7 @@ function D.layout(snap, state, nregions)
   -- браузер слева (7 окт, опция browserleft): lib + браузер — в левой колонке
   -- над матрицей, справа сайдбара нет (трекер шире)
   L.browser_left = state.browserleft and L.side_w > 0 or false
-  L.lside_w = L.browser_left and L.side_w or 0
-  if L.browser_left then L.side_w = 0 end
+  L.lside_w = L.browser_left and L.side_w or 0          -- справа остаются инструменты и слайсы
   -- правая панель свёрнута — узкая полоса с кнопкой < (2 окт)
   L.rstrip_w = state.side and 0 or (ms('<') + 2 * L.pad + 6)
   -- модуль слайсов (4 окт): колонка в верхней панели справа (у lib), по её
@@ -450,14 +449,15 @@ function D.layout(snap, state, nregions)
     end
     L.ctrl_w = L.ctrl_box[3]
   end
-  -- браузер слева: верх колонки — lib + браузер (60 %), ниже — матрица
+  -- браузер слева (7 окт): верх колонки — матрица (под главным модулем),
+  -- ниже — браузер; инструменты со слайсами — справа на всю высоту
   L.lside_rect = nil
   if L.browser_left then
     local y0 = L.mx_top or L.header_y
     local y1 = L.mx_bot or L.trk_bot
-    local split = y0 + math.max(8 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.6)))
-    L.lside_rect = { 0, y0, L.matrix_w - D.SEPW, split - y0 }
-    L.mx_top = split + D.SEPW
+    local split = y0 + math.max(6 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.4)))
+    L.mx_bot = split
+    L.lside_rect = { 0, split + D.SEPW, L.matrix_w - D.SEPW, y1 - split - D.SEPW }
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
@@ -1665,7 +1665,7 @@ local function draw_ctrl(L, info, H, hover)
         local col = {}
         for id in part:gmatch('[^,]+') do
           if id == 'xfade' then col[#col + 1] = q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade)
-          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], id == 'q_keys' and { sizer = true } or nil)
+          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], (id == 'q_keys' and { sizer = true }) or (id == 'q_side' and { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } }) or nil)   -- browser < > (7 окт): слева / справа
           elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on) end
         end
         cols[#cols + 1] = col
@@ -1708,7 +1708,7 @@ local function draw_ctrl(L, info, H, hover)
     if it.sizer then
       -- keys - + (4 окт): та же клетка — слово вкл / выкл, - + размер
       local sx = x + 2 + ms(it[2] .. ' ')
-      for _, z in ipairs({ { '-', 'q_kcm' }, { '+', 'q_kcp' } }) do
+      for _, z in ipairs(type(it.sizer) == 'table' and it.sizer or { { '-', 'q_kcm' }, { '+', 'q_kcp' } }) do
         local zw = ms(z[1]) + L.pad
         local zh = mx >= sx - 1 and mx < sx + zw and my >= y and my < y + L.rh
         if zh then hover.ctrl = z[2] end
@@ -3719,16 +3719,36 @@ function D.frame(L, snap, rows, state, info)
   end
 
   D.pmark('draw: browser')
-  if (L.side_w > 0 or L.lside_rect) and info.browser_draw then
-    -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу);
-    -- браузер слева (7 окт) — прямоугольник над матрицей
-    local SX0, SW0 = L.side_x, L.side_w
+  if L.lside_rect and info.browser_draw then
+    -- браузер слева (7 окт): справа — инструменты и слайсы на всю высоту,
+    -- слева под матрицей — браузер (вкладка fx — список эффектов)
+    local hh = L.hint_h or 0
+    local total = gfx.h - L.status_h
+    local W = L.side_x
+    set(U.PANEL); gfx.rect(W, 0, L.side_w, total, 1)
+    L.inst_side_h, L.side_y0, L.inst_knob_w, L.slices_split_rect = total, 0, 0, nil
+    local ihl = total - hh
+    if L.slices_split and info.slices_draw and ihl > 8 * L.rh then
+      local top_h = math.floor(ihl / 2)
+      D.draw_instruments(L, info, W, 0, L.side_w, top_h, hover)
+      set(D.SEP); gfx.rect(W, top_h, L.side_w, D.SEPW, 1)
+      local hs = info.slices_draw(L, W + 3, top_h + 3, L.side_w - 5, ihl - top_h - 4)
+      if hs ~= nil then hover.slices = hs end
+      L.slices_split_rect = { W, top_h + 1, L.side_w, ihl - top_h - 1 }
+    else
+      D.draw_instruments(L, info, W, 0, L.side_w, ihl, hover)
+    end
+    if hh > 0 then D.hint_bar(L, W, total - hh, L.side_w, (info.hint_bars or function() end)('inst'), info.focus == 'inst') end
+    local r = L.lside_rect
+    set(U.PANEL); gfx.rect(r[1], r[2], r[3], r[4], 1)
+    set(D.SEP); gfx.rect(0, r[2] - D.SEPW, r[3], D.SEPW, 1)
+    hover.browser = info.browser_draw(L, r[1], r[2], r[3], r[4] - hh)
+    if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end
+    if hh > 0 then D.hint_bar(L, r[1], r[2] + r[4] - hh, r[3], (info.hint_bars or function() end)(info.browser_page or 'browser'), info.focus == 'browser') end
+  elseif L.side_w > 0 and info.browser_draw then
+    -- сайдбар во всю высоту окна: от верха до статус-бара (инструменты сверху, браузер снизу)
     local sy0 = 0
     local total = gfx.h - L.status_h - sy0
-    if L.lside_rect then
-      L.side_x, L.side_w = L.lside_rect[1], L.lside_rect[3]
-      sy0, total = L.lside_rect[2], L.lside_rect[4]
-    end
     local W = L.side_x                                -- сайдбар правее модуля слайсов (4 окт)
     set(U.PANEL); gfx.rect(W, sy0, L.side_w, total, 1)
     local ih = math.max(4 * L.rh, math.min(total - 6 * L.rh, state.inst_px or math.floor(total * 0.40)))
@@ -3766,7 +3786,6 @@ function D.frame(L, snap, rows, state, info)
       for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = 'instgrip'
       set(U.AMBER); gfx.rect(W, sy0 + ih - 1, L.side_w, 2, 1)
     end
-    if L.lside_rect then set(D.SEP); gfx.rect(0, sy0 + total, L.lside_rect[3], D.SEPW, 1); L.side_x, L.side_w = SX0, SW0 end
   end
 
   -- нижняя DSP-панель: FX трека курсора блоками, параметры мини-слайдерами
@@ -4429,7 +4448,7 @@ function D.frame(L, snap, rows, state, info)
       -- до низа модуля (5 окт): статус в трекере и строка подсказок — внутри рамки
       tracker = { tx0, hy, W - tx0, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy },
       matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
-      browser = L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 } or nil,
+      browser = (L.lside_rect and { L.lside_rect[1], L.lside_rect[2], L.lside_rect[3], L.lside_rect[4] }) or (L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }) or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,
       inst = (L.inst_w > 0 or L.side_w > 0) and L.inst_rect or nil,

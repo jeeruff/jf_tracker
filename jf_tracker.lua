@@ -7517,6 +7517,12 @@ function ctrl_action(name, delta)
   elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
   elseif name == 'q_keys' then if delta == 0 then state.keycast = not state.keycast; ctx.kc = {} end
   elseif name == 'q_listen' then if delta == 0 then state.steplisten = not state.steplisten; vim.msg = 'step listen ' .. (state.steplisten and 'on: moving the cursor plays the row' or 'off') end
+  elseif name == 'q_sidel' or name == 'q_sider' then   -- browser < > (7 окт): браузер слева над… под матрицей / справа
+    if delta == 0 then
+      state.browserleft = name == 'q_sidel'; state.side = true
+      reaper.SetExtState(EXT, 'browserleft', state.browserleft and '1' or '0', true)
+      relayout(); vim.msg = 'browser ' .. (state.browserleft and 'left, under the matrix (instruments stay on the right)' or 'right, under the instruments')
+    end
   elseif name == 'q_kcm' or name == 'q_kcp' then
     if delta == 0 then
       local cur = (state.kc_scale or 0) > 0 and state.kc_scale or draw.SCALE
@@ -9141,7 +9147,7 @@ local function frame()
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
-  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
+  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
