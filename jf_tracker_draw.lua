@@ -393,8 +393,9 @@ function D.layout(snap, state, nregions)
   -- скопы треков — во вкладке scopes (3 окт), строки в шапке нет
   -- строка входа (3 окт, опция hdrin): in <вход> [smart] — под панорамой, лейны ниже
   L.hr_in = (state.hdrin ~= false) and 1 or 0
-  L.lane_row = 4 + L.hr_in
-  L.header_rows = 5 + L.hr_in + (state.captions and 1 or 0)
+  L.hr_info = state.hdrinfo and 3 or 0             -- инструменты / инсерты / сенды в шапке (опция header info, 7 окт)
+  L.lane_row = 4 + L.hr_in + L.hr_info
+  L.header_rows = 5 + L.hr_in + L.hr_info + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -2968,6 +2969,35 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.hdrin = { col = col, what = 'list' } end
         hint('hdrin', sx, iy, iw, L.rh, { col = col, what = 'list' })
       end
+      -- инфо трека (7 окт, опция header info): l — инструменты из lib на
+      -- треке, fx — инсерты (клик — в DSP, двойной — окно), s — сенды (клик —
+      -- окно маршрутизации); фишки по ширине, что не влезло — «+N»
+      if L.hr_info > 0 and info.hdr_info then
+        local hi = info.hdr_info(col) or {}
+        local y0 = hy + (4 + L.hr_in) * L.rh + 1
+        local rows = { { 'l', hi.inst or {}, 'hdrinst' }, { 'fx', hi.fx or {}, 'hdrfx' }, { 's', hi.sends or {}, 'hdrsend' } }
+        for ri, row in ipairs(rows) do
+          local ry = y0 + (ri - 1) * L.rh
+          text(sx, ry, row[1], U.GREY)
+          local cx = sx + ms('fx') + L.pad
+          local right = sx + sw
+          for k, it in ipairs(row[2]) do
+            local lab = fit(it.name or '', L.cw * 9)
+            local cw2 = ms(lab) + 2 * L.pad
+            local more = #row[2] - k + 1
+            if cx + cw2 > right - (more > 1 and ms('+9') + 2 or 0) then
+              if more > 0 then text(right - ms('+' .. more), ry, '+' .. more, U.CYAN) end
+              break
+            end
+            local hot = mx >= cx and mx < cx + cw2 and my >= ry and my < ry + L.rh
+            set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(cx, ry, cw2, L.rh - 1, 1)
+            text(cx + L.pad, ry, lab, hot and U.AMBER or ((it.off and U.GREY) or BTXT))
+            if hot then hover[row[3]] = { col = col, k = k, it = it } end
+            hint(row[3], cx, ry, cw2, L.rh, { col = col, k = k })
+            cx = cx + cw2 + 2
+          end
+        end
+      end
     end
     for li, ln in ipairs(c.lanes) do
       -- −+ подколонок — над нотным полем (3 окт; раньше справа в строке лейна);
@@ -3095,12 +3125,10 @@ function D.frame(L, snap, rows, state, info)
     local lb = (ms('proj') + ms('region') + 4 * L.pad + 6 <= bw) and 'region' or 'rgn'
     x0 = small(x0, hy + 1, 'proj', 'all', not info.view_reg, 'viewbtn')
     small(x0, hy + 1, lb, 'reg', info.view_reg, 'viewbtn')
-    -- ряд 1 (7 окт): session (док клипов) | mixer (микшер вместо трекера)
+    -- ряд 1 (7 окт): session (клипы вместо строк трекера)
     do
-      -- 7 окт: router живёт в DSP FX (одно место) — здесь session | mixer
-      local full = ms('session') + ms('mixer') + 6 <= bw
-      local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
-      small(x1, hy + 1 + L.rh, full and 'mixer' or 'mix', 'mixer', info.mixer and not info.clipsview, 'viewbtn')
+      -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
+      small(bx, hy + 1 + L.rh, ms('session') + 2 <= bw and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh
