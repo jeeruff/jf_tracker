@@ -4048,18 +4048,7 @@ ctx = {
   end,
   -- session в масштабе трекера (7 окт): строка точек, метр, follow actions
   empty_row = function(y) draw.empty_row(L, y) end,
-  ss_clip_rows = function() return tonumber(state.ssrows) or 3 end,
-  ss_mv = {},
-  ss_meter = function(ci)
-    local c = snap and snap.cols[ci]
-    if not (c and c.track and reaper.ValidatePtr(c.track, 'MediaTrack*')) then return 0 end
-    local v = math.max(reaper.Track_GetPeakInfo(c.track, 0), reaper.Track_GetPeakInfo(c.track, 1))
-    local o = ctx.ss_mv[ci] or 0
-    v = math.max(v, o * 0.88)
-    ctx.ss_mv[ci] = v
-    -- шкала дБ: −60..0 → 0..1
-    return v > 1e-4 and math.max(0, (20 * math.log(v, 10) + 60) / 60) or 0
-  end,
+  ss_clip_rows = function() return tonumber(state.ssrows) or 2 end,   -- 7 окт: в 7 строках под шапками — по 2 строки (волна, имя)
   -- follow actions: P_EXT:jf_ssfa трека = «idx=a,idx=a» (idx — номер региона-слота)
   ss_fa_cache = {},
   ss_fa = function(ci, ri, sq)
@@ -8810,11 +8799,11 @@ local function frame()
   SL.draw_drag(U, L)
   -- макро-вид (3 окт, :macro): поверх тела трекера; клики по скрытым ячейкам не идут
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
-  -- session (7 окт) — на месте тела трекера (шапки треков живые, тот же
-  -- масштаб колонок): строка подсказок и клипы; Tab — трекер ↔ session.
-  -- В фокусе session — клип-мод: клавиатура QWERTY запускает клипы
-  if state.clipsview and L.body_h > 0 and snap and L.cols then
-    local x0, y0, w0, h0 = L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h
+  -- session (7 окт) — 7 строк под шапками треков (шапки живые, тот же масштаб
+  -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔
+  -- session; в фокусе session — клип-мод: клавиатура QWERTY запускает клипы
+  if state.clipsview and (L.sess_h or 0) > 0 and snap and L.cols then
+    local x0, y0, w0, h0 = L.matrix_w, L.sess_y, L.win_w - L.matrix_w, L.sess_h
     if not HN.active then
       local keep = {}
       for _, t in ipairs(HN.targets) do
@@ -8827,9 +8816,10 @@ local function frame()
     U.set(U.BG); gfx.rect(x0, y0, w0, h0, 1)
     U.set(foc and U.tint(U.AMBER, 0.18) or U.PANEL); gfx.rect(x0, y0, w0, L.rh + 1, 1)
     local hb = foc and 'CLIP MODE  q..p a..l z..m - the clip under the letter (Shift - the whole scene)  1..0 stop track  Bksp stop all  arrows scenes  . follow  , quantize  / record  Space play  ; jump labels  Tab tracker'
-      or 'session  Tab - clip mode (the keyboard launches clips)  click a clip: launch  drop a file on a slot  f - jump labels'
+      or 'session  Tab - clip mode (the keyboard launches clips)  click a clip: launch  drop a file on a slot  wheel - scenes'
     U.text(x0 + L.pad, y0, ctx.fit(hb, w0 - 2 * L.pad), foc and U.AMBER or U.GREY)
     local hv = MX.SS.draw_body(L, x0, L.label_w, y0 + L.rh + 1, h0 - L.rh - 1, L.cols, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition(), {})
+    U.set(foc and U.AMBER or U.LINE); gfx.rect(x0, y0 + h0 - 1, w0, 1, 1)
     if foc then U.set(U.AMBER); gfx.rect(x0, y0, w0, h0, 0) end
     local mx, my = gfx.mouse_x, gfx.mouse_y
     if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then

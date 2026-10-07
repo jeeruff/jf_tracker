@@ -418,7 +418,10 @@ function D.layout(snap, state, nregions)
   L.status_in = L.statpos == 'tracker' and (L.rh + 4) or 0   -- статус в модуле трекера
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
-  L.body_y = L.header_y + L.header_h
+  -- session (7 окт): 7 строк под шапками треков — клипы; трекер под ними
+  L.sess_h = state.clipsview and (7 * L.rh) or 0
+  L.sess_y = L.header_y + L.header_h
+  L.body_y = L.header_y + L.header_h + L.sess_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
@@ -474,7 +477,8 @@ function D.layout(snap, state, nregions)
     local y1 = L.mx_bot or L.trk_bot
     local split = y0 + math.max(6 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.4)))
     L.mx_bot = split
-    L.lside_rect = { 0, split + D.SEPW, L.matrix_w - D.SEPW, y1 - split - D.SEPW }
+    local ybot = gfx.h - L.status_h                 -- до самого низа: DSP — правее браузера (7 окт)
+    L.lside_rect = { 0, split + D.SEPW, L.matrix_w - D.SEPW, ybot - split - D.SEPW }
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
@@ -3851,20 +3855,22 @@ function D.frame(L, snap, rows, state, info)
   D.pmark('draw: dsp, help, keyboard strip')
   if L.dsp_h > 0 and info.khelp and info.khelp_draw then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
-    local xo = L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0     -- главный модуль слева в полосе DSP (3 окт)
-    set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(0, dy, L.win_w, D.SEPW, 1)
+    local lx0 = L.browser_left and L.matrix_w or 0        -- браузер слева до самого низа (7 окт)
+    local xo = lx0 + (L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0)     -- главный модуль слева в полосе DSP (3 окт)
+    set(U.PANEL); gfx.rect(lx0, dy, L.win_w - lx0, L.dsp_h, 1)
+    set(D.SEP); gfx.rect(lx0, dy, L.win_w - lx0, D.SEPW, 1)
     hover.khelp = info.khelp_draw(L, xo, dy, L.win_w - xo, L.dsp_h) or true
     L.dsp_rect = { xo, dy, L.win_w - xo, L.dsp_h }
   elseif L.dsp_h > 0 then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
-    set(U.PANEL); gfx.rect(0, dy, L.win_w, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(0, dy, L.win_w, D.SEPW, 1)
+    local lx0 = L.browser_left and L.matrix_w or 0        -- браузер слева до самого низа (7 окт): DSP — правее него
+    set(U.PANEL); gfx.rect(lx0, dy, L.win_w - lx0, L.dsp_h, 1)
+    set(D.SEP); gfx.rect(lx0, dy, L.win_w - lx0, D.SEPW, 1)
     local col = info.pool_col
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
-    local xo = L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0     -- главный модуль слева в полосе DSP (3 окт)
+    local xo = lx0 + (L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0)     -- главный модуль слева в полосе DSP (3 окт)
     if info.fxb_draw then
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
       local own = math.min(L.cw * 26, math.floor(L.win_w / 4))

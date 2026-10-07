@@ -612,7 +612,7 @@ end
 -- высота строки и ширина колонок, пустые клетки — точки, как строки трекера.
 -- Сцена — блок из CLIP_ROWS строк (по умолчанию 3) плюс строка-зазор;
 -- клип — рамка на весь блок: волна сверху, снизу имя и буква follow action.
--- Снизу колонки — метр трека, бьёт вверх полупрозрачно. Шапки треков,
+-- Шапки треков,
 -- входы, R I M S — от трекера (живые). cols — L.cols; колонка сцен — на
 -- месте номеров строк [x0, x0 + lw)
 SS.CLIP_ROWS = 3
@@ -675,20 +675,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
       end
     end
   end
-  -- метры треков: снизу вверх, полупрозрачно поверх клипов
-  if ctx.ss_meter then
-    for _, c in ipairs(cols) do
-      if c.x and c.col then
-        local v = ctx.ss_meter(c.ci) or 0
-        if v > 0.002 then
-          local mh = math.floor(math.min(1, v) * h)
-          local col = v >= 0.99 and U.RED or (c.col.rgb or U.GREEN)
-          U.set(col, 0.10); gfx.rect(c.x + 1, y + h - mh, c.w - 2, mh, 1)
-          U.set(col, 0.7); gfx.rect(c.x + 1, y + h - mh, c.w - 2, 1, 1)
-        end
-      end
-    end
-  end
+  -- метров здесь нет (7 окт): они одни — в трекере (быстрая опция meters)
   if nrows > fit and ctx.vbar then
     ctx.vbar('clips', right + 1, y, 3, fit * BR * L.rh, SS.scroll, fit, nrows)
   end
