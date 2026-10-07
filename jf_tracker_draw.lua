@@ -926,6 +926,24 @@ local function draw_cell(L, cell, x, y, ty, inv)
   end
 end
 
+-- пустая строка трекера (7 окт, session в масштабе трекера): точки во всех
+-- полях всех видимых колонок — сетка та же, что у строк трекера
+function D.empty_row(L, y)
+  for _, c in ipairs(L.cols or {}) do
+    if c.x then
+      for _, ln in ipairs(c.lanes) do
+        for si = 1, ln.nsub do
+          local f = L.flat[ln.f0 + si - 1]
+          if f and f.x then
+            if c.folded then text(f.x + L.pad, y + 1, '...', D.EMPTY)
+            else draw_cell(f.G or L, nil, f.x, y, y + 1) end
+          end
+        end
+      end
+    end
+  end
+end
+
 local function draw_fold_cell(L, col, row, x, y, ty, inv)
   local text_ = text
   local function text(tx, tyy, str, c2) if inv then text_(tx, tyy, str, c2, D.inv_bg or U.TEXT) else text_(tx, tyy, str, c2) end end

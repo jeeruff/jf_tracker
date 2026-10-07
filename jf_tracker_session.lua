@@ -143,6 +143,32 @@ function SS.launch(ri, ci, seq)
   arm(ci, ri, seq)
   ctx.msg(('launch %s on %s at %s'):format(SS.slot_name(rg, ri), ctx.ss_colname(ci), SS.quant))
 end
+-- ── follow actions (7 окт): что клип делает, отыграв один проход ─────────
+-- l — крутится (по умолчанию), n — следующий клип ниже в колонке, p — выше,
+-- f — первый в колонке, r — случайный другой, s — стоп. Хранится у трека
+-- (ctx.ss_fa / ctx.ss_fa_set), буква — справа от имени клипа
+SS.FA = { 'l', 'n', 'p', 'f', 'r', 's' }
+SS.FA_NAME = { l = 'loop', n = 'next', p = 'previous', f = 'first', r = 'random', s = 'stop' }
+function SS.fa_next(a, dir)
+  for i, v in ipairs(SS.FA) do if v == (a or 'l') then return SS.FA[(i - 1 + (dir or 1)) % #SS.FA + 1] end end
+  return 'l'
+end
+-- клип-цель follow action в колонке ci после ri; nil — стоп, ri — тот же
+function SS.fa_target(a, ri, ci, seq, grid, rnd)
+  local function has(r) local c = grid and grid[r] and grid[r][ci]; return c and c.state ~= 'empty' end
+  if a == 's' then return nil end
+  if a == 'n' then for r = ri + 1, #seq do if has(r) then return r end end; for r = 1, ri - 1 do if has(r) then return r end end; return ri end
+  if a == 'p' then for r = ri - 1, 1, -1 do if has(r) then return r end end; for r = #seq, ri + 1, -1 do if has(r) then return r end end; return ri end
+  if a == 'f' then for r = 1, #seq do if has(r) then return r end end; return ri end
+  if a == 'r' then
+    local pool = {}
+    for r = 1, #seq do if r ~= ri and has(r) then pool[#pool + 1] = r end end
+    if #pool == 0 then return ri end
+    return pool[math.floor((rnd or math.random)() * #pool) + 1] or pool[1]
+  end
+  return ri
+end
+
 -- ── mlr (7 окт): прыжок и луп отрезка играющего клипа ────────────────────
 -- Клип делится на SS.STEPS шагов. jump — с ближайшей доли (или сразу при
 -- quant = now) клип играет с шага k; loop k1..k2 — только этот отрезок
@@ -203,6 +229,24 @@ function SS.playing_any()
   return false
 end
 
+-- follow actions: у играющего клипа с действием (не l) и без очереди —
+-- очередь на конец первого прохода (на шве зоны — на прыжок лупа)
+function SS.follow_tick(seq, grid)
+  local zone
+  for ci, lv in pairs(SS.live) do
+    if lv.fa and lv.fa ~= 'l' and not SS.pend[ci] and not lv.fa_done then
+      zone = zone or ctx.ss_zone()
+      if not zone then return end
+      local t0 = lv.fired or lv.phase
+      local at = lv.phase + math.ceil((t0 + 1e-3 - lv.phase) / lv.len) * lv.len
+      if at >= zone.rgnend - 1e-6 then at = zone.rgnend end
+      local tgt = SS.fa_target(lv.fa, lv.ri, ci, seq, grid)
+      lv.fa_done = true
+      if tgt ~= lv.ri then SS.pend[ci] = { ri = tgt or 'stop', at = at, follow = true } end
+    end
+  end
+end
+
 -- что играет после границы phase: весь клип, клип со сдвигом (jump: шаг
 -- step под границей) или отрезок шагов seg = { k1, k2 }. Фаза live — момент,
 -- когда клип стоит в начале отрезка (a секунд от начала слота)
@@ -225,7 +269,8 @@ function SS.plant_opt(lv, tr, src)
 end
 
 -- каждый кадр: границы пройдены — выполнить. seq / snap — текущие
-function SS.tick(seq, snap)
+function SS.tick(seq, snap, grid)
+  if grid and not SS.halt then SS.follow_tick(seq, grid) end
   if not next(SS.pend) and not next(SS.todo) then return end
   local zone = ctx.ss_zone(); if not zone then return end
   local pos, playing = ctx.ss_playpos()
@@ -253,6 +298,7 @@ function SS.tick(seq, snap)
           if src then ctx.alias.session_plant(col.track, src, zone.pos, zone.rgnend, lv.phase, keep0 and { keep0, keep1 } or nil, p.ri .. ':' .. ci, nil, SS.plant_opt(lv, col.track, src)) end
         end)
       end
+      if lv then lv.fired = phase; lv.fa = ctx.ss_fa and ctx.ss_fa(ci, p.ri, seq) or 'l' end
       SS.live[ci] = lv
       if keep0 then SS.todo[ci] = { from = keep0, to = keep1, ri = src and p.ri or nil, phase = phase, lv = lv } end
       SS.pend[ci] = nil
@@ -296,6 +342,15 @@ function SS.key(c, seq, snap, grid, mods)
   return eaten
 end
 function SS.key_body(c, ch, seq, snap, grid, ncols)
+  if (ch == 'a' or ch == 'A') and ctx.ss_fa_set then   -- follow action клипа курсора (7 окт)
+    local cell = grid[SS.cur.ri] and grid[SS.cur.ri][SS.cur.ci]
+    if cell and cell.state ~= 'empty' then
+      local a = SS.fa_next(ctx.ss_fa(SS.cur.ci, SS.cur.ri, seq), ch == 'A' and -1 or 1)
+      ctx.ss_fa_set(SS.cur.ci, SS.cur.ri, seq, a)
+      ctx.msg(('follow action: %s'):format(SS.FA_NAME[a]))
+    end
+    return true
+  end
   if SS.pending_d and ch ~= 'd' then SS.pending_d = nil; if c == 27 then return true end end
   if ch == 'j' or c == 1685026670 then SS.cur.ri = SS.cur.ri + 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'k' or c == 30064 then SS.cur.ri = SS.cur.ri - 1; clamp(seq, ncols); SS.follow(seq)
@@ -474,7 +529,15 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
       end
   end
   if label_h > 0 then
-    U.text(cx + L.pad, ry + chh - label_h - 2, ctx.fit(SS.slot_name(rg, ri), cw - 2 * L.pad), is_live and U.AMBER or U.TEXT)
+    -- справа от имени — буква follow action (7 окт): клик — следующая, ПКМ… — a / A с клавиатуры
+    local fa = ctx.ss_fa and ctx.ss_fa(ci, ri) or 'l'
+    local fl = fa:upper()
+    local fw = U.measure(fl) + 2 * L.pad
+    local fx, fy = cx + cw - fw, ry + chh - label_h - 2
+    local hotfa = mx >= fx and mx < fx + fw and my >= fy and my < fy + L.rh
+    U.text(cx + L.pad, fy, ctx.fit(SS.slot_name(rg, ri), cw - 2 * L.pad - fw), is_live and U.AMBER or U.TEXT)
+    if hotfa then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(fx, fy, fw, L.rh, 1); hover.ssfa = { ri = ri, ci = ci } end
+    U.text(fx + L.pad, fy, fl, hotfa and U.AMBER or (fa == 'l' and U.GREY or U.CYAN))
   end
   if is_live then
     local pr = SS.progress(live, playpos or 0)
@@ -497,42 +560,80 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
   if ctx.hint then ctx.hint('sess', cx, ry, cw, chh, { ri = ri, ci = ci }) end
 end
 
--- тело трекера в виде clips (6 окт): шапки треков, входы, R I M S, гор.
--- прокрутка — от трекера (живые); вместо строк — сцены × колонки трекера.
--- cols — L.cols ({ col, ci, x, w } — x == nil: вне экрана); колонка сцен —
--- на месте номеров строк [x0, x0 + lw)
+-- тело трекера в виде clips (6 окт; 7 окт — в масштабе трекера): та же
+-- высота строки и ширина колонок, пустые клетки — точки, как строки трекера.
+-- Сцена — блок из CLIP_ROWS строк (по умолчанию 3) плюс строка-зазор;
+-- клип — рамка на весь блок: волна сверху, снизу имя и буква follow action.
+-- Снизу колонки — метр трека, бьёт вверх полупрозрачно. Шапки треков,
+-- входы, R I M S — от трекера (живые). cols — L.cols; колонка сцен — на
+-- месте номеров строк [x0, x0 + lw)
+SS.CLIP_ROWS = 3
 function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local nrows = #seq
-  local rh = math.max(2 * L.rh + 4, math.min(3 * L.rh + 6, math.floor(h / math.max(1, nrows))))   -- 2..3 строки
-  local fit = math.max(1, math.floor(h / rh))
+  local CR = math.max(2, (ctx.ss_clip_rows and ctx.ss_clip_rows()) or SS.CLIP_ROWS)
+  local BR = CR + 1
+  local nvis = math.max(1, math.floor(h / L.rh))
+  local fit = math.max(1, math.floor(nvis / BR))
   SS.rows_fit = fit
   SS.scroll = math.max(0, math.min(math.max(0, nrows - fit), SS.scroll))
-  U.set(U.BG); gfx.rect(x0, y, (cols[#cols] and cols[#cols].x and (cols[#cols].x + cols[#cols].w) or (x0 + lw)) - x0, h, 1)
+  local last = cols[#cols]
+  local right = last and last.x and (last.x + last.w) or (x0 + lw)
+  U.set(U.BG); gfx.rect(x0, y, right - x0, h, 1)
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
-  for r = 1, fit do
-    local ri = SS.scroll + r
+  -- сетка трекера: точки на каждой строке
+  for r = 0, nvis - 1 do
+    local ry = y + r * L.rh
+    if ctx.empty_row then ctx.empty_row(ry) end
+  end
+  for b = 0, fit - 1 do
+    local ri = SS.scroll + b + 1
     local rg = seq[ri]; if not rg then break end
-    local ry = y + (r - 1) * rh
+    local by = y + b * BR * L.rh
+    local bh = CR * L.rh
+    U.set(U.LINE); gfx.rect(x0, by, right - x0, 1, 1)            -- граница сцены — как линия такта
     -- сцена: имя слота, длина; клик — вся сцена
-    local hot = mx >= x0 and mx < x0 + lw and my >= ry and my < ry + rh
-    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 1, ry + 1, lw - 3, rh - 2, 1)
-    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 1, ry + 1, lw - 3, rh - 2, 0)
-    U.text(x0 + L.pad, ry + L.pad, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 2), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
-    if rg.qn1 and rg.qn0 and rh >= 2 * L.rh + 2 then U.text(x0 + L.pad, ry + L.pad + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad), U.GREY) end
+    local hot = mx >= x0 and mx < x0 + lw and my >= by and my < by + bh
+    U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 1, by + 1, lw - 3, bh - 1, 1)
+    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 1, by + 1, lw - 3, bh - 1, 0)
+    U.text(x0 + L.pad, by + 1, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 2), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
+    if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad, by + 1 + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad), U.GREY) end
     if hot then hover.sessrow = ri end
-    if ctx.hint then ctx.hint('sessrow', x0 + 1, ry + 1, lw - 3, rh - 2, ri) end
+    if ctx.hint then ctx.hint('sessrow', x0 + 1, by + 1, lw - 3, bh - 1, ri) end
     for _, c in ipairs(cols) do
       if c.x and c.col then
-        if c.col.armed then U.set(U.tint(U.RED, 0.10)); gfx.rect(c.x, ry, c.w, rh, 1) end   -- армирован — сюда пойдёт запись
-        SS.draw_cell(L, c.x + 1, ry + 1, c.w - 3, rh - 3, grid[ri] and grid[ri][c.ci], c.col, ri, c.ci, rg, blink, playpos, hover)
+        local cell = grid[ri] and grid[ri][c.ci]
+        if c.col.armed then U.set(U.RED, 0.10); gfx.rect(c.x, by, c.w, bh, 1) end   -- армирован — сюда пойдёт запись
+        local busy = (cell and cell.state ~= 'empty') or (SS.rec and SS.rec.ri == ri and SS.rec.ci == c.ci) or (SS.pend[c.ci] and SS.pend[c.ci].ri == ri)
+        if busy then
+          SS.draw_cell(L, c.x + 1, by + 1, c.w - 3, bh - 1, cell, c.col, ri, c.ci, rg, blink, playpos, hover)
+        else
+          -- пустой слот: точки трекера; наведение / курсор — рамка (клик, бросок, R — запись)
+          local hot2 = mx >= c.x and mx < c.x + c.w and my >= by and my < by + bh
+          if ri == SS.cur.ri and c.ci == SS.cur.ci then U.set(U.TEXT); gfx.rect(c.x + 1, by + 1, c.w - 3, bh - 1, 0)
+          elseif hot2 then U.set(U.LINE); gfx.rect(c.x + 1, by + 1, c.w - 3, bh - 1, 0) end
+          if hot2 then hover.sess = { ri = ri, ci = c.ci } end
+          if ctx.hint then ctx.hint('sess', c.x + 1, by + 1, c.w - 3, bh - 1, { ri = ri, ci = c.ci }) end
+        end
+      end
+    end
+  end
+  -- метры треков: снизу вверх, полупрозрачно поверх клипов
+  if ctx.ss_meter then
+    for _, c in ipairs(cols) do
+      if c.x and c.col then
+        local v = ctx.ss_meter(c.ci) or 0
+        if v > 0.002 then
+          local mh = math.floor(math.min(1, v) * h)
+          local col = v >= 0.99 and U.RED or (c.col.rgb or U.GREEN)
+          U.set(col, 0.10); gfx.rect(c.x + 1, y + h - mh, c.w - 2, mh, 1)
+          U.set(col, 0.7); gfx.rect(c.x + 1, y + h - mh, c.w - 2, 1, 1)
+        end
       end
     end
   end
   if nrows > fit and ctx.vbar then
-    local last = cols[#cols]
-    local sbx = last and last.x and (last.x + last.w + 1) or (x0 + lw)
-    ctx.vbar('clips', sbx, y, 3, fit * rh, SS.scroll, fit, nrows)
+    ctx.vbar('clips', right + 1, y, 3, fit * BR * L.rh, SS.scroll, fit, nrows)
   end
   hover.ssbig = true
   return hover

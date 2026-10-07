@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'session in the tracker body at the tracker scale: the same rows with dots and column widths, a clip is a 3-row block (wave, name), track meters rise from the bottom; follow actions per clip - the letter right of the name (L loop, N next, P previous, F first, R random, S stop): click or a / A',
+    'matrix: folded by default, the fold button is called zoom (old zoom - detail); no clips view in the matrix and no clips tab on top - zs in the tracker; zr - router, zR - big router (zM toggles fold all / unfold all)',
     'DSP: double click on a parameter resets it to the plugin default (read once per plugin type from a fresh hidden instance, one undo step)',
     'DSP: router button next to take fx opens dsp big; ReaEQ shows only its curve with draggable band points (x frequency, y gain, wheel width), P in its header switches to the parameters only (option reaeq graph only)',
     'dsp big (zz in DSP, :dsp big): the fx chain with its routing in place of the tracker (headers + rows; the matrix, top, DSP and browser stay); option router see-through - half transparent over the tracks - parallel rows with split / sum buses, containers as frames with their plugins inside; h l j k walk the signal, a / A add after / in parallel, | joins or leaves a row, s solo in a row, = branches to unity, b x za o',

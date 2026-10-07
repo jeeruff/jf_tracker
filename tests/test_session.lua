@@ -217,6 +217,28 @@ items = {}
 A.plant_loop('tr', { item = src_it, la = 1.0, lb = 3.0, rate = 2, xf = 0 }, 100, 104, 100, nil, 't')
 eq('rate 2: step 1s', #items, 4); near('rate 2: no xf len', items[1].len, 1.0)   -- без xf хвоста через шов нет
 
+-- ── follow actions (7 окт) ───────────────────────────────────────────────
+-- колонка 1: клипы в рядах 1 и 3 (grid выше: 1:has, 2:empty, 3:has)
+eq('fa next skips empty', SS.fa_target('n', 1, 1, seq, grid), 3)
+eq('fa next wraps', SS.fa_target('n', 3, 1, seq, grid), 1)
+eq('fa prev', SS.fa_target('p', 3, 1, seq, grid), 1)
+eq('fa first', SS.fa_target('f', 3, 1, seq, grid), 1)
+eq('fa stop', SS.fa_target('s', 1, 1, seq, grid), nil)
+eq('fa random: the other clip', SS.fa_target('r', 1, 1, seq, grid, function() return 0.5 end), 3)
+eq('fa loop stays', SS.fa_target('l', 1, 1, seq, grid), 1)
+eq('fa cycle', SS.fa_next('l', 1) .. SS.fa_next('l', -1), 'ns')
+-- клип 2 с (слот 0..2 в стабе) запущен на 100, follow next → очередь на 102 в ряд 3
+SS.live, SS.pend, SS.todo, SS.halt = { [1] = { ri = 1, phase = 100, len = 2, full = 2, a = 0, fired = 100, fa = 'n' } }, {}, {}, nil
+playing = true; pos = 100.5
+SS.follow_tick(seq, grid)
+eq('follow queued', SS.pend[1] and SS.pend[1].ri, 3); near('follow at the end of the pass', SS.pend[1] and SS.pend[1].at or 0, 102)
+SS.pend = {}; SS.follow_tick(seq, grid); eq('follow once per launch', SS.pend[1], nil)
+SS.live = { [1] = { ri = 1, phase = 100, len = 2, full = 2, a = 0, fired = 100, fa = 's' } }
+SS.follow_tick(seq, grid); eq('follow stop', SS.pend[1] and SS.pend[1].ri, 'stop')
+SS.live = { [1] = { ri = 1, phase = 114, len = 4, full = 4, a = 0, fired = 114, fa = 'n' } }; SS.pend = {}
+SS.follow_tick(seq, grid); near('follow past the zone end waits for the loop jump', SS.pend[1] and SS.pend[1].at or 0, 116)
+SS.live, SS.pend, SS.todo = {}, {}, {}
+
 -- ── mlr (7 окт): прыжок и луп отрезка ────────────────────────────────────
 -- слот intro 0..4 с = 8 шагов по 0.5 с; играет на треке 1 с фазой 104
 SS.live, SS.pend, SS.todo = { [1] = { ri = 1, phase = 104, len = 4, full = 4, a = 0 } }, {}, {}

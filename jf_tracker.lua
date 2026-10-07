@@ -3935,6 +3935,51 @@ ctx = {
     vim.msg = ('%s: %.1f dB'):format(c.name or ('track ' .. ci), db)
   end,
   ss_is_big = function() return state.ss_big and true or false end,
+  -- session в масштабе трекера (7 окт): строка точек, метр, follow actions
+  empty_row = function(y) draw.empty_row(L, y) end,
+  ss_clip_rows = function() return tonumber(state.ssrows) or 3 end,
+  ss_mv = {},
+  ss_meter = function(ci)
+    local c = snap and snap.cols[ci]
+    if not (c and c.track and reaper.ValidatePtr(c.track, 'MediaTrack*')) then return 0 end
+    local v = math.max(reaper.Track_GetPeakInfo(c.track, 0), reaper.Track_GetPeakInfo(c.track, 1))
+    local o = ctx.ss_mv[ci] or 0
+    v = math.max(v, o * 0.88)
+    ctx.ss_mv[ci] = v
+    -- шкала дБ: −60..0 → 0..1
+    return v > 1e-4 and math.max(0, (20 * math.log(v, 10) + 60) / 60) or 0
+  end,
+  -- follow actions: P_EXT:jf_ssfa трека = «idx=a,idx=a» (idx — номер региона-слота)
+  ss_fa_cache = {},
+  ss_fa = function(ci, ri, sq)
+    local c = snap and snap.cols[ci]
+    local rg = (sq or seq)[ri]
+    if not (c and c.track and rg) then return 'l' end
+    local cache = ctx.ss_fa_cache[c.guid]
+    local now = reaper.time_precise()
+    if not cache or now - cache.t > 1 then
+      local _, v = reaper.GetSetMediaTrackInfo_String(c.track, 'P_EXT:jf_ssfa', '', false)
+      cache = { t = now, map = {} }
+      for k, a in (v or ''):gmatch('(%d+)=(%a)') do cache.map[tonumber(k)] = a end
+      ctx.ss_fa_cache[c.guid] = cache
+    end
+    return cache.map[rg.idx] or 'l'
+  end,
+  ss_fa_set = function(ci, ri, sq, a)
+    local c = snap and snap.cols[ci]
+    local rg = (sq or seq)[ri]
+    if not (c and c.track and rg) then return end
+    ctx.ss_fa(ci, ri, sq)
+    local map = ctx.ss_fa_cache[c.guid].map
+    map[rg.idx] = a ~= 'l' and a or nil
+    local parts = {}
+    for k, v in pairs(map) do parts[#parts + 1] = k .. '=' .. v end
+    table.sort(parts)
+    reaper.GetSetMediaTrackInfo_String(c.track, 'P_EXT:jf_ssfa', table.concat(parts, ','), true)
+    -- играет этот клип — действие сразу в силе
+    local lv = MX.SS.live[ci]
+    if lv and lv.ri == ri then lv.fa = a; lv.fa_done = nil end
+  end,
   -- песочница тестов: проект без имени, треки sandbox_setup.lua
   is_sandbox = function()
     local _, pname = reaper.EnumProjects(-1, '')
@@ -7876,7 +7921,7 @@ local function frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
-  if snap and seq then MX.SS.tick(seq, snap) end                           -- session: границы квантизации (6 окт)
+  if snap and seq then MX.SS.tick(seq, snap, MX.grid(snap, seq)) end                           -- session: границы квантизации (6 окт)
   do local sz = MX.SS.playing_any(); if sz ~= model.SHOW_ZONE then model.SHOW_ZONE = sz; model.invalidate() end end   -- строки трекера видят зону, пока клипы играют (7 окт)
   if MX.SS.rec then ctx.ss_rec_tick() end                                -- запись в клип: стоп за концом слота
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
@@ -9073,7 +9118,12 @@ local function frame()
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
   end
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
-  if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(hover.topclips and 'top' or 'matrix') end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
+  if U.click and hover.ssfa and snap then   -- буква follow action клипа (7 окт): клик — следующее действие
+    local a = MX.SS.fa_next(ctx.ss_fa(hover.ssfa.ci, hover.ssfa.ri), 1)
+    ctx.ss_fa_set(hover.ssfa.ci, hover.ssfa.ri, seq, a); vim.msg = 'follow action: ' .. MX.SS.FA_NAME[a]
+    U.click = false
+  end
+  if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, snap, MX.grid(snap, seq), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(state.clipsview and 'tracker' or (hover.topclips and 'top' or 'matrix')) end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and bpm_menu then
     if bpm_menu.hover then
