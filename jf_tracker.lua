@@ -8889,6 +8889,23 @@ local function frame()
       hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
     end
   else MX.SS.clip_mode = false end
+  -- выбран клип (7 окт): трекер под клипами — на его слот, курсор — на трек и
+  -- лейн клипа: видно, какие ноты в нём записаны (на смену выбора, не наведение)
+  if state.clipsview and snap and L.flat then
+    local cur = MX.SS.cur
+    local key = cur.ri .. ':' .. cur.ci
+    if key ~= ctx.ss_shown then
+      ctx.ss_shown = key
+      local rg, v = seq[cur.ri], ctx.ss_V().cols[cur.ci]
+      if rg and v and not (state.follow and playing()) then
+        for i, f in ipairs(L.flat) do
+          if f.col == v.col and (not v.lane or (f.lane and f.lane.idx == v.lane)) then vim.cur.fi = i; break end
+        end
+        vim.cur.row = math.floor(rg.r0 + 1e-6)
+        state.row0 = math.max(0, vim.cur.row)
+      end
+    end
+  end
   -- полиметрия в строках (7 окт): зона сессии видна — в колонке каждого играющего
   -- клипа янтарная линия на начале его цикла (у 4/4 и 5/4 — свои швы)
   if model.SHOW_ZONE and not state.ss_big and L.body_h > 0 and snap and L.cols then
