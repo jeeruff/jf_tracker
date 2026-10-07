@@ -156,6 +156,7 @@ local state = {
   ssbsync = flag('ssbsync', true),
   clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
+  eqgraph = flag('eqgraph', true),               -- ReaEQ в DSP: только график (кнопка P — только параметры), 7 окт
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
@@ -421,7 +422,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -4770,6 +4771,7 @@ ctx = {
       { key = 'pmshape', label = 'pm card shape', kind = 'cycle', values = { 'wide', 'compact', 'square' }, desc = 'wide - thumbnail left, name, preview wave, bpm / date, status; compact - three rows, the wave inside the thumbnail; square - thumbnail on top (w in the pm grid)', get = function() return ctx.pm_mod().shape end, set = function(v) ctx.pm_mod().shape = v; ctx.PM.invalidate(); reaper.SetExtState(EXT, 'pmshape', v, true) end },
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
+      flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
@@ -8171,6 +8173,7 @@ local function frame()
     step_labels = ctx.step_labels,
     smart_ok = reaper.file_exists(ctx.smart_input_path),
     dsptrack = state.dsptrack,
+    eqgraph = state.eqgraph,
     trk_io = (state.dsp and not state.khelp) and function(col)
       local tr = col and col.track
       if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
@@ -9439,6 +9442,9 @@ local function frame()
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
+      elseif hover.dspbtn.what == 'vmode' then
+        state.eqgraph = not state.eqgraph; reaper.SetExtState(EXT, 'eqgraph', state.eqgraph and '1' or '0', true)
+        vim.msg = 'ReaEQ: ' .. (state.eqgraph and 'graph only (P - parameters)' or 'parameters only (G - graph)')
       elseif hover.dspbtn.what == 'preset' then ctx.dsp_preset(hover.dspbtn.fx, 'pick')
       elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx)   -- двойной клик не удаляет второй
       elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
@@ -9446,6 +9452,9 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
+    elseif hover.dsprouter then
+      ctx.dsp_big()                                          -- router: DSP big (7 окт)
+      click = { t = now2, zone = 'dsprouter' }
     elseif hover.dsptarget then
       ctx.set_focus('dsp'); ctx.dsp_toggle_target(hover.dsptarget == 'take')
       click = { t = now2, zone = 'dsptarget' }

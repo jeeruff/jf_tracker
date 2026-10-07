@@ -3765,6 +3765,16 @@ function D.frame(L, snap, rows, state, info)
         hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
         hx = hx + bw + L.pad
       end
+      -- router (7 окт): цепочка с роутингом на всё окно (DSP big, zz)
+      do
+        local bw = ms('router') + 2 * L.pad
+        local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
+        set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(hx, dy + 2, bw, L.rh, 1)
+        set(hot and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
+        text(hx + L.pad, dy + 3, 'router', hot and U.AMBER or U.GREY)
+        if hot then hover.dsprouter = true end
+        hx = hx + bw + L.pad
+      end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
       text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
@@ -3795,6 +3805,7 @@ function D.frame(L, snap, rows, state, info)
     local stubw = ms('99>') + 2 * L.pad
     local bh0 = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
     local function ncol_of(f)
+      if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2) / L.rh))
         return math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
@@ -3850,6 +3861,11 @@ function D.frame(L, snap, rows, state, info)
       local tw = bw - 2 * L.pad - 4 * kb - 9
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
       if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - 2 * kb - 5 end
+      -- ReaEQ (7 окт): P — только параметры, G — только график
+      if f.view == 'eq' and tw > L.cw * 8 + kb then
+        bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
+        tw = tw - kb - 2
+      end
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
       local pre = info.fx_preset and not f.container and info.fx_preset(f)
@@ -4014,12 +4030,13 @@ function D.frame(L, snap, rows, state, info)
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
       end
-      if f.view and D.FX_VIEWS[f.view] then
+      local eq_only = f.view == 'eq' and info.eqgraph            -- ReaEQ: только график, во весь блок
+      if f.view and D.FX_VIEWS[f.view] and not (f.view == 'eq' and not info.eqgraph) then
         -- вид встроенного эффекта REAPER (4 окт) — первая колонка
         pcol0 = 1
         VRH = L.rh
         D.eq_hit = nil
-        D.fx_view(f.view, f, vals, bx + L.pad, by + L.rh + 1, pw, bh - L.rh - 4)
+        D.fx_view(f.view, f, vals, bx + L.pad, by + L.rh + 1, eq_only and (bw - 2 * L.pad) or pw, bh - L.rh - 4)
         -- ReaEQ: щелчок в виде хватает ближайшую точку полосы (не блок)
         local eh = f.view == 'eq' and D.eq_hit
         if eh and not drag and mx >= eh.x and mx < eh.x + eh.w and my >= eh.y and my < eh.y + eh.h and #eh.pts > 0 then
@@ -4152,6 +4169,7 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.dspab = { f = f, x = tx0, w = tw0 } end
       end
       for pi, p in ipairs(f.params) do
+        if eq_only then break end
         if not cl and pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)
         local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh

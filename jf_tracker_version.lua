@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'DSP: router button next to take fx opens dsp big; ReaEQ shows only its curve with draggable band points (x frequency, y gain, wheel width), P in its header switches to the parameters only (option reaeq graph only)',
     'dsp big (zz in DSP, :dsp big): the fx chain with its routing on the whole window - parallel rows with split / sum buses, containers as frames with their plugins inside; h l j k walk the signal, a / A add after / in parallel, | joins or leaves a row, s solo in a row, = branches to unity, b x za o',
     'swing is the REAPER project grid swing: a swing button on the transport opens its menu (on / off, amounts with triplet 33 %, grid 1/4..1/32, custom), wheel +-1 %, :swing; new notes, slices, envelope points, the automation item editor and the quantizer follow it; every item has swing on by default (item tab row, item menu)',
     'envelope lanes: - in a lane header hides it, + (and a+ on a track without lanes) adds one from the parameter picker; overlapping automation items get their own narrow handles; automation item points shown on the lanes (option); VISUAL selects the REAPER items and envelope points like the right-drag marquee',
