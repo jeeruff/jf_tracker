@@ -274,10 +274,13 @@ function DB.metrics(L)
   return { nw = cw * 16, nh = 2 * L.rh + 2 * L.pad, gap = cw * 3, bus = cw * 2, pad = L.pad + 2, th = L.rh + L.pad }
 end
 
-function DB.draw(L, x, y, w, h, root, title)
+-- glass (7 окт, опция routerglass): фон полупрозрачный — треки видны сквозь
+-- роутер, узлы плотные
+function DB.draw(L, x, y, w, h, root, title, glass)
   local hover = { dbig = true }
   local m = DB.metrics(L)
-  U.set(U.BG); gfx.rect(x, y, w, h, 1)
+  U.set(U.BG, glass and 0.72 or nil); gfx.rect(x, y, w, h, 1)
+  U.set(U.BG)
   -- шапка: что за цепочка и подсказка
   U.text(x + L.pad, y + L.pad, ctx.fit('router - ' .. (title or ''), w // 2), U.AMBER)
   local help = 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'

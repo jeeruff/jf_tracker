@@ -156,7 +156,8 @@ local state = {
   ssbsync = flag('ssbsync', true),
   clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
-  eqgraph = flag('eqgraph', true),               -- ReaEQ в DSP: только график (кнопка P — только параметры), 7 окт
+  eqgraph = flag('eqgraph', true),
+  routerglass = flag('routerglass', false),       -- роутер полупрозрачный поверх треков (7 окт)               -- ReaEQ в DSP: только график (кнопка P — только параметры), 7 окт
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
@@ -422,7 +423,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'routerglass', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -4771,6 +4772,7 @@ ctx = {
       { key = 'pmshape', label = 'pm card shape', kind = 'cycle', values = { 'wide', 'compact', 'square' }, desc = 'wide - thumbnail left, name, preview wave, bpm / date, status; compact - three rows, the wave inside the thumbnail; square - thumbnail on top (w in the pm grid)', get = function() return ctx.pm_mod().shape end, set = function(v) ctx.pm_mod().shape = v; ctx.PM.invalidate(); reaper.SetExtState(EXT, 'pmshape', v, true) end },
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
+      flag('routerglass', 'router see-through', 'the router over the tracker is half transparent: the tracks show through, the fx boxes stay solid'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
@@ -8582,27 +8584,6 @@ local function frame()
     HN.reset()
     hover = MX.SS.draw_big(L, 0, 0, gfx.w, gfx.h - L.status_h, seq, snap, MX.grid(snap, seq), reaper.time_precise(), reaper.GetPlayPosition())
   end
-  -- DSP big (7 окт): цепочка FX поверх всего
-  -- роутер — на месте трекера (шапки + тело), остальные модули живые (7 окт)
-  if state.dsp_big and not idle_skip and L.body_h > 0 then
-    local root, _, title = ctx.db_tree()
-    if root then
-      -- уголок (proj | region, session | router) остаётся: им роутер и закрывают;
-      -- номера строк под ним гаснут
-      local x0, y0, w0, h0 = L.matrix_w + L.label_w, L.header_y, L.win_w - L.matrix_w - L.label_w, L.header_h + L.body_h
-      U.set(U.BG); gfx.rect(L.matrix_w, L.body_y, L.label_w, L.body_h, 1)
-      if not HN.active then
-        local keep = {}
-        for _, t in ipairs(HN.targets) do
-          if not (t.y and t.y >= y0 and t.y < y0 + h0 and t.x and t.x >= x0 and t.x < x0 + w0) then keep[#keep + 1] = t end
-        end
-        HN.targets = keep
-      end
-      local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title)
-      local mx, my = gfx.mouse_x, gfx.mouse_y
-      if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then hover = hv end
-    end
-  end
   idle.hover = hover
   -- debug: нажатия мыши — что под ней (6 окт)
   if state.debug then
@@ -8663,6 +8644,27 @@ local function frame()
           t = t + l.len; guard = guard + 1
         end
       end
+    end
+  end
+  -- DSP big (7 окт): после clips и линий полиметрии — роутер всегда сверху
+  -- роутер — на месте трекера (шапки + тело), остальные модули живые (7 окт)
+  if state.dsp_big and not idle_skip and L.body_h > 0 then
+    local root, _, title = ctx.db_tree()
+    if root then
+      -- уголок (proj | region, session | router) остаётся: им роутер и закрывают;
+      -- номера строк под ним гаснут
+      local x0, y0, w0, h0 = L.matrix_w + L.label_w, L.header_y, L.win_w - L.matrix_w - L.label_w, L.header_h + L.body_h
+      U.set(U.BG); gfx.rect(L.matrix_w, L.body_y, L.label_w, L.body_h, 1)
+      if not HN.active then
+        local keep = {}
+        for _, t in ipairs(HN.targets) do
+          if not (t.y and t.y >= y0 and t.y < y0 + h0 and t.x and t.x >= x0 and t.x < x0 + w0) then keep[#keep + 1] = t end
+        end
+        HN.targets = keep
+      end
+      local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title, state.routerglass)
+      local mx, my = gfx.mouse_x, gfx.mouse_y
+      if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then hover = hv; idle.hover = hover end
     end
   end
   if state.macro and L.body_h > 0 then
