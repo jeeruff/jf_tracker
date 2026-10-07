@@ -157,6 +157,7 @@ local state = {
   ssbsync = flag('ssbsync', true),
   clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
+  measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
   whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
   browserleft = flag('browserleft', false),       -- браузер слева над матрицей, вкладка fx (7 окт)
@@ -179,7 +180,8 @@ local state = {
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
-  wzoom = tonumber(reaper.GetExtState(EXT, 'wzoom')) or 0,      -- зум ширины треков (3 окт)
+  wzoom = 0,                                                       -- 7 окт: прежний зум 0/1/2 заменён уровнями wzlevel
+  wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')),         -- общий уровень ширины треков (Cmd + гор. колесо), nil — как у трека
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
@@ -827,12 +829,15 @@ ctx = {
   -- sync track header size (6 окт): высота трека REAPER (I_TCPH) ↔ свёртка
   -- колонки: < 36 px — свёрнута (mini), < 80 — компактная, выше — полная;
   -- свёртка в трекере ставит высоту 24 / 56 / 96 (I_HEIGHTOVERRIDE)
-  HDR_H = { mini = 24, compact = 56, full = 96 },
+  HDR_H = { mini = 24, compact = 34, full = 64 },   -- 7 окт: высоты = уровни 0 / 1 / 4 (шаг 10 px)
   hdr_want = function(h) return h < 36 and 'mini' or (h < 80 and true or nil) end,
+  -- 7 окт: высота → уровень ширины колонки, шаг 10 px (24 px — полоска)
+  hdr_level = function(h) return math.max(0, math.min(L and L.MAXLVL or 10, math.floor((h - 24) / 10 + 0.5))) end,
   hdr_push = function(col)
     if not (state.synchdr and col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
     local f = state.folds[col.guid]
     local h = f == 'mini' and ctx.HDR_H.mini or (f and ctx.HDR_H.compact or ctx.HDR_H.full)
+    if state.wlevel then state.wlevel[col.guid] = f == 'mini' and 0 or (f and 1 or nil) end   -- za — уровень сбрасывается к свёртке
     reaper.SetMediaTrackInfo_Value(col.track, 'I_HEIGHTOVERRIDE', h)
     reaper.TrackList_AdjustWindows(false)
     ctx.hdr_t = reaper.time_precise() + 0.5           -- REAPER применит высоту не сразу — опрос чуть позже
@@ -844,8 +849,11 @@ ctx = {
     ctx.hdr_t = now
     for _, c in ipairs(snap.cols or {}) do
       if c.track and c.guid and reaper.ValidatePtr(c.track, 'MediaTrack*') then
-        local want = ctx.hdr_want(reaper.GetMediaTrackInfo_Value(c.track, 'I_TCPH'))
-        if state.folds[c.guid] ~= want then state.folds[c.guid] = want end
+        local h = reaper.GetMediaTrackInfo_Value(c.track, 'I_TCPH')
+        -- 7 окт: колесо — по одному полю (уровни), не сразу полная / нота / полоска
+        state.wlevel = state.wlevel or {}
+        local lv = ctx.hdr_level(h)
+        if state.wlevel[c.guid] ~= lv then state.wlevel[c.guid] = lv; ctx.hdr_lv_t = now end
       end
     end
   end,
@@ -2153,13 +2161,17 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug|clipsview,dsp_big,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure|clipsview,dsp_big,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
   quick_str = function()
     local q = state.quick
     -- 7 окт: session и router — в начале средней колонки (и в своей раскладке)
+    if q and not q:find('measure', 1, true) then   -- 7 окт: measure — в конец левой колонки
+      local a, rest = q:match('^([^|]*)(|.*)$')
+      if a then q = a .. ',measure' .. rest; state.quick = q end
+    end
     if q and q:find('dsp_big', 1, true) and not q:find('whichkey', 1, true) then   -- whichkey — в начало третьей колонки
       local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
       if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
@@ -4915,6 +4927,7 @@ ctx = {
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
+      flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). Right click / Esc - off'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
@@ -8930,6 +8943,24 @@ local function frame()
     end
   end
   draw.popup(L, pop, anchor)
+  -- линейка measure (7 окт): перекрестье у мыши, рамка от начала до мыши / конца, размер
+  if state.measure then
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    U.set(U.CYAN, 0.35); gfx.rect(0, my, gfx.w, 1, 1); gfx.rect(mx, 0, 1, gfx.h, 1)
+    local M = ctx.meas
+    if M and M.a then
+      local bx, by = M.b and M.b[1] or mx, M.b and M.b[2] or my
+      local x0, y0 = math.min(M.a[1], bx), math.min(M.a[2], by)
+      local w, h = math.abs(bx - M.a[1]), math.abs(by - M.a[2])
+      U.set(U.AMBER, 0.12); gfx.rect(x0, y0, w + 1, h + 1, 1)
+      U.set(U.AMBER); gfx.rect(x0, y0, w + 1, h + 1, 0)
+      local lab = ('%dx%d px  %.1f x %.1f'):format(w, h, w / L.cw, h / L.rh)
+      local lw = U.measure(lab) + 2 * L.pad
+      local lx, ly = math.min(gfx.w - lw - 2, bx + 6), math.max(0, by - L.rh - 4)
+      U.set(U.BG); gfx.rect(lx, ly, lw, L.rh + 2, 1)
+      U.text(lx + L.pad, ly + 1, lab, U.AMBER)
+    end
+  end
   -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
@@ -9245,6 +9276,39 @@ local function frame()
     else
       local r = draw.popup_rect
       if not (r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]) then vim.hydra = nil end
+    end
+    U.click, U.rclick = false, false
+  end
+  -- линейка measure (7 окт): щелчки ставят точки, а не нажимают; второй —
+  -- отчёт (px, знаки, строки, что под точками) в статус, ExtState measure и,
+  -- с debug, в журнал. ПКМ — выкл; щелчок по самой опции — как обычно
+  if state.measure and (U.click or U.rclick) and hover.ctrl ~= 'measure' then
+    local function under(hv)
+      local parts = {}
+      for k, v in pairs(hv or {}) do
+        local tv = type(v)
+        if tv == 'string' or tv == 'number' or tv == 'boolean' then parts[#parts + 1] = k .. '=' .. tostring(v)
+        elseif tv == 'table' then
+          local sub = {}
+          for k2, v2 in pairs(v) do local t2 = type(v2); if t2 == 'string' or t2 == 'number' or t2 == 'boolean' then sub[#sub + 1] = k2 .. ':' .. tostring(v2) end end
+          table.sort(sub); parts[#parts + 1] = k .. '{' .. table.concat(sub, ' ', 1, math.min(#sub, 6)) .. '}'
+        end
+      end
+      table.sort(parts)
+      return ('focus %s | %s'):format(state.focus, table.concat(parts, ' '))
+    end
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    if U.rclick then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'
+    elseif not ctx.meas or ctx.meas.b then ctx.meas = { a = { mx, my, under(hover) } }; vim.msg = 'measure: click the end point (right click - off)'
+    else
+      local M = ctx.meas
+      M.b = { mx, my, under(hover) }
+      local w, h = math.abs(mx - M.a[1]), math.abs(my - M.a[2])
+      local rep = ('measure %dx%d px = %.1f chars x %.1f rows (cw %d rh %d, window %dx%d) | A %d,%d %s | B %d,%d %s'):format(
+        w, h, w / L.cw, h / L.rh, L.cw, L.rh, gfx.w, gfx.h, M.a[1], M.a[2], M.a[3], mx, my, M.b[3])
+      reaper.SetExtState(EXT, 'measure', rep, false)
+      if state.debug then ctx.dlog(rep) end
+      vim.msg = ('measure: %d x %d px = %.1f chars x %.1f rows%s'):format(w, h, w / L.cw, h / L.rh, state.debug and ' (in the debug log)' or '')
     end
     U.click, U.rclick = false, false
   end
@@ -10739,8 +10803,15 @@ local function frame()
       local nv, nh = ctx.zoom_steps('v', zv), ctx.zoom_steps('h', zh)
       if nv ~= 0 then ctrl_action('lpb', nv > 0 and 1 or -1) end
       if nh ~= 0 then
-        state.wzoom = math.max(0, math.min(2, (state.wzoom or 0) - (nh > 0 and 1 or -1)))
-        vim.msg = 'width zoom: ' .. ({ [0] = 'as set per track', [1] = 'all compact', [2] = 'all strips' })[state.wzoom]
+        -- 7 окт: по одному полю за шаг (уровни 0..MAXLVL), от полной ширины
+        local cur = state.wzlevel or (3 + math.min(L.MAXFX or 4, state.fxcols or 0))
+        local nl = cur + (nh > 0 and 1 or -1)                  -- nh > 0 — шире (как прежний зум)
+        if nl > (L.MAXLVL or 10) then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека
+        state.wzlevel = nl
+        reaper.SetExtState(EXT, 'wzlevel', nl and tostring(nl) or '', true)
+        if not nl then vim.msg = 'width: as set per track'; nl = -1 end
+        local NAMES = { [0] = 'strips', 'notes', 'note + vol', 'note + vol + delay' }
+        if nl >= 0 then vim.msg = 'width: ' .. (NAMES[nl] or (nl <= 3 + (L.MAXFX or 4) and ('+ ' .. (nl - 3) .. ' fx column(s)') or ('+ ' .. (nl - 3 - (L.MAXFX or 4)) .. ' note column(s)'))) .. '  (automation shows when a track is wider than 50 chars)' end
       end
       gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
     end
@@ -11020,6 +11091,7 @@ local function frame()
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
+  if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Tab (7 окт): Tab — трекер ↔ session, Shift+Tab — фокус назад, Option+Tab /
   -- Option+Shift+Tab — фокус по модулям по кругу (был Tab), Ctrl+Tab — вкладки

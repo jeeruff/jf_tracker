@@ -320,6 +320,22 @@ function D.layout(snap, state, nregions)
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
+  -- уровни ширины колонки (7 окт): колесо (высота трека REAPER при sync
+  -- header) шагает по одному полю: 0 полоска, 1 нота, 2 + vol, 3 + delay,
+  -- 4..7 + fx-колонки по одной, дальше + подколонки нот; автоматизация — когда
+  -- колонка шире 50 знаков. GL[k] — раскладка подколонки уровня k (1..7)
+  L.MAXFX = 4
+  L.MAXLVL = 3 + L.MAXFX + 3
+  L.GL = { [1] = L.GC }
+  L.GL[2] = setmetatable({ narrow = true, nfx = 0, x_fx = {}, x_del = L.x_vol + L.w_vol + L.pad, nfields = 2,
+                           sub_w = L.x_vol + L.w_vol + L.pad }, { __index = L })
+  for k = 0, L.MAXFX do
+    local t = { nfx = k, x_fx = {}, nfields = 3 + k }
+    local xx = L.x_vol + L.w_vol + L.pad
+    for i = 1, k do t.x_fx[i] = xx; xx = xx + L.w_fx + L.pad end
+    t.x_del = xx; t.sub_w = xx + L.w_del + L.pad
+    L.GL[3 + k] = setmetatable(t, { __index = L })
+  end
   L.env_hex_w = ms(state.envfmt == 'hex' and 'FF' or '127')   -- формат значений (6 окт)
   L.env_bar_w = ms('WWWW')
   -- поле формы сегмента (2 окт): lin sqr slo fas fae bez — справа от значения
@@ -480,10 +496,12 @@ function D.layout(snap, state, nregions)
     end
     -- fold: true — компактный вид (волна + нота), 'mini' — полоска в символ (прежний fold)
     local fs = state.folds[col.guid]
+    -- уровень ширины (7 окт): задан — колонка по нему, свёртка za не действует
+    local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
+    if lvl then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
-    if (state.wzoom or 0) >= 2 then fs = 'mini' elseif (state.wzoom or 0) == 1 and fs == nil then fs = true end
     local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini', compact = fs == true, hidden = hidden }
     local lx = (c.x or 0) + 1
     if c.folded then
@@ -494,11 +512,13 @@ function D.layout(snap, state, nregions)
       for li, lane in ipairs(col.lanes) do
         -- минимум подколонок задаёт пользователь кнопками -/+ над лейном (1 окт)
         local nsub = math.max(1, #lane.subs, (state.subs_min or {})[col.guid .. ':' .. tostring(lane.idx)] or 0)
+        if lvl and lvl > 3 + L.MAXFX and li == 1 then nsub = math.max(nsub, 1 + lvl - 3 - L.MAXFX) end   -- шире всех fx — подколонки нот
         local ln = { lane = lane, x = lx, nsub = nsub, f0 = #L.flat + 1, sx = {} }
         local off = 0
         for si = 1, nsub do
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
+          if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           local sw = G and G.sub_w or L.sub_w
           ln.sx[si] = off
           L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
@@ -513,6 +533,7 @@ function D.layout(snap, state, nregions)
       local show_env = state.trackenvs and state.trackenvs[col.guid]
       if show_env == nil then show_env = state.envs end
       if c.compact then show_env = true end         -- свёрнутый: автоматизация видна всегда, схемой
+      if lvl then show_env = (lx - (c.x or 0)) >= 50 * L.cw end   -- уровни: автоматизация — последней, когда колонка шире 50 знаков
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
         local ew = c.compact and L.env_cw or L.env_w

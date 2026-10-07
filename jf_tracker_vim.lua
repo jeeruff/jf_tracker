@@ -116,6 +116,7 @@ local function nfields(fi)
   if f.ml then return 1 end                 -- MIDI-лейн (CC / PC / артикуляции / SysEx): одно поле
   if f.env then return f.compact and 1 or 2 end   -- огибающая: значение, форма сегмента (свёрнутый — только значение)
   if f.compact then return 1 end           -- свёрнутый трек: только нота
+  if f.G and f.G.nfields then return f.G.nfields end   -- уровень ширины (7 окт): свои поля
   if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
   return 3 + (ctx.state.fxcols or 0)
 end
