@@ -619,6 +619,50 @@ function E.item_slices(it)
 end
 
 -- записать нарезку в item-инструмент (пустая таблица — снять)
+-- Opt+Enter в браузере (7 окт): файл — новым слайсом в конец инструмента.
+-- Слайсы — позиции в одном item, поэтому файл ставится вплотную за сэмпл
+-- инструмента и они склеиваются нативным glue REAPER (новый файл); слайсы
+-- прежние + стык. Возвращает новый item (или nil)
+function E.slice_append(it, path)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return nil end
+  local out
+  run('add the file as a slice', function()
+    local tr = R.GetMediaItem_Track(it)
+    local pos, len = R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local old = E.item_slices(it)
+    local tk0 = R.GetActiveTake(it)
+    local name = ''
+    if tk0 then local _, n = R.GetSetMediaItemTakeInfo_String(tk0, 'P_NAME', '', false); name = n or '' end
+    local src = R.PCM_Source_CreateFromFile(path)
+    if not src then return end
+    local slen = R.GetMediaSourceLength(src)
+    if not slen or slen <= 0 then return end
+    local nit = R.AddMediaItemToTrack(tr)
+    local ntk = R.AddTakeToMediaItem(nit)
+    R.SetMediaItemTake_Source(ntk, src)
+    R.SetMediaItemInfo_Value(nit, 'D_POSITION', pos + len)
+    R.SetMediaItemInfo_Value(nit, 'D_LENGTH', slen)
+    R.SetMediaItemInfo_Value(nit, 'I_FIXEDLANE', R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE'))
+    R.SelectAllMediaItems(0, false)
+    R.SetMediaItemSelected(it, true); R.SetMediaItemSelected(nit, true)
+    R.Main_OnCommand(41588, 0)                       -- Item: Glue items
+    local g = R.GetSelectedMediaItem(0, 0)
+    if not g then return end
+    local sl = {}
+    if #old == 0 then sl[1] = 0 else for _, t in ipairs(old) do sl[#sl + 1] = t end end
+    sl[#sl + 1] = len
+    local parts = {}
+    for _, t in ipairs(sl) do parts[#parts + 1] = ('%.6f'):format(t) end
+    R.GetSetMediaItemInfo_String(g, 'P_EXT:jf_slices', table.concat(parts, ','), true)
+    local gtk = R.GetActiveTake(g)
+    R.GetSetMediaItemInfo_String(g, 'P_EXT:jf_slice_base', ('%.6f;%.6f;%.6f'):format(gtk and R.GetMediaItemTakeInfo_Value(gtk, 'D_STARTOFFS') or 0, R.GetMediaItemInfo_Value(g, 'D_LENGTH'), 1), true)
+    if gtk and name and name ~= '' then R.GetSetMediaItemTakeInfo_String(gtk, 'P_NAME', name, true) end
+    out = g
+  end)
+  if model then model.invalidate() end
+  return out
+end
+
 function E.set_slices(it, slices)
   run('slices', function()
     local parts = {}

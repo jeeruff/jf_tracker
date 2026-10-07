@@ -806,6 +806,9 @@ function B.key(c)
   elseif ch == 'g' then B.cur = 1
   elseif ch == 'G' then B.cur = #B.entries
   elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
+  elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
+    local e = B.entries[B.cur]
+    if e and not (e.dir or e.db or e.pm or e.pmdir or e.kit or e.trk or e.rgn or e.mark or e.other or e.empty) and ctx.lib_append_slice then ctx.lib_append_slice(B.full(e)) end
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
   elseif ch == ' ' then B.preview()

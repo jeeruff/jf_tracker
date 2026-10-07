@@ -5644,6 +5644,16 @@ ctx = {
   pool_select = pool_select,
   browse = function(path) B.init(ctx, path or B.root); state.side = true end,
   -- файл → депо трека курсора (зона после маркера =LIB на самом треке)
+  -- Opt+Enter в браузере (7 окт): файл — новым слайсом выбранного инструмента
+  lib_append_slice = function(path)
+    local col = cur_col()
+    local e = col and (col.pool or {})[vim.inst]
+    if e and e.parent then e = e.parent end
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then ctx.add_to_depot(path); return end
+    local g = edit.slice_append(e.item, path)
+    if g then reselect_item = g; vim.msg = '+ slice ' .. (path:match('[^/]+$') or path) .. ' -> ' .. (e.name or 'instrument') .. ' (glued into one sample)'
+    else vim.msg = 'could not add the slice' end
+  end,
   add_to_depot = function(path)
     if IMP.kind(path) then ctx.import_sliced(path); return end
     local c = cur_col()
@@ -8240,7 +8250,7 @@ local function frame()
     prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000)
   end
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
-  do local sr = ctx.slice_root(); state.slices_on = (sr and not sr.file and sr.slices and #sr.slices > 0) and true or false end
+  do local sr = ctx.slice_root(); state.slices_on = (sr and not sr.file) and true or false end   -- 7 окт: всегда, когда выбран инструмент (хотя бы «весь сэмпл»)
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
   relayout()
   local t_2 = reaper.time_precise()
@@ -8807,7 +8817,7 @@ local function frame()
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
       for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
-      for kk, t0 in ipairs(root.slices) do
+      for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
         rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = child ~= nil, fx = child and ctx.inst_has_fx(child) }
       end
