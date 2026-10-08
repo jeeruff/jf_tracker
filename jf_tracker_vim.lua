@@ -1611,6 +1611,9 @@ function V.key_impl(c)
       local keys = name and V.regs['@' .. name]
       if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
       V.count = nil; return
+    elseif p == 't' then
+      if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit() else finish_move() end
+      V.count = nil; return
     elseif p == 'da' then
       -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)
       if c == ('w'):byte() and ctx.clear_track(true) then finish_edit() else finish_move() end
@@ -1743,6 +1746,7 @@ function V.key_impl(c)
     if h then V.search = h.name ~= '' and h.name or h.note; V.find_next(1) end
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
+  elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' then V.pending = ch; return
   elseif ch == 'q' then
     if V.macro then

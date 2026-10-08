@@ -1588,6 +1588,24 @@ ctx = {
     return true
   end,
   -- dd (4 окт) — удалить трек курсора целиком (с FX), один undo
+  -- tt (8 окт): новый трек сразу после трека курсора (счётчик — сколько),
+  -- как dd удаляет; курсор переходит на первый новый
+  new_track = function(n)
+    n = math.max(1, math.min(32, n or 1))
+    local f = L.flat[vim.cur.fi]
+    local idx = (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) and math.floor(reaper.GetMediaTrackInfo_Value(f.col.track, 'IP_TRACKNUMBER')) or reaper.CountTracks(0)
+    local first
+    edit.run('new track', function()
+      for k = 0, n - 1 do
+        reaper.InsertTrackAtIndex(idx + k, true)
+        if k == 0 then first = reaper.GetTrack(0, idx) end
+      end
+    end)
+    model.invalidate()
+    ctx.goto_track = first                            -- после пересборки — курсор на него
+    vim.msg = ('tt: %d new track(s) after %s (dd deletes, ctrl+z - back)'):format(n, f and f.col and f.col.name or 'the last')
+    return true
+  end,
   delete_track = function()
     local f = L.flat[vim.cur.fi]
     if not (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) then return false end
@@ -8750,6 +8768,9 @@ local function frame()
   do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split') and true or false end
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
   relayout()
+  if ctx.goto_track and L and L.flat then             -- tt: курсор на новый трек, как только он в раскладке
+    for i, f in ipairs(L.flat) do if f.col and f.col.track == ctx.goto_track and not f.env then vim.cur.fi = i; ctx.goto_track = nil; break end end
+  end
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
   publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise()); mm_settle(reaper.time_precise()); learn_poll()
