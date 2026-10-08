@@ -1623,14 +1623,34 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
   return it
 end
 
+-- конец зоны библиотеки (8 окт): позже всех items после =LIB на ВСЕХ
+-- треках и всех регионов-паттернов библиотеки. Семплы и паттерны делят одну
+-- зону — раньше семпл ставился после items своего трека, а паттерн — после
+-- регионов, и регион ложился поверх семплов (паттерн «съедал» их как своё)
+function E.lib_tail(lib)
+  lib = lib or E.ensure_lib()
+  local t = lib
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+      if p >= lib - 1e-6 then t = math.max(t, p + R.GetMediaItemInfo_Value(it, 'D_LENGTH')) end
+    end
+  end
+  local i = 0
+  while true do
+    local ret, isrgn, p, e = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if isrgn and p >= lib - 1e-6 then t = math.max(t, e) end
+    i = i + 1
+  end
+  return t
+end
+
 -- выделение → депо трека (после =LIB), чтобы потом нарезать как инструмент
 function E.depot_span(track, entry, t0, t1)
-  local pos = E.ensure_lib()
-  for i = 0, R.CountTrackMediaItems(track) - 1 do
-    local it = R.GetTrackMediaItem(track, i)
-    local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-    if e > pos then pos = e end
-  end
+  local pos = E.lib_tail()
   return E.insert_span(track, nil, 4, 0, entry, t0, t1, pos)
 end
 
@@ -2624,12 +2644,7 @@ function E.kit_load(path, track)
   local chunks = E.kit_items(text)
   local n = 0
   run('kit load', function()
-    local pos = E.ensure_lib()
-    for i = 0, R.CountTrackMediaItems(track) - 1 do
-      local it = R.GetTrackMediaItem(track, i)
-      local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if e > pos then pos = e end
-    end
+    local pos = E.lib_tail()   -- 8 окт: общий конец зоны (семплы всех треков и паттерны)
     for _, ch in ipairs(chunks) do
       local it = R.AddMediaItemToTrack(track)
       if R.SetItemStateChunk(it, set_chunk_pos(ch, pos), false) then
@@ -2648,12 +2663,7 @@ function E.depot_add(path, track)
     local tr = track
     local pos = 0
     if tr then
-      pos = E.ensure_lib()
-      for i = 0, R.CountTrackMediaItems(tr) - 1 do
-        local it = R.GetTrackMediaItem(tr, i)
-        local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-        if e > pos then pos = e end
-      end
+      pos = E.lib_tail()
     else
       for ti = 0, R.CountTracks(0) - 1 do
         local t = R.GetTrack(0, ti)
@@ -2717,12 +2727,7 @@ end
 function E.inst_put(track, snaps, names)
   local out = {}
   run('instrument put', function()
-    local pos = E.ensure_lib()
-    for i = 0, R.CountTrackMediaItems(track) - 1 do
-      local it = R.GetTrackMediaItem(track, i)
-      local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if e > pos then pos = e end
-    end
+    local pos = E.lib_tail()   -- 8 окт: общий конец зоны (семплы всех треков и паттерны)
     for k, sn in ipairs(snaps) do
       local it = R.AddMediaItemToTrack(track)
       R.SetItemStateChunk(it, sn.chunk, false)

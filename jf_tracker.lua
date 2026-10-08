@@ -7509,12 +7509,7 @@ function retro_put(target, raw, at_pos, loop_len)
   local tr = c.col.track
   local pos
   if target == 'depot' then
-    pos = edit.ensure_lib()
-    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
-      local it = reaper.GetTrackMediaItem(tr, i)
-      local e = reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if e > pos then pos = e end
-    end
+    pos = edit.lib_tail()   -- 8 окт: общий конец зоны библиотеки
   else
     pos = at_pos or edit.row_time(vim.cur.row, state.lpb, 0)
   end

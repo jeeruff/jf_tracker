@@ -627,6 +627,7 @@ function A.move_to_lib(regions, rg)
   local lib = A.ensure_lib(regions)
   local t = lib
   for _, r in ipairs(regions) do if r.lib and r.rgnend > t then t = r.rgnend end end
+  if edit and edit.lib_tail then t = math.max(t, edit.lib_tail(lib)) end   -- 8 окт: и после семплов зоны
   t = bar_ceil(t)
   local len = rg.rgnend - rg.pos
   local dst = { pos = t, rgnend = t + len, name = rg.name }
