@@ -4907,7 +4907,7 @@ function D.frame(L, snap, rows, state, info)
   end
   -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
   if L.piano_h > 0 then
-    local p = state.hints and info.piano or nil   -- 8 окт: клавиатура — только с подсказками (это подсказка раскладки)
+    local p = (state.hints or state.pianokeys) and info.piano or nil   -- 8 окт: клавиатура — с подсказками или быстрой опцией keys
     if p then p.ins = info.vmode == 'insert' end
     local st
     if L.kbstat or (info.ctrl and info.ctrl.bigstatus) then

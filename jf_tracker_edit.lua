@@ -787,7 +787,7 @@ end
 -- ── note-off: укоротить событие до строки ─────────────────────────────────
 function E.note_off(heads, lpb, row)
   if #heads == 0 then return end
-  local t = row_time(row, lpb, 0)
+  local t = row_time(row + (E.OFF_END and 1 or 0), lpb, 0)   -- 8 окт: OFF в конце строки — нота звучит и на ней
   run('note off', function()
     for _, h in ipairs(heads) do
       if h.kind == 'audio' then

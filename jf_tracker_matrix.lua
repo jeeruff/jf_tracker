@@ -84,7 +84,8 @@ local function cell_of(col, lanes, rg, rgb_of, model)
                   rgb = rgb or nil
                 end
                 ev[#ev + 1] = { pos = (a - rg.r0) / span, len = (b - a) / span, kind = cell.kind, muted = cell.muted, rgb = rgb or col.rgb,
-                                head = cell.kind == 'audio' and cell or nil, cut = (r < rg.r0) and (rg.r0 - r) / math.max(1, r1 - r + 1) or 0 }   -- head: волна в клипе (6 окт)
+                                head = cell.kind == 'audio' and cell or nil, cut = (r < rg.r0) and (rg.r0 - r) / math.max(1, r1 - r + 1) or 0,   -- head: волна в клипе (6 окт)
+                                pitch = cell.kind == 'midi' and r >= rg.r0 and cell.pitch or nil, r0 = r }   -- 8 окт: аккорды клипа (ноты одной строки)
               end
             end
           end

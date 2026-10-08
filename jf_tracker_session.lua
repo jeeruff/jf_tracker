@@ -583,6 +583,36 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
             U.set(c); gfx.rect(ex, ry + L.pad, ew, ih, 1)
           end
         end
+        -- 8 окт: MIDI-клип с аккордами (2+ ноты на строке) — имена аккордов
+        -- поверх блоков, по своим местам, последовательностью; не налезают
+        if ctx.chord_name and chh >= L.rh + 2 then
+          local by, order = {}, {}
+          for _, e in ipairs(cell.ev or {}) do
+            if e.pitch then
+              local g = by[e.r0]
+              if not g then g = { pos = e.pos, p = {} }; by[e.r0] = g; order[#order + 1] = g end
+              g.p[#g.p + 1] = e.pitch
+            end
+          end
+          table.sort(order, function(a, b) return a.pos < b.pos end)
+          local ix = SS.cell_inset or 0
+          local last_x, prev = -1e9, nil
+          for _, g in ipairs(order) do
+            if #g.p >= 2 then
+              local nm = ctx.chord_name(g.p)
+              if nm and nm ~= prev then
+                local tx = cx + ix + L.pad + math.floor(g.pos * (cw - ix - 2 * L.pad))
+                local tw = U.measure(nm)
+                if tx >= last_x and tx + tw <= cx + cw - L.pad then
+                  U.set(U.BG, 0.6); gfx.rect(tx - 1, ry + L.pad, tw + 2, L.rh - 1, 1)
+                  U.text(tx, ry + L.pad, nm, U.TEXT)
+                  last_x = tx + tw + U.measure(' ')
+                end
+                prev = nm
+              end
+            end
+          end
+        end
         if cell.state == 'muted' and chh >= 2 * L.rh then U.text(cx + L.pad, ry + chh - L.rh - 3, 'muted', U.GREY) end
       else
         U.text(cx + math.floor((cw - U.measure('.')) / 2), ry + math.floor((chh - L.rh) / 2), '.', U.DIM)

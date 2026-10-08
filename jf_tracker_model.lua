@@ -327,6 +327,10 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
         -- note-off ровно на границе строки — OFF стоит в этой строке с delay 0;
         -- если конец в той же строке, что и начало, OFF не помещается: нота
         -- короче строки, показываем только голову
+        -- 8 окт: опция «OFF в конце строки» (M.OFF_END): конец ровно на
+        -- границе строки r1 — OFF в последней звучащей строке r1 - 1 (нота
+        -- звучит и на ней); строка r1 свободна для следующей ноты — короче на строку
+        if M.OFF_END and d1 == 0 and r1 > r0 then r1 = r1 - 1 end
         if r1 <= r0 then place(lane, r0, r0, head) else place(lane, r0, r1, head, nil, tail) end
       end
     end

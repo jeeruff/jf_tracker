@@ -170,6 +170,8 @@ local state = {
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,   -- толщина скроллбаров, px (8 окт)
+  offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
+  pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -443,7 +445,7 @@ local function save_win()
   S('sbw', tostring(state.sbw or 3)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2259,7 +2261,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure,title|clipsview,dsp_big,mixer,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -2274,6 +2276,7 @@ ctx = {
       local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
       if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
     end
+    if q and not q:find('pianokeys', 1, true) then q = q:gsub('q_hints', 'q_hints,pianokeys', 1); state.quick = q end   -- 8 окт: keys — под hints
     if q and not q:find('title', 1, true) then local a, rest = q:match('^([^|]*)(|.*)$'); if a then q = a .. ',title' .. rest; state.quick = q end end   -- 8 окт: title — в конец левой колонки
     if q and q:find('dsp_big', 1, true) and not q:find('mixer', 1, true) then q = q:gsub('dsp_big', 'dsp_big,mixer', 1); state.quick = q end   -- 8 окт: mixer — под router
     if q and not q:find('dsp_big', 1, true) then
@@ -4314,6 +4317,7 @@ ctx = {
   -- = 'chord', ещё раз — обратно); :chord Cm7 — гармонайзер: аккорд в строку
   -- курсора (ноты, что там начинаются, заменяются; длина — как у них, иначе
   -- до следующих нот трека, не больше такта)
+  chord_name = function(pitches) return MMX.CH.name(pitches) end,   -- клипы сессии: имена аккордов
   chord_heads = function(col, row)
     local heads, pitches = {}, {}
     for _, lane in ipairs(col.lanes or {}) do
@@ -5391,7 +5395,9 @@ ctx = {
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
+      { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
+      flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
@@ -8562,6 +8568,7 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  if model.OFF_END ~= (state.offend or false) then model.OFF_END, edit.OFF_END = state.offend or false, state.offend or false; model.invalidate() end   -- OFF в конце строки (опция, 8 окт)
   if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
   theme_check()
   if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end
