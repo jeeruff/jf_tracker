@@ -586,23 +586,33 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
         -- 8 окт: MIDI-клип с аккордами (2+ ноты на строке) — имена аккордов
         -- поверх блоков, по своим местам, последовательностью; не налезают
         if ctx.chord_name and chh >= L.rh + 2 then
-          local by, order = {}, {}
-          for _, e in ipairs(cell.ev or {}) do
-            if e.pitch then
-              local g = by[e.r0]
-              if not g then g = { pos = e.pos, p = {} }; by[e.r0] = g; order[#order + 1] = g end
-              g.p[#g.p + 1] = e.pitch
+          -- 8 окт: аккорды клетки — один раз на снимок (клетка живёт до пересборки), не каждый кадр
+          local order = cell._chords
+          if not order then
+            local by = {}
+            order = {}
+            for _, e in ipairs(cell.ev or {}) do
+              if e.pitch then
+                local g = by[e.r0]
+                if not g then g = { pos = e.pos, p = {} }; by[e.r0] = g; order[#order + 1] = g end
+                g.p[#g.p + 1] = e.pitch
+              end
             end
+            table.sort(order, function(a, b) return a.pos < b.pos end)
+            for _, g in ipairs(order) do
+              local nm = #g.p >= 3 and ctx.chord_name(g.p) or nil
+              g.name = (nm and not nm:find('?', 1, true)) and nm or nil
+            end
+            cell._chords = order
           end
-          table.sort(order, function(a, b) return a.pos < b.pos end)
           local ix = SS.cell_inset or 0
           local last_x, prev = -1e9, nil
           -- клетка низкая — имя слота в той же строке: аккорды правее него (без наложений)
           if chh < 2 * L.rh + 4 then last_x = cx + ix + L.pad + U.measure(SS.slot_name(rg, ri)) + U.measure('  ') end
           for _, g in ipairs(order) do
-            if #g.p >= 3 then                          -- 8 окт: 3+ ноты и узнанный аккорд (барабаны — не аккорды: «D7?»)
-              local nm = ctx.chord_name(g.p)
-              if nm and not nm:find('?', 1, true) and nm ~= prev then
+            if g.name then                             -- 3+ ноты и узнанный аккорд (барабаны — не аккорды: «D7?»)
+              local nm = g.name
+              if nm ~= prev then
                 local tx = math.max(last_x, cx + ix + L.pad + math.floor(g.pos * (cw - ix - 2 * L.pad)))   -- тесно — сдвиг вправо, порядок цел
                 local tw = U.measure(nm)
                 if tx + tw <= cx + cw - L.pad then

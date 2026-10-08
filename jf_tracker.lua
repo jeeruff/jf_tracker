@@ -8221,6 +8221,9 @@ end
 -- стартовое значение gridkey не исполняем: оно от прошлого сеанса
 local mx_last, gridkey_last = '', reaper.GetExtState(EXT, 'gridkey')
 local function publish_matrix(playpos)
+  -- 8 окт: читает только daemon_tracker (мономе) — без монома не собираем
+  -- (строка сетки на 425 × 28 клеток каждый кадр стоила ~50 мс)
+  if not mono_read().alive then return end
   -- страница clips грида (7 окт): состояние сессии, команды — poll_gridkey
   do
     local SS = MX.SS
@@ -8784,7 +8787,7 @@ local function frame()
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
-  draw.pmark('layout, status, info')
+  draw.pmark('pre: relayout + polls')
   local t_1 = reaper.time_precise()
   if changed then
     prof.rebuild = (t_1 - t_0) * 1000                              -- пересборка снимка (пульс hb)
@@ -8793,16 +8796,25 @@ local function frame()
   end
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
   -- 8 окт: под инструментами (slices = split) — всегда, и на пустом слоте (заголовок + подсказка)
+  local tq0 = reaper.time_precise()
   do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split') and true or false end
+  local tq1 = reaper.time_precise()
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
+  local tq2 = reaper.time_precise()
   relayout()
+  if state.debug and reaper.time_precise() - tq0 > 0.02 then ctx.dlog(('slow pre: slice_root %.1f hdr_poll %.1f relayout %.1f ms'):format((tq1 - tq0) * 1000, (tq2 - tq1) * 1000, (reaper.time_precise() - tq2) * 1000)) end
   if ctx.goto_track and L and L.flat then             -- tt: курсор на новый трек, как только он в раскладке
     for i, f in ipairs(L.flat) do if f.col and f.col.track == ctx.goto_track and not f.env then vim.cur.fi = i; ctx.goto_track = nil; break end end
   end
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
-  publish_matrix(playpos); publish_state(is_playing); poll_gridkey(); poll_cmd(); poll_midi_in(); poll_audio_in(reaper.time_precise()); settle_puts(reaper.time_precise()); mm_settle(reaper.time_precise()); learn_poll()
+  do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
+    local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
+    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
+    T('poll_audio_in', poll_audio_in, reaper.time_precise()); T('settle_puts', settle_puts, reaper.time_precise()); T('mm_settle', mm_settle, reaper.time_precise()); T('learn_poll', learn_poll)
+  end
 
+  draw.pmark('pre: lock sync')
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
   -- в REAPER → курсор трекера прыгает туда (вид — следом); курсор трекера
   -- сдвинулся (клавиши, мышь) → edit-курсор и выделение трека REAPER следом.
@@ -8839,6 +8851,7 @@ local function frame()
     end
   end
 
+  draw.pmark('pre: listen, follow, view, hover')
   -- step listen (4 окт): транспорт стоит, курсор трекера сменил строку — эта
   -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
   if state.steplisten and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
@@ -8967,6 +8980,7 @@ local function frame()
     end
     if not state.auto_inst then ctx.auto_by_tab = nil end
   end
+  draw.pmark('pre: info table')
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
@@ -9412,6 +9426,7 @@ local function frame()
     end or nil,
   })
   -- большая справка F1 (6 окт): поверх всего окна
+  draw.pmark('post: big views')
   if state.khelp_big and not idle_skip then
     HN.reset()
     hover = ctx.DOC.draw(L, 0, 0, gfx.w, gfx.h - L.status_h)
@@ -9454,6 +9469,7 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
+  draw.pmark('post: effects row')
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
@@ -9472,6 +9488,7 @@ local function frame()
   -- session (7 окт) — 7 строк под шапками треков (шапки живые, тот же масштаб
   -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔
   -- session; в фокусе session — клип-мод: клавиатура QWERTY запускает клипы
+  draw.pmark('post: session clips')
   if state.clipsview and (L.sess_h or 0) > 0 and snap and L.cols then
     local x0, y0, w0, h0 = L.matrix_w, L.sess_y, L.win_w - L.matrix_w, L.sess_h
     if not HN.active then
@@ -9571,6 +9588,7 @@ local function frame()
   end
   -- метки f и призраки бросков — после всех оверлеев (session, эффекты,
   -- роутер), иначе их заливка закрашивала метки клипов и сцен (8 окт)
+  draw.pmark('post: hints, ghosts, popups')
   HN.draw(U, L)
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end

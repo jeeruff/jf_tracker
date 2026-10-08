@@ -8,6 +8,8 @@ V.CHANGES = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
+    'speed: the matrix grid is built in one pass over a track\'s events (was: every note of the track per cell) and its mini automation is sampled lazily, only for drawn cells - the ~110 ms hitch after every project change (425 x 28 cells with the 512-bar matrix) is gone (46 -> 8 ms); the grid string for the monome daemon is built only while the monome is connected; clip chord names cached per cell',
+    'jftop: finer parts (pre: relayout + polls / lock sync / listen, follow, view / info table; post: big views / effects row / session clips / hints, ghosts, popups); with debug on, calls over 20 ms and matrix grid builds over 5 ms go to the debug log',
     'the keyboard under the tracker is a char wider again (readable); option small piano - keys as wide as their letter',
     'ts: a new track "send" that the selected tracks (or the cursor track) send into - a bus / fx return; tr: a new track "source" that sends into them (they get receives)',
     'scrollbars: no full-height track line next to a module edge (it looked like a doubled border), the thumb only, 1 px off the edge',

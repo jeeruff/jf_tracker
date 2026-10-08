@@ -63,13 +63,39 @@ MX.ENV_PTS = 12          -- отсчётов огибающей на ячейк�
 
 -- клетка: события трека col на лейнах lanes в регионе rg (MX.grid — все
 -- лейны трека, MX.vgrid — один лейн виртуальной колонки сессии)
-local function cell_of(col, lanes, rg, rgb_of, model)
+-- 8 окт: события колонки — один раз списком по строке начала (было: для
+-- каждой клетки сетки — перебор всех нот трека; 425 × 28 клеток ≈ 46 мс)
+local function col_index(lanes)
+  local list, maxlen = {}, 1
+  for _, lane in ipairs(lanes) do
+    for _, sub in ipairs(lane.subs) do
+      for r, cell in pairs(sub) do
+        if cell.kind == 'audio' or cell.kind == 'midi' then
+          local n = cell.rows or 1
+          list[#list + 1] = { r = r, cell = cell }
+          if n > maxlen then maxlen = n end
+        end
+      end
+    end
+  end
+  table.sort(list, function(a, b) return a.r < b.r end)
+  return { list = list, maxlen = maxlen }
+end
+local function first_ge(list, v)               -- первый индекс с list[i].r >= v
+  local lo, hi = 1, #list + 1
+  while lo < hi do local m = (lo + hi) // 2; if list[m].r < v then lo = m + 1 else hi = m end end
+  return lo
+end
+local function cell_of(col, lanes, rg, rgb_of, model, idx)
       local span = math.max(1, rg.r1 - rg.r0)
       local has, all_muted, covered, ev = false, true, 0, {}
-      for _, lane in ipairs(lanes) do
-        for _, sub in ipairs(lane.subs) do
-          for r, cell in pairs(sub) do
-            if cell.kind == 'audio' or cell.kind == 'midi' then
+      idx = idx or col_index(lanes)
+      local list = idx.list
+      for k = first_ge(list, rg.r0 - idx.maxlen + 1), first_ge(list, rg.r1) - 1 do
+        local r, cell = list[k].r, list[k].cell
+        do
+          do
+            do
               local r1 = r + (cell.rows or 1) - 1
               if r < rg.r1 and r1 >= rg.r0 then
                 has = true
@@ -92,27 +118,40 @@ local function cell_of(col, lanes, rg, rgb_of, model)
         end
       end
       -- мини-автоматизация: отсчёты каждой огибающей трека на длине региона
-      local envs
-      if model and model.env_samples and col.envs and #col.envs > 0 then
-        envs = {}
-        for _, e in ipairs(col.envs) do
-          envs[#envs + 1] = { e = e, pts = model.env_samples(e, rg.pos, rg.rgnend, MX.ENV_PTS) }
-        end
-      end
-      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envs = envs }
+      -- 8 окт: отсчёты — лениво, при первой отрисовке клетки (MX.cell_envs):
+      -- сетка строится на весь проект после каждой пересборки, и десятки
+      -- Envelope_Evaluate на огибающую в каждой клетке давали пик ~110 мс
+      local envsrc = (model and model.env_samples and col.envs and #col.envs > 0) and { col = col, pos = rg.pos, e1 = rg.rgnend } or nil
+      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envsrc = envsrc }
 end
 
+function MX.cell_envs(g)
+  if g.envs or not g.envsrc then return g.envs end
+  local src, envs = g.envsrc, {}
+  local model = ctx and ctx.model
+  if not model then return nil end
+  for _, e in ipairs(src.col.envs) do envs[#envs + 1] = { e = e, pts = model.env_samples(e, src.pos, src.e1, MX.ENV_PTS) } end
+  g.envs, g.envsrc = envs, nil
+  return envs
+end
 function MX.grid(snap, regions)
   if cache.snap == snap and cache.regs == regions then return cache.grid end
+  local t0 = reaper.time_precise()
   local grid = {}
   local rgb_of = {}        -- item → цвет (один вызов на item)
   local model = ctx and ctx.model
+  local idxs = {}
   for ri, rg in ipairs(regions) do
     local row = {}
-    for ci, col in ipairs(snap.cols) do row[ci] = cell_of(col, col.lanes, rg, rgb_of, model) end
+    for ci, col in ipairs(snap.cols) do
+      idxs[ci] = idxs[ci] or col_index(col.lanes)
+      row[ci] = cell_of(col, col.lanes, rg, rgb_of, model, idxs[ci])
+    end
     grid[ri] = row
   end
   cache.snap, cache.regs, cache.grid = snap, regions, grid
+  local dt = (reaper.time_precise() - t0) * 1000
+  if dt > 5 and ctx and ctx.dlog and ctx.state and ctx.state.debug then ctx.dlog(('matrix grid %d x %d: %.1f ms'):format(#regions, #snap.cols, dt)) end
   return grid
 end
 
@@ -143,9 +182,10 @@ function MX.vgrid(snap, regions)
   local vs = MX.vcols(snap)
   if vcache.grid and vcache.regs == regions then return vcache.grid end
   local grid, rgb_of, model = {}, {}, ctx and ctx.model
+  local vidx = {}
   for ri, rg in ipairs(regions) do
     local row = {}
-    for vi, v in ipairs(vs.cols) do row[vi] = cell_of(v.col, v.lanes, rg, rgb_of, model) end
+    for vi, v in ipairs(vs.cols) do vidx[vi] = vidx[vi] or col_index(v.lanes); row[vi] = cell_of(v.col, v.lanes, rg, rgb_of, model, vidx[vi]) end
     grid[ri] = row
   end
   vcache.grid, vcache.regs = grid, regions
@@ -434,6 +474,7 @@ function MX.draw(L, snap, regions, info)
             U.set(e.muted and U.mix(U.GREY, U.BG, 0.5) or U.mix(rgb, U.BG, 0.25)); gfx.rect(x + 2, ey, iw, eh, 1)
             U.set(e.muted and U.GREY or rgb); gfx.rect(x + 2, ey, iw, eh, 0)
           end
+          if g.envsrc or g.envs then MX.cell_envs(g) end
           if g.envs and info.env_shown and info.env_shown(col) then
             for _, en in ipairs(g.envs) do
               local n = #en.pts
