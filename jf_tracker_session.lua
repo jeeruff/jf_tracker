@@ -597,13 +597,15 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
           table.sort(order, function(a, b) return a.pos < b.pos end)
           local ix = SS.cell_inset or 0
           local last_x, prev = -1e9, nil
+          -- клетка низкая — имя слота в той же строке: аккорды правее него (без наложений)
+          if chh < 2 * L.rh + 4 then last_x = cx + ix + L.pad + U.measure(SS.slot_name(rg, ri)) + U.measure('  ') end
           for _, g in ipairs(order) do
             if #g.p >= 2 then
               local nm = ctx.chord_name(g.p)
               if nm and nm ~= prev then
-                local tx = cx + ix + L.pad + math.floor(g.pos * (cw - ix - 2 * L.pad))
+                local tx = math.max(last_x, cx + ix + L.pad + math.floor(g.pos * (cw - ix - 2 * L.pad)))   -- тесно — сдвиг вправо, порядок цел
                 local tw = U.measure(nm)
-                if tx >= last_x and tx + tw <= cx + cw - L.pad then
+                if tx + tw <= cx + cw - L.pad then
                   U.set(U.BG, 0.6); gfx.rect(tx - 1, ry + L.pad, tw + 2, L.rh - 1, 1)
                   U.text(tx, ry + L.pad, nm, U.TEXT)
                   last_x = tx + tw + U.measure(' ')

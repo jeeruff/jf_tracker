@@ -4793,7 +4793,8 @@ function D.frame(L, snap, rows, state, info)
   if L.status_in > 0 then
     -- в модуле трекера: под треками (от границы матрицы), под матрицей — её фон
     sx, sy, sw, sh = L.matrix_w, L.stat_y, L.win_w - L.matrix_w, L.status_in
-    if L.matrix_w > 0 then set(U.PANEL); gfx.rect(0, sy, L.matrix_w, sh, 1) end
+    -- 8 окт: только если под статусом — матрица; браузер слева / матрица до DSP — не трогать (рвало браузер)
+    if L.matrix_w > 0 and not L.lside_rect and not L.mx_ext and not state.mx_hidden then set(U.PANEL); gfx.rect(0, sy, L.matrix_w, sh, 1) end
   end
   if sh > 0 then
     set(U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
