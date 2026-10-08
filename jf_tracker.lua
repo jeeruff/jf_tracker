@@ -929,6 +929,8 @@ ctx = {
   -- ── заметки (2 окт): project — заметки проекта; context — item под курсором,
   -- без item — трек (заметки трека SWS) ──────────────────────────────────────
   notes_owner = function()
+    if NT.target == 'dev' and not state.debug then NT.target = 'project' end
+    if NT.target == 'dev' then return 'dev', DIR .. '/CHECK.md', 'dev notes: what to check (CHECK.md, not in the project)' end   -- 8 окт
     if NT.target == 'project' then return 'project', nil, 'project notes' end
     local item = ctx.item_at_cursor()
     if item then
@@ -943,6 +945,7 @@ ctx = {
     local kind, obj, title = ctx.notes_owner()
     local text = ''
     if kind == 'project' then text = reaper.GetSetProjectNotes(0, false, '')
+    elseif kind == 'dev' then local fh = io.open(obj, 'r'); if fh then text = fh:read('a') or ''; fh:close() end; NT.dev_text = text
     elseif kind == 'item' then local _, t = reaper.GetSetMediaItemInfo_String(obj, 'P_NOTES', '', false); text = t or ''
     elseif kind == 'track' then text = reaper.NF_GetSWSTrackNotes and reaper.NF_GetSWSTrackNotes(obj) or '' end
     NT.set(text); NT.owner = obj; NT.kind = kind; NT.title = title
@@ -951,6 +954,7 @@ ctx = {
     if not NT.dirty then return end
     local text = NT.text()
     if NT.kind == 'project' then reaper.GetSetProjectNotes(0, true, text)
+    elseif NT.kind == 'dev' and NT.owner then local fh = io.open(NT.owner, 'w'); if fh then fh:write(text); fh:close(); NT.dev_text = text end
     elseif NT.kind == 'item' and NT.owner and reaper.ValidatePtr(NT.owner, 'MediaItem*') then
       edit.run('item notes', function() reaper.GetSetMediaItemInfo_String(NT.owner, 'P_NOTES', text, true) end)
     elseif NT.kind == 'track' and NT.owner and reaper.NF_SetSWSTrackNotes then reaper.NF_SetSWSTrackNotes(NT.owner, text) end
@@ -961,6 +965,17 @@ ctx = {
     if state.notes_open then state.top = true; ctx.notes_load(); ctx.set_focus('notes')
     else ctx.notes_save(); if state.focus == 'notes' then ctx.set_focus('tracker') end end
     vim.msg = state.notes_open and ('notes: ' .. (NT.title or '')) or 'notes closed'
+  end,
+  -- dev notes (8 окт): файл CHECK.md меняется снаружи (его пополняет Claude) —
+  -- открытый редактор без своих правок перечитывает его раз в 2 с
+  notes_dev_poll = function()
+    if not (state.notes_open and NT.kind == 'dev' and not NT.dirty and NT.owner) then return end
+    local now = reaper.time_precise()
+    if now - (ctx.dev_poll_t or 0) < 2 then return end
+    ctx.dev_poll_t = now
+    local fh = io.open(NT.owner, 'r'); if not fh then return end
+    local text = fh:read('a') or ''; fh:close()
+    if text ~= NT.dev_text then local l, c = NT.l, NT.c; NT.set(text); NT.l, NT.c = math.min(l, #NT.lines), 0; NT.dev_text = text end
   end,
   notes_target = function(t)
     ctx.notes_save(); NT.target = t; ctx.notes_load(); ctx.set_focus('notes')
@@ -6320,6 +6335,9 @@ ctx = {
               if state.notes_open then ctx.notes_target('project') else NT.target = 'project'; ctx.notes_toggle() end end },
           { key = 'c', label = 'notes of the item under the cursor', fn = function()
               if state.notes_open then ctx.notes_target('context') else NT.target = 'context'; ctx.notes_toggle() end end },
+          { key = 'd', label = 'dev notes: what to check (with debug on)', fn = function()
+              if not state.debug then vim.msg = 'dev notes live in debug mode: turn debug on'; return end
+              if state.notes_open then ctx.notes_target('dev') else NT.target = 'dev'; ctx.notes_toggle() end end },
           { key = 's', label = 'save the project', fn = function() reaper.Main_OnCommand(40026, 0); vim.msg = 'project saved' end },
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           { key = 'a', label = 'about', fn = function() ctrl_action('about', 0) end },
@@ -8370,6 +8388,7 @@ local function frame()
   U.begin_frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   PV.tick()
+  ctx.notes_dev_poll()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
   if snap and seq then MX.SS.tick(seq, ctx.ss_V(), ctx.ss_G()) end                           -- session: границы квантизации (6 окт)
   do local sz = MX.SS.playing_any(); if sz ~= model.SHOW_ZONE then model.SHOW_ZONE = sz; model.invalidate() end end   -- строки трекера видят зону, пока клипы играют (7 окт)
@@ -8852,6 +8871,7 @@ local function frame()
     notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
+      NT.show_dev = state.debug
       if sc <= 0 or sc == draw.SCALE then return NT.draw(U, Lx, x, y, w, h, state.focus == 'notes', ctx.fit, NT.title) end
       local s0, extra = draw.SCALE, Lx.rh - draw.texth()
       draw.SCALE = sc
@@ -10197,7 +10217,7 @@ local function frame()
       if e and not e.dir and not e.db and not e.pmdir and not e.mark then B.drag = { e = e, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
     elseif hover.notes then
       ctx.set_focus('notes')
-      if hover.notes == 'project' or hover.notes == 'context' then ctx.notes_target(hover.notes) end
+      if hover.notes == 'project' or hover.notes == 'context' or hover.notes == 'dev' then ctx.notes_target(hover.notes) end
       -- плавающее окошко: шапка — перенос, угол — размер (4 окт)
       if (hover.notes == 'drag' or hover.notes == 'resize') and L.notes_rect then
         local r = L.notes_rect

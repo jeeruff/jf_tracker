@@ -20,7 +20,7 @@ NT.lines = { '' }
 NT.l, NT.c = 1, 0          -- курсор: строка, символ (0 — перед первым)
 NT.scroll = 0
 NT.dirty = false
-NT.target = 'project'      -- 'project' | 'context'
+NT.target = 'project'      -- 'project' | 'context' | 'dev' (CHECK.md, с debug)
 
 local LEFT, RIGHT, UP, DOWN, HOME, END, DEL = 1818584692, 1919379572, 30064, 1685026670, 1752132965, 6647396, 6579564
 
@@ -120,7 +120,7 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
   U.set(U.LINE); gfx.rect(x + w - 1, y, 1, h, 1)
   -- шапка: [project] [context] и чьи заметки
   local bx = x + L.pad
-  for _, t in ipairs({ 'project', 'context' }) do
+  for _, t in ipairs(NT.show_dev and { 'project', 'context', 'dev' } or { 'project', 'context' }) do   -- dev — только в режиме debug (8 окт)
     local bw = U.measure(t) + 2 * L.pad
     local on = NT.target == t
     local hot = mx >= bx and mx < bx + bw and my >= y + 2 and my < y + 2 + L.rh
