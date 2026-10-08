@@ -8420,6 +8420,18 @@ local function frame()
   draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
   local hover
   if idle_skip then hover = idle.hover else
+  -- 8 окт: вкладка automation включает в lib строку automation — в модуле
+  -- слайсов список automation items трека; уход с вкладки — обратно, если
+  -- включила она (выбранное руками остаётся)
+  do
+    local tab = state.top and state.toptab or nil
+    if tab ~= ctx.tab_seen then
+      if tab == 'modulation' and not state.auto_inst then state.auto_inst = true; ctx.auto_by_tab = true
+      elseif ctx.tab_seen == 'modulation' and ctx.auto_by_tab then state.auto_inst = false; ctx.auto_by_tab = nil end
+      ctx.tab_seen = tab
+    end
+    if not state.auto_inst then ctx.auto_by_tab = nil end
+  end
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
