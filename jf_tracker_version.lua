@@ -8,6 +8,7 @@ V.CHANGES = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
+    'mouse selection drag: the DSP panel keeps the track where the drag started, lock does not push the track selection to REAPER until release, step listen stays quiet - no more 8 fps while dragging across tracks',
     'fx chips under the headers: a click selects the fx in DSP, a double click opens its native window (with param on too)',
     'modules sit tight (one 1 px line between neighbours; the module gap option is gone); the focus frame is drawn inside the active module, so the neighbour keeps its grey edge',
     'top panel position clips: the tabs module under the session clips, above the tracker rows',

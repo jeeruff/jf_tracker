@@ -601,7 +601,9 @@ end
 -- (state.dsp_take — включается строкой «take fx» в свойствах сэмпла, t в DSP)
 local dspt_cache = {}
 local function dsp_target()
-  local col = cur_col()
+  -- 8 окт: пока тянут выделение мышью — DSP держит трек начала протяжки
+  -- (иначе каждая новая колонка перестраивала панель, 8 fps)
+  local col = (sel_drag and sel_drag.active and sel_drag.col) or cur_col()
   if not col then return nil end
   if state.dsp_take then
     local e = (col.pool or {})[vim.inst]
@@ -8773,7 +8775,7 @@ local function frame()
         local fi = fi_of(sel_tr); if fi then vim.cur.fi = fi end
       end
       lock_sync.cp, lock_sync.tr, lock_sync.row, lock_sync.fi = curpos, sel_tr, vim.cur.row, vim.cur.fi
-    elseif vim.cur.row ~= lock_sync.row or vim.cur.fi ~= lock_sync.fi then
+    elseif (vim.cur.row ~= lock_sync.row or vim.cur.fi ~= lock_sync.fi) and not (sel_drag and sel_drag.active) then   -- 8 окт: протяжка мышью — в REAPER не толкаем (каждое выделение трека = пересборка)
       -- трекер → REAPER
       if vim.cur.row ~= lock_sync.row and not is_playing then
         reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false)
@@ -8786,7 +8788,7 @@ local function frame()
 
   -- step listen (4 окт): транспорт стоит, курсор трекера сменил строку — эта
   -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
-  if state.steplisten and state.focus == 'tracker' and not vim.picker and not vim.hydra then
+  if state.steplisten and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
     local r = vim.cur.row
     if ctx.sl_row ~= r then
       local prev = ctx.sl_row
@@ -10759,7 +10761,7 @@ local function frame()
         local head = cell
         local opt = gfx.mouse_cap & 16 == 16
         -- протяжка без модификатора — выделение блока (NORMAL и INSERT), 2 окт
-        if not opt and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
+        if not opt and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, col = L.flat[hover.fi] and L.flat[hover.fi].col } end
         if head and not dbl and opt then
           local hr = head.row0 or hover.row.row
           local heads = (vis_heads and #vis_heads > 0) and vis_heads or vim.heads_in(hover.fi, hover.fi, hr, hr)
