@@ -4262,7 +4262,7 @@ ctx = {
         local y = y0 + (n - 1) * L.rh
         if n == shown and #list > shown then U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
         elseif e.kind == 'hdrparam' then pslider(e, cx, y, right - cx)
-        else chip(e, cx, y, right - cx, ctx.fit(e.it.name or '', right - cx - 2 * L.pad)) end
+        else chip(e, cx, y, right - cx, draw.fit_short(e.it.name or '', right - cx - 2 * L.pad)) end   -- тесно — согласными
       end
       return math.min(#list, MAXL or #list)
     end

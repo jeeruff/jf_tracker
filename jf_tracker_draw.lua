@@ -697,6 +697,23 @@ local function fit(s, w)
   return s:sub(1, n)
 end
 D.fit = fit
+-- 8 окт: короткое имя для тесных мест (эффекты сбоку фейдера) — не влезает,
+-- значит без «(вендора)», потом согласными: первая буква и все не-гласные
+-- (ReaVerbate → RVrbt, Container → Cntnr); и это длинно — обрезка fit
+local VOW = {}
+for _, ch in utf8.codes('aeiouyаеёиоуыэюя') do VOW[ch] = true end
+function D.fit_short(s, w)
+  if ms(s) <= w then return s end
+  local b = s:gsub('%s*%b()%s*$', '')
+  if b ~= '' and ms(b) <= w then return b end
+  if b == '' then b = s end
+  local out, first = {}, true
+  for _, ch in utf8.codes(b) do
+    if first or not (VOW[ch] or ch == 32) then out[#out + 1] = utf8.char(ch) end
+    first = false
+  end
+  return fit(table.concat(out), w)
+end
 
 -- строка подсказок модуля: «клавиша действие» парами, клавиши янтарём; пара,
 -- которая не влезает целиком, не рисуется (без наложений); модуль в фокусе ярче
