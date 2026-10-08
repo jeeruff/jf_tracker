@@ -624,7 +624,8 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
     -- справа от имени — буква follow action (7 окт): клик — следующая, ПКМ… — a / A с клавиатуры
     local fa = ctx.ss_fa and ctx.ss_fa(ci, ri) or 'l'
     local fl = fa:upper()
-    local fw = U.measure(fl) + 2 * L.pad
+    -- 8 окт: буква follow action спрятана (по просьбе, пока); SS.show_fa = true вернёт
+    local fw = SS.show_fa and (U.measure(fl) + 2 * L.pad) or 0
     local fx, fy = cx + cw - fw, ry + chh - label_h - 2
     if SS.name_over then fy = ry + chh - L.rh end           -- нижняя строка, поверх волны
     local hotfa = mx >= fx and mx < fx + fw and my >= fy and my < fy + L.rh
@@ -632,8 +633,10 @@ function SS.draw_cell(L, cx, ry, cw, chh, cell, col, ri, ci, rg, blink, playpos,
     local nm = ctx.fit(SS.slot_name(rg, ri), cx + cw - fw - nx - L.pad)
     if SS.name_over then U.set(U.BG, 0.55); gfx.rect(nx - 1, fy, U.measure(nm) + 2, L.rh - 1, 1) end   -- подложка: имя читается на волне
     U.text(nx, fy, nm, is_live and U.AMBER or U.TEXT)
-    if hotfa then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(fx, fy, fw, L.rh, 1); hover.ssfa = { ri = ri, ci = ci } end
-    U.text(fx + L.pad, fy, fl, hotfa and U.AMBER or (fa == 'l' and U.GREY or U.CYAN))
+    if SS.show_fa then
+      if hotfa then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(fx, fy, fw, L.rh, 1); hover.ssfa = { ri = ri, ci = ci } end
+      U.text(fx + L.pad, fy, fl, hotfa and U.AMBER or (fa == 'l' and U.GREY or U.CYAN))
+    end
   end
   if is_live then
     local pr = SS.progress(live, playpos or 0)
