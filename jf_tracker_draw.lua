@@ -3652,7 +3652,28 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
-  D.vis_box = nil
+  -- выделение VISUAL (8 окт): без рамки (она ложилась на соседнюю колонку) и
+  -- одним полупрозрачным прямоугольником на колонку, под текстом, вместо
+  -- заливки каждой ячейки — быстрее и без швов
+  if vis then
+    local y0, y1
+    for i, r in ipairs(rows) do
+      if not r.clip and r.row >= vis.r0 and r.row <= vis.r1 then
+        local yy = L.body_y + (i - 1) * L.rh
+        y0 = y0 or yy; y1 = yy + L.rh
+      end
+    end
+    if y0 then
+      for fi = vis.f0, vis.f1 do
+        local f = L.flat[fi]
+        if f and f.x then
+          if f.env then set(U.TEXT, 0.10) else set(U.CYAN, 0.16) end
+          gfx.rect(f.x, y0, f.w, y1 - y0, 1)
+        end
+      end
+      gfx.a = 1
+    end
+  end
   D.pmark('draw: rows')
   -- граница регионов (5 окт): тонкие линии цвета регионов у линии такта —
   -- уходящий над ней, следующий под ней; фоном, items рисуются поверх
@@ -3715,15 +3736,6 @@ function D.frame(L, snap, rows, state, info)
           local f = L.flat[fi]
           local x = f.x
           if x then
-            if vis and fi >= vis.f0 and fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
-              -- 5 окт: полупрозрачно — рамки и цвета items под выделением видны;
-              -- границу блока рисует контур после строк
-              set(U.CYAN, 0.16); gfx.rect(x, y, f.w, L.rh, 1); gfx.a = 1
-              local vb = D.vis_box
-              if not vb then vb = {}; D.vis_box = vb end
-              vb.x0 = math.min(vb.x0 or x, x); vb.x1 = math.max(vb.x1 or (x + f.w), x + f.w)
-              vb.y0 = math.min(vb.y0 or y, y); vb.y1 = math.max(vb.y1 or (y + L.rh), y + L.rh)
-            end
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
@@ -3764,13 +3776,6 @@ function D.frame(L, snap, rows, state, info)
         if r.clip then goto env_next end
         -- выделение на лейне огибающей (6 окт): Shift+j/k, мышь — лёгкое
         -- высветление фона, линия и точки под ним видны
-        if vis and ev.fi >= vis.f0 and ev.fi <= vis.f1 and r.row >= vis.r0 and r.row <= vis.r1 then
-          set(U.TEXT, 0.10); gfx.rect(ev.x, y, ev.w, L.rh, 1); gfx.a = 1
-          local vb = D.vis_box
-          if not vb then vb = {}; D.vis_box = vb end
-          vb.x0 = math.min(vb.x0 or ev.x, ev.x); vb.x1 = math.max(vb.x1 or (ev.x + ev.w), ev.x + ev.w)
-          vb.y0 = math.min(vb.y0 or y, y); vb.y1 = math.max(vb.y1 or (y + L.rh), y + L.rh)
-        end
         if vc and vc.fi == ev.fi and vc.row == r.row then
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
           if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
@@ -3839,8 +3844,6 @@ function D.frame(L, snap, rows, state, info)
     for _, ly in ipairs(hd.seams) do gfx.triangle(hd.x, ly - tz, hd.x, ly + tz, hd.x + tz, ly) end
   end
   D.ai_handles = nil
-  -- контур выделения (5 окт): видно границу блока, содержимое не закрыто
-  if D.vis_box then local b = D.vis_box; set(U.CYAN); gfx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 0); D.vis_box = nil end
   -- каналы при mute / solo (5 окт, как во всех трекерах; опция tint channels):
   -- заглушённые — тусклые; есть solo — тусклые все, кроме solo
   if state.tintmute ~= false then
