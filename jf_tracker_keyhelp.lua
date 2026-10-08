@@ -278,7 +278,7 @@ KH.PAGES = {
     { k = 'a', d = 'select all' },
     { k = 'v', d = 'view: peaks / spectral' },
     { k = 'q 2 w 3 e …', d = 'q - the whole sample, 2 w 3 e … - slices 1 2 3 4 … (the note keyboard, as over the wave)' },
-    { k = 's', d = 'slice menu: t transients, 2 4 8 1 3 6 - equal 2 4 8 16 32 64, d delete slices, q quantize, z autotrim' },
+    { k = 's', d = 'slice menu: s smart (transients + spectrum: kick, next bright hit, dark again), t transients, 2 4 8 1 3 6 - equal 2 4 8 16 32 64, d delete slices, q quantize, z autotrim' },
     { k = 'd', d = 'detect transients (with selection: to lib)' },
     { k = '+ -', d = 'transient sensitivity' },
     { k = 'x', d = 'clear slices' },

@@ -20,6 +20,7 @@ P.cur_path, P.cur_len = nil, 0  -- что играет из браузера (м
 
 local function stop_audio()
   if cur then pcall(R.CF_Preview_Stop, cur); cur = nil end
+  P.stop_pos = nil
   P.cur_path = nil
   P.cur_item = nil
 end
@@ -153,10 +154,17 @@ function P.slice(track, entry, t0, t1, semis)
   if not src then return false end
   stop_audio()
   local rate = entry.rate or 1
-  audio_stop_at = R.time_precise() + math.max(0.05, (t1 - t0))
+  local dur = math.max(0.05, (t1 - t0))
   local pv = R.CF_CreatePreview(src)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
+  -- 8 окт: конец слайса — по позиции самого превью (D_POSITION в источнике),
+  -- а не по таймеру от нажатия: таймер не учитывал задержку старта превью,
+  -- и короткие слайсы обрывались раньше конца (D_LENGTH у SWS только для
+  -- чтения). Таймер — страховка, если позиция не читается
+  R.CF_Preview_SetValue(pv, 'D_FADEOUTLEN', 0.004)
+  P.stop_pos = (entry.offs or 0) + t1 * rate
+  audio_stop_at = R.time_precise() + dur + 0.5
   R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
   -- transpose инструмента — база слайса (6 окт: слайс звучал без него); Option+нота — поверх
   local base = entry.take and R.GetMediaItemTakeInfo_Value(entry.take, 'D_PITCH') or 0
@@ -210,6 +218,10 @@ end
 
 -- звать каждый кадр
 function P.tick()
+  if cur and P.stop_pos then
+    local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+    if ok and pos >= P.stop_pos - 0.002 then audio_stop_at = nil; stop_audio() end
+  end
   if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio() end
   if stop_at and R.time_precise() >= stop_at then
     stop_at = nil

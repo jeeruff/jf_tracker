@@ -1485,6 +1485,7 @@ ctx = {
     local function ready() if not SL.active and ctx.open_slicer then ctx.open_slicer() end; return SL.active and SL.entry and not SL.entry.file end
     local function eq(n) return function() if not ready() then vim.msg = 'slice: pick a sample of the track first'; return end; SL.equal(n); vim.msg = ('%d equal slices'):format(n) end end
     vim.open_hydra({ title = 'slice', items = {
+      { key = 's', label = 'smart: transients + spectrum (kick, then the next bright hit, then dark again ...)', fn = function() if not ready() then vim.msg = 'slice: pick a sample of the track first'; return end; SL.smart_slice(); vim.msg = 'smart slice: ' .. (SL.mode or '') end },
       { key = 't', label = 'at transients', fn = function() if not ready() then vim.msg = 'slice: pick a sample of the track first'; return end; SL.use_transients(); vim.msg = ('sliced at transients: %d slices'):format(#(SL.slices or {})) end },
       { key = '2', label = '2 equal', fn = eq(2) }, { key = '4', label = '4 equal', fn = eq(4) }, { key = '8', label = '8 equal', fn = eq(8) },
       { key = '1', label = '16 equal', fn = eq(16) }, { key = '3', label = '32 equal', fn = eq(32) }, { key = '6', label = '64 equal', fn = eq(64) },
@@ -8889,7 +8890,7 @@ local function frame()
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
-        rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = child ~= nil, fx = child and ctx.inst_has_fx(child) }
+        rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = child ~= nil, fx = child and ctx.inst_has_fx(child), name = child and child.name ~= root.name and child.name or nil }
       end
       local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k, root)
       local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))

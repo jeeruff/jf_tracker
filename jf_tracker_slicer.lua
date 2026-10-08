@@ -249,6 +249,74 @@ function S.use_transients()
   commit()
 end
 
+-- smart slice (8 окт, s s): транзиенты чувствительно, у каждого — яркость
+-- атаки (доля энергии первой разности: бочка тёмная, хет / снейр / перкуссия
+-- светлые; 25 мс после начала). Порог тёмный / светлый — медиана яркостей
+-- этого сэмпла. Слайс ставится только на контрастном ударе: после тёмного —
+-- первый светлый, после светлого — первый тёмный; одинаковые подряд (ролл
+-- хетов, дубль бочки) сливаются в один слайс. Чтение — аудио-аксессор take
+S.SMART_GAP = 0.06
+function S.brightness_reader()
+  local e = S.entry
+  if not (e and e.take and R.ValidatePtr(e.take, 'MediaItem_Take*')) then return nil end
+  local acc = R.CreateTakeAudioAccessor(e.take)
+  if not acc then return nil end
+  local src = R.GetMediaItemTake_Source(e.take)
+  local sr = src and R.GetMediaSourceSampleRate(src) or 44100
+  if not sr or sr <= 0 then sr = 44100 end
+  local n = math.floor(sr * 0.025)
+  local buf = R.new_array(n)
+  local st = R.GetAudioAccessorStartTime(acc)
+  return function(t)
+    buf.clear()
+    if R.GetAudioAccessorSamples(acc, sr, 1, st + t, n, buf) < 0 then return nil end
+    local x = buf.table()
+    local en, df = 0, 0
+    for i = 2, n do local a = x[i] or 0; en = en + a * a; local d = a - (x[i - 1] or 0); df = df + d * d end
+    if en < 1e-9 then return nil end
+    return df / en
+  end, function() R.DestroyAudioAccessor(acc) end
+end
+
+function S.smart_slice()
+  if not S.entry then return 0 end
+  local sens0 = S.sens
+  S.sens = math.min(1, math.max(S.sens, 0.75))       -- кандидаты — с запасом, отбор — по спектру
+  S.detect()
+  S.sens = sens0
+  local cand = {}
+  for _, t in ipairs(S.trans or {}) do cand[#cand + 1] = t end
+  if #cand == 0 then S.msg = 'smart slice: no transients'; return 0 end
+  local read, done = S.brightness_reader()
+  if not read then S.use_transients(); S.msg = 'smart slice: no audio access - plain transients'; return #S.slices end
+  local br = {}
+  for i, t in ipairs(cand) do br[i] = read(t) end
+  done()
+  local sorted = {}
+  for i = 1, #cand do if br[i] then sorted[#sorted + 1] = br[i] end end
+  table.sort(sorted)
+  local med = sorted[math.max(1, math.floor((#sorted + 1) / 2))] or 0
+  S.slices = {}
+  if cand[1] > 0.01 then S.slices[1] = 0 end
+  local last_cls, last_t
+  local nd, nb = 0, 0
+  for i, t in ipairs(cand) do
+    if br[i] then
+      local cls = br[i] > med and 'b' or 'd'
+      if cls ~= last_cls and (not last_t or t - last_t >= S.SMART_GAP) then
+        S.slices[#S.slices + 1] = t
+        last_cls, last_t = cls, t
+        if cls == 'b' then nb = nb + 1 else nd = nd + 1 end
+      end
+    end
+  end
+  table.sort(S.slices)
+  S.mode = ('smart %d (dark %d, bright %d)'):format(#S.slices, nd, nb)
+  commit()
+  S.msg = S.mode
+  return #S.slices
+end
+
 function S.apply()
   if not S.entry then return end
   ctx.edit.set_slices(S.entry.item, S.slices)
@@ -274,6 +342,8 @@ end
 function S.preview(k)
   local t0, t1 = S.bounds(S.slices, k, S.entry.len)
   if not t0 then return end
+  -- 8 окт: slice playthru — нота слайса играет до конца сэмпла, превью так же
+  if S.entry.item and ctx.edit and ctx.edit.playthru and ctx.edit.playthru(S.entry.item) then t1 = S.entry.len end
   ctx.preview_slice(S.track, S.entry, t0, t1)
 end
 

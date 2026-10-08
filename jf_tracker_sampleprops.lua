@@ -227,9 +227,18 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
     local on = r.k == sel
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + RH
     if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, RH, 1) end
-    local lbl = r.k == 0 and (('%s %s'):format(r.key or ' ', (r.name and r.name ~= '') and r.name or 'whole')) or (('%s S%02X'):format(r.key or ' ', r.k))
+    -- 8 окт: колонки клавиша | Sxx (команда слайса в трекере) | имя | длина
     local lt = r.len < 10 and ('%.2fs'):format(r.len) or ('%.1fs'):format(r.len)
-    U.text(x + L.pad, ry, ctx.fit(lbl, w - U.measure(lt) - (r.fx and (U.measure('fx') + L.pad) or 0) - 3 * L.pad), on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY))
+    local col_c = on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY)
+    local kx = x + L.pad
+    U.text(kx, ry, r.key or ' ', on and U.AMBER or U.GREY)
+    local sx = kx + U.measure('W') + L.pad
+    local sxx = ('S%02X'):format(r.k)
+    U.text(sx, ry, sxx, on and U.AMBER or U.CYAN)
+    local nx = sx + U.measure('S00') + L.pad
+    local nm = (r.name and r.name ~= '' and r.name ~= sxx) and r.name or (r.k == 0 and 'whole' or '')
+    local nw = x + w - nx - U.measure(lt) - (r.fx and (U.measure('fx') + L.pad) or 0) - 2 * L.pad
+    if nm ~= '' and nw > U.measure('W') then U.text(nx, ry, ctx.fit(nm, nw), col_c) end
     U.text(x + w - L.pad - U.measure(lt), ry, lt, U.GREY)
     if r.fx then U.text(x + w - 2 * L.pad - U.measure(lt) - U.measure('fx'), ry, 'fx', U.GREEN) end   -- take FX на нотах слайса (7 окт)
     -- зум: волна куска строкой ниже подписи

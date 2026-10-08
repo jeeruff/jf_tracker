@@ -2298,7 +2298,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
     text(x + L.pad, ly + L.rh, zx, U.GREY)
     local kx = x + lw
-    local kw = math.floor(math.min(4 * L.cw, (w - lw - L.pad) / 22))       -- клавиатуре — до ~половины полосы
+    local kw = math.floor(math.min(ms('W') + 4, (w - lw - L.pad) / 22))   -- 8 окт: всегда минимальная — клавиша по букве
     if kw >= 4 then
       local ky, kh = y + 2, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
@@ -2323,7 +2323,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           out.letters = out.letters + 1
         end
       end
-      local bw, bh = math.max(3, math.floor(kw * 0.6)), math.floor(kh * 0.6)
+      local bw, bh = math.max(3, math.min(kw - 2, math.max(ms('W') + 2, math.floor(kw * 0.6)))), math.floor(kh * 0.6)   -- 8 окт: цифра на чёрной видна и в минимальной
       for _, k in ipairs(D.PIANO_BLACK) do
         local bx = kx + k[3] * kw - math.floor(bw / 2) - 1
         local fill = key_fill(k[1], U.PANEL)
@@ -4669,7 +4669,7 @@ function D.frame(L, snap, rows, state, info)
   end
   -- пианинка (4 окт): слой пианино — полоса клавиш под скролл-баром треков
   if L.piano_h > 0 then
-    local p = info.piano
+    local p = state.hints and info.piano or nil   -- 8 окт: клавиатура — только с подсказками (это подсказка раскладки)
     if p then p.ins = info.vmode == 'insert' end
     local st
     if L.kbstat or (info.ctrl and info.ctrl.bigstatus) then
