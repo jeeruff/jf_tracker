@@ -3518,16 +3518,16 @@ ctx = {
     local ks = state.kslider
     local ch = c > 0 and c < 256 and string.char(c) or ''
     if c == 1818584692 then ch = 'h' elseif c == 1919379572 then ch = 'l' elseif c == 1685026670 then ch = 'j' elseif c == 30064 then ch = 'k' end   -- стрелки
-    -- 8 окт: фейдер микшера вертикальный — жест по форме: k j — громкость
-    -- (K J — мелкий шаг), h l — к панораме / обратно
-    if state.mixer and ks.what == 'vol' and (ch == 'j' or ch == 'k' or ch == 'J' or ch == 'K') then
-      ctx.trs_nudge(ks.col, 'vol', (ch == 'j' or ch == 'J') and -1 or 1, ch == 'J' or ch == 'K'); return true
-    end
-    if state.mixer and (ch == 'h' or ch == 'l') and (ks.what == 'vol' or (ch == 'h' and (ks.what == 'pan' or ks.what == 'panl'))) then
-      local pm = reaper.GetMediaTrackInfo_Value(ks.col.track, 'I_PANMODE')
-      ks.what = ks.what == 'vol' and (pm == 6 and 'panl' or 'pan') or 'vol'
-      vim.msg = ('%s %s: %s'):format(ks.col.name or '', ks.what, ks.what == 'vol' and 'k j change (K J fine), l pan, 0 reset, Esc done' or 'h l change, j k next, h on the left end - fader')
-      if ks.what ~= 'vol' or ch == 'h' then return true end
+    -- 8 окт: фейдер микшера (f на фейдере) — k j громкость, h l панорама
+    -- (у dual pan — левая), Shift — мелкий шаг; 0 — сброс громкости
+    if state.mixer and ks.what == 'vol' then
+      if ch == 'j' or ch == 'k' or ch == 'J' or ch == 'K' then
+        ctx.trs_nudge(ks.col, 'vol', (ch == 'j' or ch == 'J') and -1 or 1, ch == 'J' or ch == 'K'); return true
+      end
+      if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' then
+        local pm = reaper.GetMediaTrackInfo_Value(ks.col.track, 'I_PANMODE')
+        ctx.trs_nudge(ks.col, pm == 6 and 'panl' or 'pan', (ch == 'h' or ch == 'H') and -1 or 1, ch == 'H' or ch == 'L'); return true
+      end
     end
     -- горизонтальный слайдер (5 окт): h l — значение (H L — мелкий шаг, 6 окт), j k —
     -- соседний слайдер шапки сверху вниз: громкость, панорама, ширина / L R
@@ -6625,7 +6625,13 @@ local function hint_go(t)
     if d.what == 'smart' then ctx.smart_input(d.col) else ctx.input_picker(d.col) end
   elseif t.kind == 'trs' then
     state.kslider = { col = d.col, what = d.what }
-    vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what)
+    if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
+    else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
+  elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё
+    if reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
+      edit.track_value(d.col.track, 'D_VOL', 10 ^ (d.db / 20)); edit.track_undo('track vol'); model.invalidate()
+      vim.msg = ('%s vol %+d dB'):format(d.col.name or '', d.db)
+    end
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil

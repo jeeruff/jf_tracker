@@ -3128,6 +3128,7 @@ function D.frame(L, snap, rows, state, info)
           if lblw > 0 and (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
             text(bx0 - 2 - ms(ml), ly, ml, m == 0 and U.TEXT or U.GREY)
+            hint('trsmark', bx0 - 2 - ms(ml), ly, ms(ml), L.rh, { col = col, db = m })   -- f: громкость на метку
             last_ly = ly
           end
         end
