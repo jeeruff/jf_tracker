@@ -3381,7 +3381,10 @@ function D.frame(L, snap, rows, state, info)
       local full = ms('session') + ms('effects') + 6 <= bw
       local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
       local x2 = small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
-      local _ = x2   -- 8 окт: кнопка param — в самой строке effects (у подписи fx), не в уголке
+      -- 8 окт: param — рядом с effects (одно место; было в строке effects и в
+      -- уголке микшера); не влезает слово — «p»
+      local plb = (x2 + ms('param') + 4 <= bx + bw) and 'param' or ((x2 + ms('p') + 4 <= bx + bw) and 'p' or nil)
+      if plb then small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn') end
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh

@@ -4303,18 +4303,6 @@ ctx = {
   -- всегда (микшер); возвращает, сколько строк нужно (для высоты строки effects)
   -- кнопка param (параметры TCP под эффектами): в строке effects, в микшере —
   -- в уголке под кнопками вида (строки effects там нет)
-  param_btn = function(hover, bx, y)
-    local mx, my = gfx.mouse_x, gfx.mouse_y
-    local lab = (U.measure('fx param') + 4 * L.pad <= L.label_w) and 'param' or 'p'
-    local bw = U.measure(lab) + 2 * L.pad
-    local on = state.fxparams
-    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y, bw, L.rh - 1, 1)
-    U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y, bw, L.rh - 1, 0)
-    U.text(bx + L.pad, y, lab, hot and U.AMBER or (on and U.CYAN or U.TEXT))
-    if hot then hover.viewbtn = 'fxparams' end
-    ctx.hint('viewbtn', bx, y, bw, L.rh, 'fxparams')
-  end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local hi = ctx.hdr_info(col)
@@ -9297,16 +9285,11 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
-  if L.mixer and L.header_h and L.matrix_w then                   -- микшер: param — в уголке (сверху — в шапке, снизу — под трекером); ^ v — у быстрой опции mixer
-    local by = L.mix_bottom and (L.mix_y + 4) or (L.header_y + 4 * L.rh + 2)
-    ctx.param_btn(hover, L.matrix_w + L.pad, by)
-  end
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
-    ctx.param_btn(hover, L.matrix_w + 2 * L.pad + U.measure('fx'), y0 + 1)   -- 8 окт: кнопка param — в строке effects, правее «fx»
     local MAXL = state.fxparams and 14 or 6
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
