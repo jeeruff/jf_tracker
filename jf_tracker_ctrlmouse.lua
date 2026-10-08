@@ -1,0 +1,121 @@
+-- jf_tracker_ctrlmouse.lua — мышь с Ctrl (8 окт): универсальная ручка.
+--
+-- Держишь Control — движение мыши меняет значение, без щелчка (относительно:
+-- сдвинул мышь — значение сдвинулось, работает в любом месте экрана).
+-- Вверх — больше; Shift — мелко. Что меняется (запоминается в момент нажатия
+-- Ctrl и держится, пока он зажат): выделенные цели → цель под мышью → цель
+-- в фокусе клавиатуры. Ровно две выделенные — XY: по горизонтали первая,
+-- по вертикали вторая.
+-- Выделение: Cmd+щелчок — добавить / убрать, Shift+щелчок — диапазон
+-- параметров одного эффекта от прошлого щелчка.
+--
+-- Цель: { kind = 'fx', tid, fx, p, name } — параметр эффекта (нормированное
+-- 0..1); { kind = 'trk', tid, what = 'vol' | 'pan' | 'width' …, name } —
+-- громкость (дБ) / панорама трека. tid — GUID трека (ключ), сам объект
+-- трека — t.track / t.col, их ставит main.
+-- Чтение / запись — через io = { get(t), set(t, v) } в единицах вида
+-- (CM.UNIT). Без reaper.* — тест tests/test_ctrlmouse.lua.
+
+local CM = { sel = {}, order = {}, anchor = nil, latch = nil }
+
+-- шаг на пиксель, пределы
+CM.UNIT = {
+  fx    = { step = 0.004, lo = 0,   hi = 1 },     -- 250 px — весь ход
+  vol   = { step = 0.25,  lo = -60, hi = 12 },    -- дБ
+  pan   = { step = 0.005, lo = -1,  hi = 1 },
+  width = { step = 0.005, lo = -1,  hi = 1 },
+  panl  = { step = 0.005, lo = -1,  hi = 1 },
+  panr  = { step = 0.005, lo = -1,  hi = 1 },
+}
+CM.FINE = 0.1
+
+function CM.key(t)
+  if t.kind == 'fx' then return 'fx|' .. tostring(t.tid) .. '|' .. tostring(t.fx) .. '|' .. tostring(t.p) end
+  return 'trk|' .. tostring(t.tid) .. '|' .. tostring(t.what)
+end
+function CM.unit(t) return CM.UNIT[t.kind == 'fx' and 'fx' or t.what] or CM.UNIT.fx end
+function CM.has(t) return CM.sel[CM.key(t)] ~= nil end
+function CM.count() return #CM.order end
+
+local function add(t)
+  local k = CM.key(t)
+  if CM.sel[k] then return end
+  CM.sel[k] = t; CM.order[#CM.order + 1] = t
+end
+local function remove(t)
+  local k = CM.key(t)
+  if not CM.sel[k] then return end
+  CM.sel[k] = nil
+  for i, e in ipairs(CM.order) do if CM.key(e) == k then table.remove(CM.order, i); break end end
+end
+function CM.clear() CM.sel, CM.order, CM.anchor = {}, {}, nil end
+
+-- Cmd+щелчок: true — добавлена, false — убрана
+function CM.toggle(t)
+  CM.anchor = t
+  if CM.has(t) then remove(t); return false end
+  add(t); return true
+end
+
+-- Shift+щелчок: диапазон от якоря до t в списке list (параметры одного
+-- эффекта по порядку: { {p = i, name = …}, … }); якорь другого эффекта или
+-- нет якоря — просто добавить t. Возвращает число добавленных.
+function CM.range(t, list)
+  local a = CM.anchor
+  if not (a and t.kind == 'fx' and a.kind == 'fx' and a.tid == t.tid and a.fx == t.fx and list) then
+    local had = CM.has(t); add(t); CM.anchor = t; return had and 0 or 1
+  end
+  local ia, it
+  for i, e in ipairs(list) do if e.p == a.p then ia = i end; if e.p == t.p then it = i end end
+  if not (ia and it) then add(t); CM.anchor = t; return 1 end
+  local n0 = #CM.order
+  for i = math.min(ia, it), math.max(ia, it) do
+    local e = list[i]
+    add({ kind = 'fx', tid = t.tid, fx = t.fx, p = e.p, name = e.name, track = t.track })
+  end
+  CM.anchor = t
+  return #CM.order - n0
+end
+
+-- нажатие Ctrl: что крутить. hover / focus — цели или nil
+function CM.press(hover, focus, mx, my)
+  local list
+  if #CM.order > 0 then list = {}; for i, e in ipairs(CM.order) do list[i] = e end
+  elseif hover then list = { hover }
+  elseif focus then list = { focus } end
+  if not list then CM.latch = nil; return nil end
+  CM.latch = { list = list, mx = mx, my = my, xy = #list == 2 and #CM.order == 2, moved = false }
+  return CM.latch
+end
+
+-- кадр с зажатым Ctrl: сдвиг мыши → значения. Возвращает изменённые цели
+local function clamp(v, u) return math.max(u.lo, math.min(u.hi, v)) end
+function CM.move(mx, my, fine, io)
+  local L = CM.latch
+  if not L then return nil end
+  local dx, dy = mx - L.mx, L.my - my                 -- вверх — больше
+  L.mx, L.my = mx, my
+  if dx == 0 and dy == 0 then return nil end
+  local k = fine and CM.FINE or 1
+  local out = {}
+  for i, t in ipairs(L.list) do
+    local d = L.xy and (i == 1 and dx or dy) or dy
+    if d ~= 0 then
+      local u = CM.unit(t)
+      local v0 = io.get(t)
+      if v0 then
+        local v = clamp(v0 + d * u.step * k, u)
+        if v ~= v0 then io.set(t, v); out[#out + 1] = t; L.moved = true end
+      end
+    end
+  end
+  return out
+end
+
+function CM.release()
+  local L = CM.latch
+  CM.latch = nil
+  return L
+end
+
+return CM

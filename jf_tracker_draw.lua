@@ -1542,6 +1542,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     else gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1) end
     text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY)
     if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww } end
+    if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
   end
   local vol = lv('vol', col.vol or 1)
   local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
@@ -2912,6 +2913,17 @@ end
 -- b = { x0, x1, sx, sw, yc, yb, rh } (main); кадр — в буфере (gfx.dest ≠ -1).
 -- 1019 — строки ниже курсора, 1018 — отрезок строки курсора; блит без
 -- фильтрации — пиксели битмапа ровно ×2, как у шрифта ×2
+-- мышь с Ctrl (8 окт): выделенные цели — голубой рамкой. D.csel — модуль
+-- jf_tracker_ctrlmouse (ставит main), ключи — как CM.key
+function D.csel_on(tid, fx, p)
+  local S = D.csel
+  if not S or #S.order == 0 or not tid then return false end
+  if p then return S.sel['fx|' .. tostring(tid) .. '|' .. tostring(fx) .. '|' .. tostring(p)] ~= nil end
+  return S.sel['trk|' .. tostring(tid) .. '|' .. tostring(fx)] ~= nil
+end
+local function csel_frame(x, y, w, h) set(U.CYAN); gfx.rect(x, y, w, h, 0) end
+D.csel_frame = csel_frame
+
 local bc_w, bc_h = 0, 0
 function D.bigcur(b)
   local d = gfx.dest
@@ -3130,6 +3142,7 @@ function D.frame(L, snap, rows, state, info)
         end
         if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
+        if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
         -- слайдер под клавиатурой (метка f, 5 окт): янтарная рамка
         local ks = info.kslider
@@ -3253,6 +3266,7 @@ function D.frame(L, snap, rows, state, info)
         set(hc); gfx.rect(bx0 + 1, cy0, bw0 - 2, chh, 0)
         gfx.rect(bx0 + 3, hy2, bw0 - 6, 1, 1)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
+        if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
@@ -4716,6 +4730,7 @@ function D.frame(L, snap, rows, state, info)
           if steps_inline then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
           elseif p.kind == 'steps' and p.nsteps then hover.dsp.steplist = true end   -- клик — список (5 окт)
         end
+        if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
         ::next_param::
       end

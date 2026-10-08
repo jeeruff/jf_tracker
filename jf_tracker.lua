@@ -39,6 +39,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
 MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+MMX.CM = dofile(DIR .. '/jf_tracker_ctrlmouse.lua')   -- мышь с Ctrl: универсальная ручка, Cmd / Shift-выделение, XY (8 окт)
 MMX.HM.init(U, MMX.CH)
 MMX.HM.root = tonumber(reaper.GetExtState('jf_tracker', 'harmroot')) or 0
 MMX.HM.minor = reaper.GetExtState('jf_tracker', 'harmminor') == '1'
@@ -4480,6 +4481,7 @@ ctx = {
       U.set(U.LINE); gfx.rect(x + 1, y + L.rh - 3, w2 - 2, 2, 1)
       U.set(hot and U.AMBER or U.CYAN); gfx.rect(x + 1, y + L.rh - 3, math.max(1, math.floor((w2 - 2) * v + 0.5)), 2, 1)
       if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = col, k = e.k } end
+      if draw.csel_on(col and col.guid, fx, pi) then draw.csel_frame(x + 1, y, w2 - 2, L.rh) end
       ctx.hint('hdrparam', x, y, w2, L.rh, { col = col, k = e.k })
     end
     local function chip(e, x, y, w2, lab)
@@ -10149,6 +10151,87 @@ local function frame()
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   -- параметр TCP под эффектом (8 окт): тянуть по горизонтали, двойной
   -- клик — умолчание, колесо — шаг 1 %
+  -- мышь с Ctrl (8 окт, jf_tracker_ctrlmouse): Control зажат — движение мыши
+  -- крутит выделенные / под мышью / в фокусе клавиатуры (относительно, вверх —
+  -- больше, Shift — мелко; две выделенные — XY). Cmd+щелчок — в выделение,
+  -- Shift+щелчок — диапазон параметров эффекта; Esc — снять выделение.
+  -- Запись — напрямую, undo и пересборка — одним разом при отпускании Ctrl
+  do
+    local CM = MMX.CM
+    draw.csel = CM
+    local dcol = dsp_target()
+    draw.csel_dsp_tid = dcol and dcol.guid
+    local function fxt(col, f, pidx)
+      local p = col and f and f.params and f.params[pidx]
+      if not p then return nil end
+      return { kind = 'fx', tid = col.guid, track = col.track, fx = p.fx or f.i, p = p.i, name = p.name }
+    end
+    local function trk(col, what) return { kind = 'trk', tid = col.guid, track = col.track, what = what, name = (col.name or '') .. ' ' .. what } end
+    local function under()
+      if hover.dsp and hover.dsp.param then return fxt(dcol, hover.dsp.f, hover.dsp.param) end
+      local h = hover.hdrparam
+      if h and h.col then return { kind = 'fx', tid = h.col.guid, track = h.track, fx = h.fx, p = h.param, name = h.name } end
+      if hover.trs and hover.trs.col then return trk(hover.trs.col, hover.trs.what) end
+    end
+    if not ctx.cm_io then
+      local function ok(t) return t.track and reaper.ValidatePtr(t.track, t.kind == 'fx' and model.is_take(t.track) and 'MediaItem_Take*' or 'MediaTrack*') end
+      ctx.cm_io = {
+        get = function(t)
+          if not ok(t) then return nil end
+          if t.kind == 'fx' then return model.fxapi(t.track).GetParamNormalized(t.track, t.fx, t.p) end
+          local v = reaper.GetMediaTrackInfo_Value(t.track, TRS_KEY[t.what] or 'D_VOL')
+          if t.what == 'vol' then return v <= 1e-6 and -60 or math.max(-60, 20 * math.log(v, 10)) end
+          return v
+        end,
+        set = function(t, v)
+          if t.kind == 'fx' then model.fxapi(t.track).SetParamNormalized(t.track, t.fx, t.p, v); return end
+          if t.what == 'vol' then v = v <= -60 and 0 or 10 ^ (v / 20) end
+          edit.track_value(t.track, TRS_KEY[t.what] or 'D_VOL', v)
+        end,
+        show = function(t)
+          if not ok(t) then return '' end
+          if t.kind == 'fx' then local _, s2 = model.fxapi(t.track).GetFormattedParamValue(t.track, t.fx, t.p, ''); return (t.name or 'param') .. ' ' .. (s2 or '') end
+          local v = ctx.cm_io.get(t)
+          return t.name .. (t.what == 'vol' and (v <= -60 and ' -inf' or (' %+.1f dB'):format(v)) or (' %+.0f%%'):format(v * 100))
+        end,
+      }
+    end
+    local ctrl = gfx.mouse_cap & 32 == 32
+    if ctrl and not CM.latch then
+      local focus, k = nil, state.kslider
+      if k and k.col then focus = trk(k.col, k.what or 'vol')
+      elseif state.focus == 'dsp' and DK.pslider and dcol then focus = fxt(dcol, dcol.fx and dcol.fx[dsp_sel.fx], dsp_sel.param) end
+      CM.press(under(), focus, gfx.mouse_x, gfx.mouse_y)
+    elseif ctrl then
+      CM.move(gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap & 8 == 8, ctx.cm_io)
+    elseif CM.latch then
+      local L = CM.release()
+      if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end
+    end
+    if CM.latch then
+      local parts = {}
+      for i, t in ipairs(CM.latch.list) do if i > 4 then parts[#parts + 1] = '+' .. (#CM.latch.list - 4); break end; parts[#parts + 1] = ctx.cm_io.show(t) end
+      state.status = '-- CTRL --' .. (CM.latch.xy and ' XY  ' or '  ') .. table.concat(parts, CM.latch.xy and '  |  ' or ', ') .. '   (move the mouse, up = more, Shift fine)'
+      U.click, U.rclick = false, false                 -- щелчок с Ctrl — не щелчок (и не меню)
+    elseif U.click and gfx.mouse_cap & 12 ~= 0 then
+      local t = under()
+      if t then
+        if gfx.mouse_cap & 4 == 4 then
+          local on = CM.toggle(t)
+          vim.msg = (on and 'ctrl-mouse: + ' or 'ctrl-mouse: - ') .. (t.name or '?') .. ('  (%d selected, hold Ctrl and move; Esc clears)'):format(CM.count())
+        else
+          local list
+          if t.kind == 'fx' and hover.dsp and hover.dsp.f then
+            list = {}
+            for _, e in ipairs(hover.dsp.f.params or {}) do if (e.fx or hover.dsp.f.i) == t.fx then list[#list + 1] = { p = e.i, name = e.name } end end
+          end
+          CM.range(t, list)
+          vim.msg = ('ctrl-mouse: %d selected (hold Ctrl and move; Esc clears)'):format(CM.count())
+        end
+        U.click = false
+      end
+    end
+  end
   if U.click and hover.hdrparam then
     local hp, now3 = hover.hdrparam, reaper.time_precise()
     local lc = ctx.hp_last
@@ -12055,6 +12138,7 @@ local function frame()
     else ctx.clips_toggle() end
     c = 0
   end
+  if c == 27 and MMX.CM.count() > 0 and not HN.active and not vim.picker and not vim.hydra and vim.mode == 'normal' then MMX.CM.clear(); vim.msg = 'ctrl-mouse: selection cleared'; c = 0 end
   if c > 0 and state.kslider and not HN.active and ctx.kslider_key(c) then c = 0 end
   if c > 0 and HN.active then
     local r = HN.key(c)
