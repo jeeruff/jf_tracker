@@ -6,7 +6,7 @@ V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
-    'mixer fader: the same size on every track, pan above it; a dark box with dB marks (+6 0 -6 -12 -24 -48, labels never overlap), the track peak meter L R inside, a [-] handle; peak hold __ (1.5 s), the max peak in digits on top, clip = red == (click the number to reset); console taper (top stretched); keyboard: f label, k j volume (K J fine), l / h to pan and back, 0 reset',
+    'mixer fader: the same size on every track, pan above it; a dark box with dB marks (+6 0 -6 -12 -24 -48, labels never overlap), the track peak meter L R inside, a [-] handle; peak hold __ (1.5 s); the max peak in digits on top and clip (red ==) are REAPER's native peak hold - the same as in its mixer, click the number to reset both; console taper (top stretched); keyboard: f label, k j volume (K J fine), l / h to pan and back, 0 reset',
     'library = the muted track LIB: every instrument on its own fixed lane from 0 (no overlaps, the project does not grow, master render stays clean), lane named after it, owner track in P_EXT:jf_home; the =LIB marker is gone; library patterns are the regions after =END',
     'mixer (quick option): the track headers unfold - a vertical fader (16 rows), pan / width above it, the fx with their TCP parameters beside it when short names fit (else under it); the effects row is part of it; param button in the corner',
     'ø (phase invert) button in every track header, next to R I M S',

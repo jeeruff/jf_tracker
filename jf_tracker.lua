@@ -9473,7 +9473,7 @@ local function frame()
   elseif hover.sendpop then state.status = ({ add = '+ send: pick a track (fzf)', routing = 'REAPER routing window', mute = 'mute this send', del = 'remove this send' })[hover.sendpop.what] or ''
   elseif hover.sendvol then state.status = 'send volume - drag'
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
-  elseif hover.mixpk then state.status = 'peak max since reset (red == - clipped) - click: reset'
+  elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.poolsave then state.status = 'save the lib as a kit: a REAPER track template (TrackTemplates/jf_kits) - load it in the browser tab kits or with Insert track from template'
@@ -10117,7 +10117,8 @@ local function frame()
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
     elseif hover.mixpk then
-      draw.mix_hold[hover.mixpk] = nil; click = { t = now2, zone = 'mixpk' }   -- сброс макс. пика / клипа фейдера
+      if reaper.ValidatePtr(hover.mixpk, 'MediaTrack*') then reaper.Track_GetPeakHoldDB(hover.mixpk, 0, true); reaper.Track_GetPeakHoldDB(hover.mixpk, 1, true) end
+      click = { t = now2, zone = 'mixpk' }   -- сброс макс. пика / клипа — нативный, как щелчок в микшере REAPER
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
       click = { t = now2, zone = 'trkio' }

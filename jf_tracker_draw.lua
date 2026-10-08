@@ -2800,7 +2800,7 @@ end
 -- шкала фейдера микшера (8 окт): амплитуда в степени 1/4 от +12 dB — верх
 -- (около 0 dB) растянут, низ сжат, как у фейдеров пультов
 local FMAX = 10 ^ (12 / 20)
-D.mix_hold = {}   -- guid → удержание пиков фейдера: {max, clip, {db,t} L, {db,t} R}
+D.mix_hold = {}   -- guid → удержание пиков фейдера (рисунок __): {db,t} L, {db,t} R; max / clip — нативные
 function D.fader_pos(db)
   if db <= -150 then return 0 end
   return math.max(0, math.min(1, (10 ^ (math.min(12, db) / 20) / FMAX) ^ 0.25))
@@ -3059,11 +3059,17 @@ function D.frame(L, snap, rows, state, info)
         set(dark); gfx.rect(bx0, ty0 - 6 - L.rh, bw0, th + 9 + L.rh, 1)
         set((hot or kon) and U.AMBER or U.LINE); gfx.rect(bx0, ty0 - 6 - L.rh, bw0, th + 9 + L.rh, 0)
         -- метр: пики трека, шкала та же, что у фейдера (метки совпадают);
-        -- удержание пика __ (1.5 с, потом падает), сверху цифрами максимум
-        -- с последнего сброса, клип (> 0 dB) — красное == над столбиком
-        -- до щелчка по числу (hover.mixpk)
+        -- удержание пика __ (1.5 с, потом падает) — своё, только рисунок;
+        -- максимум цифрами сверху и клип (> 0 dB, красное ==) — НАТИВНЫЕ
+        -- (Track_GetPeakHoldDB, как в микшере REAPER: те же цифры, тот же
+        -- сброс; щелчок по числу — hover.mixpk — чистит оба)
         local hold = D.mix_hold[col.guid]
-        if not hold then hold = { max = -150, clip = false, { db = -150, t = 0 }, { db = -150, t = 0 } }; D.mix_hold[col.guid] = hold end
+        if not hold then hold = { { db = -150, t = 0 }, { db = -150, t = 0 } }; D.mix_hold[col.guid] = hold end
+        hold.max = -150
+        if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+          for ch = 0, 1 do hold.max = math.max(hold.max, reaper.Track_GetPeakHoldDB(col.track, ch, false) * 100) end
+        end
+        hold.clip = hold.max > 0
         local now = reaper.time_precise()
         local mw = math.max(2, math.floor((bw0 - 10) / 2))
         for k2 = 1, 2 do
@@ -3073,8 +3079,6 @@ function D.frame(L, snap, rows, state, info)
           local hk = hold[k2]
           if pdb >= hk.db then hk.db, hk.t = pdb, now
           elseif now - hk.t > 1.5 then hk.db = math.max(pdb, hk.db - 20 * (now - hk.t - 1.5)) end
-          if pdb > hold.max then hold.max = pdb end
-          if pdb > 0 then hold.clip = true end
           local mx0 = bx0 + 4 + (k2 - 1) * (mw + 2)
           set(U.mix(dark, U.TEXT, 0.12)); gfx.rect(mx0, ty0, mw, th, 0)
           if pdb > -60 then
@@ -3089,7 +3093,7 @@ function D.frame(L, snap, rows, state, info)
         local ptxt = hold.max <= -60 and '-inf' or ('%+.1f'):format(hold.max)
         local pty = ty0 - 5 - L.rh
         text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, dark, 3) or U.readable(U.TEXT, dark, 4))
-        if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 4 then hover.mixpk = col.guid end
+        if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 4 then hover.mixpk = col.track end
         local last_ly
         for _, m in ipairs({ 6, 0, -6, -12, -24, -48 }) do
           local yy = ypos(m)
