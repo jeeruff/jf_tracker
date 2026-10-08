@@ -6833,7 +6833,7 @@ local function hint_go(t)
   elseif t.kind == 'swapbtn' then ctx.swap_click()
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
-  elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param
+  elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d
   elseif t.kind == 'browserbtn' then B.click(d)
   elseif t.kind == 'sess' then
@@ -10485,7 +10485,7 @@ local function frame()
       click = { t = now2, zone = 'dspwave' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
-      dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end
+      dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
       if hover.dsp.param and col and dbl and click.zone == 'dsp' and click.param == hover.dsp.param and click.fx == hover.dsp.fx then
@@ -11011,8 +11011,15 @@ local function frame()
   if hover.dsp and hover.dsp.param and not hover.dsp.steplist and not (vim.hydra or vim.picker) and gfx.mouse_cap & 1 == 1 and click.zone == 'dsp' and not (dsp_drag and dsp_drag.active) and not fxb_drag then
     local col = dsp_target()
     local p = col and hover.dsp.f.params[hover.dsp.param]
-    if p and p.kind ~= 'toggle' and hover.dsp.sv then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
+    -- 8 окт: протяжка лагала — каждый кадр SetParam + пересборка всей модели
+    -- (model.invalidate). Значение DSP рисует живым, поэтому пишем только
+    -- изменение, а модель — один раз, при отпускании
+    if p and p.kind ~= 'toggle' and hover.dsp.sv and math.abs(hover.dsp.sv - (ctx.dspdrag_v or -1)) > 1e-5 then
+      model.fxapi(col.track).SetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i, math.max(0, math.min(1, hover.dsp.sv)))
+      ctx.dspdrag_v, ctx.dspdrag_dirty = hover.dsp.sv, true
+    end
   end
+  if ctx.dspdrag_dirty and gfx.mouse_cap & 1 == 0 then ctx.dspdrag_v, ctx.dspdrag_dirty = nil, nil; model.invalidate() end
   -- огибающая мышью, как в аранжировке: клик/протяжка — точка со значением
   -- от x, правый клик — удалить точку строки, колесо — ±1/64
   if hover.env and hover.row and not ai_drag and not hover.aiedge and not pt_drag and click.zone ~= 'envpt' then

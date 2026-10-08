@@ -6,6 +6,8 @@ V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
+    'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
+    'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
     'chords: :chord - the cursor track as one chord lane (names from its notes: A#m, G#6, Cmaj7/E; ¦ while they sound, OFF); :chord Cm7 - a harmonizer: the chord written at the cursor row (replaces the notes starting there; length as theirs, else up to the next notes, at most a bar)',
     'matrix: the playing pattern shows a moving playhead (progress line + tick) in one-row view too',
     'narrow track v / p button: opening it (click or f) takes the keyboard - h l change, Esc closes',
