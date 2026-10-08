@@ -1612,7 +1612,9 @@ function V.key_impl(c)
       if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
       V.count = nil; return
     elseif p == 't' then
-      if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit() else finish_move() end
+      if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
+      elseif (c == ('s'):byte() or c == ('r'):byte()) and ctx.bus_track and ctx.bus_track(c == ('s'):byte() and 'send' or 'recv') then finish_edit()   -- ts / tr
+      else finish_move() end
       V.count = nil; return
     elseif p == 'da' then
       -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)

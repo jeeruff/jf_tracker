@@ -2611,28 +2611,28 @@ D.vbars = {}
 -- 3 px), прижаты к правому / нижнему краю отведённого места; чуть ярче
 function D.vbar(key, x, y, w, h, scroll, nvis, total)
   D.vbars[key] = nil
-  local sw = D.SBW or 3; x = x + w - sw; w = sw
+  local sw = D.SBW or 3; x = x + w - sw - 1; w = sw     -- на пиксель от края: не сливается с линией модуля
   if total <= nvis or h < 8 then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local th = math.max(6, math.floor(h * nvis / total))
   local ty = y + math.floor((h - th) * math.min(1, scroll / math.max(1, total - nvis)))
   local hot = mx >= x - 3 and mx < x + w + 3 and my >= y and my < y + h
   local drag = D.vbar_drag and D.vbar_drag.key == key
-  set(U.LINE); gfx.rect(x + math.floor(w / 2), y, 1, h, 1)
+  -- 8 окт: без дорожки во всю высоту — она рядом с границей модуля давала
+  -- двойную линию; только ползунок
   set((hot or drag) and U.AMBER or U.GREY); gfx.rect(x, ty, w, th, 1)
   D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
 end
 -- горизонтальная полоса (5 окт, матрица): та же запись, ось x
 function D.hbar(key, x, y, w, h, scroll, nvis, total)
   D.vbars[key] = nil
-  local sw = D.SBW or 3; y = y + h - sw; h = sw
+  local sw = D.SBW or 3; y = y + h - sw - 1; h = sw
   if total <= nvis or w < 8 then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local tw = math.max(6, math.floor(w * nvis / total))
   local tx = x + math.floor((w - tw) * math.min(1, scroll / math.max(1, total - nvis)))
   local hot = mx >= x and mx < x + w and my >= y - 3 and my < y + h + 3
   local drag = D.vbar_drag and D.vbar_drag.key == key
-  set(U.LINE); gfx.rect(x, y + math.floor(h / 2), w, 1, 1)
   set((hot or drag) and U.AMBER or U.GREY); gfx.rect(tx, y, tw, h, 1)
   D.vbars[key] = { horiz = true, x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx, th = tw, a0 = x, alen = w }
 end
@@ -4917,7 +4917,6 @@ function D.frame(L, snap, rows, state, info)
       tx = math.min(tx, x0 + w - tw)
       local inbar = mx >= x0 and mx < x0 + w and my >= L.hsb_y and my < L.hsb_y + L.hsb_h
       local onthumb = inbar and mx >= tx and mx < tx + tw
-      set(U.LINE); gfx.rect(x0, y + math.floor(h / 2), w, 1, 1)
       set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.GREY or U.LINE)); gfx.rect(tx, y, tw, h, 1)
       if inbar then hover.hsb = { thumb = onthumb, x0 = x0, w = w, n = n, page = math.max(1, L.hs_full), dir = mx < tx and -1 or 1 } end
     end

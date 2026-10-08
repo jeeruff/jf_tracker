@@ -1606,6 +1606,32 @@ ctx = {
     vim.msg = ('tt: %d new track(s) after %s (dd deletes, ctrl+z - back)'):format(n, f and f.col and f.col.name or 'the last')
     return true
   end,
+  -- ts / tr (8 окт): новый трек-шина. ts — выделенные треки (или трек
+  -- курсора) шлют в него (send / FX-возврат); tr — наоборот, он шлёт в них
+  -- (у выделенных появляется receive). Новый трек — в конце, курсор на нём
+  bus_track = function(dir)
+    local tgt = {}
+    for _, c2 in ipairs(snap and snap.cols or {}) do if c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.IsTrackSelected(c2.track) then tgt[#tgt + 1] = c2 end end
+    if #tgt == 0 then local c2 = cur_col(); if c2 and c2.track then tgt[1] = c2 end end
+    if #tgt == 0 then vim.msg = (dir == 'send' and 'ts' or 'tr') .. ': no track'; return false end
+    local nt
+    edit.run(dir == 'send' and 'new send track' or 'new receive source track', function()
+      local n = reaper.CountTracks(0)
+      reaper.InsertTrackAtIndex(n, true)
+      nt = reaper.GetTrack(0, n)
+      reaper.GetSetMediaTrackInfo_String(nt, 'P_NAME', dir == 'send' and 'send' or 'source', true)
+      for _, c2 in ipairs(tgt) do
+        if dir == 'send' then reaper.CreateTrackSend(c2.track, nt) else reaper.CreateTrackSend(nt, c2.track) end
+      end
+    end)
+    model.invalidate()
+    ctx.goto_track = nt
+    local names = {}
+    for i, c2 in ipairs(tgt) do if i <= 4 then names[#names + 1] = c2.name end end
+    vim.msg = dir == 'send' and ('ts: new track "send" <- %s'):format(table.concat(names, ', ') .. (#tgt > 4 and ' ...' or ''))
+      or ('tr: new track "source" -> %s'):format(table.concat(names, ', ') .. (#tgt > 4 and ' ...' or ''))
+    return true
+  end,
   delete_track = function()
     local f = L.flat[vim.cur.fi]
     if not (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) then return false end

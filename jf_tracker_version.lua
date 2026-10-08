@@ -8,6 +8,8 @@ V.CHANGES = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
+    'ts: a new track "send" that the selected tracks (or the cursor track) send into - a bus / fx return; tr: a new track "source" that sends into them (they get receives)',
+    'scrollbars: no full-height track line next to a module edge (it looked like a doubled border), the thumb only, 1 px off the edge',
     'fix: the last, partly visible track column is cut at the tracker edge - its header and effects row no longer run over the module line',
     'tt: a new track right after the cursor track (3tt - three), the cursor moves onto it; dd deletes',
     'mouse: the block is selected with the RIGHT drag (a right click without moving still opens the menu); the LEFT drag moves the event or the selected block under the mouse (was Option+drag); option select block with = left brings the old way back',

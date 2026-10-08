@@ -87,6 +87,8 @@ KH.PAGES = {
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three); dd deletes the track' },
+    { k = 'ts', d = 'new track "send": the selected tracks (or the cursor track) send into it - a bus / fx return' },
+    { k = 'tr', d = 'new track "source": it sends into the selected tracks (they get a receive)' },
     { k = 'mouse', d = 'right drag: select a block (a right click without moving: the menu); left drag: move the event or the selected block under the mouse; Shift+drag: extend the block (option select block with = left swaps the buttons)' },
     { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped' },
     { k = 'Opt+1..9', d = 'select / unselect track N in REAPER - f on a dB mark moves all selected faders' },
