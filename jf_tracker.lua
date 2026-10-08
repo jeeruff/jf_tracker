@@ -4354,11 +4354,16 @@ ctx = {
     vim.msg = ('clip deleted: %s / %s (%d items, u - undo)'):format(col.name, MX.SS.slot_name(rg, ri), #items)
   end,
   -- клип под курсором (6 окт): его сэмпл — во вкладке item, зона = начало / конец клипа, L — точки лупа
-  ss_focus = function(ri, ci, grid)
+  -- 8 окт: hover — клип под мышью показывается временно: мышь ушла с сетки —
+  -- вид и инструмент возвращаются (раньше клип «залипал» во вкладке item,
+  -- линии L и пропавшие свойства — до случайного следующего наведения).
+  -- Клик / курсор клип-мода — выбор, держится
+  ss_focus = function(ri, ci, grid, hover)
     local cell = grid and grid[ri] and grid[ri][ci]
     local head
     for _, e in ipairs(cell and cell.ev or {}) do if e.head then head = e.head; break end end
-    state.ss_clip = head and { item = head.item } or nil
+    local prev = state.ss_clip and state.ss_clip.prev or vim.inst
+    state.ss_clip = head and { item = head.item, hover = hover, prev = hover and prev or nil } or nil
     if not head then return end
     local n = snap and snap.inst_of and snap.inst_of[head.item]
     if n then
@@ -8899,9 +8904,14 @@ local function frame()
       -- L — отрезок лупа (P_EXT:jf_cliploop, секунды источника; нет — весь клип),
       -- xf — кроссфейд шва; вид — клип во всю ширину, без панели свойств
       local cl = state.ss_clip
-      if cl and e and not e.file and (MX.clips or state.ss_big or state.clipsview) and reaper.ValidatePtr(cl.item, 'MediaItem*') then
+      if cl and not (state.clipsview or MX.clips or state.ss_big) then state.ss_clip, cl = nil, nil end   -- 8 окт: вид клипов закрыт — клипа нет
+      if cl and e and not e.file and reaper.ValidatePtr(cl.item, 'MediaItem*') then
         local tk = reaper.GetActiveTake(cl.item)
-        if tk and not reaper.TakeIsMIDI(tk) then
+        -- 8 окт: зона клипа — только на волне ЕГО файла (иначе линии L вставали
+        -- на чужой сэмпл по чужим offset)
+        local csrc = tk and reaper.GetMediaItemTake_Source(tk)
+        local same = csrc and e.fpath and reaper.GetMediaSourceFileName(csrc, '') == e.fpath
+        if tk and same and not reaper.TakeIsMIDI(tk) then
           local er = (e.rate and e.rate ~= 0) and e.rate or 1
           local eo = e.offs or 0
           local co = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
@@ -8924,7 +8934,7 @@ local function frame()
             local m = math.max(0.02, (b - a) * 0.05)
             SL.zoom_e, SL.va, SL.vb = e.item, math.max(0, a - m), b + m
           end
-        end
+        else state.ss_zone = nil end   -- 8 окт: клип не этого файла — зоны нет
       else state.ss_zone = nil end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       ctx.sprops_maxw = pw
@@ -9705,8 +9715,15 @@ local function frame()
   -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
   if hover.sess and snap then
     local k = hover.sess.ri .. ':' .. hover.sess.ci
-    if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, ctx.ss_G()) end
-  else state.ss_hkey = nil end
+    if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, ctx.ss_G(), true) end
+  else
+    state.ss_hkey = nil
+    local cl = state.ss_clip
+    if cl and cl.hover then
+      state.ss_clip, state.ss_zone = nil, nil
+      if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
+    end
+  end
   do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
     local e = ctx.eq_drag or hover.dspeq
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
