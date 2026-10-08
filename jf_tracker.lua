@@ -11343,6 +11343,15 @@ local function frame()
         local rep = ('shot %s %dx%d at %d,%d -> %s%s'):format(req, w, h, x, y, path, M and M.b and (' | ' .. (reaper.GetExtState(EXT, 'measure') or '')) or '')
         reaper.SetExtState(EXT, 'shot', rep, false)
         if ctx.dlog then ctx.dlog(rep) end
+        -- 8 окт: dev notes (debug) — ссылка на снимок строкой под пунктом с
+        -- курсором: Claude читает CHECK.md и открывает снимок этого пункта
+        if state.debug and NT.kind == 'dev' and NT.owner then
+          local l = math.max(1, math.min(#NT.lines, NT.l or 1))
+          while NT.lines[l + 1] and NT.lines[l + 1]:match('^%s*!%[shot%]') do l = l + 1 end   -- несколько снимков — друг под другом
+          table.insert(NT.lines, l + 1, '  ![shot](' .. path .. ')')
+          NT.dirty = true; ctx.notes_save()
+          vim.msg = vim.msg .. ' - linked under the dev note'
+        end
         vim.msg = 'shot: ' .. path:match('[^/]+$') .. (' (%dx%d)'):format(w, h)
       else vim.msg = 'shot: cannot write ' .. path end
     end
