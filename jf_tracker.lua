@@ -11531,9 +11531,28 @@ local function frame()
   -- вертикаль = LPB, горизонталь = ширина треков; трекпад копится до щелчка
   if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and not hover.dsp and not hover.browser and not hover.fxb and not OPT.active then
     local zv, zh = ctx.zoom_axes(gfx.mouse_wheel, gfx.mouse_hwheel or 0)
+    if zv and gfx.mouse_cap & 8 == 8 then zh, zv = (zh ~= 0 and zh or zv), 0 end   -- 8 окт: Shift — колесо по ширине (выделенных треков)
     if zv then
       local nv, nh = ctx.zoom_steps('v', zv), ctx.zoom_steps('h', zh)
       if nv ~= 0 then ctrl_action('lpb', nv > 0 and 1 or -1) end
+      -- 8 окт: + Shift и есть выделенные треки (REAPER, Option+цифра) — ширина
+      -- только у них (свой уровень трека), остальные как были
+      local selw = {}
+      if nh ~= 0 and gfx.mouse_cap & 8 == 8 then
+        for _, c2 in ipairs(snap and snap.cols or {}) do if c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.IsTrackSelected(c2.track) then selw[#selw + 1] = c2 end end
+      end
+      if nh ~= 0 and #selw > 0 then
+        state.wlevel = state.wlevel or {}
+        local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+        for _, c2 in ipairs(selw) do
+          local cur = state.wlevel[c2.guid] or state.wzlevel or full
+          local nl = cur + (nh > 0 and 1 or -1)
+          state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
+        end
+        relayout()
+        vim.msg = ('width of %d selected track(s) %s'):format(#selw, nh > 0 and 'wider' or 'narrower')
+        nh = 0
+      end
       if nh ~= 0 then
         -- 7 окт: по одному полю за шаг (уровни 0..MAXLVL), от полной ширины
         local cur = state.wzlevel or (3 + math.min(L.MAXFX or 4, state.fxcols or 0))
