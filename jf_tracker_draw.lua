@@ -2797,6 +2797,19 @@ function D.pmark(name)
   pm_name, pm_t = name, t
 end
 
+-- шкала фейдера микшера (8 окт): амплитуда в степени 1/4 от +12 dB — верх
+-- (около 0 dB) растянут, низ сжат, как у фейдеров пультов
+local FMAX = 10 ^ (12 / 20)
+function D.fader_pos(db)
+  if db <= -150 then return 0 end
+  return math.max(0, math.min(1, (10 ^ (math.min(12, db) / 20) / FMAX) ^ 0.25))
+end
+function D.fader_db(p)
+  p = math.max(0, math.min(1, p))
+  if p <= 0 then return -150 end
+  return 20 * math.log((p ^ 4) * FMAX, 10)
+end
+
 function D.frame(L, snap, rows, state, info)
   D.pmark('draw: top module')
   local W = L.win_w
@@ -3021,16 +3034,51 @@ function D.frame(L, snap, rows, state, info)
         text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY)
         local ty0, ty1 = y1 + L.rh + 2, y1 + fh - npan * L.rh - 4
         local th = math.max(8, ty1 - ty0)
-        local tx = sx + math.floor(fx_w / 2) - 3
-        local frac = (math.max(-60, math.min(12, db)) + 60) / 72
+        -- 8 окт: фейдер на фоне темы, совмещён с метром: шкала dB слева
+        -- (метки +6 0 -6 -12 -24 -48), посередине два столбика пиков L R,
+        -- поверх — ручка во всю ширину коробки; клавиатура — метка f → h l
+        local function ypos(dbv) return ty0 + th - math.floor(th * D.fader_pos(dbv) + 0.5) end
         local hot = mx >= sx and mx < sx + fx_w and my >= ty0 - 2 and my < ty0 + th + 2
-        set(U.GREY); gfx.rect(tx, ty0, 6, th, 0)   -- дорожка видна на любом цвете шапки
-        set(U.LINE); gfx.rect(tx - 3, ty0 + math.floor(th * (1 - 60 / 72)), 12, 1, 1)   -- метка 0 dB
-        local fhh = math.max(1, math.floor(th * frac + 0.5))
-        set(hot and U.AMBER or U.TEXT); gfx.rect(tx + 1, ty0 + th - fhh, 4, fhh, 1)
-        set(hot and U.AMBER or U.TEXT); gfx.rect(tx - 4, ty0 + th - fhh - 1, 14, 3, 1)       -- ручка
+        local ks = info.kslider
+        local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
+        local lblw = (fx_w >= ms('-48') + 24) and (ms('-48') + 2) or 0
+        local bx0, bw0 = sx + lblw, fx_w - lblw
+        set(U.BG); gfx.rect(bx0, ty0 - 1, bw0, th + 2, 1)
+        set((hot or kon) and U.AMBER or U.LINE); gfx.rect(bx0, ty0 - 1, bw0, th + 2, 0)
+        local last_ly
+        for _, m in ipairs({ 6, 0, -6, -12, -24, -48 }) do
+          local yy = ypos(m)
+          set(m == 0 and U.GREY or U.LINE); gfx.rect(bx0 + 1, yy, 3, 1, 1); gfx.rect(bx0 + bw0 - 4, yy, 3, 1, 1)
+          -- подпись — только если не налезает на предыдущую (без наложений)
+          local ly = yy - math.floor(L.rh / 2)
+          if lblw > 0 and (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
+            local ml = (m > 0 and '+' or '') .. m
+            text(bx0 - 2 - ms(ml), ly, ml, m == 0 and U.TEXT or U.GREY)
+            last_ly = ly
+          end
+        end
+        -- метр: пики трека (линейно → dB), два столбика посередине
+        if info.peaks then
+          local pl, pr = info.peaks(col)
+          local mw = math.max(2, math.floor((bw0 - 12) / 5))
+          local mcx = bx0 + math.floor(bw0 / 2)
+          for k2, pk in ipairs({ pl or 0, pr or 0 }) do
+            local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+            if pdb > -60 then
+              local yy = ypos(pdb)
+              local mx0 = k2 == 1 and (mcx - mw - 1) or (mcx + 1)
+              local function seg(d0, d1, c3) local a, b = ypos(math.min(pdb, d1)), ypos(d0); if b > a then set(c3); gfx.rect(mx0, a, mw, b - a, 1) end end
+              seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
+              local _ = yy
+            end
+          end
+        end
+        -- ручка: полоса во всю ширину коробки на уровне громкости
+        local hy2 = ypos(db)
+        set((hot or kon) and U.AMBER or U.TEXT); gfx.rect(bx0 + 1, hy2 - 1, bw0 - 2, 3, 1)
+        set(U.BG); gfx.rect(bx0 + 1, hy2, bw0 - 2, 1, 1)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
-        hint('trs', sx, ty0, fx_w, th, { col = col, what = 'vol' })
+        hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
         local pyy = y1 + fh - npan * L.rh - 1
         if col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)

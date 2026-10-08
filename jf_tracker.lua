@@ -3503,6 +3503,17 @@ ctx = {
     local ks = state.kslider
     local ch = c > 0 and c < 256 and string.char(c) or ''
     if c == 1818584692 then ch = 'h' elseif c == 1919379572 then ch = 'l' elseif c == 1685026670 then ch = 'j' elseif c == 30064 then ch = 'k' end   -- стрелки
+    -- 8 окт: фейдер микшера вертикальный — жест по форме: k j — громкость
+    -- (K J — мелкий шаг), h l — к панораме / обратно
+    if state.mixer and ks.what == 'vol' and (ch == 'j' or ch == 'k' or ch == 'J' or ch == 'K') then
+      ctx.trs_nudge(ks.col, 'vol', (ch == 'j' or ch == 'J') and -1 or 1, ch == 'J' or ch == 'K'); return true
+    end
+    if state.mixer and (ch == 'h' or ch == 'l') and (ks.what == 'vol' or (ch == 'h' and (ks.what == 'pan' or ks.what == 'panl'))) then
+      local pm = reaper.GetMediaTrackInfo_Value(ks.col.track, 'I_PANMODE')
+      ks.what = ks.what == 'vol' and (pm == 6 and 'panl' or 'pan') or 'vol'
+      vim.msg = ('%s %s: %s'):format(ks.col.name or '', ks.what, ks.what == 'vol' and 'k j change (K J fine), l pan, 0 reset, Esc done' or 'h l change, j k next, h on the left end - fader')
+      if ks.what ~= 'vol' or ch == 'h' then return true end
+    end
     -- горизонтальный слайдер (5 окт): h l — значение (H L — мелкий шаг, 6 окт), j k —
     -- соседний слайдер шапки сверху вниз: громкость, панорама, ширина / L R
     if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' then
@@ -10985,7 +10996,7 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       local frac = trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
         or math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
-      local v = trs_value(trs_drag.what, frac)
+      local v = trs_drag.vert and 10 ^ (draw.fader_db(frac) / 20) or trs_value(trs_drag.what, frac)   -- вертикальный — своя шкала
       edit.track_value(trs_drag.col.track, TRS_KEY[trs_drag.what], v)
       trs_drag.v = v
     else
