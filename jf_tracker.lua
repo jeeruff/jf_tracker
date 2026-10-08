@@ -161,6 +161,7 @@ local state = {
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
   fxparams = flag('fxparams', false),
+  notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
@@ -433,7 +434,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -503,28 +504,34 @@ end
 -- macOS, над Dock). 8 окт: окно без рамки и заголовка (JS_Window_SetStyle
 -- POPUP, есть js_ReaScriptAPI; без него — обычное окно); перед доком
 -- рамка возвращается
-local function toggle_dock()
+local function toggle_dock(apply_title)
+  -- окно без рамки и заголовка (JS_Window_SetStyle POPUP, нужен
+  -- js_ReaScriptAPI); быстрая опция title (state.notitle) — вкл / выкл
   local function frameless(on)                     -- внутри: у главного чанка нет свободных локалей
     if not (reaper.JS_Window_Find and reaper.JS_Window_SetStyle) then return end
     local hwnd = reaper.JS_Window_Find('jf_tracker', true)
     if not hwnd then return end
     reaper.JS_Window_SetStyle(hwnd, on and 'POPUP' or 'CAPTION,SIZEBOX,SYSMENU')
-    if on then
-      local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)
-      reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t)
-    end
+    local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)
+    -- macOS (y снизу): REAPER в своём полном экране кладёт поверх строки
+    -- меню чёрную шторку выше рабочей области — верх окна не выше верха
+    -- главного окна REAPER, иначе шапка трекера уезжает под шторку
+    local _, ml, mt, mr, mb = reaper.JS_Window_GetRect(reaper.GetMainHwnd())
+    if mt and mb and mt > mb and mb <= t + 1 and ml <= l and mr >= r then b = math.min(b, mt) end   -- только если REAPER сам во весь экран
+    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t)
   end
-  local d = gfx.dock(-1)
-  if d & 1 == 1 then
+  local docked = gfx.dock(-1) & 1 == 1
+  if apply_title then                              -- опция title / старт: только рамка плавающего окна
+    if not docked then frameless(state.notitle) end
+    return
+  end
+  if docked then
     local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)
     gfx.dock(0, l, t, r - l, b - t)
-    frameless(true); state.frameless = true
-    vim.msg = 'fullscreen'
-  elseif not state.frameless and reaper.JS_Window_SetStyle then
-    frameless(true); state.frameless = true                 -- плавало с рамкой → сначала полный экран
-    vim.msg = 'fullscreen'
+    frameless(state.notitle)
+    vim.msg = 'fullscreen' .. (state.notitle and '' or ' (title bar on - quick option title)')
   else
-    frameless(false); state.frameless = nil
+    frameless(false)
     local saved = tonumber(reaper.GetExtState(EXT, 'dock_last')) or 1
     if saved & 1 ~= 1 then saved = 1 end
     gfx.dock(saved)
@@ -2243,7 +2250,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure|clipsview,dsp_big,mixer,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure,title|clipsview,dsp_big,mixer,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -2258,6 +2265,7 @@ ctx = {
       local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
       if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
     end
+    if q and not q:find('title', 1, true) then local a, rest = q:match('^([^|]*)(|.*)$'); if a then q = a .. ',title' .. rest; state.quick = q end end   -- 8 окт: title — в конец левой колонки
     if q and q:find('dsp_big', 1, true) and not q:find('mixer', 1, true) then q = q:gsub('dsp_big', 'dsp_big,mixer', 1); state.quick = q end   -- 8 окт: mixer — под router
     if q and not q:find('dsp_big', 1, true) then
       q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
@@ -5283,6 +5291,7 @@ ctx = {
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
+      { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
@@ -8435,6 +8444,7 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
   theme_check()
   if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end
   if state.toptab == 'garden' and not state.dev then state.toptab = 'master' end   -- Orca — только .dev   -- вкладка grid выключена в опциях

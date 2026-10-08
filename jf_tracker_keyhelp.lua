@@ -88,7 +88,7 @@ KH.PAGES = {
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped' },
     { k = 'Opt+1..9', d = 'select / unselect track N in REAPER - f on a dB mark moves all selected faders' },
-    { k = 'F11', d = 'fullscreen without the title bar <-> docked' },
+    { k = 'F11', d = 'fullscreen <-> docked (quick option title: title bar on / off)' },
     { k = 'm', d = 'keyboard on / off: on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'Space Enter', d = 'play / stop, move edit cursor here' },
     { k = 'F', d = 'follow playhead on / off' },
