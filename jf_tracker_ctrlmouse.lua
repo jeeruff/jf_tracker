@@ -118,4 +118,27 @@ function CM.release()
   return L
 end
 
+-- жест «треки» (Control+Option, 8 окт): окно по горизонтали — N зон, по
+-- одной на трек; ведёшь вбок — выбор трека, мышь пошла вертикально —
+-- фейдер выбранного (замок оси), снова явно вбок — опять выбор.
+-- g = CM.gesture (nil до начала); возвращает g с полями ti (1..N), mode
+-- 'pick' | 'fader', dy (пиксели вверх этого кадра в режиме fader)
+CM.G_LOCK, CM.G_UNLOCK = 4, 14          -- px: вертикаль включает фейдер, вбок — снова выбор
+function CM.gesture_step(g, mx, my, n, w)
+  n = math.max(1, n)
+  local function zone(x) return math.max(1, math.min(n, math.floor(x / math.max(1, w) * n) + 1)) end
+  if not g then return { ti = zone(mx), mode = 'pick', mx = mx, my = my, ax = 0, ay = 0, dy = 0 } end
+  local dx, dy = mx - g.mx, g.my - my
+  g.mx, g.my, g.dy = mx, my, 0
+  if g.mode == 'pick' then
+    g.ti = zone(mx)
+    if math.abs(dy) > math.abs(dx) then g.ay = g.ay + dy else g.ay = 0 end
+    if math.abs(g.ay) >= CM.G_LOCK then g.mode, g.ax = 'fader', 0; g.dy = g.ay; g.ay = 0 end
+  else
+    if math.abs(dx) > 2 * math.abs(dy) then g.ax = g.ax + dx else g.ax = 0; g.dy = dy end
+    if math.abs(g.ax) >= CM.G_UNLOCK then g.mode, g.ay = 'pick', 0; g.ti = zone(mx) end
+  end
+  return g
+end
+
 return CM

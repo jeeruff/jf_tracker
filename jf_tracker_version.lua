@@ -30,6 +30,7 @@ V.CHANGES = {
     'fix: resizing the top module no longer resizes the main module (and squeezes the matrix) - it takes its own height',
     'scrollbars: one thickness everywhere (option scrollbar width, default 3 px), a bit brighter',
     'playhead: the colour of the play cursor of the REAPER theme, with a fading tail of played rows (option playhead tail, 0 2 4 8 16 rows)',
+    'Ctrl+Option+mouse (experimental): the window is one zone per track - sideways picks the track, up / down moves its fader',
     'Ctrl+mouse: hold Control and move - any params / faders change without a click (relative, Shift fine); Cmd+click selects, Shift+click a range, two selected = XY; one undo when Control is up',
     'option big fixed cursor: with the fixed cursor its row is twice as big (two rows high, x2 around the cursor field), the rows below move down; the mouse still hits the right rows',
     'fps 30 / 25 / 24: the frame buffer is cleared before every frame (old frames could pile up under scaled text)',

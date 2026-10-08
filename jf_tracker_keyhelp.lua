@@ -92,6 +92,7 @@ KH.PAGES = {
     { k = 'mouse', d = 'right drag: select a block (a right click without moving: the menu); left drag: move the event or the selected block under the mouse; Shift+drag: extend the block (option select block with = left swaps the buttons)' },
     { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped' },
     { k = 'Ctrl+mouse', d = 'hold Control and move the mouse: the selected params / faders change (else the one under the mouse, else the keyboard slider); up = more, Shift fine; two selected = XY. Cmd+click: add / remove, Shift+click: a range of params of one effect, Esc: clear' },
+    { k = 'Ctrl+Opt+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another' },
     { k = 'Opt+1..9', d = 'select / unselect track N in REAPER - f on a dB mark moves all selected faders' },
     { k = 'F11', d = 'fullscreen <-> docked (quick option title: title bar on / off)' },
     { k = 'm', d = 'keyboard on / off: on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },

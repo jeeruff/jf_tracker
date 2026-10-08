@@ -49,5 +49,18 @@ CM.release(); CM.clear()
 eq(CM.press(nil, nil, 0, 0), nil, 'no target')
 eq(CM.move(5, 5, false, io), nil, 'no latch, no move')
 
+-- жест «треки»: 10 треков на 1000 px
+local g = CM.gesture_step(nil, 250, 500, 10, 1000)
+eq(g.ti, 3, 'zone 3'); eq(g.mode, 'pick', 'starts picking')
+CM.gesture_step(g, 460, 501, 10, 1000)
+eq(g.ti, 5, 'sideways -> track 5')
+CM.gesture_step(g, 461, 498, 10, 1000); CM.gesture_step(g, 461, 495, 10, 1000)
+eq(g.mode, 'fader', 'vertical locks the fader'); eq(g.dy, 6, 'first fader step = accumulated')
+CM.gesture_step(g, 470, 490, 10, 1000)
+eq(g.ti, 5, 'small drift sideways keeps the track'); eq(g.mode, 'fader', 'still fader'); eq(g.dy, 5, 'up 5')
+CM.gesture_step(g, 490, 490, 10, 1000)
+eq(g.mode, 'pick', 'clearly sideways unlocks'); eq(g.ti, 5, 'zone of 490')
+CM.gesture_step(g, 5000, 490, 10, 1000)
+eq(g.ti, 10, 'clamped to the last track')
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end

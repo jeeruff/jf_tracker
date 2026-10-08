@@ -10196,8 +10196,35 @@ local function frame()
         end,
       }
     end
-    local ctrl = gfx.mouse_cap & 32 == 32
-    if ctrl and not CM.latch then
+    -- жест «треки» (Control+Option): окно по ширине — все треки зонами; вбок —
+    -- выбор трека (фейдер в фокусе клавиатуры), вертикально — его громкость
+    local gest = gfx.mouse_cap & 48 == 48
+    local ctrl = gfx.mouse_cap & 32 == 32 and not gest
+    if gest then
+      if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
+      local cols = snap and snap.cols or {}
+      local g = CM.gesture_step(ctx.cm_gest, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w)
+      ctx.cm_gest = g
+      local col = cols[g.ti]
+      if col then
+        state.kslider = { col = col, what = 'vol' }
+        local t = trk(col, 'vol')
+        if g.mode == 'fader' and g.dy ~= 0 then
+          local v = ctx.cm_io.get(t)
+          if v then
+            ctx.cm_io.set(t, math.max(-60, math.min(12, v + g.dy * CM.UNIT.vol.step * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
+            g.moved = true
+          end
+        end
+        state.status = ('-- TRACKS --  %d / %d  %s  %s   (sideways: track, then up / down: its fader; Shift fine)'):format(g.ti, #cols, g.mode == 'fader' and '[fader]' or '[pick]', ctx.cm_io.show(t))
+      end
+      U.click, U.rclick = false, false
+    elseif ctx.cm_gest then
+      if ctx.cm_gest.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: track faders'); model.invalidate() end
+      ctx.cm_gest = nil
+    end
+    if gest then
+    elseif ctrl and not CM.latch then
       local focus, k = nil, state.kslider
       if k and k.col then focus = trk(k.col, k.what or 'vol')
       elseif state.focus == 'dsp' and DK.pslider and dcol then focus = fxt(dcol, dcol.fx and dcol.fx[dsp_sel.fx], dsp_sel.param) end
