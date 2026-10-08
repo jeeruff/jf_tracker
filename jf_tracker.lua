@@ -4309,23 +4309,6 @@ ctx = {
     if hot then hover.viewbtn = 'fxparams' end
     ctx.hint('viewbtn', bx, y, bw, L.rh, 'fxparams')
   end,
-  -- кнопка v / ^ в уголке микшера (8 окт): микшер под трекер / над ним
-  mixpos_btn = function(hover, bx, y)
-    local mx, my = gfx.mouse_x, gfx.mouse_y
-    local lab = state.mixpos == 'bottom' and '^' or 'v'
-    local bw = U.measure(lab) + 2 * L.pad
-    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh - 1, 1)
-    U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh - 1, 0)
-    U.text(bx + L.pad, y, lab, hot and U.AMBER or U.TEXT)
-    if hot then hover.viewbtn = 'mixpos' end
-    ctx.hint('viewbtn', bx, y, bw, L.rh, 'mixpos')
-  end,
-  mixpos_toggle = function()
-    state.mixpos = state.mixpos == 'bottom' and 'top' or 'bottom'
-    reaper.SetExtState(EXT, 'mixpos', state.mixpos, true)
-    vim.msg = 'mixer ' .. (state.mixpos == 'bottom' and 'under the tracker' or 'above the tracker (in the headers)')
-  end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local hi = ctx.hdr_info(col)
@@ -6768,7 +6751,6 @@ local function hint_go(t)
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
-  elseif t.kind == 'viewbtn' and d == 'mixpos' then ctx.mixpos_toggle(); relayout()
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
@@ -7948,6 +7930,12 @@ function ctrl_action(name, delta)
       reaper.SetExtState(EXT, 'browserleft', state.browserleft and '1' or '0', true)
       relayout(); vim.msg = 'browser ' .. (state.browserleft and 'left, under the matrix (instruments stay on the right)' or 'right, under the instruments')
     end
+  elseif name == 'q_mixup' or name == 'q_mixdn' then   -- mixer ^ v (8 окт): микшер над трекером (в шапке) / под ним
+    if delta == 0 then
+      state.mixpos = name == 'q_mixdn' and 'bottom' or 'top'; state.mixer = true
+      reaper.SetExtState(EXT, 'mixpos', state.mixpos, true)
+      relayout(); vim.msg = 'mixer ' .. (state.mixpos == 'bottom' and 'under the tracker' or 'above the tracker, in the headers')
+    end
   elseif name == 'q_kcm' or name == 'q_kcp' then
     if delta == 0 then
       local cur = (state.kc_scale or 0) > 0 and state.kc_scale or draw.SCALE
@@ -8643,7 +8631,8 @@ local function frame()
     prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000)
   end
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
-  do local sr = ctx.slice_root(); state.slices_on = (sr and not sr.file) and true or false end   -- 7 окт: всегда, когда выбран инструмент (хотя бы «весь сэмпл»)
+  -- 8 окт: под инструментами (slices = split) — всегда, и на пустом слоте (заголовок + подсказка)
+  do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split') and true or false end
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
   relayout()
   local t_2 = reaper.time_precise()
@@ -9222,7 +9211,11 @@ local function frame()
         return hv
       end
       local root, col = ctx.slice_root()
-      if not (root and root.slices) then return nil end
+      if not root or root.file then                 -- пустой слот / файл: модуль на месте, подсказка
+        U.text(x, y, 'slices', U.GREY)
+        U.text(x, y + Lx.rh, ctx.fit('no sample in this slot - pick one above or drop a file', w - 5), U.DIM)
+        return nil
+      end
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
@@ -9281,10 +9274,9 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
-  if L.mixer and L.header_h and L.matrix_w then                   -- микшер: param и v / ^ — в уголке (сверху — в шапке, снизу — над скроллом)
+  if L.mixer and L.header_h and L.matrix_w then                   -- микшер: param — в уголке (сверху — в шапке, снизу — под трекером); ^ v — у быстрой опции mixer
     local by = L.mix_bottom and (L.mix_y + 4) or (L.header_y + 4 * L.rh + 2)
     ctx.param_btn(hover, L.matrix_w + L.pad, by)
-    ctx.mixpos_btn(hover, L.matrix_w + L.pad, by + L.rh + 2)
   end
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
@@ -9577,7 +9569,6 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
-  elseif hover.viewbtn == 'mixpos' then state.status = 'mixer ' .. (state.mixpos == 'bottom' and '^ - back above the tracker, in the headers' or 'v - under the tracker')
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
@@ -9682,7 +9673,7 @@ local function frame()
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
-  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
+  elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_mixup = 'mixer above the tracker, in the headers', q_mixdn = 'mixer under the tracker', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
@@ -10184,7 +10175,6 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
-    elseif hover.viewbtn == 'mixpos' then ctx.mixpos_toggle(); relayout()
     elseif hover.viewbtn == 'fxparams' then
       state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true)
       if state.fxparams and not state.fxrow then state.fxrow = true; reaper.SetExtState(EXT, 'fxrow', '1', true) end

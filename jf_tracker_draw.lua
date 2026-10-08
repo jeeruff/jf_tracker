@@ -1743,7 +1743,7 @@ local function draw_ctrl(L, info, H, hover)
         for id in part:gmatch('[^,]+') do
           if id == 'xfade' then col[#col + 1] = q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade)
           elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], (id == 'q_keys' and { sizer = true }) or (id == 'q_side' and { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } }) or nil)   -- browser < > (7 окт): слева / справа
-          elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on) end
+          elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on, id == 'mixer' and { sizer = { { '^', 'q_mixup' }, { 'v', 'q_mixdn' } } } or nil) end   -- mixer ^ v (8 окт): над / под трекером
         end
         cols[#cols + 1] = col
         if #cols == 3 then break end

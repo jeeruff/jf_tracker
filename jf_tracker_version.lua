@@ -6,7 +6,8 @@ V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
-    'mixer above or under the tracker: v / ^ in its corner (next to param); a click on a fader takes the keyboard (k j volume, h l pan), the strip gets an amber frame',
+    'mixer above or under the tracker: ^ v at the quick option mixer; a click on a fader takes the keyboard (k j volume, h l pan), the strip gets an amber frame',
+    'slices list under the instruments (slices = split) always shown, an empty slot says so',
     'input list: with no audio inputs on the device (0 now) the audio inputs 1..8 are still listed, plus audio device settings',
     'fader glide: a count before f - 2f + a dB mark moves the fader there in 2 bars (2,f - beats) as volume envelope points (created if missing; linear, holds after); playing - starts at the next session quantize, stopped - at the cursor row',
     'Option+1..9 selects / unselects track N in REAPER (cyan frame on the name); f on a dB mark (jump or glide) moves all selected tracks',
