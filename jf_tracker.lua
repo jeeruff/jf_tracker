@@ -4331,8 +4331,11 @@ ctx = {
     end
     local function chip(e, x, y, w2, lab)
       local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w2, L.rh - 1, 1)
-      U.text(x + L.pad, y, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
+      local cbg = hot and U.tint(U.AMBER, 0.3) or U.BG
+      U.set(cbg); gfx.rect(x, y, w2, L.rh - 1, 1)
+      -- 8 окт: шапка подменяет U.TEXT / U.GREY под свою заливку (на светлой —
+      -- тёмные), а плашка тёмная — цвет подтягиваем к фону самой плашки
+      U.text(x + L.pad, y, lab, U.readable(hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)), cbg, 4.5))
       if hot then hover[e.kind] = { col = col, k = e.k, it = e.it } end
       ctx.hint(e.kind, x, y, w2, L.rh, { col = col, k = e.k })
     end
