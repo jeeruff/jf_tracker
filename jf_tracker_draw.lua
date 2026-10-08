@@ -2390,7 +2390,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
     text(x + L.pad, ly + L.rh, zx, U.GREY)
     local kx = x + lw
-    local kw = math.floor(math.min(ms('W') + 4, (w - lw - L.pad) / 22))   -- 8 окт: всегда минимальная — клавиша по букве
+    -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
+    -- впритык к букве (для крупного битмапа x2 и узких окон)
+    local kw0 = (D.PIANO_SMALL and 0 or ms('W')) + ms('W') + 4
+    local kw = math.floor(math.min(kw0, (w - lw - L.pad) / 22))
     if kw >= 4 then
       local ky, kh = y + 2, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
@@ -2905,6 +2908,7 @@ end
 function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
+  D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w

@@ -173,6 +173,7 @@ local state = {
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
+  pianosmall = flag('pianosmall', false),        -- маленькая клавиатура: клавиша по букве (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -447,7 +448,7 @@ local function save_win()
   S('sbw', tostring(state.sbw or 3)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -5446,6 +5447,7 @@ ctx = {
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
+      flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
