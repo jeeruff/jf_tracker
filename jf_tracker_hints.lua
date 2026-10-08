@@ -58,7 +58,7 @@ function H.start()
   end
   if k == 0 then return false end
   H.active = true
-  H.typed = ''
+  H.typed, H.upper = '', false
   return true
 end
 
@@ -71,6 +71,8 @@ function H.key(c)
   if c < 32 or c > 126 then return 'pending' end
   local ch = string.char(c):lower()
   if not ALPHA:find(ch, 1, true) then return 'pending' end
+  if H.typed == '' then H.upper = false end
+  if string.char(c) ~= ch then H.upper = true end     -- 8 окт: метка заглавной (Shift) — вариант цели, у фейдера «туда и обратно»
   H.typed = H.typed .. ch
   for _, t in ipairs(H.targets) do
     if t.label == H.typed then H.stop(); return t end

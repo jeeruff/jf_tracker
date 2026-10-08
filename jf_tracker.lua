@@ -3642,15 +3642,19 @@ ctx = {
           local mode = reaper.GetEnvelopeScalingMode(env)
           local _, v0 = reaper.Envelope_Evaluate(env, t0, 0, 0)
           local v1 = reaper.ScaleToEnvelopeMode(mode, amp)
+          local _, vend = reaper.Envelope_Evaluate(env, t1, 0, 0)   -- нырок: вернуться к тому, что было в конце
           reaper.DeleteEnvelopePointRange(env, t0 - 1e-4, t1 + 1e-4)
           reaper.InsertEnvelopePoint(env, t0, v0, 0, 0, false, true)
-          reaper.InsertEnvelopePoint(env, t1, v1, 0, 0, false, true)
+          if glide.back then
+            reaper.InsertEnvelopePoint(env, (t0 + t1) / 2, v1, 0, 0, false, true)
+            reaper.InsertEnvelopePoint(env, t1, vend, 0, 0, false, true)
+          else reaper.InsertEnvelopePoint(env, t1, v1, 0, 0, false, true) end
           reaper.Envelope_SortPoints(env)
         end
       end
     end)
     model.invalidate()
-    vim.msg = ('%s -> %+d dB in %d %s%s'):format(#cols > 1 and (#cols .. ' tracks') or (col.name or ''), db, glide.n,
+    vim.msg = ('%s %s %+d dB in %d %s%s'):format(#cols > 1 and (#cols .. ' tracks') or (col.name or ''), glide.back and 'dips to' or '->', db, glide.n,
       glide.unit == 'beat' and 'beat(s)' or 'bar(s)', playing() and (' from the next ' .. MX.SS.quant) or ' from the cursor')
   end,
   trs_nudge = function(col, what, d, coarse)
@@ -6887,6 +6891,8 @@ local function hint_go(t)
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
   elseif t.kind == 'harm' then ctx.set_focus('top'); state.toptab = 'harm'; ctx.harm_do(MMX.HM.click(d, ctx.harm_pitches(cur_col())))
   elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
+    -- метка заглавной (Shift) — нырок: туда и обратно за N тактов (без счёта — за 1)
+    if HN.upper then ctx.glide = ctx.glide or { n = 1, unit = 'bar' }; ctx.glide.back = true end
     if reaper.ValidatePtr(d.col.track, 'MediaTrack*') then ctx.fader_jump(d.col, d.db, ctx.glide) end
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
