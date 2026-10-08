@@ -105,7 +105,7 @@ D.SCALE, D.SPACE = 1, 2
 local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
--- вертикальный текст, 960..1019 спектрограммы анализатора, 1022 логотип about, 1023 черновик поворота
+-- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
 -- 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 799
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
@@ -1171,7 +1171,7 @@ local function heat(v)
   elseif v < 0.75 then return U.mix(U.GREEN, U.AMBER, (v - 0.4) / 0.35)
   else return U.mix(U.AMBER, U.RED, (v - 0.75) / 0.25) end
 end
-local SG_IMG = 960                 -- спектрограммы: 960..1019 (60 слотов)
+local SG_IMG = 960                 -- спектрограммы: 960..1017 (58 слотов; 1018-1019 — лупа big fixed cursor)
 -- bare (3 окт): цвет линии осциллограммы без подложки — скоп поверх полоски курсора
 local function draw_analyzer(x, y, w, h, slot, mode, info, bare)
   if not slot or w < 8 or h < 4 then return end
@@ -1189,7 +1189,7 @@ local function draw_analyzer(x, y, w, h, slot, mode, info, bare)
         gfx.rect(x + math.floor((b - 1) * bw), y + h - 1 - bh, math.max(1, math.floor(bw) - 1), bh, 1)
       end
     end
-  elseif mode == 'sgram' and info.spec and slot < 60 then
+  elseif mode == 'sgram' and info.spec and slot < 58 then
     local st = sg[slot]
     if not st then st = { col = 0, frame = -1 }; sg[slot] = st; gfx.setimgdim(SG_IMG + slot, SG_COLS, SG_ROWS) end
     local fr = info.spec_frame and info.spec_frame(slot) or 0
@@ -2908,6 +2908,28 @@ function D.fader_db(p)
   return 20 * math.log((p ^ 4) * FMAX, 10)
 end
 
+-- big fixed cursor (8 окт): лупа ×2 строки курсора поверх готового тела.
+-- b = { x0, x1, sx, sw, yc, yb, rh } (main); кадр — в буфере (gfx.dest ≠ -1).
+-- 1019 — строки ниже курсора, 1018 — отрезок строки курсора; блит без
+-- фильтрации — пиксели битмапа ровно ×2, как у шрифта ×2
+local bc_w, bc_h = 0, 0
+function D.bigcur(b)
+  local d = gfx.dest
+  if d == -1 then return end
+  local w, rh = b.x1 - b.x0, b.rh
+  local h = b.yb - b.yc                      -- строка курсора + всё ниже — одним чтением из кадра
+  if bc_w ~= w or bc_h ~= h then bc_w, bc_h = w, h; gfx.setimgdim(1019, -1, -1); gfx.setimgdim(1019, w, h) end
+  local mode, a = gfx.mode, gfx.a
+  gfx.a = 1; gfx.mode = 4
+  gfx.dest = 1019
+  gfx.blit(d, 1, 0, b.x0, b.yc, w, h, 0, 0, w, h)
+  gfx.dest = d
+  local below = h - 2 * rh
+  if below > 0 then gfx.blit(1019, 1, 0, 0, rh, w, below, b.x0, b.yc + 2 * rh, w, below) end
+  gfx.blit(1019, 1, 0, b.sx - b.x0, 0, b.sw, rh, b.x0, b.yc, b.sw * 2, rh * 2)
+  gfx.mode, gfx.a = mode, a
+end
+
 function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 4))
@@ -3512,7 +3534,7 @@ function D.frame(L, snap, rows, state, info)
       if k == 0 then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1)
       elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.22 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     end
-    if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1); D.cur_y = y end
   end
   -- рамки items — ДО строк (5 окт): фоном, под волной и текстом; раньше
   -- рисовались последними и резали ноту, начатую посреди строки.

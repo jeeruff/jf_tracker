@@ -170,7 +170,8 @@ local state = {
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
-  phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 4,   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
+  phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 4,
+  bigcur = flag('bigcur', false),                 -- fixed cursor: строка курсора лупой ×2 (8 окт)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
@@ -449,7 +450,7 @@ local function save_win()
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -5447,6 +5448,7 @@ ctx = {
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
+      flag('bigcur', 'big fixed cursor', 'with the fixed cursor (centre) its row is drawn twice as big: two rows high, half the width around the cursor field; the rows below move one row down. Off while f-hints are shown'),
       { key = 'phtail', label = 'playhead tail', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, like a play cursor with a trail; the colour is the play cursor of the REAPER theme (0 - just the row)', get = function() return state.phtail or 4 end, set = function(v) state.phtail = v end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
@@ -8960,10 +8962,17 @@ local function frame()
     -- каждом тике defer буфер выводится на экран; max — прямо, без буфера.
     -- Выше ~33 fps скрипт не может: defer REAPER тикает около 30 раз в секунду.
     local fps_t = tonumber(state.fps)
-    if fps_t then
+    -- big fixed cursor (8 окт): кадр в буфер и при fps max — лупа копирует
+    -- строку курсора из картинки, не из экрана
+    ctx.bigbuf = state.fixed and state.bigcur or nil
+    if fps_t or ctx.bigbuf then
       if fps_buf.w ~= gfx.w or fps_buf.h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); fps_buf.w, fps_buf.h = gfx.w, gfx.h; fps_buf.last = 0 end
       gfx.dest = 1021
-      if now_t - fps_buf.last >= 1 / fps_t - 0.004 or not idle.hover then fps_buf.last = now_t
+      if not fps_t or now_t - fps_buf.last >= 1 / fps_t - 0.004 or not idle.hover then
+        fps_buf.last = now_t
+        -- 8 окт: буфер чистится сам — U.begin_frame стёр экран ДО gfx.dest = 1021,
+        -- а текст ×2 ложится сложением: прошлые кадры копились (видно с лупой)
+        U.set(U.BG); gfx.rect(0, 0, gfx.w, gfx.h, 1)
       else idle_skip = true end
     end
   end
@@ -8990,6 +8999,28 @@ local function frame()
     if not state.auto_inst then ctx.auto_by_tab = nil end
   end
   draw.pmark('pre: info table')
+  -- big fixed cursor (8 окт): строка курсора в центре — лупой ×2 (две строки
+  -- высотой, половина ширины тела вокруг поля курсора), строки ниже — на
+  -- строку вниз, последняя уходит. Мышь в этой зоне пересчитывается в
+  -- координаты обычного кадра (как у верхнего модуля в буфере), поэтому
+  -- hover / щелчки / протяжка попадают в те же строки. С метками f — без лупы.
+  ctx.bigcur = nil
+  local bc_yc = ctx.bigbuf and not HN.active and L.nrows >= 4 and L.body_h > 0 and draw.cur_y   -- где строку курсора нарисовал прошлый кадр
+  draw.cur_y = nil
+  if bc_yc and bc_yc >= L.body_y and bc_yc + 2 * L.rh <= L.body_y + L.nrows * L.rh then
+    local x0, x1 = L.matrix_w, L.win_w
+    local f = L.flat[vim.cur.fi]
+    local cx = f and f.x and (f.x + (f.w or 0) / 2) or (x0 + x1) / 2
+    local sw = math.floor((x1 - x0) / 2)
+    local sx = math.floor(math.max(x0, math.min(x1 - sw, cx - sw / 2)))
+    local yc, yb = bc_yc, L.body_y + L.nrows * L.rh
+    ctx.bigcur = { x0 = x0, x1 = x1, sx = sx, sw = sw, yc = yc, yb = yb, rh = L.rh }
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    if mx >= x0 and mx < x1 and my >= yc and my < yb then
+      if my < yc + 2 * L.rh then gfx.mouse_x, gfx.mouse_y = sx + (mx - x0) // 2, yc + (my - yc) // 2
+      else gfx.mouse_y = my - L.rh end
+    end
+  end
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
@@ -9434,6 +9465,7 @@ local function frame()
       return hv
     end or nil,
   })
+  if ctx.bigcur then draw.bigcur(ctx.bigcur) end
   -- большая справка F1 (6 окт): поверх всего окна
   draw.pmark('post: big views')
   if state.khelp_big and not idle_skip then
@@ -11735,7 +11767,7 @@ local function frame()
     end
   end
   draw.pmark('blit, gfx.update')
-  if tonumber(state.fps) then
+  if tonumber(state.fps) or ctx.bigbuf then
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
     gfx.dest = -1
     gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
