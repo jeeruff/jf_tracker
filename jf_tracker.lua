@@ -9052,6 +9052,7 @@ local function frame()
     dsp_title = (function() local t = dsp_target(); if not t then return nil end
       return t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name end)(),
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
+    dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,

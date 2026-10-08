@@ -4163,7 +4163,7 @@ function D.frame(L, snap, rows, state, info)
     -- шапка: имя трека (цвет как шапка канала), [track fx] [take fx], затем имя цепочки
     do
       local hx = fbw + L.pad
-      local tcol = info.pool_col
+      local tcol = info.dsp_col or info.pool_col
       if tcol then
         local nm = tcol.name ~= '' and tcol.name or 'track'
         local nw = ms(nm) + 2 * L.pad
