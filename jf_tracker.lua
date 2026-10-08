@@ -216,6 +216,7 @@ local state = {
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
+  seldrag = reaper.GetExtState(EXT, 'seldrag') == 'left' and 'left' or 'right',   -- выделение блока: правой (по умолчанию, 8 окт) / левой кнопкой
   statpos = ({ tracker = 'tracker', keyboard = 'keyboard' })[reaper.GetExtState(EXT, 'statpos')] or 'bottom',
   envfmt = reaper.GetExtState(EXT, 'envfmt') == 'hex' and 'hex' or 'midi',   -- значения огибающих / CC: midi 0..127 или hex (6 окт)
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
@@ -451,7 +452,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -5382,6 +5383,7 @@ ctx = {
       { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'clips', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / under the clips (above the rows) / above DSP / below DSP', get = function() return state.toppos or 'mid' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
+      { key = 'seldrag', label = 'select block with', kind = 'cycle', values = { 'right', 'left' }, desc = 'right (default): right drag selects a block, left drag moves the event / the selected block under the mouse, a right click without moving opens the menu; left: left drag selects (Option+drag moves, as before)', get = function() return state.seldrag or 'right' end, set = function(v) state.seldrag = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
@@ -10752,7 +10754,9 @@ local function frame()
         -- протяжка события (2 окт): в любом режиме; внутри VISUAL-блока — весь блок.
         -- Блок запоминается ДО того, как клик сдвинет курсор (угол блока)
         local vis_heads, vis_o
-        if (vim.mode == 'visual' or vim.mode == 'vline') and gfx.mouse_cap & 16 == 16 then
+        -- 8 окт: опция select block with = right — левая протяжка переносит (как Option+протяжка)
+        local move_ev = gfx.mouse_cap & 16 == 16 or (state.seldrag or 'right') == 'right'
+        if (vim.mode == 'visual' or vim.mode == 'vline') and move_ev then
           local f0, f1, r0, r1 = vim.visual_range()
           if hover.fi >= f0 and hover.fi <= f1 and hover.row.row >= r0 and hover.row.row <= r1 then
             vis_heads = vim.heads_in(f0, f1, r0, r1); vis_o = { fi = f0, row = r0, f1 = f1, r1 = r1, anchor = vim.anchor and { fi = vim.anchor.fi, row = vim.anchor.row }, cur = { fi = vim.cur.fi, row = vim.cur.row } }
@@ -10767,8 +10771,8 @@ local function frame()
         local head = cell
         local opt = gfx.mouse_cap & 16 == 16
         -- протяжка без модификатора — выделение блока (NORMAL и INSERT), 2 окт
-        if not opt and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, col = L.flat[hover.fi] and L.flat[hover.fi].col } end
-        if head and not dbl and opt then
+        if not move_ev and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, col = L.flat[hover.fi] and L.flat[hover.fi].col } end
+        if head and not dbl and move_ev then
           local hr = head.row0 or hover.row.row
           local heads = (vis_heads and #vis_heads > 0) and vis_heads or vim.heads_in(hover.fi, hover.fi, hr, hr)
           if #heads > 0 then
@@ -10939,13 +10943,19 @@ local function frame()
   end
   -- протяжка без модификатора: VISUAL-блок от точки нажатия до мыши
   if sel_drag then
-    if gfx.mouse_cap & 1 == 1 then
+    if gfx.mouse_cap & (sel_drag.btn or 1) ~= 0 then
       if not sel_drag.active and (math.abs(gfx.mouse_y - sel_drag.y0) > 3 or math.abs(gfx.mouse_x - sel_drag.x0) > 3) then
         sel_drag.active = true
         vim.anchor = { fi = sel_drag.fi, row = sel_drag.row }; vim.mode = 'visual'
       end
       if sel_drag.active and hover.row and hover.fi and not hover.row.clip then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
-    else sel_drag = nil end
+    else
+      if sel_drag.btn == 2 and not sel_drag.active then          -- правый клик без протяжки — контекстное меню
+        vim.cur.fi, vim.cur.row = sel_drag.fi, sel_drag.row
+        local ok, e = pcall(context_menu, hover); if not ok then vim.msg = tostring(e):match('[^\n]*$') end
+      end
+      sel_drag = nil
+    end
   end
   -- перенос события / блока мышью (Option): на отпускании — один undo (взять, удалить, вставить)
   if ev_drag then
@@ -11125,6 +11135,10 @@ local function frame()
     ctx.gain_comp(hover.dspcomp, 'remove')
   elseif U.rclick and hover.btn and hover.btn.what == 'auto' then
     ctx.open_params(hover.btn.col)
+  elseif U.rclick and (state.seldrag or 'right') == 'right' and hover.row and hover.fi and not hover.row.clip and not hover.env and not (vim.hydra or vim.picker) then
+    -- 8 окт: правая протяжка — выделение блока; отпустили без движения — меню
+    ctx.set_focus('tracker')
+    sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, btn = 2, col = L.flat[hover.fi] and L.flat[hover.fi].col }
   elseif U.rclick then
     local ok, e = pcall(context_menu, hover)
     if not ok then vim.msg = tostring(e):match('[^\n]*$') end

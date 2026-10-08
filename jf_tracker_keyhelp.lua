@@ -86,6 +86,7 @@ KH.PAGES = {
     { k = '^/ ⌥/ ⌘/', d = 'search: all effects / the DSP chain of the track / files' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
+    { k = 'mouse', d = 'right drag: select a block (a right click without moving: the menu); left drag: move the event or the selected block under the mouse; Shift+drag: extend the block (option select block with = left swaps the buttons)' },
     { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped' },
     { k = 'Opt+1..9', d = 'select / unselect track N in REAPER - f on a dB mark moves all selected faders' },
     { k = 'F11', d = 'fullscreen <-> docked (quick option title: title bar on / off)' },
