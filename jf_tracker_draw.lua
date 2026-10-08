@@ -488,8 +488,9 @@ function D.layout(snap, state, nregions)
   if L.browser_left then
     local y0 = L.mx_top or L.header_y
     local y1 = L.mx_bot or L.trk_bot
-    local split = y0 + math.max(6 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.4)))
-    L.mx_bot = split
+    local split = y0 + math.max(6 * L.rh, math.min(y1 - y0 - 6 * L.rh, math.floor((y1 - y0) * (state.lside_frac or 0.4))))
+    L.lside_y0, L.lside_y1, L.lside_split = y0, y1, split   -- линию раздела тянут мышью (8 окт)
+    L.mx_bot = split - (L.hint_h or 0)              -- строка подсказок матрицы — над разделом, не на браузере
     local ybot = gfx.h - L.status_h                 -- до самого низа: DSP — правее браузера (7 окт)
     L.lside_rect = { 0, split + D.SEPW, L.matrix_w - D.SEPW, ybot - split - D.SEPW }
   end
@@ -3864,7 +3865,7 @@ function D.frame(L, snap, rows, state, info)
   -- строки подсказок трекера и матрицы — в резерве под телом (опция hints)
   if (L.hint_h or 0) > 0 then
     local hy2 = L.under_y
-    if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
+    if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, L.lside_split and L.mx_bot or hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
     -- под полосой транспорта — подсказки её элементов, каждая под своим (5 окт)
     if not (L.piano_h > 0 and L.tppos == 'tracker' and info.hint_bars and D.strip_hints(L, L.matrix_w, hy2, L.win_w - L.matrix_w, info.focus == 'tracker')) then
       D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
@@ -4521,7 +4522,7 @@ function D.frame(L, snap, rows, state, info)
     local rects = {
       -- до низа модуля (5 окт): статус в трекере и строка подсказок — внутри рамки
       tracker = { tx0, hy, W - tx0, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy },
-      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.lside_split or L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
       browser = (L.lside_rect and { L.lside_rect[1], L.lside_rect[2], L.lside_rect[3], L.lside_rect[4] }) or (L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }) or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,

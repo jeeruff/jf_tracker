@@ -5,6 +5,9 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'browser on the left: the matrix / browser split is dragged with the mouse (dblclick: auto); the matrix hint bar sits above the split, not on the browser',
+    'narrow window: clips stay inside their module, the cells at the edge are cut like tracker columns',
+    'scene buttons show the region number',
     'f jump labels are drawn above every module: clips and scene buttons show their labels; labels on the item parameters (volume, pan, transpose ...) jump to the parameter',
     'the rec / item / automation panel sits above DSP by default (options: top panel position); with the browser on the left it starts right of it',
     'slices list is always shown for the selected instrument (at least the whole sample); browser Opt+Enter appends the file to the selected instrument as a new slice (glued into one sample), Enter - a new instrument as before',

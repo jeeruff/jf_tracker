@@ -644,6 +644,10 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   SS.scroll = math.max(0, math.min(math.max(0, nrows - fit), SS.scroll))
   local last = cols[#cols]
   local right = last and last.x and (last.x + last.w) or (x0 + lw)
+  -- 8 окт: узкое окно — клипы не вылезают за модуль (на lib справа): край —
+  -- правый край трекера, клетки на краю обрезаются, как колонки трекера
+  local edge = (L.win_w or right) - 6
+  if right > edge then right = edge end
   -- колонки сессии — по лейнам (7 окт): snap.cols — виртуальные (MX.vcols),
   -- клетка на каждый лейн трека шириной лейна; slots — видимые слева направо
   local vmap = {}
@@ -653,7 +657,8 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     if c.x and c.col then
       for li, ln in ipairs(c.lanes or {}) do
         local vi = vmap[c.ci .. ':' .. li]
-        if vi then slots[#slots + 1] = { vi = vi, c = c, x = ln.x + 1, w = math.max(L.cw * 3, ln.w - 3) } end
+        local sw = math.min(math.max(L.cw * 3, ln.w - 3), edge - ln.x - 1)
+        if vi and sw >= L.cw * 3 then slots[#slots + 1] = { vi = vi, c = c, x = ln.x + 1, w = sw } end
       end
     end
   end

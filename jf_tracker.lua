@@ -153,7 +153,8 @@ local state = {
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
   ssbars = tonumber(ext('ssbars', 8)) or 8,
-  ss_px = tonumber(reaper.GetExtState(EXT, 'ss_px')),   -- высота clips над матрицей (тянется мышью)
+  ss_px = tonumber(reaper.GetExtState(EXT, 'ss_px')),
+  lside_frac = tonumber(reaper.GetExtState(EXT, 'lside_frac')),   -- раздел матрица | браузер слева (8 окт)   -- высота clips над матрицей (тянется мышью)
   ssbsync = flag('ssbsync', true),
   clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
@@ -426,7 +427,7 @@ local function save_win()
   if state.ss_big and state.ss_saved then for k, v in pairs(state.ss_saved) do state[k] = v end; state.ss_big = false end   -- session big тоже
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or '')
+  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
@@ -9387,6 +9388,7 @@ local function frame()
     elseif L.fxb_rect and math.abs(gfx.mouse_x - (L.fxb_rect[1] + L.fxb_rect[3])) <= 3 and gfx.mouse_y >= L.fxb_rect[2] and gfx.mouse_y < L.fxb_rect[2] + L.fxb_rect[4] then edge = 'fxb'
     elseif state.side and L.inst_side_h and gfx.mouse_x > W0 and math.abs(gfx.mouse_y - ((L.side_y0 or 0) + L.inst_side_h + 1)) <= 3 then edge = 'inst'
     elseif state.top and math.abs(gfx.mouse_y - (L.top_first and ((L.top_y or 0) + L.top_h) or L.top_y)) <= 3 and gfx.mouse_x < W0 then edge = 'top'
+    elseif L.lside_split and gfx.mouse_x < L.matrix_w - 3 and math.abs(gfx.mouse_y - L.lside_split) <= 3 then edge = 'lsplit'   -- 8 окт: матрица | браузер слева
     elseif state.clipsview and (L.sess_h or 0) > 0 and gfx.mouse_x >= L.matrix_w and gfx.mouse_x < L.win_w and math.abs(gfx.mouse_y - (L.sess_y + L.sess_h)) <= 3 then edge = 'clips' end   -- 7 окт: высота модуля клипов
     if resize_drag then
       if gfx.mouse_cap & 1 == 1 then
@@ -9395,20 +9397,21 @@ local function frame()
         elseif resize_drag == 'fxb' then state.fxb_px = math.max(L.cw * 12, math.min(math.floor(gfx.w * 0.5), gfx.mouse_x - (L.fxb_rect and L.fxb_rect[1] or 0))); state.status = ('fx list width %d px'):format(state.fxb_px)
         elseif resize_drag == 'side' then state.side_px = math.max(L.cw * 10, math.min(math.floor(gfx.w * 0.6), gfx.w - gfx.mouse_x))
         elseif resize_drag == 'inst' then state.inst_px = math.max(4 * L.rh, gfx.mouse_y - (L.side_y0 or 0))
+        elseif resize_drag == 'lsplit' then state.lside_frac = math.max(0.1, math.min(0.9, (gfx.mouse_y - (L.lside_y0 or 0)) / math.max(1, (L.lside_y1 or gfx.h) - (L.lside_y0 or 0)))); state.status = ('matrix %d%% / browser'):format(math.floor(state.lside_frac * 100 + 0.5))
         elseif resize_drag == 'clips' then state.ss_px = math.max(5 * L.rh, gfx.mouse_y - (L.sess_y or 0)); state.status = ('clips height %d rows'):format(math.floor(state.ss_px / L.rh))
         else
           -- наверху — тянется нижний край; mid / bottom — верхний (растёт вверх)
           local want = L.top_first and (gfx.mouse_y - (L.top_y or 0)) or ((L.top_y + L.top_h) - gfx.mouse_y)
           state.top_px = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), want))
         end
-        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' and resize_drag ~= 'clips' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('lib %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
+        if resize_drag ~= 'mx' and resize_drag ~= 'fxb' and resize_drag ~= 'clips' and resize_drag ~= 'lsplit' then state.status = resize_drag == 'side' and ('sidebar width %d px'):format(state.side_px) or (resize_drag == 'inst' and ('lib %d px'):format(state.inst_px) or ('top panel %d px'):format(state.top_px)) end
       else resize_drag = nil end
     elseif edge then
-      state.status = edge == 'clips' and 'drag: clips height (dblclick: auto)' or edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: lib / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
+      state.status = edge == 'lsplit' and 'drag: matrix / browser split (dblclick: auto)' or edge == 'clips' and 'drag: clips height (dblclick: auto)' or edge == 'fxb' and 'drag: fx list width (dblclick: auto)' or edge == 'side' and 'drag: resize sidebar width (dblclick: auto)' or (edge == 'inst' and 'drag: lib / browser split (dblclick: auto)' or 'drag: resize top panel height (dblclick: auto)')
       if U.click then
         local now2 = reaper.time_precise()
         if (now2 - click.t) < 0.4 and click.zone == 'resize' then
-          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil elseif edge == 'fxb' then state.fxb_px = nil elseif edge == 'clips' then state.ss_px = nil else state.top_px = nil end
+          if edge == 'side' then state.side_px = nil elseif edge == 'inst' then state.inst_px = nil elseif edge == 'fxb' then state.fxb_px = nil elseif edge == 'clips' then state.ss_px = nil elseif edge == 'lsplit' then state.lside_frac = nil else state.top_px = nil end
         else resize_drag = edge end
         click = { t = now2, zone = 'resize' }
         U.click = false
