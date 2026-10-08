@@ -271,13 +271,10 @@ end
 
 -- ── раскладка ─────────────────────────────────────────────────────────────
 function D.layout(snap, state, nregions)
-  -- зазор между модулями (7 окт, опция module gap 0..20 px, эксперимент):
-  -- ширина разделителей; шире 2 px — пустым фоном, без линии
-  do
-    local g = tonumber(state.modgap) or 2
-    D.SEPW = math.max(0, math.min(20, g))
-    D.SEP = g > 2 and U.mix(U.BG, U.PANEL, 0.5) or U.mix(U.BG, U.TEXT, 0.38)
-  end
+  -- модули вплотную (8 окт: опция module gap убрана — она обрезала модули):
+  -- между соседями одна линия 1 px; активный — рамка внутри своих границ
+  D.SEPW = 1
+  D.SEP = U.mix(U.BG, U.TEXT, 0.38)
   gfx.setfont(D.font_id)
   local L = {}
   L.th = TH()
@@ -5006,9 +5003,10 @@ function D.frame(L, snap, rows, state, info)
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'
       set(ins and D.FOCUS_INS or D.FOCUS)
-      -- ободок ровно по границе модуля, без зазора: 1 px; INSERT — красный, 2 px
-      gfx.rect(r[1], r[2], r[3], r[4], 0)
-      if ins then gfx.rect(r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, 0) end
+      -- 8 окт: ободок внутри модуля (на пиксель внутрь): общая линия с соседом
+      -- остаётся серой — видно, какой из двух соседних активен; INSERT — 2 px
+      gfx.rect(r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, 0)
+      if ins then gfx.rect(r[1] + 2, r[2] + 2, r[3] - 4, r[4] - 4, 0) end
     end
   end
 
