@@ -2829,6 +2829,7 @@ function D.fader_db(p)
 end
 
 function D.frame(L, snap, rows, state, info)
+  D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -3045,9 +3046,16 @@ function D.frame(L, snap, rows, state, info)
         local y1 = hy + 2 * L.rh + 1
         local H = L.hr_vp * L.rh
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
-        local fh = math.max(math.floor(H / 2), H - 3 * L.rh)             -- место dB + панорамы + фейдера; 3 строки под эффекты
         local lblw0 = ms('-48') + 2
         local fx_w = math.min(lw1 - 2 * L.pad - indent, lblw0 + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
+        -- эффекты сбоку, если влезают 5 знаков — тогда фейдер на всю высоту
+        -- полосы; иначе под ним 3 строки эффектов. Высота фейдера при этом
+        -- одна на всех треках: решает ширина трека, а она у треков своя —
+        -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
+        -- узкий (L.mix_under — с прошлого кадра)
+        local side = c.x + c.w - 2 - (sx + fx_w + L.pad + 2) >= 5 * L.cw
+        if not side then D.mix_under_next = true end
+        local fh = D.mix_under and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY)
         local pyy = y1 + L.rh
@@ -3138,7 +3146,7 @@ function D.frame(L, snap, rows, state, info)
         if info.fx_stack then
           local sx1 = sx + fx_w + L.pad + 2
           local ex, ey, ew, eh
-          if c.x + c.w - 2 - sx1 >= 5 * L.cw then
+          if side then
             ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
             set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1)
           else
