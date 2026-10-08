@@ -161,6 +161,7 @@ local state = {
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
   fxparams = flag('fxparams', false),
+  mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -4308,6 +4309,23 @@ ctx = {
     if hot then hover.viewbtn = 'fxparams' end
     ctx.hint('viewbtn', bx, y, bw, L.rh, 'fxparams')
   end,
+  -- кнопка v / ^ в уголке микшера (8 окт): микшер под трекер / над ним
+  mixpos_btn = function(hover, bx, y)
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    local lab = state.mixpos == 'bottom' and '^' or 'v'
+    local bw = U.measure(lab) + 2 * L.pad
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh - 1, 1)
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh - 1, 0)
+    U.text(bx + L.pad, y, lab, hot and U.AMBER or U.TEXT)
+    if hot then hover.viewbtn = 'mixpos' end
+    ctx.hint('viewbtn', bx, y, bw, L.rh, 'mixpos')
+  end,
+  mixpos_toggle = function()
+    state.mixpos = state.mixpos == 'bottom' and 'top' or 'bottom'
+    reaper.SetExtState(EXT, 'mixpos', state.mixpos, true)
+    vim.msg = 'mixer ' .. (state.mixpos == 'bottom' and 'under the tracker' or 'above the tracker (in the headers)')
+  end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local hi = ctx.hdr_info(col)
@@ -4858,14 +4876,22 @@ ctx = {
     local function add(label, v) items[#items + 1] = { label = (v == cur and '● ' or '  ') .. label, data = v } end
     add('none', -1)
     local n = reaper.GetNumAudioInputs()
-    for i = 0, n - 1 do add('mono  ' .. (reaper.GetInputChannelName(i) or ('in ' .. (i + 1))), i) end
-    for i = 0, n - 2 do add(('stereo  %s / %s'):format(reaper.GetInputChannelName(i) or (i + 1), reaper.GetInputChannelName(i + 1) or (i + 2)), 1024 + i) end
+    -- 8 окт: у устройства 0 входов (CoreAudio без входа / закрыт) — всё равно
+    -- аудио-входы 1..8 (пометка), и пункт настроек аудиоустройства
+    local none = n == 0
+    local na = none and 8 or n
+    local function nm(i) return (not none and reaper.GetInputChannelName(i)) or ('in ' .. (i + 1)) end
+    local tag = none and '   (the audio device has no inputs now)' or ''
+    for i = 0, na - 1 do add('mono  ' .. nm(i) .. tag, i) end
+    for i = 0, na - 2 do add(('stereo  %s / %s'):format(nm(i), nm(i + 1)) .. tag, 1024 + i) end
+    if none then items[#items + 1] = { label = '  audio device settings ... (no inputs: pick an input device there)', data = 'prefs' } end
     add('MIDI  all inputs, all channels', 4096 + (63 << 5))
     for d = 0, reaper.GetNumMIDIInputs() - 1 do
       local ok, nm = reaper.GetMIDIInputName(d, '')
       if ok then add('MIDI  ' .. nm .. ', all channels', 4096 + (d << 5)) end
     end
     vim.open_picker('input ' .. col.name, items, function(it)
+      if it.data == 'prefs' then reaper.Main_OnCommand(40099, 0); return end   -- Options: Audio device preferences
       edit.run('track input', function() reaper.SetMediaTrackInfo_Value(tr, 'I_RECINPUT', it.data) end)
       model.invalidate()
       vim.msg = col.name .. ' input: ' .. it.label:sub(4)
@@ -6742,6 +6768,7 @@ local function hint_go(t)
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
+  elseif t.kind == 'viewbtn' and d == 'mixpos' then ctx.mixpos_toggle(); relayout()
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
@@ -9254,7 +9281,11 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
-  if L.mixer and L.header_h and L.matrix_w then ctx.param_btn(hover, L.matrix_w + L.pad, L.header_y + 4 * L.rh + 2) end   -- микшер: param — в уголке
+  if L.mixer and L.header_h and L.matrix_w then                   -- микшер: param и v / ^ — в уголке (сверху — в шапке, снизу — над скроллом)
+    local by = L.mix_bottom and (L.mix_y + 4) or (L.header_y + 4 * L.rh + 2)
+    ctx.param_btn(hover, L.matrix_w + L.pad, by)
+    ctx.mixpos_btn(hover, L.matrix_w + L.pad, by + L.rh + 2)
+  end
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
@@ -9546,6 +9577,7 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.viewbtn == 'mixpos' then state.status = 'mixer ' .. (state.mixpos == 'bottom' and '^ - back above the tracker, in the headers' or 'v - under the tracker')
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
@@ -10152,6 +10184,7 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
+    elseif hover.viewbtn == 'mixpos' then ctx.mixpos_toggle(); relayout()
     elseif hover.viewbtn == 'fxparams' then
       state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true)
       if state.fxparams and not state.fxrow then state.fxrow = true; reaper.SetExtState(EXT, 'fxrow', '1', true) end
@@ -10246,6 +10279,11 @@ local function frame()
         trs_drag = nil
       else
         trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h }
+      end
+      -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
+      if t.vert and t.what == 'vol' then
+        state.kslider = { col = t.col, what = 'vol' }
+        vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(t.col.name or '')
       end
       click = { t = now2, zone = 'trs', row = t.what }
     elseif hover.fxcolbtn then

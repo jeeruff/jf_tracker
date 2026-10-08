@@ -421,7 +421,11 @@ function D.layout(snap, state, nregions)
   -- громкости и панорамы (2) полоса микшера: фейдер шириной в лейн, справа
   -- (один лейн — под ним) эффекты с параметрами
   L.mixer = state.mixer and true or false
-  L.hr_vp = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 2
+  -- 8 окт: микшер — над трекером (в шапке) или под ним (кнопки v ^ в уголке)
+  L.mix_bottom = L.mixer and state.mixpos == 'bottom' or false
+  L.mix_rows = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 0
+  L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4) or 0
+  L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   L.lane_row = 2 + L.hr_vp + L.hr_in + L.hr_info
   L.header_rows = 3 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
@@ -450,9 +454,10 @@ function D.layout(snap, state, nregions)
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6
-  L.low_h = L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера
+  L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
-  L.hsb_y = L.body_y + L.body_h
+  L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
+  L.hsb_y = L.mix_y + L.mix_h
   L.piano_y = L.hsb_y + L.hsb_h
   if L.tppos == 'top' then L.piano_y = 0 elseif L.tppos == 'bottom' then L.piano_y = gfx.h - L.status_h - L.tp_h end
   L.stat_y = L.body_y + L.body_h + L.low_h          -- статус в трекере (status_in)
@@ -3044,8 +3049,12 @@ function D.frame(L, snap, rows, state, info)
         -- зарезервированы всегда), фейдер. Фейдер ОДНОГО размера на всех
         -- треках: высота — 2/3 полосы, ширина — подписи + коробка 6 знаков;
         -- эффекты с параметрами — сбоку (если влезают) / под фейдером
-        local y1 = hy + 2 * L.rh + 1
-        local H = L.hr_vp * L.rh
+        local y1 = L.mix_bottom and (L.mix_y + 3) or (hy + 2 * L.rh + 1)
+        local H = L.mix_rows * L.rh
+        if L.mix_bottom then
+          hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
+          set(D.SEP); gfx.rect(c.x, L.mix_y, c.w + 1, D.SEPW, 1)
+        end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local lblw0 = ms('-48') + 2
         local fx_w = math.min(lw1 - 2 * L.pad - indent, lblw0 + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
@@ -3078,6 +3087,7 @@ function D.frame(L, snap, rows, state, info)
         local hot = mx >= sx and mx < sx + fx_w and my >= ty0 - 4 and my < ty0 + th + 4
         local ks = info.kslider
         local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
+        if kon then set(U.AMBER); gfx.rect(c.x + 1, y1 - 1, c.w - 1, H, 0) end   -- полоса под клавиатурой (щелчок / f): k j громкость, h l панорама
         local lblw = (fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
         local bx0, bw0 = sx + lblw, fx_w - lblw
         local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
