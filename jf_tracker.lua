@@ -5091,7 +5091,7 @@ ctx = {
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
-      flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) to ~/Pictures/screenshots, c - the same for Claude (REAPER/jf_tracker_shot.png + the report). Right click / Esc - off'),
+      flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
@@ -7948,7 +7948,7 @@ local function poll_cmd()
     for _, f in ipairs(t and t.fx or {}) do if f.i == addr then for _, p in ipairs(f.params or {}) do out[#out + 1] = tostring(p.name) .. ':' .. tostring(p.i) .. ':' .. tostring(p.fx) end end end
     reaper.SetExtState(EXT, 'dbg', 'dbp ' .. #out .. ' | ' .. table.concat(out, ' '), false)
   elseif name == 'st' then reaper.SetExtState(EXT, 'dbg', ('focus %s mode %s pending %s op %s clips %s'):format(state.focus, vim.mode, tostring(vim.pending), tostring(vim.op), tostring(state.clipsview)), false)   -- тест: состояние фокуса (только чтение)
-  elseif name == 'shot' then ctx.shot_req = 'claude'                -- тест (8 окт): снимок окна трекера своим кодером
+  elseif name == 'shot' then ctx.shot_req = 'file'                -- тест (8 окт): снимок окна трекера своим кодером
   elseif name == 'notesadd' then
     -- 8 окт: дописать файл CHECK.md (список проверки) в конец заметок проекта
     -- активной вкладки; открытый редактор заметок перечитывает их
@@ -11273,15 +11273,18 @@ local function frame()
       gfx.dest = tonumber(state.fps) and 1021 or -1
       local ok, rgb = pcall(MX.PNG.grab, x, y, w, h)
       gfx.dest = d0
-      local path = req == 'claude' and (reaper.GetResourcePath() .. '/jf_tracker_shot.png')
-        or ((os.getenv('HOME') or '') .. '/Pictures/screenshots/jf_tracker_' .. os.date('%Y-%m-%d_%H-%M-%S') .. '.png')
+      -- 8 окт: как системный снимок macOS — та же папка (screencapture location
+      -- ~/Pictures/Screenshots) и то же имя «Screenshot 2026-10-08 at 9.30.23 AM»
+      -- (час без нуля, перед AM — узкий неразрывный пробел U+202F) + _jftracker
+      local hh = tonumber(os.date('%I'))
+      local path = ('%s/Pictures/Screenshots/Screenshot %s at %d.%s\u{202F}%s_jftracker.png'):format(os.getenv('HOME') or '', os.date('%Y-%m-%d'), hh, os.date('%M.%S'), os.date('%p'))
       local fh = ok and io.open(path, 'wb')
       if fh then
         fh:write(MX.PNG.encode(w, h, rgb)); fh:close()
         local rep = ('shot %s %dx%d at %d,%d -> %s%s'):format(req, w, h, x, y, path, M and M.b and (' | ' .. (reaper.GetExtState(EXT, 'measure') or '')) or '')
         reaper.SetExtState(EXT, 'shot', rep, false)
         if ctx.dlog then ctx.dlog(rep) end
-        vim.msg = req == 'claude' and ('shot for Claude: ' .. w .. 'x' .. h .. ' - say "смотри снимок"') or ('shot saved: ' .. path:match('[^/]+$'))
+        vim.msg = 'shot: ' .. path:match('[^/]+$') .. (' (%dx%d)'):format(w, h)
       else vim.msg = 'shot: cannot write ' .. path end
     end
   end
@@ -11533,7 +11536,7 @@ local function frame()
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
-  if state.measure and (c == ('s'):byte() or c == ('c'):byte()) then ctx.shot_req = c == ('s'):byte() and 'file' or 'claude'; c = 0 end   -- 8 окт: снимок линейки
+  if state.measure and c == ('s'):byte() then ctx.shot_req = 'file'; c = 0 end   -- 8 окт: снимок линейки (одна клавиша)
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Tab (7 окт): Tab — трекер ↔ session, Shift+Tab — фокус назад, Option+Tab /
   -- Option+Shift+Tab — фокус по модулям по кругу (был Tab), Ctrl+Tab — вкладки
