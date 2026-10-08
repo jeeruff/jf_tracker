@@ -689,7 +689,13 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
     local hot = mx >= x0 and mx < x0 + lw and my >= sy and my < sy + bh
     U.set(hot and U.tint(U.AMBER, 0.25) or U.PANEL); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 1)
     U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x0 + 3, sy, lw - 5, bh - 1, 0)
-    U.text(x0 + L.pad + 2, sy, ctx.fit(SS.slot_name(rg, ri), lw - 2 * L.pad - 4), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
+    -- 8 окт: номер региона перед именем — цифровой индекс сцены (как в шапке региона)
+    local nx = x0 + L.pad + 2
+    if rg.idx and not rg.gap then
+      local ns = tostring(rg.idx)
+      U.text(nx, sy, ns, U.GREY); nx = nx + U.measure(ns) + U.measure('W')
+    end
+    U.text(nx, sy, ctx.fit(SS.slot_name(rg, ri), x0 + lw - L.pad - 2 - nx), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
     if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad + 2, sy + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad - 4), U.GREY) end
     if hot then hover.sessrow = ri end
     if ctx.hint then ctx.hint('sessrow', x0 + 3, sy, lw - 5, L.rh, ri) end
