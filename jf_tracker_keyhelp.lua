@@ -204,7 +204,7 @@ KH.PAGES = {
   } },
   pm = { title = 'pm cards (jf_pm, experimental)', e = {
     { k = 'h j k l', d = 'move over the cards (also arrows); g G - first / last' },
-    { k = 'Enter o', d = 'open the project in a new REAPER tab (an open tab is just switched to)' },
+    { k = 'Enter o', d = 'open the project in a new REAPER tab (an open tab is just switched to); t - in this tab instead' },
     { k = 'Shift+Enter', d = 'inside the project: tracks / samples / regions / markers (Enter inserts, h - back)' },
     { k = 'Space', d = 'listen to the project preview (its _preview.wav, proxy or render); again - stop' },
     { k = 'T s p', d = 'jf_pm tags (:pmtag), status (the kanban classes), pin on top - written into jf_pm_index.json' },

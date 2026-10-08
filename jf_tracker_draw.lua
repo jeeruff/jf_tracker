@@ -483,12 +483,13 @@ function D.layout(snap, state, nregions)
       -- в левой колонке: колонка не уже модуля
       if not state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
       local cw = state.mx_hidden and L.ctrl_w or (L.matrix_w - D.SEPW)
+      local bh = L.top_h + (state.ptabs and (L.rh + 3) or 0)   -- 8 окт: строка вкладок проектов сверху
       if L.ctrlpos == 'top' then
-        L.ctrl_box = { 0, L.header_y, cw, L.top_h }
-        L.mx_top = L.header_y + L.top_h
+        L.ctrl_box = { 0, L.header_y, cw, bh }
+        L.mx_top = L.header_y + bh
       else
-        L.ctrl_box = { 0, L.trk_bot - L.top_h, cw, L.top_h }
-        L.mx_bot = L.trk_bot - L.top_h
+        L.ctrl_box = { 0, L.trk_bot - bh, cw, bh }
+        L.mx_bot = L.trk_bot - bh
       end
       if state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
     end
@@ -1833,6 +1834,27 @@ local function draw_ctrl(L, info, H, hover)
     return n + (ci > 0 and 1 or 0)
   end
   local function thin(yy) set(D.SEP); gfx.rect(L.pad, yy, L.ctrl_w - 2 * L.pad, 1, 1) end
+  -- вкладки проектов (8 окт): тонкая строка сверху, кнопки поровну
+  -- (не уже 6 знаков, лишние — «+N»); активная — янтарём, * — не сохранён
+  if c.ptabs and #c.ptabs > 0 then
+    local n = #c.ptabs
+    local tw = L.ctrl_w - 2 * L.pad
+    local bw = math.max(6 * L.cw, math.floor(tw / n))
+    local fitn = math.max(1, math.floor(tw / bw))
+    local x = L.pad
+    for i, t in ipairs(c.ptabs) do
+      if i > fitn or (i == fitn and n > fitn) then text(x + 2, y + 1, '+' .. (n - i + 1), U.CYAN); break end
+      local w2 = (i == fitn) and (L.pad + tw - x) or bw
+      local hot = mx >= x and mx < x + w2 - 2 and my >= y and my < y + L.rh
+      set(t.on and U.tint(U.AMBER, 0.3) or (hot and D.CURROW or U.PANEL)); gfx.rect(x, y, w2 - 2, L.rh, 1)
+      set(t.on and U.AMBER or (hot and U.AMBER or U.LINE)); gfx.rect(x, y, w2 - 2, L.rh, 0)
+      text(x + 3, y + 1, fit((t.dirty and '*' or '') .. t.name, w2 - 8), (t.on or hot) and U.AMBER or U.GREY)
+      if hot then hover.ctrl = 'ptab:' .. (i - 1) end
+      hint('ctrl', x, y, w2 - 2, L.rh, 'ptab:' .. (i - 1))
+      x = x + w2
+    end
+    y = y + L.rh + 3
+  end
   for gi, g in ipairs(groups) do
     local ci = 0
     -- 6 окт: быстрые опции — ширина колонок по самому длинному слову колонки

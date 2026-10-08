@@ -162,6 +162,7 @@ local state = {
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
   fxparams = flag('fxparams', false),
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
+  ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -435,7 +436,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3922,8 +3923,13 @@ ctx = {
       if fn == path then reaper.SelectProjectInstance(proj); vim.msg = 'pm: switched to the open tab ' .. (name or path); return end
       i = i + 1
     end
-    OPT.ask.open('open ' .. (name or path), 'in a new REAPER tab - scripts stop when a project opens, the tracker starts again there', {
+    OPT.ask.open('open ' .. (name or path), 'scripts stop when a project opens, the tracker starts again there', {
       { key = 'n', label = 'cancel', fn = function() vim.msg = 'pm: not opened' end },
+      { key = 't', label = 'open in this tab (instead of the current project; REAPER asks to save it)', fn = function()
+        local exe = reaper.GetExePath() .. '/REAPER.app/Contents/MacOS/REAPER'
+        reaper.Main_openProject(path)
+        reaper.ExecProcess(('"%s" -nonewinst "%s/jf_tracker.lua"'):format(exe, DIR), -1)
+      end },
       { key = 'o', label = 'open in a new tab', fn = function()
         local exe = reaper.GetExePath() .. '/REAPER.app/Contents/MacOS/REAPER'
         reaper.Main_OnCommand(40859, 0)                      -- File: New project tab
@@ -5301,6 +5307,7 @@ ctx = {
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
+      flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
@@ -7898,6 +7905,13 @@ end
 -- клик / колесо по контролу верхней панели
 function ctrl_action(name, delta)
   ctx.dlog(('ctrl %s %s'):format(tostring(name), tostring(delta)))
+  -- вкладки проектов (8 окт): строка над главным модулем, щелчок — переключить
+  local pti = tostring(name):match('^ptab:(%d+)$')
+  if pti then
+    local proj = reaper.EnumProjects(tonumber(pti))
+    if proj and delta == 0 then reaper.SelectProjectInstance(proj); vim.msg = 'project tab ' .. (tonumber(pti) + 1) end
+    return
+  end
   -- общая клетка быстрых опций (6 окт): тумблер — переключить, выбор — следующее значение
   local qi = ctx.qitems and ctx.qitems[name]
   if qi then
@@ -8955,6 +8969,15 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
+      ptabs = state.ptabs and (function()
+        local out, cur = {}, reaper.EnumProjects(-1)
+        for i = 0, 63 do
+          local p = reaper.EnumProjects(i); if not p then break end
+          local nm = (reaper.GetProjectName(p) or ''):gsub('%.[Rr][Pp][Pp]$', '')
+          out[#out + 1] = { name = nm ~= '' and nm or 'unsaved', on = p == cur, dirty = reaper.IsProjectDirty(p) ~= 0 }
+        end
+        return out
+      end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
