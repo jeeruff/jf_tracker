@@ -761,12 +761,13 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           if ctx.hint then ctx.hint('sess', cx, ky, cw, L.rh, { ri = ri, ci = vi }) end
           if ri == (last_clip[vi] or 0) + 1 then corner(bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = vi }) end
         end
-        -- клип-мод: буква клавиши — в служебной строке справа
+        -- клип-мод: буква клавиши — слева сверху, над кнопкой > (8 окт; была
+        -- справа и ярко-жёлтой): приглушённая плашка, буква янтарём
         local kl = SS.clip_mode and SS.key_of(ri, vi, SS.vis_draw)
         if kl then
           local kw = U.measure(kl) + 4
-          U.set(U.AMBER); gfx.rect(cx + cw - kw - 2, ky + 1, kw, L.rh - 1, 1)
-          U.text(cx + cw - kw, ky + 1, kl, U.BG)
+          U.set(U.mix(U.BG, U.AMBER, 0.28)); gfx.rect(bx, ky + 1, kw, L.rh - 1, 1)
+          U.text(bx + 2, ky + 1, kl, U.AMBER)
         end
       end
     end
