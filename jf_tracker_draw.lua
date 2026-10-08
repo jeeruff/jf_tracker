@@ -327,6 +327,7 @@ function D.layout(snap, state, nregions)
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
+  L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
   -- уровни ширины колонки (7 окт): колесо (высота трека REAPER при sync
   -- header) шагает по одному полю: 0 полоска, 1 нота, 2 + vol, 3 + delay,
   -- 4..7 + fx-колонки по одной, дальше + подколонки нот; автоматизация — когда
@@ -541,12 +542,13 @@ function D.layout(snap, state, nregions)
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
-    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini', compact = fs == true, hidden = hidden }
+    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini' or fs == 'chord', chord = fs == 'chord', compact = fs == true, hidden = hidden }
     local lx = (c.x or 0) + 1
     if c.folded then
-      L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, x = vis and lx or nil, w = L.fold_w }
-      c.lanes[1] = { lane = col.lanes[1], x = lx, w = L.fold_w, nsub = 1, f0 = #L.flat, folded = true }
-      lx = lx + L.fold_w + 1
+      local fw = c.chord and L.chord_w or L.fold_w    -- 8 окт: лейн аккордов — шире полоски
+      L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, chord = c.chord, x = vis and lx or nil, w = fw }
+      c.lanes[1] = { lane = col.lanes[1], x = lx, w = fw, nsub = 1, f0 = #L.flat, folded = true }
+      lx = lx + fw + 1
     else
       for li, lane in ipairs(col.lanes) do
         -- минимум подколонок задаёт пользователь кнопками -/+ над лейном (1 окт)
@@ -1052,6 +1054,29 @@ local function draw_fold_cell(L, col, row, x, y, ty, inv)
     if glyph == 'o' then break end
   end
   text(x + (L.fold_w - ms(glyph)) / 2, ty, glyph, inv and U.BG or colr)
+end
+
+-- лейн аккордов (8 окт, :chord): на строке, где ноты начинаются, —
+-- обозначение (D.CH.name), пока звучат — «¦», все кончились — OFF
+function D.draw_chord_cell(L, col, row, x, y, ty, inv, w)
+  local text_ = text
+  local function tx(xx, yy, str, c2) if inv then text_(xx, yy, str, c2, D.inv_bg or U.TEXT) else text_(xx, yy, str, c2) end end
+  local pitches, cont, off = {}, false, false
+  for _, lane in ipairs(col.lanes) do
+    for _, sub in ipairs(lane.subs) do
+      local c = sub[row]
+      if c then
+        if c.kind == 'midi' and c.row0 == row then pitches[#pitches + 1] = c.pitch
+        elseif c.kind == 'off' then off = true
+        elseif c.kind == 'cont' or c.kind == 'midi' then cont = true end
+      end
+    end
+  end
+  if #pitches > 0 and D.CH then
+    tx(x + L.pad, ty, fit(D.CH.name(pitches) or '?', w - 2 * L.pad), inv and U.BG or U.CYAN)
+  elseif cont then tx(x + math.floor((w - ms('¦')) / 2), ty, '¦', inv and U.BG or U.GREY)
+  elseif off then tx(x + L.pad, ty, 'OFF', inv and U.BG or U.GREY)
+  else tx(x + math.floor((w - ms('...')) / 2), ty, '...', inv and U.BG or D.EMPTY) end
 end
 
 -- огибающая как в аранжировке REAPER: линия значения по строкам, точки —
@@ -3705,6 +3730,7 @@ function D.frame(L, snap, rows, state, info)
             end
             local cell
             if r.row < 0 or r.clip then
+            elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
             D.cur_box = nil

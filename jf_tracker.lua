@@ -36,6 +36,8 @@ local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
 local B = dofile(DIR .. '/jf_tracker_browser.lua')
 local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
+MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
+draw.CH = MMX.CH
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
@@ -3639,7 +3641,7 @@ ctx = {
       edit.track_value(ks.col.track, TRS_KEY[ks.what], TRS_RESET[ks.what]); edit.track_undo('track ' .. ks.what .. ' reset'); model.invalidate()
       vim.msg = ks.what .. ' reset'; return true
     end
-    state.kslider = nil
+    state.kslider = nil; draw.trspop = nil            -- всплывающий слайдер узкого трека закрывается вместе с фокусом
     vim.msg = 'slider: done'
     return c == 27 or c == 13                                 -- Esc / Enter — съедены; другое (Tab …) — дальше
   end,
@@ -4303,6 +4305,49 @@ ctx = {
   -- всегда (микшер); возвращает, сколько строк нужно (для высоты строки effects)
   -- кнопка param (параметры TCP под эффектами): в строке effects, в микшере —
   -- в уголке под кнопками вида (строки effects там нет)
+  -- аккорды (8 окт): :chord — трек курсора одним лейном аккордов (state.folds
+  -- = 'chord', ещё раз — обратно); :chord Cm7 — гармонайзер: аккорд в строку
+  -- курсора (ноты, что там начинаются, заменяются; длина — как у них, иначе
+  -- до следующих нот трека, не больше такта)
+  chord_heads = function(col, row)
+    local heads, pitches = {}, {}
+    for _, lane in ipairs(col.lanes or {}) do
+      for _, sub in ipairs(lane.subs or {}) do
+        local c = sub[row]
+        if c and c.kind == 'midi' and c.row0 == row then heads[#heads + 1] = c; pitches[#pitches + 1] = c.pitch end
+      end
+    end
+    return heads, pitches
+  end,
+  chord_cmd = function(arg)
+    local col = cur_col(); if not col then vim.msg = 'chord: no track under the cursor'; return end
+    arg = (arg or ''):match('^%s*(.-)%s*$')
+    if arg == '' or arg == 'off' then
+      local on = state.folds[col.guid] == 'chord'
+      if arg == 'off' then on = true end
+      state.folds[col.guid] = (not on) and 'chord' or nil
+      relayout()
+      vim.msg = col.name .. (on and ': notes again' or ': one chord lane - names from the notes; :chord Cm7 writes a chord at the cursor')
+      return
+    end
+    local pitches = MMX.CH.voicing(arg, math.max(1, math.min(7, (vim.octave or 4))))
+    if not pitches then vim.msg = 'chord: what is ' .. arg .. '? (C Cm C7 Cmaj7 Cm7 Cdim Caug Csus4 C6 C9 ... /bass)'; return end
+    local row = vim.cur.row
+    local heads = ctx.chord_heads(col, row)
+    local rows
+    for _, h in ipairs(heads) do rows = math.max(rows or 0, h.rows or 1) end
+    if not rows then
+      local sn, sd = ctx.sig_at(edit.row_time(row, state.lpb, 0)); local rb = math.max(1, math.floor(state.lpb * sn * 4 / sd + 0.5))   -- такт в строках
+      rows = rb
+      for r = row + 1, row + rb - 1 do if #ctx.chord_heads(col, r) > 0 then rows = r - row; break end end
+    end
+    edit.run('chord ' .. arg, function()
+      if #heads > 0 then edit.delete(heads, state.lpb) end
+      for _, p in ipairs(pitches) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, rows) end
+    end)
+    model.invalidate()
+    vim.msg = ('%s: %s at %d, %d row(s) - %s'):format(col.name, arg, row, rows, table.concat((function() local t = {} for _, p in ipairs(pitches) do t[#t + 1] = model.note_name(p) end return t end)(), ' '))
+  end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local hi = ctx.hdr_info(col)
@@ -6729,6 +6774,8 @@ local function hint_go(t)
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
+    -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
+    if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -9288,6 +9335,7 @@ local function frame()
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
+    U.set(U.LINE); for _, c in ipairs(L.cols) do if c.x then gfx.rect(c.x, y0, 1, L.fxrow_h, 1) end end   -- 8 окт: разделители треков, как в теле
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local MAXL = state.fxparams and 14 or 6
@@ -10267,6 +10315,7 @@ local function frame()
       local t = hover.trsbtn
       local open = draw.trspop and draw.trspop.guid == t.col.guid and draw.trspop.what == t.what
       draw.trspop = (not open) and { guid = t.col.guid, what = t.what } or nil
+      if not open then state.kslider = { col = t.col, what = t.what } else state.kslider = nil end   -- 8 окт: фокус клавиатуры на открытый слайдер
       click = { t = now2, zone = 'trsbtn' }
     elseif hover.trs then
       local t = hover.trs

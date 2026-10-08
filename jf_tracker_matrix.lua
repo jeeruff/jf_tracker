@@ -328,6 +328,13 @@ function MX.draw(L, snap, regions, info)
     if playing and rh > L.rh then
       local fy = y + math.floor((info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0) * rh)
       U.set(U.AMBER); gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 1, 1)
+    elseif playing then
+      -- 8 окт: строка в одну высоту — плейхед по горизонтали: полоса прогресса
+      -- снизу и риска на месте (по клеткам паттерна, слева направо)
+      local frac = (info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0)
+      local x0 = L.mx_label_w
+      local fx = x0 + math.floor(frac * (W - x0 - 2) + 0.5)
+      U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
     -- цвет региона (2 окт): полоска у края и подкраска под номером и именем —
