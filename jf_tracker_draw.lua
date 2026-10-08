@@ -598,6 +598,19 @@ function D.layout(snap, state, nregions)
         end
       end
     c.w = lx - (c.x or 0)
+    -- 8 окт: колонка не влезла целиком — режем по границе трекера (шапка и
+    -- строка эффектов выходили за линию модуля); подколонки за краем — без x
+    if vis and c.x and c.x + c.w > L.win_w - 2 then
+      local lim = L.win_w - 2
+      c.w = math.max(0, lim - c.x)
+      for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do
+        local f = L.flat[k]
+        if f.x and f.ci == ci then
+          if f.x >= lim then f.x = nil elseif f.x + f.w > lim then f.w = lim - f.x end
+        end
+      end
+      for _, ev in ipairs(c.envs) do if ev.x >= lim then ev.x = lim; ev.w = 0 elseif ev.x + ev.w > lim then ev.w = lim - ev.x end end
+    end
     if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
     if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
     -- скрытые дети свёрнутой папки: записи L.flat остаются (курсор не ломается), x = nil
