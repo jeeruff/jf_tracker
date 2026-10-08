@@ -181,7 +181,7 @@ local state = {
   mxruler = flag('mxruler', true),
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
-  toppos = (function() local v = reaper.GetExtState(EXT, 'toppos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),
+  toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
   wzoom = 0,                                                       -- 7 окт: прежний зум 0/1/2 заменён уровнями wzlevel
   wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')),         -- общий уровень ширины треков (Cmd + гор. колесо), nil — как у трека
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
@@ -435,7 +435,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos', state.toppos or 'top'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -4960,7 +4960,7 @@ ctx = {
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
       flag('top', 'top panel', 'control / item / modulate / midi'),
-      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'top' end, set = function(v) state.toppos = v end },
+      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'mid' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
@@ -6463,6 +6463,7 @@ local function hint_go(t)
     -- session (6 окт): f + метка — клип; после F — вся сцена ряда
     if MX.SS.scene_mode then MX.SS.scene(d.ri, seq, ctx.ss_G(), #ctx.ss_V().cols) else MX.SS.launch(d.ri, d.ci, seq) end
     MX.SS.scene_mode = false; MX.SS.cur.ri, MX.SS.cur.ci = d.ri, d.ci
+  elseif t.kind == 'sprop' then ctx.set_focus('top'); state.toptab = 'sample'; SPROP.sel = d   -- параметр сэмпла (8 окт: метки были, прыжка не было)
   elseif t.kind == 'sessrow' then MX.SS.scene_mode = false; MX.SS.cur.ri = d; MX.SS.scene(d, seq, ctx.ss_G(), #ctx.ss_V().cols)
   elseif t.kind == 'ssplay' then MX.SS.launch(d.ri, d.ci, seq)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
@@ -7814,6 +7815,18 @@ local function poll_cmd()
     for _, f in ipairs(t and t.fx or {}) do if f.i == addr then for _, p in ipairs(f.params or {}) do out[#out + 1] = tostring(p.name) .. ':' .. tostring(p.i) .. ':' .. tostring(p.fx) end end end
     reaper.SetExtState(EXT, 'dbg', 'dbp ' .. #out .. ' | ' .. table.concat(out, ' '), false)
   elseif name == 'st' then reaper.SetExtState(EXT, 'dbg', ('focus %s mode %s pending %s op %s clips %s'):format(state.focus, vim.mode, tostring(vim.pending), tostring(vim.op), tostring(state.clipsview)), false)   -- тест: состояние фокуса (только чтение)
+  elseif name == 'notesadd' then
+    -- 8 окт: дописать файл CHECK.md (список проверки) в конец заметок проекта
+    -- активной вкладки; открытый редактор заметок перечитывает их
+    local fh = io.open(DIR .. '/CHECK.md', 'r')
+    if fh then
+      local add = fh:read('a'); fh:close()
+      if state.focus == 'notes' then ctx.notes_save() end
+      local old = reaper.GetSetProjectNotes(0, false, '')
+      reaper.GetSetProjectNotes(0, true, (old ~= '' and (old .. '\n\n') or '') .. add)
+      if state.notes_open then ctx.notes_load() end
+      reaper.SetExtState(EXT, 'dbg', 'notesadd: ' .. #add .. ' bytes', false)
+    end
   elseif name == 'rbig' then ctx.router_big()                   -- тест (7 окт): zR
   elseif name == 'dbkey' then   -- тест (7 окт): клавиши DSP big, только в песочнице: dbkey <буквы>
     if not ctx.is_sandbox() then reaper.SetExtState(EXT, 'dbg', 'dbkey: REFUSED, not a sandbox', false)
@@ -8864,10 +8877,6 @@ local function frame()
   end
   end
 
-  HN.draw(U, L)
-  B.draw_drag(U, L)
-  if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
-  if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   if ev_drag and ev_drag.active then draw.ghost(('%d event(s) %+d'):format(#ev_drag.heads, ev_drag.drow or 0)) end
   SL.draw_drag(U, L)
   -- макро-вид (3 окт, :macro): поверх тела трекера; клики по скрытым ячейкам не идут
@@ -9001,6 +9010,12 @@ local function frame()
       beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
     hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
   end
+  -- метки f и призраки бросков — после всех оверлеев (session, эффекты,
+  -- роутер), иначе их заливка закрашивала метки клипов и сцен (8 окт)
+  HN.draw(U, L)
+  B.draw_drag(U, L)
+  if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
+  if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
   if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy' or state.popup_at.kind == 'sprops' or state.popup_at.kind == 'strip')) then state.popup_at = nil end

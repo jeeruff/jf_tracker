@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'f jump labels are drawn above every module: clips and scene buttons show their labels; labels on the item parameters (volume, pan, transpose ...) jump to the parameter',
+    'the rec / item / automation panel sits above DSP by default (options: top panel position); with the browser on the left it starts right of it',
     'slices list is always shown for the selected instrument (at least the whole sample); browser Opt+Enter appends the file to the selected instrument as a new slice (glued into one sample), Enter - a new instrument as before',
     'clips per lane: a track with fixed lanes gets a clip column per lane, two clips play on one track at once (the lane is set to play together with the others); a row above each clip for the jump labels and the clip-mode letter, > / o left of a 2-row wave',
     'popups without an anchor (a hydra from the item tab) open at the focused module, not in the corner of the window',

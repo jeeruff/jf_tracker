@@ -1850,17 +1850,20 @@ end
 local function draw_topbar(L, info)
   local hover = {}
   local H = L.top_h
-  set(U.PANEL); gfx.rect(0, 0, L.win_w, H, 1)
+  -- 8 окт: над DSP при браузере слева — правее левой колонки (браузер идёт
+  -- до низа окна и закрывал вкладки и начало волны)
+  local X0 = (not L.top_first and L.browser_left) and L.matrix_w or 0
+  set(U.PANEL); gfx.rect(X0, 0, L.win_w - X0, H, 1)
   -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
   -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
   -- иначе стык без линии или две линии рядом
-  set(D.SEP); gfx.rect(0, (not L.top_first) and 0 or H - 2, gfx.w, D.SEPW, 1)
+  set(D.SEP); gfx.rect(X0, (not L.top_first) and 0 or H - 2, gfx.w - X0, D.SEPW, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
 
   if not L.ctrl_alone then draw_ctrl(L, info, H, hover) end
 
   -- центр: вкладки scope | sample | mod | retro | master
-  local sx0 = L.ctrl_alone and L.pad or (L.ctrl_w + L.pad)
+  local sx0 = X0 + (L.ctrl_alone and L.pad or (L.ctrl_w + L.pad))
   local sx1 = L.win_w - L.inst_w - L.pad - (L.slices_w or 0)   -- справа — модуль слайсов
   local tab = info.toptab or 'scope'
   local tx = sx0
@@ -2800,7 +2803,8 @@ function D.frame(L, snap, rows, state, info)
       gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
       if not ok then error(res, 0) end
       th = res
-      gfx.blit(1020, 1, 0, 0, 0, gfx.w, L.top_h, 0, ty, gfx.w, L.top_h)
+      local bx0 = L.browser_left and L.matrix_w or 0   -- левая колонка браузера — не затирать
+      gfx.blit(1020, 1, 0, bx0, 0, gfx.w - bx0, L.top_h, bx0, ty, gfx.w - bx0, L.top_h)
       -- прямоугольники для фокуса и меню — в координаты окна
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
       if L.ctrl_area then L.ctrl_area[2] = L.ctrl_area[2] + ty end
