@@ -982,7 +982,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       else text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
     end
   elseif k == 'off' then
-    text(x + L.x_note, ty, 'OFF', c(1, D.CONT))
+    text(x + L.x_note, ty, D.OFF_TXT or 'OFF', c(1, D.CONT))   -- 8 окт: опция note OFF glyph — «|» вместо OFF
     if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
     if L.narrow or L.notes_only then
     elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
@@ -1076,7 +1076,7 @@ function D.draw_chord_cell(L, col, row, x, y, ty, inv, w)
   if #pitches > 0 and D.CH then
     tx(x + L.pad, ty, fit(D.CH.name(pitches) or '?', w - 2 * L.pad), inv and U.BG or U.CYAN)
   elseif cont then tx(x + math.floor((w - ms('¦')) / 2), ty, '¦', inv and U.BG or U.GREY)
-  elseif off then tx(x + L.pad, ty, 'OFF', inv and U.BG or U.GREY)
+  elseif off then tx(x + L.pad, ty, D.OFF_TXT or 'OFF', inv and U.BG or U.GREY)
   else tx(x + math.floor((w - ms('...')) / 2), ty, '...', inv and U.BG or D.EMPTY) end
 end
 
@@ -2891,6 +2891,7 @@ end
 
 function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
+  D.OFF_TXT = state.offbar and '|' or 'OFF'
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w

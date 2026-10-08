@@ -8,6 +8,7 @@ V.CHANGES = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
+    'option note OFF as |: a bar instead of the word OFF in the note column (and the chord lane)',
     'SESSION mode: with the clips module in focus the status says -- SESSION -- (the keyboard launches clips), not KEYS',
     'mouse selection drag: the DSP panel keeps the track where the drag started, lock does not push the track selection to REAPER until release, step listen stays quiet - no more 8 fps while dragging across tracks',
     'fx chips under the headers: a click selects the fx in DSP, a double click opens its native window (with param on too)',
