@@ -103,7 +103,7 @@ local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1019 спектрограммы анализатора, 1022 логотип about, 1023 черновик поворота
--- 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
+-- 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 799
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
@@ -3184,7 +3184,8 @@ function D.frame(L, snap, rows, state, info)
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('session') + ms('effects') + 6 <= bw
       local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
-      small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
+      local x2 = small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
+      if x2 + ms('par') + 2 <= bx + bw then small(x2, hy + 1 + L.rh, 'par', 'fxparams', info.fxparams, 'viewbtn') end   -- 8 окт: параметры TCP под эффектами
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh

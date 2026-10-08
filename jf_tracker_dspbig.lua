@@ -282,7 +282,31 @@ end
 DB.MAXP = 8
 -- compact (7 окт): в панели DSP FX — без заголовка, узел в одну строку (имя),
 -- кабели; прокрутка по горизонтали
-function DB.draw(L, x, y, w, h, root, title, glass, big, compact)
+-- 8 окт: прокрученная схема не вылезает за модуль — рисуется в буфер 89
+-- в координатах окна (мышь и метки те же), на экран — только прямоугольник
+-- модуля; метки f вне него не ставятся
+function DB.draw(L, x, y, w, h, ...)
+  if gfx.w <= 0 or gfx.h <= 0 then return DB.draw_in(L, x, y, w, h, ...) end
+  if DB.buf_w ~= gfx.w or DB.buf_h ~= gfx.h then gfx.setimgdim(89, gfx.w, gfx.h); DB.buf_w, DB.buf_h = gfx.w, gfx.h end
+  local dest0, hint0 = gfx.dest, ctx and ctx.hint
+  gfx.dest = 89
+  U.set(U.BG); gfx.rect(x, y, w, h, 1)
+  if hint0 then
+    ctx.hint = function(kind, hx, hy, hw, hh, data)
+      if hx >= x and hx < x + w and hy >= y and hy < y + h then return hint0(kind, hx, hy, math.min(hw, x + w - hx), hh, data) end
+    end
+  end
+  local ok, res = pcall(DB.draw_in, L, x, y, w, h, ...)
+  gfx.dest = dest0
+  if hint0 then ctx.hint = hint0 end
+  if not ok then error(res, 0) end
+  gfx.blit(89, 1, 0, x, y, w, h, x, y, w, h)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  if not (mx >= x and mx < x + w and my >= y and my < y + h) then return { dbig = false } end   -- узлы, уехавшие за край, мышь не ловят
+  return res
+end
+
+function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   local hover = { dbig = true }
   local m = DB.metrics(L)
   DB.view_w = w

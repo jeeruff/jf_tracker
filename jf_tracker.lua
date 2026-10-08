@@ -160,6 +160,7 @@ local state = {
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
+  fxparams = flag('fxparams', false),             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
   whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
@@ -431,7 +432,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -4072,6 +4073,36 @@ ctx = {
   ss_G = function() return snap and MX.vgrid(snap, seq) or {} end,
   -- инфо трека для шапки (7 окт): кэш на полсекунды по треку
   hdr_cache = {},
+  -- параметры, вынесенные в TCP (8 окт): REAPER пишет их в chunk трека
+  -- строкой PARM_TCP после FXID эффекта («80:… 84:…» — номер параметра до
+  -- двоеточия); API нет — chunk читается не чаще раза в 2 с и при правках
+  tcp_cache = {},
+  tcp_params = function(col)
+    local tr = col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return {} end
+    local now, sc = reaper.time_precise(), reaper.GetProjectStateChangeCount(0)
+    local c = ctx.tcp_cache[col.guid]
+    if c and (c.sc == sc or now - c.t < 2) then return c.by end
+    local by = {}
+    local ok, chunk = reaper.GetTrackStateChunk(tr, '', false)
+    if ok then
+      local guid
+      for ln in chunk:gmatch('[^\n]+') do
+        local g = ln:match('^%s*FXID%s+(%b{})')
+        if g then guid = g
+        elseif guid then
+          local rest = ln:match('^%s*PARM_TCP%s+(.*)$')
+          if rest then
+            local list = {}
+            for tok in rest:gmatch('%S+') do local n = tonumber(tok:match('^(%d+)')); if n then list[#list + 1] = n end end
+            by[guid] = list; guid = nil
+          elseif ln:match('^%s*WAK') then guid = nil end
+        end
+      end
+    end
+    ctx.tcp_cache[col.guid] = { t = now, sc = sc, by = by }
+    return by
+  end,
   hdr_info = function(col)
     local now = reaper.time_precise()
     local c = ctx.hdr_cache[col.guid]
@@ -4080,7 +4111,12 @@ ctx = {
     for i, e in ipairs(snap and snap.pool or {}) do
       if not e.parent and e.home == col.name then c.inst[#c.inst + 1] = { name = e.name or '?', i = i } end
     end
-    for k, f in ipairs(col.fx or {}) do c.fx[#c.fx + 1] = { name = f.name, off = not f.enabled, k = k } end
+    local tcp = state.fxparams and ctx.tcp_params(col) or nil
+    for k, f in ipairs(col.fx or {}) do
+      local e = { name = f.name, off = not f.enabled, k = k, i = f.i }
+      if tcp and col.track and f.i and reaper.ValidatePtr(col.track, 'MediaTrack*') then e.params = tcp[reaper.TrackFX_GetFXGUID(col.track, f.i) or ''] end
+      c.fx[#c.fx + 1] = e
+    end
     local tr = col.track
     if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
       for si = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
@@ -6475,6 +6511,7 @@ local function hint_go(t)
   elseif t.kind == 'sessrow' then MX.SS.scene_mode = false; MX.SS.cur.ri = d; MX.SS.scene(d, seq, ctx.ss_G(), #ctx.ss_V().cols)
   elseif t.kind == 'ssplay' then MX.SS.launch(d.ri, d.ci, seq)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
+  elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
 end
@@ -8479,7 +8516,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     draw_router = function(x, y, w, h)
@@ -8908,7 +8945,7 @@ local function frame()
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
-    local MAXL = 6
+    local MAXL = state.fxparams and 14 or 6
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
     -- по эффекту на строку (имя по ширине колонки), высота — по самому длинному
@@ -8917,11 +8954,32 @@ local function frame()
         local hi = ctx.hdr_info(c.col)
         local cx, right = c.x + 2, c.x + c.w - 2
         local list = {}
-        for k, it in ipairs(hi.fx or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrfx' } end
+        local np = 0
+        for k, it in ipairs(hi.fx or {}) do
+          list[#list + 1] = { it = it, k = k, kind = 'hdrfx' }
+          -- 8 окт: параметры TCP — под своим эффектом тонкими слайдерами
+          for _, pi in ipairs(it.params or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrparam', param = pi }; np = np + 1 end
+        end
         for k, it in ipairs(hi.sends or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrsend' } end
         local sum = 0
         for _, e in ipairs(list) do sum = sum + U.measure(ctx.fit(e.it.name or '', L.cw * 9)) + 2 * L.pad + 2 end
-        local vert = #list > 1 and sum > right - cx
+        local vert = np > 0 or (#list > 1 and sum > right - cx)
+        local function pslider(e, x, y, w2)
+          local tr, fx, pi = c.col.track, e.it.i, e.param
+          if not (tr and fx and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+          local v = reaper.TrackFX_GetParamNormalized(tr, fx, pi)
+          local _, pn = reaper.TrackFX_GetParamName(tr, fx, pi, '')
+          local _, fv = reaper.TrackFX_GetFormattedParamValue(tr, fx, pi, '')
+          local hot = (mx >= x and mx < x + w2 and my >= y and my < y + L.rh) or (ctx.hp_drag and ctx.hp_drag.track == tr and ctx.hp_drag.fx == fx and ctx.hp_drag.param == pi)
+          local vw = U.measure(fv or '')
+          local nw = w2 - 2 * L.pad - (vw + L.pad < w2 * 0.5 and vw + L.pad or 0)
+          U.text(x + L.pad, y, ctx.fit(pn or ('p' .. pi), nw), hot and U.AMBER or U.GREY)
+          if vw + L.pad < w2 * 0.5 then U.text(x + w2 - L.pad - vw, y, fv, hot and U.AMBER or U.TEXT) end
+          U.set(U.LINE); gfx.rect(x + 1, y + L.rh - 3, w2 - 2, 2, 1)
+          U.set(hot and U.AMBER or U.CYAN); gfx.rect(x + 1, y + L.rh - 3, math.max(1, math.floor((w2 - 2) * v + 0.5)), 2, 1)
+          if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = c.col, k = e.k } end
+          ctx.hint('hdrparam', x, y, w2, L.rh, { col = c.col, k = e.k })
+        end
         local function chip(e, x, y, w2, lab)
           local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
           U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w2, L.rh - 1, 1)
@@ -8938,6 +8996,7 @@ local function frame()
             local y = y0 + 1 + (n - 1) * L.rh
             if n == shown and #list > shown then
               U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
+            elseif e.kind == 'hdrparam' then pslider(e, cx, y, right - cx)
             else
               local lab = ctx.fit(e.it.name or '', right - cx - 2 * L.pad)
               chip(e, cx, y, right - cx, lab)
@@ -9235,6 +9294,8 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.viewbtn == 'fxparams' then state.status = 'par: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
+  elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'session' then state.status = 'session: clips instead of the rows - scenes x tracks, Enter launches (zs, quick option clips)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
@@ -9570,6 +9631,31 @@ local function frame()
     else MX.DB.pdrag = nil end
   end
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
+  -- параметр TCP под эффектом (8 окт): тянуть по горизонтали, двойной
+  -- клик — умолчание, колесо — шаг 1 %
+  if U.click and hover.hdrparam then
+    local hp, now3 = hover.hdrparam, reaper.time_precise()
+    local lc = ctx.hp_last
+    if lc and lc.track == hp.track and lc.fx == hp.fx and lc.param == hp.param and now3 - lc.t < 0.35 then
+      edit.fx_param_default(hp.track, hp.fx, hp.param); ctx.hp_drag, ctx.hp_last = nil, nil
+      vim.msg = (hp.name or 'parameter') .. ': default'
+    else
+      ctx.hp_last = { track = hp.track, fx = hp.fx, param = hp.param, t = now3 }
+      ctx.hp_drag = { track = hp.track, fx = hp.fx, param = hp.param, x = hp.x, w = hp.w }
+    end
+    U.click = false
+  end
+  if ctx.hp_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      local d = ctx.hp_drag
+      if reaper.ValidatePtr(d.track, 'MediaTrack*') then edit.fx_param(d.track, d.fx, d.param, (gfx.mouse_x - d.x) / math.max(1, d.w)) end
+    else ctx.hp_drag = nil end
+  end
+  if gfx.mouse_wheel ~= 0 and hover.hdrparam then
+    local hp = hover.hdrparam
+    edit.fx_param(hp.track, hp.fx, hp.param, reaper.TrackFX_GetParamNormalized(hp.track, hp.fx, hp.param) + (gfx.mouse_wheel > 0 and 0.01 or -0.01))
+    gfx.mouse_wheel = 0
+  end
   if U.click and (hover.hdrfx or hover.hdrinst or hover.hdrsend) then   -- фишки шапки (7 окт)
     local h2 = hover.hdrfx or hover.hdrinst or hover.hdrsend
     local kind = hover.hdrfx and 'fx' or (hover.hdrinst and 'inst' or 'send')
@@ -9577,7 +9663,7 @@ local function frame()
     local lc = ctx.hdr_last
     local dbl = lc and lc.kind == kind and lc.col == h2.col and lc.k == h2.k and now3 - lc.t < 0.35
     ctx.hdr_last = { kind = kind, col = h2.col, k = h2.k, t = now3 }
-    ctx.hdr_pick(kind, h2.col, h2.k, dbl)
+    ctx.hdr_pick(kind, h2.col, h2.k, dbl or (kind == 'fx' and state.fxparams))   -- с параметрами: клик по имени — окно эффекта
     U.click = false
   end
   -- клип (7 окт): > в углу — запуск, o под последним клипом — запись в слот
@@ -9809,6 +9895,10 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
+    elseif hover.viewbtn == 'fxparams' then
+      state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true)
+      if state.fxparams and not state.fxrow then state.fxrow = true; reaper.SetExtState(EXT, 'fxrow', '1', true) end
+      ctx.hdr_cache = {}; relayout()
     elseif hover.viewbtn == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
     elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)

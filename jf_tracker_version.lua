@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'par (next to fx in the corner): the parameters shown in the REAPER track controls (TCP) under their fx in the effects row - thin horizontal sliders (drag, wheel, dblclick: default); a click on the fx name opens its window',
+    'router in the DSP panel: a scrolled graph stays inside the module (drawn into its own buffer), nodes outside it do not catch the mouse or f labels',
     'top panel above DSP is as wide as the tracker; with the browser on the right the matrix runs down to the fx list',
     'matrix without an =END marker is long: 512 free bars from =START',
     'effects row: wide track - fx in a line; when they do not all fit - stacked, one per line (the row grows to the longest stack, up to 6)',
