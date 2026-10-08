@@ -2815,7 +2815,7 @@ function D.frame(L, snap, rows, state, info)
       gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
       if not ok then error(res, 0) end
       th = res
-      local bx0 = L.top_x0 or 0   -- левая колонка (браузер / матрица) — не затирать
+      local bx0 = math.max(0, (L.top_x0 or 0) - 2)   -- левая колонка (браузер / матрица) — не затирать; 8 окт: −2 — левая граница модуля в кадре
       gfx.blit(1020, 1, 0, bx0, 0, gfx.w - bx0, L.top_h, bx0, ty, gfx.w - bx0, L.top_h)
       -- прямоугольники для фокуса и меню — в координаты окна
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
@@ -3803,6 +3803,9 @@ function D.frame(L, snap, rows, state, info)
     end
   end
 
+  -- 8 окт: панель вкладок над DSP шириной с трекер — левая граница после
+  -- матрицы (её фон шёл до самого края и закрывал линию)
+  if (L.top_x0 or 0) > 0 and L.top_h > 0 then set(D.SEP); gfx.rect(L.top_x0 - 2, L.top_y, D.SEPW, L.top_h, 1) end
   D.pmark('draw: browser')
   if L.lside_rect and info.browser_draw then
     -- браузер слева (7 окт): справа — инструменты и слайсы на всю высоту,
