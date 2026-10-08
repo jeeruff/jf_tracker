@@ -399,7 +399,7 @@ function D.layout(snap, state, nregions)
   L.inst_w = state.side and 0 or (L.cw * 32 + 2 * L.pad)
   -- положение верхнего модуля (3 окт): top — над трекером, mid — над DSP,
   -- bottom — под DSP; статус-бар: bottom — низ окна, tracker — строка в модуле трекера
-  L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom') and state.toppos or 'top'
+  L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom' or state.toppos == 'clips') and state.toppos or 'top'   -- 8 окт: clips — под клипами, над строками трекера
   L.statpos = (state.statpos == 'tracker' or state.statpos == 'keyboard') and state.statpos or 'bottom'
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
@@ -446,7 +446,7 @@ function D.layout(snap, state, nregions)
   L.sess_y = L.fxrow_y + L.fxrow_h
   -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места
   L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.33))) or 0
-  L.body_y = L.sess_y + L.sess_h
+  L.body_y = L.sess_y + L.sess_h + (L.toppos == 'clips' and L.top_h or 0)
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
@@ -456,7 +456,7 @@ function D.layout(snap, state, nregions)
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
-  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - (L.toppos ~= 'top' and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
+  L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
   L.hsb_y = L.mix_y + L.mix_h
   L.piano_y = L.hsb_y + L.hsb_h
@@ -467,6 +467,7 @@ function D.layout(snap, state, nregions)
   L.trk_bot = after                                 -- низ модуля трекера (тело, статус в нём, подсказки)
   if L.toppos == 'mid' then L.top_y = after; L.dsp_y = after + L.top_h
   elseif L.toppos == 'bottom' then L.dsp_y = after; L.top_y = after + L.dsp_h
+  elseif L.toppos == 'clips' then L.top_y = L.sess_y + L.sess_h; L.dsp_y = after
   else L.top_y = (L.tppos == 'top' and L.tp_h or 0); L.dsp_y = after end
   -- главный модуль отдельно от верхней панели (3 окт, экспериментально):
   -- state.ctrlpos top — левый верх (над матрицей), mid — низ левой колонки над
@@ -514,6 +515,7 @@ function D.layout(snap, state, nregions)
   -- (браузер справа — матрица тянется вниз до DSP / списка эффектов) или
   -- браузер слева (он и так до низа)
   L.top_x0, L.mx_ext = 0, nil
+  if L.toppos == 'clips' and L.top_h > 0 then L.top_x0 = L.matrix_w end   -- под клипами — шириной с трекер
   if L.toppos == 'mid' and L.top_h > 0 and L.matrix_w > 0 and (L.browser_left or (not state.mx_hidden and L.ctrlpos ~= 'mid')) then
     L.top_x0 = L.matrix_w
     if not L.browser_left then L.mx_bot = L.dsp_y - (L.hint_h or 0); L.mx_ext = true end

@@ -194,7 +194,8 @@ function MX.width(L, nregions, ncols)
   end
   MX.btns_w = bw
   -- шапка матрицы: вертикальные имена треков (до 10 букв) + полоса кнопок
-  MX.name_h = L.cw * 12 + 4
+  -- 8 окт: высота — по самому длинному имени трека (прошлый кадр), не больше 10 знаков
+  MX.name_h = L.cw * math.max(3, math.min(10, MX.name_chars or 10)) + 4
   L.mx_head_h = L.rh + 2 + MX.name_h + 4
   -- справа — колонка кнопок < > = у линии раздела: ячейки под неё не уходят
   local knob_w = U.measure('>') + 2 * L.pad + 6
@@ -255,6 +256,13 @@ function MX.draw(L, snap, regions, info)
   end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
+  local nmax = 0                                      -- 8 окт: самое длинное имя среди ВИДИМЫХ колонок
+  for ci, col in ipairs(snap.cols) do
+    local x = L.mx_label_w + (ci - 1 - MX.hs) * L.mx_cell_w
+    if x + L.mx_cell_w > W - 4 then break end
+    if ci > MX.hs then nmax = math.max(nmax, utf8.len(col.name ~= '' and col.name or tostring(ci)) or 0) end
+  end
+  MX.name_chars = nmax
   for ci, col in ipairs(snap.cols) do
     local x = L.mx_label_w + (ci - 1 - MX.hs) * L.mx_cell_w
     if x + L.mx_cell_w > W - 4 then break end

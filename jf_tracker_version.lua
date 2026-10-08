@@ -8,6 +8,8 @@ V.CHANGES = {
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',
+    'top panel position clips: the tabs module under the session clips, above the tracker rows',
+    'matrix: the track-name header is as tall as the longest visible name (at most 10 chars)',
     'Shift + Cmd + wheel: width of the selected tracks only (REAPER selection, Option+1..9)',
     'option note OFF at the row end: the note sounds through the OFF row (a long chord takes a row less, the next note may start right after); default - at the row start, like Renoise / IT',
     'session clips: a MIDI clip shows its chord names in sequence (A#m G#6 ...)',

@@ -196,7 +196,7 @@ local state = {
   mxruler = flag('mxruler', true),
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
-  toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
+  toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom' or v == 'clips') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
   wzoom = 0,                                                       -- 7 окт: прежний зум 0/1/2 заменён уровнями wzlevel
   wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')),         -- общий уровень ширины треков (Cmd + гор. колесо), nil — как у трека
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
@@ -5377,7 +5377,7 @@ ctx = {
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
       flag('top', 'top panel', 'control / item / modulate / midi'),
-      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / above DSP / below DSP', get = function() return state.toppos or 'mid' end, set = function(v) state.toppos = v end },
+      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'clips', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / under the clips (above the rows) / above DSP / below DSP', get = function() return state.toppos or 'mid' end, set = function(v) state.toppos = v end },
       { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
