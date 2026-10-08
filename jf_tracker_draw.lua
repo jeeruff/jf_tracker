@@ -2920,6 +2920,7 @@ function D.frame(L, snap, rows, state, info)
     end
     if col.rgb and mode == 'line' and not c.folded then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
+    if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
     hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
     if not c.folded then

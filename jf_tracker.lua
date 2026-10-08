@@ -499,14 +499,32 @@ local function select_item_in_reaper(item)
   reaper.UpdateArrange()
 end
 
--- F11: док ↔ плавающее окно на весь экран (рабочая область монитора)
+-- F11: док ↔ полный экран (рабочая область монитора — под строкой меню
+-- macOS, над Dock). 8 окт: окно без рамки и заголовка (JS_Window_SetStyle
+-- POPUP, есть js_ReaScriptAPI; без него — обычное окно); перед доком
+-- рамка возвращается
 local function toggle_dock()
+  local function frameless(on)                     -- внутри: у главного чанка нет свободных локалей
+    if not (reaper.JS_Window_Find and reaper.JS_Window_SetStyle) then return end
+    local hwnd = reaper.JS_Window_Find('jf_tracker', true)
+    if not hwnd then return end
+    reaper.JS_Window_SetStyle(hwnd, on and 'POPUP' or 'CAPTION,SIZEBOX,SYSMENU')
+    if on then
+      local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)
+      reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t)
+    end
+  end
   local d = gfx.dock(-1)
   if d & 1 == 1 then
     local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)
     gfx.dock(0, l, t, r - l, b - t)
+    frameless(true); state.frameless = true
+    vim.msg = 'fullscreen'
+  elseif not state.frameless and reaper.JS_Window_SetStyle then
+    frameless(true); state.frameless = true                 -- плавало с рамкой → сначала полный экран
     vim.msg = 'fullscreen'
   else
+    frameless(false); state.frameless = nil
     local saved = tonumber(reaper.GetExtState(EXT, 'dock_last')) or 1
     if saved & 1 ~= 1 then saved = 1 end
     gfx.dock(saved)
@@ -3500,6 +3518,69 @@ ctx = {
   end,
   -- шаг слайдера шапки (колесо, клавиатура): громкость 0.5 dB, панорама 0.02;
   -- coarse — 3 dB / 0.1
+  -- 8 окт: прыжок фейдера на метку dB (f) — сразу или ходом за N тактов /
+  -- долей (счётчик перед f: 2f — такты, 2,f — доли). Цели — трек метки, а
+  -- если он выделен в REAPER (Option+цифра) — все выделенные треки.
+  -- Ход — точки огибающей Volume (создаётся, если нет): текущее значение в
+  -- начале, цель в конце, между — линейно; после — громкость держится.
+  -- Старт: играет — следующая граница квантизации сессии (bar / beat / now),
+  -- стоит — строка курсора трекера
+  fader_targets = function(col)
+    local out = {}
+    if col.track and reaper.IsTrackSelected(col.track) then
+      for _, c2 in ipairs(snap and snap.cols or {}) do
+        if c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.IsTrackSelected(c2.track) then out[#out + 1] = c2 end
+      end
+    end
+    if #out == 0 then out[1] = col end
+    return out
+  end,
+  fader_jump = function(col, db, glide)
+    local cols = ctx.fader_targets(col)
+    local amp = 10 ^ (db / 20)
+    if not glide then
+      edit.run('fader jump', function()
+        for _, c2 in ipairs(cols) do edit.track_value(c2.track, 'D_VOL', amp) end
+      end)
+      model.invalidate()
+      vim.msg = ('%s vol %+d dB'):format(#cols > 1 and (#cols .. ' tracks') or (col.name or ''), db)
+      return
+    end
+    local t0
+    if playing() then
+      local p, q = reaper.GetPlayPosition(), MX.SS.quant
+      t0 = q == 'now' and p or (q == 'beat' and ctx.ss_beat_after(p) or ctx.ss_bar_after(p))
+    else t0 = edit.row_time(vim.cur.row, state.lpb, 0) end
+    local t1
+    if glide.unit == 'beat' then t1 = reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, t0) + glide.n)
+    else
+      local bt, meas = reaper.TimeMap2_timeToBeats(0, t0)
+      t1 = reaper.TimeMap2_beatsToTime(0, bt, meas + glide.n)
+    end
+    if t1 <= t0 then return end
+    edit.run('fader glide', function()
+      for _, c2 in ipairs(cols) do
+        local tr = c2.track
+        local env = reaper.GetTrackEnvelopeByName(tr, 'Volume')
+        if not env then
+          MMX.PP.toggle_env(tr, { kind = 'trk', env_name = 'Volume', words = 'volume', label = 'Volume' })
+          env = reaper.GetTrackEnvelopeByName(tr, 'Volume')
+        end
+        if env then
+          local mode = reaper.GetEnvelopeScalingMode(env)
+          local _, v0 = reaper.Envelope_Evaluate(env, t0, 0, 0)
+          local v1 = reaper.ScaleToEnvelopeMode(mode, amp)
+          reaper.DeleteEnvelopePointRange(env, t0 - 1e-4, t1 + 1e-4)
+          reaper.InsertEnvelopePoint(env, t0, v0, 0, 0, false, true)
+          reaper.InsertEnvelopePoint(env, t1, v1, 0, 0, false, true)
+          reaper.Envelope_SortPoints(env)
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('%s -> %+d dB in %d %s%s'):format(#cols > 1 and (#cols .. ' tracks') or (col.name or ''), db, glide.n,
+      glide.unit == 'beat' and 'beat(s)' or 'bar(s)', playing() and (' from the next ' .. MX.SS.quant) or ' from the cursor')
+  end,
   trs_nudge = function(col, what, d, coarse)
     local key = TRS_KEY[what]
     if not (col and key and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
@@ -6627,11 +6708,8 @@ local function hint_go(t)
     state.kslider = { col = d.col, what = d.what }
     if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
-  elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё
-    if reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
-      edit.track_value(d.col.track, 'D_VOL', 10 ^ (d.db / 20)); edit.track_undo('track vol'); model.invalidate()
-      vim.msg = ('%s vol %+d dB'):format(d.col.name or '', d.db)
-    end
+  elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
+    if reaper.ValidatePtr(d.col.track, 'MediaTrack*') then ctx.fader_jump(d.col, d.db, ctx.glide) end
   elseif t.kind == 'trsbtn' then
     local open = draw.trspop and draw.trspop.guid == d.col.guid and draw.trspop.what == d.what
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
@@ -11513,6 +11591,24 @@ local function frame()
       end
     end
   end
+  -- Option+1..9 (8 окт): выделить / снять трек N трекера в REAPER (нативное
+  -- выделение) — цели прыжка фейдера f; символ от раскладки — физическая клавиша
+  if c > 0 and reaper.JS_VKeys_GetState and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
+    local m = ctx.mods()
+    if m.alt and not m.cmd and not m.ctrl and not m.shift then
+      local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
+      for n = 1, 9 do
+        if ks and ks:byte(48 + n) ~= 0 then
+          local c2 = snap and snap.cols[n]
+          if c2 and c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') then
+            reaper.SetTrackSelected(c2.track, not reaper.IsTrackSelected(c2.track)); model.invalidate()
+            vim.msg = ('%s %s - f on a dB mark moves all selected faders'):format(c2.name or '', reaper.IsTrackSelected(c2.track) and 'selected' or 'unselected')
+          end
+          c = 0; break
+        end
+      end
+    end
+  end
   -- автоповтор (4 окт, «гост-нажатия»): нотная клавиша пришла снова, а
   -- отпускания с прошлого нажатия не было — это повтор macOS, не нота.
   -- Только там, где клавиши — ноты (INSERT, слой пианино, вкладка item);
@@ -11641,13 +11737,19 @@ local function frame()
   if c > 0 and HN.active then
     local r = HN.key(c)
     if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
+    if not HN.active then ctx.glide = nil end
     c = 0
   elseif c == ('F'):byte() and (state.ss_big or (state.clipsview and state.focus == 'tracker') or (MX.clips and state.focus == 'matrix') or (state.top and state.toptab == 'clips' and state.focus == 'top')) and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     MX.SS.scene_mode = true
     if HN.start() then vim.msg = 'scene: type the label of any cell in the row, Esc' else MX.SS.scene_mode = false; vim.msg = 'no targets' end
     c = 0
+  elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
+    ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли
   elseif c == ('f'):byte() and vim.mode == 'normal' and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes' then
-    if HN.start() then vim.msg = 'hints: type label, Esc' else vim.msg = 'no targets' end
+    -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
+    ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
+    vim.count, ctx.glide_unit = nil, nil
+    if HN.start() then vim.msg = ctx.glide and ('hints: a dB mark glides the fader in %d %s, Esc'):format(ctx.glide.n, ctx.glide.unit) or 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
   end
   -- быстрая нарезка (5 окт): фокус в lib или во вкладке сэмпла — ! по
