@@ -10209,7 +10209,25 @@ local function frame()
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}
-      local g = CM.gesture_step(ctx.cm_gest, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w)
+      local g0 = ctx.cm_gest
+      local pcol = gfx.mouse_cap & 4 == 4 and g0 and cols[g0.ti]
+      if pcol and reaper.ValidatePtr(pcol.track, 'MediaTrack*') then
+        -- + Cmd (8 окт): трек держится, всё окно — пан-пэд: x — пан / баланс,
+        -- y — ширина (верх широко, середина 0, низ — каналы местами);
+        -- двойной пан — левый / правый расходятся или перекрещиваются
+        local tr = pcol.track
+        local pn, wd, l, r = CM.panpad(gfx.mouse_x, gfx.mouse_y, gfx.w, gfx.h)
+        local dual = reaper.GetMediaTrackInfo_Value(tr, 'I_PANMODE') == 6
+        if dual then edit.track_value(tr, 'D_DUALPANL', l); edit.track_value(tr, 'D_DUALPANR', r)
+        else edit.track_value(tr, 'D_PAN', pn); edit.track_value(tr, 'D_WIDTH', wd) end
+        g0.moved, g0.mode, g0.mx, g0.my, g0.ax, g0.ay, g0.dy = true, 'fader', gfx.mouse_x, gfx.mouse_y, 0, 0, 0   -- Cmd отпущен — снова фейдер, без скачка
+        state.kslider = { col = pcol, what = dual and 'panl' or 'pan' }
+        state.status = dual and ('-- PAN PAD --  %s  L %+.0f%%  R %+.0f%%   (up: apart, down: crossed, sideways: balance)'):format(pcol.name or '', l * 100, r * 100)
+          or ('-- PAN PAD --  %s  pan %+.0f%%  width %+.0f%%   (sideways: pan, up: wider, down: narrower / reversed)'):format(pcol.name or '', pn * 100, wd * 100)
+        U.click, U.rclick = false, false
+        goto cm_gest_done
+      end
+      local g = CM.gesture_step(g0, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w)
       ctx.cm_gest = g
       local col = cols[g.ti]
       if col then
@@ -10225,6 +10243,7 @@ local function frame()
         state.status = ('-- TRACKS --  %d / %d  %s  %s   (sideways: track, then up / down: its fader; Shift fine)'):format(g.ti, #cols, g.mode == 'fader' and '[fader]' or '[pick]', ctx.cm_io.show(t))
       end
       U.click, U.rclick = false, false
+      ::cm_gest_done::
     elseif ctx.cm_gest then
       if ctx.cm_gest.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: track faders'); model.invalidate() end
       ctx.cm_gest = nil

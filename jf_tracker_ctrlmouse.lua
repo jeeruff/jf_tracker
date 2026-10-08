@@ -141,4 +141,15 @@ function CM.gesture_step(g, mx, my, n, w)
   return g
 end
 
+-- пан-пэд (Control+Option, трек выбран, + Cmd): всё окно — XY. x — пан /
+-- баланс (лево … право), y — ширина: верх +1, середина 0, низ −1 (каналы
+-- меняются местами). Двойной пан: левый = баланс − ширина, правый = баланс +
+-- ширина (в центре оба по центру, вверх — расходятся, вниз — перекрещиваются)
+function CM.panpad(mx, my, w, h)
+  local function c(v) return math.max(-1, math.min(1, v)) end
+  local pan = c((mx / math.max(1, w)) * 2 - 1)
+  local width = c(1 - (my / math.max(1, h)) * 2)
+  return pan, width, c(pan - width), c(pan + width)
+end
+
 return CM
