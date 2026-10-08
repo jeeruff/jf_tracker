@@ -136,6 +136,17 @@ DM.modules = {
     },
   },
   {
+    -- chord follow (8 окт): ноты трека — к аккорду лейна аккордов трекера (:chord)
+    match = 'jf_tracker_chordfollow',
+    title = 'chord follow',
+    cols = 1,
+    params = {
+      { 'Mode',            'mode' },
+      { 'Range',           'range' },
+      { 'Bass split',      'bass split' },
+    },
+  },
+  {
     -- генератор гармонии (2 окт): аккорды с ноги, latch, сложность по CC
     match = 'jf_chord_latch',
     title = 'chord latch',

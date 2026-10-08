@@ -7393,6 +7393,59 @@ local function with_ns(ns, fn)
   if not ok then return nil end
   return a, b
 end
+-- chord follow (8 окт): линия аккордов трека с лейном аккордов (:chord) —
+-- в gmem jf_tracker_chord для эффекта jf_tracker_chordfollow (раскладка — в
+-- его заголовке). Пишется, когда меняется проект или трек-источник; без
+-- источника n = 0 — эффект пропускает ноты как есть
+ctx.chord_pub = { cc = -1, src = nil }
+ctx.chord_publish = function()
+  local cc = reaper.GetProjectStateChangeCount(0)
+  local src
+  for _, c in ipairs(snap and snap.cols or {}) do if state.folds[c.guid] == 'chord' and c.track then src = c; break end end
+  local key = src and src.guid or ''
+  -- раз в секунду: пространство gmem живёт, пока к нему привязан эффект
+  -- (память gmem-attach) — добавили эффект позже / все удалили → таблица
+  -- пуста, а аккорды есть: записать заново
+  local now = reaper.time_precise()
+  if cc == ctx.chord_pub.cc and key == ctx.chord_pub.src and (ctx.chord_pub.n or 0) > 0 and now - (ctx.chord_pub.t or 0) > 1 then
+    ctx.chord_pub.t = now
+    if (with_ns('jf_tracker_chord', function() return reaper.gmem_read(1) end) or 0) ~= math.min(ctx.chord_pub.n, 8000) then ctx.chord_pub.cc = -1 end
+  end
+  if cc == ctx.chord_pub.cc and key == ctx.chord_pub.src then return end
+  ctx.chord_pub.cc, ctx.chord_pub.src = cc, key
+  local notes = {}
+  if src and reaper.ValidatePtr(src.track, 'MediaTrack*') then
+    local tr = src.track
+    for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, ii)
+      local tk = reaper.GetActiveTake(it)
+      if tk and reaper.TakeIsMIDI(tk) and reaper.GetMediaItemInfo_Value(it, 'B_MUTE') == 0 then
+        local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local p1 = p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        local _, nn = reaper.MIDI_CountEvts(tk)
+        for k = 0, nn - 1 do
+          local _, _, muted, sp, ep, _, pitch = reaper.MIDI_GetNote(tk, k)
+          if not muted then
+            local a = reaper.MIDI_GetProjTimeFromPPQPos(tk, sp)
+            local b = math.min(p1, reaper.MIDI_GetProjTimeFromPPQPos(tk, ep))
+            if a >= p0 - 1e-6 and a < p1 and b > a then notes[#notes + 1] = { a, b, pitch } end
+          end
+        end
+      end
+    end
+  end
+  local tl = MMX.CH.timeline(notes)
+  with_ns('jf_tracker_chord', function()
+    local n = math.min(#tl, 8000)
+    for i = 1, n do
+      local e, b = tl[i], 16 + (i - 1) * 3
+      reaper.gmem_write(b, e.pos); reaper.gmem_write(b + 1, e.mask); reaper.gmem_write(b + 2, e.root)
+    end
+    reaper.gmem_write(1, n)
+    reaper.gmem_write(0, (reaper.gmem_read(0) or 0) + 1)
+  end)
+  ctx.chord_pub.n = #tl
+end
 local scope_cache = {}
 local spec_cache = {}
 -- 48 полос спектра слота (кадр FFT моста) и номер кадра
@@ -8806,6 +8859,7 @@ local function frame()
   draw.itemnames = state.itemnames
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
+  ctx.chord_publish()                     -- 8 окт: линия аккордов для jf_tracker_chordfollow (только при правке)
   draw.pmark('pre: relayout + polls')
   local t_1 = reaper.time_precise()
   if changed then

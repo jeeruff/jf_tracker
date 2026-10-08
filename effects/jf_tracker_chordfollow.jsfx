@@ -1,0 +1,81 @@
+desc:jf_tracker_chordfollow (notes follow the chord lane of jf_tracker)
+//tags: MIDI processing
+//author: jeeruff
+options:gmem=jf_tracker_chord
+
+// Ноты трека подстраиваются под аккорд лейна аккордов jf_tracker (8 окт).
+// Трекер пишет в gmem линию аккордов всего проекта (время → классы нот);
+// эффект сам находит аккорд момента по play_position + смещению события,
+// поэтому смена аккорда точна до сэмпла и не ждёт кадра трекера.
+// Раскладка gmem (jf_tracker_chord):
+//   [0]  номер версии таблицы (растёт при каждой записи)
+//   [1]  число точек n
+//   [16 + i*3 + 0]  время точки, с (по возрастанию)
+//   [16 + i*3 + 1]  маска классов нот 0..4095 (бит 0 = C), 0 — тишина
+//   [16 + i*3 + 2]  корень 0..11, −1 — тишина
+// Нота: ближайший класс аккорда в пределах Range (при равенстве — вниз);
+// дальше Range или тишина — без изменений. Ниже Bass split — к корню.
+// Note-off и полифоническое послекасание идут на ту ноту, в которую ушёл
+// note-on (таблица по каналу и ноте).
+
+slider1:1<0,1,1{off,chord tones}>Mode
+slider2:2<1,6,1>Range (semitones)
+slider3:0<0,127,1>Bass split note (0 = off)
+
+@init
+NMAP = 0;                 // 16 каналов * 128 нот: куда ушла нота, -1 — нет
+i = 0;
+loop(2048, NMAP[i] = -1; i += 1;);
+EBASE = 16;
+
+@block
+cnt = gmem[1];
+while (midirecv(ofs, m1, m2, m3)) (
+  stat = m1 & 0xF0;
+  chn = m1 & 0x0F;
+  (stat == 0x90 && m3 > 0) ? (
+    outn = m2;
+    (slider1 >= 1 && cnt > 0) ? (
+      tnow = play_position + ofs / srate;
+      lo = 0; hi = cnt - 1; kk = -1;
+      while (lo <= hi) (
+        md = floor((lo + hi) / 2);
+        gmem[EBASE + md * 3] <= tnow + 0.0005 ? (kk = md; lo = md + 1) : (hi = md - 1);
+      );
+      kk >= 0 ? (
+        msk = gmem[EBASE + kk * 3 + 1];
+        rt = gmem[EBASE + kk * 3 + 2];
+        (slider3 > 0 && m2 < slider3) ? (
+          rt >= 0 ? (
+            dd = (rt - (m2 % 12) + 12) % 12;
+            dd > 6 ? dd -= 12;
+            outn = m2 + dd;
+          );
+        ) : msk > 0 ? (
+          pc = m2 % 12;
+          bst = 99;
+          dd = 0;
+          while (dd <= slider2 && bst == 99) (
+            (msk & (1 << ((pc - dd + 12) % 12))) ? bst = 0 - dd
+            : (msk & (1 << ((pc + dd) % 12))) ? bst = dd;
+            dd += 1;
+          );
+          bst != 99 ? outn = m2 + bst;
+        );
+      );
+    );
+    outn = max(0, min(127, outn));
+    NMAP[chn * 128 + m2] = outn;
+    midisend(ofs, m1, outn, m3);
+  ) : (stat == 0x80 || stat == 0x90) ? (
+    oo = NMAP[chn * 128 + m2];
+    oo < 0 ? oo = m2;
+    NMAP[chn * 128 + m2] = -1;
+    midisend(ofs, m1, oo, m3);
+  ) : stat == 0xA0 ? (
+    oo = NMAP[chn * 128 + m2];
+    midisend(ofs, m1, oo >= 0 ? oo : m2, m3);
+  ) : (
+    midisend(ofs, m1, m2, m3);
+  );
+);

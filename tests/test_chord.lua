@@ -20,5 +20,15 @@ eq(CH.parse('Bbm').root, 10, 'flat root')
 eq(CH.parse('Xyz'), nil, 'nonsense')
 eq(CH.parse('Csus').suffix, 'sus4', 'sus alias')
 eq(CH.name(CH.voicing('Ebmaj7', 4)), 'D#maj7', 'round trip (sharps)')
+-- линия аккордов
+do
+  local tl = CH.timeline({ { 0, 2, 60 }, { 0, 2, 64 }, { 0, 2, 67 }, { 2, 4, 57 }, { 2, 4, 60 }, { 2, 4, 64 }, { 5, 6, 62 } })
+  eq(#tl, 5, 'timeline: C, Am, silence, D, silence')
+  eq(tl[1].pos, 0, 'C at 0'); eq(tl[1].mask, (1 << 0) | (1 << 4) | (1 << 7), 'C mask'); eq(tl[1].root, 0, 'C root')
+  eq(tl[2].pos, 2, 'Am at 2'); eq(tl[2].root, 9, 'Am root = A')
+  eq(tl[3].mask, 0, 'silence mask 0'); eq(tl[3].root, -1, 'silence root -1')
+  eq(tl[4].root, 2, 'single D: root D')
+  eq(#CH.timeline({}), 0, 'empty')
+end
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end

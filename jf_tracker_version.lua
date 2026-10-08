@@ -30,6 +30,7 @@ V.CHANGES = {
     'fix: resizing the top module no longer resizes the main module (and squeezes the matrix) - it takes its own height',
     'scrollbars: one thickness everywhere (option scrollbar width, default 3 px), a bit brighter',
     'playhead: the colour of the play cursor of the REAPER theme, with a fading tail of played rows (option playhead tail, 0 2 4 8 16 rows)',
+    'chord follow: JS jf_tracker_chordfollow on any track - its notes snap to the chord of the chord lane track (:chord) at that moment, sample-exact (the tracker sends the whole chord line); range, bass split to the root; a module in DSP',
     'pan pad: Ctrl+Option picks a track, + Cmd - the window is XY: sideways pan / balance, up / down width (dual pan: L and R apart / crossed)',
     'fader dip: f + a dB mark in CAPITALS (Shift) - there and back (2F… over 2 bars, no count - 1 bar), volume envelope points',
     'Ctrl+Option+mouse (experimental): the window is one zone per track - sideways picks the track, up / down moves its fader',

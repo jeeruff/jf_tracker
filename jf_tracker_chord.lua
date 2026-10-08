@@ -100,4 +100,36 @@ function CH.voicing(sym, oct)
   return out
 end
 
+-- линия аккордов (8 окт, chord follow): ноты { {t0, t1, pitch}, … } (время
+-- проекта) → точки смены { {pos, mask, root}, … } по возрастанию pos:
+-- mask — 12 бит классов звучащих нот (0 — тишина), root — корень по CH.name
+-- (не узнали — бас; тишина — −1). Соседние одинаковые точки сливаются
+function CH.timeline(notes)
+  local pts = {}
+  for _, n in ipairs(notes or {}) do pts[#pts + 1] = n[1]; pts[#pts + 1] = n[2] end
+  table.sort(pts)
+  local out = {}
+  local last
+  for i, t in ipairs(pts) do
+    if i == 1 or t > pts[i - 1] + 1e-6 then
+      local mask, ps = 0, {}
+      for _, n in ipairs(notes) do
+        if n[1] <= t + 1e-6 and n[2] > t + 1e-6 then mask = mask | (1 << (n[3] % 12)); ps[#ps + 1] = n[3] end
+      end
+      local root = -1
+      if #ps > 0 then
+        local nm = CH.name(ps)
+        local c = nm and CH.parse((nm:gsub('%?$', '')))
+        if c and not nm:find('?', 1, true) then root = c.root
+        else local lo = math.huge; for _, p in ipairs(ps) do if p < lo then lo = p end end; root = lo % 12 end
+      end
+      if not last or last.mask ~= mask or last.root ~= root then
+        last = { pos = t, mask = mask, root = root }
+        out[#out + 1] = last
+      end
+    end
+  end
+  return out
+end
+
 return CH
