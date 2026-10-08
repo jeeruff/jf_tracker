@@ -4868,6 +4868,8 @@ function D.frame(L, snap, rows, state, info)
     local ok, err = pcall(draw_ctrl, L, info, bh, hv)
     -- граница модуля сверху (к матрице / трекеру) — у mid / bottom
     if by > 0 then set(D.SEP); gfx.rect(0, 0, bw + D.SEPW, D.SEPW, 1) end
+    -- 8 окт: над матрицей (top) — граница снизу, к матрице (пропадала)
+    if L.ctrlpos == 'top' and not L.ctrl_dsp then set(D.SEP); gfx.rect(0, bh - D.SEPW, bw + D.SEPW, D.SEPW, 1) end
     gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
     if not ok then error(err, 0) end
     gfx.blit(99, 1, 0, 0, 0, bw + D.SEPW, bh, bx, by, bw + D.SEPW, bh)
