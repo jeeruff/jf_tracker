@@ -160,7 +160,8 @@ local state = {
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
-  fxparams = flag('fxparams', false),             -- параметры TCP под своими эффектами в строке effects (8 окт)
+  fxparams = flag('fxparams', false),
+  mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
   whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
@@ -432,7 +433,7 @@ local function save_win()
   S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2209,7 +2210,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure|clipsview,dsp_big,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,q_listen,debug,measure|clipsview,dsp_big,mixer,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -2224,6 +2225,7 @@ ctx = {
       local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
       if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
     end
+    if q and q:find('dsp_big', 1, true) and not q:find('mixer', 1, true) then q = q:gsub('dsp_big', 'dsp_big,mixer', 1); state.quick = q end   -- 8 окт: mixer — под router
     if q and not q:find('dsp_big', 1, true) then
       q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
       local a, b = q:match('^([^|]*)|(.*)$')
@@ -4174,6 +4176,82 @@ ctx = {
     add('Remove FX', function() edit.fx_remove(tr, fx) end)
     add('Add FX … (fzf)', function() ctx.fx_picker() end)
   end,
+  -- эффекты трека со строкой / столбиком (8 окт): строка effects и микшер.
+  -- Рисует в [cx, right) от y0; avail — строк в распоряжении; vert — столбиком
+  -- всегда (микшер); возвращает, сколько строк нужно (для высоты строки effects)
+  -- кнопка param (параметры TCP под эффектами): в строке effects, в микшере —
+  -- в уголке под кнопками вида (строки effects там нет)
+  param_btn = function(hover, bx, y)
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    local lab = (U.measure('fx param') + 4 * L.pad <= L.label_w) and 'param' or 'p'
+    local bw = U.measure(lab) + 2 * L.pad
+    local on = state.fxparams
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y, bw, L.rh - 1, 1)
+    U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y, bw, L.rh - 1, 0)
+    U.text(bx + L.pad, y, lab, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+    if hot then hover.viewbtn = 'fxparams' end
+    ctx.hint('viewbtn', bx, y, bw, L.rh, 'fxparams')
+  end,
+  fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    local hi = ctx.hdr_info(col)
+    local list = {}
+    local np = 0
+    for k, it in ipairs(hi.fx or {}) do
+      list[#list + 1] = { it = it, k = k, kind = 'hdrfx' }
+      for _, pi in ipairs(it.params or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrparam', param = pi }; np = np + 1 end   -- параметры TCP — под своим эффектом
+    end
+    for k, it in ipairs(hi.sends or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrsend' } end
+    local sum = 0
+    for _, e in ipairs(list) do sum = sum + U.measure(ctx.fit(e.it.name or '', L.cw * 9)) + 2 * L.pad + 2 end
+    local vert = force_vert or np > 0 or (#list > 1 and sum > right - cx)
+    local function pslider(e, x, y, w2)
+      local tr, fx, pi = col.track, e.it.i, e.param
+      if not (tr and fx and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+      local v = reaper.TrackFX_GetParamNormalized(tr, fx, pi)
+      local _, pn = reaper.TrackFX_GetParamName(tr, fx, pi, '')
+      local _, fv = reaper.TrackFX_GetFormattedParamValue(tr, fx, pi, '')
+      local hot = (mx >= x and mx < x + w2 and my >= y and my < y + L.rh) or (ctx.hp_drag and ctx.hp_drag.track == tr and ctx.hp_drag.fx == fx and ctx.hp_drag.param == pi)
+      local vw = U.measure(fv or '')
+      local nw = w2 - 2 * L.pad - (vw + L.pad < w2 * 0.5 and vw + L.pad or 0)
+      U.text(x + L.pad, y, ctx.fit(pn or ('p' .. pi), nw), hot and U.AMBER or U.GREY)
+      if vw + L.pad < w2 * 0.5 then U.text(x + w2 - L.pad - vw, y, fv, hot and U.AMBER or U.TEXT) end
+      U.set(U.LINE); gfx.rect(x + 1, y + L.rh - 3, w2 - 2, 2, 1)
+      U.set(hot and U.AMBER or U.CYAN); gfx.rect(x + 1, y + L.rh - 3, math.max(1, math.floor((w2 - 2) * v + 0.5)), 2, 1)
+      if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = col, k = e.k } end
+      ctx.hint('hdrparam', x, y, w2, L.rh, { col = col, k = e.k })
+    end
+    local function chip(e, x, y, w2, lab)
+      local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w2, L.rh - 1, 1)
+      U.text(x + L.pad, y, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
+      if hot then hover[e.kind] = { col = col, k = e.k, it = e.it } end
+      ctx.hint(e.kind, x, y, w2, L.rh, { col = col, k = e.k })
+    end
+    if vert then
+      local shown = math.min(#list, avail)
+      for n = 1, shown do
+        local e = list[n]
+        local y = y0 + (n - 1) * L.rh
+        if n == shown and #list > shown then U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
+        elseif e.kind == 'hdrparam' then pslider(e, cx, y, right - cx)
+        else chip(e, cx, y, right - cx, ctx.fit(e.it.name or '', right - cx - 2 * L.pad)) end
+      end
+      return math.min(#list, MAXL or #list)
+    end
+    for n, e in ipairs(list) do
+      local lab = ctx.fit(e.it.name or '', L.cw * 9)
+      local w2 = U.measure(lab) + 2 * L.pad
+      local more = #list - n + 1
+      local avail_w = right - cx - (more > 1 and U.measure('+9') + 2 or 0)
+      if w2 > avail_w and avail_w >= L.cw * 3 + 2 * L.pad then lab = ctx.fit(e.it.name or '', avail_w - 2 * L.pad); w2 = U.measure(lab) + 2 * L.pad end
+      if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0, '+' .. more, U.CYAN); break end
+      chip(e, cx, y0, w2, lab)
+      cx = cx + w2 + 2
+    end
+    return 1
+  end,
   hdr_info = function(col)
     local now = reaper.time_precise()
     local c = ctx.hdr_cache[col.guid]
@@ -5095,6 +5173,7 @@ ctx = {
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
+      flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
@@ -6590,6 +6669,7 @@ local function hint_go(t)
   elseif t.kind == 'ssplay' then MX.SS.launch(d.ri, d.ci, seq)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
+  elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
 end
@@ -8608,7 +8688,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     draw_router = function(x, y, w, h)
@@ -9037,93 +9117,19 @@ local function frame()
   -- clips в теле трекера (6 окт): шапки / входы / R I M S живые, вместо строк — сцены × треки
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
+  if L.mixer and L.header_h and L.matrix_w then ctx.param_btn(hover, L.matrix_w + L.pad, L.header_y + 4 * L.rh + 2) end   -- микшер: param — в уголке
   if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
-    do   -- 8 окт: кнопка param (параметры TCP под эффектами) — в строке effects, правее «fx»
-      local lab = (U.measure('fx param') + 4 * L.pad <= L.label_w) and 'param' or 'p'
-      local bx = L.matrix_w + 2 * L.pad + U.measure('fx')
-      local bw = U.measure(lab) + 2 * L.pad
-      local on = state.fxparams
-      local hot = mx >= bx and mx < bx + bw and my >= y0 + 1 and my < y0 + 1 + L.rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y0 + 1, bw, L.rh - 1, 1)
-      U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y0 + 1, bw, L.rh - 1, 0)
-      U.text(bx + L.pad, y0 + 1, lab, hot and U.AMBER or (on and U.CYAN or U.TEXT))
-      if hot then hover.viewbtn = 'fxparams' end
-      ctx.hint('viewbtn', bx, y0 + 1, bw, L.rh, 'fxparams')
-    end
+    ctx.param_btn(hover, L.matrix_w + 2 * L.pad + U.measure('fx'), y0 + 1)   -- 8 окт: кнопка param — в строке effects, правее «fx»
     local MAXL = state.fxparams and 14 or 6
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
     -- по эффекту на строку (имя по ширине колонки), высота — по самому длинному
     for _, c in ipairs(L.cols) do
-      if c.x and c.col then
-        local hi = ctx.hdr_info(c.col)
-        local cx, right = c.x + 2, c.x + c.w - 2
-        local list = {}
-        local np = 0
-        for k, it in ipairs(hi.fx or {}) do
-          list[#list + 1] = { it = it, k = k, kind = 'hdrfx' }
-          -- 8 окт: параметры TCP — под своим эффектом тонкими слайдерами
-          for _, pi in ipairs(it.params or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrparam', param = pi }; np = np + 1 end
-        end
-        for k, it in ipairs(hi.sends or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrsend' } end
-        local sum = 0
-        for _, e in ipairs(list) do sum = sum + U.measure(ctx.fit(e.it.name or '', L.cw * 9)) + 2 * L.pad + 2 end
-        local vert = np > 0 or (#list > 1 and sum > right - cx)
-        local function pslider(e, x, y, w2)
-          local tr, fx, pi = c.col.track, e.it.i, e.param
-          if not (tr and fx and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
-          local v = reaper.TrackFX_GetParamNormalized(tr, fx, pi)
-          local _, pn = reaper.TrackFX_GetParamName(tr, fx, pi, '')
-          local _, fv = reaper.TrackFX_GetFormattedParamValue(tr, fx, pi, '')
-          local hot = (mx >= x and mx < x + w2 and my >= y and my < y + L.rh) or (ctx.hp_drag and ctx.hp_drag.track == tr and ctx.hp_drag.fx == fx and ctx.hp_drag.param == pi)
-          local vw = U.measure(fv or '')
-          local nw = w2 - 2 * L.pad - (vw + L.pad < w2 * 0.5 and vw + L.pad or 0)
-          U.text(x + L.pad, y, ctx.fit(pn or ('p' .. pi), nw), hot and U.AMBER or U.GREY)
-          if vw + L.pad < w2 * 0.5 then U.text(x + w2 - L.pad - vw, y, fv, hot and U.AMBER or U.TEXT) end
-          U.set(U.LINE); gfx.rect(x + 1, y + L.rh - 3, w2 - 2, 2, 1)
-          U.set(hot and U.AMBER or U.CYAN); gfx.rect(x + 1, y + L.rh - 3, math.max(1, math.floor((w2 - 2) * v + 0.5)), 2, 1)
-          if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = c.col, k = e.k } end
-          ctx.hint('hdrparam', x, y, w2, L.rh, { col = c.col, k = e.k })
-        end
-        local function chip(e, x, y, w2, lab)
-          local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
-          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w2, L.rh - 1, 1)
-          U.text(x + L.pad, y, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
-          if hot then hover[e.kind] = { col = c.col, k = e.k, it = e.it } end
-          ctx.hint(e.kind, x, y, w2, L.rh, { col = c.col, k = e.k })
-        end
-        if vert then
-          local lines = math.min(#list, MAXL)
-          need = math.max(need, lines)
-          local shown = math.min(#list, draw.fxrow_lines or 1)
-          for n = 1, shown do
-            local e = list[n]
-            local y = y0 + 1 + (n - 1) * L.rh
-            if n == shown and #list > shown then
-              U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
-            elseif e.kind == 'hdrparam' then pslider(e, cx, y, right - cx)
-            else
-              local lab = ctx.fit(e.it.name or '', right - cx - 2 * L.pad)
-              chip(e, cx, y, right - cx, lab)
-            end
-          end
-        else
-          for n, e in ipairs(list) do
-            local lab = ctx.fit(e.it.name or '', L.cw * 9)
-            local w2 = U.measure(lab) + 2 * L.pad
-            local more = #list - n + 1
-            local avail = right - cx - (more > 1 and U.measure('+9') + 2 or 0)
-            if w2 > avail and avail >= L.cw * 3 + 2 * L.pad then lab = ctx.fit(e.it.name or '', avail - 2 * L.pad); w2 = U.measure(lab) + 2 * L.pad end
-            if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0 + 1, '+' .. more, U.CYAN); break end
-            chip(e, cx, y0 + 1, w2, lab)
-            cx = cx + w2 + 2
-          end
-        end
-      end
+      if c.x and c.col then need = math.max(need, ctx.fx_stack(hover, c.col, c.x + 2, c.x + c.w - 2, y0 + 1, draw.fxrow_lines or 1, false, MAXL)) end
     end
     if need ~= (draw.fxrow_lines or 1) then draw.fxrow_lines = need; relayout() end
   end
@@ -10098,7 +10104,7 @@ local function frame()
         edit.track_value(t.col.track, TRS_KEY[t.what], TRS_RESET[t.what]); edit.track_undo('track ' .. t.what .. ' reset'); model.invalidate()
         trs_drag = nil
       else
-        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w }
+        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h }
       end
       click = { t = now2, zone = 'trs', row = t.what }
     elseif hover.fxcolbtn then
@@ -10968,7 +10974,8 @@ local function frame()
   end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then
-      local frac = math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
+      local frac = trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
+        or math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
       local v = trs_value(trs_drag.what, frac)
       edit.track_value(trs_drag.col.track, TRS_KEY[trs_drag.what], v)
       trs_drag.v = v

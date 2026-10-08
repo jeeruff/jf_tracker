@@ -389,6 +389,7 @@ function M.build(lpb)
       local col = { track = tr, name = name, color = color, lanes = {}, fixed = fixed,
                     muted = R.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1, guid = M.track_guid(tr),
                     solo = R.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0,
+                    phase = R.GetMediaTrackInfo_Value(tr, 'B_PHASE') == 1,   -- ø в шапке (8 окт)
                     armed = R.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1,
                     vol = R.GetMediaTrackInfo_Value(tr, 'D_VOL'), pan = R.GetMediaTrackInfo_Value(tr, 'D_PAN'),
                     width = R.GetMediaTrackInfo_Value(tr, 'D_WIDTH'), panmode = math.floor(R.GetMediaTrackInfo_Value(tr, 'I_PANMODE')),

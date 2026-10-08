@@ -417,8 +417,13 @@ function D.layout(snap, state, nregions)
   -- строка входа (3 окт, опция hdrin): in <вход> [smart] — под панорамой, лейны ниже
   L.hr_in = (state.hdrin ~= false) and 1 or 0
   L.hr_info = state.hdrinfo and 3 or 0             -- инструменты / инсерты / сенды в шапке (опция header info, 7 окт)
-  L.lane_row = 4 + L.hr_in + L.hr_info
-  L.header_rows = 5 + L.hr_in + L.hr_info + (state.captions and 1 or 0)
+  -- микшер (8 окт, быстрая опция mixer): шапка разворачивается — вместо строк
+  -- громкости и панорамы (2) полоса микшера: фейдер шириной в лейн, справа
+  -- (один лейн — под ним) эффекты с параметрами
+  L.mixer = state.mixer and true or false
+  L.hr_vp = L.mixer and math.max(6, tonumber(state.mix_rows) or 12) or 2
+  L.lane_row = 2 + L.hr_vp + L.hr_in + L.hr_info
+  L.header_rows = 3 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -431,7 +436,7 @@ function D.layout(snap, state, nregions)
   -- строка effects (7 окт): эффекты и сенды трека — под шапками, над клипами
   -- 8 окт: узкий трек — эффекты столбиком; высота строки — по самому
   -- длинному столбику прошлого кадра (D.fxrow_lines ставит main), до 6 строк
-  L.fxrow_h = state.fxrow and ((D.fxrow_lines or 1) * L.rh + 2) or 0
+  L.fxrow_h = (state.fxrow and not L.mixer) and ((D.fxrow_lines or 1) * L.rh + 2) or 0   -- в микшере эффекты — часть его полосы
   L.fxrow_y = L.header_y + L.header_h
   L.sess_y = L.fxrow_y + L.fxrow_h
   -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места
@@ -2899,6 +2904,7 @@ function D.frame(L, snap, rows, state, info)
       local labels = { { 'R', col.armed, D.ARM, 'arm' },
                        { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                        { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
+                       { 'ø', col.phase, U.AMBER, 'phase' },          -- 8 окт: инверсия фазы (буква, как в блоке трека DSP)
                        { 'trim', nenv > 0, U.CYAN or U.AMBER, 'auto' } }
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
       local trim_w = ms('trim') + 4
@@ -2906,15 +2912,20 @@ function D.frame(L, snap, rows, state, info)
       for k, b in ipairs(labels) do
         local x = bx + (k - 1) * (L.btn_w + 1)
         local bwk = L.btn_w
-        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 4 * (L.btn_w + 1) + L.pad then break end end
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (L.btn_w + 1) + L.pad then break end end
         if x + bwk > c.x + c.w - 1 then break end
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
         set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, L.rh - 2, 1)
         set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, L.rh - 2, 0)
-        text(x + 2, by, b[1], on and b[3] or BTXT)
-        if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
-        hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
+        text(x + math.floor((bwk - ms(b[1])) / 2), by, b[1], on and b[3] or BTXT)
+        if b[4] == 'phase' then
+          if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.trkio = { col = col, what = 'phase' } end
+          hint('trkio', x, by, bwk, L.rh, { col = col, what = 'phase' })
+        else
+          if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
+          hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
+        end
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
@@ -2993,9 +3004,53 @@ function D.frame(L, snap, rows, state, info)
       local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
       local db = db_of(vol)
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
-      slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
       local py = hy + 3 * L.rh + 1
       local px, pw = sx, sw
+      if L.mixer then
+        -- 8 окт: полоса микшера. Фейдер — шириной в первый лейн (один лейн —
+        -- в верхней половине), тянется вертикально; под ним панорама (и
+        -- ширина у stereo pan); эффекты с параметрами — справа / под фейдером
+        local y1 = hy + 2 * L.rh + 1
+        local H = L.hr_vp * L.rh
+        local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
+        local one = #c.lanes <= 1
+        local fh = one and math.floor(H / 2) or H                       -- место фейдера с панорамой
+        local fx_w = lw1 - 2 * L.pad - indent
+        local npan = (col.panmode == 5 or col.panmode == 6) and 2 or 1
+        local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
+        text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY)
+        local ty0, ty1 = y1 + L.rh + 2, y1 + fh - npan * L.rh - 4
+        local th = math.max(8, ty1 - ty0)
+        local tx = sx + math.floor(fx_w / 2) - 3
+        local frac = (math.max(-60, math.min(12, db)) + 60) / 72
+        local hot = mx >= sx and mx < sx + fx_w and my >= ty0 - 2 and my < ty0 + th + 2
+        set(U.GREY); gfx.rect(tx, ty0, 6, th, 0)   -- дорожка видна на любом цвете шапки
+        set(U.LINE); gfx.rect(tx - 3, ty0 + math.floor(th * (1 - 60 / 72)), 12, 1, 1)   -- метка 0 dB
+        local fhh = math.max(1, math.floor(th * frac + 0.5))
+        set(hot and U.AMBER or U.TEXT); gfx.rect(tx + 1, ty0 + th - fhh, 4, fhh, 1)
+        set(hot and U.AMBER or U.TEXT); gfx.rect(tx - 4, ty0 + th - fhh - 1, 14, 3, 1)       -- ручка
+        if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
+        hint('trs', sx, ty0, fx_w, th, { col = col, what = 'vol' })
+        local pyy = y1 + fh - npan * L.rh - 1
+        if col.panmode == 5 then
+          slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
+          slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
+        elseif col.panmode == 6 then
+          slider(sx, pyy, fx_w, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl', nil, true)
+          slider(sx, pyy + L.rh, fx_w, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr', nil, true)
+        else
+          slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
+        end
+        -- эффекты (часть микшера): справа от фейдера / под ним у однолейнового
+        if info.fx_stack then
+          local ex, ey, ew, eh
+          if one then ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
+          else ex, ey, ew, eh = c.x + lw1 + 2, y1, lw1 - 4, H end            -- ширина одного лейна; лишние лейны — пустые
+          set(U.LINE); if one then gfx.rect(c.x + 2, ey - 1, c.w - 4, 1, 1) else gfx.rect(ex - 2, ey, 1, eh, 1) end
+          info.fx_stack(hover, col, ex, ex + ew, ey, math.max(1, math.floor(eh / L.rh)), true)
+        end
+      else
+      slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
       if col.panmode == 5 then
         local half = math.floor(pw / 2)
         slider(px, py, half - L.pad, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
@@ -3007,10 +3062,11 @@ function D.frame(L, snap, rows, state, info)
       else
         slider(px, py, pw, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan')
       end
+      end   -- микшер / строки громкости и панорамы
       -- строка входа (3 окт): in <вход> — клик: список входов (fzf) под ней,
       -- повторный клик закрывает; smart — в DSP-модуле трека (4 окт)
       if L.hr_in > 0 and info.input_name then
-        local iy = hy + 4 * L.rh + 1
+        local iy = hy + (2 + L.hr_vp) * L.rh + 1
         local iw = sw
         local hot = mx >= sx and mx < sx + iw and my >= iy and my < iy + L.rh
         local open = info.in_open and info.in_open(col)
@@ -3028,7 +3084,7 @@ function D.frame(L, snap, rows, state, info)
       -- окно маршрутизации); фишки по ширине, что не влезло — «+N»
       if L.hr_info > 0 and info.hdr_info then
         local hi = info.hdr_info(col) or {}
-        local y0 = hy + (4 + L.hr_in) * L.rh + 1
+        local y0 = hy + (2 + L.hr_vp + L.hr_in) * L.rh + 1
         local rows = { { 'l', hi.inst or {}, 'hdrinst' }, { 'fx', hi.fx or {}, 'hdrfx' }, { 's', hi.sends or {}, 'hdrsend' } }
         for ri, row in ipairs(rows) do
           local ry = y0 + (ri - 1) * L.rh

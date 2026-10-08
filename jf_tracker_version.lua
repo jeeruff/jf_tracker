@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'mixer (quick option): the track headers unfold - a vertical fader one lane wide, pan / width under it, the fx with their TCP parameters right of it (one-lane track: under it); the effects row is part of it; param button in the corner',
+    'ø (phase invert) button in every track header, next to R I M S',
     'item tab: a clip is shown only when selected (click / clip-mode cursor) and while the focus is on the clips or the item tab; leaving restores the instrument; hovering does not switch it; clip zone lines only on the wave of the clip file',
     'measure: s - PNG of the measured box (or the window) next to the system screenshots, named like them + _jftracker (path + report in the debug log); own PNG encoder, no external programs',
     'right click on an fx or a parameter (effects row, param sliders, router, DSP): the fx / parameter menu - LFO, ACS, link, modulation window, automation envelope, show in the track header (TCP), default; bypass, window, show in DSP, rename, remove',
