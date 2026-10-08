@@ -701,7 +701,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
       U.text(nx, sy, ns, U.GREY); nx = nx + U.measure(ns) + U.measure('W')
     end
     U.text(nx, sy, ctx.fit(SS.slot_name(rg, ri), x0 + lw - L.pad - 2 - nx), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
-    if rg.qn1 and rg.qn0 and CR >= 2 then U.text(x0 + L.pad + 2, sy + L.rh, ctx.fit(('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', lw - 2 * L.pad - 4), U.GREY) end
+    -- 8 окт: длины в тактах на кнопке нет (по просьбе) — номер и имя
     if hot then hover.sessrow = ri end
     if ctx.hint then ctx.hint('sessrow', x0 + 3, sy, lw - 5, L.rh, ri) end
     for _, sl in ipairs(slots) do
