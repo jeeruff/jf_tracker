@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'library = the muted track LIB: every instrument on its own fixed lane from 0 (no overlaps, the project does not grow, master render stays clean), lane named after it, owner track in P_EXT:jf_home; the =LIB marker is gone; library patterns are the regions after =END',
     'mixer (quick option): the track headers unfold - a vertical fader one lane wide, pan / width under it, the fx with their TCP parameters right of it (one-lane track: under it); the effects row is part of it; param button in the corner',
     'ø (phase invert) button in every track header, next to R I M S',
     'item tab: a clip is shown only when selected (click / clip-mode cursor) and while the focus is on the clips or the item tab; leaving restores the instrument; hovering does not switch it; clip zone lines only on the wave of the clip file',

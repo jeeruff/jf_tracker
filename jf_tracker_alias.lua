@@ -36,7 +36,7 @@ local function tracks()
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
-    if name ~= model.DEPOT then out[#out + 1] = tr end
+    if not (model.is_lib_name and model.is_lib_name(name) or name == model.DEPOT) then out[#out + 1] = tr end
   end
   return out
 end
@@ -498,29 +498,13 @@ local function bar_ceil(t)
 end
 
 function A.ensure_lib(regions)
+  -- 8 окт: маркера =LIB нет — библиотека паттернов начинается с =END (нет
+  -- его — с конца проекта, по такту)
   local endp = model.marker_pos and model.marker_pos(model.END_MARKER)
-  if regions.lib_pos and not (endp and regions.lib_pos < endp - EPS) then return regions.lib_pos end
-  if regions.lib_pos then
-    -- =LIB раньше =END — переставить за =END (маркер трекера, не пользователя)
-    local i = 0
-    while true do
-      local ret, isrgn, pos, _, nm, _, color = R.EnumProjectMarkers3(0, i)
-      if not ret or ret == 0 then break end
-      if not isrgn and nm == model.LIB_MARKER then
-        local nt = bar_ceil(endp)
-        R.SetProjectMarkerByIndex(0, i, false, nt, 0, -1, nm, color or 0)
-        return nt
-      end
-      i = i + 1
-    end
-  end
+  if endp then return endp end
   local t = R.GetProjectLength(0)
   for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
-  t = bar_ceil(t) + R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, 0) + 4) -- +такт
-  local endp = model.marker_pos and model.marker_pos(model.END_MARKER)
-  if endp and t < endp then t = endp end                    -- библиотека не раньше =END (2 окт)
-  R.AddProjectMarker2(0, false, t, 0, model.LIB_MARKER, -1, 0)
-  return t
+  return bar_ceil(t)
 end
 
 -- сдвинуть всё, что начинается после t (включая маркеры/регионы), на delta

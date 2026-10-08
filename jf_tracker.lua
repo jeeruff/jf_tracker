@@ -7408,10 +7408,10 @@ local AUD_THR, AUD_GAP, AUD_PRE = 0.08, 0.25, 0.01
 -- СВОЁМ кадре (@gfx), позже заказа. Поэтому заказ запоминает items трека, а
 -- кадр трекера ловит новый item и ставит его точно в нужную позицию.
 local put_pending = {}
-local function expect_put(track, pos, loop_len)
+local function expect_put(track, pos, loop_len, to_lib)
   local before = {}
   for i = 0, reaper.CountTrackMediaItems(track) - 1 do before[reaper.GetTrackMediaItem(track, i)] = true end
-  put_pending[#put_pending + 1] = { track = track, pos = pos, before = before, t = reaper.time_precise(), loop = loop_len }
+  put_pending[#put_pending + 1] = { track = track, pos = pos, before = before, t = reaper.time_precise(), loop = loop_len, lib = to_lib }
 end
 local function settle_puts(now)
   for k = #put_pending, 1, -1 do
@@ -7431,6 +7431,15 @@ local function settle_puts(now)
       if p.loop then
         reaper.SetMediaItemInfo_Value(found, 'B_LOOPSRC', 1)
         reaper.SetMediaItemInfo_Value(found, 'D_LENGTH', p.loop)
+      end
+      -- 8 окт: в библиотеку — jf_rec печатает на свой трек за концом проекта,
+      -- отсюда item переезжает в свой лейн трека LIB (владелец — этот трек)
+      if p.lib then
+        edit.run('retro to lib', function()
+          local ltr, lane = edit.lib_slot()
+          reaper.MoveMediaItemToTrack(found, ltr)
+          edit.lib_mark(found, p.track, lane)
+        end)
       end
       reaper.UpdateArrange(); model.invalidate()
       table.remove(put_pending, k)
@@ -7684,19 +7693,19 @@ function retro_put(target, raw, at_pos, loop_len)
   local tr = c.col.track
   local pos
   if target == 'depot' then
-    pos = edit.lib_tail()   -- 8 окт: общий конец зоны библиотеки
+    pos = reaper.GetProjectLength(0) + 4   -- 8 окт: печать за концом проекта, потом — в лейн трека LIB
   else
     pos = at_pos or edit.row_time(vim.cur.row, state.lpb, 0)
   end
   local tnum = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')) - 1
-  expect_put(tr, pos, loop_len)
+  expect_put(tr, pos, loop_len, target == 'depot')
   with_ns('jf_rec', function()
     reaper.gmem_write(11, tnum); reaper.gmem_write(12, pos)
     reaper.gmem_write(13, start); reaper.gmem_write(14, samps); reaper.gmem_write(15, 0)
     reaper.gmem_write(10, 1)
   end)
   retro.put_t = reaper.time_precise()
-  retro.msg = ('retro: %.2fs → %s @ %.2fs'):format(samps / c.srate, target == 'depot' and 'depot (=LIB)' or c.col.name, pos)
+  retro.msg = ('retro: %.2fs → %s @ %.2fs'):format(samps / c.srate, target == 'depot' and 'lib (track LIB)' or c.col.name, pos)
   vim.msg = retro.msg
 end
 -- ретро-лупер (2 окт): «подхватить уже сыгранное и лупить». Во время игры

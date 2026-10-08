@@ -17,7 +17,9 @@
 local M = {}
 local R = reaper
 
-M.DEPOT = 'DEPOT'        -- трек-депо сэмплов (этап 4), в колонках не показываем
+M.DEPOT = 'LIB'          -- 8 окт: библиотека — заглушённый трек LIB (fixed lanes: инструмент — свой лейн с нуля); в колонках не показываем
+M.LIB_NAMES = { LIB = true, DEPOT = true }   -- DEPOT — старое имя того же трека
+function M.is_lib_name(name) return M.LIB_NAMES[name or ''] == true end
 M.BASE_NOTE = 60         -- «C-4 = оригинал»: MIDI 60 показываем как C-4
 M.MAX_UNROLL = 256       -- предел разворота зацикленного MIDI-item (повторов)
 
@@ -365,10 +367,10 @@ function M.build(lpb)
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
-    if name == M.DEPOT then depot_tr = tr end
+    if M.is_lib_name(name) then depot_tr = tr end
   end
   snap.depot = depot_tr
-  snap.lib_pos = M.lib_pos()
+  snap.lib_pos = nil                       -- 8 окт: маркера =LIB больше нет
   snap.end_pos = M.marker_pos(M.END_MARKER)
   snap.zone = M.session_zone()                -- зона сессии (7 окт): её items — не библиотека
   -- мастер: для вкладки master (скоп слот 31, цепь FX)
@@ -382,7 +384,7 @@ function M.build(lpb)
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
-    if name ~= M.DEPOT then
+    if not M.is_lib_name(name) then
       local freemode = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE')
       local fixed = freemode == 2
       local color = R.GetTrackColor(tr)
@@ -464,7 +466,7 @@ function M.build(lpb)
       col.envs = M.track_envs(tr, lpb)
       col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
       local t1 = R.time_precise()
-      col.pool = M.track_pool(tr, depot_tr, snap.lib_pos, snap.end_pos, snap.zone)
+      col.pool = M.track_pool(tr, depot_tr, nil, snap.end_pos, snap.zone, col.guid, #snap.cols == 0)
       local t2 = R.time_precise()
       col.mods = M.track_mods(tr)
       local t3 = R.time_precise()
@@ -796,7 +798,7 @@ M.START_MARKER = '=START'
 -- Пул трека: items до маркера =END (последовательность) и после =LIB
 -- (библиотека). Всё между =END и =LIB — не читается (просьба 1 окт: путаница;
 -- сэмплы библиотеки реально лежат на треках за =LIB).
-function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone)
+function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone, guid, first)
   local pool, seen = {}, {}
   for i = 0, R.CountTrackMediaItems(tr) - 1 do
     local it = R.GetTrackMediaItem(tr, i)
@@ -808,7 +810,13 @@ function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone)
     ::skip_item::
   end
   if depot_tr then
-    for i = 0, R.CountTrackMediaItems(depot_tr) - 1 do pool_add(pool, seen, R.GetTrackMediaItem(depot_tr, i), true) end
+    -- 8 окт: семпл трека LIB — у трека-владельца (P_EXT:jf_home = GUID трека);
+    -- без владельца — у первого трека
+    for i = 0, R.CountTrackMediaItems(depot_tr) - 1 do
+      local it = R.GetTrackMediaItem(depot_tr, i)
+      local _, home = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_home', '', false)
+      if (home ~= '' and home == guid) or (home == '' and first) then pool_add(pool, seen, it, true) end
+    end
   end
   return pool
 end
@@ -1455,7 +1463,7 @@ function M.regions(lpb)
                         qn0 = qn0, qn1 = qn1, r0 = r0, r1 = r1, color = color,
                         -- библиотека — после =LIB И после =END (2 окт: =LIB, поставленный
                         -- раньше =END, прятал регионы последовательности)
-                        lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6),
+                        lib = end_pos ~= nil and pos >= end_pos - 1e-6 and name ~= '=SESSION',   -- 8 окт: паттерны библиотеки — регионы после =END (маркера =LIB нет)
                         session = name == '=SESSION' }
     end
     i = i + 1

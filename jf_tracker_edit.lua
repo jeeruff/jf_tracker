@@ -136,7 +136,7 @@ local function census()
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
-    if not model or name ~= model.DEPOT then
+    if not model or not model.is_lib_name(name) then
       local set
       for i = 0, R.CountTrackMediaItems(tr) - 1 do
         local it = R.GetTrackMediaItem(tr, i)
@@ -163,7 +163,7 @@ local function rescue(pre)
   for tr, set in pairs(pre) do
     if R.ValidatePtr(tr, 'MediaTrack*') then
       for fn, in_seq in pairs(set) do
-        if in_seq and not (post[tr] and post[tr][fn] ~= nil) then
+        if in_seq and not (post[tr] and post[tr][fn] ~= nil) and not E.lib_has(fn, tr) then
           if E.depot_add(fn, tr) then saved[#saved + 1] = fn:match('[^/]+$') or fn end
         end
       end
@@ -1623,35 +1623,29 @@ function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
   return it
 end
 
--- конец зоны библиотеки (8 окт): позже всех items после =LIB на ВСЕХ
--- треках и всех регионов-паттернов библиотеки. Семплы и паттерны делят одну
--- зону — раньше семпл ставился после items своего трека, а паттерн — после
--- регионов, и регион ложился поверх семплов (паттерн «съедал» их как своё)
+-- конец библиотеки паттернов (8 окт): регионы после =END; маркера =LIB
+-- нет, семплы — на треке LIB и с паттернами больше не пересекаются
 function E.lib_tail(lib)
-  lib = lib or E.ensure_lib()
-  local t = lib
-  for ti = 0, R.CountTracks(0) - 1 do
-    local tr = R.GetTrack(0, ti)
-    for i = 0, R.CountTrackMediaItems(tr) - 1 do
-      local it = R.GetTrackMediaItem(tr, i)
-      local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-      if p >= lib - 1e-6 then t = math.max(t, p + R.GetMediaItemInfo_Value(it, 'D_LENGTH')) end
-    end
-  end
+  local t = lib or model.marker_pos(model.END_MARKER) or R.GetProjectLength(0)
   local i = 0
   while true do
-    local ret, isrgn, p, e = R.EnumProjectMarkers3(0, i)
+    local ret, isrgn, p, e, nm = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
-    if isrgn and p >= lib - 1e-6 then t = math.max(t, e) end
+    if isrgn and p >= t - 1e-6 and nm ~= '=SESSION' then t = math.max(t, e) end
     i = i + 1
   end
   return t
 end
 
--- выделение → депо трека (после =LIB), чтобы потом нарезать как инструмент
+-- выделение → библиотека трека (трек LIB, свой лейн) — потом нарезать как инструмент
 function E.depot_span(track, entry, t0, t1)
-  local pos = E.lib_tail()
-  return E.insert_span(track, nil, 4, 0, entry, t0, t1, pos)
+  local it
+  run('lib span', function()
+    local tr, lane = E.lib_slot()
+    it = E.insert_span(tr, lane, 4, 0, entry, t0, t1, 0)
+    E.lib_mark(it, track, lane)
+  end)
+  return it
 end
 
 -- targets(dfi) → {track=, lane_idx=} — колонка для смещения dfi от курсора
@@ -2605,34 +2599,77 @@ function E.mute_span(track, t0, t1, flag)
   end)
 end
 
--- добавить файл в трек DEPOT (создаётся заглушённым в конце, если нет);
--- item ставится после последнего в депо, длина = источник. Возвращает item.
--- маркер =LIB: есть — его позиция; нет — ставим на такт после конца проекта
-function E.ensure_lib()
-  local pos = model.lib_pos()
-  local endp = model.marker_pos(model.END_MARKER)
-  if pos and not (endp and pos < endp - 1e-6) then return pos end
-  if pos then
-    -- =LIB раньше =END (2 окт) — не библиотека: перенести маркер за =END
-    local qn = R.TimeMap2_timeToQN(0, endp)
-    local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
-    local nt = (qms and math.abs(qn - qms) < 1e-6) and endp or R.TimeMap2_QNToTime(0, qme or (qn + 4))
-    local i = 0
-    while true do
-      local ret, isrgn, _, _, nm, _, color = R.EnumProjectMarkers3(0, i)
-      if not ret or ret == 0 then break end
-      if not isrgn and nm == model.LIB_MARKER then R.SetProjectMarkerByIndex(0, i, false, nt, 0, -1, nm, color or 0); return nt end
-      i = i + 1
-    end
+-- ── библиотека — трек LIB (8 окт) ─────────────────────────────────────────
+-- Заглушённый трек LIB в конце: fixed lanes, каждый инструмент — свой лейн,
+-- item с позиции 0 (не наслаиваются и не удлиняют проект, в мастер-рендер
+-- не попадают); лейн подписан именем инструмента; P_EXT:jf_home — GUID
+-- трека-владельца (lib показывает семпл под ним). Маркера =LIB больше нет.
+function E.lib_track(create)
+  for ti = 0, R.CountTracks(0) - 1 do
+    local t = R.GetTrack(0, ti)
+    local _, name = R.GetTrackName(t)
+    if model.is_lib_name(name) then return t end
   end
-  local len = R.GetProjectLength(0)
-  local qn = R.TimeMap2_timeToQN(0, len)
-  local _, _, qme = R.TimeMap_QNToMeasures(0, qn)
-  pos = R.TimeMap2_QNToTime(0, (qme or (qn + 4)) + 4)
-  local endp = model.marker_pos(model.END_MARKER)
-  if endp and pos < endp then pos = endp end                -- библиотека не раньше =END (2 окт)
-  R.AddProjectMarker2(0, false, pos, 0, model.LIB_MARKER, -1, 0)
-  return pos
+  if not create then return nil end
+  R.InsertTrackAtIndex(R.CountTracks(0), false)
+  local tr = R.GetTrack(0, R.CountTracks(0) - 1)
+  R.GetSetMediaTrackInfo_String(tr, 'P_NAME', model.DEPOT, true)
+  R.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1)
+  R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 2)
+  R.SetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES', 1)
+  return tr
+end
+-- место под новый инструмент: трек LIB, свободный лейн (первый пустой или
+-- новый в конце); возвращает трек, номер лейна, позицию 0
+function E.lib_slot()
+  local tr = E.lib_track(true)
+  local n = math.max(1, math.floor(R.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES')))
+  local used = {}
+  for i = 0, R.CountTrackMediaItems(tr) - 1 do used[math.floor(R.GetMediaItemInfo_Value(R.GetTrackMediaItem(tr, i), 'I_FIXEDLANE'))] = true end
+  for l = 0, n - 1 do if not used[l] then return tr, l, 0 end end
+  R.SetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES', n + 1)
+  return tr, n, 0
+end
+-- item в LIB: лейн, владелец, имя лейна = имя take
+function E.lib_mark(it, home, lane)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return end
+  local tr = R.GetMediaItem_Track(it)
+  R.SetMediaItemInfo_Value(it, 'D_POSITION', 0)
+  if lane then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane) end
+  if home and R.ValidatePtr(home, 'MediaTrack*') then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_home', model.track_guid(home), true) end
+  local tk = R.GetActiveTake(it)
+  if tr and lane and tk then R.GetSetMediaTrackInfo_String(tr, 'P_LANENAME:' .. lane, R.GetTakeName(tk), true) end
+end
+-- есть ли файл fn у владельца tr в LIB (страховка сэмплов не дублирует)
+function E.lib_has(fn, home)
+  local tr = E.lib_track(false)
+  if not tr then return false end
+  local g = model.track_guid(home)
+  for i = 0, R.CountTrackMediaItems(tr) - 1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local _, h = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_home', '', false)
+    local tk = R.GetActiveTake(it)
+    if h == g and tk and root_file(R.GetMediaItemTake_Source(tk)) == fn then return true end
+  end
+  return false
+end
+
+-- файл → библиотека трека track (трек LIB, свой лейн). Возвращает item
+function E.depot_add(path, track)
+  local item
+  path = E.media_copy(path)
+  run('lib add', function()
+    local src = R.PCM_Source_CreateFromFile(path)
+    if not src then return end
+    local tr, lane = E.lib_slot()
+    item = R.AddMediaItemToTrack(tr)
+    local tk = R.AddTakeToMediaItem(item)
+    R.SetMediaItemTake_Source(tk, src)
+    R.SetMediaItemInfo_Value(item, 'D_LENGTH', R.GetMediaSourceLength(src) or 1)
+    R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', path:match('([^/]+)%.%w+$') or path, true)
+    E.lib_mark(item, track, lane)
+  end)
+  return item
 end
 
 -- файл → депо трека: item после маркера =LIB (конец зоны библиотеки трека);
@@ -2686,56 +2723,16 @@ function E.kit_load(path, track)
   local chunks = E.kit_items(text)
   local n = 0
   run('kit load', function()
-    local pos = E.lib_tail()   -- 8 окт: общий конец зоны (семплы всех треков и паттерны)
-    for _, ch in ipairs(chunks) do
-      local it = R.AddMediaItemToTrack(track)
-      if R.SetItemStateChunk(it, set_chunk_pos(ch, pos), false) then
-        pos = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') + 1
-        n = n + 1
-      else R.DeleteTrackMediaItem(track, it) end
+    for _, ch in ipairs(chunks) do                 -- 8 окт: каждый сэмпл — свой лейн трека LIB
+      local tr, lane = E.lib_slot()
+      local it = R.AddMediaItemToTrack(tr)
+      if R.SetItemStateChunk(it, set_chunk_pos(ch, 0), false) then E.lib_mark(it, track, lane); n = n + 1
+      else R.DeleteTrackMediaItem(tr, it) end
     end
   end)
   return n
 end
 
-function E.depot_add(path, track)
-  local item
-  path = E.media_copy(path)
-  run('depot add', function()
-    local tr = track
-    local pos = 0
-    if tr then
-      pos = E.lib_tail()
-    else
-      for ti = 0, R.CountTracks(0) - 1 do
-        local t = R.GetTrack(0, ti)
-        local _, name = R.GetTrackName(t)
-        if name == model.DEPOT then tr = t; break end
-      end
-      if not tr then
-        R.InsertTrackAtIndex(R.CountTracks(0), false)
-        tr = R.GetTrack(0, R.CountTracks(0) - 1)
-        R.GetSetMediaTrackInfo_String(tr, 'P_NAME', model.DEPOT, true)
-        R.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1)
-      end
-      for i = 0, R.CountTrackMediaItems(tr) - 1 do
-        local it = R.GetTrackMediaItem(tr, i)
-        local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-        if e > pos then pos = e end
-      end
-    end
-    local src = R.PCM_Source_CreateFromFile(path)
-    if not src then return end
-    item = R.AddMediaItemToTrack(tr)
-    local tk = R.AddTakeToMediaItem(item)
-    R.SetMediaItemTake_Source(tk, src)
-    local len = R.GetMediaSourceLength(src)
-    R.SetMediaItemInfo_Value(item, 'D_POSITION', pos)
-    R.SetMediaItemInfo_Value(item, 'D_LENGTH', len or 1)
-    R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', path:match('([^/]+)%.%w+$') or path, true)
-  end)
-  return item
-end
 
 -- ── инструменты как объекты Vim (2 окт): dd / yy / p в модуле инструментов ──
 -- Снимок инструмента: чанк его item без GUID и имя take (нарезка P_EXT
@@ -2769,15 +2766,13 @@ end
 function E.inst_put(track, snaps, names)
   local out = {}
   run('instrument put', function()
-    local pos = E.lib_tail()   -- 8 окт: общий конец зоны (семплы всех треков и паттерны)
-    for k, sn in ipairs(snaps) do
-      local it = R.AddMediaItemToTrack(track)
+    for k, sn in ipairs(snaps) do                  -- 8 окт: в трек LIB, свой лейн
+      local tr, lane = E.lib_slot()
+      local it = R.AddMediaItemToTrack(tr)
       R.SetItemStateChunk(it, sn.chunk, false)
-      R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
-      if R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', 0) end
       local tk = R.GetActiveTake(it)
       if tk and names and names[k] then R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', names[k], true) end
-      pos = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      E.lib_mark(it, track, lane)
       out[#out + 1] = it
     end
   end)
