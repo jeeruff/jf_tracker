@@ -9687,7 +9687,7 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
-  elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
+  elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'session' then state.status = 'session: clips instead of the rows - scenes x tracks, Enter launches (zs, quick option clips)'
@@ -10061,7 +10061,7 @@ local function frame()
     local lc = ctx.hdr_last
     local dbl = lc and lc.kind == kind and lc.col == h2.col and lc.k == h2.k and now3 - lc.t < 0.35
     ctx.hdr_last = { kind = kind, col = h2.col, k = h2.k, t = now3 }
-    ctx.hdr_pick(kind, h2.col, h2.k, dbl or (kind == 'fx' and state.fxparams))   -- с параметрами: клик по имени — окно эффекта
+    ctx.hdr_pick(kind, h2.col, h2.k, dbl)   -- 8 окт: клик — выбрать эффект в DSP, двойной — нативное окно (и с param тоже)
     U.click = false
   end
   -- клип (7 окт): > в углу — запуск, o под последним клипом — запись в слот
