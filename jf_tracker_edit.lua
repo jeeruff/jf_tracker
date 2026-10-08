@@ -2053,6 +2053,10 @@ end
 E.fx_defaults = {}
 function E.fx_param_default(track, fx, param)
   local A = FA(track)
+  -- 8 окт: у REAPER 7 есть param.X.default_value — сначала оно (без временного экземпляра)
+  local okd, dv = A.GetNamedConfigParm(track, fx, ('param.%d.default_value'):format(param))
+  dv = okd and tonumber(dv)
+  if dv then run('fx param default', function() A.SetParamNormalized(track, fx, param, dv) end); if model then model.invalidate() end; return dv end
   local okn, orig = A.GetNamedConfigParm(track, fx, 'original_name')
   if not okn or orig == '' then local _, nm = A.GetFXName(track, fx, ''); orig = nm end
   if not orig or orig == '' then return nil end
@@ -2195,6 +2199,44 @@ function E.fx_bypass(track, fx)
   run('fx bypass', function() A.SetEnabled(track, fx, not A.GetEnabled(track, fx)) end)
 end
 function E.fx_show(track, fx) FA(track).Show(track, fx, 3) end
+-- параметр в track controls REAPER (8 окт): API на запись нет — правка chunk
+-- трека: строка PARM_TCP после FXID эффекта (« N[:…]» на параметр; формат
+-- REAPER — число и необязательный хвост). on = nil — переключить
+function E.fx_param_tcp(track, fx, param, on)
+  local guid = R.TrackFX_GetFXGUID(track, fx)
+  if not guid then return false end
+  local ok, chunk = R.GetTrackStateChunk(track, '', false)
+  if not ok then return false end
+  local lines, out, done, state = {}, {}, false, nil
+  for ln in (chunk .. '\n'):gmatch('(.-)\n') do lines[#lines + 1] = ln end
+  local i = 1
+  while i <= #lines do
+    local ln = lines[i]
+    out[#out + 1] = ln
+    local g = ln:match('^%s*FXID%s+(%b{})')
+    if g and g == guid and not done then
+      done = true
+      local ind = ln:match('^(%s*)') or ''
+      local nxt = lines[i + 1] or ''
+      local rest = nxt:match('^%s*PARM_TCP%s+(.*)$')
+      local toks, has = {}, false
+      if rest then
+        for tok in rest:gmatch('%S+') do
+          if tonumber(tok:match('^(%d+)')) == param then has = true else toks[#toks + 1] = tok end
+        end
+        i = i + 1
+      end
+      local want = on; if want == nil then want = not has end
+      if want then toks[#toks + 1] = tostring(param) end
+      if #toks > 0 then out[#out + 1] = ind .. 'PARM_TCP ' .. table.concat(toks, ' ') end
+      state = want
+    end
+    i = i + 1
+  end
+  if not done then return false end
+  run('fx param in track controls', function() R.SetTrackStateChunk(track, table.concat(out, '\n'), false) end)
+  return true, state
+end
 -- delta solo (4 окт): нативный параметр :delta эффекта (REAPER 7) — слышна
 -- разница сухого и обработанного; nil — у эффекта нет :delta
 function E.fx_delta_idx(obj, fx)

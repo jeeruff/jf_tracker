@@ -4085,6 +4085,16 @@ ctx = {
     local c = ctx.tcp_cache[col.guid]
     if c and (c.sc == sc or now - c.t < 2) then return c.by end
     local by = {}
+    if reaper.CountTCPFXParms then
+      -- 8 окт: нативное API (CountTCPFXParms / GetTCPFXParm) — без чтения chunk
+      for k = 0, reaper.CountTCPFXParms(0, tr) - 1 do
+        local okp, fxi, pi = reaper.GetTCPFXParm(0, tr, k)
+        local g = okp and reaper.TrackFX_GetFXGUID(tr, fxi)
+        if g then by[g] = by[g] or {}; table.insert(by[g], pi) end
+      end
+      ctx.tcp_cache[col.guid] = { t = now, sc = sc, by = by }
+      return by
+    end
     local ok, chunk = reaper.GetTrackStateChunk(tr, '', false)
     if ok then
       local guid
@@ -4103,6 +4113,66 @@ ctx = {
     end
     ctx.tcp_cache[col.guid] = { t = now, sc = sc, by = by }
     return by
+  end,
+  param_in_tcp = function(tr, fx, pi)
+    if reaper.CountTCPFXParms then
+      for k = 0, reaper.CountTCPFXParms(0, tr) - 1 do
+        local ok, f2, p2 = reaper.GetTCPFXParm(0, tr, k)
+        if ok and f2 == fx and p2 == pi then return true end
+      end
+    end
+    return false
+  end,
+  param_tcp_toggle = function(tr, fx, pi, name)
+    local ok, on = edit.fx_param_tcp(tr, fx, pi)
+    ctx.tcp_cache, ctx.hdr_cache = {}, {}
+    if ok and on and not state.fxparams then state.fxparams = true; state.fxrow = true; reaper.SetExtState(EXT, 'fxparams', '1', true); reaper.SetExtState(EXT, 'fxrow', '1', true); relayout() end
+    vim.msg = ok and ((name or 'parameter') .. (on and ': in the track header (par)' or ': removed from the track header')) or 'track header: failed'
+  end,
+  -- меню параметра (8 окт): модуляция, автоматизация, шапка трека, умолчание
+  param_menu_items = function(tr, fx, pi, pname, add)
+    local function flag(what) local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, fx, ('param.%d.%s.active'):format(pi, what)); return ok and v == '1' end
+    pname = pname or select(2, reaper.TrackFX_GetParamName(tr, fx, pi, '')) or ('p' .. pi)
+    add((flag('lfo') and '!' or '') .. 'Modulate ' .. pname .. ': LFO', function() edit.mod_set(tr, fx, pi, 'lfo') end)
+    add((flag('acs') and '!' or '') .. 'Modulate: audio control (ACS)', function() edit.mod_set(tr, fx, pi, 'acs') end)
+    add((flag('plink') and '!' or '') .. 'Link to parameter … (fzf)', function()
+      local items = {}
+      for f2 = 0, reaper.TrackFX_GetCount(tr) - 1 do
+        local _, fnm = reaper.TrackFX_GetFXName(tr, f2, '')
+        for q = 0, math.min(64, reaper.TrackFX_GetNumParams(tr, f2)) - 1 do
+          if not (f2 == fx and q == pi) then
+            local _, qn = reaper.TrackFX_GetParamName(tr, f2, q, '')
+            items[#items + 1] = { label = (fnm or ''):gsub('^[^:]*: ', '') .. ' / ' .. (qn or q), data = { fx = f2, param = q } }
+          end
+        end
+      end
+      vim.open_picker('link ' .. pname .. ' to', items, function(it) edit.mod_set(tr, fx, pi, 'plink', true, it.data.fx, it.data.param) end)
+    end)
+    if flag('plink') then add('Unlink parameter', function() edit.mod_set(tr, fx, pi, 'plink', false) end) end
+    add('Open parameter modulation window', function()
+      local v = reaper.TrackFX_GetParamNormalized(tr, fx, pi); reaper.TrackFX_SetParamNormalized(tr, fx, pi, v)
+      local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
+      if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
+    end)
+    add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(tr, fx, pi, true) end); state.envs = true; model.invalidate() end)
+    add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in track header (TCP, par)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end)
+    add('Default value', function() edit.fx_param_default(tr, fx, pi); vim.msg = pname .. ': default' end)
+    add('--', function() end)
+  end,
+  -- меню эффекта (8 окт): то же, что в DSP — bypass, окно, удалить, добавить
+  fx_menu_items = function(tr, fx, fname, add)
+    local en = reaper.TrackFX_GetEnabled(tr, fx)
+    add((en and 'Bypass ' or 'Enable ') .. (fname or 'fx'), function() edit.fx_bypass(tr, fx) end)
+    add('Open FX window', function() edit.fx_show(tr, fx) end)
+    add('Show in DSP', function()
+      for i, f in ipairs(L.flat or {}) do if f.col and f.col.track == tr then vim.cur.fi = i; break end end
+      state.dsp = true; relayout()
+      local c = cur_col(); for k, f in ipairs(c and c.fx or {}) do if f.i == fx then dsp_sel.fx = k end end
+      ctx.set_focus('dsp')
+    end)
+    add('Rename … (:fxname)', function() state.fxname_target = { track = tr, addr = fx }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end)
+    add('Remove FX', function() edit.fx_remove(tr, fx) end)
+    add('Add FX … (fzf)', function() ctx.fx_picker() end)
   end,
   hdr_info = function(col)
     local now = reaper.time_precise()
@@ -6785,6 +6855,23 @@ function ctx.context_items(hover)
       add((FB.is_fav(it) and '!' or '') .. 'Favourite', function() FB.toggle_fav(it); ctx.fxb_save() end)
       add('Native FX browser', function() reaper.Main_OnCommand(40271, 0) end)
     end
+  elseif hover.hdrparam or hover.hdrfx or hover.dbparam or hover.dbnode then
+    -- 8 окт: ПКМ по эффекту / параметру в строке effects и в роутере — меню
+    -- эффекта и параметра (как в DSP), не общее меню вида
+    local tr, fx, pi, pname, fname
+    if hover.hdrparam then tr, fx, pi, pname = hover.hdrparam.track, hover.hdrparam.fx, hover.hdrparam.param, hover.hdrparam.name
+    elseif hover.hdrfx then
+      local c = hover.hdrfx.col; tr = c and c.track; fx = hover.hdrfx.it and hover.hdrfx.it.i
+    else
+      local t = dsp_target(); tr = t and not t.take and t.track
+      if hover.dbparam then fx, pi, pname = hover.dbparam.addr, hover.dbparam.i, hover.dbparam.name
+      else fx = hover.dbnode.addr end
+    end
+    if tr and fx and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      local _, fn = reaper.TrackFX_GetFXName(tr, fx, ''); fname = (fn or ''):gsub('^[^:]*: ', '')
+      if pi then ctx.param_menu_items(tr, fx, pi, pname, add) end
+      ctx.fx_menu_items(tr, fx, fname, add)
+    end
   elseif hover.matrix and hover.matrix.ri then
     MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci or MX.cur.ci)
     for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key) end
@@ -6854,6 +6941,7 @@ function ctx.context_items(hover)
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
       add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end)
+      add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, par)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
       add('--', function() end)
     end
     -- плагин внутри контейнера (6 окт): ПКМ по его колонке / строке

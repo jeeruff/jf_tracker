@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'right click on an fx or a parameter (effects row, par sliders, router, DSP): the fx / parameter menu - LFO, ACS, link, modulation window, automation envelope, show in the track header (TCP), default; bypass, window, show in DSP, rename, remove',
+    'parameter default: the native param.X.default_value first (REAPER 7), a temporary instance only as a fallback; TCP parameters read with CountTCPFXParms / GetTCPFXParm',
     'lib zone: samples and library patterns share one tail - a pattern sent to the lib goes after all samples, a new sample after all lib patterns (a region lay over the samples)',
     'smart slice (s s in the item tab): transients + the brightness of each hit - a slice only on a contrasting hit (kick, then the next bright one - hat / snare / perc, then dark again), repeats merge',
     'slice preview plays to the end: stops by the position of the preview itself, not by a timer from the key press; with slice playthru on it plays to the end of the sample',
