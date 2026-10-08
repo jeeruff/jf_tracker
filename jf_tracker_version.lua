@@ -30,6 +30,7 @@ V.CHANGES = {
     'fix: resizing the top module no longer resizes the main module (and squeezes the matrix) - it takes its own height',
     'scrollbars: one thickness everywhere (option scrollbar width, default 3 px), a bit brighter',
     'playhead: the colour of the play cursor of the REAPER theme, with a fading tail of played rows (option playhead tail, 0 2 4 8 16 rows)',
+    'speed: the mouse wheel and drags show up in the same tick (as keys and clicks already did); the fx chains measured warm - 0 rebuilds of 29 after an edit',
     'session clips: their hint row only with hints on',
     'midi learn list: a scrollbar on the right when the targets do not fit (drag, wheel)',
     'harmonizer tab (next to midi): key (< > tonic, major / minor, auto from the track notes), the seven degree chords and their sevenths - click / 1..7 (Shift - seventh) writes one at the cursor row; the chord at the cursor and the chords of the track in the pattern; chord lane button (:chord)',

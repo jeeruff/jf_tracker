@@ -1028,7 +1028,7 @@ function M.auto_reset(short) M.fx_gen = M.fx_gen + 1; for k in pairs(auto_cache)
 -- (M.fx_gen). Значения параметров читаются вживую каждый кадр (fx_values);
 -- файл сэмплера (FILE0) обновляется при каждом обращении.
 M.fx_gen = 0
-local fx_cache = setmetatable({}, { __mode = 'k' })
+local fx_cache = setmetatable({}, { __mode = 'k' })   -- 8 окт, замер: слабый ключ MediaTrack* живёт и после GC
 local build_track_fx
 function M.track_fx(tr)
   local A = M.fxapi(tr)
@@ -1057,6 +1057,7 @@ function M.track_fx(tr)
   local key = table.concat(parts, '|')
   local c = fx_cache[tr]
   if c and c.key == key then
+    M.bprof.fxhit = (M.bprof.fxhit or 0) + 1
     for _, e in ipairs(c.out) do
       if e.wave and A.GetNamedConfigParm then
         local ok, file = A.GetNamedConfigParm(tr, e.i, 'FILE0')
@@ -1066,6 +1067,7 @@ function M.track_fx(tr)
     return c.out
   end
   local out = build_track_fx(tr)
+  M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
   return out
 end

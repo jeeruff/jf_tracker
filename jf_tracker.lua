@@ -8665,6 +8665,13 @@ local function frame()
   local t_0 = reaper.time_precise()
   U.begin_frame()
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
+  -- 8 окт: колесо и протяжка (кнопка зажата, мышь сдвинулась) — тоже ввод:
+  -- прокрутка / выделение видны в этом же тике, а не в следующем
+  do
+    local mxy = gfx.mouse_x * 65536 + gfx.mouse_y
+    if gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0 or (gfx.mouse_cap & 3 ~= 0 and mxy ~= prof.mxy) then prof.input = true end
+    prof.mxy = mxy
+  end
   PV.tick()
   ctx.notes_dev_poll()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
@@ -8794,7 +8801,7 @@ local function frame()
   if changed then
     prof.rebuild = (t_1 - t_0) * 1000                              -- пересборка снимка (пульс hb)
     local b = model.bprof or {}
-    prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000)
+    prof.rb = ('env %.1f pool %.1f mod %.1f fx %.1f %d/%d'):format((b.envs or 0) * 1000, (b.pool or 0) * 1000, (b.mods or 0) * 1000, (b.fx or 0) * 1000, b.fxmiss or 0, (b.fxmiss or 0) + (b.fxhit or 0))
   end
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
   -- 8 окт: под инструментами (slices = split) — всегда, и на пустом слоте (заголовок + подсказка)
@@ -12328,6 +12335,7 @@ local function frame()
     -- результат попадал на экран только в следующем тике defer (~30 мс).
     -- Был ввод — кадр сразу ещё раз, в этом же тике (4 мс); повтор один,
     -- defer ставит уже он
+    gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0       -- 8 окт: не разобранное колесо не держит повтор кадра
     if (c > 0 or prof.input) and not prof.rerun then
       prof.rerun = true; prof.reruns = (prof.reruns or 0) + 1
       frame()
