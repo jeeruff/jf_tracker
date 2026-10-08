@@ -3024,13 +3024,13 @@ function D.frame(L, snap, rows, state, info)
         -- 8 окт: полоса микшера. Сверху вниз: dB, панорама (две строки
         -- зарезервированы всегда), фейдер. Фейдер ОДНОГО размера на всех
         -- треках: высота — 2/3 полосы, ширина — подписи + коробка 6 знаков;
-        -- эффекты с параметрами — под фейдером
+        -- эффекты с параметрами — сбоку (если влезают) / под фейдером
         local y1 = hy + 2 * L.rh + 1
         local H = L.hr_vp * L.rh
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local fh = math.max(math.floor(H / 2), H - 3 * L.rh)             -- место dB + панорамы + фейдера; 3 строки под эффекты
         local lblw0 = ms('-48') + 2
-        local fx_w = math.min(lw1 - 2 * L.pad - indent, lblw0 + 6 * L.cw)
+        local fx_w = math.min(lw1 - 2 * L.pad - indent, lblw0 + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY)
         local pyy = y1 + L.rh
@@ -3112,10 +3112,18 @@ function D.frame(L, snap, rows, state, info)
         gfx.rect(bx0 + 3, hy2, bw0 - 6, 1, 1)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
-        -- эффекты (часть микшера): всегда под фейдером, во всю ширину трека
+        -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
+        -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
         if info.fx_stack then
-          local ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
-          set(U.LINE); gfx.rect(ex, ey - 1, ew, 1, 1)
+          local sx1 = sx + fx_w + L.pad + 2
+          local ex, ey, ew, eh
+          if c.x + c.w - 2 - sx1 >= 5 * L.cw then
+            ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
+            set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1)
+          else
+            ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
+            set(U.LINE); gfx.rect(ex, ey - 1, ew, 1, 1)
+          end
           info.fx_stack(hover, col, ex, ex + ew, ey, math.max(1, math.floor(eh / L.rh)), true)
         end
       else
