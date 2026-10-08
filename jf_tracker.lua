@@ -4836,7 +4836,7 @@ ctx = {
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
-    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 end
+    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0 end
     return 0
   end,
   vbar_scroll = function(key, v)
@@ -4844,7 +4844,8 @@ ctx = {
     local mx = r and math.max(0, r.total - r.nvis) or v
     v = math.max(0, math.min(mx, v))
     if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
-    elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1) end
+    elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1)
+    elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur)) end   -- курсор — в видимое, иначе прокрутку вернёт
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -6749,6 +6750,7 @@ MX.init(U, ctx)
 DK.init(ctx)
 IK.init(ctx)
 MM.hint = function(...) return draw.hint(...) end
+MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
 MX.fold = state.mxfold
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
@@ -11472,6 +11474,9 @@ local function frame()
     local v = PV.vol; local db = v > 1e-6 and 20 * math.log(v, 10) or -40
     ctx.preview_set_vol(10 ^ (math.max(-40, math.min(6, db + (gfx.mouse_wheel > 0 and 1 or -1))) / 20))
     gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover.midimap then          -- 8 окт: колесо по списку MIDI learn — прокрутка
+    ctx.vbar_scroll('midimap', (MM.scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1)); gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.trs then
     ctx.trs_nudge(hover.trs.col, hover.trs.what, gfx.mouse_wheel > 0 and 1 or -1)

@@ -244,8 +244,11 @@ function MM.draw(U, L, x, y, w, h, focused, fit)
   -- две колонки, если влезают: имя | привязка | режим
   local colw = w
   local ncol = (w >= L.cw * 76 and #MM.TARGETS > nvis) and 2 or 1
-  colw = math.floor(w / ncol)
   local per = nvis * ncol
+  -- 8 окт: не влезают — справа скроллбар (тянуть, колесо), колонки уже на его ширину
+  local sbw = (#MM.TARGETS > per and MM.vbar) and 6 or 0
+  colw = math.floor((w - sbw) / ncol)
+  MM.per = per
   if MM.cur - 1 < MM.scroll then MM.scroll = MM.cur - 1 end
   if MM.cur - 1 >= MM.scroll + per then MM.scroll = MM.cur - per end
   local name_w = math.min(U.measure('transients ') + L.pad, math.floor(colw * 0.34))
@@ -277,6 +280,7 @@ function MM.draw(U, L, x, y, w, h, focused, fit)
     if hot and not hover then hover = { row = i, btn = 'learn' } end
     if MM.hint then MM.hint('midirow', cx, ry, colw - L.pad, L.rh, i) end
   end
+  if sbw > 0 then MM.vbar('midimap', x + w - sbw, top, sbw, nvis * L.rh, MM.scroll, per, #MM.TARGETS) end
   return hover
 end
 

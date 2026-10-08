@@ -11,6 +11,7 @@ V.CHANGES = {
     'fix: resizing the top module no longer resizes the main module (and squeezes the matrix) - it takes its own height',
     'scrollbars: one thickness everywhere (option scrollbar width, default 3 px), a bit brighter',
     'session clips: their hint row only with hints on',
+    'midi learn list: a scrollbar on the right when the targets do not fit (drag, wheel)',
     'harmonizer tab (next to midi): key (< > tonic, major / minor, auto from the track notes), the seven degree chords and their sevenths - click / 1..7 (Shift - seventh) writes one at the cursor row; the chord at the cursor and the chords of the track in the pattern; chord lane button (:chord)',
     'chords: :chord - the cursor track as one chord lane (names from its notes: A#m, G#6, Cmaj7/E; ¦ while they sound, OFF); :chord Cm7 - a harmonizer: the chord written at the cursor row (replaces the notes starting there; length as theirs, else up to the next notes, at most a bar)',
     'matrix: the playing pattern shows a moving playhead (progress line + tick) in one-row view too',
