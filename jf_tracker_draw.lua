@@ -3185,7 +3185,7 @@ function D.frame(L, snap, rows, state, info)
       local full = ms('session') + ms('effects') + 6 <= bw
       local x1 = small(bx, hy + 1 + L.rh, full and 'session' or 'sess', 'session', info.clipsview, 'viewbtn')
       local x2 = small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
-      if x2 + ms('par') + 2 <= bx + bw then small(x2, hy + 1 + L.rh, 'par', 'fxparams', info.fxparams, 'viewbtn') end   -- 8 окт: параметры TCP под эффектами
+      local _ = x2   -- 8 окт: кнопка param — в самой строке effects (у подписи fx), не в уголке
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
     local ny = hy + 1 + 2 * L.rh

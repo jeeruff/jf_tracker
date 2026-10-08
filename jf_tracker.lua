@@ -4127,7 +4127,7 @@ ctx = {
     local ok, on = edit.fx_param_tcp(tr, fx, pi)
     ctx.tcp_cache, ctx.hdr_cache = {}, {}
     if ok and on and not state.fxparams then state.fxparams = true; state.fxrow = true; reaper.SetExtState(EXT, 'fxparams', '1', true); reaper.SetExtState(EXT, 'fxrow', '1', true); relayout() end
-    vim.msg = ok and ((name or 'parameter') .. (on and ': in the track header (par)' or ': removed from the track header')) or 'track header: failed'
+    vim.msg = ok and ((name or 'parameter') .. (on and ': in the track header (param)' or ': removed from the track header')) or 'track header: failed'
   end,
   -- меню параметра (8 окт): модуляция, автоматизация, шапка трека, умолчание
   param_menu_items = function(tr, fx, pi, pname, add)
@@ -4155,7 +4155,7 @@ ctx = {
       if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
     end)
     add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(tr, fx, pi, true) end); state.envs = true; model.invalidate() end)
-    add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in track header (TCP, par)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end)
+    add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end)
     add('Default value', function() edit.fx_param_default(tr, fx, pi); vim.msg = pname .. ': default' end)
     add('--', function() end)
   end,
@@ -5091,7 +5091,7 @@ ctx = {
       { key = 'pmthumb', label = 'pm card thumbnail', kind = 'toggle', desc = 'the preview picture on the cards (off - text only, more cards)', get = function() return state.pmthumb ~= false end, set = function(v) state.pmthumb = v; if ctx.PM then ctx.PM.show_thumb = v end end },
       { key = 'pmicon', label = 'pm card daw mark', kind = 'toggle', desc = 'the two-letter DAW mark (Ab, FL, Lg ...) right of the name', get = function() return state.pmicon ~= false end, set = function(v) state.pmicon = v; if ctx.PM then ctx.PM.show_icon = v end end },
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
-      flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). Right click / Esc - off'),
+      flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) to ~/Pictures/screenshots, c - the same for Claude (REAPER/jf_tracker_shot.png + the report). Right click / Esc - off'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
@@ -6535,6 +6535,10 @@ local function hint_go(t)
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
+  elseif t.kind == 'viewbtn' and d == 'fxparams' then
+    state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
+  elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
+  elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
@@ -6941,7 +6945,7 @@ function ctx.context_items(hover)
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
       add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end)
-      add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, par)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
+      add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
       add('--', function() end)
     end
     -- плагин внутри контейнера (6 окт): ПКМ по его колонке / строке
@@ -7944,6 +7948,7 @@ local function poll_cmd()
     for _, f in ipairs(t and t.fx or {}) do if f.i == addr then for _, p in ipairs(f.params or {}) do out[#out + 1] = tostring(p.name) .. ':' .. tostring(p.i) .. ':' .. tostring(p.fx) end end end
     reaper.SetExtState(EXT, 'dbg', 'dbp ' .. #out .. ' | ' .. table.concat(out, ' '), false)
   elseif name == 'st' then reaper.SetExtState(EXT, 'dbg', ('focus %s mode %s pending %s op %s clips %s'):format(state.focus, vim.mode, tostring(vim.pending), tostring(vim.op), tostring(state.clipsview)), false)   -- тест: состояние фокуса (только чтение)
+  elseif name == 'shot' then ctx.shot_req = 'claude'                -- тест (8 окт): снимок окна трекера своим кодером
   elseif name == 'notesadd' then
     -- 8 окт: дописать файл CHECK.md (список проверки) в конец заметок проекта
     -- активной вкладки; открытый редактор заметок перечитывает их
@@ -9029,6 +9034,18 @@ local function frame()
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
+    do   -- 8 окт: кнопка param (параметры TCP под эффектами) — в строке effects, правее «fx»
+      local lab = (U.measure('fx param') + 4 * L.pad <= L.label_w) and 'param' or 'p'
+      local bx = L.matrix_w + 2 * L.pad + U.measure('fx')
+      local bw = U.measure(lab) + 2 * L.pad
+      local on = state.fxparams
+      local hot = mx >= bx and mx < bx + bw and my >= y0 + 1 and my < y0 + 1 + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y0 + 1, bw, L.rh - 1, 1)
+      U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y0 + 1, bw, L.rh - 1, 0)
+      U.text(bx + L.pad, y0 + 1, lab, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      if hot then hover.viewbtn = 'fxparams' end
+      ctx.hint('viewbtn', bx, y0 + 1, bw, L.rh, 'fxparams')
+    end
     local MAXL = state.fxparams and 14 or 6
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
@@ -9378,7 +9395,7 @@ local function frame()
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
   elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
-  elseif hover.viewbtn == 'fxparams' then state.status = 'par: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
+  elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'session' then state.status = 'session: clips instead of the rows - scenes x tracks, Enter launches (zs, quick option clips)'
@@ -11238,6 +11255,36 @@ local function frame()
     gfx.mouse_wheel = 0
   end
 
+  -- снимок measure (8 окт): s — в ~/Pictures/screenshots, c — для Claude
+  -- (файл jf_tracker_shot.png в ресурсах REAPER + отчёт в журнал debug);
+  -- прямоугольник линейки, без неё — всё окно. Пиксели — из готового кадра
+  -- (gfx.getpixel), PNG — своим кодером (без внешних программ)
+  if ctx.shot_req then
+    local req = ctx.shot_req; ctx.shot_req = nil
+    MX.PNG = MX.PNG or dofile(DIR .. '/jf_tracker_png.lua')
+    local x, y, w, h = 0, 0, gfx.w, gfx.h
+    local M = ctx.meas
+    if M and M.a and M.b then
+      x, y = math.floor(math.min(M.a[1], M.b[1])), math.floor(math.min(M.a[2], M.b[2]))
+      w, h = math.floor(math.abs(M.b[1] - M.a[1])) + 1, math.floor(math.abs(M.b[2] - M.a[2])) + 1
+    end
+    if w > 4 and h > 4 then
+      local d0 = gfx.dest
+      gfx.dest = tonumber(state.fps) and 1021 or -1
+      local ok, rgb = pcall(MX.PNG.grab, x, y, w, h)
+      gfx.dest = d0
+      local path = req == 'claude' and (reaper.GetResourcePath() .. '/jf_tracker_shot.png')
+        or ((os.getenv('HOME') or '') .. '/Pictures/screenshots/jf_tracker_' .. os.date('%Y-%m-%d_%H-%M-%S') .. '.png')
+      local fh = ok and io.open(path, 'wb')
+      if fh then
+        fh:write(MX.PNG.encode(w, h, rgb)); fh:close()
+        local rep = ('shot %s %dx%d at %d,%d -> %s%s'):format(req, w, h, x, y, path, M and M.b and (' | ' .. (reaper.GetExtState(EXT, 'measure') or '')) or '')
+        reaper.SetExtState(EXT, 'shot', rep, false)
+        if ctx.dlog then ctx.dlog(rep) end
+        vim.msg = req == 'claude' and ('shot for Claude: ' .. w .. 'x' .. h .. ' - say "смотри снимок"') or ('shot saved: ' .. path:match('[^/]+$'))
+      else vim.msg = 'shot: cannot write ' .. path end
+    end
+  end
   draw.pmark('blit, gfx.update')
   if tonumber(state.fps) then
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
@@ -11486,6 +11533,7 @@ local function frame()
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
+  if state.measure and (c == ('s'):byte() or c == ('c'):byte()) then ctx.shot_req = c == ('s'):byte() and 'file' or 'claude'; c = 0 end   -- 8 окт: снимок линейки
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
   -- Tab (7 окт): Tab — трекер ↔ session, Shift+Tab — фокус назад, Option+Tab /
   -- Option+Shift+Tab — фокус по модулям по кругу (был Tab), Ctrl+Tab — вкладки

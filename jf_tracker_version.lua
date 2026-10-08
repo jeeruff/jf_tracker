@@ -5,14 +5,15 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
-    'right click on an fx or a parameter (effects row, par sliders, router, DSP): the fx / parameter menu - LFO, ACS, link, modulation window, automation envelope, show in the track header (TCP), default; bypass, window, show in DSP, rename, remove',
+    'measure: s - PNG of the measured box (or the window) to ~/Pictures/screenshots, c - for Claude (REAPER/jf_tracker_shot.png + report in the debug log); own PNG encoder, no external programs',
+    'right click on an fx or a parameter (effects row, param sliders, router, DSP): the fx / parameter menu - LFO, ACS, link, modulation window, automation envelope, show in the track header (TCP), default; bypass, window, show in DSP, rename, remove',
     'parameter default: the native param.X.default_value first (REAPER 7), a temporary instance only as a fallback; TCP parameters read with CountTCPFXParms / GetTCPFXParm',
     'lib zone: samples and library patterns share one tail - a pattern sent to the lib goes after all samples, a new sample after all lib patterns (a region lay over the samples)',
     'smart slice (s s in the item tab): transients + the brightness of each hit - a slice only on a contrasting hit (kick, then the next bright one - hat / snare / perc, then dark again), repeats merge',
     'slice preview plays to the end: stops by the position of the preview itself, not by a timer from the key press; with slice playthru on it plays to the end of the sample',
     'slices list: own Sxx column (key | Sxx | name | length)',
     'keyboard in the transport strip only with hints on, always minimal (a key per letter)',
-    'par (next to fx in the corner): the parameters shown in the REAPER track controls (TCP) under their fx in the effects row - thin horizontal sliders (drag, wheel, dblclick: default); a click on the fx name opens its window',
+    'param (a button on the effects row, next to fx): the parameters shown in the REAPER track controls (TCP) under their fx in the effects row - thin horizontal sliders (drag, wheel, dblclick: default); a click on the fx name opens its window',
     'router in the DSP panel: a scrolled graph stays inside the module (drawn into its own buffer), nodes outside it do not catch the mouse or f labels',
     'top panel above DSP is as wide as the tracker; with the browser on the right the matrix runs down to the fx list',
     'matrix without an =END marker is long: 512 free bars from =START',
