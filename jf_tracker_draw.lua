@@ -429,7 +429,9 @@ function D.layout(snap, state, nregions)
   -- 7 окт: модуль клипов — по умолчанию 30 строк, не больше половины места
   -- под шапками; высоту тянут мышью за нижнюю границу (state.ss_px)
   -- строка effects (7 окт): эффекты и сенды трека — под шапками, над клипами
-  L.fxrow_h = state.fxrow and (L.rh + 2) or 0
+  -- 8 окт: узкий трек — эффекты столбиком; высота строки — по самому
+  -- длинному столбику прошлого кадра (D.fxrow_lines ставит main), до 6 строк
+  L.fxrow_h = state.fxrow and ((D.fxrow_lines or 1) * L.rh + 2) or 0
   L.fxrow_y = L.header_y + L.header_h
   L.sess_y = L.fxrow_y + L.fxrow_h
   -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места

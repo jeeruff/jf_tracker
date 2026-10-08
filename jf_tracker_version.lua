@@ -7,7 +7,7 @@ V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'top panel above DSP is as wide as the tracker; with the browser on the right the matrix runs down to the fx list',
     'matrix without an =END marker is long: 512 free bars from =START',
-    'effects row: a name that does not fit is shortened instead of only +N',
+    'effects row: wide track - fx in a line; when they do not all fit - stacked, one per line (the row grows to the longest stack, up to 6)',
     'the automation tab selects the automation row of the lib: the slices module lists the automation items of the track; leaving the tab goes back to the slices',
     'browser on the left: the matrix / browser split is dragged with the mouse (dblclick: auto); the matrix hint bar sits above the split, not on the browser',
     'narrow window: clips stay inside their module, the cells at the edge are cut like tracker columns',

@@ -8908,6 +8908,10 @@ local function frame()
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
     local mx, my = gfx.mouse_x, gfx.mouse_y
+    local MAXL = 6
+    local need = 1
+    -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
+    -- по эффекту на строку (имя по ширине колонки), высота — по самому длинному
     for _, c in ipairs(L.cols) do
       if c.x and c.col then
         local hi = ctx.hdr_info(c.col)
@@ -8915,23 +8919,45 @@ local function frame()
         local list = {}
         for k, it in ipairs(hi.fx or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrfx' } end
         for k, it in ipairs(hi.sends or {}) do list[#list + 1] = { it = it, k = k, kind = 'hdrsend' } end
-        for n, e in ipairs(list) do
-          local lab = ctx.fit(e.it.name or '', L.cw * 9)
-          local w2 = U.measure(lab) + 2 * L.pad
-          local more = #list - n + 1
-          -- 8 окт: не влезает целиком — имя короче (от 3 знаков), а не сразу «+N»
-          local avail = right - cx - (more > 1 and U.measure('+9') + 2 or 0)
-          if w2 > avail and avail >= L.cw * 3 + 2 * L.pad then lab = ctx.fit(e.it.name or '', avail - 2 * L.pad); w2 = U.measure(lab) + 2 * L.pad end
-          if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0 + 1, '+' .. more, U.CYAN); break end
-          local hot = mx >= cx and mx < cx + w2 and my >= y0 and my < y0 + L.rh
-          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y0 + 1, w2, L.rh - 1, 1)
-          U.text(cx + L.pad, y0 + 1, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
+        local sum = 0
+        for _, e in ipairs(list) do sum = sum + U.measure(ctx.fit(e.it.name or '', L.cw * 9)) + 2 * L.pad + 2 end
+        local vert = #list > 1 and sum > right - cx
+        local function chip(e, x, y, w2, lab)
+          local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
+          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, y, w2, L.rh - 1, 1)
+          U.text(x + L.pad, y, lab, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
           if hot then hover[e.kind] = { col = c.col, k = e.k, it = e.it } end
-          ctx.hint(e.kind, cx, y0 + 1, w2, L.rh, { col = c.col, k = e.k })
-          cx = cx + w2 + 2
+          ctx.hint(e.kind, x, y, w2, L.rh, { col = c.col, k = e.k })
+        end
+        if vert then
+          local lines = math.min(#list, MAXL)
+          need = math.max(need, lines)
+          local shown = math.min(#list, draw.fxrow_lines or 1)
+          for n = 1, shown do
+            local e = list[n]
+            local y = y0 + 1 + (n - 1) * L.rh
+            if n == shown and #list > shown then
+              U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
+            else
+              local lab = ctx.fit(e.it.name or '', right - cx - 2 * L.pad)
+              chip(e, cx, y, right - cx, lab)
+            end
+          end
+        else
+          for n, e in ipairs(list) do
+            local lab = ctx.fit(e.it.name or '', L.cw * 9)
+            local w2 = U.measure(lab) + 2 * L.pad
+            local more = #list - n + 1
+            local avail = right - cx - (more > 1 and U.measure('+9') + 2 or 0)
+            if w2 > avail and avail >= L.cw * 3 + 2 * L.pad then lab = ctx.fit(e.it.name or '', avail - 2 * L.pad); w2 = U.measure(lab) + 2 * L.pad end
+            if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0 + 1, '+' .. more, U.CYAN); break end
+            chip(e, cx, y0 + 1, w2, lab)
+            cx = cx + w2 + 2
+          end
         end
       end
     end
+    if need ~= (draw.fxrow_lines or 1) then draw.fxrow_lines = need; relayout() end
   end
   -- session (7 окт) — 7 строк под шапками треков (шапки живые, тот же масштаб
   -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔
