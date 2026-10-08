@@ -3640,7 +3640,7 @@ function D.frame(L, snap, rows, state, info)
         local pl, pr = info.peaks(c.col)
         local v = math.min(1, math.max(pl or 0, pr or 0))
         if v > 0 then
-          local x0, w0 = c.x + 2, math.max(2, math.floor(c.w * 0.3))
+          local x0, w0 = c.x + 2, math.max(2, math.min(c.w - 4, 3 * L.cw))   -- 8 окт: одной ширины на всех треках (было — треть колонки)
           for _, sg in ipairs({ { 0, 0.6, U.GREEN }, { 0.6, 0.85, U.AMBER }, { 0.85, 1, U.RED } }) do
             local s0, s1 = math.floor(sg[1] * maxh), math.floor(math.min(v, sg[2]) * maxh)
             if s1 > s0 then gfx.set(sg[3][1], sg[3][2], sg[3][3], 0.45); gfx.rect(x0, math.max(L.body_y, by - s1), w0, s1 - s0, 1) end
