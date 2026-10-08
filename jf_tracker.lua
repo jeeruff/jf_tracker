@@ -4354,16 +4354,14 @@ ctx = {
     vim.msg = ('clip deleted: %s / %s (%d items, u - undo)'):format(col.name, MX.SS.slot_name(rg, ri), #items)
   end,
   -- клип под курсором (6 окт): его сэмпл — во вкладке item, зона = начало / конец клипа, L — точки лупа
-  -- 8 окт: hover — клип под мышью показывается временно: мышь ушла с сетки —
-  -- вид и инструмент возвращаются (раньше клип «залипал» во вкладке item,
-  -- линии L и пропавшие свойства — до случайного следующего наведения).
-  -- Клик / курсор клип-мода — выбор, держится
-  ss_focus = function(ri, ci, grid, hover)
+  -- выбор клипа (клик / курсор клип-мода): вкладка item показывает клип;
+  -- prev — инструмент до клипа (вернуть, когда фокус уйдёт)
+  ss_focus = function(ri, ci, grid)
     local cell = grid and grid[ri] and grid[ri][ci]
     local head
     for _, e in ipairs(cell and cell.ev or {}) do if e.head then head = e.head; break end end
     local prev = state.ss_clip and state.ss_clip.prev or vim.inst
-    state.ss_clip = head and { item = head.item, hover = hover, prev = hover and prev or nil } or nil
+    state.ss_clip = head and { item = head.item, prev = prev } or nil
     if not head then return end
     local n = snap and snap.inst_of and snap.inst_of[head.item]
     if n then
@@ -9713,16 +9711,13 @@ local function frame()
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
   -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
-  if hover.sess and snap then
-    local k = hover.sess.ri .. ':' .. hover.sess.ci
-    if k ~= state.ss_hkey then state.ss_hkey = k; ctx.ss_focus(hover.sess.ri, hover.sess.ci, ctx.ss_G(), true) end
-  else
-    state.ss_hkey = nil
+  -- 8 окт: клип во вкладке item — только выбранный (клик / курсор клип-мода),
+  -- пока фокус в клипах или во вкладке (правка зоны клипа); фокус ушёл —
+  -- клип снят, инструмент прежний. Наведение мыши клип не показывает
+  if state.ss_clip and state.focus ~= 'session' and state.focus ~= 'top' and not state.ss_big then
     local cl = state.ss_clip
-    if cl and cl.hover then
-      state.ss_clip, state.ss_zone = nil, nil
-      if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
-    end
+    state.ss_clip, state.ss_zone = nil, nil
+    if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
   end
   do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
     local e = ctx.eq_drag or hover.dspeq

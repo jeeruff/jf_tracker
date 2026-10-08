@@ -5,7 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
-    'item tab: a clip under the mouse is shown only while the mouse is over the clips (leaving restores the instrument and its properties); clip zone lines only on the wave of the clip file; no clip view when the clips view is closed',
+    'item tab: a clip is shown only when selected (click / clip-mode cursor) and while the focus is on the clips or the item tab; leaving restores the instrument; hovering does not switch it; clip zone lines only on the wave of the clip file',
     'measure: s - PNG of the measured box (or the window) next to the system screenshots, named like them + _jftracker (path + report in the debug log); own PNG encoder, no external programs',
     'right click on an fx or a parameter (effects row, param sliders, router, DSP): the fx / parameter menu - LFO, ACS, link, modulation window, automation envelope, show in the track header (TCP), default; bypass, window, show in DSP, rename, remove',
     'parameter default: the native param.X.default_value first (REAPER 7), a temporary instance only as a fallback; TCP parameters read with CountTCPFXParms / GetTCPFXParm',
