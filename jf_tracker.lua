@@ -169,7 +169,8 @@ local state = {
   fxparams = flag('fxparams', false),
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
-  sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,   -- толщина скроллбаров, px (8 окт)
+  sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
+  phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 4,   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
@@ -445,7 +446,7 @@ local function save_win()
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
-  S('sbw', tostring(state.sbw or 3)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
+  S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
@@ -5446,6 +5447,7 @@ ctx = {
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
+      { key = 'phtail', label = 'playhead tail', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, like a play cursor with a trail; the colour is the play cursor of the REAPER theme (0 - just the row)', get = function() return state.phtail or 4 end, set = function(v) state.phtail = v end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),

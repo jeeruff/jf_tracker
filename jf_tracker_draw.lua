@@ -41,7 +41,10 @@ function D.init(u, peaks_fn, matrix)
   D.PEAKB, D.PEAKMB = U.mix(D.PEAK, U.BG, 0.62), U.mix(D.PEAK, U.BG, 0.8)   -- волна фоном (3 окт)
   D.BAR   = U.mix(U.BG, U.TEXT, 0.62)
   D.BEAT  = U.DIM
-  D.PLAY  = U.tint(U.AMBER, 0.22)
+  -- плейхед (8 окт): цвет курсора воспроизведения темы REAPER (playcursor_color),
+  -- строка — намёком; хвост — сыгранные строки выше, тают (Options: playhead tail)
+  D.PLAYC = U.readable(U.theme('playcursor_color', U.AMBER), U.BG, 3.0)
+  D.PLAY  = U.tint(D.PLAYC, 0.22)
   D.CUR   = U.AMBER
   D.CURROW = U.mix(U.BG, U.TEXT, 0.16)
   D.CURTOP = U.AMBER                            -- яркая верхняя кромка строки курсора
@@ -2907,6 +2910,7 @@ end
 
 function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
+  D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 4))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
   D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
@@ -3503,7 +3507,11 @@ function D.frame(L, snap, rows, state, info)
   -- automation item лежат поверх, сверху — только зелёная линия курсора
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
-    if r.row == ph then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    if ph then
+      local k = ph - r.row
+      if k == 0 then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1)
+      elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.22 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+    end
     if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
   end
   -- рамки items — ДО строк (5 окт): фоном, под волной и текстом; раньше
