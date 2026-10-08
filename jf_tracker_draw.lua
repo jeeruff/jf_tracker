@@ -494,6 +494,14 @@ function D.layout(snap, state, nregions)
     local ybot = gfx.h - L.status_h                 -- до самого низа: DSP — правее браузера (7 окт)
     L.lside_rect = { 0, split + D.SEPW, L.matrix_w - D.SEPW, ybot - split - D.SEPW }
   end
+  -- 8 окт: верхняя панель над DSP (mid) — шириной с трекер: слева матрица
+  -- (браузер справа — матрица тянется вниз до DSP / списка эффектов) или
+  -- браузер слева (он и так до низа)
+  L.top_x0, L.mx_ext = 0, nil
+  if L.toppos == 'mid' and L.top_h > 0 and L.matrix_w > 0 and (L.browser_left or (not state.mx_hidden and L.ctrlpos ~= 'mid')) then
+    L.top_x0 = L.matrix_w
+    if not L.browser_left then L.mx_bot = L.dsp_y - (L.hint_h or 0); L.mx_ext = true end
+  end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
@@ -1853,12 +1861,13 @@ local function draw_topbar(L, info)
   local H = L.top_h
   -- 8 окт: над DSP при браузере слева — правее левой колонки (браузер идёт
   -- до низа окна и закрывал вкладки и начало волны)
-  local X0 = (not L.top_first and L.browser_left) and L.matrix_w or 0
+  local X0 = L.top_x0 or 0
   set(U.PANEL); gfx.rect(X0, 0, L.win_w - X0, H, 1)
   -- граница модуля (3 окт): наверху — линия снизу (к трекеру); mid / bottom —
   -- сверху (к трекеру или DSP и списку эффектов), снизу её даёт DSP / статус —
   -- иначе стык без линии или две линии рядом
   set(D.SEP); gfx.rect(X0, (not L.top_first) and 0 or H - 2, gfx.w - X0, D.SEPW, 1)
+  if X0 > 0 then gfx.rect(X0 - 2, 0, D.SEPW, H, 1) end
   local mx, my = gfx.mouse_x, gfx.mouse_y
 
   if not L.ctrl_alone then draw_ctrl(L, info, H, hover) end
@@ -2804,7 +2813,7 @@ function D.frame(L, snap, rows, state, info)
       gfx.mouse_y, D.hint, gfx.dest = my0, hint0, dest0
       if not ok then error(res, 0) end
       th = res
-      local bx0 = L.browser_left and L.matrix_w or 0   -- левая колонка браузера — не затирать
+      local bx0 = L.top_x0 or 0   -- левая колонка (браузер / матрица) — не затирать
       gfx.blit(1020, 1, 0, bx0, 0, gfx.w - bx0, L.top_h, bx0, ty, gfx.w - bx0, L.top_h)
       -- прямоугольники для фокуса и меню — в координаты окна
       if L.top_rect then L.top_rect[2] = L.top_rect[2] + ty end
@@ -3865,7 +3874,7 @@ function D.frame(L, snap, rows, state, info)
   -- строки подсказок трекера и матрицы — в резерве под телом (опция hints)
   if (L.hint_h or 0) > 0 then
     local hy2 = L.under_y
-    if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, L.lside_split and L.mx_bot or hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
+    if L.matrix_w > 0 and not state.mx_hidden then D.hint_bar(L, 0, (L.lside_split or L.mx_ext) and L.mx_bot or hy2, L.matrix_w - 1, (info.hint_bars or function() end)('matrix'), info.focus == 'matrix') end
     -- под полосой транспорта — подсказки её элементов, каждая под своим (5 окт)
     if not (L.piano_h > 0 and L.tppos == 'tracker' and info.hint_bars and D.strip_hints(L, L.matrix_w, hy2, L.win_w - L.matrix_w, info.focus == 'tracker')) then
       D.hint_bar(L, L.matrix_w, hy2, L.win_w - L.matrix_w, (info.hint_bars or function() end)(info.vmode == 'insert' and 'insert' or 'tracker'), info.focus == 'tracker')
@@ -4522,7 +4531,7 @@ function D.frame(L, snap, rows, state, info)
     local rects = {
       -- до низа модуля (5 окт): статус в трекере и строка подсказок — внутри рамки
       tracker = { tx0, hy, W - tx0, (L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy },
-      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.lside_split or L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
+      matrix = (L.matrix_w > 0 and not state.mx_hidden) and { 0, hy, L.matrix_w, (L.lside_split or (L.mx_ext and L.dsp_y) or L.trk_bot or (L.body_y + L.body_h + L.low_h)) - hy } or nil,
       browser = (L.lside_rect and { L.lside_rect[1], L.lside_rect[2], L.lside_rect[3], L.lside_rect[4] }) or (L.side_w > 0 and { L.side_x, (L.side_y0 or 0) + (L.inst_side_h or 0) + 2, L.side_w, gfx.h - L.status_h - (L.side_y0 or 0) - (L.inst_side_h or 0) - 2 }) or nil,
       top = L.top_h > 0 and L.top_rect or nil,
       ctrl = L.top_h > 0 and L.ctrl_area or nil,

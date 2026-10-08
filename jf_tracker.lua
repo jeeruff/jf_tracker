@@ -2435,9 +2435,16 @@ ctx = {
   -- свободное место между ними и до =END — строки по такту (rg.gap = true),
   -- имя такой строки (n / dblclick) создаёт регион на этом такте. Кэш по
   -- таблице регионов, LPB и маркерам.
+  MX_BARS = 512,
   sequence = function()
     local s0 = regions.start_pos or 0
     local s1 = regions.end_pos
+    -- 8 окт: без =END матрица длинная — 512 тактов свободных строк от =START
+    -- (маркер не ставится; :end переносит конец)
+    if not s1 then
+      local _, m0 = reaper.TimeMap2_timeToBeats(0, s0)
+      s1 = reaper.TimeMap2_beatsToTime(0, 0, (m0 or 0) + ctx.MX_BARS)
+    end
     local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1)
     if seq_cache.key == key then return seq_cache.seq end
     local out, real = {}, {}
@@ -8912,6 +8919,9 @@ local function frame()
           local lab = ctx.fit(e.it.name or '', L.cw * 9)
           local w2 = U.measure(lab) + 2 * L.pad
           local more = #list - n + 1
+          -- 8 окт: не влезает целиком — имя короче (от 3 знаков), а не сразу «+N»
+          local avail = right - cx - (more > 1 and U.measure('+9') + 2 or 0)
+          if w2 > avail and avail >= L.cw * 3 + 2 * L.pad then lab = ctx.fit(e.it.name or '', avail - 2 * L.pad); w2 = U.measure(lab) + 2 * L.pad end
           if cx + w2 > right - (more > 1 and U.measure('+9') + 2 or 0) then U.text(right - U.measure('+' .. more), y0 + 1, '+' .. more, U.CYAN); break end
           local hot = mx >= cx and mx < cx + w2 and my >= y0 and my < y0 + L.rh
           U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y0 + 1, w2, L.rh - 1, 1)
