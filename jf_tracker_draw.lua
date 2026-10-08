@@ -1955,7 +1955,7 @@ local function draw_topbar(L, info)
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
   for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
-    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'automation') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or t)
+    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'automation') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or (t == 'harm' and 'harmonizer') or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
     -- 6 окт: вкладки с y = 2, как кнопки главного модуля — пиксель фона под кромкой
@@ -2040,6 +2040,9 @@ local function draw_topbar(L, info)
         hover.sess, hover.sessrow, hover.sesscol, hover.sessbtn = hv.sess, hv.sessrow, hv.sesscol, hv.sessbtn
       end
     end
+  elseif tab == 'harm' then
+    -- harmonizer (8 окт, jf_tracker_harm.lua): лад, ступени, аккорды трека
+    if info.harm_draw then hover.harm = info.harm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'midi' then
     -- MIDI learn (jf_tracker_midimap.lua): цели слайсера и их CC / ноты
     if info.midi_draw then hover.midimap = info.midi_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end

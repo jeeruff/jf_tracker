@@ -38,6 +38,10 @@ local B = dofile(DIR .. '/jf_tracker_browser.lua')
 local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
+MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+MMX.HM.init(U, MMX.CH)
+MMX.HM.root = tonumber(reaper.GetExtState('jf_tracker', 'harmroot')) or 0
+MMX.HM.minor = reaper.GetExtState('jf_tracker', 'harmminor') == '1'
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
@@ -2542,7 +2546,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'scopes', 'master' }   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'scopes', 'master' }   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -4318,6 +4322,51 @@ ctx = {
       end
     end
     return heads, pitches
+  end,
+  -- вкладка harmonizer (8 окт): высоты нот трека курсора, аккорды паттерна,
+  -- действие кнопки / клавиши
+  harm_pitches = function(col)
+    local out = {}
+    for _, lane in ipairs(col and col.lanes or {}) do
+      for _, sub in ipairs(lane.subs or {}) do
+        for _, c in pairs(sub) do if type(c) == 'table' and c.kind == 'midi' and c.pitch then out[#out + 1] = c.pitch end end
+      end
+    end
+    return out
+  end,
+  harm_info = function()
+    local col = cur_col()
+    local inf = { col_name = col and col.name, lane = col and state.folds[col.guid] == 'chord', list = {} }
+    if not col then return inf end
+    local _, here = ctx.chord_heads(col, vim.cur.row)
+    inf.here = #here > 0 and MMX.CH.name(here) or nil
+    local rows = {}
+    for _, lane in ipairs(col.lanes or {}) do
+      for _, sub in ipairs(lane.subs or {}) do
+        for r, c in pairs(sub) do if type(c) == 'table' and c.kind == 'midi' and c.row0 == r then rows[r] = true end end
+      end
+    end
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local r0 = rg and model.row_of_time(rg.pos, state.lpb) or -1e9
+    local r1 = rg and model.row_of_time(rg.rgnend or rg.pos, state.lpb) or 1e9
+    local list = {}
+    for r in pairs(rows) do if r >= r0 and r < r1 then list[#list + 1] = r end end
+    table.sort(list)
+    for i, r in ipairs(list) do
+      if i > 48 then break end
+      local _, ps = ctx.chord_heads(col, r)
+      inf.list[#inf.list + 1] = { row = r, name = MMX.CH.name(ps) or '?', cur = r == vim.cur.row }
+    end
+    return inf
+  end,
+  harm_do = function(r)
+    if r == 'leave' then ctx.set_focus('tracker'); return end
+    if type(r) == 'table' then
+      if r.write then ctx.chord_cmd(r.write) elseif r.lane then ctx.chord_cmd('') end
+    end
+    reaper.SetExtState('jf_tracker', 'harmroot', tostring(MMX.HM.root), true)
+    reaper.SetExtState('jf_tracker', 'harmminor', MMX.HM.minor and '1' or '0', true)
+    if r == true then vim.msg = 'harmonizer: ' .. MMX.HM.key_name() end
   end,
   chord_cmd = function(arg)
     local col = cur_col(); if not col then vim.msg = 'chord: no track under the cursor'; return end
@@ -6769,6 +6818,7 @@ local function hint_go(t)
     state.kslider = { col = d.col, what = d.what }
     if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
+  elseif t.kind == 'harm' then ctx.set_focus('top'); state.toptab = 'harm'; ctx.harm_do(MMX.HM.click(d, ctx.harm_pitches(cur_col())))
   elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
     if reaper.ValidatePtr(d.col.track, 'MediaTrack*') then ctx.fader_jump(d.col, d.db, ctx.glide) end
   elseif t.kind == 'trsbtn' then
@@ -9067,6 +9117,9 @@ local function frame()
       return GD.draw(Lx, x, y, w, h, snap, seq, { play_row = ph_row, queued = MX.queued, garden_on = garden.f and garden.f.on },
                      state.focus == 'top' and state.toptab == 'garden')
     end,
+    harm_draw = function(Lx, x, y, w, h)
+      return MMX.HM.draw(Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'harm', ctx.harm_info(), ctx.fit, ctx.hint)
+    end,
     midi_draw = function(Lx, x, y, w, h)
       local hv = MM.draw(U, Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'midi', ctx.fit)
       return hv
@@ -9609,6 +9662,7 @@ local function frame()
   elseif hover.garden and hover.garden.ox then
     local ch = garden.f and garden.f.cells[hover.garden.oy][hover.garden.ox] or '.'
     state.status = ('orca (%d,%d) %s'):format(hover.garden.ox, hover.garden.oy, ORCA.DOC[ch] or ORCA.DOC[ch:upper()] or 'click to place the cursor, type to write')
+  elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
   elseif hover.midimap then
     local t = MM.TARGETS[hover.midimap.row]
     state.status = t and (t.label .. ': ' .. t.d .. (hover.midimap.btn == 'mode' and ' - click: abs / rel / rel64' or ' - click: select, click again / Enter: learn, d: clear')) or ''
@@ -10074,6 +10128,9 @@ local function frame()
         GD.ocur = { x = hover.garden.ox, y = hover.garden.oy }
         click = { t = now2, zone = 'gardenorca' }
       end
+    elseif hover.harm then
+      ctx.set_focus('top'); ctx.harm_do(MMX.HM.click(hover.harm, ctx.harm_pitches(cur_col())))
+      click = { t = now2, zone = 'harm' }
     elseif hover.midimap then
       ctx.set_focus('top')
       local i = hover.midimap.row
@@ -12079,6 +12136,9 @@ local function frame()
           if not MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then
             if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
+        elseif state.toptab == 'harm' then
+          local r = MMX.HM.key(c, ctx.harm_pitches(cur_col()))
+          if r then ctx.harm_do(r) else return vim.key(c) end
         elseif state.toptab == 'midi' then
           local r = MM.key(c)
           if r == 'leave' then ctx.set_focus('tracker')
