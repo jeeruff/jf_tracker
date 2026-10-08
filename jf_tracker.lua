@@ -169,6 +169,7 @@ local state = {
   fxparams = flag('fxparams', false),
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
+  sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,   -- толщина скроллбаров, px (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -439,7 +440,7 @@ local function save_win()
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
-  S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
+  S('sbw', tostring(state.sbw or 3)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
@@ -5389,6 +5390,7 @@ ctx = {
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
+      { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
@@ -9419,9 +9421,9 @@ local function frame()
     U.set(U.BG); gfx.rect(x0 + 2, y0, w0 - 4, h0, 1)
     -- 7 окт: подсказки — обычным серым хинт-баром внизу модуля (клавиши жёлтым),
     -- как у остальных модулей; в фокусе — клип-мод
-    local hb = L.rh + 1
+    local hb = state.hints and (L.rh + 1) or 0                -- 8 окт: подсказки клипов — только с hints
     local hv = MX.SS.draw_body(L, x0, L.label_w, y0, h0 - hb, L.cols, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise(), reaper.GetPlayPosition(), {})
-    draw.hint_bar(setmetatable({ hint_h = hb }, { __index = L }), x0 + 2, y0 + h0 - hb, w0 - 4, KH.BARS[foc and 'clipmode' or 'session'], foc)
+    if hb > 0 then draw.hint_bar(setmetatable({ hint_h = hb }, { __index = L }), x0 + 2, y0 + h0 - hb, w0 - 4, KH.BARS[foc and 'clipmode' or 'session'], foc) end
     if foc then U.set(U.AMBER); gfx.rect(x0 + 2, y0, w0 - 4, h0, 0) end   -- свой модуль в фокусе — своя рамка внутри
     local mx, my = gfx.mouse_x, gfx.mouse_y
     if mx >= x0 and mx < x0 + w0 and my >= y0 and my < y0 + h0 then

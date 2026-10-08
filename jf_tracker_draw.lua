@@ -484,7 +484,9 @@ function D.layout(snap, state, nregions)
       -- в левой колонке: колонка не уже модуля
       if not state.mx_hidden then L.matrix_w = math.max(L.matrix_w, L.ctrl_w + D.SEPW) end
       local cw = state.mx_hidden and L.ctrl_w or (L.matrix_w - D.SEPW)
-      local bh = L.top_h + (state.ptabs and (L.rh + 3) or 0)   -- 8 окт: строка вкладок проектов сверху
+      -- 8 окт: высота — по содержимому (прошлый кадр), не верхней панели:
+      -- растягивание верхнего модуля сжимало матрицу (баг)
+      local bh = D.ctrl_need_h or (L.top_h + (state.ptabs and (L.rh + 3) or 0))
       if L.ctrlpos == 'top' then
         L.ctrl_box = { 0, L.header_y, cw, bh }
         L.mx_top = L.header_y + bh
@@ -1918,6 +1920,7 @@ local function draw_ctrl(L, info, H, hover)
     if ci > 0 then y = y + L.rh end
     if g.name == 'help' then D.ctrl_help_bottom = y + 1 end
   end
+  D.ctrl_need_h = y + 4                              -- 8 окт: своя высота модуля (по содержимому), не высота верхней панели
   -- заметки — всплывашкой от низа кнопок окон (D.notes_popup), тур — в
   -- оставшемся месте под быстрыми кнопками
   if info.notes_draw then D.notes_popup = { y = D.ctrl_help_bottom or 2 } end
@@ -2592,29 +2595,33 @@ end
 -- key — чей; scroll / nvis / total — строки; рисуется, только если не всё
 -- влезло. D.vbars[key] — прямоугольник для мыши (main: клик / протяжка)
 D.vbars = {}
+-- 8 окт: толщина одна на все скроллбары (опция scrollbar width, по умолчанию
+-- 3 px), прижаты к правому / нижнему краю отведённого места; чуть ярче
 function D.vbar(key, x, y, w, h, scroll, nvis, total)
   D.vbars[key] = nil
+  local sw = D.SBW or 3; x = x + w - sw; w = sw
   if total <= nvis or h < 8 then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local th = math.max(6, math.floor(h * nvis / total))
   local ty = y + math.floor((h - th) * math.min(1, scroll / math.max(1, total - nvis)))
   local hot = mx >= x - 3 and mx < x + w + 3 and my >= y and my < y + h
   local drag = D.vbar_drag and D.vbar_drag.key == key
-  set(U.DIM); gfx.rect(x + math.floor(w / 2), y, 1, h, 1)
-  set((hot or drag) and U.AMBER or U.LINE); gfx.rect(x, ty, w, th, 1)
+  set(U.LINE); gfx.rect(x + math.floor(w / 2), y, 1, h, 1)
+  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(x, ty, w, th, 1)
   D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
 end
 -- горизонтальная полоса (5 окт, матрица): та же запись, ось x
 function D.hbar(key, x, y, w, h, scroll, nvis, total)
   D.vbars[key] = nil
+  local sw = D.SBW or 3; y = y + h - sw; h = sw
   if total <= nvis or w < 8 then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local tw = math.max(6, math.floor(w * nvis / total))
   local tx = x + math.floor((w - tw) * math.min(1, scroll / math.max(1, total - nvis)))
   local hot = mx >= x and mx < x + w and my >= y - 3 and my < y + h + 3
   local drag = D.vbar_drag and D.vbar_drag.key == key
-  set(U.DIM); gfx.rect(x, y + math.floor(h / 2), w, 1, 1)
-  set((hot or drag) and U.AMBER or U.LINE); gfx.rect(tx, y, tw, h, 1)
+  set(U.LINE); gfx.rect(x, y + math.floor(h / 2), w, 1, 1)
+  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(tx, y, tw, h, 1)
   D.vbars[key] = { horiz = true, x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx, th = tw, a0 = x, alen = w }
 end
 
@@ -2884,6 +2891,7 @@ function D.fader_db(p)
 end
 
 function D.frame(L, snap, rows, state, info)
+  D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w
@@ -4882,8 +4890,8 @@ function D.frame(L, snap, rows, state, info)
   do
     local x0 = tx0 + L.label_w
     local w = W - x0 - L.pad
-    local y = L.hsb_y + 1
-    local h = L.hsb_h - 2
+    local h = math.min(L.hsb_h - 2, D.SBW or 3)          -- 8 окт: толщина, как у всех скроллбаров
+    local y = L.hsb_y + math.floor((L.hsb_h - h) / 2)
     hover.hsb = nil
     if w > 20 and L.hs_n > 0 then
       local n = L.hs_n
@@ -4892,9 +4900,8 @@ function D.frame(L, snap, rows, state, info)
       tx = math.min(tx, x0 + w - tw)
       local inbar = mx >= x0 and mx < x0 + w and my >= L.hsb_y and my < L.hsb_y + L.hsb_h
       local onthumb = inbar and mx >= tx and mx < tx + tw
-      set(U.BG); gfx.rect(x0, y, w, h, 1)
-      set(U.DIM); gfx.rect(x0, y + math.floor(h / 2), w, 1, 1)
-      set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.LINE or U.DIM)); gfx.rect(tx, y, tw, h, 1)
+      set(U.LINE); gfx.rect(x0, y + math.floor(h / 2), w, 1, 1)
+      set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.GREY or U.LINE)); gfx.rect(tx, y, tw, h, 1)
       if inbar then hover.hsb = { thumb = onthumb, x0 = x0, w = w, n = n, page = math.max(1, L.hs_full), dir = mx < tx and -1 or 1 } end
     end
   end

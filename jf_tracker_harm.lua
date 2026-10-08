@@ -73,7 +73,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   cx = btn(cx, y, U.measure('chord lane') + 2 * L.pad, 'chord lane', info.lane, { kind = 'lane' })
   if info.col_name then U.text(cx + L.pad, y, fit(info.col_name .. (info.here and ('  now: ' .. info.here) or '  now: -'), x + w - cx - L.pad), info.here and U.TEXT or U.GREY) end
   -- строки 2..3: ступени — трезвучия и септаккорды
-  local cw = math.max(U.measure('G#m7b5') + 2 * L.pad, math.floor((w - 6 * 2) / 7))
+  local cw = math.max(U.measure('G#m') + 2 * L.pad, math.floor((w - 6 * 2) / 7))   -- 8 окт: узко — все 7, подписи обрезаются (было одна кнопка)
   for row = 0, 1 do
     local by = y + (1 + row) * (rh + 2)
     if by + rh > y + h then break end
@@ -81,7 +81,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
       local bx = x + (k - 1) * (cw + 2)
       if bx + cw > x + w then break end
       local sym = HM.degree(k, row == 1)
-      local lab = (row == 0 and (ROM[HM.minor][k] .. ' ') or '') .. sym
+      local lab = (row == 0 and cw >= U.measure('vii° G#dim') + 2 * L.pad and (ROM[HM.minor][k] .. ' ') or '') .. sym
       btn(bx, by, cw, lab, info.here == sym, { kind = 'deg', k = k, seventh = row == 1 })
     end
   end
