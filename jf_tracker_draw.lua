@@ -601,7 +601,7 @@ function D.layout(snap, state, nregions)
   for ci, col in ipairs(snap.cols) do
     local depth = col.depth or 0
     if hide_below and depth <= hide_below then hide_below = nil end
-    local hidden = hide_below ~= nil and depth > hide_below
+    local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.win_w
     -- PT-mode (3 окт): ровно 4 канала от прокрутки

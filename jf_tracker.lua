@@ -2284,6 +2284,13 @@ ctx = {
   select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell } end end,
   set_last_slice = function(k) vim.last_slice = k end,
   mx_zoom = function() MX.toggle_zoom() end,
+  -- кнопка zoom (9 окт): обычный вид → sel (в трекере только треки
+  -- выделенных ячеек) → fold (свёрнутая матрица) → обычный
+  mx_zoom_cycle = function()
+    if MX.fold then ctx.mx_fold_toggle()
+    elseif MX.selmode then MX.selmode = false; ctx.mx_fold_toggle()
+    else MX.selmode = true; vim.msg = 'matrix sel: the tracker shows only the tracks of the selected cells (Cmd+click adds a cell, v / Shift - a block, Esc clears)' end
+  end,
   mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
@@ -7526,7 +7533,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() elseif d == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
+    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() elseif d == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -9513,13 +9520,27 @@ local function frame()
   -- 9 окт: блок матрицы (v / Shift+hjkl / мышь) выделяет в REAPER свои
   -- треки и items — только при смене блока; lock не принимает это за
   -- выбор трека в REAPER (его память обновляется следом)
-  if MX.anchor and #seq > 0 and snap then
+  -- режим sel (9 окт): в трекере только треки выделенных ячеек
+  if MX.selmode and snap then
+    local only = {}
+    for ci in pairs(MX.sel_cols()) do local c = snap.cols[ci]; if c then only[c.guid] = true end end
+    state.mxonly = only
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    if f and f.col and not only[f.col.guid] then                 -- курсор — на первый показанный трек
+      for i, f2 in ipairs(L.flat) do if f2.col and only[f2.col.guid] and not f2.env then vim.cur.fi = i; break end end
+    end
+  else state.mxonly = nil end
+  if (MX.anchor or next(MX.picks)) and #seq > 0 and snap then
     local r0, r1, c0, c1 = MX.block()
-    local k = r0 .. ':' .. r1 .. ':' .. c0 .. ':' .. c1   -- без снимка: выделение само пересобирает снимок — иначе петля
+    local pk = {}
+    for kk in pairs(MX.picks) do pk[#pk + 1] = kk end
+    table.sort(pk)
+    local k = (MX.anchor and (r0 .. ':' .. r1 .. ':' .. c0 .. ':' .. c1) or '') .. '|' .. table.concat(pk, ',')   -- без снимка: выделение само пересобирает снимок — иначе петля
     if k ~= ctx.mx_selk then
       ctx.mx_selk = k
       reaper.PreventUIRefresh(1)
-      alias.cells_select(seq, snap, r0, r1, c0, c1)
+      if MX.anchor then alias.cells_select(seq, snap, r0, r1, c0, c1) else reaper.SelectAllMediaItems(0, false); reaper.Main_OnCommand(40297, 0) end   -- 40297: снять выделение треков
+      for _, p in pairs(MX.picks) do alias.cells_select(seq, snap, p.ri, p.ri, p.ci, p.ci, true) end
       reaper.PreventUIRefresh(-1)
       reaper.UpdateArrange()
       lock_sync.tr = reaper.GetSelectedTrack(0, 0)
@@ -11513,7 +11534,7 @@ local function frame()
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       if hover.matrix.btn == 'zoom' then ctx.mx_zoom()
-      elseif hover.matrix.btn == 'fold' then ctx.mx_fold_toggle()
+      elseif hover.matrix.btn == 'fold' then ctx.mx_zoom_cycle()
       elseif hover.matrix.btn == 'fill' then MX.fill = not MX.fill
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
@@ -11549,8 +11570,14 @@ local function frame()
     elseif hover.matrix and hover.matrix.next then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.next, 1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.ri and hover.matrix.ci then
       ctx.set_focus('matrix')
-      -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки (9 окт)
-      if gfx.mouse_cap & 8 == 8 then MX.anchor = MX.anchor or { ri = MX.cur.ri, ci = MX.cur.ci } else MX.anchor = nil end
+      -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки; Cmd+щелчок —
+      -- ячейка в выделение вразброс (повтор — убрать), 9 окт
+      if gfx.mouse_cap & 4 == 4 then
+        local k = hover.matrix.ri .. ':' .. hover.matrix.ci
+        if not next(MX.picks) and not MX.anchor then MX.picks[MX.cur.ri .. ':' .. MX.cur.ci] = { ri = MX.cur.ri, ci = MX.cur.ci } end
+        MX.picks[k] = (not MX.picks[k]) and { ri = hover.matrix.ri, ci = hover.matrix.ci } or nil
+      elseif gfx.mouse_cap & 8 == 8 then MX.anchor = MX.anchor or { ri = MX.cur.ri, ci = MX.cur.ci }; MX.picks = {}
+      else MX.anchor = nil; MX.picks = {} end
       MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci)
       if dbl and click.zone == 'matrix' and click.row == hover.matrix.ri and state.mxlaunch then
         local vi = ctx.mx_vi(hover.matrix.ci)
@@ -11569,7 +11596,7 @@ local function frame()
         end
       end
       click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
-      ctx.mx_cdrag = { ri = hover.matrix.ri, ci = hover.matrix.ci }   -- протяжка по клеткам = блок (9 окт)
+      if gfx.mouse_cap & 4 == 0 then ctx.mx_cdrag = { ri = hover.matrix.ri, ci = hover.matrix.ci } end   -- протяжка по клеткам = блок (9 окт)
     elseif hover.browser == 'pvvol' and dbl and click.zone == 'pvvol' then
       ctx.preview_set_vol(1); vim.msg = 'preview volume 0 dB'
     elseif type(hover.browser) == 'string' then

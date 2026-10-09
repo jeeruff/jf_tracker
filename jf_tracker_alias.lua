@@ -421,9 +421,9 @@ end
 
 -- выделение (9 окт): блок матрицы = выделение в REAPER — его треки и его
 -- items (остальное снимается); возвращает число items
-function A.cells_select(regions, snap, r0, r1, c0, c1)
-  R.SelectAllMediaItems(0, false)
-  local n, first = 0, true
+function A.cells_select(regions, snap, r0, r1, c0, c1, add)   -- add: добавить к выделению (ячейки вразброс)
+  if not add then R.SelectAllMediaItems(0, false) end
+  local n, first = 0, not add
   for ci = math.min(c0, c1), math.max(c0, c1) do
     local col = snap.cols[ci]
     if col and col.track then

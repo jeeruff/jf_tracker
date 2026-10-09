@@ -27,6 +27,19 @@ local U, ctx
 MX.cur = { ri = 1, ci = 1 }
 MX.focus = false
 MX.anchor = nil        -- якорь блока (Shift+hjkl / v); блок = anchor..cur
+MX.picks = {}          -- 9 окт: ячейки вразброс (Cmd+щелчок), ключ «ri:ci» → { ri, ci }
+MX.selmode = false     -- 9 окт: режим sel (кнопка zoom) — в трекере только треки выделенных ячеек
+-- треки выделения: блок + ячейки вразброс; пусто — ячейка курсора. ci → true
+function MX.sel_cols()
+  local out, any = {}, false
+  if MX.anchor then
+    local _, _, c0, c1 = MX.block()
+    for ci = c0, c1 do out[ci] = true; any = true end
+  end
+  for _, p in pairs(MX.picks) do out[p.ci] = true; any = true end
+  if not any and MX.cur.ci and MX.cur.ci >= 1 then out[MX.cur.ci] = true end
+  return out
+end
 function MX.block()
   local a = MX.anchor or MX.cur
   -- колонки номера / имени (ci −1 / 0) в блок не входят — только треки
@@ -287,12 +300,13 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   for _, b in ipairs(btns()) do
     local label = b[2]
     if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end
+    if b[1] == 'fold' and MX.selmode then label = 'sel' end
     if ctx.ic then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.fold) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and (MX.fold or MX.selmode)) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -615,6 +629,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local r0, r1, c0, c1 = MX.block()
         if ri >= r0 and ri <= r1 and ci >= c0 and ci <= c1 then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1 end
       end
+      if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
       if MX.cur.ri == ri and MX.cur.ci == ci then
         U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x, y, L.mx_cell_w, rh, 0)
         gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 2, 0)
@@ -724,7 +739,7 @@ function MX.key(c, regions, snap)
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
   if ch == 'v' then if MX.anchor then MX.anchor = nil else MX.anchor = { ri = MX.cur.ri, ci = MX.cur.ci } end; return true end
-  if c == 27 and MX.anchor then MX.anchor = nil; return true end
+  if c == 27 and (MX.anchor or next(MX.picks)) then MX.anchor = nil; MX.picks = {}; return true end
   -- в блоке y / d / x действуют на ячейки блока
   if MX.anchor and ch == 'y' then ctx.mx_block('copy'); return true end
   if MX.anchor and (ch == 'd' or ch == 'x') then ctx.mx_block('cut'); return true end
