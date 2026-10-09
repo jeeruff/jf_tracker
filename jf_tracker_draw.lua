@@ -443,7 +443,7 @@ function D.layout(snap, state, nregions)
   L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0)) or 0
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
-  L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0) + L.jr_h
+  L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0)
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
@@ -481,7 +481,7 @@ function D.layout(snap, state, nregions)
   L.sess_y = L.fxrow_y + L.fxrow_h
   -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места
   L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.33))) or 0
-  L.body_y = L.sess_y + L.sess_h + (L.toppos == 'clips' and L.top_h or 0)
+  L.body_y = L.sess_y + L.sess_h + (L.toppos == 'clips' and L.top_h or 0) + L.jr_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
   -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
@@ -575,12 +575,12 @@ function D.layout(snap, state, nregions)
     L.matrix_w = tr.x
     L.win_w = tr.x + tr.w
     L.side_x = L.win_w
-    L.header_y = tr.y + (L.tppos == 'top' and L.tp_h or 0) + L.jr_h
+    L.header_y = tr.y + (L.tppos == 'top' and L.tp_h or 0)
     L.fxrow_y = L.header_y + L.header_h
     L.sess_y = L.fxrow_y + L.fxrow_h
     local bot = tr.y + tr.h
     L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
-    L.body_y = L.sess_y + L.sess_h
+    L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
     L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
     L.mix_y = L.body_y + L.body_h
     L.route_y = L.mix_y
@@ -4203,11 +4203,11 @@ function D.frame(L, snap, rows, state, info)
     if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
-  -- 9 окт: линейка прыжков (опция jumps) — над шапками, как relativenumber в
+  -- 9 окт: линейка прыжков (опция jumps) — между клипами и строками, как relativenumber в
   -- Vim по горизонтали: у каждого трека — сколько до него от курсора (3L / 3H
   -- прыгают туда), у трека курсора — его номер янтарём
   if (L.jr_h or 0) > 0 then
-    local jy = hy - L.jr_h
+    local jy = L.body_y - L.jr_h                       -- между клипами и строками (просьба 9 окт)
     set(U.PANEL); gfx.rect(tx0, jy, W - tx0, L.jr_h, 1)
     local cci = info.cur_ci
     for _, c in ipairs(L.cols or {}) do
