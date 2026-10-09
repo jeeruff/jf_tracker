@@ -11315,7 +11315,11 @@ local function frame()
   if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   if ctx.ins_drag and ctx.ins_drag.active then   -- 9 окт: вставка на другой трек
     local d = ctx.ins_drag
-    draw.ghost(d.name .. (d.target and d.target.track ~= d.col.track and ('  -> ' .. (d.target.name ~= '' and d.target.name or 'track') .. ((gfx.mouse_cap & 16 == 16) and ' (copy)' or '')) or '  (drop on a track; Opt - copy)'))
+    local m = d.mark
+    if m then U.set(U.AMBER); gfx.rect(m.x, m.y - 1, 2, m.h + 1, 1) end
+    local where = m and (m.before and ('  before ' .. m.before) or ('  after ' .. m.after)) or '  (end of chain)'
+    local tn = d.target and ((d.target.name ~= '' and d.target.name) or 'track')
+    draw.ghost(d.name .. ((d.target and (d.target.track ~= d.col.track or m)) and ('  -> ' .. tn .. where .. ((gfx.mouse_cap & 16 == 16) and ' (copy)' or '')) or '  (drop on a track or between its inserts; Opt - copy)'))
   end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
@@ -12112,18 +12116,31 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if not d.active and math.abs(gfx.mouse_x - d.x0) + math.abs(gfx.mouse_y - d.y0) > 6 then d.active = true end
       if d.active then
-        d.target = nil
+        d.target, d.pos, d.mark = nil, nil, nil
         for _, c in ipairs(L.cols or {}) do
           if c.x and c.col and c.col.track and gfx.mouse_x >= c.x and gfx.mouse_x < c.x + c.w and gfx.mouse_y >= L.header_y and gfx.mouse_y < gfx.h - L.status_h then d.target = c.col end
+        end
+        -- 9 окт: над фишкой вставки — место в цепи: левая половина — перед
+        -- ней, правая — после (и на своём треке — переставить)
+        local h = hover.hdrfx
+        if h and h.col and h.col.track and h.it and h.it.i and h.x then
+          local after = gfx.mouse_x >= h.x + h.w / 2
+          d.target, d.pos = h.col, h.it.i + (after and 1 or 0)
+          d.mark = { x = after and (h.x + h.w) or (h.x - 2), y = h.y, h = L.rh, before = not after and (h.it.name or 'fx') or nil, after = after and (h.it.name or 'fx') or nil }
         end
       end
     else
       ctx.ins_drag = nil
       local dst = d.active and d.target
-      if dst and dst.track ~= d.col.track and reaper.ValidatePtr(dst.track, 'MediaTrack*') and reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
-        local copy = gfx.mouse_cap & 16 == 16
+      local same = dst and dst.track == d.col.track
+      local copy = gfx.mouse_cap & 16 == 16
+      -- свой трек — только с местом в цепи (перестановка или копия туда)
+      if same and d.pos and not copy and (d.pos == d.fxi or d.pos == d.fxi + 1) then dst = nil end   -- на то же место
+      if dst and (not same or d.pos) and reaper.ValidatePtr(dst.track, 'MediaTrack*') and reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
+        local to = d.pos or reaper.TrackFX_GetCount(dst.track)
+        if same and not copy and to > d.fxi then to = to - 1 end            -- перенос вниз по своей цепи: место после изъятия
         edit.run((copy and 'copy fx ' or 'move fx ') .. d.name, function()
-          reaper.TrackFX_CopyToTrack(d.col.track, d.fxi, dst.track, reaper.TrackFX_GetCount(dst.track), not copy)
+          reaper.TrackFX_CopyToTrack(d.col.track, d.fxi, dst.track, to, not copy)
         end)
         model.invalidate()
         vim.msg = (copy and 'copied ' or 'moved ') .. d.name .. ' -> ' .. (dst.name ~= '' and dst.name or 'track')

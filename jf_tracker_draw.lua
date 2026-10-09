@@ -4119,7 +4119,7 @@ function D.frame(L, snap, rows, state, info)
             local hot = mx >= cx and mx < cx + cw2 and my >= ry and my < ry + L.rh
             set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(cx, ry, cw2, L.rh - 1, 1)
             text(cx + L.pad, ry, lab, hot and U.AMBER or ((it.off and U.GREY) or BTXT))
-            if hot then hover[row[3]] = { col = col, k = k, it = it } end
+            if hot then hover[row[3]] = { col = col, k = k, it = it, x = cx, w = cw2, y = ry } end   -- x w y: бросок вставки в место цепи (9 окт)
             hint(row[3], cx, ry, cw2, L.rh, { col = col, k = k })
             cx = cx + cw2 + 2
           end
