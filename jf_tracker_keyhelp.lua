@@ -244,6 +244,7 @@ KH.PAGES = {
     { k = 'r', d = 'reload the jf_pm index' },
   } },
   browser = { title = 'browser', e = {
+    { k = ': ↑ ↓  Ctrl+R', d = 'command line history: up / down - commands starting with what you typed (Ctrl+P / Ctrl+N too), Ctrl+R - fzf over the history' },
     { k = ':z words  :zi', d = 'zoxide: jump to the most used / recent folder matching the words (last word - in the folder name); :zi - pick from the visited folders' },
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },

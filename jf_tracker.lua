@@ -3059,6 +3059,18 @@ ctx = {
       if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
     end
   end,
+  -- история команд : (9 окт): Data/jf_tracker_cmdhist.txt, строка — команда
+  cmd_hist_load = function()
+    local out = {}
+    local f = io.open(reaper.GetResourcePath() .. '/Data/jf_tracker_cmdhist.txt', 'r')
+    if f then for l in f:lines() do if l:match('%S') then out[#out + 1] = l end end; f:close() end
+    return out
+  end,
+  cmd_hist_save = function(list)
+    reaper.RecursiveCreateDirectory(reaper.GetResourcePath() .. '/Data', 0)
+    local f = io.open(reaper.GetResourcePath() .. '/Data/jf_tracker_cmdhist.txt', 'w')
+    if f then for _, l in ipairs(list) do f:write((l:gsub('\n', ' ')), '\n') end; f:close() end
+  end,
   -- :z / :zi (9 окт, zoxide): браузер — в самую частую и недавнюю папку под слова
   browse_z = function(arg)
     local words = {}

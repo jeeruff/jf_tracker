@@ -1066,10 +1066,39 @@ function V.key_impl(c)
   -- командная строка (+ подсказка и Tab-дополнение)
   if V.mode == 'cmd' then
     local back = (V.cmd_from == 'insert') and 'insert' or 'normal'
+    -- история (9 окт, как в zsh / atuin): ↑ ↓ Ctrl+P Ctrl+N — по набранному
+    -- началу, Ctrl+R — fzf по всей истории (выбранная — в строку)
+    V.hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
+    if c == UP or c == DOWN or c == 16 or c == 14 then
+      local h = V.hist
+      if not V.hist_pos then V.hist_pos, V.hist_pre = #h + 1, V.cmdline or '' end
+      local d = (c == UP or c == 16) and -1 or 1
+      local i = V.hist_pos + d
+      while i >= 1 and i <= #h and h[i]:sub(1, #V.hist_pre) ~= V.hist_pre do i = i + d end
+      if i < 1 then return end
+      if i > #h then V.hist_pos = #h + 1; V.cmdline = V.hist_pre; return end
+      V.hist_pos = i; V.cmdline = h[i]; V.cmd_cycle = nil
+      return
+    end
+    if c == 18 then
+      local items, seen = {}, {}
+      for i = #V.hist, 1, -1 do local l = V.hist[i]; if not seen[l] then seen[l] = true; items[#items + 1] = { label = l, data = l } end end
+      if #items == 0 then V.msg = 'no command history yet'; return end
+      local from = V.cmd_from
+      V.open_picker('command history (Enter - into the line)', items, function(it) V.cmd_from = from; V.mode = 'cmd'; V.cmdline = it.data end, V.cmdline or '')
+      return
+    end
+    if c ~= UP and c ~= DOWN then V.hist_pos, V.hist_pre = nil, nil end
     if c == ESC then V.mode = back; V.cmdline = nil; V.cmd_cycle = nil
     elseif c == ENTER then
       local line = V.cmdline or ''
       V.mode = back; V.cmdline = nil; V.cmd_cycle = nil
+      if line:match('%S') then
+        for i = #V.hist, 1, -1 do if V.hist[i] == line then table.remove(V.hist, i) end end
+        V.hist[#V.hist + 1] = line
+        while #V.hist > 200 do table.remove(V.hist, 1) end
+        if ctx.cmd_hist_save then ctx.cmd_hist_save(V.hist) end
+      end
       return run_cmd(line)
     elseif c == TAB then
       local matches, word = V.cmd_matches(V.cmdline)
