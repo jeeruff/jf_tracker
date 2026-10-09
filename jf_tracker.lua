@@ -3432,6 +3432,32 @@ ctx = {
     f:write(MX.MR.serialize(list)); f:close()
   end,
   mac_rows = function() return MX.MR.rows(vim.regs, ctx.mac_saved()) end,
+  -- меню \ q: записанные — своей буквой регистра, остальные — 1..9, A..Z
+  mac_hydra = function()
+    local items, used, pool = {}, {}, '123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    local pi = 1
+    local function nextkey() while pi <= #pool and used[pool:sub(pi, pi)] do pi = pi + 1 end; local k = pool:sub(pi, pi); pi = pi + 1; return k end
+    for _, r in ipairs(ctx.mac_rows()) do
+      if r.kind then
+        local k = (r.kind == 'rec' and not used[r.name]) and r.name or nextkey()
+        if k and k ~= '' then
+          used[k] = true
+          local row = r
+          items[#items + 1] = { key = k, label = (r.kind == 'rec' and ('@' .. r.name .. '  ' .. (r.body or '')) or (r.name .. '  ' .. (r.desc or r.body or ''))), fn = function() ctx.mac_do({ kind = 'play', row = row }) end }
+        end
+      end
+    end
+    if #items == 0 then items[1] = { key = 'q', label = 'no macros yet - q + letter records one', fn = function() end } end
+    return { title = 'macros (play at the cursor)', items = items }
+  end,
+  -- :mac имя — макрос по имени (свой / встроенный / @a)
+  mac_run = function(name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    for _, r in ipairs(ctx.mac_rows()) do
+      if r.kind and (r.name == name or ('@' .. (r.name or '')) == name) then ctx.mac_do({ kind = 'play', row = r }); return end
+    end
+    vim.msg = 'mac: no macro named ' .. name
+  end,
   mac_save = function(arg)
     local reg, name = (arg or ''):match('^%s*(%l)%s+(.-)%s*$')
     local keys = reg and vim.regs['@' .. reg]
@@ -7816,6 +7842,8 @@ ctx = {
             } } end },
         } } end },
       { key = 'A', label = 'about', fn = function() ctrl_action('about', 0) end },
+      -- 9 окт: \ q — макросы (как запись q): записанные, свои, встроенные; буква — проиграть у курсора
+      { key = 'q', label = 'macros: play one at the cursor', sub = function() return ctx.mac_hydra() end },
       { key = 'r', label = 'record', sub = function() return { title = 'record', items = {
           { key = 'a', label = (col and col.armed) and 'disarm track' or 'arm track', fn = ctx.rec_arm },
           { key = 'i', label = 'choose input', sub = function() return ctx.hydra_inputs() end },
