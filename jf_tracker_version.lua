@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'MIDI clips in the lib (MIDI items in the lib zone / LIB track): a mini piano roll instead of the waveform, a note key inserts a copy of the clip transposed from C-4, click opens the MIDI editor',
     'video items in the tracker show VID in the note field; Ixx / Oxx fade the picture too (item fades)',
     'video tab (after master): the Video window on / off, Video processor of the cursor track with presets and parameters, the list of video items (click: cursor there)',
     'lib: sort by type (click type in the column heads) - audio / video groups',

@@ -1686,7 +1686,30 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         if tk and not R.TakeIsMIDI(tk) then has_audio = true; break end
       end
     end
-    if mit or (not has_audio and not depot_item) then
+    local dtk = depot_item and R.GetActiveTake(depot_item)
+    if dtk and R.TakeIsMIDI(dtk) then
+      -- MIDI-клип из lib (9 окт): копия клипа в строку, нота — транспонирование
+      -- (C-4 — как есть); пул MIDI у копии снят — оригинал не меняется
+      E.ensure_iid(depot_item)
+      local ok, chunk = R.GetItemStateChunk(depot_item, '', false)
+      if ok then
+        chunk = strip_guids(chunk):gsub('\n%s*POOLEDEVTS %b{}', '')
+        local it = insert_chunk(track, lane_idx, t0, chunk)
+        R.SetMediaItemInfo_Value(it, 'B_MUTE', 0)
+        local tk = R.GetActiveTake(it)
+        local d = pitch - model.BASE_NOTE
+        if tk and d ~= 0 then
+          local _, nn = R.MIDI_CountEvts(tk)
+          for k = 0, nn - 1 do
+            local _, sel, mu, sp, ep, ch, p, v = R.MIDI_GetNote(tk, k)
+            R.MIDI_SetNote(tk, k, sel, mu, sp, ep, ch, math.max(0, math.min(127, p + d)), v, true)
+          end
+          R.MIDI_Sort(tk)
+        end
+        finish_insert(track, lane_idx, it)
+        made = it
+      end
+    elseif mit or (not has_audio and not depot_item) then
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
     elseif depot_item then
       E.ensure_iid(depot_item)                          -- копия унесёт метку в чанке

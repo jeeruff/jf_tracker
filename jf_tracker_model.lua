@@ -715,9 +715,13 @@ M.pool_key = pool_key
 
 local function pool_add(pool, seen, it, from_depot)
   local take = R.GetActiveTake(it)
-  if not take or R.TakeIsMIDI(take) then return end
+  if not take then return end
+  -- MIDI-клипы (9 окт): только из зоны lib / трека LIB — MIDI-item песни это
+  -- контейнеры нот трекера, не инструменты; каждый клип — свой (без склейки)
+  local midi = R.TakeIsMIDI(take)
+  if midi and not from_depot then return end
   local name = R.GetTakeName(take)
-  local key = pool_key(it, take, name)
+  local key = midi and ('midi|' .. (R.BR_GetMediaItemGUID and R.BR_GetMediaItemGUID(it) or tostring(it))) or pool_key(it, take, name)
   pool_by_item[it] = key
   local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
   local at = seen[key]
@@ -748,7 +752,7 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   local stype = src0 and R.GetMediaSourceType and R.GetMediaSourceType(ps or src0, '') or ''
   pool[at] = {
     item = it, take = take, name = name, src = src0,
-    stype = (stype:upper():find('VIDEO', 1, true) and 'video') or 'audio',
+    stype = (R.TakeIsMIDI(take) and 'midi') or (stype:upper():find('VIDEO', 1, true) and 'video') or 'audio',
     ord = tonumber((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ord', '', false)))),   -- порядок в lib (3 окт, перетаскивание)
     offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS'),
     len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
@@ -775,6 +779,20 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     fpath = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }
+  -- мини-пиано-ролл MIDI-клипа в lib (9 окт): ноты долями длины item
+  if pool[at].stype == 'midi' and R.MIDI_CountEvts then
+    local _, nn = R.MIDI_CountEvts(take)
+    local len = math.max(1e-6, pool[at].len)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local notes = {}
+    for k = 0, math.min(nn, 512) - 1 do
+      local _, _, _, sp, ep, _, p = R.MIDI_GetNote(take, k)
+      local a = (R.MIDI_GetProjTimeFromPPQPos(take, sp) - pos) / len
+      local b = (R.MIDI_GetProjTimeFromPPQPos(take, ep) - pos) / len
+      notes[#notes + 1] = { a, b, p }
+    end
+    pool[at].notes = notes
+  end
   -- виртуальная нарезка (jf_tracker_slicer): тайм-коды в P_EXT
   local _, sl = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', false)
   local _, bs = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_bsync', '', false)

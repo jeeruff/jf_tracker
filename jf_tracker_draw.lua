@@ -2248,7 +2248,7 @@ function D.pool_rows(pool, sort, col, cols)
   if sort == 'type' then
     -- 9 окт: по типу — группы audio / video (заголовком), внутри — порядок пула;
     -- automation — как всегда, последней строкой
-    for _, ty in ipairs({ 'audio', 'video' }) do
+    for _, ty in ipairs({ 'audio', 'midi', 'video' }) do
       local first = true
       for i, e in ipairs(pool) do
         if not e.parent and (e.stype or 'audio') == ty then
@@ -2864,7 +2864,24 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         text(tx0 + L.pad, y + 1, TILDE, th and U.AMBER or U.CYAN)
       end
       local npix = w - (wx - ix) - L.pad
-      if npix > 8 then
+      if npix > 8 and e.stype == 'midi' then
+        -- MIDI-клип (9 окт): мини-пиано-ролл вместо волны — ноты чёрточками
+        local lo, hi = 127, 0
+        for _, n in ipairs(e.notes or {}) do lo = math.min(lo, n[3]); hi = math.max(hi, n[3]) end
+        local wc = U.readable(U.mix(rgb, U.TEXT, 0.35), U.BG, 4.0)
+        set(U.mix(U.BG, U.TEXT, 0.08)); gfx.rect(wx, y + 1, npix, L.rh - 2, 1)
+        set(wc)
+        if hi < lo then gfx.line(wx, y + L.rh / 2, wx + npix, y + L.rh / 2)
+        else
+          local span = math.max(1, hi - lo)
+          for _, n in ipairs(e.notes) do
+            local nx0 = wx + math.floor(math.max(0, n[1]) * npix)
+            local nx1 = wx + math.max(nx0 - wx + 1, math.floor(math.min(1, n[2]) * npix))
+            local ny = y + L.rh - 2 - math.floor((n[3] - lo) / span * (L.rh - 4) + 0.5)
+            gfx.rect(nx0, ny, math.max(1, nx1 - nx0), 1, 1)
+          end
+        end
+      elseif npix > 8 then
         local pk = get_peaks and get_peaks(e, npix)
         local cy, hh = y + L.rh / 2, L.rh / 2 - 1
         local wc = U.readable(U.mix(rgb, U.TEXT, 0.35), U.BG, 4.0)

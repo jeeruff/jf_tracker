@@ -1684,6 +1684,7 @@ ctx = {
     if n then pool_select(n) end
     local e = col.pool[n or vim.inst]
     if not e then vim.msg = 'no instrument'; return end
+    if e.stype == 'midi' then vim.msg = 'midi clip: nothing to slice (click its notes - MIDI editor)'; return end
     -- слайс / кусок: редактируется исходник (его нарезка), кусок подсвечен зоной (2 окт)
     if e.parent then e = e.parent end
     SL.open(e, col.track)
@@ -10637,7 +10638,7 @@ local function frame()
     elseif hover.poolsortcol then
       local k = hover.poolsortcol
       state.poolsort = (k == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or k
-      vim.msg = 'lib order: ' .. ({ track = 'tree by track', mark = 'marks @ $ *', name = 'name', len = 'length', type = 'type: audio / video' })[state.poolsort]
+      vim.msg = 'lib order: ' .. ({ track = 'tree by track', mark = 'marks @ $ *', name = 'name', len = 'length', type = 'type: audio / midi / video' })[state.poolsort]
       click = { t = now2, zone = 'poolsortcol' }
     elseif hover.poolsort then
       ctx.set_focus('inst')
@@ -11143,6 +11144,11 @@ local function frame()
         -- ~ (9 окт): огибающие take этого item — во вкладке automation
         draw.lib_drag = nil
         ctx.take_env_open(pe.item)
+      elseif pe and pe.stype == 'midi' and (hover.pool.wave or (dbl and click.zone == 'pool' and click.row == hover.pool.i)) then
+        -- MIDI-клип (9 окт): волны нет — MIDI-редактор REAPER на нём
+        draw.lib_drag = nil
+        reaper.SelectAllMediaItems(0, false); reaper.SetMediaItemSelected(pe.item, true); reaper.Main_OnCommand(40153, 0)
+        vim.msg = 'midi clip ' .. (pe.name or '') .. ': MIDI editor'
       elseif hover.pool.wave or (dbl and click.zone == 'pool' and click.row == hover.pool.i) then
         -- щелчок по волне (9 окт) — сразу вкладка item, как двойной по строке
         draw.lib_drag = nil
