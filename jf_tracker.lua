@@ -2958,6 +2958,93 @@ ctx = {
     end
   end,
   -- редактор automation item (5 окт): вкладка modulation, страница item
+  -- ── панели (9 окт, бета): фокус и операции дерева tmux / zellij ─────────
+  -- id панели в фокусе (вкладки живут как 'top' + toptab)
+  pane_cur = function()
+    if state.focus == 'top' then return state.toptab end
+    if state.focus == 'session' then return 'tracker' end
+    return state.focus
+  end,
+  pane_focus = function(id)
+    local PN = draw.panes
+    if not (id and PN.BY[id]) then return end
+    ctx.pn_prev = ctx.pane_cur()
+    if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
+    else ctx.set_focus(id) end
+    relayout()
+  end,
+  -- операция над деревом: снимок для u (20 шагов), пересчёт раскладки
+  pane_do = function(fn, msg)
+    local before = draw.panes.encode(state.panes)
+    if fn() then
+      ctx.pn_undo = ctx.pn_undo or {}
+      table.insert(ctx.pn_undo, before)
+      if #ctx.pn_undo > 20 then table.remove(ctx.pn_undo, 1) end
+      relayout()
+      if msg then vim.msg = msg end
+      return true
+    end
+    return false
+  end,
+  -- режим PANE (Ctrl+W, липкий как в zellij): hjkl фокус, HJKL перенос,
+  -- w W по кругу, 1..9 лист, g<буква> панель, s / v <буква> сплит вниз /
+  -- вправо, T<буква> в стек, X<буква> своп, B из стека, x своп с прошлым,
+  -- Tab стек, + - < > размер, = поровну, z zoom, c скрыть, Space пресет,
+  -- u отмена, Esc / Enter / Ctrl+W — выход
+  pane_key = function(c)
+    local PN, m = draw.panes, state.panes
+    local ch = (c > 0 and c < 256) and string.char(c) or ''
+    local id = ctx.pane_cur()
+    local pend = ctx.pn_pend
+    ctx.pn_pend = nil
+    if pend then
+      local tgt = PN.BYKEY[ch]
+      if c == 27 then vim.msg = '-- PANE --'; return end
+      if not tgt then vim.msg = 'pane: no panel on ' .. ch; return end
+      if pend == 'g' then
+        if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
+        ctx.pane_focus(tgt)
+      elseif pend == 's' or pend == 'v' then
+        ctx.pane_do(function() return PN.split(m, id, tgt, pend == 's' and 'd' or 'r') end, ('pane %s split %s'):format(tgt, pend == 's' and 'below' or 'right'))
+      elseif pend == 'T' then
+        ctx.pane_do(function() return PN.stack(m, tgt, id) end, ('pane %s stacked with %s'):format(tgt, id))
+      elseif pend == 'X' then
+        ctx.pane_do(function() return PN.swap(m, id, tgt) end, ('pane %s <-> %s'):format(id, tgt))
+      end
+      return
+    end
+    local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
+    local ARR = { [1818584692] = 'l', [1685026670] = 'd', [30064] = 'u', [1919379572] = 'r' }
+    if c == 27 or c == 13 or c == 23 then state.pane_mode = false; vim.msg = ''; return end
+    if DIR[ch] or ARR[c] then
+      local to = PN.focus_dir(L.pn, id, DIR[ch] or ARR[c]); if to then ctx.pane_focus(to) end
+    elseif DIR[ch:lower()] then
+      ctx.pane_do(function() return PN.move(m, id, DIR[ch:lower()]) end, 'pane ' .. id .. ' moved')
+    elseif ch == 'w' or ch == 'W' then
+      local o, a = L.pn.order, PN.active_of(m, id)
+      for i, x in ipairs(o) do if x == a then ctx.pane_focus(o[(i - 1 + (ch == 'w' and 1 or -1)) % #o + 1]); break end end
+    elseif ch:match('^[1-9]$') then ctx.pane_focus(L.pn.order[tonumber(ch)])
+    elseif ch == 'g' or ch == 's' or ch == 'v' or ch == 'T' or ch == 'X' then
+      ctx.pn_pend = ch; vim.msg = '-- PANE -- ' .. ch .. ' + panel letter'
+    elseif ch == 'B' then ctx.pane_do(function() return PN.unstack(m, id, 'd') end, 'pane ' .. id .. ' out of the stack')
+    elseif ch == 'x' then if ctx.pn_prev then ctx.pane_do(function() return PN.swap(m, id, ctx.pn_prev) end, 'pane swap') end
+    elseif c == 9 or c == 25 then
+      local nx = PN.cycle(m, id, c == 25 and -1 or 1); if nx then ctx.pane_focus(nx) end
+    elseif ch == '+' or ch == '-' then ctx.pane_do(function() return PN.resize(m, id, 'v', ch == '+' and 0.03 or -0.03) end)
+    elseif ch == '>' or ch == '<' then ctx.pane_do(function() return PN.resize(m, id, 'h', ch == '>' and 0.03 or -0.03) end)
+    elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
+    elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
+    elseif ch == 'c' or ch == 'q' then
+      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker') end
+    elseif ch == ' ' then
+      ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
+      local nm = PN.preset(ctx.pn_preset, m)
+      ctx.pane_do(function() state.panes = nm; return true end, 'layout: ' .. ctx.pn_preset)
+    elseif ch == 'u' then
+      local u = ctx.pn_undo and table.remove(ctx.pn_undo)
+      if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
+    end
+  end,
   -- огибающие take у item lib (9 окт): только с точками — колонка ~ в lib,
   -- щелчок по ней открывает их во вкладке automation (лейны — по одной на
   -- огибающую). Кэш — по счётчику изменений проекта
@@ -9938,8 +10025,8 @@ local function frame()
   -- which-key (7 окт, быстрая опция whichkey): ждём вторую клавишу — у курсора
   -- (там, куда уже смотрят глаза) список того, что можно нажать дальше
   local pop = vim.popup()
-  if not pop and state.whichkey then
-    local wk = (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
+  if not pop and (state.whichkey or state.pane_mode) then
+    local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
@@ -12284,6 +12371,23 @@ local function frame()
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
+  -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
+  -- соседа, Cmd+Shift+hjkl — перенести панель туда (как dwm), без режима
+  if state.panes_ui and L and L.pn and c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    local m = ctx.mods()
+    if state.pane_mode then ctx.pane_key(c); c = 0
+    elseif c == 23 and m.ctrl and not m.cmd then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc'; c = 0
+    elseif m.cmd and not m.ctrl and not m.alt then
+      local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
+      local ch = c < 256 and string.char(c):lower() or ''
+      if DIR[ch] then
+        local id = ctx.pane_cur()
+        if m.shift then ctx.pane_do(function() return draw.panes.move(state.panes, id, DIR[ch]) end, 'pane ' .. id .. ' moved')
+        else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
+        c = 0
+      end
+    end
+  end
   local quit = false
   if c == keys.f1 then if ctx.mods().shift then state.khelp_big = false; ctx.tutorial() else ctx.help_big() end; c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end

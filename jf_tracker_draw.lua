@@ -3128,6 +3128,13 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           end
         end
       end
+      -- режим PANE: номер листа (1..9 — фокус цифрой) у правого края рамки
+      if state.pane_mode and c.num and c.num <= 9 and c.tab then
+        local ns = tostring(c.num)
+        local nx = c.x + c.w - ms(ns) - L.pad - 2
+        set(U.AMBER); gfx.rect(nx - 2, c.y, ms(ns) + 4, c.tab.h, 1)
+        text(nx, c.y + 1, ns, U.BG)
+      end
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
       if id == 'matrix' then
