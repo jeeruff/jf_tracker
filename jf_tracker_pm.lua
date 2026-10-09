@@ -567,7 +567,8 @@ function PM.bake_pending()
 end
 -- слот превью для карточки сейчас (nil — ещё не запечено, поставлено в очередь)
 function PM.thumb(e, size)
-  local c = e.card
+  local c = e and e.card
+  if not c then return nil end                      -- 9 окт: не карточка (список другого режима) — без превью
   local audio = audio_cache[c.path]
   local kind = PM.thumb_kind(c, audio or nil)
   if kind == 'wave' and PM.shape == 'wide' then kind = 'nav' end

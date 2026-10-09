@@ -2229,6 +2229,77 @@ function E.fx_unpack(track, c)
   return ok
 end
 -- копия эффекта (с объекта src, индекс si) на объект dst в позицию di
+-- ── вырезать / вставить эффект через chunk трека (9 окт) ─────────────────
+-- x / dd в DSP удаляли эффект, а регистр ссылался на него по GUID — вставить
+-- было нечего. Теперь вырезание берёт текст эффекта из <FXCHAIN> (BYPASS …
+-- <VST …> … FXID … WAK) и кладёт в регистр; вставка — в цепочку любого трека,
+-- FXID новые. Чистые функции — тест tests/test_fxchunk.lua.
+local function split_lines(s) local t = {}; for l in (s .. '\n'):gmatch('([^\n]*)\n') do t[#t + 1] = l end; if t[#t] == '' then t[#t] = nil end; return t end
+-- записи цепочки: { fxchain = i (строка <FXCHAIN), close = j (её «>»), entries = { {a, b} … } }
+function E.chain_entries(lines)
+  local fc
+  for i, l in ipairs(lines) do if l:match('^%s*<FXCHAIN') then fc = i; break end end
+  if not fc then return nil end
+  local depth, entries, cur = 1, {}, nil
+  for i = fc + 1, #lines do
+    local l = lines[i]
+    if depth == 1 and l:match('^%s*BYPASS ') then
+      if cur then cur[2] = i - 1 end
+      cur = { i, nil }; entries[#entries + 1] = cur
+    end
+    if l:match('^%s*<') then depth = depth + 1
+    elseif l:match('^%s*>%s*$') then
+      depth = depth - 1
+      if depth == 0 then
+        if cur then cur[2] = i - 1 end
+        return { fxchain = fc, close = i, entries = entries }
+      end
+    end
+  end
+  return nil
+end
+function E.chunk_fx_get(chunk, k)          -- k: 1-based номер эффекта; текст записи или nil
+  local lines = split_lines(chunk)
+  local ch = E.chain_entries(lines)
+  local e = ch and ch.entries[k]
+  if not e then return nil end
+  return table.concat(lines, '\n', e[1], e[2])
+end
+function E.chunk_fx_put(chunk, k, seg, newguid)   -- вставить перед k-м (k > n — в конец); новые FXID
+  newguid = newguid or function() return '{00000000-0000-0000-0000-000000000000}' end
+  seg = seg:gsub('FXID %b{}', function() return 'FXID ' .. newguid() end)
+  local lines = split_lines(chunk)
+  local ch = E.chain_entries(lines)
+  local at
+  if ch then at = (ch.entries[k] and ch.entries[k][1]) or ch.close
+  else
+    -- цепочки нет: своя, перед первым item трека (или перед концом трека)
+    local pos = #lines
+    for i, l in ipairs(lines) do if l:match('^%s*<ITEM') then pos = i; break end end
+    if pos == #lines and lines[#lines]:match('^%s*>%s*$') then pos = #lines end
+    seg = '<FXCHAIN\nSHOW 0\nLASTSEL 0\nDOCKED 0\n' .. seg .. '\n>'
+    at = pos
+  end
+  local segl = split_lines(seg)
+  for i = #segl, 1, -1 do table.insert(lines, at, segl[i]) end
+  return table.concat(lines, '\n')
+end
+function E.fx_cut_chunk(track, fxi)       -- текст эффекта fxi (0-based) трека, до удаления
+  if model.is_take(track) then return nil end
+  local ok, chunk = R.GetTrackStateChunk(track, '', false)
+  if not ok then return nil end
+  return E.chunk_fx_get(chunk, fxi + 1)
+end
+function E.fx_paste_chunk(track, di, seg)  -- вставить на место di (0-based)
+  if model.is_take(track) then return false end
+  local ok, chunk = R.GetTrackStateChunk(track, '', false)
+  if not ok then return false end
+  local out = E.chunk_fx_put(chunk, di + 1, seg, R.genGuid and function() return R.genGuid('') end or nil)
+  local done
+  run('fx paste', function() done = R.SetTrackStateChunk(track, out, false) end)
+  if model then model.invalidate() end
+  return done
+end
 function E.fx_copy(src, si, dst, di)
   run('fx copy', function() copy_fx(src, si, dst, di, false) end)
   if model then model.invalidate() end

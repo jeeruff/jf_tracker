@@ -1201,12 +1201,18 @@ ctx = {
     local col = dsp_target(); local fxs = col and col.fx or {}
     if not fxs[k0] then vim.msg = 'dsp: no fx'; return end
     local names = {}
+    -- 9 окт: удаление = вырезание: текст эффектов — в регистр (p / P вставят)
+    if not col.take then
+      local segs = {}
+      for k = k0, math.min(k1, #fxs) do local sg = edit.fx_cut_chunk(col.track, fxs[k].i); if sg then segs[#segs + 1] = sg end end
+      if #segs > 0 then state.fx_reg = { chunk = table.concat(segs, '\n'), name = fxs[k0].name .. (#segs > 1 and (' +' .. (#segs - 1)) or '') } end
+    end
     edit.run('fx delete', function()
       for k = math.min(k1, #fxs), k0, -1 do names[#names + 1] = fxs[k].name; model.fxapi(col.track).Delete(col.track, fxs[k].i) end
     end)
     model.invalidate()
     dsp_sel.fx = math.max(1, k0 - 1); dsp_sel.param = 1
-    vim.msg = 'fx deleted: ' .. table.concat(names, ', ') .. ' (u / Cmd+Z undo)'
+    vim.msg = 'fx cut: ' .. table.concat(names, ', ') .. ' - p / P pastes it (u undo)'
   end,
   dsp_yank = function(k)
     local col, f = ctx.dsp_fx(k)
@@ -1218,6 +1224,15 @@ ctx = {
     local reg = state.fx_reg
     local col, f = ctx.dsp_fx(k)
     if not (reg and col) then vim.msg = 'fx register empty (yy)'; return end
+    if reg.chunk then                                   -- 9 окт: вырезанный эффект (x / dd) — из текста
+      if col.take then vim.msg = 'cut fx paste goes to a track chain (not a take)'; return end
+      local di = f and (after and f.i + 1 or f.i) or model.fxapi(col.track).GetCount(col.track)
+      if edit.fx_paste_chunk(col.track, di, reg.chunk) then
+        dsp_sel.fx = f and (after and k + 1 or k) or 1
+        vim.msg = 'fx paste: ' .. reg.name
+      else vim.msg = 'fx paste failed' end
+      return
+    end
     if not (reaper.ValidatePtr(reg.track, 'MediaTrack*') or model.is_take(reg.track)) then vim.msg = 'yanked fx owner is gone'; return end
     local RA = model.fxapi(reg.track)
     local si
@@ -9915,11 +9930,21 @@ local function frame()
 
   -- 9 окт: панели pm / browser — режим модуля браузера по фокусу (pm — своя
   -- панель; браузеру — последний файловый режим)
+  -- 9 окт (исправлено): у браузера и pm один модуль и один список строк —
+  -- режим переключается целиком (set_mode, список заново) у той панели,
+  -- что видна; видны обе — у той, что в фокусе (вторая — подсказка)
   if state.panes_ui and not state.pm_big then
     B.panes = true
     if B.mode ~= 'pm' and B.mode ~= 'fx' then B.bmode = B.mode end
-    if state.focus == 'pm' then B.mode = 'pm'
-    elseif B.mode == 'pm' or B.mode == 'fx' then B.mode = B.bmode or 'files' end
+    local function vis(id) local c = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]; return c ~= nil and c.active_id == id end
+    local vb, vp = vis('browser'), vis('pm')
+    local want
+    if vp and not vb then want = 'pm'
+    elseif vb and not vp then want = 'browser'
+    elseif vb and vp then want = (state.focus == 'pm' and 'pm') or (state.focus == 'browser' and 'browser') or ctx.b_owner or 'browser' end
+    if want == 'pm' and B.mode ~= 'pm' then B.set_mode('pm')
+    elseif want == 'browser' and (B.mode == 'pm' or B.mode == 'fx') then B.set_mode(B.bmode or 'files') end
+    ctx.b_owner = want or ctx.b_owner
   else B.panes = nil end
   -- 9 окт: трек курсора левее начала прокрутки (колонки сменили ширину —
   -- огибающая, свёртка) — прокрутка к нему, а не «пропавший» трек
@@ -10568,11 +10593,11 @@ local function frame()
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
-      local m = B.mode; B.mode = 'pm'
-      local ok, r = pcall(B.draw, U, Lx, x, y, w, h)
-      B.mode = m
-      if not ok then error(r) end
-      return r
+      if B.mode ~= 'pm' then                        -- модуль сейчас у браузера (обе панели видны)
+        U.text(x + Lx.pad, y + 2, ctx.fit('pm and the browser share one module - click here to show the projects', w - 2 * Lx.pad), U.GREY)
+        return 'pmhere'
+      end
+      return B.draw(U, Lx, x, y, w, h)
     end or nil,
     browser_draw = (state.side or state.panes_ui) and function(Lx, x, y, w, h)   -- панели: у браузера свой лист
       -- вкладка fx (браузер слева): список эффектов внутри браузера
@@ -10581,6 +10606,10 @@ local function frame()
         return FB.draw(U, Lx, fx, fy, fw, fh, state.focus == 'fxb', ctx.fit)
       end or nil
       if not B.fx_draw and B.mode == 'fx' then B.mode = 'files' end
+      if B.panes and B.mode == 'pm' then                -- 9 окт: модуль сейчас у панели pm
+        U.text(x + Lx.pad, y + 2, ctx.fit('the browser and pm share one module - click here to show the files', w - 2 * Lx.pad), U.GREY)
+        return 'browserhere'
+      end
       return B.draw(U, Lx, x, y, w, h)
     end or nil,
     -- модуль слайсов (4 окт): список слайсов выбранного инструмента + скролл-бар
