@@ -23,6 +23,8 @@ local U, get_peaks, MX
 D.font_id = 0
 D.hint = nil   -- функция сбора целей подсказок (kind, x, y, w, h, data); ставит main
 local function hint(kind, x, y, w, h, data) if D.hint then D.hint(kind, x, y, w, h, data) end end
+-- рамка выделения Ctrl-мыши (Cmd+щелчок, 8 окт) — объявлена до всех рисовальщиков
+local function csel_frame(x, y, w, h) U.set(U.CYAN); gfx.rect(x, y, w, h, 0) end
 local ms, TH   -- объявлены ниже (set_font)
 
 function D.init(u, peaks_fn, matrix)
@@ -2921,7 +2923,6 @@ function D.csel_on(tid, fx, p)
   if p then return S.sel['fx|' .. tostring(tid) .. '|' .. tostring(fx) .. '|' .. tostring(p)] ~= nil end
   return S.sel['trk|' .. tostring(tid) .. '|' .. tostring(fx)] ~= nil
 end
-local function csel_frame(x, y, w, h) set(U.CYAN); gfx.rect(x, y, w, h, 0) end
 D.csel_frame = csel_frame
 
 local bc_w, bc_h = 0, 0
@@ -3032,7 +3033,47 @@ function D.frame(L, snap, rows, state, info)
     if c.folded then
       -- свёрнут в полоску (4 окт): имя вертикально во всю высоту шапки
       hset(rbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
-      D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, L.header_h - 5, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
+      -- 9 окт: в микшере у полоски — фейдер в знак шириной (метр + риска
+      -- уровня); имя — над ним. Тянуть / f / Ctrl — как у большого
+      local fy0, fy1
+      if L.mixer then
+        if L.mix_bottom then
+          fy0, fy1 = L.mix_y + 4, L.mix_y + L.mix_h - 3
+          hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
+          set(D.SEP); gfx.rect(c.x, L.mix_y, c.w + 1, D.SEPW, 1)
+        else
+          fy0, fy1 = hy + 2 * L.rh + 1 + math.floor(L.mix_rows * L.rh / 3), hy + (2 + L.mix_rows) * L.rh - 2
+        end
+      end
+      local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5)
+      D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
+      if fy0 and fy1 - fy0 >= 12 then
+        local fx0, fw, th = c.x + 2, c.w - 3, fy1 - fy0
+        local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
+        local live = info.trs_live
+        local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
+        local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
+        local hotf = mx >= fx0 and mx < fx0 + fw and my >= fy0 and my < fy1
+        local ks = info.kslider
+        local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
+        local function yp(d) return fy1 - 2 - math.floor((th - 4) * D.fader_pos(d) + 0.5) end
+        set(dark); gfx.rect(fx0, fy0, fw, th, 1)
+        set((hotf or kon) and U.AMBER or U.LINE); gfx.rect(fx0, fy0, fw, th, 0)
+        if info.peaks then
+          local pl, pr = info.peaks(col)
+          local pk = math.max(pl or 0, pr or 0)
+          local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+          if pdb > -60 then
+            local ya = yp(pdb)
+            set(pdb > 0 and U.RED or (pdb > -6 and U.AMBER or U.GREEN)); gfx.rect(fx0 + 2, ya, math.max(1, fw - 4), fy1 - 2 - ya, 1)
+          end
+        end
+        set(U.readable(U.GREY, dark, 3)); gfx.rect(fx0 + 1, yp(0), 2, 1, 1)                        -- риска 0 dB
+        set(U.readable((hotf or kon) and U.AMBER or U.TEXT, dark, 4)); gfx.rect(fx0 + 1, yp(db) - 1, fw - 2, 3, 1)
+        if hotf then hover.trs = { col = col, what = 'vol', vert = true, y0 = fy1 - 2, h = th - 4, sv = math.max(0, math.min(1, (fy1 - 2 - my) / math.max(1, th - 4))) } end
+        if D.csel_on(col.guid, 'vol') then csel_frame(fx0, fy0, fw, th) end
+        hint('trs', fx0, fy0, fw, th, { col = col, what = 'vol' })
+      end
     else
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
@@ -3171,7 +3212,10 @@ function D.frame(L, snap, rows, state, info)
         end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local lblw0 = ms('-48') + 2
-        local fx_w = math.min(lw1 - 2 * L.pad - indent, lblw0 + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
+        -- 9 окт: по умолчанию — узкая коробка 5 знаков без подписей; big fader
+        -- (и pt-mode) — с подписями dB слева
+        local bigf = state.bigfader or state.ptmode
+        local fx_w = math.min(lw1 - 2 * L.pad - indent, (bigf and lblw0 or 0) + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
         -- эффекты сбоку, если влезают 5 знаков — тогда фейдер на всю высоту
         -- полосы; иначе под ним 3 строки эффектов. Высота фейдера при этом
         -- одна на всех треках: решает ширина трека, а она у треков своя —
@@ -3202,12 +3246,12 @@ function D.frame(L, snap, rows, state, info)
         local ks = info.kslider
         local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
         if kon then set(U.AMBER); gfx.rect(c.x + 1, y1 - 1, c.w - 1, H, 0) end   -- полоса под клавиатурой (щелчок / f): k j громкость, h l панорама
-        local lblw = (fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
+        local lblw = (bigf and fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
         local bx0, bw0 = sx + lblw, fx_w - lblw
         local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
         local tick = U.readable(U.GREY, dark, 3)
-        set(dark); gfx.rect(bx0, ty0 - 6 - L.rh, bw0, th + 9 + L.rh, 1)
-        set((hot or kon) and U.AMBER or U.LINE); gfx.rect(bx0, ty0 - 6 - L.rh, bw0, th + 9 + L.rh, 0)
+        set(dark); gfx.rect(bx0, ty0 - 6, bw0, th + 9, 1)
+        set((hot or kon) and U.AMBER or U.LINE); gfx.rect(bx0, ty0 - 6, bw0, th + 9, 0)
         -- метр: пики трека, шкала та же, что у фейдера (метки совпадают);
         -- удержание пика __ (1.5 с, потом падает) — своё, только рисунок;
         -- максимум цифрами сверху и клип (> 0 dB, красное ==) — НАТИВНЫЕ
@@ -3240,10 +3284,14 @@ function D.frame(L, snap, rows, state, info)
           end
           if hold.clip then set(U.RED); gfx.rect(mx0 + 1, ty0 - 2, mw - 2, 1, 1); gfx.rect(mx0 + 1, ty0 - 4, mw - 2, 1, 1) end
         end
-        local ptxt = hold.max <= -60 and '-inf' or ('%+.1f'):format(hold.max)
-        local pty = ty0 - 5 - L.rh
-        text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, dark, 3) or U.readable(U.TEXT, dark, 4))
-        if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 4 then hover.mixpk = col.track end
+        -- 9 окт: макс. пик — строкой сразу над коробкой, приглушённо; нет
+        -- сигнала — пусто (без -inf)
+        local pty = ty0 - 6 - L.rh
+        if hold.max > -60 then
+          local ptxt = ('%+.1f'):format(hold.max)
+          text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3))
+        end
+        if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 6 then hover.mixpk = col.track end
         local last_ly
         for _, m in ipairs({ 6, 0, -6, -12, -24, -48 }) do
           local yy = ypos(m)

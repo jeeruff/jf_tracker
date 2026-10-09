@@ -178,6 +178,7 @@ local state = {
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
   pianosmall = flag('pianosmall', false),        -- маленькая клавиатура: клавиша по букве (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
+  bigfader = flag('bigfader', false),             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
@@ -451,7 +452,7 @@ local function save_win()
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2103,7 +2104,7 @@ ctx = {
     elseif what == 'paste' then
       if not state.mx_clip then vim.msg = 'matrix: clipboard empty (Ctrl+C)'; return end
       local n
-      edit.run('matrix paste', function() n = alias.cells_paste(seq, snap, MX.cur.ri, MX.cur.ci, state.mx_clip) end)
+      edit.run('matrix paste', function() n = alias.cells_paste(seq, snap, MX.cur.ri, math.max(1, MX.cur.ci), state.mx_clip) end)
       vim.msg = ('matrix: pasted %d item(s)'):format(n or 0)
     end
     MX.anchor = nil
@@ -3088,7 +3089,7 @@ ctx = {
     vim.msg = 'top panel fits the sample properties'
   end,
   hints_on = function() return state.hints end,
-  mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, MX.cur.ci) end,
+  mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, math.max(1, MX.cur.ci)) end,
   loop_cells = function()
     if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
       loop_cache.snap, loop_cache.seq, loop_cache.grid = snap, seq, GD.cells(snap, seq)
@@ -5460,6 +5461,7 @@ ctx = {
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
+      flag('bigfader', 'big fader', 'mixer: a wide fader with dB marks left of it (+6 0 -6 ...); off - a narrow box, marks as ticks only. Always big in pt-mode'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
@@ -8133,6 +8135,7 @@ function ctrl_action(name, delta)
       qi.set(qi.values[(k + ((delta or 0) < 0 and -2 or 0)) % #qi.values + 1])
     end
     relayout(); vim.msg = qi.label .. ': ' .. tostring(qi.get())
+    ctx.dlog(('quick %s -> %s'):format(tostring(name), tostring(qi.get())))
     return
   end
   local col = cur_col()
@@ -11992,6 +11995,14 @@ local function frame()
       if code then c = code; inject_cap = tonumber(cap) end
     end
   end
+  -- Ctrl+J (9 окт): на macOS код 10 до gfx.getchar не доходит (Ctrl+H K L
+  -- приходят) — физическая J при зажатом Control, только когда окно в фокусе
+  if c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 32 ~= 0 and gfx.mouse_cap & 4 == 0
+     and (gfx.getchar(65536) & 2) ~= 0 then
+    local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
+    if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10 end
+  end
+  ctx.ctrlj_t = reaper.time_precise()
   local quit = false
   if c == keys.f1 then if ctx.mods().shift then state.khelp_big = false; ctx.tutorial() else ctx.help_big() end; c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end

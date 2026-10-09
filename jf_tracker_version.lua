@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'mixer: a narrow fader by default (Options: big fader - with dB marks, always in pt-mode); max peak above the box, empty without signal; folded tracks get a one-char fader',
+    'matrix: the cursor reaches the region name and its < NN > number (h past the first track); Ctrl+j works on macOS',
     'dev notes (debug on): a third tab of the notes editor - CHECK.md of the tracker folder, the list of what to check; it reloads when the file changes outside; also P n d',
     'DSP: dragging a parameter no longer lags (no model rebuild per frame, only on release)',
     'DSP: f on a parameter (or a click) - h l change its value (H L coarse), j k next parameter, Esc - back to moving between effects',

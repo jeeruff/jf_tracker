@@ -29,7 +29,8 @@ MX.focus = false
 MX.anchor = nil        -- якорь блока (Shift+hjkl / v); блок = anchor..cur
 function MX.block()
   local a = MX.anchor or MX.cur
-  return math.min(a.ri, MX.cur.ri), math.max(a.ri, MX.cur.ri), math.min(a.ci, MX.cur.ci), math.max(a.ci, MX.cur.ci)
+  -- колонки номера / имени (ci −1 / 0) в блок не входят — только треки
+  return math.min(a.ri, MX.cur.ri), math.max(a.ri, MX.cur.ri), math.max(1, math.min(a.ci, MX.cur.ci)), math.max(1, a.ci, MX.cur.ci)
 end
 
 function MX.init(u, c) U, ctx = u, c end
@@ -423,6 +424,12 @@ function MX.draw(L, snap, regions, info)
       U.text(xn, y + 1, ('%02d'):format((info.pat_num and info.pat_num(rg) or rg.idx) % 100), U.TEXT)
       U.text(xb, y + 1, '>', hot_next and U.AMBER or U.GREY)
       if hot_prev then hover.prev = ri elseif hot_next then hover.next = ri end
+    end
+    -- курсор на номере (9 окт): Enter / < > — паттерн слота
+    if MX.cur.ri == ri and MX.cur.ci == -1 then
+      U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(xa - 2, y, xb + aw + 3 - xa + 2, L.rh, 0)
+    end
+    if not rg.gap then
       if ctx.hint then ctx.hint('mxprev', xa, y, aw + 3, L.rh, ri); ctx.hint('mxnext', xb, y, aw + 3, L.rh, ri) end
     end
     -- имя и длина — интерактивные (1 окт): dblclick имени → :name, клик по
@@ -433,6 +440,7 @@ function MX.draw(L, snap, regions, info)
     if nw > 0 then
     U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
+    if MX.cur.ri == ri and MX.cur.ci == 0 then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
     do
@@ -548,7 +556,8 @@ end
 -- ── навигация и действия ──────────────────────────────────────────────────
 local function clamp(regions, ncols)
   if MX.cur.ri < 1 then MX.cur.ri = 1 elseif MX.cur.ri > #regions then MX.cur.ri = math.max(1, #regions) end
-  if MX.cur.ci < 1 then MX.cur.ci = 1 elseif MX.cur.ci > ncols then MX.cur.ci = math.max(1, ncols) end
+  -- 9 окт: левее треков — имя региона (ci 0) и номер «< NN >» (ci −1)
+  if MX.cur.ci < -1 then MX.cur.ci = -1 elseif MX.cur.ci > ncols then MX.cur.ci = math.max(1, ncols) end
 end
 
 -- Живая матрица: движение курсора ведёт edit-курсор REAPER к региону
@@ -558,10 +567,11 @@ end
 MX.queued = nil
 
 function MX.goto_cell(regions, snap, ri, ci)
+  if ci == 0 and MX.fold then ci = MX.cur.ci > 0 and -1 or 1 end   -- свёрнута: имени нет — через него
   MX.cur.ri, MX.cur.ci = ri, ci
   clamp(regions, #snap.cols)
   local rg = regions[MX.cur.ri]
-  if rg then ctx.scroll_to(rg.r0, MX.cur.ci); ctx.region_cursor(rg) end
+  if rg then ctx.scroll_to(rg.r0, math.max(1, MX.cur.ci)); ctx.region_cursor(rg) end
 end
 
 function MX.space(regions)
@@ -638,6 +648,11 @@ function MX.key(c, regions, snap)
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
+  -- 9 окт: курсор на имени (ci 0) — Enter / i / r переименовать; на номере
+  -- (ci −1) — Enter следующий паттерн слота
+  if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
+  if MX.cur.ci == -1 and c == 13 then ctx.slot_cycle(MX.cur.ri, 1); return true end
+  if MX.cur.ci < 1 and (ch == 'm' or ch == 'M' or ch == 'x' or c == 22 or c == 3 or c == 24) then ctx.msg('on the region name / number - move to a track cell (l)'); return true end
   -- слой лупов: цифры+Enter, > < + - = — лупы ячейки (вместо паттерна / длины)
   if MX.loops and ctx.mx_loop_key and ctx.mx_loop_key(c) then return true end
   -- счётчик (2 окт): 4+ — четыре региона одним шагом
