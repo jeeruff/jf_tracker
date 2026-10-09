@@ -286,6 +286,21 @@ state.panes = (function()
 end)()
 -- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
 if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
+-- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
+-- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
+if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'macros') then
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    if host then
+      local lf = PNm.find(state.panes, host)
+      local act = lf and lf.active
+      PNm.stack(state.panes, 'macros', host)
+      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
+    end
+  end
+  reaper.SetExtState(EXT, 'panes_mig6', '1', true)
+end
 -- 9 окт (миграция 5): вкладка macros — в стек вкладок верхнего модуля
 if state.panes and reaper.GetExtState(EXT, 'panes_mig5') ~= '1' then
   local PNm = draw.panes
