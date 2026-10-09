@@ -7568,6 +7568,67 @@ ctx = {
       if g.ci == ci and not g.hidden then vim.cur.fi, vim.cur.field = i, 1; vim.ensure_visible(); vim.msg = (g.col and g.col.name or '') .. ' (Tab)'; return end
     end
   end,
+  -- аккорд вводом (9 окт, Option+нота в INSERT): первая нота — в подколонку
+  -- курсора, следующие — рядом (новая / свободная подколонка той же строки),
+  -- курсор переходит на неё; все ноты аккорда тянутся, пока идёт ввод (длина
+  -- в строках по темпу). 1.5 с без Option+нот или курсор ушёл — аккорд
+  -- закончен: длина зафиксирована, курсор — под аккорд, в первую подколонку
+  chord = nil,
+  chord_note = function(f, lane, pitch, inst)
+    local now = reaper.time_precise()
+    local ch = ctx.chord
+    if not ch or ch.track ~= f.col.track or ch.row ~= vim.cur.row then
+      if ch then ctx.chord_end() end
+      ch = { track = f.col.track, row = vim.cur.row, t0 = now, n = 0, fi0 = vim.cur.fi, pitches = {}, lane_idx = f.col.fixed and lane.idx or nil }
+      ctx.chord = ch
+    end
+    edit.beside = ch.n > 0
+    if ch.n == 0 then
+      local cell = f.sub and f.sub[vim.cur.row]
+      if cell and (cell.kind == 'audio' or cell.kind == 'midi') then edit.delete({ cell }, state.lpb) end   -- первая нота — перезапись, как обычно
+    end
+    local src = (ctx.inst_src and ctx.inst_src(f.col, inst)) or (inst and inst.item)
+    edit.insert_note(ch.track, ch.lane_idx, state.lpb, ch.row, pitch, vim.vel, math.max(1, vim.step), src)
+    edit.beside = false
+    if state.preview then ctx.preview(ch.track, pitch, src, ch.row, 1) end
+    ch.n, ch.t_last, ch.follow = ch.n + 1, now, pitch
+    ch.pitches[#ch.pitches + 1] = pitch
+    model.invalidate()
+    ctx.chord_len(ch, false)
+    vim.msg = ('chord: %d note(s) - Option+note adds, a pause ends it'):format(ch.n)
+  end,
+  -- головы аккорда: ноты строки ch.row трека с высотами аккорда
+  chord_heads = function(ch)
+    local f0, f1
+    for i, f in ipairs(L.flat) do if f.col and f.col.track == ch.track and not f.env then f0 = f0 or i; f1 = i end end
+    if not f0 then return {} end
+    local want = {}
+    for _, p in ipairs(ch.pitches) do want[p] = true end
+    local out = {}
+    for _, h in ipairs(vim.heads_in(f0, f1, ch.row, ch.row)) do
+      local p = h.pitch or (h.semis and (model.BASE_NOTE + math.floor(h.semis + 0.5)))
+      if p and want[p] then out[#out + 1] = h end
+    end
+    return out
+  end,
+  chord_len = function(ch, final)
+    local rd = math.max(1e-3, edit.row_time(ch.row + 1, state.lpb, 0) - edit.row_time(ch.row, state.lpb, 0))
+    local rows = math.max(math.max(1, vim.step), math.floor(((final and ch.t_last or reaper.time_precise()) - ch.t0) / rd + 0.5) + (final and 1 or 0))
+    ch.rows = rows
+    local heads = ctx.chord_heads(ch)
+    if #heads > 0 then edit.note_off(heads, state.lpb, ch.row + rows - (edit.OFF_END and 1 or 0)) end
+  end,
+  chord_end = function()
+    local ch = ctx.chord
+    if not ch then return end
+    ctx.chord = nil
+    ctx.chord_len(ch, true)
+    model.invalidate()
+    vim.cur.fi = ch.fi0
+    vim.cur.row = ch.row + (ch.rows or 1)
+    vim.ensure_visible()
+    vim.msg = ('chord: %d note(s), %d row(s)'):format(ch.n, ch.rows or 1)
+  end,
   toggle_mixer = function()
     state.mixer = not state.mixer
     relayout()
@@ -10156,6 +10217,19 @@ local function frame()
       if math.abs(v) < 0.02 then v = 0 end
       if math.abs(v - ((edit.sw.on and edit.sw.amt) or 0)) > 0.004 then edit.swing_set(v ~= 0, v); vim.msg = ctx.swing_text() end
     else ctx.swdrag = nil end
+  end
+  -- 9 окт: аккорд вводом — курсор за новой нотой, пауза 1.5 с / курсор ушёл — конец
+  if ctx.chord and L and L.flat then
+    local ch = ctx.chord
+    if ch.follow then
+      for i, f in ipairs(L.flat) do
+        local h = f.col and f.col.track == ch.track and f.sub and f.sub[ch.row]
+        if h and (h.kind == 'audio' or h.kind == 'midi') and (h.pitch or (h.semis and model.BASE_NOTE + math.floor(h.semis + 0.5))) == ch.follow and h.row0 == ch.row then
+          vim.cur.fi = i; ch.follow = nil; ch.fi_last = i
+        end
+      end
+    end
+    if reaper.time_precise() - (ch.t_last or 0) > 1.5 or vim.cur.row ~= ch.row then ctx.chord_end() end
   end
   -- 9 окт: note-off превью плагина-инструмента
   if ctx.note_offs and #ctx.note_offs > 0 then

@@ -1553,6 +1553,12 @@ function V.key_impl(c)
           local ni = ctx.ins_next(f.col)
           if ni then inst = (f.col.pool or {})[ni] end
         end
+        -- 9 окт: Option+нота — аккорд вводом: нота в следующую подколонку,
+        -- курсор туда, длина аккорда — по времени ввода (ctx.chord_note)
+        if how == 'beside' and ctx.chord_note then
+          ctx.chord_note(f, lane, pitch, inst)
+          return
+        end
         -- нота поверх события: ПЕРЕЗАПИСЬ (старое удаляется), Option+нота —
         -- рядом, в новой подколонке, даже та же нота (решение пользователя 2 окт)
         local beside = how == 'beside'
@@ -1582,8 +1588,8 @@ function V.key_impl(c)
   -- ноты (звучат; Cmd+нота — с удержанием), z / x — октава, Esc / Enter —
   -- INSERT (i здесь — нота). Выключена — чистый Vim.
   if (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.pending and not V.op then
-    if c == ('m'):byte() then                          -- 9 окт: m — микшер (клавиатура — Shift+Tab)
-      if ctx.toggle_mixer then ctx.toggle_mixer() end
+    if c == ('m'):byte() then                          -- 9 окт: m — клавиатура снова (микшер — zm)
+      if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end
       return
     end
     if V.piano then
@@ -1677,6 +1683,7 @@ function V.key_impl(c)
         -- zC — прежний fold: трек в полоску шириной в символ
         local f = flat()[V.cur.fi]
         if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
+      elseif c == ('m'):byte() then if ctx.toggle_mixer then ctx.toggle_mixer() end   -- 9 окт: zm — микшер вкл / выкл
       elseif c == ('M'):byte() then   -- zM (7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
         local any = false
         for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
