@@ -3651,7 +3651,7 @@ function D.frame(L, snap, rows, state, info)
             elseif ms(ml) <= bw0 - 2 then
               -- 9 окт: узкий фейдер — метки внутри коробки, серым (f прыгает на них)
               local lx = bx0 + math.floor((bw0 - ms(ml)) / 2)
-              text(lx, ly, ml, U.readable(U.GREY, dark, 3))
+              text(lx, ly, ml, U.mix(U.GREY, dark, 0.45))   -- 9 окт: метки внутри коробки — темнее
               hint('trsmark', lx, ly, ms(ml), L.rh, { col = col, db = m })
               last_ly = ly
             end
