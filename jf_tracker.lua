@@ -3190,10 +3190,19 @@ ctx = {
       vim.msg = ('alias of "%s": %d item(s), linked - MIDI pooled, items grouped (clone C: a free copy, U: make unique)'):format(alias_src.name, n)
       return
     end
+    -- 9 окт (Paketti): clone без заглушённых — копия, где у muted-треков пусто
+    local nomute = kind == 'clone_nomute'
+    if nomute then kind = 'clone' end
     if kind == 'clone' then
       sl = alias.slot_snapshot(seq, snap, ri)
       if not sl then return end
       sl.name = alias.free_name(regions, sl.name)
+      if nomute and sl.clip and sl.clip.cells[1] then
+        for k in pairs(sl.clip.cells[1]) do
+          local c2 = snap.cols[k]
+          if c2 and (c2.muted or (c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.GetMediaTrackInfo_Value(c2.track, 'B_MUTE') == 1)) then sl.clip.cells[1][k] = {} end
+        end
+      end
     else
       local t = before and rg.pos or rg.rgnend
       local qn = reaper.TimeMap2_timeToQN(0, t)
@@ -3210,7 +3219,7 @@ ctx = {
     if kind == 'empty' then
       vim.msg = 'new 1-bar slot - n: name, = / [ ]: length'
     else
-      vim.msg = ('%s slot "%s": %d item(s)%s'):format(kind == 'clone' and 'cloned' or 'put', sl.name, n, kind == 'clone' and ' - free copy, no link' or '')
+      vim.msg = ('%s slot "%s": %d item(s)%s'):format(kind == 'clone' and 'cloned' or 'put', sl.name, n, kind == 'clone' and (nomute and ' - free copy, muted tracks left empty' or ' - free copy, no link') or '')
     end
   end,
   -- make unique (U): повтор под курсором матрицы отвязать — своё имя, свой пул, без группы

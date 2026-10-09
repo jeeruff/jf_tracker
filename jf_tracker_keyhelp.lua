@@ -155,6 +155,7 @@ KH.PAGES = {
     { k = '< >', d = 'switch pattern of slot (previous / next)' },
     { k = 'h past the first track', d = 'the cursor goes to the region name (Enter / i - rename) and to its number < NN > (Enter - next pattern)' },
     { k = 'Ctrl+h j k l', d = 'move like h j k l' },
+    { k = 'Ctrl+Up Down', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },
     { k = 'M', d = 'mute / unmute cell (Shift+m)' },
     { k = 'Space', d = 'play from slot, or queue it while playing' },
     { k = 'F', d = 'fold the matrix: slot numbers, track names and cells only (button fold)' },

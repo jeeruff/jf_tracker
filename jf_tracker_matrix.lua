@@ -662,6 +662,9 @@ function MX.key(c, regions, snap)
   local count = MX.count
   MX.count = nil
   if OPS[ch] then MX.pending = ch; ctx.msg(ch .. '...'); return true end
+  -- Ctrl+Up / Ctrl+Down (9 окт, как Paketti в Renoise): дубль слота выше / ниже,
+  -- в копии заглушённые треки пустые
+  if mods.ctrl and (c == 30064 or c == 1685026670) then ctx.slot_new('clone_nomute', c == 30064); return true end
   if ch == 'j' or c == 1685026670 then MX.goto_cell(regions, snap, MX.cur.ri + 1, MX.cur.ci)
   elseif ch == 'k' or c == 30064 then MX.goto_cell(regions, snap, MX.cur.ri - 1, MX.cur.ci)
   elseif ch == 'h' or c == 1818584692 then MX.goto_cell(regions, snap, MX.cur.ri, MX.cur.ci - 1)

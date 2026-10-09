@@ -6,6 +6,7 @@ V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
     'mixer: a narrow fader by default (Options: big fader - with dB marks, always in pt-mode); max peak above the box, empty without signal; folded tracks get a one-char fader',
+    'matrix: Ctrl+Up / Ctrl+Down duplicate the slot above / below with muted tracks cleared (Paketti); transport buttons: cassette symbol over the word',
     'harmonizer: compact degree buttons; the chord on a staff and as a guitar tab (s / t); pan knob option, dB marks inside the narrow fader',
     'mixer: pan as a knob when the fader is narrow (drag up / down); folded tracks with MIDI lanes fold to one char too; Ctrl+Option tracks start from the track under the mouse',
     'matrix: the cursor reaches the region name and its < NN > number (h past the first track); Ctrl+j works on macOS',

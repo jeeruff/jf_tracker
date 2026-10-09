@@ -2514,8 +2514,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
       local sym = b[5] or ''
-      text(bx + math.floor((bw - ms(sym)) / 2), by + 1 - (D.SPACE or 0), sym, tc)
-      text(bx + math.floor((bw - ms(b[2])) / 2), by + L.rh - 1 - (D.SPACE or 0), b[2], hot and U.AMBER or (on and b[3] or U.GREY))
+      -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
+      local gap2 = math.max(0, math.floor((bh - 2 * L.th - 3) / 2))
+      text(bx + math.floor((bw - ms(sym)) / 2), by + 2 + gap2, sym, tc)
+      text(bx + math.floor((bw - ms(b[2])) / 2), by + bh - 1 - L.th - gap2, b[2], hot and U.AMBER or (on and b[3] or U.GREY))
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
