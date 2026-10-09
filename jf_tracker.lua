@@ -6813,8 +6813,11 @@ ctx = {
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if state.panes_ui and L and L.pn then
       -- панели (9 окт): фокус — только на видимую панель дерева (вкладки — 'top' + toptab)
+      -- скрытая панель при переходе в неё появляется (F-клавиши, Ctrl+Tab, / …), как open в tmux
       local id = f == 'top' and state.toptab or f
-      if f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and not draw.panes.visible(state.panes, id) then f = 'tracker' end
+      if f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and not draw.panes.visible(state.panes, id) then
+        if not draw.panes.show(state.panes, id) then f = 'tracker' end
+      end
       if f == 'top' then draw.panes.set_active(state.panes, state.toptab); state.top = true end
     else
     if f == 'browser' and not state.side then f = 'tracker' end
@@ -6837,6 +6840,14 @@ ctx = {
   -- Tab — вперёд по кругу, Shift-Tab — назад (dir = -1)
   toggle_focus = function(dir)
     dir = dir or 1
+    -- панели (9 окт): по кругу листов дерева (порядок обхода, трекер первым)
+    if state.panes_ui and L and L.pn then
+      local o, cur = L.pn.order, ctx.pane_cur()
+      local i = 1
+      for k, id in ipairs(o) do if id == draw.panes.active_of(state.panes, cur) then i = k end end
+      ctx.pane_focus(o[(i - 1 + dir) % #o + 1])
+      return
+    end
     if state.pm_big then ctx.set_focus('browser'); return end                -- big: фокус только у карточек
     if state.ss_big then ctx.set_focus('matrix'); return end
     -- по часовой (2 окт): трекер → инструменты → браузер → DSP → матрица → верхний док → трекер
@@ -10470,6 +10481,11 @@ local function frame()
           draw.panes.drag_grip(state.panes, L.pn, pd.g, cur - pd.last); pd.last = cur; relayout()
         end
       else ctx.pn_drag = nil end
+    elseif U.rclick and hover.ptab then
+      -- ПКМ по подписи — скрыть панель (вернуть: Ctrl+W g + буква, кнопка, :pane … show)
+      local id = hover.ptab.id
+      if ctx.pane_do(function() return draw.panes.hide(state.panes, id) end, 'pane ' .. id .. ' hidden (Ctrl+W g + letter shows it)') and ctx.pane_cur() == id then ctx.set_focus('tracker') end
+      U.rclick = false
     elseif U.click and hover.pgrip then
       local now = reaper.time_precise()
       if ctx.pn_click and now - ctx.pn_click < 0.35 then
