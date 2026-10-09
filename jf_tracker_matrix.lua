@@ -324,16 +324,17 @@ function MX.draw(L, snap, regions, info)
   -- Маркера нет — строка тусклая с «--», поле его создаст
   local function mark_row(mk, y, which)
     local c = mk.missing and U.GREY or (mk.rgb or U.CYAN)
-    U.set(c); gfx.rect(0, y + math.floor(L.rh / 2), W - 4, 1, 1)
     local ed = MX.mkedit and MX.mkedit.which == which
     local val = ed and (MX.mkedit.buf .. '_') or mk.bar
     local fw = math.max(U.measure(val), U.measure('000.0')) + 4
     local fx = L.pad
+    -- 9 окт: линия — от правого края ячейки (слева её обрезок читался как «--» мимо ячейки)
+    U.set(c); gfx.rect(fx + fw, y + math.floor(L.rh / 2), W - 4 - fx - fw, 1, 1)
     local lx = math.max(RW, fx + fw + L.pad) + L.pad
     local hot = mx >= fx and mx < fx + fw and my >= y and my < y + L.rh
     U.set(ed and U.BG or (hot and U.tint(U.AMBER, 0.3) or U.PANEL)); gfx.rect(fx, y, fw, L.rh, 1)
     U.set((ed or hot) and U.AMBER or U.LINE); gfx.rect(fx, y, fw, L.rh, 0)
-    U.text(fx + 2, y + 1, val, ed and U.AMBER or c)
+    U.text(fx + math.floor((fw - U.measure(val)) / 2), y + 1, val, ed and U.AMBER or c)   -- значение — посередине ячейки
     if hot then hover.btn = which == 'start' and 'mkstart' or 'mkend' end
     U.set(U.PANEL); gfx.rect(lx - 2, y, U.measure(mk.name) + 4, L.rh, 1)
     U.text(lx, y + 1, mk.name, c)

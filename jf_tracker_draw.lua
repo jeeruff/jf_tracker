@@ -649,6 +649,13 @@ local function rawset_col(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 -- >1 текст блитится аддитивно (чёрный фон картинки не виден)
 local function text(x, y, s, col, bg)
   if s == nil or s == '' then return end
+  -- 9 окт, стандарт: текст не выходит за модуль. D.clip = { x0, x1 } ставит
+  -- отрисовка модуля; всё, что правее x1, обрезается (fit), левее x0 — нет
+  local cl = D.clip
+  if cl then
+    if x >= cl[2] or x + ms(s) <= cl[1] then return end
+    if x + ms(s) > cl[2] then s = D.fit(s, cl[2] - x); if s == '' then return end end
+  end
   if bg then col, bg = mono(col), mono(bg) else col = mono_text(col) end   -- с подложкой (курсор) — без порога
   y = y + D.SPACE
   if D.SCALE == 1 then
@@ -3007,6 +3014,7 @@ function D.bigcur(b)
 end
 
 function D.frame(L, snap, rows, state, info)
+  D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 4))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
@@ -4385,6 +4393,7 @@ function D.frame(L, snap, rows, state, info)
   elseif L.dsp_h > 0 then
     local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
     local lx0 = L.browser_left and L.matrix_w or 0        -- браузер слева до самого низа (7 окт): DSP — правее него
+    D.clip = { lx0, L.win_w - 1 }                         -- 9 окт: ничего за правый край DSP
     set(U.PANEL); gfx.rect(lx0, dy, L.win_w - lx0, L.dsp_h, 1)
     set(D.SEP); gfx.rect(lx0, dy, L.win_w - lx0, D.SEPW, 1)
     local col = info.pool_col
@@ -4445,7 +4454,7 @@ function D.frame(L, snap, rows, state, info)
         hx = hx + bw + L.pad
       end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
-      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), gfx.w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
+      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), L.win_w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
     local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
@@ -4974,6 +4983,7 @@ function D.frame(L, snap, rows, state, info)
       D.hint_bar(L, fbw, hy3, L.win_w - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
     end
     L.dsp_rect = { fbw, dy, L.win_w - fbw, L.dsp_h }
+    D.clip = nil
   end
 
   -- кнопки у линии раздела трекер | правая панель (2 окт): > свернуть, < развернуть,
