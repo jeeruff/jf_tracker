@@ -448,7 +448,7 @@ function D.layout(snap, state, nregions)
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
   -- скопы треков — во вкладке scopes (3 окт), строки в шапке нет
   -- строка входа (3 окт, опция hdrin): in <вход> [smart] — под панорамой, лейны ниже
-  L.hr_in = (state.hdrin ~= false) and 1 or 0
+  L.hr_in = (state.hdrin ~= false and not (state.mixer and state.mixpos == 'bottom')) and 1 or 0   -- 9 окт: с нижним микшером вход — в его полосе
   L.hr_info = state.hdrinfo and 3 or 0             -- инструменты / инсерты / сенды в шапке (опция header info, 7 окт)
   -- микшер (8 окт, быстрая опция mixer): шапка разворачивается — вместо строк
   -- громкости и панорамы (2) полоса микшера: фейдер шириной в лейн, справа
@@ -3493,7 +3493,7 @@ function D.frame(L, snap, rows, state, info)
       if L.mixer and not c.master then
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + 5 * L.cw
-        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0)
+        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
         mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 6 * L.rh
         -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
         -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
@@ -3559,7 +3559,7 @@ function D.frame(L, snap, rows, state, info)
         if mixcol then
           local vert = ms('SRO') + 4 > D.mcb_w
           local rhh = vert and math.max(D.mcb_h, 3 * (L.rh - 4) + 4) or D.mcb_h
-          local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0)
+          local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
           if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
         end
         local rw = ms('SRO') + 4
@@ -3646,6 +3646,7 @@ function D.frame(L, snap, rows, state, info)
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
       local py = hy + 3 * L.rh + 1
       local px, pw = sx, sw
+      local mixin_y                                   -- 9 окт: строка входа в полосе нижнего микшера
       if L.mixer then
         -- 8 окт: полоса микшера. Сверху вниз: dB, панорама (две строки
         -- зарезервированы всегда), фейдер. Фейдер ОДНОГО размера на всех
@@ -3663,6 +3664,7 @@ function D.frame(L, snap, rows, state, info)
             if state.mixnames == 'top' then ny = y1; y1 = y1 + L.rh end
             text(c.x + L.pad, ny, fit(nm, c.w - 2 * L.pad), ncol)
           end
+          if state.hdrin ~= false and not c.master then H = H - L.rh; mixin_y = y1 + H end   -- вход — над именем, под эффектами
         end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local lblw0 = ms('-48') + 2
@@ -3878,9 +3880,11 @@ function D.frame(L, snap, rows, state, info)
       end   -- микшер / строки громкости и панорамы
       -- строка входа (3 окт): in <вход> — клик: список входов (fzf) под ней,
       -- повторный клик закрывает; smart — в DSP-модуле трека (4 окт)
-      if L.hr_in > 0 and info.input_name and not c.master then
-        local iy = hy + (2 + L.hr_vp) * L.rh + 1
+      if (L.hr_in > 0 or mixin_y) and info.input_name and not c.master then
+        local iy = mixin_y or (hy + (2 + L.hr_vp) * L.rh + 1)
         local iw = sw
+        local sx = sx
+        if mixin_y then sx, iw = c.x + L.pad, c.w - 2 * L.pad end   -- своя копия: sx ниже нужен строкам инфо
         local hot = mx >= sx and mx < sx + iw and my >= iy and my < iy + L.rh
         local open = info.in_open and info.in_open(col)
         if hot or open then set(open and U.tint(U.AMBER, 0.3) or D.CURROW); gfx.rect(sx, iy, iw, L.rh - 1, 1) end
