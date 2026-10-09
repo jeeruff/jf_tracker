@@ -805,6 +805,7 @@ ctx = {
       if it.get and it.key then local v = it.get(); if type(v) ~= 'table' and v ~= nil then t['o_' .. it.key] = v end end
     end
     for _, k in ipairs(ctx.SS_LAYOUT) do local v = state[k]; if v ~= nil and type(v) ~= 'table' then t[k] = v end end
+    do local z = state.panes.zoom; state.panes.zoom = nil; t.panes = draw.panes.encode(state.panes); state.panes.zoom = z end   -- дерево панелей (9 окт)
     local sets, order = ctx.ss_read()
     if not sets[name] then order[#order + 1] = name end
     sets[name] = t
@@ -819,6 +820,10 @@ ctx = {
       if v ~= nil and it.set and it.get and it.get() ~= v then pcall(it.set, v) end
     end
     for _, k in ipairs(ctx.SS_LAYOUT) do if t[k] ~= nil then state[k] = t[k] end end
+    if type(t.panes) == 'string' and t.panes ~= '' then   -- дерево панелей (9 окт); старые наборы его не трогают
+      local v = state.panes.v
+      state.panes = draw.panes.decode(t.panes); state.panes.v = v + 1
+    end
     if MX then MX.fold = state.mxfold end
     draw.set_font(state); model.invalidate()
     vim.msg = 'screenset: ' .. name
@@ -3045,6 +3050,36 @@ ctx = {
       if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
     end
   end,
+  -- :pane (9 окт): то же, что режим Ctrl+W, словами (для макросов и справки)
+  pane_cmd = function(arg)
+    local PN, m = draw.panes, state.panes
+    local w = {}
+    for t in (arg or ''):gmatch('%S+') do w[#w + 1] = t end
+    if #w == 0 then vim.msg = PN.encode(m); return end
+    if w[1] == 'reset' then ctx.pane_do(function() state.panes = PN.DEFAULT(); state.panes.v = m.v + 1; return true end, 'panes: default layout'); return end
+    for _, nm in ipairs(PN.LAYOUTS) do
+      if w[1] == nm then local p = PN.preset(nm, m); ctx.pane_do(function() state.panes = p; return true end, 'layout: ' .. nm); return end
+    end
+    local id = PN.parse_name(w[1])
+    if not id then vim.msg = 'pane: unknown panel ' .. w[1] .. ' (matrix browser lib main slices notes fx dsp rec item automation midi harmonizer scopes master video)'; return end
+    local op, other = w[2] or 'show', w[3] and PN.parse_name(w[3])
+    local SIDE = { left = 'l', right = 'r', top = 'u', bottom = 'd', up = 'u', down = 'd' }
+    local ok
+    if SIDE[op] then
+      ok = ctx.pane_do(function()
+        if not PN.visible(m, id) then PN.show(m, id) end
+        local moved = false
+        for _ = 1, 6 do if PN.move(m, id, SIDE[op]) then moved = true else break end end
+        return moved
+      end, 'pane ' .. id .. ' ' .. op)
+    elseif op == 'with' and other then ok = ctx.pane_do(function() return PN.stack(m, id, other) end, ('pane %s stacked with %s'):format(id, other))
+    elseif op == 'swap' and other then ok = ctx.pane_do(function() return PN.swap(m, id, other) end, ('pane %s <-> %s'):format(id, other))
+    elseif op == 'hide' then ok = ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden')
+    elseif op == 'show' then ok = ctx.pane_do(function() return PN.show(m, id) end, 'pane ' .. id .. ' shown'); ctx.pane_focus(id); ok = true
+    elseif op == 'zoom' then ok = ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
+    end
+    if not ok then vim.msg = 'pane: nothing to do (' .. (arg or '') .. ')' end
+  end,
   -- огибающие take у item lib (9 окт): только с точками — колонка ~ в lib,
   -- щелчок по ней открывает их во вкладке automation (лейны — по одной на
   -- огибающую). Кэш — по счётчику изменений проекта
@@ -5093,6 +5128,17 @@ ctx = {
   end,
   preview_stop = function() PV.stop() end,
   sample_big = function()
+    -- панели (9 окт): большой редактор = zoom листа item (повтор — назад)
+    if state.panes_ui and L and L.pn then
+      local PN = draw.panes
+      if not PN.visible(state.panes, 'sample') then PN.show(state.panes, 'sample') end
+      PN.set_active(state.panes, 'sample')
+      ctx.pane_do(function() return PN.zoom(state.panes, 'sample') end)
+      state.sample_big = state.panes.zoom == 'sample'
+      if state.sample_big then state.top = true; state.toptab = 'sample'; ctx.set_focus('top') end
+      vim.msg = state.sample_big and 'item zoomed (:big, Ctrl+W z - back)' or 'item back in its pane'
+      return
+    end
     state.sample_big = not state.sample_big
     if state.sample_big then state.top = true; state.toptab = 'sample'; ctx.set_focus('top') end
     vim.msg = state.sample_big and 'big sample editor: wheel zoom at the mouse, sideways / Shift+wheel scroll; :big or big - back' or 'sample editor back to the top panel'

@@ -555,7 +555,9 @@ function D.layout(snap, state, nregions)
   -- сайдбар, левая колонка) не рисуются: их рисует оболочка листов
   L.pn = nil
   if state.panes_ui and D.panes and state.panes then
-    L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0
+    -- zellij: подсказки клавиш панели в фокусе — одной строкой внизу окна, над статусом
+    L.pn_keys = state.hints and (L.rh + 1) or 0
+    L.status_h = (L.statpos == 'bottom' and (L.rh + 4) or 0) + L.pn_keys
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
     local c = lay.by_panel.tracker
@@ -5264,6 +5266,16 @@ function D.frame(L, snap, rows, state, info)
   -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
   -- по ширине матрица + трекер (tracker)
   local sx, sy, sw, sh = 0, gfx.h - L.status_h, gfx.w, L.status_h
+  -- панели (9 окт): строка клавиш панели в фокусе (как zellij), статус под ней
+  if L.pn and (L.pn_keys or 0) > 0 then
+    local f = info.focus
+    local page = (f == 'tracker' and (info.vmode == 'insert' and 'insert' or 'tracker'))
+      or (f == 'top' and D.panes.BY[info.toptab or ''] and D.panes.BY[info.toptab].hint)
+      or (f == 'browser' and (info.browser_page or 'browser')) or (f == 'slices' and 'inst') or f
+    set(U.PANEL); gfx.rect(0, sy, gfx.w, L.pn_keys, 1)
+    if not state.pane_mode and info.hint_bars then D.hint_bar(L, 0, sy, gfx.w, info.hint_bars(page), true) end
+    sy, sh = sy + L.pn_keys, sh - L.pn_keys
+  end
   if L.status_in > 0 then
     -- в модуле трекера: под треками (от границы матрицы), под матрицей — её фон
     sx, sy, sw, sh = L.matrix_w, L.stat_y, L.win_w - L.matrix_w, L.status_in

@@ -107,6 +107,10 @@
 - [ ] Cmd+h j k l — фокус в соседний лист (из трекера: h матрица, l lib / браузер, k вкладки, j DSP); Cmd+Shift+h j k l — перенести лист туда
 - [ ] Ctrl+W — режим PANE (which-key, номера листов на рамках): hjkl / HJKL, w W, 1..9, g + буква панели, s / v + буква — сплит, T + буква — в стек, B — из стека, x / X — своп, Tab — по стеку, + - < > размер, = поровну, z zoom, c скрыть, Space — пресет, u отмена, Esc выход
 - [ ] Cmd+Z — по-прежнему undo (zoom — только Ctrl+W z)
+- [ ] с опцией hints — строка клавиш панели в фокусе внизу окна над статусом (как zellij); под листами подсказок нет
+- [ ] :pane — строка раскладки; :pane dsp with item — DSP вкладкой к item; :pane browser hide / show; :pane matrix right; :pane reset; :pane wide / stack / tracker / main-right — пресеты
+- [ ] :ssave / :sload — раскладка панелей сохраняется в наборе (старые наборы её не трогают)
+- [ ] :big — item на весь экран (zoom), :big ещё раз — назад
 
 ## Раньше
 - [ ] browser Opt+Enter — файл слайсом в инструмент (glue вживую не проверен)
