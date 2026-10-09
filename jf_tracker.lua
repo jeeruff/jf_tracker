@@ -6979,13 +6979,14 @@ ctx = {
           { key = 'd', label = 'dev notes: what to check (with debug on)', fn = function()
               if not state.debug then vim.msg = 'dev notes live in debug mode: turn debug on'; return end
               if state.notes_open then ctx.notes_target('dev') else NT.target = 'dev'; ctx.notes_toggle() end end },
-          { key = 's', label = 'save the project', fn = function() reaper.Main_OnCommand(40026, 0); vim.msg = 'project saved' end },
+          { key = 's', label = 'save the project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
+          { key = 'S', label = 'save the project as …', fn = function() reaper.Main_OnCommand(40022, 0) end },   -- 9 окт: второй пункт project слит сюда
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           { key = 'a', label = 'about', fn = function() ctrl_action('about', 0) end },
         } } end },
       { key = 'r', label = 'record', sub = function() return { title = 'record', items = {
           { key = 'a', label = (col and col.armed) and 'disarm track' or 'arm track', fn = ctx.rec_arm },
-          { key = 'i', label = 'choose input …', sub = function() return ctx.hydra_inputs() end },
+          { key = 'i', label = 'choose input', sub = function() return ctx.hydra_inputs() end },
           { key = 's', label = 'smart input (most active)', fn = ctx.smart_input },
           { key = 'm', label = 'monitor off/on/tape', fn = function()
               if col then edit.run('rec mon', function()
@@ -6993,10 +6994,10 @@ ctx = {
                 reaper.SetMediaTrackInfo_Value(col.track, 'I_RECMON', (m + 1) % 3) end) end end },
           { key = 'r', label = 'REAPER record (transport)', fn = function() reaper.Main_OnCommand(1013, 0) end },
           { key = 'p', label = 'punch: time selection = pattern/bar', fn = ctx.punch },
-          { key = 'o', label = 'record mode …', sub = function() return ctx.hydra_recmode() end },
+          { key = 'o', label = 'record mode', sub = function() return ctx.hydra_recmode() end },
           { key = 'l', label = 'fixed lanes on/off (:lanes)', fn = ctx.toggle_lanes },
         } } end },
-      { key = 'i', label = 'insert: note / slice / whole sample / automation …', sub = function() return ctx.insert_hydra() end },
+      { key = 'i', label = 'insert: note / slice / whole sample / automation', sub = function() return ctx.insert_hydra() end },
       { key = 'I', label = 'instrument (pool)', sub = function()
           local it = {}
           for i, e in ipairs(col and col.pool or {}) do
@@ -7007,7 +7008,7 @@ ctx = {
         end },
       { key = 'f', label = 'add FX (fzf by all installed) …', fn = ctx.fx_picker },
       { key = 'a', label = 'REAPER actions (all, fzf) … (:!)', fn = function() ctx.reaper_actions() end },
-      { key = 'l', label = 'loop in region (polymeter) …', sub = function() return { title = 'loop', items = {
+      { key = 'l', label = 'loop in region (polymeter)', sub = function() return { title = 'loop', items = {
           { key = 'i', label = 'item -> region end (loop)  [>]', fn = function() ctx.loop('item') end },
           { key = 'r', label = 'region -> item end  [<]', fn = function() ctx.loop('region') end },
           { key = 'o', label = 'loop off', fn = function() ctx.loop('off') end },
@@ -7019,7 +7020,7 @@ ctx = {
           { key = '8', label = 'period 8 rows', fn = function() ctx.loop('item', 8) end },
           { key = 'n', label = 'period N rows … (:loop N)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'loop ' end },
         } } end },
-      { key = 'x', label = 'x-fade (' .. (state.xfade and 'on' or 'off') .. ', ' .. state.xfade_ms .. ' ms) …', sub = function() return { title = 'x-fade', items = {
+      { key = 'x', label = 'x-fade (' .. (state.xfade and 'on' or 'off') .. ', ' .. state.xfade_ms .. ' ms)', sub = function() return { title = 'x-fade', items = {
           { key = 'x', label = (state.xfade and 'turn OFF' or 'turn ON') .. ' x-fade on insert', fn = ctx.xfade_toggle },
           { key = 'c', label = 'crossfade now (selection / column in region)', fn = ctx.xfade_now },
           { key = 'm', label = 'by: ' .. (state.xfademode == 'fades' and 'item fades -> switch to vol values' or 'vol values (take envelope) -> switch to item fades'), fn = function() state.xfademode = state.xfademode == 'fades' and 'vol' or 'fades'; vim.msg = 'x-fade by ' .. state.xfademode end },
@@ -7032,13 +7033,9 @@ ctx = {
           { key = '+', label = 'length +1 ms', fn = function() ctx.xfade_len(1) end },
           { key = '-', label = 'length -1 ms', fn = function() ctx.xfade_len(-1) end },
         } } end },
-      { key = 'd', label = (state.dsp and 'hide' or 'show') .. ' DSP panel (:dsp)', fn = ctx.toggle_dsp },
-      { key = 'o', label = 'options (quick toggles) …', sub = function() return ctx.options_hydra() end },
+      { key = 'd', label = (((state.panes_ui and L and L.pn) and draw.panes.visible(state.panes, 'dsp')) or (not (state.panes_ui and L and L.pn) and state.dsp)) and 'hide DSP (:dsp)' or 'show DSP (:dsp)', fn = function() ctrl_action('q_dsp', 0) end },   -- панели: лист DSP
+      { key = 'o', label = 'options (quick toggles)', sub = function() return ctx.options_hydra() end },
       -- \P — проект (2 окт): s сохранить (как :w), S сохранить как…
-      { key = 'P', label = 'project …', sub = function() return { title = 'project', items = {
-          { key = 's', label = 'save project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
-          { key = 'S', label = 'save project as …', fn = function() reaper.Main_OnCommand(40022, 0) end },
-        } } end },
       { key = ':', label = 'command line', fn = function() vim.mode = 'cmd'; vim.cmdline = '' end },
       { key = '/', label = 'search', fn = function() vim.mode = 'search'; vim.searchline = '' end },
       { key = '?', label = 'keys cheat sheet', sub = function() return ctx.hydra_keys() end },

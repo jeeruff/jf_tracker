@@ -1920,8 +1920,27 @@ function V.picker_key(c)
 end
 
 -- ── hydra (which-key) ─────────────────────────────────────────────────────
+-- 9 окт: повтор буквы в меню (второй пункт был недостижим) — пункт берёт
+-- следующую свободную букву своей подписи, в журнал debug — предупреждение
+function V.hydra_fix(h)
+  if type(h) ~= 'table' or not h.items then return h end
+  local used, dups = {}, {}
+  for _, it in ipairs(h.items) do
+    if it.key and used[it.key] then
+      dups[#dups + 1] = it.key
+      local nk
+      for ch in ((it.label or '') .. 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):gmatch('%w') do
+        if not used[ch] then nk = ch; break end
+      end
+      it.key = nk
+    end
+    if it.key then used[it.key] = true end
+  end
+  if #dups > 0 and ctx.dlog then ctx.dlog(('menu "%s": duplicate keys %s - moved to free letters'):format(tostring(h.title), table.concat(dups, ' '))) end
+  return h
+end
 function V.open_hydra(h)
-  V.hydra = h; V.hydra_stack = {}
+  V.hydra = V.hydra_fix(h); V.hydra_stack = {}
 end
 
 function V.hydra_key(c)
@@ -1933,7 +1952,7 @@ function V.hydra_key(c)
     if it.key == ch then
       if it.sub then
         V.hydra_stack[#V.hydra_stack + 1] = h
-        V.hydra = type(it.sub) == 'function' and it.sub() or it.sub
+        V.hydra = V.hydra_fix(type(it.sub) == 'function' and it.sub() or it.sub)
       else
         V.hydra = nil
         if it.fn then local ok, e = pcall(it.fn); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
@@ -1957,7 +1976,7 @@ function V.popup()
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
-      lines[#lines + 1] = { key = it.key, text = it.label .. (it.sub and ' …' or ''), hk = it.hk }
+      lines[#lines + 1] = { key = it.key, text = it.label .. ((it.sub and not it.label:find('…', 1, true)) and ' …' or ''), hk = it.hk }   -- 9 окт: без двойного …
     end
     return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
   elseif V.mode == 'cmd' then
