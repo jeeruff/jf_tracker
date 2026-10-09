@@ -5722,6 +5722,11 @@ function D.popup(L, p, anchor)
   local maxcol = math.floor((W - 3 * L.pad) / ncol)
   if L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad > maxcol then tw = math.max(ms('WWWWWWWW'), maxcol - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad)) end
   local colw = L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad
+  -- 9 окт: пикер не уже заголовка (до 60 знаков) — поиск не сжимает окно
+  if p.kind == 'picker' and ncol == 1 then
+    local tmin = math.min(ms(p.title or ''), ms(string.rep('W', 60))) + 2 * L.pad
+    if colw < tmin then tw = tw + (tmin - colw); colw = tmin end
+  end
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2

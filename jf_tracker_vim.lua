@@ -2008,7 +2008,9 @@ function V.popup()
     for i = first, math.min(#pk.matches, first + nr - 1) do
       lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = pk.matches[i].label, col = pk.matches[i].col }   -- col: свой цвет строки (маршрутизация, 9 окт)
     end
-    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', hl = pk.sel - first + 1 }
+    -- 9 окт: пусто — строкой, иначе окно сжималось до клочка заголовка («ro»)
+    if #lines == 0 then lines[1] = { key = ' ', text = 'no matches - Backspace (Ctrl+J / K or arrows move, letters search)', col = { 0.6, 0.6, 0.6 } } end
+    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', hl = #pk.matches > 0 and (pk.sel - first + 1) or nil }
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
