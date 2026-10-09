@@ -3545,7 +3545,7 @@ function D.frame(L, snap, rows, state, info)
           set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
           -- шкала: от центра (верх) до значения — дуга цветом, риска — указатель
           local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
-          set(U.readable(U.CYAN, kdark, 3)); gfx.arc(cx, cy, r - 2, math.min(0, a), math.max(0, a), 0)
+          -- 9 окт: дуги значения нет — только точка-указатель
           -- указатель — яркая точка на краю (9 окт, вместо линии)
           set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
           local pr = math.max(1, math.floor(r / 4))
