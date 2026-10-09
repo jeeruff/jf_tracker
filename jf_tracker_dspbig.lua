@@ -327,25 +327,11 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   local top
   if compact then top = y + 2
   else
-  -- шапка: что за цепочка; подсказка (9 окт) — внизу, с переносом по словам-парам
+  -- шапка: что за цепочка; подсказки (9 окт) — в строке статуса (KH.BARS router / dspbig)
   U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w - 2 * L.pad), U.AMBER)
   top = y + L.rh + 3 * L.pad
   end
-  local hl = {}
-  if not compact then
-    local help = big and 'h l signal  j k row  a A add  | join row  s solo  = unity  b bypass  d delete  o window  drag a slider  dblclick default  zR back'
-      or 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  d delete  za fold  o window  zz back'
-    local line, sep = '', '   '
-    for part in (help .. '  '):gmatch('(.-)  ') do
-      if part ~= '' then
-        local t = line == '' and part or (line .. sep .. part)
-        if line ~= '' and U.measure(t) > w - 2 * L.pad then hl[#hl + 1] = line; line = part else line = t end
-      end
-    end
-    if line ~= '' then hl[#hl + 1] = line end
-    for i, t in ipairs(hl) do U.text(x + L.pad, y + h - L.pad - (#hl - i + 1) * L.rh, ctx.fit(t, w - 2 * L.pad), U.GREY) end
-  end
-  local bh = h - (top - y) - (compact and 2 or L.pad) - #hl * L.rh
+  local bh = h - (top - y) - (compact and 2 or L.pad)
   local io = U.measure('in') + 2 * L.pad
   local cw, ch = DB.layout(root, m, 0, 0, bh)
   DB.total = cw + 2 * io + 4 * L.pad

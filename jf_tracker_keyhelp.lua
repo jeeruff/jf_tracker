@@ -441,6 +441,11 @@ KH.BARS = {
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
           { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'find' }, { 'af', 'add' }, { 'zz', 'big' }, { '?', 'help' } },
+  -- 9 окт: роутер (zR) и цепочка на всё окно (zz) — подсказки в строке статуса
+  router = { { 'h l', 'signal' }, { 'j k', 'row' }, { 'a A', 'add' }, { '|', 'join row' }, { 's', 'solo' }, { '=', 'unity' }, { 'b', 'bypass' },
+             { 'd', 'delete' }, { 'o', 'window' }, { 'drag', 'slider' }, { 'dblclick', 'default' }, { 'zR Esc', 'back' } },
+  dspbig = { { 'h l', 'signal' }, { 'j k', 'row' }, { 'a', 'add' }, { 'A', 'parallel' }, { '|', 'join row' }, { 's', 'solo' }, { '=', 'unity' },
+             { 'b', 'bypass' }, { 'd', 'delete' }, { 'za', 'fold' }, { 'o', 'window' }, { 'zz Esc', 'back' } },
   notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },

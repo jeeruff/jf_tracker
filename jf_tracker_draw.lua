@@ -3154,6 +3154,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         end
       elseif id == 'browser' and info.browser_draw then
         hover.browser = info.browser_draw(L, ct.x, ct.y, ct.w, ct.h)
+        if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end   -- 9 окт: вкладка fx браузера (router big) — щелчки
       elseif id == 'inst' then
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'slices' and info.slices_draw then
@@ -5313,7 +5314,7 @@ function D.frame(L, snap, rows, state, info)
   -- панели (9 окт): строка клавиш панели в фокусе (как zellij), статус под ней
   if L.pn and (L.pn_keys or 0) > 0 then
     local f = info.focus
-    local page = (f == 'tracker' and (info.vmode == 'insert' and 'insert' or 'tracker'))
+    local page = (state.router_big and 'router') or (state.dsp_big and 'dspbig') or (f == 'tracker' and (info.vmode == 'insert' and 'insert' or 'tracker'))
       or (f == 'top' and D.panes.BY[info.toptab or ''] and D.panes.BY[info.toptab].hint)
       or (f == 'browser' and (info.browser_page or 'browser')) or (f == 'slices' and 'inst') or f
     set(U.PANEL); gfx.rect(0, sy, gfx.w, L.pn_keys, 1)
