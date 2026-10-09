@@ -3449,19 +3449,19 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         -- буфер 1020 (без главного модуля, lib и слайсов), на экран — только
         -- область под её строкой вкладок
         local cy0 = 1 + L.rh + 3
-        local bw, bh = ct.w, ct.h + cy0             -- 9 окт: тело вкладки = ct.h − 2 (низ не срезается)
+        local bw, bh = ct.w, ct.h + cy0 - 2         -- 9 окт: тело вкладки = ct.h − 4: 2 px сверху и снизу, ничего не срезается
         if D.pnt_w ~= bw or D.pnt_h ~= bh then gfx.setimgdim(1020, bw, bh); D.pnt_w, D.pnt_h = bw, bh end
         local sv = { L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab }
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = bh, 0, bw, 0, 0, true, true, id
         local dest0, mx0, my0, hint0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, D.clip
-        local dy = ct.y - cy0                               -- строка cy0 буфера = верх панели
+        local dy = ct.y - cy0 + 2                           -- содержимое на 2 px ниже рамки
         gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil
         if hint0 then D.hint = function(kind, x, y, w, h, data) if y >= cy0 then return hint0(kind, x + ct.x, y + dy, w, h, data) end end end
         local ok, th = xpcall(draw_topbar, debug.traceback, L, info)
         gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = table.unpack(sv, 1, 8)
         if ok then
-          gfx.blit(1020, 1, 0, 0, cy0, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 9 окт: с начала содержимого — низ вкладки целиком
+          gfx.blit(1020, 1, 0, 0, cy0 - 2, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 2 px запаса сверху (кнопки не на рамке), тело короче — низ цел
         else
           -- 9 окт: ошибка одной вкладки не роняет трекер — сообщение на её месте, стек в debug log
           set(U.PANEL); gfx.rect(ct.x, ct.y, ct.w, ct.h, 1)
