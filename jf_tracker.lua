@@ -9325,6 +9325,10 @@ function ctrl_action(name, delta)
     ctx.PERF.reset = function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
     if ctx.PERF.active then state.mx_hidden = false; ctx.PERF.t = 0 end
     vim.msg = ctx.PERF.active and 'performance in the matrix: n - REAPER performance meter, j k scroll, Esc (matrix focused) closes' or 'performance closed'
+  elseif name == 'swingbar' then
+    -- 9 окт: слайдер свинга — щелчок / протяжка: значение по x (ctx.swdrag), колесо — ±1 %
+    if delta == 0 then ctx.swdrag = true
+    else local s = edit.sw; edit.swing_set(true, (s.on and s.amt or 0) + delta / 100); vim.msg = ctx.swing_text() end
   elseif name == 'swing' then
     -- 6 окт: свинг сетки проекта REAPER; клик — выпадашка, колесо — ±1 %
     if delta == 0 then ctx.swing_menu()
@@ -10030,6 +10034,16 @@ local function frame()
     local f = L and L.flat and L.flat[vim.cur.fi]
     if f and f.ci and (state.hscroll or 1) > f.ci then state.hscroll = f.ci; relayout() end
   end
+  -- 9 окт: протяжка слайдера свинга в транспорте (ячейка swingbar)
+  if ctx.swdrag then
+    local r = draw.strip_cell and draw.strip_cell.swingbar
+    if gfx.mouse_cap & 1 == 1 and r then
+      local sw2 = 8 * L.cw
+      local v = math.max(-1, math.min(1, ((gfx.mouse_x - r[1]) / sw2) * 2 - 1))
+      if math.abs(v) < 0.02 then v = 0 end
+      if math.abs(v - ((edit.sw.on and edit.sw.amt) or 0)) > 0.004 then edit.swing_set(v ~= 0, v); vim.msg = ctx.swing_text() end
+    else ctx.swdrag = nil end
+  end
   -- 9 окт: note-off превью плагина-инструмента
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
@@ -10405,7 +10419,7 @@ local function frame()
         end
         return out
       end)() or nil,
-      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),

@@ -2627,9 +2627,10 @@ function D.transport_groups(c)
                   { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
   end
   -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
-  g[#g + 1] = { { { 'lpb', ('LPB %d'):format(c.lpb or 0) }, { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
+  -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
+  g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) }, { 'swing', c.swing_txt or 'swing off', c.swing_on and U.CYAN or U.GREY } },
+  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ('inst %d'):format(c.inst or 0) }, { 'lpb', ('LPB %d'):format(c.lpb or 0) } },
                 { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
@@ -2640,6 +2641,8 @@ function D.transport_groups(c)
   g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
+  g[#g + 1] = { { { 'swing', c.swing_txt or 'swing off', c.swing_on and U.CYAN or U.GREY } },
+                { { 'swingbar', '', nil, slider = { v = c.swing_amt or 0 } } } }
   return g
 end
 
@@ -2765,7 +2768,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local c = info.ctrl or {}
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
   local gap, sep = 2 * L.pad, 3 * L.pad
-  local function cw_of(it) return ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) end
+  local function cw_of(it) return ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   local function group_w(g)
     local gw = 0
     for _, row in ipairs(g) do
@@ -2790,6 +2793,18 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             set(k == it.beats.cur and U.AMBER or U.DIM)
             gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
           end
+        end
+        if it.slider then                                 -- 9 окт: слайдер свинга −100..100 %, от центра
+          local sw2 = 8 * L.cw
+          local mid = cx + math.floor(sw2 / 2)
+          local yy = cy + math.floor(L.rh / 2)
+          set(U.DIM); gfx.rect(cx, yy - 1, sw2, 2, 1)
+          set(U.GREY); gfx.rect(mid, cy + 3, 1, L.rh - 6, 1)
+          local v = math.max(-1, math.min(1, it.slider.v or 0))
+          local px = mid + math.floor(v * (sw2 / 2 - 1) + 0.5)
+          set(hot and U.AMBER or (math.abs(v) > 1e-6 and U.CYAN or U.GREY))
+          gfx.rect(math.min(mid, px), cy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
+          gfx.rect(px - 1, cy + 2, 3, L.rh - 4, 1)
         end
         hint('ctrl', cx, cy, iw, L.rh, it[1])
         D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
@@ -2892,8 +2907,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   addg('step')
   order[#order + 1] = { w = btot, draw = draw_buttons }
   if big then order[#order + 1] = { w = bigw, draw = draw_big } else addg('play') end
-  addg('lpb'); addg('punch')
-  local last = nil                -- тоглы (follow / lock / fixed / x-fade) — в главном модуле (5 окт)
+  addg('sig'); addg('punch')       -- 9 окт: LPB — в блоке step; блок размера такта начинается с sig
+  -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
+  local last = by_id.swing and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx

@@ -1748,6 +1748,9 @@ function V.key_impl(c)
       end
       if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
       local t = motion(c, n, p)
+      -- 9 окт: dl / dh (yl, cl …) — только своя подколонка: шаг по полю через
+      -- край задевал соседнюю колонку; dl = x (событие строки курсора)
+      if t and (c == ('l'):byte() or c == ('h'):byte() or c == RIGHT or c == LEFT) then t.fi = V.cur.fi; t.row = V.cur.row end
       if t then
         local f0, f1, r0, r1 = range_or_event(p, t)
         local e = apply(p, f0, f1, r0, r1)

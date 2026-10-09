@@ -1673,7 +1673,10 @@ function E.paste(reg, lpb, row, targets)
       if tg then
         local t = row_time(row + c.drow, lpb, c.delay)
         if c.kind == 'audio' and c.chunk then
-          xfade_join(tg.track, tg.lane_idx, insert_chunk(tg.track, tg.lane_idx, t, c.chunk))
+          -- 9 окт: как ввод ноты — звучащее на строке вставки обрезается (mono —
+          -- на всём треке), иначе копии перекрывались и уезжали в соседнюю подколонку
+          local it = insert_chunk(tg.track, tg.lane_idx, t, c.chunk)
+          finish_insert(tg.track, tg.lane_idx, it)
         elseif c.kind == 'midi' then
           local qn = R.TimeMap2_timeToQN(0, t)
           local t1 = R.TimeMap2_QNToTime(0, qn + c.len_qn)
