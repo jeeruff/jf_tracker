@@ -23,6 +23,7 @@ local EXT = 'jf_tracker'
 local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия (5 окт, релиз: без внешних зависимостей)
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
+draw.panes = dofile(DIR .. '/jf_tracker_panes.lua')     -- раскладка окна как tmux / zellij (9 окт); полем draw: предел локальных
 local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
 local vim = dofile(DIR .. '/jf_tracker_vim.lua')
@@ -246,6 +247,17 @@ local state = {
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
+-- дерево панелей (9 окт): из ExtState panes; нет — один раз из прежних
+-- опций положения (пользователю ничего делать не нужно)
+state.panes = (function()
+  local s = reaper.GetExtState(EXT, 'panes')
+  if s ~= '' then return draw.panes.decode(s) end
+  return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
+    browserleft = state.browserleft, side = state.side, dsp = state.dsp, fxb = state.fxb, khelp = state.khelp,
+    notes_open = state.notes_open, mx_hidden = state.mx_hidden, toptab = state.toptab, mxfold = state.mxfold,
+    top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
+    mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
+end)()
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
 -- ext() отдаёт число для числовых строк: сравнивать через tostring (иначе 3 ~= '3'
 -- и шрифт сбрасывался в битмап при каждом старте)
@@ -456,6 +468,7 @@ local function save_win()
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
+  do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
