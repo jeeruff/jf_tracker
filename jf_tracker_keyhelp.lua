@@ -66,6 +66,7 @@ KH.PAGES = {
     { k = 'env: w b e dd y p', d = 'envelope points are events: motions, delete / yank / paste points (value + shape)', t = {} },
     { k = 'gg G', d = 'first row / last row' },
     { k = 'Esc', d = 'toggles INSERT (as the edit mode in Renoise): NORMAL -> INSERT, INSERT -> NORMAL' },
+    { k = "'a '1..'9 '' 'd", d = "harpoon: pin the cursor place (track + row), jump to pin 1..9, list the pins (fzf), unpin the cursor place; per project" },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
     { k = 'gs  Ctrl+Enter  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with the mouse or h j k l + Enter; VISUAL - the whole block' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },

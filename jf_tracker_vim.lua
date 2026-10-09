@@ -1638,6 +1638,10 @@ function V.key_impl(c)
         V.mode = 'normal'; finish_edit()
       else finish_move() end
       V.count = nil; return
+    elseif p == "'" then
+      -- harpoon (9 окт): 'a добавить место, '1..'9 — к месту, '' — список, 'd — убрать
+      if ctx.harpoon then ctx.harpoon((c < 256) and string.char(c) or '') end
+      V.count = nil; finish_move(); return
     elseif p == 'q' then
       if c >= ('a'):byte() and c <= ('z'):byte() then V.macro = { name = string.char(c), keys = {} }; V.msg = 'recording @' .. string.char(c) end
       V.count = nil; finish_move(); return
@@ -1784,7 +1788,7 @@ function V.key_impl(c)
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
-  elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' then V.pending = ch; return
+  elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
     if V.macro then
       V.regs['@' .. V.macro.name] = V.macro.keys

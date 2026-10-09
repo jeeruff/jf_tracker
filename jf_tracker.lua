@@ -3059,6 +3059,50 @@ ctx = {
       if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
     end
   end,
+  -- harpoon (9 окт, как в Neovim): закреплённые места песни — трек + строка,
+  -- список на проект (ProjExtState jf_tracker/harpoon «guid@row|…»)
+  harpoon = function(ch)
+    local _, raw = reaper.GetProjExtState(0, EXT, 'harpoon')
+    local list = {}
+    for g, r in (raw or ''):gmatch('([^@|]+)@(%d+)') do list[#list + 1] = { guid = g, row = tonumber(r) } end
+    local function save()
+      local t = {}
+      for _, e in ipairs(list) do t[#t + 1] = e.guid .. '@' .. e.row end
+      reaper.SetProjExtState(0, EXT, 'harpoon', table.concat(t, '|'))
+    end
+    local function name(e)
+      for _, c in ipairs(snap and snap.cols or {}) do if c.guid == e.guid then return ('%s @ %04d'):format(c.name or '?', e.row) end end
+      return ('(gone) @ %04d'):format(e.row)
+    end
+    local function go(e)
+      if not e then vim.msg = 'harpoon: no such place'; return end
+      for i, f in ipairs(L.flat) do
+        if f.col and f.col.guid == e.guid then
+          vim.cur.fi, vim.cur.row = i, e.row; vim.ensure_visible(); ctx.set_focus('tracker')
+          vim.msg = 'harpoon: ' .. name(e); return
+        end
+      end
+      vim.msg = 'harpoon: the track is not visible (' .. name(e) .. ')'
+    end
+    local f = L.flat[vim.cur.fi]
+    local here = f and f.col and { guid = f.col.guid, row = vim.cur.row }
+    if ch == 'a' then
+      if not here then vim.msg = 'harpoon: no track under the cursor'; return end
+      for _, e in ipairs(list) do if e.guid == here.guid and e.row == here.row then vim.msg = 'harpoon: already there'; return end end
+      if #list >= 9 then table.remove(list, 1) end
+      list[#list + 1] = here; save()
+      vim.msg = ("harpoon %d: %s  ('%d jumps, '' lists)"):format(#list, name(here), #list)
+    elseif ch == 'd' then
+      for i, e in ipairs(list) do if here and e.guid == here.guid and e.row == here.row then table.remove(list, i); save(); vim.msg = 'harpoon: place removed'; return end end
+      vim.msg = 'harpoon: the cursor is not on a pinned place'
+    elseif ch:match('^[1-9]$') then go(list[tonumber(ch)])
+    elseif ch == "'" then
+      if #list == 0 then vim.msg = "harpoon: empty - 'a pins the cursor place"; return end
+      local items = {}
+      for i, e in ipairs(list) do items[#items + 1] = { label = i .. '  ' .. name(e), data = e } end
+      vim.open_picker("harpoon ('1..'9 jump, 'a add, 'd remove)", items, function(it) go(it.data) end)
+    else vim.msg = "harpoon: 'a add, '1..'9 jump, '' list, 'd remove" end
+  end,
   -- история команд : (9 окт): Data/jf_tracker_cmdhist.txt, строка — команда
   cmd_hist_load = function()
     local out = {}

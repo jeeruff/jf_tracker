@@ -31,6 +31,7 @@ local T = {
         { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' },
         { 'panels', 'm matrix  b browser  l lib  n main' }, { '', 's slices  o notes  f fx list  d dsp' },
         { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video' } } },
+  ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin the cursor place' }, { '1..9', 'jump to the pin' }, { "'", 'list (fzf)' }, { 'd', 'unpin this place' } } },
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' } } },
