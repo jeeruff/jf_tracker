@@ -7468,6 +7468,8 @@ ctx = {
         return
       end
       local p = math.max(0, math.min(127, math.floor(pitch)))
+      ctx.stuffed = ctx.stuffed or {}
+      ctx.stuffed[#ctx.stuffed + 1] = { p = p, t = reaper.time_precise() }   -- вход MIDI их пропустит
       reaper.StuffMIDIMessage(0, 0x90, p, math.max(1, math.min(127, vim.vel or 100)))
       ctx.note_offs = ctx.note_offs or {}
       ctx.note_offs[#ctx.note_offs + 1] = { p = p, t = reaper.time_precise() + 0.4 }
@@ -8448,6 +8450,24 @@ local function poll_midi_in()
   if #fresh == 0 then return end
   if not midiin.seq then midiin.seq = fresh[1].seq; return end   -- старт: старое не пишем
   midiin.seq = fresh[1].seq
+  -- 9 окт: свои ноты превью (StuffMIDIMessage в виртуальную клавиатуру) —
+  -- не вход: иначе нота писалась второй раз и курсор шагал дважды
+  if ctx.stuffed and #ctx.stuffed > 0 then
+    local now, rest, keep = reaper.time_precise(), {}, {}
+    for _, o in ipairs(ctx.stuffed) do if now - o.t < 1.0 then keep[#keep + 1] = o end end
+    ctx.stuffed = keep
+    for _, ev in ipairs(fresh) do
+      local b = ev.buf
+      local st, d1 = b:byte(1) or 0, b:byte(2) or -1
+      local mine = false
+      if (st & 0xF0) == 0x90 or (st & 0xF0) == 0x80 then
+        for _, o in ipairs(keep) do if o.p == d1 then mine = true; break end end
+      end
+      if not mine then rest[#rest + 1] = ev end
+    end
+    fresh = rest
+    if #fresh == 0 then return end
+  end
   -- MIDI learn: привязанные CC / ноты (и learn) — не дальше (2 окт)
   do
     local rest = {}
@@ -9725,7 +9745,10 @@ local function frame()
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
     for _, o in ipairs(ctx.note_offs) do
-      if now >= o.t then reaper.StuffMIDIMessage(0, 0x80, o.p, 0) else keep[#keep + 1] = o end
+      if now >= o.t then
+        ctx.stuffed = ctx.stuffed or {}; ctx.stuffed[#ctx.stuffed + 1] = { p = o.p, t = now }
+        reaper.StuffMIDIMessage(0, 0x80, o.p, 0)
+      else keep[#keep + 1] = o end
     end
     ctx.note_offs = keep
   end
