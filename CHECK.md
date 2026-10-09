@@ -126,6 +126,8 @@
 
 - [ ] Ctrl+Option (треки) и Ctrl+мышь: фейдер / кноб / пан-пэд двигаются вместе с мышью, на отпускании ничего не прыгает
 
+- [ ] Options: разделы по смыслу — look, panes and bars, cursor and editing, headers and mixer, items and waves, sound and samples, session, pm cards, profiles; широкое окно — 2-3 колонки (j k по порядку), хоткеи — только на вкладке hotkeys, одной колонкой
+
 ## Раньше
 - [ ] browser Opt+Enter — файл слайсом в инструмент (glue вживую не проверен)
 - [ ] o (запись клипа) пишет весь трек, не лейн — известное ограничение

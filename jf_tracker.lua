@@ -5850,7 +5850,37 @@ ctx = {
   end,
   options = function()
     local items = {}
-    for _, it in ipairs(ctx.option_items()) do if state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon') then items[#items + 1] = it end end
+    -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
+    -- раздела — как в option_items; без раздела — в «other»
+    local SECT = {
+      { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
+      { 'panes and bars', { 'panes_ui', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'cursor and editing', { 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
+      { 'sound and samples', { 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'session', { 'clipsview', 'ssbsync', 'ssbars' } },
+      { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
+    }
+    local byk, used = {}, {}
+    for _, it in ipairs(ctx.option_items()) do
+      if not it.sep and (state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
+    end
+    local function add_sect(title, keys)
+      local first = true
+      for _, k in ipairs(keys) do
+        for _, it in ipairs(byk) do
+          if it.key == k and not used[it] then
+            if first then items[#items + 1] = { sep = true, title = title }; first = false end
+            items[#items + 1] = it; used[it] = true
+          end
+        end
+      end
+    end
+    for _, sct in ipairs(SECT) do add_sect(sct[1], sct[2]) end
+    local rest = {}
+    for _, it in ipairs(byk) do if not used[it] then rest[#rest + 1] = it.key end end
+    add_sect('other', rest)
     -- hotkeys (5 окт): все клавиши со страниц ? — клавиша, модуль, описание;
     -- / ищет по клавише, описанию и модулю
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }

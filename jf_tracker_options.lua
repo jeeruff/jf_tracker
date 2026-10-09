@@ -446,6 +446,14 @@ function O.draw(L, W, H)
     end
   end
   local bw = math.min(W - 2 * L.pad - 20, math.max(lw + vw + dw + 3 * L.pad, L.cw * 72))
+  -- 9 окт: опции — в 2-3 колонки, если хватает ширины (строки сверху вниз,
+  -- потом следующая колонка; j k идут по порядку); хоткеи — одной колонкой
+  local colw0 = math.max(lw + vw + math.min(dw, L.cw * 24) + 3 * L.pad, L.cw * 56)   -- длинный цикл (темы) — текстом, колонку не раздувает
+  local ncol = 1
+  if not O.compact and O.tab ~= 'hotkeys' and O.query == '' then
+    ncol = math.max(1, math.min(3, math.floor((W - 2 * L.pad - 20) / colw0)))
+    if ncol > 1 then bw = ncol * colw0 end
+  end
   local nvis = math.max(3, math.min(n, math.floor((H - 6 * rh) / rh)))
   local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
@@ -459,8 +467,9 @@ function O.draw(L, W, H)
     by = math.max(2, math.min(H - bh - 2, O.compact.y or by))
   end
   O.box = { bx, by, bw, bh }
+  local cap = nvis * ncol
   if O.sel - 1 < O.scroll then O.scroll = O.sel - 1 end
-  if O.sel > O.scroll + nvis then O.scroll = O.sel - nvis end
+  if O.sel > O.scroll + cap then O.scroll = O.sel - cap end
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
   U.text(bx + L.pad, by + 2, ctx.fit(O.compact and O.compact.title or 'options', bw - 2 * L.pad - U.measure('x') - 2 * L.pad), U.AMBER)
@@ -507,19 +516,19 @@ function O.draw(L, W, H)
   end
   local by0 = by
   if not O.compact then by = by + rh * ((#O.tabs > 0) and 2 or 1) end   -- список — под вкладками и поиском
-  O.nvis = nvis
+  O.nvis = cap
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
   local sbw = 0
-  if #O.items > nvis then
+  if #O.items > cap then
     sbw = 7
     local sx, sy, sh = bx + bw - sbw - 2, by + rh + 4, nvis * rh
-    local th = math.max(8, math.floor(sh * nvis / #O.items))
-    local maxs = math.max(1, #O.items - nvis)
+    local th = math.max(8, math.floor(sh * cap / #O.items))
+    local maxs = math.max(1, #O.items - cap)
     if O.sb_drag then
       if gfx.mouse_cap & 1 == 1 then
         local f = math.max(0, math.min(1, (my - sy - th / 2) / math.max(1, sh - th)))
-        O.scroll = math.floor(f * maxs + 0.5); O.sel = math.max(O.scroll + 1, math.min(O.scroll + nvis, O.sel))
+        O.scroll = math.floor(f * maxs + 0.5); O.sel = math.max(O.scroll + 1, math.min(O.scroll + cap, O.sel))
       else O.sb_drag = nil end
     end
     local ty2 = sy + math.floor((sh - th) * math.min(1, O.scroll / maxs))
@@ -536,11 +545,15 @@ function O.draw(L, W, H)
     if gfx.mouse_cap & 1 == 1 and O.vrect_last and O.vrect_last[O.drag.i] then num_from_x(O.items[O.drag.i], O.vrect_last[O.drag.i], mx)
     else O.drag = nil end
   end
-  for r = 1, nvis do
+  local colw = math.floor(bw / ncol)
+  for r = 1, cap do
     local i = O.scroll + r
     local it = O.items[i]
     if not it then break end
-    local y = by + rh + 4 + (r - 1) * rh
+    local col, rr = (r - 1) // nvis, (r - 1) % nvis
+    local y = by + rh + 4 + rr * rh
+    -- колонка: свои x и ширина (у последней — минус полоса прокрутки)
+    local bx, bw = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
     if it.sep then
       -- раздел (4 окт): заголовок темы, иначе — тонкая линия
       if it.title then U.text(bx + L.pad, y + 1, it.title, U.CYAN); U.set(U.DIM); gfx.rect(bx + L.pad + U.measure(it.title) + L.pad, y + math.floor(rh / 2), bw - 3 * L.pad - U.measure(it.title), 1, 1)
