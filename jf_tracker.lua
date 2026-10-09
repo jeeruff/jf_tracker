@@ -230,6 +230,7 @@ local state = {
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
   mixroute = flag('mixroute', true),
+  jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
   mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
@@ -257,6 +258,10 @@ local state = {
   fcollapse = {},                               -- guid папки → свёрнута
 }
 -- быстрая опция dB marks (9 окт): один раз — рядом с mixer в сохранённых быстрых опциях
+-- 9 окт: быстрая опция jumps (линейка прыжков) — в первую колонку быстрых
+if (state.quick or '') ~= '' and not (',' .. state.quick:gsub('|', ',') .. ','):find(',jumps,', 1, true) then
+  state.quick = state.quick:gsub('q_ruler', 'q_ruler,jumps', 1)
+end
 if (state.quick or '') ~= '' and not (',' .. state.quick:gsub('|', ',') .. ','):find(',dbmarks,', 1, true) then
   state.quick = state.quick:gsub('mixer', 'mixer,dbmarks', 1)
 end
@@ -486,7 +491,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2364,7 +2369,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -6131,6 +6136,7 @@ ctx = {
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
+      flag('jumps', 'jump ruler', 'a row over the track headers, like relativenumber in Vim: how many tracks away each one is (L3 - 3L jumps right, H2 - 2H left), the cursor track shows its number'),
       flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu'),
       flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
       flag('dbmarks', 'dB marks', 'mixer faders: the +6 0 -12 -24 -48 marks and ticks (f jumps to a mark)'),
@@ -6199,7 +6205,7 @@ ctx = {
     local SECT = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
-      { 'cursor and editing', { 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'jumps', 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },

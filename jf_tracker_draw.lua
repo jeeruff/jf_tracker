@@ -442,7 +442,8 @@ function D.layout(snap, state, nregions)
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
   L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0)) or 0
   L.top_first = L.toppos == 'top'
-  L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0)
+  L.jr_h = state.jumps and L.rh or 0                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
+  L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0) + L.jr_h
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
   -- шапка (2 окт): имя | R I M S A | громкость | панорама | лейн / огибающие [| подписи — опция]
@@ -574,7 +575,7 @@ function D.layout(snap, state, nregions)
     L.matrix_w = tr.x
     L.win_w = tr.x + tr.w
     L.side_x = L.win_w
-    L.header_y = tr.y + (L.tppos == 'top' and L.tp_h or 0)
+    L.header_y = tr.y + (L.tppos == 'top' and L.tp_h or 0) + L.jr_h
     L.fxrow_y = L.header_y + L.header_h
     L.sess_y = L.fxrow_y + L.fxrow_h
     local bot = tr.y + tr.h
@@ -4202,6 +4203,25 @@ function D.frame(L, snap, rows, state, info)
     if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
+  -- 9 окт: линейка прыжков (опция jumps) — над шапками, как relativenumber в
+  -- Vim по горизонтали: у каждого трека — сколько до него от курсора (3L / 3H
+  -- прыгают туда), у трека курсора — его номер янтарём
+  if (L.jr_h or 0) > 0 then
+    local jy = hy - L.jr_h
+    set(U.PANEL); gfx.rect(tx0, jy, W - tx0, L.jr_h, 1)
+    local cci = info.cur_ci
+    for _, c in ipairs(L.cols or {}) do
+      if c.x and c.ci and not c.master then
+        local d = cci and (c.ci - cci) or nil
+        local lab = (d == 0 or not d) and tostring(c.ci) or tostring(math.abs(d))
+        local col2 = (d == 0) and U.AMBER or (d and d < 0 and U.CYAN or U.GREY)
+        if d and d ~= 0 then lab = (d < 0 and 'H' or 'L') .. lab end
+        if ms(lab) > c.w - 2 then lab = (d == 0 or not d) and tostring(c.ci) or tostring(math.abs(d)) end
+        if ms(lab) <= c.w - 2 then text(c.x + math.floor((c.w - ms(lab)) / 2), jy, lab, col2) end
+        set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1)
+      end
+    end
+  end
   if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end   -- от левого края модуля: и над мастером
   -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),
   -- источники (R зелёный), сам трек (белый), трек под строкой — янтарь, 2 px
