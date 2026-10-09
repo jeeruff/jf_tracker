@@ -2731,14 +2731,22 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if D.pool_scroll > math.max(0, #rows - nvis) then D.pool_scroll = math.max(0, #rows - nvis) end
   if D.pool_scroll < 0 then D.pool_scroll = 0 end
   local label_w = math.min(L.cw * 18, math.floor(w * 0.55))
+  -- колонка ~ (9 окт): у item есть точки в огибающих take — щелчок открывает
+  -- их во вкладке automation; место — только если такой item есть
+  local TILDE = D.ttf and '∿' or '~'
+  local tew = 0
+  if info.pool_tenv then
+    for _, e in pairs(pool) do if type(e) == 'table' and info.pool_tenv(e) > 0 then tew = ms(TILDE) + 2 * L.pad; break end end
+  end
   -- заголовки колонок (3 окт): # (порядок: дерево треков / метки), name, len,
   -- preview; клик — сортировка, активная — янтарём
   do
     local hy2 = iy + 2 + L.rh
     local cols_h = { { '#', ix + 6, sort == 'track' or sort == 'mark', sort == 'mark' and '#@' or '#', 'index' },
                      { 'name', ix + 6 + ms('00 @ '), sort == 'name', 'name', 'name' },
-                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' },
-                     { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'preview', nil } }
+                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' } }
+    if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad, false, TILDE, nil } end
+    cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + tew, false, 'preview', nil }
     for k, h2 in ipairs(cols_h) do
       local x1 = cols_h[k + 1] and cols_h[k + 1][2] or (ix + w - L.pad)
       if h2[2] + ms(h2[4]) <= x1 then
@@ -2820,7 +2828,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if w - (dx - ix) - L.pad > dw + 8 then
         text(dx + dw - L.pad - ms(dtxt), y + 1, dtxt, sel and U.AMBER or U.GREY)
       else dw = 0 end
-      local wx = dx + dw
+      local tx0 = dx + dw
+      local ntenv = tew > 0 and info.pool_tenv(e) or 0
+      local wx = dx + dw + tew
+      local rowhot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if ntenv > 0 then
+        local th = rowhot and mx >= tx0 and mx < wx
+        text(tx0 + L.pad, y + 1, TILDE, th and U.AMBER or U.CYAN)
+      end
       local npix = w - (wx - ix) - L.pad
       if npix > 8 then
         local pk = get_peaks and get_peaks(e, npix)
@@ -2860,7 +2875,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         end
         dbg[#dbg + 1] = ('%02d wx%d n%d pk%s wc%.2f,%.2f,%.2f'):format(i, wx, npix, pk and pk.n or '-', wc[1], wc[2], wc[3])
       end
-      if mx >= ix and mx < ix + w and my >= y and my < y + L.rh then hover.pool = { ci = info.pool_ci, i = i } end
+      -- зоны (9 окт): ~ — огибающие take (вкладка automation), волна — вкладка item
+      if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = (ntenv > 0 and mx >= tx0 and mx < wx) or nil, wave = (mx >= wx and npix > 8) or nil } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
       if drag and my >= y and my < y + L.rh then
         if my < y + L.rh / 2 then D.lib_drop, drop_y = { before = i }, y

@@ -1798,7 +1798,7 @@ ctx = {
   -- иначе регион курсора, иначе такт от строки курсора.
   lfo_target = function()
     local ae = state.ai_edit
-    if ae and mod_pane == 'ai' and reaper.ValidatePtr(ae.env, 'TrackEnvelope*') then
+    if ae and mod_pane == 'ai' and not ae.take and reaper.ValidatePtr(ae.env, 'TrackEnvelope*') then   -- огибающая take — время item, генератор пишет в проектном
       return { e = { env = ae.env, min = ae.min, max = ae.max, name = ae.label }, label = 'item ' .. (ae.label or ''), ai = ae }
     end
     local f = L and L.flat[vim.cur.fi]
@@ -2942,15 +2942,60 @@ ctx = {
     end
   end,
   -- редактор automation item (5 окт): вкладка modulation, страница item
+  -- огибающие take у item lib (9 окт): только с точками — колонка ~ в lib,
+  -- щелчок по ней открывает их во вкладке automation (лейны — по одной на
+  -- огибающую). Кэш — по счётчику изменений проекта
+  take_envs = function(item)
+    local cc = reaper.GetProjectStateChangeCount(0)
+    if ctx.tenv_cc ~= cc then ctx.tenv_cc, ctx.tenv_cache = cc, {} end
+    local hit = item and ctx.tenv_cache[item]
+    if hit then return hit end
+    local out = {}
+    local tk = item and reaper.ValidatePtr(item, 'MediaItem*') and reaper.GetActiveTake(item)
+    if tk then
+      local _, iname = reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)
+      for i = 0, reaper.CountTakeEnvelopes(tk) - 1 do
+        local env = reaper.GetTakeEnvelope(tk, i)
+        local np = env and reaper.CountEnvelopePoints(env) or 0
+        if np > 0 then
+          local _, name = reaper.GetEnvelopeName(env, '')
+          local mn, mx = 0, 1
+          if reaper.BR_EnvAlloc then
+            local be = reaper.BR_EnvAlloc(env, false)
+            if be then
+              local _, _, _, _, _, _, a, b = reaper.BR_EnvGetProperties(be)
+              reaper.BR_EnvFree(be, false)
+              if a and b and b > a then mn, mx = a, b end
+            end
+          end
+          local smode = reaper.GetEnvelopeScalingMode(env)
+          if smode ~= 0 then mn, mx = reaper.ScaleToEnvelopeMode(smode, mn), reaper.ScaleToEnvelopeMode(smode, mx) end
+          local pts = {}
+          for p = 0, np - 1 do local _, t, v = reaper.GetEnvelopePoint(env, p); pts[#pts + 1] = { t, v } end
+          out[#out + 1] = { env = env, take = tk, item = item, idx = -1, pool = i, envname = name, label = (name or '') .. ' - ' .. (iname or ''),
+                            min = mn, max = mx, pts = pts }
+        end
+      end
+    end
+    if item then ctx.tenv_cache[item] = out end
+    return out
+  end,
+  take_env_open = function(item)
+    local l = ctx.take_envs(item)
+    if #l == 0 then vim.msg = 'this item has no take envelope points'; return false end
+    ctx.ai_edit_open(l[1])
+    vim.msg = ('take envelope %s (%d on this item): edit the points; another lane - click it'):format(l[1].envname or '', #l)
+    return true
+  end,
   ai_edit_open = function(a)
     ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
     ctx.AIE.on_save = function() vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'curvesave ' end
     ctx.AIE.on_load = function() ctx.curve_browse() end
     ctx.AIE.on_pick = function(b)                                  -- другой лейн пула (6 окт)
-      for i, c in ipairs(ctx.ai_list()) do if c == b then ctx.ai_sel = i end end
+      if not b.take then for i, c in ipairs(ctx.ai_list()) do if c == b then ctx.ai_sel = i end end end
       ctx.ai_edit_open(b)
     end
-    state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool, col = a.col }
+    state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool, col = a.col, take = a.take, item = a.item }
     state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
     vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'
   end,
@@ -9221,6 +9266,7 @@ local function frame()
     pat_num = function(rg) local _, by = model.patterns(regions); local p = by[rg.name]; return p and p.num or rg.idx end,
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
+    pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
@@ -9368,7 +9414,8 @@ local function frame()
           -- справа узкий блок свойств item (6 окт): loop, повторы, playrate …
           local pw = math.min(Lx.cw * 26, math.floor(lw2 * 0.3))
           ctx.aied_hover = ctx.AIE.draw(U, Lx, lx, ly, lw2 - pw - Lx.pad, lh, state.ai_edit, ctx.fit,
-            function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end, ctx.ai_list())
+            function(r) return edit.row_time(r, state.lpb, 0) end, function(t) return model.row_of_time(t, state.lpb) end,
+            (state.ai_edit and state.ai_edit.take) and ctx.take_envs(state.ai_edit.item) or ctx.ai_list())   -- огибающие take — свои лейны (9 окт)
           local ph = ctx.AIE.props(U, Lx, lx + lw2 - pw, ly, pw, lh, state.ai_edit, ctx.fit)
           if ph then ctx.aied_hover = ph end
           return nil
@@ -10017,7 +10064,10 @@ local function frame()
     state.status = 'automation: automation items of the track as one instrument - the slices list shows them; a note key inserts the selected one, its rate by the key (C-4 = x1, an octave up = x2)'
   elseif hover.pool then
     local col = hover.pool.ci and snap.cols[hover.pool.ci] or cur_col(); local e = col and col.pool[hover.pool.i]
-    state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick: open in the item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
+    if e and hover.pool.tenv then state.status = ('inst %02d: %s - take envelopes (%d) - click: edit them in the automation tab'):format(hover.pool.i, e.name, #ctx.take_envs(e.item))
+    elseif e and hover.pool.wave then state.status = ('inst %02d: %s - click the waveform: open in the item tab'):format(hover.pool.i, e.name)
+    else state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick or click the waveform: item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
+    end
   elseif hover.matrix and hover.matrix.btn then
     state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
   elseif hover.matrix and hover.matrix.ri then
@@ -10978,7 +11028,13 @@ local function frame()
       state.prev_by_mouse = nil
       -- двойной клик (5 окт, правка): инструмент остаётся на своём месте, фокус —
       -- в модуль сэмпла (вкладка item). Вставка на трек — Enter / insert
-      if dbl and click.zone == 'pool' and click.row == hover.pool.i then
+      local pe = cur_col() and cur_col().pool[hover.pool.i]
+      if hover.pool.tenv and pe then
+        -- ~ (9 окт): огибающие take этого item — во вкладке automation
+        draw.lib_drag = nil
+        ctx.take_env_open(pe.item)
+      elseif hover.pool.wave or (dbl and click.zone == 'pool' and click.row == hover.pool.i) then
+        -- щелчок по волне (9 окт) — сразу вкладка item, как двойной по строке
         draw.lib_drag = nil
         state.top = true; state.toptab = 'sample'; ctx.set_focus('top'); vim.msg = 'item: ' .. ((cur_col() and cur_col().pool[hover.pool.i] or {}).name or '')
       else draw.lib_drag = { i = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y } end   -- протяжка — перестановка

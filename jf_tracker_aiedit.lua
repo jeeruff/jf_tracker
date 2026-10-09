@@ -39,7 +39,23 @@ local function pts_of(t)
   return out
 end
 -- один проход пула в секундах проекта (луп / playrate), иначе длина item
+-- огибающая take (9 окт, t.take; idx = −1): время точек — от начала item,
+-- во времени источника (× playrate); A.toff / A.trate переводят его в
+-- проектное для сетки
+A.toff, A.trate = 0, 1
+local function tq(tm) return R.TimeMap2_timeToQN(0, A.toff + tm / A.trate) end
+local function qt(q) return (R.TimeMap2_QNToTime(0, q) - A.toff) * A.trate end
 function A.span(t)
+  if t.take then
+    local it = R.ValidatePtr(t.take, 'MediaItem_Take*') and R.GetMediaItemTake_Item(t.take)
+    if not it then return 0, 1, 1 end
+    local rate = R.GetMediaItemTakeInfo_Value(t.take, 'D_PLAYRATE')
+    if not rate or rate <= 0 then rate = 1 end
+    A.toff, A.trate = R.GetMediaItemInfo_Value(it, 'D_POSITION'), rate
+    local one = math.max(1e-3, R.GetMediaItemInfo_Value(it, 'D_LENGTH') * rate)
+    return 0, one, one
+  end
+  A.toff, A.trate = 0, 1
   local pos = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_POSITION', 0, false)
   local len = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_LENGTH', 0, false)
   local pq = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_POOL_QNLEN', 0, false) or 0
@@ -64,16 +80,16 @@ end
 -- время ↔ сетка (в QN)
 local function snap_t(tm, g)
   if not g or g <= 0 then return tm end
-  local q = R.TimeMap2_timeToQN(0, tm)
+  local q = tq(tm)
   local qq = math.floor(q / g + 0.5) * g
   if A.swing_qn then qq = A.swing_qn(qq) end                 -- свинг сетки проекта (6 окт)
-  return R.TimeMap2_QNToTime(0, qq)
+  return qt(qq)
 end
 local function cell_of(tm, g, t0, t1)
   if not g or g <= 0 then return t0, t1 end
-  local q = R.TimeMap2_timeToQN(0, tm)
+  local q = tq(tm)
   local q0 = math.floor(q / g) * g
-  return math.max(t0, R.TimeMap2_QNToTime(0, q0)), math.min(t1, R.TimeMap2_QNToTime(0, q0 + g))
+  return math.max(t0, qt(q0)), math.min(t1, qt(q0 + g))
 end
 
 -- кнопки строки инструментов; возвращает выбранное под мышью
@@ -135,7 +151,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
     local p0, one = A.span(t)
     R.DeleteEnvelopePointRangeEx(t.env, t.idx, p0 - 1, p0 + one + 1)
     R.Envelope_SortPointsEx(t.env, t.idx)
-    R.Undo_OnStateChange('automation item clear'); R.UpdateArrange()
+    R.Undo_OnStateChange(t.take and 'take envelope clear' or 'automation item clear'); R.UpdateArrange()
     press = false
   end
   local gx, gy, gw, gh = x + L.pad + 4, y + 2 * L.rh + 6, w - 2 * L.pad - 8, h - 2 * L.rh - 10
@@ -191,12 +207,12 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
   local function V(py) return lo + N(py) * (hi - lo) end
   -- сетка: линии по шагу (доли — ярче)
   if A.grid > 0 then
-    local q0, q1 = R.TimeMap2_timeToQN(0, t0), R.TimeMap2_timeToQN(0, t1)
+    local q0, q1 = tq(t0), tq(t1)
     local n = (q1 - q0) / A.grid
     if n < gw / 3 then
       local q = math.ceil(q0 / A.grid - 1e-9) * A.grid
       while q <= q1 + 1e-9 do
-        local px = X(R.TimeMap2_QNToTime(0, q))
+        local px = X(qt(q))
         U.set(math.abs(q - math.floor(q + 0.5)) < 1e-9 and U.LINE or U.DIM); gfx.rect(px, gy, 1, gh, 1)
         q = q + A.grid
       end
@@ -367,6 +383,12 @@ local PROPS = {
 }
 function A.props(U, L, x, y, w, h, t, fit)
   if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then return nil end
+  if t.take then                                            -- огибающая take: свойств automation item нет
+    U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
+    U.text(x + L.pad, y, fit('take envelope', w - L.pad), U.GREY)
+    U.text(x + L.pad, y + L.rh, fit(t.label or '', w - L.pad), U.TEXT)
+    return nil
+  end
   local function get(k) return R.GetSetAutomationItemInfo(t.env, t.idx, k, 0, false) end
   local function put(k, v) R.GetSetAutomationItemInfo(t.env, t.idx, k, v, true) end
   local pos, one, len = A.span(t)
