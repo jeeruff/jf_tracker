@@ -990,7 +990,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   draw_inst()
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
-    text(x + L.x_note, ty, cell.note, c(1, muted and U.GREY or U.TEXT))
+    text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or U.TEXT)))   -- видео-событие (9 окт)
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or U.CYAN)) end
     if L.narrow or L.notes_only then
     elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, U.TEXT))

@@ -228,6 +228,12 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
   }
   head.fx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   head.rgb = M.item_rgb(it)
+  -- видео-лейн (9 окт): видео-item — событие как аудио (фейды Ixx / Oxx
+  -- REAPER применяет и к картинке), в поле ноты — VID
+  if src and R.GetMediaSourceType then
+    local ps = R.GetMediaSourceParent and R.GetMediaSourceParent(src) or nil
+    head.video = R.GetMediaSourceType(ps or src, ''):upper():find('VIDEO', 1, true) ~= nil
+  end
   head.smap, head.smap_sig = M.stretch_map(take)
   -- луп (B_LOOPSRC): период в строках и первая граница (offset укорачивает первый проход)
   if src and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1 then
