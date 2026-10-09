@@ -3115,14 +3115,6 @@ ctx = {
     local f = io.open(reaper.GetResourcePath() .. '/Data/jf_tracker_cmdhist.txt', 'w')
     if f then for _, l in ipairs(list) do f:write((l:gsub('\n', ' ')), '\n') end; f:close() end
   end,
-  -- луп слотов матрицы (9 окт): от начала слота a до конца слота b (любой порядок), повтор вкл
-  mx_set_loop = function(a, b)
-    local r0, r1 = seq[math.min(a, b)], seq[math.max(a, b)]
-    if not (r0 and r1) then return end
-    reaper.GetSet_LoopTimeRange(true, true, r0.pos, r1.rgnend, false)
-    reaper.GetSetRepeat(1)
-    vim.msg = ('loop: slots %d..%d'):format(math.min(a, b), math.max(a, b))
-  end,
   -- :z / :zi (9 окт, zoxide): браузер — в самую частую и недавнюю папку под слова
   browse_z = function(arg)
     local words = {}
@@ -9560,7 +9552,7 @@ local function frame()
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode, loop_tr = { reaper.GetSet_LoopTimeRange(false, true, 0, 0, false) },
+    vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
@@ -10383,7 +10375,7 @@ local function frame()
   elseif hover.sessrow then state.status = 'scene: click / Enter / O - launch every clip of the row (empty cells stop their tracks)'
   elseif hover.sesscol then state.status = 'track: click - stop its clip at the next boundary'
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
-  elseif hover.matrix and hover.matrix.loopedge then state.status = 'cell edge - click / drag: loop these slots (REAPER loop + repeat); a loop is there - its top / bottom edge moves'
+  elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
@@ -10448,7 +10440,7 @@ local function frame()
     local names = {}
     for _, rg in ipairs(regions or {}) do if hover.ruler >= rg.r0 and hover.ruler < rg.r1 then names[#names + 1] = 'region ' .. (rg.name ~= '' and rg.name or ('#' .. rg.idx)) end end
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
-    state.status = ('ruler row %d: %s - click: go to the row'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
+    state.status = ('ruler row %d: %s - click: go to the row, drag: time selection'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
@@ -10610,12 +10602,20 @@ local function frame()
       end
     end
   end
-  -- луп слотов матрицы: протяжка за край (9 окт)
-  if ctx.mx_loopdrag then
+  -- протяжка клетки матрицы за край (9 окт): каждый новый слот на пути — копия
+  if ctx.mx_rep then
+    local r = ctx.mx_rep
     if gfx.mouse_cap & 1 == 1 then
       local ri = hover.matrix and hover.matrix.ri
-      if ri and ri ~= ctx.mx_loopdrag.last then ctx.mx_loopdrag.last = ri; ctx.mx_set_loop(ctx.mx_loopdrag.a, ri) end
-    else ctx.mx_loopdrag = nil end
+      if ri and (ri - r.last) * r.dir > 0 and r.clip then
+        local n = 0
+        edit.run(r.linked and 'matrix repeat cell (alias)' or 'matrix repeat cell (copy)', function()
+          for k = r.last + r.dir, ri, r.dir do if seq[k] then n = n + alias.cells_paste(seq, snap, k, r.ci, r.clip, r.linked) end end
+        end)
+        r.last = ri; r.n = (r.n or 0) + n; model.invalidate()
+        vim.msg = ('cell repeated to slot %d (%s)'):format(ri, r.linked and 'aliases' or 'unique copies')
+      end
+    else ctx.mx_rep = nil end
   end
   -- панели (9 окт, бета): ручка между листами — протяжка (двойной щелчок —
   -- поровну); подпись стека — активная вкладка (focus_at ниже ставит фокус)
@@ -11197,7 +11197,9 @@ local function frame()
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
       click = { t = now2, zone = 'rglen' }
     elseif hover.ruler then
+      -- линейка (9 окт, как в REAPER): щелчок — курсор в строку, протяжка — time selection
       ctx.set_focus('tracker'); vim.cur.row = hover.ruler
+      ts_drag = { row = hover.ruler, active = false, y0 = gfx.mouse_y, keep = true }
       click = { t = now2, zone = 'ruler' }
     elseif hover.sidectl then
       if hover.sidectl == 'open' then state.side = true; vim.msg = 'sidebar shown'
@@ -11305,19 +11307,21 @@ local function frame()
     elseif hover.lanebtn then
       ctx.lane_subs(hover.lanebtn.col, hover.lanebtn.lane, hover.lanebtn.d, hover.lanebtn.n)
       click = { t = now2, zone = 'lanebtn' }
-    elseif hover.matrix and hover.matrix.loopedge then
-      -- 9 окт, луп как в Renoise: край клетки — тянуть луп REAPER по слотам.
-      -- Луп есть — тянется его край (верхний — начало, нижний — конец), нет —
-      -- начинается со щелчка
-      local e = hover.matrix.loopedge
-      local a
-      for _, r in ipairs(MX.loop_rows or {}) do
-        if e.edge == 'top' and (not a or r.ri > a) then a = r.ri end
-        if e.edge == 'bottom' and (not a or r.ri < a) then a = r.ri end
+    elseif hover.matrix and hover.matrix.cellrep then
+      -- 9 окт, как в Renoise: тянешь клетку за край — она повторяется в
+      -- следующих слотах (вниз / вверх), пока ведёшь; алиасы, с Option — уникальные
+      local e = hover.matrix.cellrep
+      local linked = gfx.mouse_cap & 16 == 0
+      local probe = alias.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci)
+      if not (probe.cells[1] and probe.cells[1][1] and #probe.cells[1][1] > 0) then
+        vim.msg = 'empty cell - nothing to repeat'                       -- пустая клетка стёрла бы клетки на пути
+      else
+        local clip = probe
+        if linked then edit.run('matrix repeat cell: link the source', function() clip = alias.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci, true) end) end
+        ctx.mx_rep = { ri = e.ri, ci = e.ci, last = e.ri, dir = e.edge == 'top' and -1 or 1, linked = linked, clip = clip }
       end
-      ctx.mx_loopdrag = { a = a or e.ri }
-      ctx.mx_set_loop(ctx.mx_loopdrag.a, e.ri)
-      click = { t = now2, zone = 'mxloop' }
+      MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
+      click = { t = now2, zone = 'mxrep' }
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       if hover.matrix.btn == 'zoom' then ctx.mx_zoom()
@@ -11842,7 +11846,7 @@ local function frame()
         state.status = ('time selection: rows %04d - %04d (%d)'):format(a, b - 1, b - a)
       end
     else
-      if not ts_drag.active then reaper.GetSet_LoopTimeRange(true, false, 0, 0, false); vim.msg = 'time selection cleared' end
+      if not ts_drag.active and not ts_drag.keep then reaper.GetSet_LoopTimeRange(true, false, 0, 0, false); vim.msg = 'time selection cleared' end
       ts_drag = nil
     end
   elseif hover.rownum then

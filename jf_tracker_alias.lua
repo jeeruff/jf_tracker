@@ -420,13 +420,17 @@ function A.cells_delete(regions, snap, r0, r1, c0, c1)
 end
 
 -- копия блока: chunks без GUID, позиция относительно начала региона, lane
-function A.cells_copy(regions, snap, r0, r1, c0, c1)
+-- linked (9 окт, протяжка клетки) — исходник связывается (пул MIDI + группа),
+-- копии вставляются алиасами (cells_paste ..., linked)
+function A.cells_copy(regions, snap, r0, r1, c0, c1, linked)
   local clip = { nr = math.abs(r1 - r0) + 1, nc = math.abs(c1 - c0) + 1, cells = {} }
   each_cell(regions, snap, r0, r1, c0, c1, function(dr, dc, rg, col)
     local list = {}
     for _, it in ipairs(items_in(col.track, rg.pos, rg.rgnend)) do
-      local ok, chunk = R.GetItemStateChunk(it, '', false)
-      if ok then list[#list + 1] = { chunk = strip_guids(chunk), rel = R.GetMediaItemInfo_Value(it, 'D_POSITION') - rg.pos, lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') } end
+      local chunk, gid
+      if linked then chunk, gid = link_src(it)
+      else local ok, c = R.GetItemStateChunk(it, '', false); chunk = ok and strip_guids(c) or nil end
+      if chunk then list[#list + 1] = { chunk = chunk, gid = gid, rel = R.GetMediaItemInfo_Value(it, 'D_POSITION') - rg.pos, lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') } end
     end
     clip.cells[dr] = clip.cells[dr] or {}
     clip.cells[dr][dc] = list
@@ -436,7 +440,7 @@ end
 
 -- вставка блока от ячейки (ri, ci): содержимое ячеек-целей заменяется;
 -- items, не влезающие в регион, обрезаются по его концу
-function A.cells_paste(regions, snap, ri, ci, clip)
+function A.cells_paste(regions, snap, ri, ci, clip, linked)
   if not clip then return 0 end
   local n = 0
   for dr = 1, clip.nr do
@@ -449,8 +453,8 @@ function A.cells_paste(regions, snap, ri, ci, clip)
           local pos = rg.pos + c.rel
           if pos < rg.rgnend - EPS then
             local it = R.AddMediaItemToTrack(col.track)
-            R.SetItemStateChunk(it, unlink_chunk(c.chunk), false)        -- копия ячеек — без связи
-            R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+            R.SetItemStateChunk(it, linked and c.chunk or unlink_chunk(c.chunk), false)   -- копия ячеек — без связи; linked (9 окт, протяжка клетки) — алиас
+            R.SetMediaItemInfo_Value(it, 'I_GROUPID', (linked and c.gid) or 0)
             R.SetMediaItemInfo_Value(it, 'D_POSITION', pos)
             if R.GetMediaTrackInfo_Value(col.track, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', c.lane) end
             local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
