@@ -3347,7 +3347,7 @@ function D.frame(L, snap, rows, state, info)
         local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
         local hotf = mx >= fx0 and mx < fx0 + fw and my >= fy0 and my < fy1
         local ks = info.kslider
-        local kon = (ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid) or (info.touch_cols and info.touch_cols[col.guid])   -- 9 окт: и каналы под пальцами трекпада
+        local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
         local function yp(d) return fy1 - 2 - math.floor((th - 4) * D.fader_pos(d) + 0.5) end
         set(dark); gfx.rect(fx0, fy0, fw, th, 1)
         set((hotf or kon) and U.AMBER or U.LINE); gfx.rect(fx0, fy0, fw, th, 0)
@@ -3591,7 +3591,7 @@ function D.frame(L, snap, rows, state, info)
         local function ypos(dbv) return ty0 + th - math.floor(th * D.fader_pos(dbv) + 0.5) end
         local hot = mx >= sx and mx < sx + fx_w and my >= ty0 - 4 and my < ty0 + th + 4
         local ks = info.kslider
-        local kon = (ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid) or (info.touch_cols and info.touch_cols[col.guid])   -- 9 окт: и каналы под пальцами трекпада
+        local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
         if kon then set(U.AMBER); gfx.rect(c.x + 1, y1 - 1, c.w - 1, H, 0) end   -- полоса под клавиатурой (щелчок / f): k j громкость, h l панорама
         local lblw = (bigf and fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
         local bx0, bw0 = sx + lblw, fx_w - lblw

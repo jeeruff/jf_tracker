@@ -128,7 +128,6 @@
 
 - [ ] Options: разделы по смыслу — look, panes and bars, cursor and editing, headers and mixer, items and waves, sound and samples, session, pm cards, profiles; широкое окно — 2-3 колонки (j k по порядку), хоткеи — только на вкладке hotkeys, одной колонкой
 
-- [ ] мультитач: собрать и запустить помощник — cd Scripts/jf_tracker/tools; clang -O2 -o jf_touch jf_touch.c -framework CoreFoundation -framework ApplicationServices; ./jf_touch (или из BTT). Зажать Ctrl+Option, положить 2-3 пальца: каждый — свой фейдер (вверх громче); с выделенными Cmd+щелчком каналами — пальцы справа налево на них; статус -- TOUCH --; жесты macOS тремя пальцами — выключить в настройках трекпада
 
 - [ ] меню \\: один project (n c d заметки, s сохранить, S сохранить как, o опции, a about); у подменю одно …; d — показать / спрятать DSP (лист); в любом меню повтор буквы уходит на свободную (журнал debug пишет, где)
 

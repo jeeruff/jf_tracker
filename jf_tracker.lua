@@ -9551,7 +9551,7 @@ local function frame()
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, touch_cols = ctx.tch_cols, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
@@ -10766,72 +10766,6 @@ local function frame()
       end
       local g = CM.gesture_step(g0, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w, ti0)
       ctx.cm_gest = g
-      -- мультитач (9 окт, помощник tools/jf_touch): пальцы трекпада — каждый свой
-      -- фейдер. Выделены каналы (Cmd+щелчок) — пальцы справа налево на них
-      -- справа налево; иначе первый палец — канал жеста, правее — соседи
-      -- справа, левее — слева. Вверх — громче (вся высота трекпада — 48 dB)
-      do
-        local raw = reaper.GetExtState(EXT, 'touch')
-        local sq = raw:match('^(%d+)')
-        local tnow = reaper.time_precise()
-        if sq and sq ~= ctx.tch_seq then ctx.tch_seq, ctx.tch_t = sq, tnow end
-        local fingers = {}
-        if ctx.tch_t and tnow - ctx.tch_t < 0.25 then
-          for id, x, y in raw:gmatch(':(%d+),([%d%.]+),([%d%.]+)') do fingers[#fingers + 1] = { id = id, x = tonumber(x), y = tonumber(y) } end
-        end
-        if #fingers > 0 then
-          -- канал жеста держится, пока пальцы на трекпаде (палец двигает и курсор)
-          if not ctx.tch_prev then ctx.tch_prev, ctx.tch_ti = {}, g.ti end
-          g.ti = ctx.tch_ti
-          local tgt = {}
-          local idx = {}
-          for i, c in ipairs(cols) do idx[c.track] = i end
-          local sel = {}
-          for _, t in ipairs(CM.order) do if t.kind == 'trk' and idx[t.track] then sel[#sel + 1] = idx[t.track] end end
-          table.sort(fingers, function(a, b) return a.x > b.x end)        -- справа налево
-          if #sel > 0 then
-            table.sort(sel, function(a, b) return a > b end)
-            for k, f in ipairs(fingers) do tgt[f.id] = sel[k] end
-          else
-            local anchor = fingers[1]
-            for _, f in ipairs(fingers) do if tonumber(f.id) < tonumber(anchor.id) then anchor = f end end
-            local ai
-            for k, f in ipairs(fingers) do if f == anchor then ai = k end end
-            for k, f in ipairs(fingers) do tgt[f.id] = ctx.tch_ti + (ai - k) end   -- k < ai — правее якоря
-          end
-          local parts, seen = {}, {}
-          for _, f in ipairs(fingers) do
-            seen[f.id] = true
-            local ci = tgt[f.id]
-            local c = ci and cols[ci]
-            local pv = ctx.tch_prev[f.id]
-            if c and pv and pv.ci == ci then
-              local t = trk(c, 'vol')
-              local v = ctx.cm_io.get(t)
-              if v then ctx.cm_io.set(t, math.max(-60, math.min(12, v + (f.y - pv.y) * 120 * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1)))); g.moved = true end   -- 120 dB на высоту трекпада
-            end
-            ctx.tch_prev[f.id] = { ci = ci, y = f.y }
-            if c then parts[#parts + 1] = ctx.cm_io.show(trk(c, 'vol')) end
-          end
-          for id in pairs(ctx.tch_prev) do if not seen[id] then ctx.tch_prev[id] = nil end end
-          -- каналы под пальцами: рамка как у основного фейдера + выделены в REAPER
-          local tc, key = {}, ''
-          for _, f in ipairs(fingers) do local c = cols[tgt[f.id] or 0]; if c then tc[c.guid] = true; key = key .. c.guid end end
-          ctx.tch_cols = tc
-          if key ~= ctx.tch_selkey then
-            ctx.tch_selkey = key
-            local first = true
-            for _, f in ipairs(fingers) do
-              local c = cols[tgt[f.id] or 0]
-              if c and reaper.ValidatePtr(c.track, 'MediaTrack*') then
-                if first then reaper.SetOnlyTrackSelected(c.track); first = false else reaper.SetTrackSelected(c.track, true) end
-              end
-            end
-          end
-          g.dy = 0                                                     -- мышь фейдер не двигает, пока пальцы
-          ctx.tch_status = ('-- TOUCH --  %d finger(s): %s'):format(#fingers, table.concat(parts, ' | '))
-        else ctx.tch_prev, ctx.tch_status, ctx.tch_ti, ctx.tch_cols, ctx.tch_selkey = nil, nil, nil, nil, nil end
-      end
       local col = cols[g.ti]
       if col then
         state.kslider = { col = col, what = 'vol' }
@@ -10844,14 +10778,12 @@ local function frame()
           end
         end
         state.status = ('-- TRACKS --  %d / %d  %s  %s   (sideways: track, then up / down: its fader; Shift fine)'):format(g.ti, #cols, g.mode == 'fader' and '[fader]' or '[pick]', ctx.cm_io.show(t))
-        if ctx.tch_status then state.status = ctx.tch_status end
       end
       U.click, U.rclick = false, false
       ::cm_gest_done::
     elseif ctx.cm_gest then
       if ctx.cm_gest.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: track faders'); model.invalidate() end
       ctx.cm_gest = nil
-      ctx.tch_prev, ctx.tch_status, ctx.tch_ti, ctx.tch_cols, ctx.tch_selkey = nil, nil, nil, nil, nil   -- пальцы: рамки долой
     end
     if gest then
     elseif ctrl and not CM.latch then
