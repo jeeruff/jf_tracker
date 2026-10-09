@@ -6815,14 +6815,21 @@ ctx = {
     if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' then return end   -- поиск эффектов — по клику (5 окт)
     if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
+    if state.panes_ui and L and L.pn then
+      -- панели (9 окт): фокус — только на видимую панель дерева (вкладки — 'top' + toptab)
+      local id = f == 'top' and state.toptab or f
+      if f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and not draw.panes.visible(state.panes, id) then f = 'tracker' end
+      if f == 'top' then draw.panes.set_active(state.panes, state.toptab); state.top = true end
+    else
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
     if f == 'dsp' and not (state.dsp or state.khelp) then f = 'tracker' end
     if f == 'fxb' and not ((state.dsp and state.fxb and not state.khelp) or (state.side and B.mode == 'fx' and (state.browserleft or state.router_big))) then f = 'tracker' end
     if f == 'notes' and not (state.top and state.notes_open) then f = 'tracker' end
-    if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'inst' and not (state.top or state.side) then f = 'tracker' end   -- инструменты живут и в сайдбаре (2 окт)
     if f == 'ctrl' and not state.top then f = 'tracker' end
+    end
+    if state.focus == 'notes' and f ~= 'notes' and ctx.notes_save then ctx.notes_save() end
     if f == 'session' and not state.clipsview then f = 'tracker' end   -- session (7 окт)
     if f == 'ctrl' and state.focus ~= 'ctrl' then state.ctrl_sel = 'bpm' end   -- фокус на главном модуле: курсор на BPM (3 окт)
     if state.focus == 'top' and f ~= 'top' and SL.active then SL.close() end
@@ -6895,6 +6902,7 @@ ctx = {
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local items = {
       { key = '\\', label = 'context: what is under the cursor', fn = function() ctx.context_here() end },
+      { key = ',', label = 'REAPER preferences', fn = function() reaper.Main_OnCommand(40016, 0) end },   -- 9 окт: \ , — как Cmd+, в macOS
       { key = 'e', label = 'event / selection', sub = function() return group('event', event_actions(hover)) end },
       { key = 't', label = 'track' .. (col and (': ' .. col.name) or ''), sub = function() return col and group('track ' .. col.name, track_actions(col)) or { title = 'track', items = {} } end },
       { key = 'p', label = 'pattern' .. (rg and (': ' .. rg.name) or ''), sub = function() return group('pattern', region_actions(rg)) end },
@@ -12412,7 +12420,8 @@ local function frame()
   if c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 32 ~= 0 and gfx.mouse_cap & 4 == 0
      and (gfx.getchar(65536) & 2) ~= 0 then
     local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
-    if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10 end
+    if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10
+    elseif dn and dn:byte(87) ~= 0 then c = 23; c_raw = 23 end   -- Ctrl+W (9 окт, панели): тоже не доходит
   end
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
@@ -12425,7 +12434,9 @@ local function frame()
     elseif c == 23 and m.ctrl and not m.cmd then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc'; c = 0
     elseif m.cmd and not m.ctrl and not m.alt then
       local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
-      local ch = c < 256 and string.char(c):lower() or ''
+      -- Cmd+h j k l приходят кодами 8 10 11 12 (как Ctrl+H …), а не буквами (журнал 9 окт)
+      local CODE = { [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l' }
+      local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
         if m.shift then ctx.pane_do(function() return draw.panes.move(state.panes, id, DIR[ch]) end, 'pane ' .. id .. ' moved')
