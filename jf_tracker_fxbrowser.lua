@@ -202,6 +202,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
       U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh - 1, 0)
       U.text(bx + L.pad, by, fname, on and U.AMBER or (hot and U.TEXT or U.GREY))
       if hot then hover = { folder = fname } end
+      if FB.hint then FB.hint('fxbbtn', bx, by, bw, L.rh, { folder = fname }) end   -- 9 окт: метки f
       bx = bx + bw + 2
     end
     local sel = FB.selected()
@@ -214,6 +215,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     U.set(fav and U.AMBER or U.LINE); gfx.rect(sx, sy0, sw, L.rh - 1, 0)
     U.text(sx + L.pad, sy0, '*', fav and U.AMBER or (hot and U.TEXT or U.GREY))
     if hot then hover = { star = true } end
+    if FB.hint then FB.hint('fxbbtn', sx, sy0, sw, L.rh, { star = true }) end
     y, h = y + rows * L.rh + 2, h - rows * L.rh - 2
   end
   -- строка поиска
@@ -227,6 +229,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   U.text(x + 2 * L.pad, sy + 1, fit((FB.query ~= '' and '/' or '') .. q .. (focused and '_' or ''), w - 4 * L.pad - cw), FB.query ~= '' and U.TEXT or U.GREY)
   U.text(x + w - L.pad - cw, sy + 1, cnt, U.GREY)
   if mx >= x and mx < x + w and my >= sy and my < sy + L.rh then hover = 'search' end
+  if FB.hint then FB.hint('fxbbtn', x + L.pad, sy, w - 2 * L.pad, L.rh, { search = true }) end
   -- список
   local top = sy + L.rh + 3
   local nvis = math.max(1, math.floor((y + h - top - 2) / L.rh))
@@ -253,6 +256,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and U.BG or U.TEXT)
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.BG or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
+    if FB.hint then FB.hint('fxbrow', x + 1, ry, w - 3, L.rh, idx) end
     end
     ::next_row::
   end

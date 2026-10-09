@@ -7262,6 +7262,7 @@ end
 OPT.init(U, ctx)
 OPT.ask.init(U, ctx)
 draw.hint = HN.add
+FB.hint = function(...) return draw.hint(...) end   -- fx list: метки f (9 окт)
 ctx.hint = function(...) return draw.hint(...) end   -- через draw.hint: сдвиг верхнего модуля (mid / bottom)
 ctx.env_colour = draw.env_colour
 ctx.ic = function(name, text) return draw.ic(name, text) end
@@ -7332,6 +7333,11 @@ SPROP.init(U, ctx)
 local function hint_go(t)
   local d = t.data
   if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда
+  elseif t.kind == 'fxbbtn' then                                   -- 9 окт: fx list — папка / * / поиск
+    ctx.set_focus('fxb')
+    if d.folder then FB.folder = d.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
+    elseif d.star then local sel = FB.selected(); if sel then FB.toggle_fav(sel) end end
+  elseif t.kind == 'fxbrow' then ctx.set_focus('fxb'); FB.cur = d
   elseif t.kind == 'bar' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; state.row0 = math.max(0, math.min(state.row0, d.row))
   elseif t.kind == 'env' then ctx.set_focus('tracker'); vim.cur.fi = d; vim.cur.field = 1
   elseif t.kind == 'header' or t.kind == 'scope' then
