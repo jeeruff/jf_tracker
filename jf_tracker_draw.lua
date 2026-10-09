@@ -3021,7 +3021,14 @@ function D.frame(L, snap, rows, state, info)
   local hy = L.header_y
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
   local trsel = info.trsel or {}
-  for _, c in ipairs(L.cols) do
+  -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
+  -- (там было пусто); та же отрисовка, что у трека, без шапки
+  local hcols = L.cols
+  if L.mix_bottom and snap and snap.master and snap.master.vol and L.label_w >= 6 * L.cw then
+    hcols = { table.unpack(L.cols) }
+    hcols[#hcols + 1] = { col = snap.master, x = tx0, w = L.label_w, lanes = {}, envs = {}, mls = {}, master = true }
+  end
+  for _, c in ipairs(hcols) do
     local col = c.col
     -- фон шапки (3 окт), опция hdrfill: line — полоска цвета под именем,
     -- header — залита строка имени, full — вся шапка (ниже имени тусклее);
@@ -3034,8 +3041,10 @@ function D.frame(L, snap, rows, state, info)
     local rbg = (fill and mode == 'full') and U.mix(base, col.rgb, 0.18) or base
     local nh = L.rh + 1                                    -- строка имени (кнопки — с hy + rh + 1)
     local hset = fill and rawset_col or set               -- цвет трека — и в mono
-    hset(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
-    hset(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+    if not c.master then
+      hset(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
+      hset(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+    end
     -- фон светлее панели: текст шапки подтянуть по контрасту (на колонку)
     local T0, G0 = U.TEXT, U.GREY
     U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
@@ -3093,13 +3102,13 @@ function D.frame(L, snap, rows, state, info)
         if D.csel_on(col.guid, 'vol') then csel_frame(fx0, fy0, fw, th) end
         hint('trs', fx0, fy0, fw, th, { col = col, what = 'vol' })
       end
-    else
+    elseif not c.master then
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
-    if col.rgb and mode == 'line' and not c.folded then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
+    if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     if (col.depth or 0) > 0 and not c.folded then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end   -- 9 окт: у полоски закрывала фейдер
     if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
-    hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
+    if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
     if not c.folded then
       local by = hy + L.rh + 1
@@ -3120,7 +3129,7 @@ function D.frame(L, snap, rows, state, info)
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
       local trim_w = ms('trim') + 4
       local trim_x = c.x + c.w - L.pad - trim_w
-      for k, b in ipairs(labels) do
+      for k, b in ipairs(c.master and {} or labels) do
         local x = bx + (k - 1) * (L.btn_w + 1)
         local bwk = L.btn_w
         if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (L.btn_w + 1) + L.pad then break end end
@@ -3241,8 +3250,8 @@ function D.frame(L, snap, rows, state, info)
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
         local side = c.x + c.w - 2 - (sx + fx_w + L.pad + 2) >= 5 * L.cw
-        if not side then D.mix_under_next = true end
-        local fh = D.mix_under and (H - 3 * L.rh) or H
+        if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
+        local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
         if ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
@@ -3383,12 +3392,13 @@ function D.frame(L, snap, rows, state, info)
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
-        if info.fx_stack then
+        if info.fx_stack and (side or not c.master) then
           local sx1 = sx + fx_w + L.pad + 2
           local ex, ey, ew, eh
           if side then
             ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
             set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1)
+            if c.master then text(ex + 2, ey, fit('master', ew - 2), U.AMBER); ey, eh = ey + L.rh, eh - L.rh end   -- имя — над эффектами мастера
           else
             ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
             set(U.LINE); gfx.rect(ex, ey - 1, ew, 1, 1)
@@ -3411,7 +3421,7 @@ function D.frame(L, snap, rows, state, info)
       end   -- микшер / строки громкости и панорамы
       -- строка входа (3 окт): in <вход> — клик: список входов (fzf) под ней,
       -- повторный клик закрывает; smart — в DSP-модуле трека (4 окт)
-      if L.hr_in > 0 and info.input_name then
+      if L.hr_in > 0 and info.input_name and not c.master then
         local iy = hy + (2 + L.hr_vp) * L.rh + 1
         local iw = sw
         local hot = mx >= sx and mx < sx + iw and my >= iy and my < iy + L.rh
@@ -3428,7 +3438,7 @@ function D.frame(L, snap, rows, state, info)
       -- инфо трека (7 окт, опция header info): l — инструменты из lib на
       -- треке, fx — инсерты (клик — в DSP, двойной — окно), s — сенды (клик —
       -- окно маршрутизации); фишки по ширине, что не влезло — «+N»
-      if L.hr_info > 0 and info.hdr_info then
+      if L.hr_info > 0 and info.hdr_info and not c.master then
         local hi = info.hdr_info(col) or {}
         local y0 = hy + (2 + L.hr_vp + L.hr_in) * L.rh + 1
         local rows = { { 'l', hi.inst or {}, 'hdrinst' }, { 'fx', hi.fx or {}, 'hdrfx' }, { 's', hi.sends or {}, 'hdrsend' } }

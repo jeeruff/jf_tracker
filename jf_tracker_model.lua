@@ -381,6 +381,12 @@ function M.build(lpb)
   if R.GetMasterTrack then
     local mt = R.GetMasterTrack(0)
     local ms = { track = mt, fx = M.track_fx(mt) }
+    -- 9 окт: полоса master в нижнем микшере — те же поля, что у трека
+    ms.guid, ms.name, ms.lanes, ms.depth = 'master', 'master', {}, 0
+    ms.vol, ms.pan = R.GetMediaTrackInfo_Value(mt, 'D_VOL'), R.GetMediaTrackInfo_Value(mt, 'D_PAN')
+    ms.width, ms.panmode = R.GetMediaTrackInfo_Value(mt, 'D_WIDTH'), math.floor(R.GetMediaTrackInfo_Value(mt, 'I_PANMODE'))
+    ms.panL, ms.panR = R.GetMediaTrackInfo_Value(mt, 'D_DUALPANL'), R.GetMediaTrackInfo_Value(mt, 'D_DUALPANR')
+    ms.muted = R.GetMediaTrackInfo_Value(mt, 'B_MUTE') == 1
     local sfx = R.TrackFX_GetByName and R.TrackFX_GetByName(mt, 'jf_tracker_scope', false)
     if sfx and sfx >= 0 then ms.scope_slot = math.floor(R.TrackFX_GetParam(mt, sfx, 0)) end
     snap.master = ms

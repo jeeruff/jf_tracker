@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'mixer at the bottom: the master strip under the row numbers (fader, pan, peak, its fx)',
     'lib: a click on the waveform opens the item tab; items with take envelope points get a ~ column - click it to edit those envelopes in the automation tab (one lane per envelope)',
     'smart panel (gs or middle click on a cell, as Smart Select in PlayerPro): the values of the field under the cursor as a grid at the cell - notes by octave with OFF / delete, volume, delay, command letter then its value, instrument, envelope point, CC; hex or decimal as the values option; pick with the mouse or h j k l + Enter',
     'mixer: a narrow fader by default (Options: big fader - with dB marks, always in pt-mode); max peak above the box, empty without signal; folded tracks get a one-char fader',
