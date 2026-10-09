@@ -3154,9 +3154,44 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if ok and inside then hover.notes = hn or 'text' end
       elseif id == 'dsp' then
         L.pn_dsp = ct                                    -- рисует блок DSP ниже в кадре (его координаты — из листа)
+      elseif id == 'ctrl' then
+        -- главный модуль рисует от (0, 0) шириной L.ctrl_w — в буфер 99, сдвиг мыши и меток f по x и y
+        local bx, by, bw, bh = ct.x, ct.y, ct.w, ct.h
+        if D.ctrl_buf_w ~= bw or D.ctrl_buf_h ~= bh then gfx.setimgdim(99, bw, bh); D.ctrl_buf_w, D.ctrl_buf_h = bw, bh end
+        local dest0, mx0, my0, hint0, cw0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, L.ctrl_w, D.clip
+        gfx.dest = 99; gfx.mouse_x, gfx.mouse_y = mx0 - bx, my0 - by; D.clip = nil
+        if hint0 then D.hint = function(kind, x, y, w, h, data) return hint0(kind, x + bx, y + by, w, h, data) end end
+        L.ctrl_w = bw
+        set(U.PANEL); gfx.rect(0, 0, bw, bh, 1)
+        local hv = {}
+        local ok, err = pcall(draw_ctrl, L, info, bh, hv)
+        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, L.ctrl_w, D.clip = mx0, my0, hint0, dest0, cw0, clip0
+        if not ok then error(err, 0) end
+        gfx.blit(99, 1, 0, 0, 0, bw, bh, bx, by, bw, bh)
+        for _, r in pairs(D.ctrl_rect or {}) do if not r.shifted then r[1] = r[1] + bx; r[2] = r[2] + by; r.shifted = true end end
+        if L.ctrl_area then L.ctrl_area = { L.ctrl_area[1] + bx, L.ctrl_area[2] + by, L.ctrl_area[3], L.ctrl_area[4] } end
+        if inside then hover.ctrl, hover.zone = hv.ctrl, hv.zone end
+      elseif PN.BY[id].tab then
+        -- вкладка: прежняя верхняя панель рисует содержимое активной вкладки в
+        -- буфер 1020 (без главного модуля, lib и слайсов), на экран — только
+        -- область под её строкой вкладок
+        local cy0 = 1 + L.rh + 3
+        local bw, bh = ct.w, ct.h + cy0 + 2
+        if D.pnt_w ~= bw or D.pnt_h ~= bh then gfx.setimgdim(1020, bw, bh); D.pnt_w, D.pnt_h = bw, bh end
+        local sv = { L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab }
+        L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = bh, 0, bw, 0, 0, true, true, id
+        local dest0, mx0, my0, hint0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, D.clip
+        local dy = ct.y - cy0
+        gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil
+        if hint0 then D.hint = function(kind, x, y, w, h, data) if y >= cy0 then return hint0(kind, x + ct.x, y + dy, w, h, data) end end end
+        local ok, th = pcall(draw_topbar, L, info)
+        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0
+        L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = table.unpack(sv, 1, 8)
+        if not ok then error(th, 0) end
+        gfx.blit(1020, 1, 0, 0, cy0, bw, ct.h, ct.x, ct.y, bw, ct.h)
+        if inside and type(th) == 'table' then for k, v in pairs(th) do if k ~= 'tab' then hover[k] = v end end end
       else
-        -- главный модуль и вкладки переедут следующими шагами
-        text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label .. ': moves into panes next step', ct.w - 2 * L.pad), U.GREY)
+        text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)
       end
       D.clip = nil
       rects[(PN.BY[id].tab and 'top') or id] = { ct.x, ct.y, ct.w, ct.h }
