@@ -131,7 +131,7 @@ KH.PAGES = {
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
-    { k = 'F2', d = 'tracker <-> item tab (from any tab - back to the tracker)' },
+    { k = 'F2', d = 'back to the tracker from anywhere (closes the routing diagram, big router / chain); the item tab is in the F3 circle' },
     { k = 'F3', d = 'modulate; again - the next tab in a circle' },
     { k = 'F4 F5 F6', d = 'midi / scopes / master; the same key again - back to the tracker' },
     { k = 'help', d = 'this panel: the help button of the main module; F1 - the whole help' },

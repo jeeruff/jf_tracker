@@ -1317,9 +1317,25 @@ function E.legato_auto(track, on)
   R.GetSetMediaTrackInfo_String(track, 'P_EXT:jf_legato', on and '1' or '', true)
 end
 
+-- mono (9 окт, кнопка mono слайсера): один голос на трек — новая нота
+-- обрезает всё, что звучит на треке в её начале (все подколонки и лейны,
+-- даже при x-fade); выкл — poly, как раньше (только своя подколонка)
+E.mono = true
+local function mono_cut(track, t, keep)
+  for i = R.CountTrackMediaItems(track) - 1, 0, -1 do
+    local o = R.GetTrackMediaItem(track, i)
+    if o ~= keep then
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+      local tk = R.GetActiveTake(o)
+      if tk and not R.TakeIsMIDI(tk) and op < t - 1e-4 and oe > t + 1e-4 then R.SetMediaItemInfo_Value(o, 'D_LENGTH', t - op) end
+    end
+  end
+end
 local function finish_insert(track, lane_idx, it)
   if not it then return end
   E.bsync_fit(it)                                     -- beatsync инструмента: под темп в этом месте
+  if E.mono and not E.beside then mono_cut(track, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
   if E.legato_auto(track) then E.legato(track, lane_idx) end   -- трек в легато: держится при вставке

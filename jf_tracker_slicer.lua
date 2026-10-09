@@ -415,6 +415,10 @@ end
 
 -- кнопка нарезки (2 окт): равные части / транзиенты / чувствительность / сброс
 function S.button(id)
+  if id == 'mono' then                               -- 9 окт: один голос на трек при вставке / poly
+    if ctx.mono_toggle then ctx.mono_toggle() end
+    return
+  end
   if id == 'snap' then
     S.snap = not S.snap
     if S.snap and S.entry and #S.trans == 0 and S.detect then S.detect() end   -- транзиенты для притяжения
@@ -571,12 +575,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local bx = x
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' }, { 'playthru', 'pthru' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' }, { 'playthru', 'pthru' }, { 'mono', 'mono' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if bx + bw > x + hint_w then break end
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
-      local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e))   -- playthru (6 окт): горит, когда включён
+      local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e)) or (b[2] == 'mono' and ctx.mono_on and ctx.mono_on())   -- playthru (6 окт): горит, когда включён
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, y + rh, bw, rh, 1)
       U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y + rh, bw, rh, 0)
       U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))

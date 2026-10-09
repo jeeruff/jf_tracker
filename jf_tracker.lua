@@ -232,7 +232,8 @@ local state = {
   mixroute = flag('mixroute', true),
   jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
-  human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
+  human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
+  slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
   mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
@@ -496,7 +497,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3194,6 +3195,11 @@ ctx = {
     return c
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
+  mono_on = function() return state.slicemono end,
+  mono_toggle = function()
+    state.slicemono = not state.slicemono; edit.mono = state.slicemono
+    vim.msg = state.slicemono and 'mono: one voice per track - a new note cuts what still sounds on the track' or 'poly: notes may ring over each other (only the same subcolumn is cut)'
+  end,
   -- что пишет нота: 'midi' — выбран плагин-инструмент, иначе item сэмпла
   inst_src = function(col, inst)
     if ctx.inst_fx(col) then return 'midi' end
@@ -7688,6 +7694,7 @@ MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллб�
 MX.ruler = state.mxruler
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
 edit.human = state.human or 0                   -- 9 окт: human слайсов (опция)
+edit.mono = state.slicemono                     -- 9 окт: mono слайсера
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 -- импульс ReaVerb (5 окт): задание спектрограммы файла импульса для вида ir
@@ -13203,16 +13210,24 @@ local function frame()
   do
     local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'midi', [26165] = 'scopes', [26166] = 'master' }
     local tab = FTAB[c]
+    -- 9 окт: F2 — из любого места в трекер (главное перемещение); заслоняющее
+    -- трекер закрывается: диаграмма маршрутизации, большой роутер, цепочка
+    if c == 26162 and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      state.routeview = nil
+      if state.router_big and ctx.router_big then ctx.router_big() end
+      if state.dsp_big and ctx.dsp_big then ctx.dsp_big() end
+      if MX.SMART and MX.SMART.p then MX.SMART.close() end
+      ctx.set_focus('tracker'); vim.msg = 'tracker (F2)'
+      tab, c = nil, 0
+    end
     if tab and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local on_top = state.focus == 'top' and state.top
       local cur = state.toptab == 'retro' and 'retro' or state.toptab
-      if c == 26162 and on_top then tab = nil                                  -- F2 из вкладки — в трекер
-      elseif c == 26163 and on_top and cur ~= 'sample' then
+      if c == 26163 and on_top then
         local T = ctx.top_tabs()
         local i = 1
         for k, t in ipairs(T) do if t == cur then i = k end end
         tab = T[i % #T + 1]
-        if tab == 'sample' then tab = T[(i + 1) % #T + 1] end              -- круг F3 — без item (он на F2)
       elseif c ~= 26163 and on_top and cur == tab then tab = nil end        -- повтор — в трекер
       if tab then state.top = true; state.toptab = tab; ctx.set_focus('top'); vim.msg = 'tab: ' .. tab
       else ctx.set_focus('tracker'); vim.msg = 'tracker' end
