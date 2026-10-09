@@ -271,7 +271,11 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
       local _, t, v = R.GetEnvelopePoint(env, i)
       local row = M.row_of_qn(R.TimeMap2_timeToQN(0, pos + t / r), lpb)
       local cell = sub and sub[row]
-      if cell and cell.kind == 'cont' and cell.of == head then
+      -- 9 окт: служебные точки x-fade (пара точек у самого края item: громкость
+      -- и ноль) не показываются: «00» / «80» мешали и сбивали w / y3w
+      local tl, ilen = t / r, R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local edge_zero = tl <= 0.06 or tl >= ilen - 0.06   -- точки x-fade — у самого края item (≤ 60 мс)
+      if cell and cell.kind == 'cont' and cell.of == head and not edge_zero then
         cell.vol = M.vol_hex(base * R.ScaleFromEnvelopeMode(mode, v))
       end
     end

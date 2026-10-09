@@ -286,6 +286,16 @@ state.panes = (function()
 end)()
 -- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
 if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
+-- 9 окт (миграция 7): старый F3 раскрыл скрытые вкладки отдельными панелями —
+-- вкладка своей панелью (одна в листе) снова скрыта; стек вкладок не трогаем
+if state.panes and reaper.GetExtState(EXT, 'panes_mig7') ~= '1' then
+  local PNm = draw.panes
+  for _, id in ipairs({ 'midi', 'harm', 'scopes', 'master', 'video', 'garden' }) do
+    local lf = PNm.find(state.panes, id)
+    if lf and #lf.panes == 1 then PNm.hide(state.panes, id) end
+  end
+  reaper.SetExtState(EXT, 'panes_mig7', '1', true)
+end
 -- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
 -- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
 if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
@@ -7639,7 +7649,7 @@ ctx = {
     vim.msg = ('chord: %d note(s) - Option+note adds, a pause ends it'):format(ch.n)
   end,
   -- головы аккорда: ноты строки ch.row трека с высотами аккорда
-  chord_heads = function(ch)
+  chtype_heads = function(ch)
     local f0, f1
     for i, f in ipairs(L.flat) do if f.col and f.col.track == ch.track and not f.env then f0 = f0 or i; f1 = i end end
     if not f0 then return {} end
@@ -7656,7 +7666,7 @@ ctx = {
     local rd = math.max(1e-3, edit.row_time(ch.row + 1, state.lpb, 0) - edit.row_time(ch.row, state.lpb, 0))
     local rows = math.max(math.max(1, vim.step), math.floor(((final and ch.t_last or reaper.time_precise()) - ch.t0) / rd + 0.5) + (final and 1 or 0))
     ch.rows = rows
-    local heads = ctx.chord_heads(ch)
+    local heads = ctx.chtype_heads(ch)
     if #heads > 0 then edit.note_off(heads, state.lpb, ch.row + rows - (edit.OFF_END and 1 or 0)) end
   end,
   chord_end = function()
@@ -10522,6 +10532,7 @@ local function frame()
     clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
+    dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
     route_hl = ctx.route_hl,                          -- 9 окт: подсветка каналов попапа маршрутизации
     draw_router = function(x, y, w, h)
       local root, _, title = ctx.db_tree()
@@ -13722,6 +13733,26 @@ local function frame()
       if state.dsp_big and ctx.dsp_big then ctx.dsp_big() end
       if MX.SMART and MX.SMART.p then MX.SMART.close() end
       ctx.set_focus('tracker'); vim.msg = 'tracker (F2)'
+      tab, c = nil, 0
+    end
+    -- 9 окт: панели — F3 по кругу только по вкладкам видимого стека (раньше брал
+    -- общий список и ставил скрытую вкладку — трекер падал); F4..F6 — через панели
+    if tab and state.panes_ui and L and L.pn and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      local PNm = draw.panes
+      local cur = state.toptab
+      if c == 26163 then
+        local lf = (cur and PNm.find(state.panes, cur)) or nil
+        if not lf then for _, id in ipairs(PNm.TABS) do lf = PNm.find(state.panes, id); if lf then break end end end
+        local list = {}
+        for _, id in ipairs(lf and lf.panes or {}) do if PNm.BY[id] and PNm.BY[id].tab then list[#list + 1] = id end end
+        if #list > 0 then
+          local act = lf.panes[lf.active] or list[1]
+          local nxt = act
+          if state.focus == 'top' then for k, id in ipairs(list) do if id == act then nxt = list[k % #list + 1] end end end
+          ctx.pane_focus(nxt); vim.msg = 'tab: ' .. nxt .. ' (F3 - next)'
+        end
+      elseif state.focus == 'top' and cur == tab then ctx.set_focus('tracker'); vim.msg = 'tracker'
+      else ctx.pane_focus(tab); vim.msg = 'tab: ' .. tab end
       tab, c = nil, 0
     end
     if tab and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then

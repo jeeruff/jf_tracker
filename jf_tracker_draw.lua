@@ -3457,11 +3457,18 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local dy = ct.y - cy0                               -- строка cy0 буфера = верх панели
         gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil
         if hint0 then D.hint = function(kind, x, y, w, h, data) if y >= cy0 then return hint0(kind, x + ct.x, y + dy, w, h, data) end end end
-        local ok, th = pcall(draw_topbar, L, info)
+        local ok, th = xpcall(draw_topbar, debug.traceback, L, info)
         gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = table.unpack(sv, 1, 8)
-        if not ok then error(th, 0) end
-        gfx.blit(1020, 1, 0, 0, cy0, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 9 окт: с начала содержимого — низ вкладки целиком
+        if ok then
+          gfx.blit(1020, 1, 0, 0, cy0, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 9 окт: с начала содержимого — низ вкладки целиком
+        else
+          -- 9 окт: ошибка одной вкладки не роняет трекер — сообщение на её месте, стек в debug log
+          set(U.PANEL); gfx.rect(ct.x, ct.y, ct.w, ct.h, 1)
+          text(ct.x + L.pad, ct.y + 2, fit('tab ' .. tostring(id) .. ': ' .. tostring(th):match('[^\n]*'), ct.w - 2 * L.pad), U.RED)
+          if D.tab_err ~= th then D.tab_err = th; if info.dlog then info.dlog('TAB ERROR ' .. tostring(id) .. ': ' .. tostring(th)) end end
+          th = nil
+        end
         if inside and type(th) == 'table' then for k, v in pairs(th) do if k ~= 'tab' then hover[k] = v end end end
       else
         text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)

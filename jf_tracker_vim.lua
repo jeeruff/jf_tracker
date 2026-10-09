@@ -329,7 +329,7 @@ end
 -- громкости take (cell.vol); strict (W / B) — только головы аудио / MIDI item
 local function is_event(c, strict)
   if strict then return is_head(c) end
-  return is_head(c) or (c and (c.kind == 'off' or (c.kind == 'cont' and c.vol ~= nil))) or false
+  return is_head(c) or (c and c.kind == 'off') or false   -- 9 окт: точки громкости take — не события (x-fade «00» сбивал y3w)
 end
 local function track_event(f, r, strict)
   if f.env then return (not strict) and env_has(f, r) end
