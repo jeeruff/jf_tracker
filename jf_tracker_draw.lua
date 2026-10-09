@@ -3244,12 +3244,28 @@ function D.frame(L, snap, rows, state, info)
         -- (и pt-mode) — с подписями dB слева
         local bigf = state.bigfader or state.ptmode
         local fx_w = math.min(lw1 - 2 * L.pad - indent, (bigf and lblw0 or 0) + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
+        -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
+        -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
+        -- с кнобом — посередине своей части. Нет подходящей линии — как было
+        local sx = sx
+        local sepx, sepc
+        if not c.master then
+          local need = sx + fx_w + L.pad
+          local function cand(x, cl) if x >= need and c.x + c.w - 2 - (x + 2) >= 5 * L.cw and (not sepx or x < sepx) then sepx, sepc = x, cl end end
+          for li, ln in ipairs(c.lanes) do
+            if li > 1 then cand(ln.x - 1, U.DIM) end
+            for si = 2, ln.nsub or 1 do cand(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), D.EMPTY) end
+          end
+          for _, ev in ipairs(c.envs) do cand(ev.x - 1, U.DIM) end
+          for _, m in ipairs(c.mls or {}) do cand(m.x - 1, U.DIM) end
+          if sepx then sx = c.x + 1 + math.floor((sepx - c.x - 1 - fx_w) / 2) end
+        end
         -- эффекты сбоку, если влезают 5 знаков — тогда фейдер на всю высоту
         -- полосы; иначе под ним 3 строки эффектов. Высота фейдера при этом
         -- одна на всех треках: решает ширина трека, а она у треков своя —
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
-        local side = c.x + c.w - 2 - (sx + fx_w + L.pad + 2) >= 5 * L.cw
+        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + L.pad + 2) >= 5 * L.cw
         if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
         local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
@@ -3393,11 +3409,14 @@ function D.frame(L, snap, rows, state, info)
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
         if info.fx_stack and (side or not c.master) then
-          local sx1 = sx + fx_w + L.pad + 2
+          local sx1 = sepx and (sepx + 2) or (sx + fx_w + L.pad + 2)
           local ex, ey, ew, eh
           if side then
             ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
-            set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1)
+            if sepx then
+              local ly0 = L.mix_bottom and L.mix_y or (y1 - 1)               -- от горизонтали над микшером — встык
+              set(sepc); gfx.rect(sepx, ly0, 1, (L.mix_bottom and L.mix_h or H + 1), 1)
+            else set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1) end
             if c.master then text(ex + 2, ey, fit('master', ew - 2), U.AMBER); ey, eh = ey + L.rh, eh - L.rh end   -- имя — над эффектами мастера
           else
             ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
