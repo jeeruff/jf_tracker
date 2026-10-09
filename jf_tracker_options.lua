@@ -449,12 +449,20 @@ function O.draw(L, W, H)
   -- 9 окт: опции — в 2-3 колонки, если хватает ширины (строки сверху вниз,
   -- потом следующая колонка; j k идут по порядку); хоткеи — одной колонкой
   local colw0 = math.max(lw + vw + math.min(dw, L.cw * 24) + 3 * L.pad, L.cw * 56)   -- длинный цикл (темы) — текстом, колонку не раздувает
-  local ncol = 1
-  if not O.compact and O.tab ~= 'hotkeys' and O.query == '' then
-    ncol = math.max(1, math.min(3, math.floor((W - 2 * L.pad - 20) / colw0)))
-    if ncol > 1 then bw = ncol * colw0 end
+  -- 9 окт: поиск размер окна не меняет — ширина как без поиска (результаты
+  -- одной колонкой), высота — по самому длинному списку без фильтра (O.nfull),
+  -- не меньше 12 строк; что не влезло — скроллом
+  local ncw = 1
+  if not O.compact and O.tab ~= 'hotkeys' then
+    ncw = math.max(1, math.min(3, math.floor((W - 2 * L.pad - 20) / colw0)))
+    if ncw > 1 then bw = ncw * colw0 end
   end
-  local nvis = math.max(3, math.min(n, math.floor((H - 6 * rh) / rh)))
+  local ncol = O.query == '' and ncw or 1
+  O.nfull = O.nfull or {}                                -- по вкладке: хоткеи длиннее опций
+  local tk = tostring(O.tab or '')
+  if O.query == '' then O.nfull[tk] = math.max(O.nfull[tk] or 0, n) end
+  local rows = math.max(12, math.ceil((O.nfull[tk] or n) / ncw), math.ceil(n / ncol))
+  local nvis = math.max(3, math.min(rows, math.floor((H - 6 * rh) / rh)))
   local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
   local bh = (nvis + 4 + ((#O.tabs > 0) and 1 or 0)) * rh
