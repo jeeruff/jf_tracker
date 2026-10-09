@@ -3400,30 +3400,37 @@ function D.frame(L, snap, rows, state, info)
       if L.mixer and not c.master then
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + 5 * L.cw
-        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh
-        mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 5 * L.rh
+        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0)
+        mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 6 * L.rh
+        -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
+        -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
+        if mixcol then
+          D.mcb_w = (lw1 - 2 * L.pad >= fxb + 2 * L.btn_w + 4 + L.pad + 5 * L.cw + 4) and 2 * L.btn_w or L.btn_w
+          D.mcb_h = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 6) - 2))
+        end
       end
-      local function hbtn(b, x, by, bwk)
+      local function hbtn(b, x, by, bwk, bh)
+        bh = bh or (L.rh - 2)
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
-        set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, L.rh - 2, 1)
-        set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, L.rh - 2, 0)
-        text(x + math.floor((bwk - ms(b[1])) / 2), by, b[1], on and b[3] or BTXT)
+        set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
+        set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, bh, 0)
+        text(x + math.floor((bwk - ms(b[1])) / 2), by + math.floor((bh - (L.rh - 2)) / 2), b[1], on and b[3] or BTXT)
         if b[4] == 'phase' then
-          if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.trkio = { col = col, what = 'phase' } end
-          hint('trkio', x, by, bwk, L.rh, { col = col, what = 'phase' })
+          if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.trkio = { col = col, what = 'phase' } end
+          hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
         else
-          if mx >= x and mx < x + bwk and my >= by and my < by + L.rh then hover.btn = { col = col, what = b[4] } end
-          hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
+          if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.btn = { col = col, what = b[4] } end
+          hint('btn', x, by, bwk, bh + 2, { col = col, what = b[4] })
         end
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
       end
       for k, b in ipairs(c.master and {} or labels) do
         local x = bx + (k - 1) * (L.btn_w + 1)
         local bwk = L.btn_w
-        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + (mixcol and 0 or 5 * (L.btn_w + 1) + L.pad) then break end end
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (L.btn_w + 1) + L.pad then break end end
         if x + bwk > c.x + c.w - 1 then break end
-        if not mixcol or b[4] == 'auto' then hbtn(b, x, by, bwk) end
+        if not mixcol then hbtn(b, x, by, bwk) end
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
@@ -3514,6 +3521,13 @@ function D.frame(L, snap, rows, state, info)
         if L.mix_bottom then
           hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
           set(D.SEP); gfx.rect(c.x, L.mix_y, c.w + 1, D.SEPW, 1)
+          -- 9 окт: шапка далеко — имя трека ещё раз в полосе (опция mixer names)
+          if state.mixnames ~= 'off' and not c.master then
+            H = H - L.rh
+            local ny = y1 + H
+            if state.mixnames == 'top' then ny = y1; y1 = y1 + L.rh end
+            text(c.x + L.pad, ny, fit(nm, c.w - 2 * L.pad), ncol)
+          end
         end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local lblw0 = ms('-48') + 2
@@ -3528,7 +3542,7 @@ function D.frame(L, snap, rows, state, info)
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
         local sx = c.x + L.pad
         local sepx, sepc
-        local colw = mixcol and (L.btn_w + 2) or 0      -- столбик кнопок справа от фейдера
+        local colw = mixcol and (D.mcb_w + 2) or 0      -- столбик кнопок справа от фейдера
         if not c.master then
           local need = sx + fx_w + colw + L.pad
           local function cand(x, cl) if x >= need and c.x + c.w - 2 - (x + 2) >= 5 * L.cw and (not sepx or x < sepx) then sepx, sepc = x, cl end end
@@ -3686,7 +3700,13 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
-        if mixcol then for k = 1, 5 do hbtn(labels[k], sx + fx_w + 2, y1 + (k - 1) * L.rh + 1, L.btn_w) end end
+        if mixcol then
+          for k = 1, 6 do
+            local b = labels[k]
+            if b[4] == 'auto' and ms('trim') + 4 > D.mcb_w then b = { 'A', b[2], b[3], b[4] } end   -- узко — буквой
+            hbtn(b, sx + fx_w + 2, y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
+          end
+        end
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
         if info.fx_stack and (side or not c.master) then

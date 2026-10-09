@@ -23,6 +23,7 @@ local EXT = 'jf_tracker'
 local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия (5 окт, релиз: без внешних зависимостей)
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
+draw.arr = dofile(DIR .. '/jf_tracker_arr.lua')           -- аранжировки = наборы играющих лейнов (9 окт)
 draw.panes = dofile(DIR .. '/jf_tracker_panes.lua')     -- раскладка окна как tmux / zellij (9 окт); полем draw: предел локальных
 local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
@@ -227,6 +228,7 @@ local state = {
   kc_scale = tonumber(reaper.GetExtState(EXT, 'kcscale')) or 0,            -- keycaster (4 окт)
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
+  mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
   ctrlpos = (function() local v = reaper.GetExtState(EXT, 'ctrlpos'); return (v == 'mid' or v == 'bottom') and v or 'top' end)(),   -- главный модуль (3 окт)
@@ -485,7 +487,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3057,6 +3059,66 @@ ctx = {
     elseif ch == 'u' then
       local u = ctx.pn_undo and table.remove(ctx.pn_undo)
       if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
+    end
+  end,
+  -- аранжировки (9 окт): \ P a, :arr, < имя > в матрице. what: new [имя] |
+  -- dup | del | next | prev | номер | nil (показать список)
+  arr_load = function()
+    local _, raw = reaper.GetProjExtState(0, EXT, 'arr')
+    local _, cur = reaper.GetProjExtState(0, EXT, 'arr_cur')
+    local list = draw.arr.decode(raw)
+    return list, math.max(0, math.min(#list, tonumber(cur) or 0))
+  end,
+  arr_name = function()                              -- каждый кадр (матрица): разбор — только при смене строки
+    local _, raw = reaper.GetProjExtState(0, EXT, 'arr')
+    local _, cur = reaper.GetProjExtState(0, EXT, 'arr_cur')
+    local k = ctx.arr_k
+    if not k or k.raw ~= raw or k.cur ~= cur then
+      local list, c = ctx.arr_load()
+      k = { raw = raw, cur = cur, name = c > 0 and list[c].name or nil, c = c, n = #list }
+      ctx.arr_k = k
+    end
+    return k.name, k.c, k.n
+  end,
+  arr = function(what, arg)
+    local AR = draw.arr
+    local list, cur = ctx.arr_load()
+    local function save(c)
+      reaper.SetProjExtState(0, EXT, 'arr', AR.encode(list))
+      reaper.SetProjExtState(0, EXT, 'arr_cur', tostring(c))
+    end
+    local function show(c) return ('arr %d/%d: %s'):format(c, #list, list[c].name) end
+    if cur > 0 then list[cur].lanes = AR.capture(reaper) end        -- текущая = то, что играет сейчас
+    if what == 'new' or what == 'dup' then
+      local base = (what == 'dup' and cur > 0) and list[cur].name or ((arg and arg ~= '') and arg or 'arr')
+      if what == 'new' and arg and arg ~= '' then base = arg end
+      local lanes = AR.capture(reaper)
+      if not next(lanes) then vim.msg = 'arr: no track has fixed lanes yet (\\ r l turns them on)'; return end
+      table.insert(list, cur + 1, { name = AR.next_name(list, base), lanes = lanes })
+      save(cur + 1); vim.msg = show(cur + 1)
+    elseif what == 'del' then
+      if cur == 0 then vim.msg = 'arr: no current arrangement'; return end
+      local nm = list[cur].name
+      OPT.ask.open('delete the arrangement?', nm .. ' - only the name and its lane set; lanes and items stay', {
+        { key = 'k', label = 'keep it', fn = function() vim.msg = 'arrangement kept' end },
+        { key = 'd', label = 'delete', fn = function()
+          table.remove(list, cur)
+          local c = math.min(cur, #list)
+          if c > 0 then edit.run('arrangement', function() AR.apply(reaper, list[c].lanes) end) end
+          save(c); vim.msg = 'arr deleted: ' .. nm .. (c > 0 and ('  ->  ' .. show(c)) or '')
+        end },
+      })
+    elseif what == 'next' or what == 'prev' or tonumber(what) then
+      if #list == 0 then vim.msg = 'arr: none yet - \\ P a n makes one from the lanes that play'; return end
+      local c = tonumber(what) or ((cur - 1 + (what == 'next' and 1 or -1)) % #list + 1)
+      if c < 1 or c > #list then vim.msg = 'arr: no arrangement ' .. what; return end
+      edit.run('arrangement ' .. list[c].name, function() AR.apply(reaper, list[c].lanes) end)
+      reaper.UpdateArrange()
+      save(c); vim.msg = show(c)
+    else
+      local t = {}
+      for i, a in ipairs(list) do t[#t + 1] = (i == cur and '*' or '') .. i .. ' ' .. a.name end
+      vim.msg = #t > 0 and ('arr: ' .. table.concat(t, '  ')) or 'arr: none yet - \\ P a n'
     end
   end,
   -- harpoon (9 окт, как в Neovim): закреплённые места песни — трек + строка,
@@ -5874,6 +5936,7 @@ ctx = {
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: the input list by click (smart input: DSP module)', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
       flag('captions', 'column captions', 'a row under the track header naming the fields (nt vl dl fx)'),
       flag('meters', 'meters', 'peak meters over the track columns'),
+      { key = 'mixnames', label = 'mixer names', kind = 'cycle', values = { 'bottom', 'top', 'off' }, desc = 'bottom mixer: the track name again in its strip - under the fader (as in REAPER) or over it', get = function() return state.mixnames or 'bottom' end, set = function(v) state.mixnames = v end },
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
@@ -5912,7 +5975,7 @@ ctx = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'ssbsync', 'ssbars' } },
@@ -7059,8 +7122,17 @@ ctx = {
               })
             end },
           { key = 'o', label = 'options', fn = function() ctx.options() end },
-          { key = 'a', label = 'about', fn = function() ctrl_action('about', 0) end },
+          -- 9 окт: a — аранжировки (наборы играющих лейнов); about — \ A
+          { key = 'a', label = 'arrangement' .. (ctx.arr_name() and (': ' .. ctx.arr_name()) or '') .. ' …', sub = function() return { title = 'arrangement', items = {
+              { key = 'n', label = 'new: name it, from the lanes that play now', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' end },
+              { key = 'y', label = 'duplicate the current one', fn = function() ctx.arr('dup') end },
+              { key = 'd', label = 'delete the current one (asks; lanes stay)', fn = function() ctx.arr('del') end },
+              { key = 'l', label = 'next  (> in the matrix)', fn = function() ctx.arr('next') end },
+              { key = 'h', label = 'previous  (< in the matrix)', fn = function() ctx.arr('prev') end },
+              { key = 'a', label = 'list (:arr)', fn = function() ctx.arr() end },
+            } } end },
         } } end },
+      { key = 'A', label = 'about', fn = function() ctrl_action('about', 0) end },
       { key = 'r', label = 'record', sub = function() return { title = 'record', items = {
           { key = 'a', label = (col and col.armed) and 'disarm track' or 'arm track', fn = ctx.rec_arm },
           { key = 'i', label = 'choose input', sub = function() return ctx.hydra_inputs() end },
@@ -7373,7 +7445,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() end
+    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -7562,7 +7634,6 @@ function view_actions()
     { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
     { 'Options window', key = 'o', fn = function() ctx.options() end },
-    { 'About', key = 'a', fn = function() ctx.about() end },
     { 'Remove old scope bridges (:scopes)', key = 'R', fn = ctx.toggle_scopes },
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
@@ -11343,7 +11414,10 @@ local function frame()
         local w = hover.matrix.btn == 'mkstart' and 'start' or 'end'
         if gfx.mouse_cap & 8 == 8 then ctx.seq_marker(w)
         else ctx.set_focus('matrix'); MX.mkedit = { which = w, buf = '' } end
-      elseif hover.matrix.btn == 'add' then ctx.mx_add() end
+      elseif hover.matrix.btn == 'add' then ctx.mx_add()
+      elseif hover.matrix.btn == 'arrprev' then ctx.arr('prev')
+      elseif hover.matrix.btn == 'arrnext' then ctx.arr('next')
+      elseif hover.matrix.btn == 'arrname' then ctx.arr() end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
       ctx.set_focus('matrix')

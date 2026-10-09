@@ -278,6 +278,32 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
+  -- аранжировка (9 окт): < имя > справа в ряду кнопок, если есть хоть одна;
+  -- не влезает имя — только стрелки (имя в :arr / \ P a)
+  local an, ac, anum = ctx.arr_name and ctx.arr_name()
+  if an then
+    local aw = U.measure('<') + 2 * L.pad
+    local room = W - L.pad - bx - 2 * (aw + L.pad)
+    local lab = room >= U.measure('WW') + 2 * L.pad and ctx.fit and ctx.fit(an, room - 2 * L.pad) or nil
+    local parts = { { 'arrprev', '<' } }
+    if lab then parts[2] = { 'arrname', lab } end
+    parts[#parts + 1] = { 'arrnext', '>' }
+    local tot = 0
+    for _, p in ipairs(parts) do tot = tot + U.measure(p[2]) + 2 * L.pad + L.pad end
+    local ax = W - L.pad - tot + L.pad
+    if ax >= bx then
+      for _, p in ipairs(parts) do
+        local bw = U.measure(p[2]) + 2 * L.pad
+        local hot = mx >= ax and mx < ax + bw and my >= hy + 1 and my < hy + L.rh + 1
+        U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(ax, hy + 1, bw, L.rh, 1)
+        U.set(U.LINE); gfx.rect(ax, hy + 1, bw, L.rh, 0)
+        U.text(ax + L.pad, hy + 2, p[2], hot and U.AMBER or (p[1] == 'arrname' and U.CYAN or U.TEXT))
+        if hot then hover.btn = p[1] end
+        if ctx.hint then ctx.hint('mxbtn', ax, hy + 1, bw, L.rh, p[1]) end
+        ax = ax + bw + L.pad
+      end
+    end
+  end
   MX.ss_split_y = nil
   -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
   -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
