@@ -1720,12 +1720,26 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         local tk = R.GetActiveTake(it)
         -- копия несёт transpose инструмента (D_PITCH / rate чанка) — нота поверх него (6 окт)
         if tk then local h = { item = it, take = tk }; audio_set_semis(h, audio_semis(h) + pitch - model.BASE_NOTE) end
+        if tk then E.humanize(it, tk) end
         finish_insert(track, lane_idx, it)
         made = it
       end
     end
   end)
   return made
+end
+
+-- human (9 окт, экспериментально, опция human %): каждая вставленная
+-- нота-слайс — чуть другая, как живой удар: питч ±8 центов, громкость
+-- ±1 dB, скорость ±0.3 % (при 100 %); 0 — выкл. E.human ставит main
+E.human = 0
+function E.humanize(it, tk)
+  local h = (E.human or 0) / 100
+  if h <= 0 then return end
+  local function r() return (math.random() * 2 - 1) * h end
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * 0.08)
+  R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * 1.0 / 20))
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * (1 + r() * 0.003))
 end
 
 -- ── арпеджиатор (3 окт, :arp) ─────────────────────────────────────────────

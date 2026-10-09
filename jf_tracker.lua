@@ -230,7 +230,8 @@ local state = {
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
   mixroute = flag('mixroute', true),
-  cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
+  cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
+  human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
   mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
@@ -490,7 +491,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -6054,6 +6055,7 @@ ctx = {
       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
+      { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
       { key = 'cmsens', label = 'fader speed', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'Ctrl / Ctrl+Option drag (slider mode, faders by the mouse): how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
@@ -6155,7 +6157,7 @@ ctx = {
       { 'cursor and editing', { 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -7527,6 +7529,7 @@ MM.hint = function(...) return draw.hint(...) end
 MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
+edit.human = state.human or 0                   -- 9 окт: human слайсов (опция)
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 -- импульс ReaVerb (5 окт): задание спектрограммы файла импульса для вида ir
