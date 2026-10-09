@@ -3196,6 +3196,18 @@ ctx = {
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
   mono_on = function() return state.slicemono end,
+  -- 9 окт: Shift+M / Shift+S — mute / solo трека курсора (один undo)
+  track_toggle = function(what)
+    local col = cur_col(); if not (col and col.track) then return end
+    local tr = col.track
+    local on
+    edit.run('track ' .. what, function()
+      if what == 'mute' then on = reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') ~= 1; reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', on and 1 or 0)
+      else on = reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') <= 0; reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', on and 1 or 0) end
+    end)
+    model.invalidate()
+    vim.msg = (col.name ~= '' and col.name or 'track') .. ': ' .. what .. ' ' .. (on and 'on' or 'off')
+  end,
   mono_toggle = function()
     state.slicemono = not state.slicemono; edit.mono = state.slicemono
     vim.msg = state.slicemono and 'mono: one voice per track - a new note cuts what still sounds on the track' or 'poly: notes may ring over each other (only the same subcolumn is cut)'

@@ -101,6 +101,7 @@ local function reset()
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
     edit = E, state = state, piano = keys.piano,
+    track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
     snap = function() return snap end, layout = function() return L end, relayout = layout,
     bar_of_row = function(row) local b = math.floor(row / 16) * 16; return b, b + 16 end,
@@ -223,7 +224,11 @@ reset()
 keysin('yy');      eq('yy', last(), 'yank:kick'); eq('yy no delete', #calls, 1)
 keysin('4jp');     eq('p pastes at 4 on A', last(), 'paste:1@4:trA')
 reset()
-keysin('M');       eq('M (Shift+m) mutes kick', last(), 'mute:kick')
+keysin('vM');      eq('vM mutes the event (kick)', last(), 'mute:kick')
+reset()
+keysin('M');       eq('M (Shift+m) mutes the track', last(), 'track:mute')
+reset()
+keysin('S');       eq('S (Shift+s) solos the track', last(), 'track:solo')
 reset()
 keysin('2js');     eq('s splits kick at 2', last(), 'split:kick@2')
 reset()
@@ -308,7 +313,7 @@ reset()
 keysin('x');  keysin('8j.');  eq('. repeats x', last(), 'delete:snare')
 reset()
 keysin('qa'); eq('recording', V.macro and V.macro.name, 'a')
-keysin('Mwq'); eq('macro stored', #V.regs['@a'], 2); eq('rec mute kick', calls[1], 'mute:kick')
+keysin('vMwq'); eq('macro stored', #V.regs['@a'], 3); eq('rec mute kick', calls[1], 'mute:kick')
 keysin('@a'); eq('@a replays mute', last(), 'mute:ov'); eq('@a moved', V.cur.row, 8)
 keysin('@@'); eq('@@', last(), 'mute:snare')
 
@@ -472,7 +477,7 @@ keysin(',');  eq('KEYS , → prev instrument', last(), 'pool:1')
 keysin('a');  eq('KEYS a → step auto', V.step_auto, true); keysin('a')
 V.cur.row = 0; keysin('dd'); eq('INSERT dd deletes the event', last(), 'delete:kick'); eq('back in INSERT after dd', V.mode, 'insert')
 V.cur.row = 0; local nc0 = #calls; keysin('d3'); eq('INSERT d3 waits (no note)', #calls, nc0); keysin('w'); eq('d3w → back in INSERT', V.mode, 'insert'); eq('d3w did not insert a note', (last():find('^ins:') == nil), true)
-reset(); V.mode = 'insert'; V.cur.row = 8; keysin('M'); eq('INSERT M (Shift+m) mutes', last(), 'mute:snare')
+reset(); V.mode = 'insert'; V.cur.row = 8; keysin('M'); eq('INSERT M (Shift+m) mutes the track', last(), 'track:mute')
 keysin('f');  eq('KEYS f → fx field', V.cur.field, 4)
 keysin('f');  eq('KEYS f wraps (1 fx col)', V.cur.field, 4)
 V.cur.field = 1

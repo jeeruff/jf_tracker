@@ -1009,7 +1009,7 @@ local function keys_control(c)
   elseif ch == 'd' then
     -- d — оператор Vim (d3w, dd, dG…): ждёт счётчик и движение, потом обратно в INSERT (2 окт)
     V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true; V.hexbuf = nil; return true
-  elseif ch == 'M' then local hs = heads(); if #hs > 0 then ctx.edit.mute(hs, lpb()); finish_edit() end; return true   -- mute — Shift+m (3 окт)
+  elseif ch == 'M' or ch == 'S' then if ctx.track_toggle then ctx.track_toggle(ch == 'M' and 'mute' or 'solo') end; return true   -- 9 окт: Shift+M / Shift+S — mute / solo трека
   elseif ch == 'f' then
     local nf = nfields()
     local fld = V.cur.field or 1
@@ -1820,8 +1820,8 @@ function V.key_impl(c)
     for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
   elseif ch == 'x' then
     apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
-  elseif ch == 'M' then                                  -- mute — Shift+m; m — слой пианино (3 окт)
-    apply('m', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
+  elseif ch == 'M' or ch == 'S' then                     -- 9 окт: Shift+M / Shift+S — mute / solo трека (события — M в VISUAL)
+    if ctx.track_toggle then ctx.track_toggle(ch == 'M' and 'mute' or 'solo') end
   elseif ch == 's' then
     apply('s', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
   elseif c == ctrl('a') then apply('+', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
