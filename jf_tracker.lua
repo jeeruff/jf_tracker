@@ -10687,6 +10687,14 @@ local function frame()
           if t.kind == 'fx' then model.fxapi(t.track).SetParamNormalized(t.track, t.fx, t.p, v); return end
           if t.what == 'vol' then v = v <= -60 and 0 or 10 ^ (v / 20) end
           edit.track_value(t.track, TRS_KEY[t.what] or 'D_VOL', v)
+          -- 9 окт: и в снимке — фейдер / кноб двигаются вместе с мышью (снимок
+          -- обновится только на отпускании, раньше значение прыгало туда)
+          local f = ({ vol = 'vol', pan = 'pan', width = 'width', panl = 'panL', panr = 'panR' })[t.what]
+          if f then
+            local col = t.col
+            if not col then for _, c in ipairs(snap and snap.cols or {}) do if c.track == t.track then col = c; break end end end
+            if col then col[f] = v end
+          end
         end,
         show = function(t)
           if not ok(t) then return '' end
@@ -10712,8 +10720,8 @@ local function frame()
         local tr = pcol.track
         local pn, wd, l, r = CM.panpad(gfx.mouse_x, gfx.mouse_y, gfx.w, gfx.h)
         local dual = reaper.GetMediaTrackInfo_Value(tr, 'I_PANMODE') == 6
-        if dual then edit.track_value(tr, 'D_DUALPANL', l); edit.track_value(tr, 'D_DUALPANR', r)
-        else edit.track_value(tr, 'D_PAN', pn); edit.track_value(tr, 'D_WIDTH', wd) end
+        if dual then edit.track_value(tr, 'D_DUALPANL', l); edit.track_value(tr, 'D_DUALPANR', r); pcol.panL, pcol.panR = l, r
+        else edit.track_value(tr, 'D_PAN', pn); edit.track_value(tr, 'D_WIDTH', wd); pcol.pan, pcol.width = pn, wd end   -- 9 окт: снимок — сразу
         g0.moved, g0.mode, g0.mx, g0.my, g0.ax, g0.ay, g0.dy = true, 'fader', gfx.mouse_x, gfx.mouse_y, 0, 0, 0   -- Cmd отпущен — снова фейдер, без скачка
         state.kslider = { col = pcol, what = dual and 'panl' or 'pan' }
         state.status = dual and ('-- PAN PAD --  %s  L %+.0f%%  R %+.0f%%   (up: apart, down: crossed, sideways: balance)'):format(pcol.name or '', l * 100, r * 100)
