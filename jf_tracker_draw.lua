@@ -3547,7 +3547,7 @@ function D.frame(L, snap, rows, state, info)
         local lx = vert and 0 or (rx + math.floor((rw - ms('SRO')) / 2))
         local ly = vert and (ry + math.floor((rhh - 3 * th3) / 2) - 1) or (ry + math.floor((rhh - (L.rh - 2)) / 2))
         for i, ch in ipairs({ 'S', 'R', 'O' }) do
-          local cc = has[i] and U.CYAN or U.mix(BTXT, U.PANEL, 0.5)
+          local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)   -- S голубой, R зелёный, O янтарь
           if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
           else text(lx, ly, ch, cc); lx = lx + ms(ch) end
         end
@@ -4030,6 +4030,21 @@ function D.frame(L, snap, rows, state, info)
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
   if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end   -- от левого края модуля: и над мастером
+  -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),
+  -- источники (R зелёный), сам трек (белый), трек под строкой — янтарь, 2 px
+  local rhl = info.route_hl and info.route_hl()
+  if rhl then
+    local yb = L.mix_bottom and (L.mix_y + L.mix_h) or (hy + L.header_h)
+    for _, c in ipairs(L.cols or {}) do
+      local g = c.col and c.col.guid
+      local cc = g and ((rhl.sel == g) and U.AMBER or rhl[g])
+      if cc and c.x then
+        set(cc)
+        gfx.rect(c.x + 1, hy, c.w - 1, L.header_h - 2, 0); gfx.rect(c.x + 2, hy + 1, c.w - 3, L.header_h - 4, 0)
+        if L.mix_bottom then gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 0); gfx.rect(c.x + 2, L.mix_y + 1, c.w - 3, L.mix_h - 2, 0) end
+      end
+    end
+  end
   -- уголок над номерами строк (2 окт; 7 окт): ряд 0 — proj | region, ряд 1 —
   -- session | router, ряд 2 — номер и имя региона в его цвете, ряд 3 — /2 x2
   -- слева и als cln парой справа, последний — длина «< N >»
@@ -5744,7 +5759,7 @@ function D.popup(L, p, anchor)
     if p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
     if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
-    text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), U.GREY)
+    text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), ln.col or U.GREY)
   end
 end
 

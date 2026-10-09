@@ -3096,65 +3096,76 @@ ctx = {
     end
     return k.name, k.c, k.n
   end,
-  -- меню маршрутизации трека (9 окт), как ROUTE в REAPER: окно, главный
-  -- выход, добавить сенд / ресив / аппаратный выход, у каждого — mute и удалить
+  -- маршрутизация трека (9 окт): fzf-попап в стиле трекера (не нативное
+  -- меню). Строки — цветом S R O: send > голубые, recv < зелёные, hw >
+  -- янтарные. Пока открыт — каналы подсвечены: куда трек шлёт (S), откуда
+  -- принимает (R), трек под строкой выбора — янтарной рамкой (ctx.route_hl)
   route_menu = function(col)
     local tr = col and col.track
     if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
-    local items, acts = {}, {}
-    local function add(label, fn) items[#items + 1] = label; if fn then acts[#acts + 1] = fn end end
     local function nm(t) local _, n = reaper.GetTrackName(t); return n end
-    local function sub(title, list)              -- list = { {label, fn}, … }
-      if #list == 0 then add('#' .. title); acts[#acts + 1] = false; return end
-      for k, e in ipairs(list) do
-        local lab = e[1]
-        if k == 1 then lab = '>' .. title .. '|' .. lab end
-        if k == #list then lab = '<' .. lab end
-        add(lab, e[2])
-      end
-    end
+    local function guid(t) return reaper.GetTrackGUID(t) end
     local function run(what, f) return function() edit.run(what, f); model.invalidate() end end
-    add('Routing window ...', function() reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(40293, 0) end)
-    local ms_on = reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1
-    add((ms_on and '!' or '') .. (reaper.GetParentTrack(tr) and 'Parent send' or 'Master send'),
-      run('master send', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', ms_on and 0 or 1) end))
-    local others = {}
-    for i = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i); if t ~= tr then others[#others + 1] = t end end
-    local sl, rl = {}, {}
-    for _, t in ipairs(others) do
-      sl[#sl + 1] = { nm(t), run('add send', function() reaper.CreateTrackSend(tr, t) end) }
-      rl[#rl + 1] = { nm(t), run('add receive', function() reaper.CreateTrackSend(t, tr) end) }
-    end
-    sub('Add send to', sl)
-    sub('Add receive from', rl)
-    local hl = {}
-    for i = 0, reaper.GetNumAudioOutputs() - 2, 2 do
-      local ch = i
-      hl[#hl + 1] = { ('%s / %s'):format(reaper.GetOutputChannelName(i) or (i + 1), reaper.GetOutputChannelName(i + 1) or (i + 2)),
-        run('add hw out', function() local k = reaper.CreateTrackSend(tr, nil); reaper.SetTrackSendInfo_Value(tr, 1, k, 'I_DSTCHAN', ch) end) }
-    end
-    sub('Add hardware output', hl)
-    -- уже есть: сенды (0), ресивы (−1), аппаратные (1) — mute / удалить
-    for _, cat in ipairs({ { 0, 'Send to' }, { -1, 'Receive from' }, { 1, 'Hardware out' } }) do
+    local items = {}
+    local function add(label, col2, fn, tg) items[#items + 1] = { label = label, col = col2, data = fn, tg = tg } end
+    -- уже есть: сенды / ресивы / аппаратные — mute и удалить
+    for _, cat in ipairs({ { 0, 'S >', U.CYAN }, { -1, 'R <', U.GREEN }, { 1, 'O >', U.AMBER } }) do
       local c = cat[1]
-      for i = 0, reaper.GetTrackNumSends(tr, c) - 1 do
-        local label
-        if c == 0 then label = nm(reaper.GetTrackSendInfo_Value(tr, 0, i, 'P_DESTTRACK'))
-        elseif c == -1 then label = nm(reaper.GetTrackSendInfo_Value(tr, -1, i, 'P_SRCTRACK'))
-        else local ch = math.floor(reaper.GetTrackSendInfo_Value(tr, 1, i, 'I_DSTCHAN')) & 1023; label = ('out %d/%d'):format(ch + 1, ch + 2) end
-        local v = reaper.GetTrackSendInfo_Value(tr, c, i, 'D_VOL')
-        local muted = reaper.GetTrackSendInfo_Value(tr, c, i, 'B_MUTE') == 1
-        local idx = i
-        sub(('%s %s  %s'):format(cat[2], label, v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf'), {
-          { (muted and '!' or '') .. 'Mute', run('send mute', function() reaper.SetTrackSendInfo_Value(tr, c, idx, 'B_MUTE', muted and 0 or 1) end) },
-          { 'Remove', run('remove send', function() reaper.RemoveTrackSend(tr, c, idx) end) },
-        })
+      for i2 = 0, reaper.GetTrackNumSends(tr, c) - 1 do
+        local label, tg
+        if c == 0 then local d = reaper.GetTrackSendInfo_Value(tr, 0, i2, 'P_DESTTRACK'); label, tg = nm(d), guid(d)
+        elseif c == -1 then local s2 = reaper.GetTrackSendInfo_Value(tr, -1, i2, 'P_SRCTRACK'); label, tg = nm(s2), guid(s2)
+        else local ch = math.floor(reaper.GetTrackSendInfo_Value(tr, 1, i2, 'I_DSTCHAN')) & 1023; label = ('out %d/%d'):format(ch + 1, ch + 2) end
+        local v = reaper.GetTrackSendInfo_Value(tr, c, i2, 'D_VOL')
+        local muted = reaper.GetTrackSendInfo_Value(tr, c, i2, 'B_MUTE') == 1
+        local db = v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf'
+        local idx = i2
+        add(('%s %-18s %8s  %s'):format(cat[2], label, db, muted and 'unmute' or 'mute'), cat[3],
+          run('send mute', function() reaper.SetTrackSendInfo_Value(tr, c, idx, 'B_MUTE', muted and 0 or 1) end), tg)
+        add(('%s %-18s %8s  remove'):format(cat[2], label, db), cat[3],
+          run('remove send', function() reaper.RemoveTrackSend(tr, c, idx) end), tg)
       end
     end
-    gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
-    local k = gfx.showmenu(table.concat(items, '|'))
-    local fn = k > 0 and acts[k]
-    if fn then fn() end
+    local par = reaper.GetParentTrack(tr)
+    local ms_on = reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1
+    add(('main  %s send: %s -> %s'):format(par and 'parent' or 'master', ms_on and 'on' or 'off', ms_on and 'off' or 'on'), U.TEXT,
+      run('master send', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', ms_on and 0 or 1) end), par and guid(par) or nil)
+    for i2 = 0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i2)
+      if t ~= tr then
+        add('send > ' .. nm(t), U.CYAN, run('add send', function() reaper.CreateTrackSend(tr, t) end), guid(t))
+      end
+    end
+    for i2 = 0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i2)
+      if t ~= tr then
+        add('recv < ' .. nm(t), U.GREEN, run('add receive', function() reaper.CreateTrackSend(t, tr) end), guid(t))
+      end
+    end
+    for i2 = 0, reaper.GetNumAudioOutputs() - 2, 2 do
+      local ch = i2
+      add(('hw   > %s / %s'):format(reaper.GetOutputChannelName(i2) or (i2 + 1), reaper.GetOutputChannelName(i2 + 1) or (i2 + 2)), U.AMBER,
+        run('add hw out', function() local k = reaper.CreateTrackSend(tr, nil); reaper.SetTrackSendInfo_Value(tr, 1, k, 'I_DSTCHAN', ch) end))
+    end
+    add('window  routing window (REAPER)', U.GREY, function() reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(40293, 0) end)
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y }
+    vim.open_picker('route ' .. nm(tr) .. ': S > send  R < receive  O > hw', items, function(it) if it.data then it.data() end end)
+    vim.picker.rows = 18
+    vim.picker.route = guid(tr)
+  end,
+  -- подсветка каналов, пока открыт попап маршрутизации: guid → цвет
+  route_hl = function()
+    local pk = vim.picker
+    if not (pk and pk.route) then return nil end
+    local src
+    for i2 = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i2); if reaper.GetTrackGUID(t) == pk.route then src = t; break end end
+    if not src then return nil end
+    local hl = { [pk.route] = U.TEXT }
+    for i2 = 0, reaper.GetTrackNumSends(src, 0) - 1 do hl[reaper.GetTrackGUID(reaper.GetTrackSendInfo_Value(src, 0, i2, 'P_DESTTRACK'))] = U.CYAN end
+    for i2 = 0, reaper.GetTrackNumSends(src, -1) - 1 do hl[reaper.GetTrackGUID(reaper.GetTrackSendInfo_Value(src, -1, i2, 'P_SRCTRACK'))] = U.GREEN end
+    local it = pk.matches[pk.sel]
+    hl.sel = it and it.tg
+    return hl
   end,
   -- матрица как клипы (9 окт, экспериментально, опция mxlaunch): клетка
   -- слота = клип движка сессии (MX.SS); колонка трека → его первая
@@ -9867,6 +9878,7 @@ local function frame()
     clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
+    route_hl = ctx.route_hl,                          -- 9 окт: подсветка каналов попапа маршрутизации
     draw_router = function(x, y, w, h)
       local root, _, title = ctx.db_tree()
       if not root then return {} end
