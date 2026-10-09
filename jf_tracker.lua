@@ -10796,6 +10796,10 @@ local function frame()
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
   if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
+  if ctx.ins_drag and ctx.ins_drag.active then   -- 9 окт: вставка на другой трек
+    local d = ctx.ins_drag
+    draw.ghost(d.name .. (d.target and d.target.track ~= d.col.track and ('  -> ' .. (d.target.name ~= '' and d.target.name or 'track') .. ((gfx.mouse_cap & 16 == 16) and ' (copy)' or '')) or '  (drop on a track; Opt - copy)'))
+  end
   -- всплывашка — у того, что редактируется (2 окт): имя трека, строка матрицы,
   -- инструменты; иначе — ячейка курсора трекера
   if vim.mode ~= 'cmd' and not vim.picker and not (vim.hydra and state.popup_at and (state.popup_at.kind == 'ctrlbtn' or state.popup_at.kind == 'xy' or state.popup_at.kind == 'sprops' or state.popup_at.kind == 'strip')) then state.popup_at = nil end
@@ -11578,7 +11582,36 @@ local function frame()
     local dbl = lc and lc.kind == kind and lc.col == h2.col and lc.k == h2.k and now3 - lc.t < 0.35
     ctx.hdr_last = { kind = kind, col = h2.col, k = h2.k, t = now3 }
     ctx.hdr_pick(kind, h2.col, h2.k, dbl)   -- 8 окт: клик — выбрать эффект в DSP, двойной — нативное окно (и с param тоже)
+    -- 9 окт: вставку можно протянуть на другой трек (как блоки DSP)
+    if kind == 'fx' and h2.it and h2.it.i and h2.col then
+      ctx.ins_drag = { col = h2.col, fxi = h2.it.i, name = h2.it.name or 'fx', x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false }
+    end
     U.click = false
+  end
+  -- 9 окт: протяжка вставки (insert) между треками: отпустить над колонкой
+  -- трека — эффект переезжает в конец его цепочки; Option — копия
+  if ctx.ins_drag then
+    local d = ctx.ins_drag
+    if gfx.mouse_cap & 1 == 1 then
+      if not d.active and math.abs(gfx.mouse_x - d.x0) + math.abs(gfx.mouse_y - d.y0) > 6 then d.active = true end
+      if d.active then
+        d.target = nil
+        for _, c in ipairs(L.cols or {}) do
+          if c.x and c.col and c.col.track and gfx.mouse_x >= c.x and gfx.mouse_x < c.x + c.w and gfx.mouse_y >= L.header_y and gfx.mouse_y < gfx.h - L.status_h then d.target = c.col end
+        end
+      end
+    else
+      ctx.ins_drag = nil
+      local dst = d.active and d.target
+      if dst and dst.track ~= d.col.track and reaper.ValidatePtr(dst.track, 'MediaTrack*') and reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
+        local copy = gfx.mouse_cap & 16 == 16
+        edit.run((copy and 'copy fx ' or 'move fx ') .. d.name, function()
+          reaper.TrackFX_CopyToTrack(d.col.track, d.fxi, dst.track, reaper.TrackFX_GetCount(dst.track), not copy)
+        end)
+        model.invalidate()
+        vim.msg = (copy and 'copied ' or 'moved ') .. d.name .. ' -> ' .. (dst.name ~= '' and dst.name or 'track')
+      end
+    end
   end
   -- клип (7 окт): > в углу — запуск, o под последним клипом — запись в слот
   if U.click and (hover.ssplay or hover.ssrecbtn) and snap then
