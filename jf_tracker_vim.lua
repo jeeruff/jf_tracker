@@ -1082,8 +1082,7 @@ end
 -- → 'beside'; Ctrl (коды 1..26 или флаг ctrl) → 'capture'; иначе 'insert'.
 local SHIFTED = { ['@'] = '2', ['#'] = '3', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['('] = '9', [')'] = '0' }
 local OPTCH = { [339] = 'q', [8721] = 'w', [180] = 'e', [174] = 'r', [8224] = 't', [165] = 'y', [168] = 'u',
-                [710] = 'i', [248] = 'o', [960] = 'p', [8482] = '2', [163] = '3', [8734] = '5', [167] = '6',
-                [182] = '7', [170] = '9', [186] = '0' }
+                [710] = 'i', [248] = 'o', [960] = 'p' }   -- 9 окт: Option+цифры — инструменты (аккорд — буквы)
 function V.note_key(c, mods)
   mods = mods or {}
   -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
@@ -1194,6 +1193,19 @@ function V.key_impl(c)
   local HJKL = { [104] = 'h', [106] = 'j', [107] = 'k', [108] = 'l', [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l',
                  [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l',
                  [LEFT] = 'h', [DOWN] = 'j', [UP] = 'k', [RIGHT] = 'l' }   -- 6 окт: стрелки = hjkl во всех сочетаниях
+  -- 9 окт: Option+цифра — инструмент N lib (1..9, 0 = 10) в любом режиме, в
+  -- пару к Option+J / K. На US-раскладке Option+цифра даёт символ (¡ ™ £ …).
+  -- Ctrl+Option+цифра — форма сегмента огибающей (ниже), не трогаем
+  do
+    local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 0 }
+    local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+    local d = OPTDIG[cp] or ((mods.alt and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
+    if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' then
+      if d == 0 then d = 10 end
+      if ctx.pool_select then ctx.pool_select(d) end
+      V.count = nil; return
+    end
+  end
   -- ⌘+цифра — слот пула (1..9, 0 = 10) в любом режиме
   if mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
      and not ((V.mode == 'insert' or V.piano) and ctx.piano[c]) then      -- в INSERT / слое пианино ⌘+цифра — нота с удержанием

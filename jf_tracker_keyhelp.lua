@@ -38,6 +38,7 @@ KH.PAGES = {
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
     { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (q 2 w 3 ... = S01 S02 ...); not sliced - the sample at that pitch. Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). Select: the slice list (its keys), Cmd+J / K, the last played' },
     { k = 'Opt+J / K', d = 'previous / next instrument of the lib (samples, plugins, automation; a count jumps N)' },
+    { k = 'Opt+1..0', d = 'instrument 1..10 of the lib (also Cmd+1..0)' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   pane = { title = 'panes (tmux / zellij)', e = {
@@ -122,7 +123,7 @@ KH.PAGES = {
     { k = 'm', d = 'keyboard on / off: on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'zm', d = 'mixer on / off' },
     { k = 'Tab Shift+Tab', d = 'next / previous track (in the matrix - the next / previous track column)' },
-    { k = 'Opt+note', d = 'chord typing: the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },
+    { k = 'Opt+note', d = 'chord typing (letter keys; Option+digits pick instruments): the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },
     { k = 'keys button', d = 'keyboard on / off (also m; quick options keys): on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'Space Enter', d = 'play / stop, move edit cursor here' },
     { k = 'F', d = 'follow playhead on / off' },
