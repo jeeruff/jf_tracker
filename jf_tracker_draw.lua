@@ -3393,11 +3393,17 @@ function D.frame(L, snap, rows, state, info)
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
       local trim_w = ms('trim') + 4
       local trim_x = c.x + c.w - L.pad - trim_w
-      for k, b in ipairs(c.master and {} or labels) do
-        local x = bx + (k - 1) * (L.btn_w + 1)
-        local bwk = L.btn_w
-        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (L.btn_w + 1) + L.pad then break end end
-        if x + bwk > c.x + c.w - 1 then break end
+      -- 9 окт: микшер открыт — R I M S ø столбиком справа от фейдера, в том же
+      -- порядке (как кнопки у фейдера в микшере REAPER); в шапке остаётся trim.
+      -- Не влезает по ширине / высоте полосы — как было, в строке шапки
+      local mixcol = false
+      if L.mixer and not c.master then
+        local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
+        local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + 5 * L.cw
+        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh
+        mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 5 * L.rh
+      end
+      local function hbtn(b, x, by, bwk)
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
         set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, L.rh - 2, 1)
@@ -3411,6 +3417,13 @@ function D.frame(L, snap, rows, state, info)
           hint('btn', x, by, bwk, L.rh, { col = col, what = b[4] })
         end
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
+      end
+      for k, b in ipairs(c.master and {} or labels) do
+        local x = bx + (k - 1) * (L.btn_w + 1)
+        local bwk = L.btn_w
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + (mixcol and 0 or 5 * (L.btn_w + 1) + L.pad) then break end end
+        if x + bwk > c.x + c.w - 1 then break end
+        if not mixcol or b[4] == 'auto' then hbtn(b, x, by, bwk) end
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
@@ -3515,8 +3528,9 @@ function D.frame(L, snap, rows, state, info)
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
         local sx = c.x + L.pad
         local sepx, sepc
+        local colw = mixcol and (L.btn_w + 2) or 0      -- столбик кнопок справа от фейдера
         if not c.master then
-          local need = sx + fx_w + L.pad
+          local need = sx + fx_w + colw + L.pad
           local function cand(x, cl) if x >= need and c.x + c.w - 2 - (x + 2) >= 5 * L.cw and (not sepx or x < sepx) then sepx, sepc = x, cl end end
           for li, ln in ipairs(c.lanes) do
             if li > 1 then cand(ln.x - 1, U.DIM) end
@@ -3524,14 +3538,14 @@ function D.frame(L, snap, rows, state, info)
           end
           for _, ev in ipairs(c.envs) do cand(ev.x - 1, U.DIM) end
           for _, m in ipairs(c.mls or {}) do cand(m.x - 1, U.DIM) end
-          if sepx then sx = c.x + 1 + math.floor((sepx - c.x - 1 - fx_w) / 2) end
+          if sepx then sx = c.x + 1 + math.floor((sepx - c.x - 1 - fx_w - colw) / 2) end
         end
         -- эффекты сбоку, если влезают 5 знаков — тогда фейдер на всю высоту
         -- полосы; иначе под ним 3 строки эффектов. Высота фейдера при этом
         -- одна на всех треках: решает ширина трека, а она у треков своя —
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
-        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + L.pad + 2) >= 5 * L.cw
+        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + L.pad + 2) >= 5 * L.cw
         if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
         local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
@@ -3672,10 +3686,11 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
+        if mixcol then for k = 1, 5 do hbtn(labels[k], sx + fx_w + 2, y1 + (k - 1) * L.rh + 1, L.btn_w) end end
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
         if info.fx_stack and (side or not c.master) then
-          local sx1 = sepx and (sepx + 2) or (sx + fx_w + L.pad + 2)
+          local sx1 = sepx and (sepx + 2) or (sx + fx_w + colw + L.pad + 2)
           local ex, ey, ew, eh
           if side then
             ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
