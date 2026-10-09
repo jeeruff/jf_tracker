@@ -67,7 +67,7 @@ KH.PAGES = {
     { k = 'gg G', d = 'first row / last row' },
     { k = 'Esc', d = 'toggles INSERT (as the edit mode in Renoise): NORMAL -> INSERT, INSERT -> NORMAL' },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
-    { k = 'gs  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with the mouse or h j k l + Enter; VISUAL - the whole block' },
+    { k = 'gs  Ctrl+Enter  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with the mouse or h j k l + Enter; VISUAL - the whole block' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },

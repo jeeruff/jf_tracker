@@ -90,9 +90,11 @@ function SM.draw(d)
     local cx, cy = gx + c * cw, gy + r * L.rh
     local hot = mx >= cx and mx < cx + cw and my >= cy and my < cy + L.rh
     if hot then SM.hot = i end
-    if i == p.sel then set(C.SEL); gfx.rect(cx, cy, cw - 1, L.rh, 1) end
-    if hot then set(C.AMBER); gfx.rect(cx, cy, cw - 1, L.rh, 0) end
-    local col = it.on and C.AMBER or (it.dim and C.GREY or C.TEXT)
+    -- 9 окт: выбор клавишами — заметная янтарная заливка; текущее значение — янтарный текст
+    local sel = i == p.sel
+    if sel then set(C.SELF); gfx.rect(cx, cy, cw - 1, L.rh, 1); set(C.AMBER); gfx.rect(cx, cy, cw - 1, L.rh, 0) end
+    if hot and not sel then set(C.TEXT); gfx.rect(cx, cy, cw - 1, L.rh, 0) end
+    local col = sel and C.TEXT or (it.on and C.AMBER or (it.dim and C.GREY or C.TEXT))
     text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
   end
   -- подсказка: под мышью, иначе выбранное

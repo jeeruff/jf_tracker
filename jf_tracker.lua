@@ -10183,7 +10183,7 @@ local function frame()
       else p.anchor = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y } end
     end
     MX.SMART.draw({ L = L, set = draw.set, text = draw.text, ms = draw.measure, fit = draw.fit,
-      C = { PANEL = U.PANEL, FRAME = U.mix(U.LINE, U.TEXT, 0.45), SEL = draw.CURROW, TEXT = U.TEXT, GREY = U.GREY, AMBER = U.AMBER, CYAN = U.CYAN } })
+      C = { PANEL = U.PANEL, FRAME = U.mix(U.LINE, U.TEXT, 0.45), SEL = draw.CURROW, SELF = U.tint(U.AMBER, 0.45), TEXT = U.TEXT, GREY = U.GREY, AMBER = U.AMBER, CYAN = U.CYAN } })
   end
   -- линейка measure (7 окт): перекрестье у мыши, рамка от начала до мыши / конца, размер
   if state.measure then
@@ -12583,6 +12583,10 @@ local function frame()
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
+  -- Ctrl+Enter (9 окт): смарт-панель в любом режиме трекера (в INSERT gs — ноты)
+  if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    vim.smart(); c = 0
+  end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
   -- соседа, Cmd+Shift+hjkl — перенести панель туда (как dwm), без режима
   if state.panes_ui and L and L.pn and c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
