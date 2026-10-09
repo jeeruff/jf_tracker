@@ -3666,6 +3666,18 @@ function D.frame(L, snap, rows, state, info)
             text(c.x + L.pad, ny, fit(nm, c.w - 2 * L.pad), ncol)
           end
           if state.hdrin ~= false and not c.master then H = H - L.rh; mixin_y = y1 + H end   -- вход — над именем, под эффектами
+          -- 9 окт: мастер — кнопка routing внизу полосы (аппаратные выходы, окно)
+          if c.master and col.track then
+            H = H - L.rh
+            local ry, rx, rw = y1 + H, c.x + L.pad, math.min(c.w - 2 * L.pad, ms('routing') + 2 * L.pad)
+            local hw = reaper.GetTrackNumSends(col.track, 1) > 0
+            local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
+            set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry + 1, rw, L.rh - 2, 1)
+            set(hw and U.AMBER or U.DIM); gfx.rect(rx, ry + 1, rw, L.rh - 2, 0)
+            text(rx + L.pad, ry, fit('routing', rw - 2 * L.pad), hot and U.AMBER or (hw and U.AMBER or BTXT))
+            if hot then hover.btn = { col = col, what = 'route' } end
+            hint('btn', rx, ry, rw, L.rh, { col = col, what = 'route' })
+          end
         end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local lblw0 = ms('-48') + 2

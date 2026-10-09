@@ -3127,9 +3127,10 @@ ctx = {
           run('remove send', function() reaper.RemoveTrackSend(tr, c, idx) end), tg)
       end
     end
+    local is_master = tr == reaper.GetMasterTrack(0)   -- 9 окт: у мастера — только аппаратные выходы и окно
     local par = reaper.GetParentTrack(tr)
     local ms_on = reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1
-    add(('main  %s send: %s -> %s'):format(par and 'parent' or 'master', ms_on and 'on' or 'off', ms_on and 'off' or 'on'), U.TEXT,
+    if not is_master then add(('main  %s send: %s -> %s'):format(par and 'parent' or 'master', ms_on and 'on' or 'off', ms_on and 'off' or 'on'), U.TEXT,
       run('master send', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', ms_on and 0 or 1) end), par and guid(par) or nil)
     for i2 = 0, reaper.CountTracks(0) - 1 do
       local t = reaper.GetTrack(0, i2)
@@ -3143,6 +3144,7 @@ ctx = {
         add('recv < ' .. nm(t), U.GREEN, run('add receive', function() reaper.CreateTrackSend(t, tr) end), guid(t))
       end
     end
+    end
     for i2 = 0, reaper.GetNumAudioOutputs() - 2, 2 do
       local ch = i2
       add(('hw   > %s / %s'):format(reaper.GetOutputChannelName(i2) or (i2 + 1), reaper.GetOutputChannelName(i2 + 1) or (i2 + 2)), U.AMBER,
@@ -3150,7 +3152,7 @@ ctx = {
     end
     add('window  routing window (REAPER)', U.GREY, function() reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(40293, 0) end)
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y }
-    vim.open_picker('route ' .. nm(tr) .. ': S > send  R < receive  O > hw', items, function(it) if it.data then it.data() end end)
+    vim.open_picker('route ' .. (is_master and 'master' or nm(tr)) .. (is_master and ': O > hardware outputs' or ': S > send  R < receive  O > hw'), items, function(it) if it.data then it.data() end end)
     vim.picker.rows = 18
     vim.picker.route = guid(tr)
   end,
