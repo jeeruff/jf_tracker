@@ -573,29 +573,35 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- [rec] в левом углу ряда (3 окт): запись в item — режим вкладки (кольцо
   -- jf_rec); есть всегда — и у файла браузера
   local bx = x
+  local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'scramble', 'scram' }, { 'playthru', 'pthru' }, { 'mono', 'mono' } }   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { 'mono', 'mono' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
-      if bx + bw > x + hint_w then break end
-      local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= y + rh and gfx.mouse_y < y + 2 * rh
+      local lim = brow == 0 and (x + hint_w) or (x + w)
+      if bx + bw > lim then
+        if brow >= 1 then break end
+        brow, bx = brow + 1, x; lim = x + w
+      end
+      local by = y + rh + brow * rh
+      local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
       local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e)) or (b[2] == 'mono' and ctx.mono_on and ctx.mono_on())   -- playthru (6 окт): горит, когда включён
-      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, y + rh, bw, rh, 1)
-      U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, y + rh, bw, rh, 0)
-      U.text(bx + L.pad, y + rh + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
+      U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, by, bw, rh, 0)
+      U.text(bx + L.pad, by + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
       if hot then hover_sbtn = b[2] end
-      if ctx.hint then ctx.hint('slicebtn', bx, y + rh, bw, rh, b[2]) end
+      if ctx.hint then ctx.hint('slicebtn', bx, by, bw, rh, b[2]) end
       bx = bx + bw + 2
     end
-    if editing and #S.trans > 0 then U.text(bx + L.pad, y + rh + 1, ctx.fit(('sens %.2f'):format(S.sens), x + hint_w - bx - L.pad), U.GREY) end
+    if editing and #S.trans > 0 then U.text(bx + L.pad, y + rh + brow * rh + 1, ctx.fit(('sens %.2f'):format(S.sens), (brow == 0 and (x + hint_w) or (x + w)) - bx - L.pad), U.GREY) end
   else
     U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
   -- волна: peaks / spec — нативные спектральные пики REAPER, цвет той же
   -- функцией, что колонка волны трека (ctx.spec_colour); спектрограмма
   -- убрана 1 окт
-  local wy, wh = y + 2 * rh + 2, h - 3 * rh - 4
+  local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
   if wh < 6 then return end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
   -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком

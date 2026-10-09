@@ -55,6 +55,7 @@ MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роути�
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
+MX.MR = dofile(DIR .. '/jf_tracker_macros.lua')         -- вкладка macros (9 окт)
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
@@ -280,6 +281,18 @@ state.panes = (function()
     top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
     mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
 end)()
+-- 9 окт (миграция 5): вкладка macros — в стек вкладок верхнего модуля
+if state.panes and reaper.GetExtState(EXT, 'panes_mig5') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.find(state.panes, 'macros') and PNm.find(state.panes, 'harm') then
+    local act
+    local lf = PNm.find(state.panes, 'harm')
+    act = lf and lf.active
+    PNm.stack(state.panes, 'macros', 'harm')
+    lf = PNm.find(state.panes, 'harm'); if lf and act then lf.active = act end
+  end
+  reaper.SetExtState(EXT, 'panes_mig5', '1', true)
+end
 -- 9 окт (миграция 4): fx и pm — отдельные панели стеком с браузером
 -- (browser | pm | fx), один раз поверх текущей раскладки
 if state.panes and reaper.GetExtState(EXT, 'panes_mig4') ~= '1' then
@@ -2682,7 +2695,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'scopes', 'master', 'video' }   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'macros', 'scopes', 'master', 'video' }   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -3208,6 +3221,47 @@ ctx = {
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
   mono_on = function() return state.slicemono end,
+  -- ── вкладка macros (9 окт) ─────────────────────────────────────────────
+  mac_file = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_macros.txt' end,
+  mac_saved = function()
+    local f = io.open(ctx.mac_file(), 'r'); if not f then return {} end
+    local t = f:read('*a'); f:close()
+    return MX.MR.parse(t)
+  end,
+  mac_write = function(list)
+    reaper.RecursiveCreateDirectory(reaper.GetResourcePath() .. '/Data', 0)
+    local f = io.open(ctx.mac_file(), 'w'); if not f then vim.msg = 'macros: cannot write the file'; return end
+    f:write(MX.MR.serialize(list)); f:close()
+  end,
+  mac_rows = function() return MX.MR.rows(vim.regs, ctx.mac_saved()) end,
+  mac_save = function(arg)
+    local reg, name = (arg or ''):match('^%s*(%l)%s+(.-)%s*$')
+    local keys = reg and vim.regs['@' .. reg]
+    if not (keys and #keys > 0 and name ~= '') then vim.msg = 'macsave: like :macsave a my fill (register a must hold a macro)'; return end
+    local list = ctx.mac_saved()
+    list[#list + 1] = { name = name, body = MX.MR.encode(keys) }
+    ctx.mac_write(list)
+    vim.msg = 'macro saved: ' .. name
+  end,
+  mac_do = function(a)
+    if not (a and a.row) then return end
+    local r = a.row
+    if a.kind == 'play' then
+      ctx.set_focus('tracker')
+      if (r.body or ''):sub(1, 1) == ':' then vim.run_cmd(r.body:sub(2))
+      else vim.play_keys(r.keys or MX.MR.decode(r.body)) end
+      vim.msg = 'macro: ' .. (r.kind == 'rec' and ('@' .. r.name) or r.name)
+    elseif a.kind == 'delete' then
+      if r.kind == 'rec' then vim.regs['@' .. r.name] = nil; vim.msg = 'register @' .. r.name .. ' cleared'
+      elseif r.kind == 'saved' then
+        local list, out = ctx.mac_saved(), {}
+        for _, m in ipairs(list) do if not (m.name == r.name and m.body == r.body) then out[#out + 1] = m end end
+        ctx.mac_write(out); vim.msg = 'macro deleted: ' .. r.name
+      end
+    elseif a.kind == 'save' then
+      vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'macsave ' .. r.name .. ' '
+    end
+  end,
   -- 9 окт: Shift+M / Shift+S — mute / solo трека курсора (один undo)
   track_toggle = function(what)
     local col = cur_col(); if not (col and col.track) then return end
@@ -9867,6 +9921,12 @@ local function frame()
     if state.focus == 'pm' then B.mode = 'pm'
     elseif B.mode == 'pm' or B.mode == 'fx' then B.mode = B.bmode or 'files' end
   else B.panes = nil end
+  -- 9 окт: трек курсора левее начала прокрутки (колонки сменили ширину —
+  -- огибающая, свёртка) — прокрутка к нему, а не «пропавший» трек
+  do
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    if f and f.ci and (state.hscroll or 1) > f.ci then state.hscroll = f.ci; relayout() end
+  end
   -- 9 окт: note-off превью плагина-инструмента
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
@@ -10312,6 +10372,12 @@ local function frame()
         if p then ctx.video_do({ kind = 'param', i = hv.i, v = math.max(0, math.min(1, p.v + (gfx.mouse_wheel > 0 and 1 or -1) * (gfx.mouse_cap & 8 == 8 and 0.001 or 0.01))) }) end
         gfx.mouse_wheel = 0
       end
+      return hv
+    end,
+    macros_draw = function(Lx, x, y, w, h)
+      local rows = ctx.mac_rows()
+      ctx.mac_last = rows
+      local hv = MX.MR.draw({ U = U, L = Lx, fit = ctx.fit, hint = ctx.hint, focused = state.focus == 'top' and state.toptab == 'macros' }, x, y, w, h, rows)
       return hv
     end,
     harm_draw = function(Lx, x, y, w, h)
@@ -13771,6 +13837,11 @@ local function frame()
           end
         elseif state.toptab == 'clips' then
           if not MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then
+            if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
+          end
+        elseif state.toptab == 'macros' then
+          local r = MX.MR.key(c, ctx.mac_last or ctx.mac_rows())
+          if type(r) == 'table' then ctx.mac_do(r) elseif not r then
             if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
         elseif state.toptab == 'video' then

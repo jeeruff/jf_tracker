@@ -77,7 +77,13 @@ function PP.build(tr, fx_addresses)
   end
   for _, fa in ipairs(fxa) do
     local _, fn = R.TrackFX_GetFXName(tr, fa.fx, '')
-    fn = fa.prefix .. (fn or ''):gsub('^[^:]*: ', '')
+    -- 9 окт: короткое имя — у JSFX описание после « - » долой, длинные скобки
+    -- тоже; не длиннее 20 знаков (параметр в списке иначе не виден)
+    fn = (fn or ''):gsub('^[^:]*: ', '')
+    fn = fn:match('^(.-)%s+%-%s+') or fn
+    if #fn > 20 then fn = fn:gsub('%s*%(.*$', '') end
+    if #fn > 20 then fn = fn:sub(1, 20) end
+    fn = fa.prefix .. fn
     for pi = 0, math.min(1024, R.TrackFX_GetNumParams(tr, fa.fx)) - 1 do
       local _, pn = R.TrackFX_GetParamName(tr, fa.fx, pi, '')
       rows[#rows + 1] = { kind = 'fx', fx = fa.fx, param = pi, fxname = fn, pname = pn or ('p' .. pi), label = fn .. ' / ' .. (pn or ('p' .. pi)) }

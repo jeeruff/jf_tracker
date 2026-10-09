@@ -2352,6 +2352,9 @@ local function draw_topbar(L, info)
   elseif tab == 'video' then
     -- video (9 окт, jf_tracker_video.lua): пульт видео трека и список видео-item
     if info.video_draw then hover.video = info.video_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
+  elseif tab == 'macros' then
+    -- macros (9 окт, jf_tracker_macros.lua): записанные регистры, свои, встроенные
+    if info.macros_draw then hover.macros = info.macros_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'harm' then
     -- harmonizer (8 окт, jf_tracker_harm.lua): лад, ступени, аккорды трека
     if info.harm_draw then hover.harm = info.harm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end

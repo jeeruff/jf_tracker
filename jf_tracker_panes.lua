@@ -40,6 +40,7 @@ PN.PANELS = {
   { id = 'modulation', label = 'automation', key = 'a', hint = 'modulation', side = 'top', tab = true },
   { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
+  { id = 'macros',     label = 'macros',     key = 'q', hint = 'macros',  side = 'top', tab = true },   -- 9 окт: записанные / свои / встроенные макросы
   { id = 'scopes',     label = 'scopes',     key = 'c', hint = 'master',  side = 'top', tab = true },
   { id = 'master',     label = 'master',     key = 'S', hint = 'master',  side = 'top', tab = true },
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
