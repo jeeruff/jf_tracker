@@ -2572,6 +2572,11 @@ function D.pool_rows(pool, sort, col, cols)
     end
     if not e.parent then rows[#rows + 1] = { i = i } end    -- слайсы вложены в исходник (3 окт)
   end
+  -- 9 окт: группа одна (сэмплы своего трека) — заголовок «audio», как
+  -- «instruments» у плагинов ниже; несколько треков — их имена
+  local nh, h1 = 0, nil
+  for _, r in ipairs(rows) do if r.hdr then nh = nh + 1; h1 = r end end
+  if nh == 1 then h1.hdr = 'audio' end
   return add_empty(rows, pool)
 end
 
@@ -3021,7 +3026,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 9 окт: инструменты-плагины трека (VSTi / AUi / CLAPi, JSFX-инструменты) —
   -- строки после automation; выбран — клавиши пишут MIDI-ноты в него
   local tins = info.track_insts and info.track_insts(col) or {}
-  if #tins > 0 then rows[#rows + 1] = { hdr = 'track instruments', name = '' } end
+  if #tins > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
   for _, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind } end
   L.pool_rows = rows
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
