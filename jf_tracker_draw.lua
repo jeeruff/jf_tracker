@@ -45,9 +45,9 @@ function D.init(u, peaks_fn, matrix)
   D.BEAT  = U.DIM
   -- плейхед (8 окт): цвет курсора воспроизведения темы REAPER (playcursor_color),
   -- строка — намёком; хвост — сыгранные строки выше, тают (Options: playhead tail)
-  -- 9 окт: строка — как была (янтарь), цвет темы — только хвосту
-  D.PLAYC = U.readable(U.theme('playcursor_color', U.AMBER), U.BG, 3.0)
-  D.PLAY  = U.tint(U.AMBER, 0.22)
+  -- 9 окт: строка — янтарь ярче, хвост — градиент того же цвета
+  D.PLAYC = U.AMBER
+  D.PLAY  = U.tint(U.AMBER, 0.36)
   D.CUR   = U.AMBER
   D.CURROW = U.mix(U.BG, U.TEXT, 0.16)
   D.CURTOP = U.AMBER                            -- яркая верхняя кромка строки курсора
@@ -3641,7 +3641,7 @@ function D.frame(L, snap, rows, state, info)
     if ph then
       local k = ph - r.row
       if k == 0 then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1)
-      elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.22 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+      elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.30 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
     end
     if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1); D.cur_y = y end
   end
