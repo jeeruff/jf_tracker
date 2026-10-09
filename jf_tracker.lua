@@ -7920,13 +7920,11 @@ ctx = {
   end,
   preview = function(track, pitch, inst_item, row, step)
     if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
-    if inst_item and PV.available() then
-      local has_midi = false
-      for i = 0, reaper.CountTrackMediaItems(track) - 1 do
-        local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(track, i))
-        if tk and reaper.TakeIsMIDI(tk) then has_midi = true; break end
-      end
-      if not has_midi then PV.audio(track, inst_item, pitch - model.BASE_NOTE); return end
+    -- 9 окт: сэмпл (аудио-item lib) звучит сам всегда — раньше MIDI-ноты на
+    -- треке (от плагина-инструмента) переводили превью в play транспорта (q = весь сэмпл)
+    if inst_item and PV.available() and reaper.ValidatePtr(inst_item, 'MediaItem*') then
+      local itk = reaper.GetActiveTake(inst_item)
+      if itk and not reaper.TakeIsMIDI(itk) then PV.audio(track, inst_item, pitch - model.BASE_NOTE); return end
     end
     -- 9 окт: MIDI-превью (проигрывание от строки) — только если на треке есть
     -- кому звучать: плагин-инструмент или MIDI; пустой слот на пустом треке
