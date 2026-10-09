@@ -677,6 +677,9 @@ end
 -- ── цвет item ─────────────────────────────────────────────────────────────
 -- Отображаемый цвет (свой или трека), как его рисует REAPER.
 function M.item_rgb(it)
+  -- 9 окт: item мог исчезнуть (Cmd+Z / удаление) раньше пересборки снимка — сетка
+  -- клипов сессии спрашивала его цвет и роняла трекер
+  if not (it and R.ValidatePtr and R.ValidatePtr(it, 'MediaItem*')) then return nil end
   local c = R.GetDisplayedMediaItemColor and R.GetDisplayedMediaItemColor(it) or 0
   if not c or c == 0 or not R.ColorFromNative then return nil end
   local r, g, b = R.ColorFromNative(c & 0xFFFFFF)
