@@ -116,6 +116,24 @@ sign is needed, it comes from another alphabet (<code>Δ</code> delta solo, <cod
 <p>The module with the keyboard focus has a pink frame; in INSERT the tracker frame is red. By default a plain click works
 inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves the focus (option <code>focus by mouse</code>).</p>
 
+<h2 id="panes">Panes</h2>
+<p>The window is laid out like <b>tmux</b> or <b>zellij</b>: a tree of splits, every module a pane, several modules in one
+place are a stack of tabs (their titles sit in the top line of the pane border). The tracker is a pane too and always stays.
+The layout is saved with the window and in screensets.</p>
+<ul>
+  <li><kbd>⌘h</kbd> <kbd>⌘j</kbd> <kbd>⌘k</kbd> <kbd>⌘l</kbd> — focus the neighbour pane (as in dwm); with <kbd>⇧</kbd> — move the pane there.</li>
+  <li><kbd>⌥Tab</kbd> — next pane in order; <kbd>Ctrl+Tab</kbd> — next tab of the stack.</li>
+  <li><kbd>Ctrl+W</kbd> — pane mode (stays on until <kbd>Esc</kbd>, numbers on the borders, the keys in a pop-up):
+    <code>g</code>+letter go to a panel, <code>s</code>/<code>v</code>+letter split below / right, <code>T</code>+letter into this stack,
+    <code>B</code> out of the stack, <code>x</code>/<code>X</code> swap, <code>+ - &lt; &gt; =</code> size, <code>z</code> zoom,
+    <code>c</code> hide, <code>Space</code> next layout, <code>u</code> undo.</li>
+  <li><code>:pane dsp with item</code>, <code>:pane browser hide</code>, <code>:pane matrix right</code>, <code>:pane reset</code>, <code>:pane wide</code>.</li>
+  <li>Mouse: click — focus, click a title — that tab, drag the line between panes — size (double click — equal), right click a title — hide.</li>
+</ul>
+<p>Panel letters: m matrix, b browser, l lib, n main, s slices, o notes, f fx list, d dsp, r rec, i item, a automation,
+M midi, h harmonizer, c scopes, S master, v video. A hidden panel comes back when you go to it.
+Options → <code>panes</code> off brings the old fixed layout back.</p>
+
 <h2 id="normal">NORMAL</h2>
 <div class="keys">
 <div><b>move</b>
