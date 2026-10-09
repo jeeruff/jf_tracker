@@ -252,6 +252,8 @@ state.panes_ui = flag('panes_ui', false)          -- 9 окт: раскладк�
 -- опций положения (пользователю ничего делать не нужно)
 state.panes = (function()
   local s = reaper.GetExtState(EXT, 'panes')
+  -- 9 окт: миграция v2 (main — левый верх, над матрицей) — один раз поверх первой
+  if reaper.GetExtState(EXT, 'panes_mig') ~= '2' then s = ''; reaper.SetExtState(EXT, 'panes_mig', '2', true) end
   if s ~= '' then return draw.panes.decode(s) end
   return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
     browserleft = state.browserleft, side = state.side, dsp = state.dsp, fxb = state.fxb, khelp = state.khelp,
@@ -8459,6 +8461,14 @@ function ctrl_action(name, delta)
   elseif name == 'tutorial' then if delta == 0 then ctx.tutorial() end
   elseif name == 'screensets' then if delta == 0 then vim.open_hydra(ctx.screensets_hydra()); state.popup_at = { kind = 'ctrlbtn', name = 'screensets' } end
   -- быстрые вкл / выкл главного модуля (4 окт)
+  -- панели (9 окт): кнопки dsp / browser / matrix прячут и показывают свой лист
+  elseif (name == 'q_dsp' or name == 'q_side' or name == 'q_mx') and state.panes_ui and L and L.pn then
+    if delta == 0 then
+      local id = ({ q_dsp = 'dsp', q_side = 'browser', q_mx = 'matrix' })[name]
+      local shown = not draw.panes.visible(state.panes, id)
+      ctx.pane_do(function() return draw.panes.toggle(state.panes, id) end, 'pane ' .. id .. (shown and ' shown' or ' hidden'))
+      if not shown and ctx.pane_cur() == id then ctx.set_focus('tracker') end
+    end
   elseif name == 'q_dsp' then if delta == 0 then ctx.toggle_dsp() end
   elseif name == 'q_side' then if delta == 0 then state.side = not state.side end
   elseif name == 'q_mx' then if delta == 0 then state.mx_hidden = not state.mx_hidden end
@@ -9593,7 +9603,7 @@ local function frame()
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale,
-    notes_draw = (state.top and state.notes_open) and function(Lx, x, y, w, h)
+    notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
       NT.show_dev = state.debug
@@ -9825,7 +9835,7 @@ local function frame()
       return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
-    browser_draw = state.side and function(Lx, x, y, w, h)
+    browser_draw = (state.side or state.panes_ui) and function(Lx, x, y, w, h)   -- панели: у браузера свой лист
       -- вкладка fx (браузер слева): список эффектов внутри браузера
       B.fx_draw = (state.browserleft or state.router_big) and function(fx, fy, fw, fh)
         if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
@@ -12140,7 +12150,7 @@ local function frame()
     end
   end
   -- автопревью браузера: курсор перешёл на другую строку → слушаем её
-  if state.side and B.auto and B.cur ~= browse_last then
+  if (state.side or state.panes_ui) and B.auto and B.cur ~= browse_last then
     browse_last = B.cur
     local pth = B.preview_path(B.entries[B.cur])
     if pth then
@@ -12820,7 +12830,7 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if (state.ss_big or MX.clips) and MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
-      elseif state.focus == 'browser' and state.side then
+      elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
       elseif state.focus == 'slices' and state.slices_on then
         -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер

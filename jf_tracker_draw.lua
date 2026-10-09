@@ -5439,7 +5439,7 @@ function D.frame(L, snap, rows, state, info)
   end
   -- заметки (4 окт): раскрыты вниз во всю левую колонку — от своего места в
   -- главном модуле до DSP (или низа окна), поверх матрицы
-  if D.notes_popup and info.notes_draw then
+  if D.notes_popup and info.notes_draw and not L.pn then   -- панели: у заметок свой лист
     local p = D.notes_popup
     D.notes_popup = nil
     -- плавающее окошко (4 окт): место и размер — info.notes_win (тянется за

@@ -635,7 +635,11 @@ function PN.migrate(old, W, H)
   right.fr[2] = 1 - right.fr[1]
   bottom.fr[2] = 1 - bottom.fr[1]
   norm_fr(root); norm_fr(mid); norm_fr(right); norm_fr(bottom)
-  if old.ctrlpos == 'mid' then
+  -- main отдельно от вкладок (прежний ctrl_alone): ctrlpos top при вкладках не наверху — левый верх, над матрицей
+  if (old.ctrlpos or 'top') == 'top' and old.toppos and old.toppos ~= 'top' then
+    table.remove(top.kids, 1); table.remove(top.fr, 1); norm_fr(top)
+    root.kids[1] = node('v', { 0.3, 0.7 }, leaf('ctrl'), left)
+  elseif old.ctrlpos == 'mid' then
     table.remove(top.kids, 1); table.remove(top.fr, 1); norm_fr(top)
     root.kids[1] = node('v', { 0.7, 0.3 }, left, leaf('ctrl'))
   elseif old.ctrlpos == 'bottom' then
