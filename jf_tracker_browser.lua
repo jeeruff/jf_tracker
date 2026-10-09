@@ -872,7 +872,7 @@ function B.key(c)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = 'pm', pm = 'proj', proj = 'kits', kits = 'files' })[B.mode])
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.panes and 'proj' or 'pm'), pm = 'proj', proj = 'kits', kits = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -930,7 +930,8 @@ function B.draw(U, L, x, y, w, h)
   local wrap_marks = false
   do
     local bx = x + L.pad + 2
-    for _, t in ipairs(B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' }) do
+    -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
+    for _, t in ipairs(B.panes and { 'files', 'db', 'proj', 'kits' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' })) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end

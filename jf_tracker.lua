@@ -280,6 +280,18 @@ state.panes = (function()
     top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
     mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
 end)()
+-- 9 окт (миграция 4): fx и pm — отдельные панели стеком с браузером
+-- (browser | pm | fx), один раз поверх текущей раскладки
+if state.panes and reaper.GetExtState(EXT, 'panes_mig4') ~= '1' then
+  local PNm = draw.panes
+  if PNm.visible(state.panes, 'browser') then
+    PNm.stack(state.panes, 'pm', 'browser')
+    PNm.stack(state.panes, 'fxb', 'browser')
+    local lf = PNm.find(state.panes, 'browser')
+    if lf then for k, id in ipairs(lf.panes) do if id == 'browser' then lf.active = k end end end
+  end
+  reaper.SetExtState(EXT, 'panes_mig4', '1', true)
+end
 -- миграция 1 окт (2): пользователь выбрал битмап ×2
 -- ext() отдаёт число для числовых строк: сравнивать через tostring (иначе 3 ~= '3'
 -- и шрифт сбрасывался в битмап при каждом старте)
@@ -5583,7 +5595,7 @@ ctx = {
     w1, w2 = w1 or '', w2 or ''                  -- :pm без слова — просто вкладка (nil ломал проверку ниже)
     if not ctx.pm_cards() and w1 ~= '' then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
     if w1 == 'big' then ctx.pm_big(); return end
-    state.side = true; B.set_mode('pm'); ctx.set_focus('browser')
+    if state.panes_ui and L and L.pn then ctx.pane_focus('pm') else state.side = true; B.set_mode('pm'); ctx.set_focus('browser') end
     if w1 == 'grid' or w1 == 'list' then B.click(w1 == 'grid' and 'pmgrid' or 'pmlist')
     elseif w1 == 'sort' and w2 ~= '' then B.pm_sort = w2; reaper.SetExtState(EXT, 'pmsort', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: sort by ' .. w2
     elseif w1 == 'daw' and w2 ~= '' then B.pm_daw = w2; reaper.SetExtState(EXT, 'pmdaw', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: daw ' .. w2
@@ -7320,6 +7332,12 @@ ctx = {
       -- панели (9 окт): фокус — только на видимую панель дерева (вкладки — 'top' + toptab)
       -- скрытая панель при переходе в неё появляется (F-клавиши, Ctrl+Tab, / …), как open в tmux
       local id = f == 'top' and state.toptab or f
+      -- 9 окт: щелчок в панели pm — фокус pm (её рисует модуль браузера)
+      if f == 'browser' and not state.pm_big and L and L.pn and L.pn.by_panel and L.pn.by_panel.pm then
+        local r = L.pn.by_panel.pm.content
+        local mx, my = gfx.mouse_x, gfx.mouse_y
+        if r and (gfx.mouse_cap & 1 == 1) and mx >= r.x and mx < r.x + r.w and my >= r.y and my < r.y + r.h then f, id = 'pm', 'pm' end
+      end
       if f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and not draw.panes.visible(state.panes, id) then
         if not draw.panes.show(state.panes, id) then f = 'tracker' end
       end
@@ -9841,6 +9859,14 @@ local function frame()
     end
   else ctx.mx_selk = nil end
 
+  -- 9 окт: панели pm / browser — режим модуля браузера по фокусу (pm — своя
+  -- панель; браузеру — последний файловый режим)
+  if state.panes_ui and not state.pm_big then
+    B.panes = true
+    if B.mode ~= 'pm' and B.mode ~= 'fx' then B.bmode = B.mode end
+    if state.focus == 'pm' then B.mode = 'pm'
+    elseif B.mode == 'pm' or B.mode == 'fx' then B.mode = B.bmode or 'files' end
+  else B.panes = nil end
   -- 9 окт: note-off превью плагина-инструмента
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
@@ -10474,6 +10500,14 @@ local function frame()
       return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
+    -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
+    pm_draw = state.panes_ui and function(Lx, x, y, w, h)
+      local m = B.mode; B.mode = 'pm'
+      local ok, r = pcall(B.draw, U, Lx, x, y, w, h)
+      B.mode = m
+      if not ok then error(r) end
+      return r
+    end or nil,
     browser_draw = (state.side or state.panes_ui) and function(Lx, x, y, w, h)   -- панели: у браузера свой лист
       -- вкладка fx (браузер слева): список эффектов внутри браузера
       B.fx_draw = (state.browserleft or state.router_big) and function(fx, fy, fw, fh)

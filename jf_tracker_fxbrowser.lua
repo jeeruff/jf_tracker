@@ -83,15 +83,28 @@ local function score(hay, term)
   if term:sub(-1) == '$' then local t = term:sub(1, -2); return hay:sub(-#t) == t and 60 or nil end
   local p = hay:find(term, 1, true)
   if p then return 100 - math.min(p, 50) + ((p == 1 or hay:sub(p - 1, p - 1):match('[%s%(%-_]')) and 30 or 0) end
-  -- подпоследовательность
-  local j, sc, last = 1, 0, -1
-  for i = 1, #hay do
-    if hay:sub(i, i) == term:sub(j, j) then
-      sc = sc + (i == last + 1 and 3 or 1); last = i; j = j + 1
-      if j > #term then return sc end
-    end
+  -- подпоследовательность (9 окт: одним шаблоном Lua «a.-b.-c», было —
+  -- посимвольно в цикле: 2730 эффектов × буква = 250 мс на нажатие)
+  local pat = FB.subpat[term]
+  if not pat then
+    local parts = {}
+    for ch in term:gmatch('.') do parts[#parts + 1] = (ch:gsub('%p', '%%%0')) end
+    pat = table.concat(parts, '.-')
+    FB.subpat[term] = pat
   end
-  return nil
+  local a, b = hay:find(pat)
+  if not a then return nil end
+  return math.max(1, 30 - (b - a - #term))             -- плотнее — выше
+end
+FB.subpat = {}
+-- нижний регистр имени / метки — один раз на эффект (не на каждый поиск)
+local function hay_of(it)
+  if not it._hay then
+    it._name = FB.short(it.label)
+    it._hay = it._name:lower()
+    it._lab = it.label:lower()
+  end
+  return it._hay, it._lab, it._name
 end
 
 -- отфильтрованный и отсортированный список (кэш по запросу)
@@ -109,18 +122,25 @@ function FB.results()
   for t in FB.query:lower():gmatch('%S+') do terms[#terms + 1] = t end
   local rec_i = {}
   if FB.folder == 'rec' then for i, l in ipairs(FB.recent) do rec_i[l] = i end end
-  for _, it in ipairs(FB.list) do
+  -- 9 окт: запрос дописан (старый — его начало, та же папка / список) —
+  -- искать только среди прошлых результатов
+  local src = FB.list
+  if cache.res and cache.q and cache.q ~= '' and FB.query:sub(1, #cache.q) == cache.q and not FB.query:find('!', 1, true)
+     and cache.list == FB.list and cache.folder == FB.folder and cache.gen == FB.gen then
+    src = {}
+    for _, r in ipairs(cache.res) do if r.it then src[#src + 1] = r.it end end
+  end
+  for _, it in ipairs(src) do
     if (FB.folder == 'fav' and not FB.is_fav(it)) or (FB.folder == 'rec' and not rec_i[it.label]) then goto skip end
     do
-    local name = FB.short(it.label)
-    local hay = name:lower()
+    local hay, lab, name = hay_of(it)
     local total, ok = 0, true
     for _, t in ipairs(terms) do
-      local s = score(hay, t) or score(it.label:lower(), t)
+      local s = score(hay, t) or score(lab, t)
       if not s then ok = false; break end
       total = total + s
     end
-    if ok then res[#res + 1] = { it = it, s = total, name = name:lower(), g = group_of(it), r = rec_i[it.label] } end
+    if ok then res[#res + 1] = { it = it, s = total, name = hay, g = group_of(it), r = rec_i[it.label] } end
     end
     ::skip::
   end

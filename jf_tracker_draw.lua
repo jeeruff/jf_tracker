@@ -3390,6 +3390,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
         end
+      elseif id == 'pm' and info.pm_draw then
+        hover.browser = info.pm_draw(L, ct.x, ct.y, ct.w, ct.h)          -- 9 окт: проекты — своя панель
       elseif id == 'browser' and info.browser_draw then
         hover.browser = info.browser_draw(L, ct.x, ct.y, ct.w, ct.h)
         if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end   -- 9 окт: вкладка fx браузера (router big) — щелчки

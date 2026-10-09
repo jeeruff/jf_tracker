@@ -32,7 +32,8 @@ PN.PANELS = {
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
-  { id = 'fxb',        label = 'fx list',    key = 'f', hint = 'fxb',     side = 'bottom' },
+  { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
+  { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)
   { id = 'dsp',        label = 'dsp',        key = 'd', hint = 'dsp',     side = 'bottom' },
   { id = 'retro',      label = 'rec',        key = 'r', hint = 'retro',   side = 'top', tab = true },
   { id = 'sample',     label = 'item',       key = 'i', hint = 'sample',  side = 'top', tab = true },
@@ -68,8 +69,9 @@ function PN.DEFAULT()
       node('v', { 0.22, 0.60, 0.18 },
         tabs,
         leaf('tracker'),
-        node('h', { 0.25, 0.75 }, leaf('fxb'), leaf('dsp'))),
-      node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser'))),
+        leaf('dsp')),
+      -- 9 окт: browser | pm | fx — один стек справа внизу
+      node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'))),
     hidden = { notes = true } })
 end
 
@@ -629,17 +631,14 @@ function PN.migrate(old, W, H)
   local m = PN.DEFAULT()
   local root = m.root
   local left, mid, right = root.kids[1], root.kids[2], root.kids[3]
-  local bottom = mid.kids[3]
   local function frac(px, total, cur) if px and px > 0 then return math.max(0.05, math.min(0.6, px / total)) end return cur end
   root.fr[1] = frac(old.mxfold and old.mx_fold_px or old.mx_px, W, root.fr[1])
   root.fr[3] = frac(old.side_px, W, root.fr[3])
   mid.fr[1] = frac(old.top_px, H, mid.fr[1])
   right.fr[1] = frac(old.inst_px, H, right.fr[1])
-  bottom.fr[1] = frac(old.fxb_px, W, bottom.fr[1])
   root.fr[2] = math.max(0.2, 1 - root.fr[1] - root.fr[3])
   mid.fr[2] = math.max(0.3, 1 - mid.fr[1] - mid.fr[3])
-  bottom.fr[2] = 1 - bottom.fr[1]
-  norm_fr(root); norm_fr(mid); norm_fr(right); norm_fr(bottom)
+  norm_fr(root); norm_fr(mid); norm_fr(right)   -- 9 окт: внизу — один dsp (fx — в стеке браузера)
   -- main: по умолчанию — левый верх (прежний ctrl_alone); вкладки наверху и
   -- main там же — рядом с вкладками; mid — под матрицей; bottom — в нижней полосе
   local ctrlpos = old.ctrlpos or 'top'
@@ -648,7 +647,11 @@ function PN.migrate(old, W, H)
   elseif ctrlpos == 'mid' then
     left.kids[1], left.kids[2] = left.kids[2], left.kids[1]; left.fr[1], left.fr[2] = left.fr[2], left.fr[1]
   elseif ctrlpos == 'bottom' then
-    detach(m, 'ctrl'); table.insert(bottom.kids, 1, leaf('ctrl')); table.insert(bottom.fr, 1, 0.25); norm_fr(bottom)
+    detach(m, 'ctrl')
+    local mid2 = m.root.kids[2]
+    for k, kid in ipairs(mid2.kids) do
+      if is_leaf(kid) and kid.panes[1] == 'dsp' then mid2.kids[k] = node('h', { 0.25, 0.75 }, leaf('ctrl'), kid) end
+    end
   end
   if old.browserleft then
     detach(m, 'browser')

@@ -30,7 +30,7 @@ end
 local m = PN.DEFAULT()
 local lay = tiling('default 1600x900', m, 1600, 900)
 tiling('default 800x500', m, 800, 500)
-eq('cells', #lay.cells, 9)
+eq('cells', #lay.cells, 8)   -- 9 окт: browser | pm | fx — один стек, dsp один
 ok('tracker rect', lay.rects.tracker ~= nil)
 ok('tracker has no tab', lay.by_panel.tracker.tab == nil)
 eq('order starts with tracker', lay.order[1], 'tracker')
@@ -40,7 +40,7 @@ ok('tabs in one cell', lay.by_panel.sample == lay.by_panel.midi)
 -- недоступная панель: slices нет → лист схлопнут
 local M2 = setmetatable({ avail = function(id) return id ~= 'slices' end }, { __index = M })
 local lay2 = tiling('no slices', m, 1600, 900, M2)
-eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 8)
+eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 7)
 -- все скрыты
 local t = PN.preset('tracker')
 local lay3 = tiling('tracker only', t, 1600, 900)
@@ -73,17 +73,19 @@ eq('inst d', PN.focus_dir(lay, 'inst', 'd'), 'slices')   -- справа: lib, s
 
 -- move: своп в родителе
 m = PN.DEFAULT()
+PN.split(m, 'dsp', 'notes', 'r', 0.3)                       -- пара в одном ряду: dsp | notes
 local v0 = m.v
-ok('move fxb right', PN.move(m, 'fxb', 'r'))
+ok('move notes left', PN.move(m, 'notes', 'l'))
 lay = PN.layout(m, 1600, 900, M)
-ok('fxb now right of dsp', lay.by_panel.fxb.x > lay.by_panel.dsp.x)
+ok('notes now left of dsp', lay.by_panel.notes.x < lay.by_panel.dsp.x)
 ok('v bumped', m.v > v0)
 -- move: подъём к предку (dsp вниз — нет родителя 'v' на уровне … у mid есть 'v' → dsp отдельной полосой под низом)
 m = PN.DEFAULT()
+PN.split(m, 'dsp', 'notes', 'r', 0.3)
 ok('move dsp down', PN.move(m, 'dsp', 'd'))
 lay = PN.layout(m, 1600, 900, M)
-ok('dsp under fxb', lay.by_panel.dsp.y > lay.by_panel.fxb.y)
-ok('dsp spans mid width', lay.by_panel.dsp.w == lay.by_panel.fxb.w and lay.by_panel.dsp.w > 1000)
+ok('dsp under notes', lay.by_panel.dsp.y > lay.by_panel.notes.y)
+ok('dsp spans mid width', lay.by_panel.dsp.w == lay.by_panel.notes.w and lay.by_panel.dsp.w > 1000)
 -- move: у края — новый сплит
 m = PN.DEFAULT()
 ok('move matrix left', PN.move(m, 'matrix', 'l') == false or true)   -- уже у края: нет соседа → корень 'h', вставка в корень слева = та же позиция
@@ -111,7 +113,7 @@ ok('stack dsp into sample', PN.stack(m, 'dsp', 'sample'))
 lay = PN.layout(m, 1600, 900, M)
 ok('dsp in tabs cell', lay.by_panel.dsp == lay.by_panel.sample)
 eq('dsp active', lay.by_panel.dsp.active_id, 'dsp')
-ok('fxb spans bottom', lay.by_panel.fxb.w > 1000)
+ok('tracker to the bottom', lay.by_panel.tracker.y + lay.by_panel.tracker.h == 900)
 eq('stack tracker', PN.stack(m, 'tracker', 'sample'), false)
 ok('unstack dsp', PN.unstack(m, 'dsp', 'd'))
 lay = PN.layout(m, 1600, 900, M)
@@ -127,7 +129,7 @@ eq('split tracker', PN.split(m, 'notes', 'tracker', 'd'), false)
 m = PN.DEFAULT()
 ok('hide browser', PN.hide(m, 'browser')); eq('hidden', m.hidden.browser, true)
 lay = PN.layout(m, 1600, 900, M)
-ok('slices to the bottom', lay.by_panel.slices.y + lay.by_panel.slices.h == 900)
+ok('pm takes the stack', lay.by_panel.pm ~= nil and lay.by_panel.pm.active_id ~= 'browser')
 eq('hide tracker', PN.hide(m, 'tracker'), false)
 ok('show browser', PN.show(m, 'browser'))
 lay = PN.layout(m, 1600, 900, M)
@@ -188,7 +190,7 @@ ok('tracker unstacked', #PN.find(stk, 'tracker').panes == 1)
 
 -- migrate
 local d = PN.migrate({ top = true, side = true, dsp = true, fxb = true, toppos = 'mid', toptab = 'sample' }, 1600, 900)
-eq('migrate default-ish', #PN.layout(d, 1600, 900, M).cells, 9)
+eq('migrate default-ish', #PN.layout(d, 1600, 900, M).cells, 8)
 eq('migrate toptab', PN.active_of(d, 'retro'), 'sample')
 d = PN.migrate({ side = false }, 1600, 900); eq('side off → browser hidden', d.hidden.browser, true); eq('lib stays', d.hidden.inst, nil)
 d = PN.migrate({ mx_hidden = true, dsp = false }, 1600, 900); eq('matrix hidden', d.hidden.matrix, true); eq('dsp hidden', d.hidden.dsp, true); eq('fxb hidden', d.hidden.fxb, true)
