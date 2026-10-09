@@ -282,7 +282,7 @@ KH.PAGES = {
   } },
   dsp = { title = 'DSP (track fx)', e = {
     { k = 'h l', d = 'fx left / right' },
-    { k = 'zz', d = 'dsp big: the chain with its routing on the whole window - h l signal (l enters a container), j k parallel row, a add after the row, A add in parallel, | join / leave the row, s solo in the row, = branches to unity, b bypass, x / dd delete, za fold a container, o window, zz / Esc back (:dsp big)', t = { 'zz', 'z' } },
+    { k = 'zz', d = 'dsp big: the chain with its routing on the whole window - h l signal (l enters a container), j k parallel row, a add after the row, A add in parallel, | join / leave the row, s solo in the row, = branches to unity, b bypass, d (or x) delete, za fold a container, o window, zz / Esc back (:dsp big)', t = { 'zz', 'z' } },
     { k = 'j k g G', d = 'parameter down / up / first / last' },
     { k = '+ - ^A ^X', d = 'value up / down (Shift: coarse)', t = { '+', '-', '=', '^A', '^X' } },
     { k = 'dd x', d = 'delete fx (v: range)', t = { 'dd', 'd', 'x' } },

@@ -419,6 +419,23 @@ function A.cells_delete(regions, snap, r0, r1, c0, c1)
   return n
 end
 
+-- выделение (9 окт): блок матрицы = выделение в REAPER — его треки и его
+-- items (остальное снимается); возвращает число items
+function A.cells_select(regions, snap, r0, r1, c0, c1)
+  R.SelectAllMediaItems(0, false)
+  local n, first = 0, true
+  for ci = math.min(c0, c1), math.max(c0, c1) do
+    local col = snap.cols[ci]
+    if col and col.track then
+      if first then R.SetOnlyTrackSelected(col.track); first = false else R.SetTrackSelected(col.track, true) end
+    end
+  end
+  each_cell(regions, snap, r0, r1, c0, c1, function(_, _, rg, col)
+    for _, it in ipairs(items_in(col.track, rg.pos, rg.rgnend)) do R.SetMediaItemSelected(it, true); n = n + 1 end
+  end)
+  return n
+end
+
 -- копия блока: chunks без GUID, позиция относительно начала региона, lane
 -- linked (9 окт, протяжка клетки) — исходник связывается (пул MIDI + группа),
 -- копии вставляются алиасами (cells_paste ..., linked)

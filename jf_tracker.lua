@@ -4493,7 +4493,7 @@ ctx = {
       state.dsp, state.dsp_big = true, true
       ctx.db_cache = nil
       relayout(); ctx.set_focus('dsp')
-      vim.msg = 'router in DSP: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, x delete, zz back'
+      vim.msg = 'router in DSP: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, d delete, zz back'
     end
   end,
   -- большой роутер (7 окт, zR): на всё окно, узлы — устройства со слайдерами
@@ -9428,6 +9428,22 @@ local function frame()
     T('poll_audio_in', poll_audio_in, reaper.time_precise()); T('settle_puts', settle_puts, reaper.time_precise()); T('mm_settle', mm_settle, reaper.time_precise()); T('learn_poll', learn_poll)
   end
 
+  -- 9 окт: блок матрицы (v / Shift+hjkl / мышь) выделяет в REAPER свои
+  -- треки и items — только при смене блока; lock не принимает это за
+  -- выбор трека в REAPER (его память обновляется следом)
+  if MX.anchor and #seq > 0 and snap then
+    local r0, r1, c0, c1 = MX.block()
+    local k = r0 .. ':' .. r1 .. ':' .. c0 .. ':' .. c1   -- без снимка: выделение само пересобирает снимок — иначе петля
+    if k ~= ctx.mx_selk then
+      ctx.mx_selk = k
+      reaper.PreventUIRefresh(1)
+      alias.cells_select(seq, snap, r0, r1, c0, c1)
+      reaper.PreventUIRefresh(-1)
+      reaper.UpdateArrange()
+      lock_sync.tr = reaper.GetSelectedTrack(0, 0)
+    end
+  else ctx.mx_selk = nil end
+
   draw.pmark('pre: lock sync')
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
   -- в REAPER → курсор трекера прыгает туда (вид — следом); курсор трекера
@@ -10679,6 +10695,18 @@ local function frame()
       end
     end
   end
+  -- протяжка по клеткам (9 окт): из клетки нажатия в другую — блок
+  -- (anchor..cur), он же выделение треков и items в REAPER
+  if ctx.mx_cdrag then
+    local d = ctx.mx_cdrag
+    if gfx.mouse_cap & 1 == 1 then
+      local h = hover.matrix
+      if h and h.ri and h.ci and (h.ri ~= d.ri or h.ci ~= d.ci or d.moved) then
+        if not d.moved then MX.anchor = MX.anchor or { ri = d.ri, ci = d.ci }; d.moved = true end
+        MX.cur.ri, MX.cur.ci = h.ri, h.ci
+      end
+    else ctx.mx_cdrag = nil end
+  end
   -- протяжка клетки матрицы за край (9 окт): каждый новый слот на пути — копия
   if ctx.mx_rep then
     local r = ctx.mx_rep
@@ -11434,6 +11462,8 @@ local function frame()
     elseif hover.matrix and hover.matrix.next then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.next, 1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.ri and hover.matrix.ci then
       ctx.set_focus('matrix')
+      -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки (9 окт)
+      if gfx.mouse_cap & 8 == 8 then MX.anchor = MX.anchor or { ri = MX.cur.ri, ci = MX.cur.ci } else MX.anchor = nil end
       MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci)
       if dbl and click.zone == 'matrix' and click.row == hover.matrix.ri then
         if reaper.GetPlayState() & 1 == 1 then
@@ -11449,6 +11479,7 @@ local function frame()
         end
       end
       click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
+      ctx.mx_cdrag = { ri = hover.matrix.ri, ci = hover.matrix.ci }   -- протяжка по клеткам = блок (9 окт)
     elseif hover.browser == 'pvvol' and dbl and click.zone == 'pvvol' then
       ctx.preview_set_vol(1); vim.msg = 'preview volume 0 dB'
     elseif type(hover.browser) == 'string' then

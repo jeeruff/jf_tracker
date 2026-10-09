@@ -182,12 +182,10 @@ function DB.key(c, root, obj)
   if pend == 'z' then
     if ch == 'z' or ch == 'r' then ops.close() elseif ch == 'R' and ops.big then ops.big() elseif ch == 'a' and n and n.kids then DB.fold[n.guid] = not DB.fold[n.guid] or nil end
     return true
-  elseif pend == 'd' then
-    if ch == 'd' and n then DB.delete(n, obj) end
-    return true
   end
   if c == 27 or ch == 'q' then ops.close(); return true end
-  if ch == 'z' or ch == 'd' then DB.pend = ch; return true end
+  if ch == 'z' then DB.pend = ch; return true end
+  if ch == 'd' then if n then DB.delete(n, obj) end; return true end   -- 9 окт: d — удалить сразу (x — то же)
   local function go(m) if m then DB.sel = m.guid end end
   if ch == 'h' or ch == 'l' or ch == 'j' or ch == 'k' then go(DB.move(root, n, ch)); return true end
   if ch == 'g' then go(root.kids[1]); return true end
@@ -329,14 +327,25 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   local top
   if compact then top = y + 2
   else
-  -- шапка: что за цепочка и подсказка
-  U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w // 2), U.AMBER)
-  local help = big and 'h l signal  j k row  a A add  | join row  s solo  = unity  b bypass  x delete  o window  drag a slider  dblclick default  zR back'
-    or 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  x delete  za fold  o window  zz back'
-  U.text(x + w - L.pad - U.measure(ctx.fit(help, w // 2)), y + L.pad, ctx.fit(help, w // 2), U.GREY)
+  -- шапка: что за цепочка; подсказка (9 окт) — внизу, с переносом по словам-парам
+  U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w - 2 * L.pad), U.AMBER)
   top = y + L.rh + 3 * L.pad
   end
-  local bh = h - (top - y) - (compact and 2 or L.pad)
+  local hl = {}
+  if not compact then
+    local help = big and 'h l signal  j k row  a A add  | join row  s solo  = unity  b bypass  d delete  o window  drag a slider  dblclick default  zR back'
+      or 'h l signal  j k row  a add  A parallel  | join row  s solo  = unity  b bypass  d delete  za fold  o window  zz back'
+    local line, sep = '', '   '
+    for part in (help .. '  '):gmatch('(.-)  ') do
+      if part ~= '' then
+        local t = line == '' and part or (line .. sep .. part)
+        if line ~= '' and U.measure(t) > w - 2 * L.pad then hl[#hl + 1] = line; line = part else line = t end
+      end
+    end
+    if line ~= '' then hl[#hl + 1] = line end
+    for i, t in ipairs(hl) do U.text(x + L.pad, y + h - L.pad - (#hl - i + 1) * L.rh, ctx.fit(t, w - 2 * L.pad), U.GREY) end
+  end
+  local bh = h - (top - y) - (compact and 2 or L.pad) - #hl * L.rh
   local io = U.measure('in') + 2 * L.pad
   local cw, ch = DB.layout(root, m, 0, 0, bh)
   DB.total = cw + 2 * io + 4 * L.pad
