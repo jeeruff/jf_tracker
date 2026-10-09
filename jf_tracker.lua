@@ -8135,7 +8135,6 @@ function ctrl_action(name, delta)
       qi.set(qi.values[(k + ((delta or 0) < 0 and -2 or 0)) % #qi.values + 1])
     end
     relayout(); vim.msg = qi.label .. ': ' .. tostring(qi.get())
-    ctx.dlog(('quick %s -> %s'):format(tostring(name), tostring(qi.get())))
     return
   end
   local col = cur_col()
