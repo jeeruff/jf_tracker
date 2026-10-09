@@ -3205,48 +3205,109 @@ ctx = {
       vim.msg = #t > 0 and ('arr: ' .. table.concat(t, '  ')) or 'arr: none yet - \\ P a n'
     end
   end,
-  -- harpoon (9 окт, как в Neovim): закреплённые места песни — трек + строка,
-  -- список на проект (ProjExtState jf_tracker/harpoon «guid@row|…»)
+  -- harpoon (9 окт, как в Neovim): закреплённые места песни, до 9 на проект.
+  -- Вид метки — модуль в фокусе: trk — трек + строка, mx — ячейка матрицы
+  -- (трек + начало слота), dsp — параметр эффекта (трек + GUID эффекта +
+  -- номер параметра). ProjExtState jf_tracker/harpoon: «trk:guid@row|
+  -- mx:guid@pos|dsp:guid@fxguid#p»; старое «guid@row» = trk. '' — список
+  -- fzf по модулям; '1..'9 — прыжок, фокус в модуль метки
   harpoon = function(ch)
     local _, raw = reaper.GetProjExtState(0, EXT, 'harpoon')
     local list = {}
-    for g, r in (raw or ''):gmatch('([^@|]+)@(%d+)') do list[#list + 1] = { guid = g, row = tonumber(r) } end
+    for tok in (raw or ''):gmatch('[^|]+') do
+      local k, rest = tok:match('^(%a+):(.*)$')
+      if not k then k, rest = 'trk', tok end
+      if k == 'trk' then local g, r = rest:match('^([^@]+)@(%d+)$'); if g then list[#list + 1] = { k = 'trk', guid = g, row = tonumber(r) } end
+      elseif k == 'mx' then local g, t = rest:match('^([^@]+)@([%d%.%-]+)$'); if g then list[#list + 1] = { k = 'mx', guid = g, pos = tonumber(t) } end
+      elseif k == 'dsp' then local g, fg, p = rest:match('^([^@]+)@([^#]+)#(%d+)$'); if g then list[#list + 1] = { k = 'dsp', guid = g, fx = fg, p = tonumber(p) } end end
+    end
+    local function enc(e)
+      if e.k == 'mx' then return ('mx:%s@%.4f'):format(e.guid, e.pos)
+      elseif e.k == 'dsp' then return ('dsp:%s@%s#%d'):format(e.guid, e.fx, e.p) end
+      return 'trk:' .. e.guid .. '@' .. e.row
+    end
     local function save()
       local t = {}
-      for _, e in ipairs(list) do t[#t + 1] = e.guid .. '@' .. e.row end
+      for _, e in ipairs(list) do t[#t + 1] = enc(e) end
       reaper.SetProjExtState(0, EXT, 'harpoon', table.concat(t, '|'))
     end
+    local function col_of(g) for ci, c in ipairs(snap and snap.cols or {}) do if c.guid == g then return c, ci end end end
+    local function rg_at(pos) for ri, rg in ipairs(seq) do if not rg.gap and math.abs(rg.pos - pos) < 1e-3 then return rg, ri end end end
+    local function fx_of(c, fg)                                      -- эффект трека по GUID: k (номер в DSP), f
+      for k, f in ipairs(c and c.fx or {}) do if reaper.TrackFX_GetFXGUID(c.track, f.i) == fg then return k, f end end
+    end
     local function name(e)
-      for _, c in ipairs(snap and snap.cols or {}) do if c.guid == e.guid then return ('%s @ %04d'):format(c.name or '?', e.row) end end
-      return ('(gone) @ %04d'):format(e.row)
+      local c = col_of(e.guid)
+      local tn = c and (c.name ~= '' and c.name or '?') or '(gone)'
+      if e.k == 'mx' then
+        local rg = rg_at(e.pos)
+        return ('mx   %s · %s'):format(rg and (rg.name ~= '' and rg.name or ('#' .. rg.idx)) or '(gone slot)', tn)
+      elseif e.k == 'dsp' then
+        local _, f = fx_of(c, e.fx)
+        local pn = '?'
+        if f then local _, n = reaper.TrackFX_GetParamName(c.track, f.i, e.p, ''); pn = n end
+        return ('dsp  %s · %s · %s'):format(tn, f and f.name or '(gone fx)', pn)
+      end
+      return ('trk  %s @ %04d'):format(tn, e.row)
+    end
+    local function same(a, b) return a.k == b.k and a.guid == b.guid and a.row == b.row and a.fx == b.fx and a.p == b.p and (a.pos == nil or b.pos == nil or math.abs(a.pos - b.pos) < 1e-3) end
+    local function to_track(g)                                       -- курсор трекера на трек (DSP идёт за курсором)
+      for i, f in ipairs(L.flat) do if f.col and f.col.guid == g and not f.env then vim.cur.fi = i; return true end end
     end
     local function go(e)
       if not e then vim.msg = 'harpoon: no such place'; return end
-      for i, f in ipairs(L.flat) do
-        if f.col and f.col.guid == e.guid then
-          vim.cur.fi, vim.cur.row = i, e.row; vim.ensure_visible(); ctx.set_focus('tracker')
-          vim.msg = 'harpoon: ' .. name(e); return
-        end
+      local c, ci = col_of(e.guid)
+      if not c then vim.msg = 'harpoon: the track is gone (' .. name(e) .. ')'; return end
+      if e.k == 'mx' then
+        local _, ri = rg_at(e.pos)
+        if not ri then vim.msg = 'harpoon: the slot is gone (' .. name(e) .. ')'; return end
+        if state.panes_ui and L and L.pn then ctx.pane_focus('matrix') end
+        MX.goto_cell(seq, snap, ri, ci); ctx.set_focus('matrix')
+      elseif e.k == 'dsp' then
+        local k, f = fx_of(c, e.fx)
+        if not k then vim.msg = 'harpoon: the fx is gone (' .. name(e) .. ')'; return end
+        to_track(e.guid); state.dsp_take = nil
+        dsp_sel.fx = k; dsp_sel.param = 1
+        for pi, p in ipairs(f.params or {}) do if p.i == e.p and not p.fx then dsp_sel.param = pi; break end end
+        if state.panes_ui and L and L.pn then ctx.pane_focus('dsp') else state.dsp = true end
+        ctx.set_focus('dsp')
+      else
+        if not to_track(e.guid) then vim.msg = 'harpoon: the track is not visible (' .. name(e) .. ')'; return end
+        vim.cur.row = e.row; vim.ensure_visible(); ctx.set_focus('tracker')
       end
-      vim.msg = 'harpoon: the track is not visible (' .. name(e) .. ')'
+      vim.msg = 'harpoon: ' .. name(e)
     end
-    local f = L.flat[vim.cur.fi]
-    local here = f and f.col and { guid = f.col.guid, row = vim.cur.row }
+    -- метка «здесь» — по модулю в фокусе
+    local here
+    if state.focus == 'matrix' then
+      local rg, col = seq[MX.cur.ri], snap and snap.cols[MX.cur.ci]
+      if rg and not rg.gap and col then here = { k = 'mx', guid = col.guid, pos = rg.pos } end
+    elseif state.focus == 'dsp' then
+      local t = dsp_target()
+      local f = t and not t.take and t.fx[dsp_sel.fx]
+      local p = f and f.params and f.params[dsp_sel.param]
+      if p and not p.fx then here = { k = 'dsp', guid = t.col.guid, fx = reaper.TrackFX_GetFXGUID(t.track, f.i), p = p.i } end
+    else
+      local f = L.flat[vim.cur.fi]
+      if f and f.col then here = { k = 'trk', guid = f.col.guid, row = vim.cur.row } end
+    end
     if ch == 'a' then
-      if not here then vim.msg = 'harpoon: no track under the cursor'; return end
-      for _, e in ipairs(list) do if e.guid == here.guid and e.row == here.row then vim.msg = 'harpoon: already there'; return end end
+      if not here then vim.msg = 'harpoon: nothing to pin here (a track row, a matrix cell or a DSP parameter)'; return end
+      for _, e in ipairs(list) do if same(e, here) then vim.msg = 'harpoon: already there'; return end end
       if #list >= 9 then table.remove(list, 1) end
       list[#list + 1] = here; save()
       vim.msg = ("harpoon %d: %s  ('%d jumps, '' lists)"):format(#list, name(here), #list)
     elseif ch == 'd' then
-      for i, e in ipairs(list) do if here and e.guid == here.guid and e.row == here.row then table.remove(list, i); save(); vim.msg = 'harpoon: place removed'; return end end
+      for i, e in ipairs(list) do if here and same(e, here) then table.remove(list, i); save(); vim.msg = 'harpoon: place removed'; return end end
       vim.msg = 'harpoon: the cursor is not on a pinned place'
     elseif ch:match('^[1-9]$') then go(list[tonumber(ch)])
     elseif ch == "'" then
-      if #list == 0 then vim.msg = "harpoon: empty - 'a pins the cursor place"; return end
-      local items = {}
-      for i, e in ipairs(list) do items[#items + 1] = { label = i .. '  ' .. name(e), data = e } end
-      vim.open_picker("harpoon ('1..'9 jump, 'a add, 'd remove)", items, function(it) go(it.data) end)
+      if #list == 0 then vim.msg = "harpoon: empty - 'a pins the place under the cursor (tracker, matrix, DSP)"; return end
+      -- по модулям: trk, mx, dsp; номер — прыжковый ('N)
+      local items, ORD = {}, { trk = 1, mx = 2, dsp = 3 }
+      for i, e in ipairs(list) do items[#items + 1] = { label = i .. '  ' .. name(e), data = e, o = ORD[e.k] or 9, i = i } end
+      table.sort(items, function(a, b) if a.o ~= b.o then return a.o < b.o end; return a.i < b.i end)
+      vim.open_picker("harpoon: trk / mx / dsp ('1..'9 jump, 'a add, 'd remove)", items, function(it) go(it.data) end)
     else vim.msg = "harpoon: 'a add, '1..'9 jump, '' list, 'd remove" end
   end,
   -- история команд : (9 окт): Data/jf_tracker_cmdhist.txt, строка — команда
@@ -10423,6 +10484,7 @@ local function frame()
   local pop = vim.popup()
   if not pop and (state.whichkey or state.pane_mode) then
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
+      or (ctx.hp_pend and MX.WK.get("'"))
       or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
@@ -13112,6 +13174,12 @@ local function frame()
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
   if state.measure and c == ('s'):byte() then ctx.shot_req = 'file'; c = 0 end   -- 8 окт: снимок линейки (одна клавиша)
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab
+  -- harpoon в матрице и DSP (9 окт): ' + клавиша, как в трекере (там — vim)
+  if c > 0 and (state.focus == 'matrix' or state.focus == 'dsp') and not HN.active and not vim.picker and not vim.hydra
+     and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not MX.mkedit then
+    if ctx.hp_pend then ctx.hp_pend = nil; if c ~= 27 then ctx.harpoon(c < 256 and string.char(c) or '') end; c = 0
+    elseif c == 39 then ctx.hp_pend = true; c = 0 end
+  end
   -- Tab (7 окт): Tab — трекер ↔ session, Shift+Tab — фокус назад, Option+Tab /
   -- Option+Shift+Tab — фокус по модулям по кругу (был Tab), Ctrl+Tab — вкладки
   -- верхнего дока (был Option+Tab)
