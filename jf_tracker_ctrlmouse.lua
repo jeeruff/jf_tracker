@@ -96,7 +96,7 @@ function CM.move(mx, my, fine, io)
   local dx, dy = mx - L.mx, L.my - my                 -- вверх — больше
   L.mx, L.my = mx, my
   if dx == 0 and dy == 0 then return nil end
-  local k = fine and CM.FINE or 1
+  local k = (fine and CM.FINE or 1) * (CM.SENS or 1)   -- CM.SENS — опция fader speed (9 окт)
   local out = {}
   for i, t in ipairs(L.list) do
     local d = L.xy and (i == 1 and dx or dy) or dy

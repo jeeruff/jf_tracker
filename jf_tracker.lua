@@ -229,6 +229,8 @@ local state = {
   kc_scale = tonumber(reaper.GetExtState(EXT, 'kcscale')) or 0,            -- keycaster (4 окт)
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
+  mixroute = flag('mixroute', true),
+  cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
   mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
@@ -483,12 +485,12 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3080,6 +3082,66 @@ ctx = {
       ctx.arr_k = k
     end
     return k.name, k.c, k.n
+  end,
+  -- меню маршрутизации трека (9 окт), как ROUTE в REAPER: окно, главный
+  -- выход, добавить сенд / ресив / аппаратный выход, у каждого — mute и удалить
+  route_menu = function(col)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local items, acts = {}, {}
+    local function add(label, fn) items[#items + 1] = label; if fn then acts[#acts + 1] = fn end end
+    local function nm(t) local _, n = reaper.GetTrackName(t); return n end
+    local function sub(title, list)              -- list = { {label, fn}, … }
+      if #list == 0 then add('#' .. title); acts[#acts + 1] = false; return end
+      for k, e in ipairs(list) do
+        local lab = e[1]
+        if k == 1 then lab = '>' .. title .. '|' .. lab end
+        if k == #list then lab = '<' .. lab end
+        add(lab, e[2])
+      end
+    end
+    local function run(what, f) return function() edit.run(what, f); model.invalidate() end end
+    add('Routing window ...', function() reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(40293, 0) end)
+    local ms_on = reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1
+    add((ms_on and '!' or '') .. (reaper.GetParentTrack(tr) and 'Parent send' or 'Master send'),
+      run('master send', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', ms_on and 0 or 1) end))
+    local others = {}
+    for i = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i); if t ~= tr then others[#others + 1] = t end end
+    local sl, rl = {}, {}
+    for _, t in ipairs(others) do
+      sl[#sl + 1] = { nm(t), run('add send', function() reaper.CreateTrackSend(tr, t) end) }
+      rl[#rl + 1] = { nm(t), run('add receive', function() reaper.CreateTrackSend(t, tr) end) }
+    end
+    sub('Add send to', sl)
+    sub('Add receive from', rl)
+    local hl = {}
+    for i = 0, reaper.GetNumAudioOutputs() - 2, 2 do
+      local ch = i
+      hl[#hl + 1] = { ('%s / %s'):format(reaper.GetOutputChannelName(i) or (i + 1), reaper.GetOutputChannelName(i + 1) or (i + 2)),
+        run('add hw out', function() local k = reaper.CreateTrackSend(tr, nil); reaper.SetTrackSendInfo_Value(tr, 1, k, 'I_DSTCHAN', ch) end) }
+    end
+    sub('Add hardware output', hl)
+    -- уже есть: сенды (0), ресивы (−1), аппаратные (1) — mute / удалить
+    for _, cat in ipairs({ { 0, 'Send to' }, { -1, 'Receive from' }, { 1, 'Hardware out' } }) do
+      local c = cat[1]
+      for i = 0, reaper.GetTrackNumSends(tr, c) - 1 do
+        local label
+        if c == 0 then label = nm(reaper.GetTrackSendInfo_Value(tr, 0, i, 'P_DESTTRACK'))
+        elseif c == -1 then label = nm(reaper.GetTrackSendInfo_Value(tr, -1, i, 'P_SRCTRACK'))
+        else local ch = math.floor(reaper.GetTrackSendInfo_Value(tr, 1, i, 'I_DSTCHAN')) & 1023; label = ('out %d/%d'):format(ch + 1, ch + 2) end
+        local v = reaper.GetTrackSendInfo_Value(tr, c, i, 'D_VOL')
+        local muted = reaper.GetTrackSendInfo_Value(tr, c, i, 'B_MUTE') == 1
+        local idx = i
+        sub(('%s %s  %s'):format(cat[2], label, v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf'), {
+          { (muted and '!' or '') .. 'Mute', run('send mute', function() reaper.SetTrackSendInfo_Value(tr, c, idx, 'B_MUTE', muted and 0 or 1) end) },
+          { 'Remove', run('remove send', function() reaper.RemoveTrackSend(tr, c, idx) end) },
+        })
+      end
+    end
+    gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
+    local k = gfx.showmenu(table.concat(items, '|'))
+    local fn = k > 0 and acts[k]
+    if fn then fn() end
   end,
   -- матрица как клипы (9 окт, экспериментально, опция mxlaunch): клетка
   -- слота = клип движка сессии (MX.SS); колонка трека → его первая
@@ -5894,6 +5956,7 @@ ctx = {
       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
+      { key = 'cmsens', label = 'fader speed', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'Ctrl / Ctrl+Option drag (slider mode, faders by the mouse): how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -5923,6 +5986,7 @@ ctx = {
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
+      flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu'),
       flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
       flag('dbmarks', 'dB marks', 'mixer faders: the +6 0 -12 -24 -48 marks and ticks (f jumps to a mark)'),
       flag('panknob', 'pan knob', 'mixer with a narrow fader: pan / width as knobs (drag up or right - more, Shift fine); off - small sliders'),
@@ -5991,7 +6055,7 @@ ctx = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -7449,7 +7513,7 @@ local function hint_go(t)
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
     -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
-  elseif t.kind == 'btn' and d.what == 'route' then reaper.SetOnlyTrackSelected(d.col.track); reaper.Main_OnCommand(40293, 0)
+  elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -7520,7 +7584,6 @@ local function hint_go(t)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
   elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
-  elseif t.kind == 'dsprouting' then state.dsp_routing = not state.dsp_routing or nil   -- 9 окт
   elseif t.kind == 'dsptarget' then ctx.set_focus('dsp'); ctx.dsp_toggle_target(d == 'take')
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
@@ -9702,7 +9765,6 @@ local function frame()
     clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
-    dsp_routing = state.dsp_routing,                  -- 9 окт: маршрутизация всех треков в DSP
     draw_router = function(x, y, w, h)
       local root, _, title = ctx.db_tree()
       if not root then return {} end
@@ -10449,7 +10511,6 @@ local function frame()
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
-  elseif hover.dsprouting then state.status = 'routing: sends > and receives < of every track under its channel; click a row - routing window'
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -10993,7 +11054,7 @@ local function frame()
         if g.mode == 'fader' and g.dy ~= 0 then
           local v = ctx.cm_io.get(t)
           if v then
-            ctx.cm_io.set(t, math.max(-60, math.min(12, v + g.dy * CM.UNIT.vol.step * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
+            ctx.cm_io.set(t, math.max(-60, math.min(12, v + g.dy * CM.UNIT.vol.step * (state.cmsens or 50) / 100 * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
             g.moved = true
           end
         end
@@ -11012,6 +11073,7 @@ local function frame()
       elseif state.focus == 'dsp' and DK.pslider and dcol then focus = fxt(dcol, dcol.fx and dcol.fx[dsp_sel.fx], dsp_sel.param) end
       CM.press(under(), focus, gfx.mouse_x, gfx.mouse_y)
     elseif ctrl then
+      CM.SENS = (state.cmsens or 50) / 100                -- 9 окт: опция fader speed
       CM.move(gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap & 8 == 8, ctx.cm_io)
     elseif CM.latch then
       local L = CM.release()
@@ -11571,10 +11633,6 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
-    elseif hover.dsprouting then
-      state.dsp_routing = not state.dsp_routing or nil
-      vim.msg = 'DSP routing (all tracks): ' .. (state.dsp_routing and 'on - under each channel what goes where, click: routing window' or 'off')
-      click = { t = now2, zone = 'dsprouting' }
     elseif hover.dsprouter then
       -- router (7 окт): щелчок — вкл / выкл в DSP FX, Shift+щелчок — большой роутер
       if gfx.mouse_cap & 8 == 8 then ctx.router_big() else ctx.dsp_big() end
@@ -11697,8 +11755,8 @@ local function frame()
       else ctx.automation_picker(hover.btn.col, true) end
       click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'route' then
-      -- 9 окт: SRO — окно маршрутизации трека (как ROUTE в REAPER)
-      reaper.SetOnlyTrackSelected(hover.btn.col.track); reaper.Main_OnCommand(40293, 0)
+      -- 9 окт: SRO / дорожка схемы — нативное меню маршрутизации (как ROUTE в REAPER)
+      ctx.route_menu(hover.btn.col)
       click = { t = now2, zone = 'btn' }
     elseif hover.btn then
       local tr, what = hover.btn.col.track, hover.btn.what

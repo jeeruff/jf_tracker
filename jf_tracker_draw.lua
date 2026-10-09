@@ -457,7 +457,9 @@ function D.layout(snap, state, nregions)
   -- 8 окт: микшер — над трекером (в шапке) или под ним (кнопки v ^ в уголке)
   L.mix_bottom = L.mixer and state.mixpos == 'bottom' or false
   L.mix_rows = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 0
-  L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4) or 0
+  -- 9 окт: схема маршрутизации — полосой в верху нижнего микшера (опция mixroute)
+  L.route_h = (L.mix_bottom and state.mixroute ~= false) and (D.rt_need or (3 * ms('W') + 16)) or 0
+  L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4 + L.route_h) or 0
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   L.lane_row = 2 + L.hr_vp + L.hr_in + L.hr_info
   L.header_rows = 3 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
@@ -490,6 +492,7 @@ function D.layout(snap, state, nregions)
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
+  L.route_y = L.mix_y
   L.hsb_y = L.mix_y + L.mix_h
   L.piano_y = L.hsb_y + L.hsb_h
   if L.tppos == 'top' then L.piano_y = 0 elseif L.tppos == 'bottom' then L.piano_y = gfx.h - L.status_h - L.tp_h end
@@ -579,6 +582,7 @@ function D.layout(snap, state, nregions)
     L.body_y = L.sess_y + L.sess_h
     L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
     L.mix_y = L.body_y + L.body_h
+    L.route_y = L.mix_y
     L.hsb_y = L.mix_y + L.mix_h
     L.piano_y = L.hsb_y + L.hsb_h
     if L.tppos == 'top' then L.piano_y = tr.y elseif L.tppos == 'bottom' then L.piano_y = bot - L.tp_h end
@@ -834,7 +838,7 @@ local function routing_of(tr)
   for i = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
     local d = reaper.GetTrackSendInfo_Value(tr, 0, i, 'P_DESTTRACK')
     local col = reaper.GetTrackColor(d)
-    r[#r + 1] = { dir = '>', name = nm(d), db = db(reaper.GetTrackSendInfo_Value(tr, 0, i, 'D_VOL')),
+    r[#r + 1] = { dir = '>', name = nm(d), dest = d, db = db(reaper.GetTrackSendInfo_Value(tr, 0, i, 'D_VOL')),
                   mute = reaper.GetTrackSendInfo_Value(tr, 0, i, 'B_MUTE') == 1, rgb = col ~= 0 and { reaper.ColorFromNative(col) } or nil }
   end
   for i = 0, reaper.GetTrackNumSends(tr, -1) - 1 do
@@ -852,35 +856,57 @@ local function routing_of(tr)
   c.by[tr] = r
   return r
 end
-function D.routing_view(L, info, x0, y0, x1, h, hover)
+-- схема маршрутизации над нижним микшером (9 окт, опция mixer routing):
+-- в каждой колонке — дорожки выходов (сенды, аппаратные) с вертикальными
+-- именами, под ними провода к колонке получателя (цвет получателя). Щелчок
+-- по дорожке — меню маршрутизации трека. Высота — по длинному имени (D.rt_need)
+function D.route_strip(L, info, hover, x0, x1)
+  local y0, h = L.route_y, L.route_h
+  if not y0 or h <= 0 then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local nrow = math.max(1, math.floor(h / L.rh))
-  local any = false
+  set(U.PANEL); gfx.rect(x0, y0, x1 - x0, h, 1)
+  set(D.SEP); gfx.rect(x0, y0, x1 - x0, D.SEPW, 1)
+  local cw1 = ms('W')
+  local lw = L.th + 4
+  local wires_h = 10
+  local nameh = h - wires_h - 4
+  local xof = {}                                    -- трек → середина его колонки
+  for _, c in ipairs(L.cols or {}) do if c.col and c.col.track and c.x then xof[c.col.track] = c.x + math.floor(c.w / 2) end end
+  local need, wires = 0, {}
   for _, c in ipairs(L.cols or {}) do
     local col = c.col
     local tr = col and col.track
-    if tr and not c.master and reaper.ValidatePtr(tr, 'MediaTrack*') and c.x + c.w > x0 and c.x < x1 then
-      any = true
-      local cx0, cx1 = math.max(x0 + 2, c.x + 1), math.min(x1 - 1, c.x + c.w)
-      set(U.LINE); gfx.rect(cx1 - 1, y0, 1, h, 1)                     -- граница колонки — как в трекере
-      local list = routing_of(tr)
-      local w = cx1 - cx0 - 2 * L.pad
-      for i, e in ipairs(list) do
-        local y = y0 + (i - 1) * L.rh
-        if i == nrow and #list > nrow then text(cx0 + L.pad, y, '+' .. (#list - nrow + 1), U.CYAN); break end
-        local hot = mx >= cx0 and mx < cx1 and my >= y and my < y + L.rh
-        if hot then set(D.CURROW); gfx.rect(cx0, y, cx1 - cx0 - 1, L.rh, 1); hover.btn = { col = col, what = 'route' } end
-        local tc = e.mute and U.GREY or (e.hw and U.AMBER or (e.main and U.GREY or (e.recv and U.GREEN or U.CYAN)))
-        local tail = (e.db and w > ms(e.dir .. ' WWWW -12')) and (' ' .. e.db) or ''
-        if e.rgb and not e.mute then rawset_col(e.rgb); gfx.rect(cx0, y + 2, 2, L.rh - 4, 1) end
-        text(cx0 + L.pad, y, fit(e.dir .. ' ' .. e.name, w - ms(tail)), tc)
-        if tail ~= '' then text(cx1 - L.pad - ms(tail) - 1, y, tail, U.GREY) end
+    if tr and not c.master and c.x and c.x + c.w > x0 and c.x < x1 and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      set(U.LINE); gfx.rect(c.x, y0, 1, h, 1)
+      local outs = {}
+      for _, e in ipairs(routing_of(tr)) do if not e.recv and not e.main then outs[#outs + 1] = e end end
+      local fit_n = math.max(0, math.floor((c.w - 4) / lw))
+      for k, e in ipairs(outs) do
+        if k > fit_n then break end
+        local lx = c.x + 2 + (k - 1) * lw
+        if k == fit_n and #outs > fit_n then text(lx + 1, y0 + 3, '+', U.CYAN); break end
+        local tc = e.mute and U.GREY or (e.hw and U.AMBER or U.CYAN)
+        local hot = mx >= lx and mx < lx + lw and my >= y0 and my < y0 + h
+        if hot then set(D.CURROW); gfx.rect(lx, y0 + 2, lw - 1, h - 3, 1); hover.btn = { col = col, what = 'route' } end
+        D.vtext(lx + 2, y0 + 3, nameh, e.name, tc, hot and D.CURROW or U.PANEL, true)
+        need = math.max(need, #e.name)
+        if e.dest and xof[e.dest] then wires[#wires + 1] = { x = lx + math.floor(lw / 2), tx = xof[e.dest], rgb = e.rgb, mute = e.mute } end
+        hint('btn', lx, y0 + 2, lw, h - 3, { col = col, what = 'route' })
       end
-      if #list == 0 then text(cx0 + L.pad, y0, fit('-', w), U.DIM) end
-      hint('btn', cx0, y0, cx1 - cx0, math.min(h, math.max(1, #list) * L.rh), { col = col, what = 'route' })
+      if #outs == 0 then text(c.x + L.pad, y0 + 3, '-', U.DIM) end
     end
   end
-  if not any then text(x0 + L.pad, y0, 'routing: no track columns under this panel', U.GREY) end
+  -- провода: вниз из дорожки, по горизонтали к колонке получателя, стрелка вниз
+  local wy0 = y0 + h - wires_h - 1
+  for k, w in ipairs(wires) do
+    local y = wy0 + 2 + ((k - 1) % 4) * 2
+    if w.mute then set(U.GREY) elseif w.rgb then rawset_col(w.rgb) else set(U.CYAN) end
+    gfx.rect(w.x, wy0 - 1, 1, y - wy0 + 1, 1)
+    gfx.rect(math.min(w.x, w.tx), y, math.abs(w.tx - w.x) + 1, 1, 1)
+    gfx.rect(w.tx, y, 1, y0 + h - 1 - y, 1)
+    gfx.rect(w.tx - 1, y0 + h - 3, 3, 1, 1)
+  end
+  D.rt_need = need == 0 and (L.rh + 4) or (math.max(3, math.min(10, need)) * cw1 + wires_h + 6)   -- нет выходов — одна строка
 end
 
 function D.hint_bar(L, x, y, w, items, active)
@@ -3397,7 +3423,7 @@ function D.frame(L, snap, rows, state, info)
       local fy0, fy1
       if L.mixer then
         if L.mix_bottom then
-          fy0, fy1 = L.mix_y + 4, L.mix_y + L.mix_h - 3
+          fy0, fy1 = L.mix_y + 4 + (L.route_h or 0), L.mix_y + L.mix_h - 3
           hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
           set(D.SEP); gfx.rect(c.x, L.mix_y, c.w + 1, D.SEPW, 1)
         else
@@ -3625,7 +3651,7 @@ function D.frame(L, snap, rows, state, info)
         -- зарезервированы всегда), фейдер. Фейдер ОДНОГО размера на всех
         -- треках: высота — 2/3 полосы, ширина — подписи + коробка 6 знаков;
         -- эффекты с параметрами — сбоку (если влезают) / под фейдером
-        local y1 = L.mix_bottom and (L.mix_y + 3) or (hy + 2 * L.rh + 1)
+        local y1 = L.mix_bottom and (L.mix_y + 3 + (L.route_h or 0)) or (hy + 2 * L.rh + 1)
         local H = L.mix_rows * L.rh
         if L.mix_bottom then
           hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
@@ -4003,6 +4029,7 @@ function D.frame(L, snap, rows, state, info)
     if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
+  if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end   -- от левого края модуля: и над мастером
   -- уголок над номерами строк (2 окт; 7 окт): ряд 0 — proj | region, ряд 1 —
   -- session | router, ряд 2 — номер и имя региона в его цвете, ряд 3 — /2 x2
   -- слева и als cln парой справа, последний — длина «< N >»
@@ -4822,23 +4849,11 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.dsprouter = true end
         hx = hx + bw + L.pad
       end
-      -- routing (9 окт): маршрутизация всех треков — под каждым каналом трекера
-      do
-        local on = info.dsp_routing
-        local bw = ms('routing') + 2 * L.pad
-        local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
-        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(hx, dy + 2, bw, L.rh, 1)
-        set((hot or on) and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, 'routing', (hot or on) and U.AMBER or U.GREY)
-        if hot then hover.dsprouting = true end
-        hint('dsprouting', hx, dy + 2, bw, L.rh, true)
-        hx = hx + bw + L.pad
-      end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
       text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), DR - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
-    local lvl = not info.dsp_routing and info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
+    local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
     local mw = math.max(ms('o') + 4, 12)                -- тонкие метры (5 окт)
     local mby, mbh = dy + L.rh + 4, DH - L.rh - 6 - (L.hint_h or 0)
     if lvl then
@@ -4846,7 +4861,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + mw + L.pad
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
-    if info.pool_col and info.trk_io and info.dsptrack and not info.dsp_routing then
+    if info.pool_col and info.trk_io and info.dsptrack then
       local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
       local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, DH - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
@@ -4885,11 +4900,6 @@ function D.frame(L, snap, rows, state, info)
       text(x + math.floor((stubw - ms(label)) / 2), sy + math.floor((bh0 - L.rh) / 2), label, hot and U.AMBER or U.GREY)
       if hot then hover.dsp = { fx = k, f = fxs[k] } end
       hint('dsp', x, sy, stubw, L.rh, { fx = k })
-    end
-    if info.dsp_routing then                          -- 9 окт: маршрутизация всех треков, под колонками
-      D.routing_view(L, info, fbw, dy + L.rh + 4, DR, bh0, hover)
-      bx = right
-      goto dsp_router_done
     end
     if first > 1 then stub(bx, '<' .. (first - 1), first - 1); bx = bx + stubw + L.pad end
     -- роутер (7 окт): в панели DSP FX вместо блоков — схема цепочки (имена и
