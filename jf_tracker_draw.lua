@@ -2291,8 +2291,11 @@ function D.transport_buttons(c)
   -- 5 окт: без опции «I really want to have transport buttons» — только [rec] и [loop]
   -- 6 окт: text — два ряда кнопок словами (колонки: rev / rec, play / fwd, pause / loop)
   if c.tptext then
-    return { { 'tp_rew', 'rev' }, { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil },
-             { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'tp_fwd', 'fwd' }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
+    -- 9 окт: кнопки как на кассетнике — сверху символ, снизу слово; [5] — символ
+    return { { 'tp_rew', 'rew', nil, nil, '<<' }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil, nil, '||' },
+             { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil, nil, playing and '[]' or '>' },
+             { 'rec', 'rec', c.recording and U.RED or nil, U.RED, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' },
+             { 'loop', 'loop', c.loop and U.CYAN or nil, nil, D.ttf and '∞' or 'oo' } }
   end
   if not c.tpbuttons then
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
@@ -2491,34 +2494,31 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local bk = c.tpbuttons and 2 or 1                     -- полный набор — крупно (×1.5, 6 окт); rec / loop — обычного размера
   local BK = D.ttf and 1.5 or 1.5
   for i, b in ipairs(blist) do local kk = (b[1] == 'rec' and bk == 2 and not D.ttf and (D.SCALE * BK) % 1 ~= 0) and 2 or BK; b.k = kk; tws[i] = bk == 2 and D.big_measure(b[2], kk) or ms(b[2]); bws[i] = tws[i] + 2 * L.pad + (b[1] == 'rec' and 3 * L.pad or 0); btot = btot + bws[i] + (i > 1 and 2 or 0) end
-  -- text (6 окт): 3 колонки × 2 ряда, ширина колонки — по длинной подписи
-  local tcols
+  -- text (9 окт): одна строка кнопок высотой в две строки — символ сверху по
+  -- центру, слово снизу; ширина у всех одна (по самому длинному слову)
+  local tbw
   if c.tptext then
-    tcols = {}
-    btot = 0
-    for k = 1, 3 do
-      local wcol = math.max(ms(blist[k][2]), ms(blist[k + 3][2]), ms('stop')) + 2 * L.pad
-      tcols[k] = wcol; btot = btot + wcol + (k > 1 and 2 or 0)
-    end
+    tbw = 0
+    for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[2]), ms(b[5] or ''), ms('pause')) end
+    tbw = tbw + 2 * L.pad
+    btot = #blist * (tbw + 2) - 2
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
-    for k = 1, 3 do
-      for rr = 0, 1 do
-        local b = blist[k + rr * 3]
-        local by = ly + rr * L.rh
-        local bw, bh = tcols[k], L.rh - 1
-        local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
-        local on = b[3] ~= nil
-        set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
-        set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
-        -- 6 окт: буквы по центру своей высоты (L.th), без отступа строки D.SPACE —
-        -- раньше низ букв вылезал за рамку
-        text(bx + math.floor((bw - ms(b[2])) / 2), by + math.max(0, math.floor((bh - L.th) / 2)) - (D.SPACE or 0), b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT))
-        if hot then hover.ctrl = b[1] end
-        hint('ctrl', bx, by, bw, bh, b[1])
-      end
-      bx = bx + tcols[k] + 2
+    local by, bh = ly, 2 * L.rh - 1
+    for _, b in ipairs(blist) do
+      local bw = tbw
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
+      local on = b[3] ~= nil
+      local tc = hot and U.AMBER or (b[4] or b[3] or U.TEXT)
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
+      local sym = b[5] or ''
+      text(bx + math.floor((bw - ms(sym)) / 2), by + 1 - (D.SPACE or 0), sym, tc)
+      text(bx + math.floor((bw - ms(b[2])) / 2), by + L.rh - 1 - (D.SPACE or 0), b[2], hot and U.AMBER or (on and b[3] or U.GREY))
+      if hot then hover.ctrl = b[1] end
+      hint('ctrl', bx, by, bw, bh, b[1])
+      bx = bx + bw + 2
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
   end
