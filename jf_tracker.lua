@@ -9466,9 +9466,9 @@ local function frame()
       return r
     end or nil,
     -- набор в браузере эффектов: всплывашка удобного размера (3 окт)
-    fxb_expand = state.focus == 'fxb',                          -- фокус (клик / Tab) — раскрыт
+    fxb_expand = state.focus == 'fxb' and not state.panes_ui,                          -- фокус (клик / Tab) — раскрыт
     fxb_px = state.fxb_px,
-    fxb_draw = (state.dsp and state.fxb and not state.khelp and not state.browserleft) and function(Lx, x, y, w, h)
+    fxb_draw = (state.panes_ui or (state.dsp and state.fxb and not state.khelp and not state.browserleft)) and function(Lx, x, y, w, h)   -- панели: у fx list свой лист
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
     end or nil,

@@ -3095,6 +3095,7 @@ local function pn_buffered(x, y, w, h, fn)
 end
 
 function D.panes_frame(L, snap, state, info, hover, ph)
+  L.pn_dsp = nil
   local PN, lay = D.panes, L.pn
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local foc = info.focus
@@ -3151,8 +3152,10 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'notes' and info.notes_draw then
         local ok, hn = pcall(info.notes_draw, L, ct.x + L.pad, ct.y, ct.w - 2 * L.pad, ct.h - 2)
         if ok and inside then hover.notes = hn or 'text' end
+      elseif id == 'dsp' then
+        L.pn_dsp = ct                                    -- рисует блок DSP ниже в кадре (его координаты — из листа)
       else
-        -- DSP, главный модуль и вкладки переедут следующими шагами
+        -- главный модуль и вкладки переедут следующими шагами
         text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label .. ': moves into panes next step', ct.w - 2 * L.pad), U.GREY)
       end
       D.clip = nil
@@ -4546,41 +4549,44 @@ function D.frame(L, snap, rows, state, info)
   end
   -- режим справки (?): то же место внизу занимает контекстная справка
   D.pmark('draw: dsp, help, keyboard strip')
-  if L.dsp_h > 0 and info.khelp and info.khelp_draw then
-    local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
-    local lx0 = L.browser_left and L.matrix_w or 0        -- браузер слева до самого низа (7 окт)
+  -- DSP (9 окт, панели): место — лист dsp (L.pn_dsp), иначе полоса внизу
+  local DX, DY, DH, DR = nil, L.dsp_y, L.dsp_h, L.win_w
+  if L.pn then local r = L.pn_dsp; if r then DX, DY, DH, DR = r.x, r.y, r.h, r.x + r.w else DH = 0 end end
+  if DH > 0 and info.khelp and info.khelp_draw then
+    local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
+    local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт)
     local xo = lx0 + (L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0)     -- главный модуль слева в полосе DSP (3 окт)
-    set(U.PANEL); gfx.rect(lx0, dy, L.win_w - lx0, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(lx0, dy, L.win_w - lx0, D.SEPW, 1)
-    hover.khelp = info.khelp_draw(L, xo, dy, L.win_w - xo, L.dsp_h) or true
-    L.dsp_rect = { xo, dy, L.win_w - xo, L.dsp_h }
-  elseif L.dsp_h > 0 then
-    local dy = L.dsp_y                                   -- под строкой подсказок тела (или под верхним модулем)
-    local lx0 = L.browser_left and L.matrix_w or 0        -- браузер слева до самого низа (7 окт): DSP — правее него
-    D.clip = { lx0, L.win_w - 1 }                         -- 9 окт: ничего за правый край DSP
-    set(U.PANEL); gfx.rect(lx0, dy, L.win_w - lx0, L.dsp_h, 1)
-    set(D.SEP); gfx.rect(lx0, dy, L.win_w - lx0, D.SEPW, 1)
+    set(U.PANEL); gfx.rect(lx0, dy, DR - lx0, DH, 1)
+    set(D.SEP); gfx.rect(lx0, dy, DR - lx0, D.SEPW, 1)
+    hover.khelp = info.khelp_draw(L, xo, dy, DR - xo, DH) or true
+    L.dsp_rect = { xo, dy, DR - xo, DH }
+  elseif DH > 0 then
+    local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
+    local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт): DSP — правее него
+    D.clip = { lx0, DR - 1, DY, DY + DH }                         -- 9 окт: ничего за правый край DSP
+    set(U.PANEL); gfx.rect(lx0, dy, DR - lx0, DH, 1)
+    set(D.SEP); gfx.rect(lx0, dy, DR - lx0, D.SEPW, 1)
     local col = info.pool_col
     local fxs = info.dsp_fxs or (col and col.fx) or {}
     -- браузер эффектов слева (2 окт): продолжение левой колонки под матрицей
     local fbw = 0
     local xo = lx0 + (L.ctrl_dsp and (L.ctrl_w + D.SEPW) or 0)     -- главный модуль слева в полосе DSP (3 окт)
-    if info.fxb_draw then
+    if info.fxb_draw and not L.pn then           -- панели: у fx list свой лист
       -- ширина матрицы, пока она открыта; свёрнутая матрица список эффектов не сжимает (2 окт)
-      local own = math.min(L.cw * 26, math.floor(L.win_w / 4))
+      local own = math.min(L.cw * 26, math.floor(DR / 4))
       fbw = (L.matrix_w and L.matrix_w > 0 and not state.mx_hidden) and math.max(L.matrix_w, math.floor(own * 0.6)) or own
-      if info.fxb_px then fbw = math.max(L.cw * 12, math.min(math.floor(L.win_w * 0.5), info.fxb_px)) end   -- ширина мышью (3 окт)
+      if info.fxb_px then fbw = math.max(L.cw * 12, math.min(math.floor(DR * 0.5), info.fxb_px)) end   -- ширина мышью (3 окт)
       if info.fxb_expand then
         -- фокус на браузере: он раскрывается на всю левую колонку (за счёт
         -- матрицы и главного модуля) в конце кадра, после статуса; здесь — место
-        set(U.PANEL); gfx.rect(xo, dy + 2, fbw, L.dsp_h - 2, 1)
+        set(U.PANEL); gfx.rect(xo, dy + 2, fbw, DH - 2, 1)
         D.fxb_popup = { w0 = fbw }
-      else hover.fxb = info.fxb_draw(L, xo, dy + 2, fbw, L.dsp_h - 2 - (L.hint_h or 0)) end
-      L.fxb_rect = { xo, dy + 2, fbw, L.dsp_h - 2 }
+      else hover.fxb = info.fxb_draw(L, xo, dy + 2, fbw, DH - 2 - (L.hint_h or 0)) end
+      L.fxb_rect = { xo, dy + 2, fbw, DH - 2 }
     else L.fxb_rect = nil end
     fbw = fbw + xo
     -- граница список эффектов | DSP (3 окт: была чёрная щель)
-    if fbw > 0 then set(D.SEP); gfx.rect(fbw - 2, dy, D.SEPW, L.dsp_h, 1) end
+    if fbw > 0 then set(D.SEP); gfx.rect(fbw - 2, dy, D.SEPW, DH, 1) end
     -- шапка: имя трека (цвет как шапка канала), [track fx] [take fx], затем имя цепочки
     do
       local hx = fbw + L.pad
@@ -4618,12 +4624,12 @@ function D.frame(L, snap, rows, state, info)
         hx = hx + bw + L.pad
       end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
-      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), L.win_w - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
+      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), DR - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
     local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
     local mw = math.max(ms('o') + 4, 12)                -- тонкие метры (5 окт)
-    local mby, mbh = dy + L.rh + 4, L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+    local mby, mbh = dy + L.rh + 4, DH - L.rh - 6 - (L.hint_h or 0)
     if lvl then
       D.dsp_meter(L, bx, mby, mw, mbh, lvl.src == 'in' and 'i' or 'p', lvl.inp, 'in', hover)
       bx = bx + mw + L.pad
@@ -4631,7 +4637,7 @@ function D.frame(L, snap, rows, state, info)
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io and info.dsptrack then
       local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
-      local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, L.dsp_h - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
+      local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, DH - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
     end
     D.aw_status = nil
@@ -4643,9 +4649,9 @@ function D.frame(L, snap, rows, state, info)
     -- первым). Теперь: не влезает — одна колонка; цепочка длиннее панели —
     -- сдвиг так, чтобы выбранный блок был виден; по краям «<N» / «N>» —
     -- сколько блоков за краем (клик — выбрать ближний скрытый)
-    local right = L.win_w - (lvl and (mw + L.pad) or 0)
+    local right = DR - (lvl and (mw + L.pad) or 0)
     local stubw = ms('99>') + 2 * L.pad
-    local bh0 = L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+    local bh0 = DH - L.rh - 6 - (L.hint_h or 0)
     local function ncol_of(f)
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
@@ -5117,7 +5123,7 @@ function D.frame(L, snap, rows, state, info)
     -- между блоками; половина блока под мышью решает «до» или «после»
     -- бросок внутрь контейнера (6 окт): средняя половина блока-контейнера —
     -- двойная голубая рамка вместо черты; края блока — как раньше, до / после
-    if drag and my >= dy and my < dy + L.dsp_h and mx >= fbw then
+    if drag and my >= dy and my < dy + DH and mx >= fbw then
       for _, b in ipairs(blocks) do
         if b.cont and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
           set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
@@ -5126,12 +5132,12 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
-    if drag and not hover.dsp_into and my >= dy and my < dy + L.dsp_h and mx >= fbw then
+    if drag and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
       local gap, gx = #blocks, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
       for _, b in ipairs(blocks) do
         if mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
       end
-      local gy, gh = dy + 3 + L.rh, L.dsp_h - L.rh - 6 - (L.hint_h or 0)
+      local gy, gh = dy + 3 + L.rh, DH - L.rh - 6 - (L.hint_h or 0)
       set(U.AMBER); gfx.rect(gx - 1, gy, 3, gh, 1)
       gfx.rect(gx - 4, gy, 9, 2, 1); gfx.rect(gx - 4, gy + gh - 2, 9, 2, 1)
       hover.dsp_gap = gap
@@ -5142,11 +5148,11 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     if (L.hint_h or 0) > 0 then
-      local hy3 = dy + L.dsp_h - L.hint_h
+      local hy3 = dy + DH - L.hint_h
       if fbw > 0 then D.hint_bar(L, 0, hy3, fbw - 1, (info.hint_bars or function() end)(info.notes_draw and 'notes' or 'fxb'), info.focus == 'fxb' or info.focus == 'notes') end
-      D.hint_bar(L, fbw, hy3, L.win_w - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
+      D.hint_bar(L, fbw, hy3, DR - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
     end
-    L.dsp_rect = { fbw, dy, L.win_w - fbw, L.dsp_h }
+    L.dsp_rect = { fbw, dy, DR - fbw, DH }
     D.clip = nil
   end
 
