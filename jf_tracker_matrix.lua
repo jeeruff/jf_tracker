@@ -56,7 +56,7 @@ local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
-local BTNS = { { 'fold', 'zoom' }, { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
+local BTNS = { { 'fold', 'sel' }, { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'loops', 'loops' }, { 'add', '+' } }
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
@@ -300,13 +300,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   for _, b in ipairs(btns()) do
     local label = b[2]
     if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end
-    if b[1] == 'fold' and MX.selmode then label = 'sel' end
     if ctx.ic then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and (MX.fold or MX.selmode)) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -780,7 +779,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'G' then MX.goto_cell(regions, snap, #regions, MX.cur.ci)
   elseif ch == 'M' then MX.toggle_mute(regions, snap)                -- mute — Shift+m, как в трекере (3 окт)
   elseif ch == 'f' then MX.fill = not MX.fill
-  elseif ch == 'F' then if ctx.mx_fold_toggle then ctx.mx_fold_toggle() else MX.fold = not MX.fold end
+  elseif ch == 'F' then if ctx.mx_zoom_cycle then ctx.mx_zoom_cycle() end   -- 9 окт: F — sel (fold убран)
   elseif ch == 'R' then ctx.mx_ruler_toggle()
   elseif ch == 't' then if ctx.mx_trim then ctx.mx_trim() end
   elseif ch == '+' then ctx.mx_add(nil, nil, count)

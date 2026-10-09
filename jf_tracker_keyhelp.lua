@@ -179,7 +179,7 @@ KH.PAGES = {
     { k = 'Ctrl+Up Down', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },
     { k = 'M', d = 'mute / unmute cell (Shift+m)' },
     { k = 'Space', d = 'play from slot, or queue it while playing' },
-    { k = 'F', d = 'fold the matrix: slot numbers, track names and cells only (button fold)' },
+    { k = 'F', d = 'sel: the tracker shows only the tracks of the selected cells (button sel; Cmd+click a cell adds it, Esc clears)' },
     { k = '+ N+', d = 'new region at the end (N+: N regions, one undo); n names it' },
     { k = 'v HJKL', d = 'block select; in block: y copy, d x cut, M mute', t = { 'v', 'H', 'J', 'K', 'L' } },
     { k = '^C ^X ^V ^N', d = 'block copy / cut / paste / mute' },

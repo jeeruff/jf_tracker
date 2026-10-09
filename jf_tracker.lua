@@ -838,7 +838,7 @@ ctx = {
       local v = state.panes.v
       state.panes = draw.panes.decode(t.panes); state.panes.v = v + 1
     end
-    if MX then MX.fold = state.mxfold end
+    if MX then MX.fold = false end   -- 9 окт: свёрнутой матрицы больше нет
     draw.set_font(state); model.invalidate()
     vim.msg = 'screenset: ' .. name
   end,
@@ -2286,10 +2286,10 @@ ctx = {
   mx_zoom = function() MX.toggle_zoom() end,
   -- кнопка zoom (9 окт): обычный вид → sel (в трекере только треки
   -- выделенных ячеек) → fold (свёрнутая матрица) → обычный
+  -- 9 окт: кнопка sel — нажата: в трекере только треки выделенных ячеек; отжата — все
   mx_zoom_cycle = function()
-    if MX.fold then ctx.mx_fold_toggle()
-    elseif MX.selmode then MX.selmode = false; ctx.mx_fold_toggle()
-    else MX.selmode = true; vim.msg = 'matrix sel: the tracker shows only the tracks of the selected cells (Cmd+click adds a cell, v / Shift - a block, Esc clears)' end
+    MX.selmode = not MX.selmode
+    vim.msg = MX.selmode and 'matrix sel: the tracker shows only the tracks of the selected cells (Cmd+click adds a cell, v / Shift - a block, Esc clears)' or 'matrix sel off: all tracks'
   end,
   mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
@@ -7433,7 +7433,7 @@ IK.init(ctx)
 MM.hint = function(...) return draw.hint(...) end
 MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
-MX.fold = state.mxfold
+MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
 -- импульс ReaVerb (5 окт): задание спектрограммы файла импульса для вида ir
