@@ -3164,6 +3164,12 @@ ctx = {
     if p and p.ri == ri then return 'pend' end
     if l and l.ri == ri then return 'live' end
   end,
+  -- переименовать текущую (9 окт): строка :arr name с текущим именем
+  arr_rename_prompt = function()
+    local nm = ctx.arr_name()
+    if not nm then ctx.arr('new'); return end
+    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr name ' .. nm
+  end,
   arr = function(what, arg)
     local AR = draw.arr
     local list, cur = ctx.arr_load()
@@ -3177,9 +3183,15 @@ ctx = {
       local base = (what == 'dup' and cur > 0) and list[cur].name or ((arg and arg ~= '') and arg or 'arr')
       if what == 'new' and arg and arg ~= '' then base = arg end
       local lanes = AR.capture(reaper)
-      if not next(lanes) then vim.msg = 'arr: no track has fixed lanes yet (\\ r l turns them on)'; return end
+      if not next(lanes) then vim.msg = 'arr: no track has fixed lanes - an arrangement switches which lanes play (\\ r l: lanes on the cursor track)'; return end
       table.insert(list, cur + 1, { name = AR.next_name(list, base), lanes = lanes })
       save(cur + 1); vim.msg = show(cur + 1)
+    elseif what == 'name' then
+      if cur == 0 then vim.msg = 'arr: no current arrangement'; return end
+      local nm = AR.clean(arg or '')
+      if nm == '' then vim.msg = 'arr name: give a name'; return end
+      list[cur].name = nm ~= list[cur].name and AR.next_name(list, nm) or nm
+      save(cur); vim.msg = show(cur)
     elseif what == 'del' then
       if cur == 0 then vim.msg = 'arr: no current arrangement'; return end
       local nm = list[cur].name
@@ -7272,7 +7284,8 @@ ctx = {
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           -- 9 окт: a — аранжировки (наборы играющих лейнов); about — \ A
           { key = 'a', label = 'arrangement' .. (ctx.arr_name() and (': ' .. ctx.arr_name()) or '') .. ' …', sub = function() return { title = 'arrangement', items = {
-              { key = 'n', label = 'new: name it, from the lanes that play now', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' end },
+              { key = 'n', label = 'new, from the lanes that play now (r renames)', fn = function() ctx.arr('new') end },
+              { key = 'r', label = 'rename the current one', fn = function() ctx.arr_rename_prompt() end },
               { key = 'y', label = 'duplicate the current one', fn = function() ctx.arr('dup') end },
               { key = 'd', label = 'delete the current one (asks; lanes stay)', fn = function() ctx.arr('del') end },
               { key = 'l', label = 'next  (> in the matrix)', fn = function() ctx.arr('next') end },
@@ -7594,7 +7607,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() elseif d == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
+    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -11611,8 +11624,8 @@ local function frame()
       elseif hover.matrix.btn == 'add' then ctx.mx_add()
       elseif hover.matrix.btn == 'arrprev' then ctx.arr('prev')
       elseif hover.matrix.btn == 'arrnext' then ctx.arr('next')
-      elseif hover.matrix.btn == 'arrname' then ctx.arr()
-      elseif hover.matrix.btn == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new '
+      elseif hover.matrix.btn == 'arrname' then ctx.arr_rename_prompt()
+      elseif hover.matrix.btn == 'arrnew' then ctx.arr('new')
       elseif hover.matrix.btn == 'arrdup' then ctx.arr('dup')
       elseif hover.matrix.btn == 'arrdel' then ctx.arr('del')
       elseif hover.matrix.btn == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
