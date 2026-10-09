@@ -36,7 +36,8 @@ KH.PAGES = {
     { k = 'macro', t = {}, d = ':macro - bird view: a row is a bar; density and first note per track, region names; j k bars (J K by 4), h l tracks, Enter / Esc back on that bar' },
     { k = 'pt', t = {}, d = ':pt - PT-mode, a dumbed-down ProTracker view: exactly 4 channels from the scroll, note / sample / vol / one command, no waves or envelopes, LPB 4, bitmap x4 (smaller if 4 do not fit), scopes on top; :pt new creates CH1..CH4 in the project; :pt again restores everything' },
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
-    { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (q 2 w 3 ... = S01 S02 ...); not sliced - the sample at that pitch. Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). Select: the slice list, Option+J / K, the last played' },
+    { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (q 2 w 3 ... = S01 S02 ...); not sliced - the sample at that pitch. Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). Select: the slice list (its keys), Cmd+J / K, the last played' },
+    { k = 'Opt+J / K', d = 'previous / next instrument of the lib (samples, plugins, automation; a count jumps N)' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   pane = { title = 'panes (tmux / zellij)', e = {

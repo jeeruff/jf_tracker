@@ -1193,15 +1193,19 @@ function V.key_impl(c)
       local dx, dy = 0, 0
       if hk == 'h' then dx = -1 elseif hk == 'l' then dx = 1 elseif hk == 'j' then dy = 1 elseif hk == 'k' then dy = -1 end
       if ctx.matrix_move then ctx.matrix_move(dx * n, dy * n) end
-    elseif mods.cmd then
-      if ctx.pool_select then ctx.pool_select(V.inst + ((hk == 'j' or hk == 'l') and n or -n)) end
+    elseif mods.alt and (hk == 'j' or hk == 'k') then
+      -- 9 окт: Option+J / K — инструмент (сквозная нумерация lib: сэмплы,
+      -- плагины, automation); со счётчиком — через N
+      if ctx.pool_select then ctx.pool_select(V.inst + (hk == 'j' and n or -n)) end
+    elseif mods.cmd and (hk == 'j' or hk == 'k') then
+      -- Cmd+J / K (9 окт, было Option): слайс внутри инструмента; без слайсов —
+      -- прыжок по item трека (W / B)
+      if ctx.slice_step and ctx.slice_step(hk == 'j' and n or -n) then V.count = nil; return end
+      local t = motion(hk == 'j' and ('W'):byte() or ('B'):byte(), n)
+      if t then V.cur.fi, V.cur.row = t.fi, t.row; clamp_cur(); ensure_visible() end
     else
-      -- Option+J / K (4 окт): слайс внутри инструмента (Cmd+J / K — инструмент);
-      -- у инструмента без слайсов — прыжок по событиям, как раньше
-      if (hk == 'j' or hk == 'k') and ctx.slice_step and ctx.slice_step(hk == 'j' and n or -n) then V.count = nil; return end
-      local t
-      if hk == 'h' then t = motion(('H'):byte(), n) elseif hk == 'l' then t = motion(('L'):byte(), n)
-      elseif hk == 'j' then t = motion(('W'):byte(), n) else t = motion(('B'):byte(), n) end
+      -- Option+H / L — треки (Cmd+H / L — тоже)
+      local t = motion(hk == 'h' and ('H'):byte() or ('L'):byte(), n)
       if t then V.cur.fi, V.cur.row = t.fi, t.row; clamp_cur(); ensure_visible() end
     end
     V.count = nil; return

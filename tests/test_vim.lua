@@ -379,12 +379,12 @@ reset()
 alt_down = true
 V.key(108); eq('⌥L → next track', V.cur.fi, 3)
 V.key(729); eq('⌥H (˙) → prev track', V.cur.fi, 1)
-V.key(8710); eq('⌥J (∆) → next event in track', V.cur.row, 2)
-V.key(730); eq('⌥K (˚) → prev event', V.cur.row, 0)
+V.key(8710); eq('⌥J (∆) → inst 2 (9 окт: Option+J / K — инструменты)', last(), 'pool:2')
+V.key(730); eq('⌥K (˚) → inst 1', last(), 'pool:1')
 alt_down = false
 cmd_down = true
-V.key(106); eq('⌘J → inst 2', last(), 'pool:2')
-V.key(107); eq('⌘K → inst 1', last(), 'pool:1')
+V.key(106); eq('⌘J → next item in track (было ⌥J)', V.cur.row, 2)
+V.key(107); eq('⌘K → prev item', V.cur.row, 0)
 cmd_down = false
 
 -- ── a / A: огибающие и fzf ────────────────────────────────────────────────
