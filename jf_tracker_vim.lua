@@ -2150,4 +2150,6 @@ function V.inst_field_ok()
   return G.x_inst ~= nil
 end
 
+V.ensure_visible = ensure_visible   -- курсор в окне (9 окт: вкладка video)
+
 return V

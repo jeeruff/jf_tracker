@@ -51,6 +51,7 @@ local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garde
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
+MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
@@ -2609,7 +2610,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'scopes', 'master' }   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'scopes', 'master', 'video' }   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -2945,6 +2946,89 @@ ctx = {
   -- огибающие take у item lib (9 окт): только с точками — колонка ~ в lib,
   -- щелчок по ней открывает их во вкладке automation (лейны — по одной на
   -- огибающую). Кэш — по счётчику изменений проекта
+  -- вкладка video (9 окт): данные — видео-item проекта (кэш по счётчику
+  -- изменений), Video processor трека курсора, состояние Video window
+  video_info = function()
+    local col = cur_col()
+    local tr = col and col.track
+    local cc = reaper.GetProjectStateChangeCount(0)
+    local key = cc .. '|' .. tostring(tr) .. '|' .. state.lpb
+    local V = ctx.vd_cache
+    if not V or V.key ~= key then
+      V = { key = key, items = {} }
+      for t = 0, reaper.CountTracks(0) - 1 do
+        local trk = reaper.GetTrack(0, t)
+        local _, tname = reaper.GetTrackName(trk)
+        for i = 0, reaper.CountTrackMediaItems(trk) - 1 do
+          local it = reaper.GetTrackMediaItem(trk, i)
+          local tk = reaper.GetActiveTake(it)
+          local src = tk and reaper.GetMediaItemTake_Source(tk)
+          local ps = src and (reaper.GetMediaSourceParent(src) or src)
+          if ps and reaper.GetMediaSourceType(ps, ''):upper():find('VIDEO', 1, true) then
+            local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+            V.items[#V.items + 1] = { item = it, track = trk, tname = tname, name = reaper.GetTakeName(tk),
+                                      pos = pos, len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), row = (model.row_of_time(pos, state.lpb)) }
+          end
+        end
+      end
+      table.sort(V.items, function(a, b) return a.pos < b.pos end)
+      V.fx = nil
+      if tr then
+        for f = 0, reaper.TrackFX_GetCount(tr) - 1 do
+          local _, n = reaper.TrackFX_GetFXName(tr, f, '')
+          if n:lower():find('video processor', 1, true) then V.fx = f; break end
+        end
+      end
+      ctx.vd_cache = V
+    end
+    local data = { win = reaper.GetToggleCommandState(50125) == 1, track = col and col.name or '', items = V.items }
+    if tr and V.fx then
+      local _, pre = reaper.TrackFX_GetPreset(tr, V.fx, '')
+      local _, npre = reaper.TrackFX_GetPresetIndex(tr, V.fx)
+      local ps = {}
+      for p = 0, math.min(reaper.TrackFX_GetNumParams(tr, V.fx), 32) - 1 do
+        local _, pn = reaper.TrackFX_GetParamName(tr, V.fx, p, '')
+        if pn ~= 'Bypass' and pn ~= 'Wet' and pn ~= 'Delta' then
+          local _, txt = reaper.TrackFX_GetFormattedParamValue(tr, V.fx, p, '')
+          ps[#ps + 1] = { p = p, name = pn, v = reaper.TrackFX_GetParamNormalized(tr, V.fx, p), txt = txt }
+        end
+      end
+      data.vp = { preset = pre or '', npre = npre or 0, params = ps, fx = V.fx, tr = tr }
+    end
+    return data
+  end,
+  video_do = function(a)
+    if type(a) ~= 'table' then return end
+    local data = ctx.video_info()
+    local col = cur_col()
+    if a.kind == 'leave' then ctx.set_focus('tracker')
+    elseif a.kind == 'win' then reaper.Main_OnCommand(50125, 0); vim.msg = 'video window ' .. (reaper.GetToggleCommandState(50125) == 1 and 'shown' or 'hidden')
+    elseif a.kind == 'addvp' then
+      if not (col and col.track) then vim.msg = 'video: no cursor track'; return end
+      reaper.Undo_BeginBlock()
+      local f = reaper.TrackFX_AddByName(col.track, 'Video processor', false, -1)
+      reaper.Undo_EndBlock('add Video processor', -1)
+      ctx.vd_cache = nil; model.invalidate()
+      vim.msg = f >= 0 and ('Video processor on ' .. col.name .. ' - < > presets') or 'video: Video processor not found'
+    elseif (a.kind == 'prev' or a.kind == 'next') and data.vp then
+      reaper.TrackFX_NavigatePresets(data.vp.tr, data.vp.fx, a.kind == 'next' and 1 or -1)
+      local _, pre = reaper.TrackFX_GetPreset(data.vp.tr, data.vp.fx, '')
+      vim.msg = 'video preset: ' .. (pre or '')
+    elseif a.kind == 'param' and data.vp then
+      local p = data.vp.params[a.i]
+      if not p then return end
+      reaper.TrackFX_SetParamNormalized(data.vp.tr, data.vp.fx, p.p, a.v)
+      if not a.nound then reaper.Undo_OnStateChange('video processor parameter') end
+    elseif a.kind == 'item' then
+      local e = data.items[a.i]
+      if not e then return end
+      for fi, f in ipairs(L.flat) do
+        if f.col and f.col.track == e.track then vim.cur.fi = fi; break end
+      end
+      vim.cur.row = e.row; vim.ensure_visible(); ctx.set_focus('tracker')
+      vim.msg = ('video %s @ %04d (%s)'):format(e.name, e.row, e.tname)
+    end
+  end,
   take_envs = function(item)
     local cc = reaper.GetProjectStateChangeCount(0)
     if ctx.tenv_cc ~= cc then ctx.tenv_cc, ctx.tenv_cache = cc, {} end
@@ -6954,6 +7038,7 @@ local function hint_go(t)
     state.kslider = { col = d.col, what = d.what }
     if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
+  elseif t.kind == 'video' then ctx.set_focus('top'); state.toptab = 'video'; ctx.video_do({ kind = d })
   elseif t.kind == 'harm' then ctx.set_focus('top'); state.toptab = 'harm'; ctx.harm_do(MMX.HM.click(d, ctx.harm_pitches(cur_col())))
   elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
     -- метка заглавной (Shift) — нырок: туда и обратно за N тактов (без счёта — за 1)
@@ -9368,6 +9453,24 @@ local function frame()
       return GD.draw(Lx, x, y, w, h, snap, seq, { play_row = ph_row, queued = MX.queued, garden_on = garden.f and garden.f.on },
                      state.focus == 'top' and state.toptab == 'garden')
     end,
+    video_draw = function(Lx, x, y, w, h)
+      local data = ctx.video_info()
+      -- протяжка параметра процессора (9 окт): держим кнопку — значение по x
+      local d = ctx.vd_drag
+      if d then
+        if gfx.mouse_cap & 1 == 1 then
+          local v = math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.w)))
+          if v ~= d.v then d.v = v; ctx.video_do({ kind = 'param', i = d.i, v = v, nound = true }) end
+        else ctx.vd_drag = nil; reaper.Undo_OnStateChange('video processor parameter') end
+      end
+      local hv = MX.VD.draw(Lx, U, x, y, w, h, state.focus == 'top' and state.toptab == 'video', data, ctx.fit, ctx.hint)
+      if hv and hv.kind == 'param' and gfx.mouse_wheel ~= 0 and data.vp then
+        local p = data.vp.params[hv.i]
+        if p then ctx.video_do({ kind = 'param', i = hv.i, v = math.max(0, math.min(1, p.v + (gfx.mouse_wheel > 0 and 1 or -1) * (gfx.mouse_cap & 8 == 8 and 0.001 or 0.01))) }) end
+        gfx.mouse_wheel = 0
+      end
+      return hv
+    end,
     harm_draw = function(Lx, x, y, w, h)
       return MMX.HM.draw(Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'harm', ctx.harm_info(), ctx.fit, ctx.hint)
     end,
@@ -9931,6 +10034,7 @@ local function frame()
   elseif hover.garden and hover.garden.ox then
     local ch = garden.f and garden.f.cells[hover.garden.oy][hover.garden.ox] or '.'
     state.status = ('orca (%d,%d) %s'):format(hover.garden.ox, hover.garden.oy, ORCA.DOC[ch] or ORCA.DOC[ch:upper()] or 'click to place the cursor, type to write')
+  elseif hover.video then state.status = hover.video.tip or 'video'
   elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
   elseif hover.midimap then
     local t = MM.TARGETS[hover.midimap.row]
@@ -10551,6 +10655,12 @@ local function frame()
         GD.ocur = { x = hover.garden.ox, y = hover.garden.oy }
         click = { t = now2, zone = 'gardenorca' }
       end
+    elseif hover.video then
+      ctx.set_focus('top')
+      local a = MX.VD.click(hover.video, dbl and click.zone == 'video')
+      if a and a.kind == 'param' then ctx.vd_drag = { i = a.i, x0 = hover.video.x0, w = hover.video.w } end
+      ctx.video_do(a)
+      click = { t = now2, zone = 'video' }
     elseif hover.harm then
       ctx.set_focus('top'); ctx.harm_do(MMX.HM.click(hover.harm, ctx.harm_pitches(cur_col())))
       click = { t = now2, zone = 'harm' }
@@ -12614,6 +12724,9 @@ local function frame()
           if not MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then
             if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
+        elseif state.toptab == 'video' then
+          local r = MX.VD.key(c, ctx.video_info())
+          if type(r) == 'table' then ctx.video_do(r) elseif not r then return vim.key(c) end
         elseif state.toptab == 'harm' then
           local r = MMX.HM.key(c, ctx.harm_pitches(cur_col()))
           if r then ctx.harm_do(r) else return vim.key(c) end

@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'video tab (after master): the Video window on / off, Video processor of the cursor track with presets and parameters, the list of video items (click: cursor there)',
     'lib: sort by type (click type in the column heads) - audio / video groups',
     'mixer at the bottom: the master strip under the row numbers (fader, pan, peak, its fx)',
     'lib: a click on the waveform opens the item tab; items with take envelope points get a ~ column - click it to edit those envelopes in the automation tab (one lane per envelope)',
