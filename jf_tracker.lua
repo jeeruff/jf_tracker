@@ -7619,6 +7619,7 @@ local function hint_go(t)
     -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
+  elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -10440,6 +10441,19 @@ local function frame()
   -- большой роутер (7 окт, zR): на всё окно поверх всего
   -- 7 окт: верхняя панель (вкладка автоматизации) и шапки треков остаются —
   -- роутер занимает матрицу, тело трекера, DSP, lib и браузер под шапками
+  -- 9 окт: диаграмма маршрутизации всех треков (routing на мастере) — поверх тела
+  if state.routeview and not idle_skip and snap then
+    local x0, y0 = L.matrix_w, L.body_y                 -- тело трекера: над микшером (колонки — его же)
+    local w0, h0 = L.win_w - L.matrix_w, L.body_h
+    if not HN.active then
+      local keep = {}
+      for _, t in ipairs(HN.targets) do if not (t.y and t.y >= y0 and t.y < y0 + h0 and t.x and t.x >= x0 and t.x < x0 + w0) then keep[#keep + 1] = t end end
+      HN.targets = keep
+    end
+    local hv = draw.route_diagram(L, snap.cols, snap.master, x0, y0, w0, h0)
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end
+  end
   if state.router_big and not idle_skip then
     local root, _, title = ctx.db_tree()
     if root then
@@ -11881,6 +11895,10 @@ local function frame()
       elseif vim.picker and vim.picker.trim == hover.btn.col.guid then vim.picker = nil
       else ctx.automation_picker(hover.btn.col, true) end
       click = { t = now2, zone = 'btn' }
+    elseif hover.btn and hover.btn.what == 'routeview' then
+      state.routeview = not state.routeview or nil
+      vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'
+      click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'route' then
       -- 9 окт: SRO / дорожка схемы — нативное меню маршрутизации (как ROUTE в REAPER)
       ctx.route_menu(hover.btn.col)
@@ -13209,6 +13227,7 @@ local function frame()
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
+  if c == 27 and state.routeview and not vim.picker and not vim.hydra then state.routeview = nil; vim.msg = 'routing: back'; c = 0 end   -- 9 окт: Esc закрывает диаграмму
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
   if state.measure and c == ('s'):byte() then ctx.shot_req = 'file'; c = 0 end   -- 8 окт: снимок линейки (одна клавиша)
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab

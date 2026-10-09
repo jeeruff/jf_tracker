@@ -856,6 +856,128 @@ local function routing_of(tr)
   c.by[tr] = r
   return r
 end
+-- диаграмма маршрутизации всех треков (9 окт, кнопка routing на мастере):
+-- поверх тела трекера; трек — коробка, колонка — по самому длинному пути
+-- сигнала до мастера (источники слева, мастер и аппаратные выходы справа).
+-- Провода: сенд — голубой (заглушён — серый), выход в папку / мастер —
+-- тусклый, аппаратный — янтарь. Щелчок по коробке — попап маршрутизации
+-- трека. Граф — кэш по счётчику изменений проекта
+D.rd_cache = { sc = -1 }
+local function route_graph(cols, master)
+  local sc = reaper.GetProjectStateChangeCount(0)
+  local c = D.rd_cache
+  if c.sc == sc and c.g then return c.g end
+  local nodes, by = {}, {}
+  for _, col in ipairs(cols) do
+    if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+      local n = { col = col, tr = col.track, name = col.name ~= '' and col.name or '-', rgb = col.rgb, out = {} }
+      nodes[#nodes + 1] = n; by[col.track] = n
+    end
+  end
+  local mnode = master and master.track and { col = master, tr = master.track, name = 'master', master = true, out = {} } or nil
+  if mnode then nodes[#nodes + 1] = mnode; by[master.track] = mnode end
+  local hw = {}
+  local function hwnode(ch)
+    local k = ch
+    if not hw[k] then hw[k] = { name = ('out %d/%d'):format(ch + 1, ch + 2), hw = true, out = {}, ch = ch } end
+    return hw[k]
+  end
+  for _, n in ipairs(nodes) do
+    local tr = n.tr
+    for i = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
+      local d = by[reaper.GetTrackSendInfo_Value(tr, 0, i, 'P_DESTTRACK')]
+      if d then n.out[#n.out + 1] = { to = d, kind = 'send', mute = reaper.GetTrackSendInfo_Value(tr, 0, i, 'B_MUTE') == 1 } end
+    end
+    for i = 0, reaper.GetTrackNumSends(tr, 1) - 1 do
+      local ch = math.floor(reaper.GetTrackSendInfo_Value(tr, 1, i, 'I_DSTCHAN')) & 1023
+      n.out[#n.out + 1] = { to = hwnode(ch), kind = 'hw', mute = reaper.GetTrackSendInfo_Value(tr, 1, i, 'B_MUTE') == 1 }
+    end
+    if not n.master and reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1 then
+      local par = reaper.GetParentTrack(tr)
+      local d = par and by[par] or mnode
+      if d then n.out[#n.out + 1] = { to = d, kind = 'main' } end
+    end
+  end
+  -- глубина = самый длинный путь до стока (петли обрезаются)
+  local depth, busy = {}, {}
+  local function dep(n)
+    if depth[n] then return depth[n] end
+    if busy[n] then return 0 end
+    busy[n] = true
+    local d = 0
+    for _, e in ipairs(n.out) do if not e.to.hw then d = math.max(d, 1 + dep(e.to)) end end
+    busy[n] = nil
+    depth[n] = d
+    return d
+  end
+  local maxd = 0
+  for _, n in ipairs(nodes) do maxd = math.max(maxd, dep(n)) end
+  local hwl = {}
+  for _, h in pairs(hw) do hwl[#hwl + 1] = h end
+  table.sort(hwl, function(a, b) return a.ch < b.ch end)
+  local g = { nodes = nodes, hw = hwl, depth = depth, maxd = maxd }
+  c.sc, c.g = sc, g
+  return g
+end
+-- 9 окт (вертикально): диаграмма — прямо над нижним микшером, по его
+-- колонкам. Каждая связь — своя горизонтальная полоса: из колонки трека
+-- вверх, по полосе к колонке получателя, вниз в его полосу микшера
+-- (стрелка). Мастер — колонка под номерами строк; аппаратные выходы — к
+-- правому краю с подписью. Щелчок над колонкой — попап маршрутизации трека
+function D.route_diagram(L, cols, master, x, y, w, h)
+  local hover = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  set(U.BG); gfx.rect(x, y, w, h, 1)
+  local g = route_graph(cols, master)
+  -- центры колонок: треки — по L.cols, мастер — колонка номеров строк
+  local cx, cc = {}, {}
+  for _, c in ipairs(L.cols or {}) do
+    if c.col and c.col.track and c.x then cx[c.col.track] = c.x + math.floor(c.w / 2); cc[c.col.track] = c end
+  end
+  if master and master.track then cx[master.track] = L.matrix_w + math.floor(L.label_w / 2) end
+  local bot = y + h - 2
+  -- связи по порядку: сенды, аппаратные, выходы в папку / мастер (последними — ниже всех)
+  local links = {}
+  for _, n in ipairs(g.nodes) do
+    for _, e in ipairs(n.out) do
+      local a = cx[n.tr]
+      local b = e.to.hw and (x + w - L.pad - ms(e.to.name) - 4) or (e.to.tr and cx[e.to.tr])
+      if a and b then links[#links + 1] = { a = a, b = b, e = e, n = n, ord = e.kind == 'main' and 3 or (e.kind == 'hw' and 2 or 1) } end
+    end
+  end
+  table.sort(links, function(p, q) if p.ord ~= q.ord then return p.ord > q.ord end; return math.abs(p.a - p.b) < math.abs(q.a - q.b) end)
+  local step = math.max(3, math.min(L.rh, math.floor((h - L.rh - 8) / math.max(1, #links))))
+  text(x + L.pad, y + 2, fit('routing - all tracks over the mixer: cyan sends, grey to folder / master, amber hardware; click over a track - its routing; Esc - back', w - 2 * L.pad), U.AMBER)
+  -- стойки колонок (тонко) — чтобы было видно, где чья колонка
+  for tr, xx in pairs(cx) do set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(xx, y + L.rh + 4, 1, h - L.rh - 6, 1) end
+  for k, l in ipairs(links) do
+    local ly = bot - k * step
+    if ly < y + L.rh + 4 then break end
+    local e = l.e
+    if e.kind == 'hw' then set(e.mute and U.GREY or U.AMBER)
+    elseif e.kind == 'main' then set(U.mix(U.GREY, U.BG, 0.3))
+    else set(e.mute and U.GREY or U.CYAN) end
+    local a, b = l.a + ((k % 3) - 1) * 2, l.b + ((k % 3) - 1) * 2
+    gfx.rect(a, ly, 1, bot - ly + 1, 1)                        -- из колонки вверх
+    gfx.rect(math.min(a, b), ly, math.abs(b - a) + 1, 1, 1)    -- по полосе
+    if e.to.hw then
+      text(b + 3, ly - math.floor(L.th / 2), e.to.name, e.mute and U.GREY or U.AMBER)
+    else
+      gfx.rect(b, ly, 1, bot - ly + 1, 1)                      -- вниз в получателя
+      gfx.triangle(b - 2, bot - 3, b + 2, bot - 3, b, bot)
+    end
+    gfx.rect(a - 1, ly - 1, 3, 3, 1)                           -- узел у источника
+  end
+  -- щелчок над колонкой — её маршрутизация
+  if my >= y and my < y + h then
+    for tr, c in pairs(cc) do
+      if mx >= c.x and mx < c.x + c.w then hover.btn = { col = c.col, what = 'route' } end
+    end
+    if master and master.track and mx >= L.matrix_w and mx < L.matrix_w + L.label_w then hover.btn = { col = master, what = 'route' } end
+  end
+  return hover
+end
+
 -- схема маршрутизации над нижним микшером (9 окт, опция mixer routing):
 -- в каждой колонке — дорожки выходов (сенды, аппаратные) с вертикальными
 -- именами, под ними провода к колонке получателя (цвет получателя). Щелчок
@@ -3674,9 +3796,23 @@ function D.frame(L, snap, rows, state, info)
             local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
             set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry + 1, rw, L.rh - 2, 1)
             set(hw and U.AMBER or U.DIM); gfx.rect(rx, ry + 1, rw, L.rh - 2, 0)
-            text(rx + L.pad, ry, fit('routing', rw - 2 * L.pad), hot and U.AMBER or (hw and U.AMBER or BTXT))
-            if hot then hover.btn = { col = col, what = 'route' } end
-            hint('btn', rx, ry, rw, L.rh, { col = col, what = 'route' })
+            text(rx + L.pad, ry, fit('routing', rw - 2 * L.pad), (hot or state.routeview) and U.AMBER or (hw and U.AMBER or BTXT))
+            if hot then hover.btn = { col = col, what = 'routeview' } end   -- 9 окт: диаграмма всех треков
+            hint('btn', rx, ry, rw, L.rh, { col = col, what = 'routeview' })
+            -- SRO мастера — его собственная маршрутизация (попап, как у треков)
+            local sx2, sw2 = rx + rw + L.pad, ms('SRO') + 4
+            if sx2 + sw2 <= c.x + c.w - 1 then
+              local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, hw }
+              local hot2 = mx >= sx2 and mx < sx2 + sw2 and my >= ry and my < ry + L.rh
+              set(hot2 and D.CURROW or U.PANEL); gfx.rect(sx2, ry + 1, sw2, L.rh - 2, 1)
+              set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(sx2, ry + 1, sw2, L.rh - 2, 0)
+              local lx = sx2 + 2
+              for i, ch in ipairs({ 'S', 'R', 'O' }) do
+                text(lx, ry, ch, has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)); lx = lx + ms(ch)
+              end
+              if hot2 then hover.btn = { col = col, what = 'route' } end
+              hint('btn', sx2, ry, sw2, L.rh, { col = col, what = 'route' })
+            end
           end
         end
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
@@ -4873,11 +5009,11 @@ function D.frame(L, snap, rows, state, info)
       end
       -- router (7 окт): цепочка с роутингом на всё окно (DSP big, zz)
       do
-        local bw = ms('router') + 2 * L.pad
+        local bw = ms('fx routing') + 2 * L.pad
         local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
         set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(hx, dy + 2, bw, L.rh, 1)
         set(hot and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, 'router', hot and U.AMBER or U.GREY)
+        text(hx + L.pad, dy + 3, 'fx routing', hot and U.AMBER or U.GREY)
         if hot then hover.dsprouter = true end
         hx = hx + bw + L.pad
       end
