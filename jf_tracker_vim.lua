@@ -1582,8 +1582,8 @@ function V.key_impl(c)
   -- ноты (звучат; Cmd+нота — с удержанием), z / x — октава, Esc / Enter —
   -- INSERT (i здесь — нота). Выключена — чистый Vim.
   if (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.pending and not V.op then
-    if c == ('m'):byte() then
-      if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end
+    if c == ('m'):byte() then                          -- 9 окт: m — микшер (клавиатура — Shift+Tab)
+      if ctx.toggle_mixer then ctx.toggle_mixer() end
       return
     end
     if V.piano then

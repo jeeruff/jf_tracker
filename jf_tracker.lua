@@ -7553,6 +7553,26 @@ ctx = {
   -- Розовая рамка показывает, кому идут клавиши. Tab — по кругу.
   -- клавиатура (5 окт): видна = работает; приоритет над Vim-клавишами верхнего ряда
   piano_on = function() return state.piano_show and true or false end,
+  -- 9 окт: m — микшер вкл / выкл (раньше m включал клавиатуру)
+  -- 9 окт: Tab / Shift+Tab — на соседний трек: в трекере первая колонка трека,
+  -- в матрице — соседняя колонка-трек
+  col_step = function(dir)
+    if state.focus == 'matrix' then
+      if MX.goto_cell then MX.goto_cell(seq, snap, MX.cur.ri, math.max(1, (MX.cur.ci or 1) + dir)) end
+      return
+    end
+    if state.focus ~= 'tracker' or not (L and L.flat) then return end
+    local f = L.flat[vim.cur.fi]; if not f then return end
+    local ci = f.ci + dir
+    for i, g in ipairs(L.flat) do
+      if g.ci == ci and not g.hidden then vim.cur.fi, vim.cur.field = i, 1; vim.ensure_visible(); vim.msg = (g.col and g.col.name or '') .. ' (Tab)'; return end
+    end
+  end,
+  toggle_mixer = function()
+    state.mixer = not state.mixer
+    relayout()
+    vim.msg = 'mixer ' .. (state.mixer and 'on' or 'off') .. ' (m)'
+  end,
   toggle_piano = function()
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
@@ -13847,8 +13867,7 @@ local function frame()
     elseif m.alt then
       ctx.toggle_focus(back and -1 or 1)
       vim.msg = 'focus: ' .. state.focus:upper()
-    elseif back then ctx.toggle_focus(-1); vim.msg = 'focus: ' .. state.focus:upper()
-    else ctx.clips_toggle() end
+    else ctx.col_step(back and -1 or 1) end           -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     c = 0
   end
   if c == 27 and MMX.CM.count() > 0 and not HN.active and not vim.picker and not vim.hydra and vim.mode == 'normal' then MMX.CM.clear(); vim.msg = 'ctrl-mouse: selection cleared'; c = 0 end
