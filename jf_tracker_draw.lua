@@ -3646,7 +3646,7 @@ function D.frame(L, snap, rows, state, info)
   -- слева и als cln парой справа, последний — длина «< N >»
   do
     local rg = info.cur_region_full
-    local bx, bw = tx0 + 1, L.label_w - 2
+    local bx, bw = tx0 + 3, L.label_w - 4              -- 9 окт: зазор от границы модуля (2 px) — левая рамка кнопок видна
     local function small(x, y, label, what, on, kind)
       local w1 = ms(label) + 2
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
@@ -3673,8 +3673,10 @@ function D.frame(L, snap, rows, state, info)
       local plb = (x2 + ms('param') + 4 <= bx + bw) and 'param' or ((x2 + ms('p') + 4 <= bx + bw) and 'p' or nil)
       if plb then small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn') end
     end
-    -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router)
-    local ny = hy + 1 + 2 * L.rh
+    -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router);
+    -- 9 окт: высокая шапка (микшер) — имя и кнопки внизу, прямо над длиной
+    -- «< N >» (регион одним блоком), не под session
+    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
     if rg then
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
