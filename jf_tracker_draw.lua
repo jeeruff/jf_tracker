@@ -276,6 +276,33 @@ local function txt_img(str, col, bg)
 end
 
 -- ── раскладка ─────────────────────────────────────────────────────────────
+-- панели (9 окт): раскладка дерева — мемо по сигнатуре (модель, окно, шрифт,
+-- доступность панелей); в кадре — только сравнения, без аллокаций
+D.pn_M = { sep = 1, grip = 5 }
+D.pn_sig = {}
+function D.panes_layout(state, L, nregions, ncols)
+  local M, s = D.pn_M, D.pn_sig
+  local m = state.panes
+  local H = gfx.h - L.status_h
+  local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv then
+    return D.pn_lay
+  end
+  s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
+  M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
+  M.tab_h = L.rh + 2                                    -- подпись листа — в верхней линии рамки (zellij)
+  M.hint_h = 0                                          -- подсказки — в строке статуса
+  M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
+  M.avail = function(id)
+    local p = D.panes.BY[id]
+    local a = p and p.avail
+    if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
+    return true
+  end
+  D.pn_lay = D.panes.layout(m, gfx.w, H, M)
+  return D.pn_lay
+end
+
 function D.layout(snap, state, nregions)
   -- модули вплотную (8 окт: опция module gap убрана — она обрезала модули):
   -- между соседями одна линия 1 px; активный — рамка внутри своих границ
@@ -523,6 +550,39 @@ function D.layout(snap, state, nregions)
     L.top_x0 = L.matrix_w
     if not L.browser_left then L.mx_bot = L.dsp_y - (L.hint_h or 0); L.mx_ext = true end
   end
+  -- панели (9 окт, опция panes, бета): дерево tmux / zellij — трекер берёт
+  -- координаты из своего листа, прежние модули положения (верх, DSP,
+  -- сайдбар, левая колонка) не рисуются: их рисует оболочка листов
+  L.pn = nil
+  if state.panes_ui and D.panes and state.panes then
+    L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0
+    local lay = D.panes_layout(state, L, nregions, #snap.cols)
+    L.pn = lay
+    local c = lay.by_panel.tracker
+    local tr = c and c.content or { x = 0, y = 0, w = gfx.w, h = gfx.h - L.status_h }
+    L.side_w, L.rstrip_w, L.slices_w, L.inst_w, L.top_h, L.pool_h, L.dsp_h = 0, 0, 0, 0, 0, 0, 0
+    L.browser_left, L.lside_rect, L.slices_split = false, nil, false
+    L.ctrl_alone, L.ctrl_box, L.ctrl_dsp, L.mx_top, L.mx_bot, L.mx_ext, L.top_x0 = false, nil, nil, nil, nil, nil, 0
+    L.hint_h = 0                                         -- подсказки — строкой статуса (zellij)
+    L.matrix_w = tr.x
+    L.win_w = tr.x + tr.w
+    L.side_x = L.win_w
+    L.header_y = tr.y + (L.tppos == 'top' and L.tp_h or 0)
+    L.fxrow_y = L.header_y + L.header_h
+    L.sess_y = L.fxrow_y + L.fxrow_h
+    local bot = tr.y + tr.h
+    L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
+    L.body_y = L.sess_y + L.sess_h
+    L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
+    L.mix_y = L.body_y + L.body_h
+    L.hsb_y = L.mix_y + L.mix_h
+    L.piano_y = L.hsb_y + L.hsb_h
+    if L.tppos == 'top' then L.piano_y = tr.y elseif L.tppos == 'bottom' then L.piano_y = bot - L.tp_h end
+    L.stat_y = L.body_y + L.body_h + L.low_h
+    L.under_y = L.stat_y + L.status_in
+    L.trk_bot = bot
+    L.top_y, L.dsp_y = 0, bot
+  end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
@@ -654,6 +714,7 @@ local function text(x, y, s, col, bg)
   local cl = D.clip
   if cl then
     if x >= cl[2] or x + ms(s) <= cl[1] then return end
+    if cl[3] and (y < cl[3] - 2 or y >= cl[4]) then return end   -- 9 окт, панели: и по высоте листа
     if x + ms(s) > cl[2] then s = D.fit(s, cl[2] - x); if s == '' then return end end
   end
   if bg then col, bg = mono(col), mono(bg) else col = mono_text(col) end   -- с подложкой (курсор) — без порога
@@ -3013,6 +3074,106 @@ function D.bigcur(b)
   gfx.mode, gfx.a = mode, a
 end
 
+-- ── панели (9 окт, бета): оболочка листов дерева tmux / zellij ───────────
+-- У листа рамка; подпись (и подписи стека) — в верхней линии рамки, как в
+-- zellij; фокус — линия и активная подпись цветом фокуса. Содержимое — в
+-- прямоугольник листа с D.clip. Линии раздела — одной серией в конце (встык,
+-- без двойных). Лист не у левого края, а модуль рисует от x = 0 (матрица) —
+-- через закадровый буфер 1021 со сдвигом мыши.
+local function pn_buffered(x, y, w, h, fn)
+  if x == 0 then return fn() end
+  if D.pnb_w ~= w or D.pnb_h ~= gfx.h then gfx.setimgdim(1021, w, gfx.h); D.pnb_w, D.pnb_h = w, gfx.h end
+  local dest0, mx0 = gfx.dest, gfx.mouse_x
+  gfx.dest = 1021
+  set(U.PANEL); gfx.rect(0, y, w, h, 1)
+  gfx.mouse_x = mx0 - x
+  local ok, res = pcall(fn)
+  gfx.mouse_x, gfx.dest = mx0, dest0
+  if not ok then error(res, 0) end
+  gfx.blit(1021, 1, 0, 0, y, w, h, x, y, w, h)
+  return res
+end
+
+function D.panes_frame(L, snap, state, info, hover, ph)
+  local PN, lay = D.panes, L.pn
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local foc = info.focus
+  local function focused(id) return foc == id or (foc == 'top' and id == info.toptab) end
+  local rects = {}
+  for _, c in ipairs(lay.cells) do
+    local id = c.active_id
+    if id == 'tracker' then
+      rects.tracker = { c.x, c.y, c.w, c.h }
+    elseif id then
+      local ct = c.content
+      set(U.PANEL); gfx.rect(c.x, c.y, c.w, c.h, 1)
+      -- верхняя линия рамки и подписи на ней
+      local fon = focused(id)
+      if c.tab then
+        local th = c.tab.h
+        set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, c.y + math.floor(th / 2), c.w, 1, 1)
+        for _, t in ipairs(c.tabs) do
+          local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
+          if lbl ~= '' then
+            local on = t.id == id
+            local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
+            local tx = t.x + L.pad
+            set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)
+            local col = on and (fon and D.FOCUS or U.AMBER) or (hot and U.TEXT or U.GREY)
+            if t.id == 'retro' and not on then col = D.ARM end
+            text(tx, c.y + 1, lbl, col)
+            if hot then hover.ptab = { id = t.id } end
+            hint('ptab', t.x, t.y, t.w, t.h, t.id)
+          end
+        end
+      end
+      D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
+      local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
+      if id == 'matrix' then
+        if info.perf_draw then info.perf_draw(L, ct.x, ct.y, ct.w, ct.h)
+        elseif MX then
+          hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
+            return MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+              env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
+          end)
+          if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
+        end
+      elseif id == 'browser' and info.browser_draw then
+        hover.browser = info.browser_draw(L, ct.x, ct.y, ct.w, ct.h)
+      elseif id == 'inst' then
+        D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
+      elseif id == 'slices' and info.slices_draw then
+        local hs = info.slices_draw(L, ct.x + 3, ct.y + 2, ct.w - 5, ct.h - 4)
+        if hs ~= nil then hover.slices = hs end
+      elseif id == 'fxb' and info.fxb_draw then
+        local hv = info.fxb_draw(L, ct.x, ct.y, ct.w, ct.h)
+        if hv ~= nil then hover.fxb = hv end
+      elseif id == 'notes' and info.notes_draw then
+        local ok, hn = pcall(info.notes_draw, L, ct.x + L.pad, ct.y, ct.w - 2 * L.pad, ct.h - 2)
+        if ok and inside then hover.notes = hn or 'text' end
+      else
+        -- DSP, главный модуль и вкладки переедут следующими шагами
+        text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label .. ': moves into panes next step', ct.w - 2 * L.pad), U.GREY)
+      end
+      D.clip = nil
+      rects[(PN.BY[id].tab and 'top') or id] = { ct.x, ct.y, ct.w, ct.h }
+    end
+  end
+  -- линии раздела и ручки: ручка под мышью — янтарём
+  set(D.SEP)
+  for _, sp in ipairs(lay.seps) do gfx.rect(sp.x, sp.y, sp.w, sp.h, 1) end
+  for _, g in ipairs(lay.grips) do
+    if mx >= g.x and mx < g.x + g.w and my >= g.y and my < g.y + g.h then
+      hover.pgrip = g
+      for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end
+      set(U.AMBER)
+      if g.ax == 'h' then gfx.rect(g.x + math.floor(g.w / 2) - 1, g.y, 2, g.h, 1) else gfx.rect(g.x, g.y + math.floor(g.h / 2) - 1, g.w, 2, 1) end
+      break
+    end
+  end
+  D.pn_rects = rects
+end
+
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -4253,16 +4414,17 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии
-  if tx0 > 0 then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
+  if tx0 > 0 and not L.pn then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   D.pmark('draw: matrix / performance')
-  if MX and L.matrix_w > 0 and not state.mx_hidden and info.perf_draw then
+  if L.pn then D.panes_frame(L, snap, state, info, hover, ph)
+  elseif MX and L.matrix_w > 0 and not state.mx_hidden and info.perf_draw then
     -- производительность (6 окт): на месте матрицы, пока открыта
     local y0 = L.mx_top or L.header_y
     local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
     info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
-  elseif MX and L.matrix_w > 0 and not state.mx_hidden then
+  elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
     hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
     -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
@@ -4271,7 +4433,7 @@ function D.frame(L, snap, rows, state, info)
   end
   -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,
   -- над ней = — ручка ширины (тянуть, двойной клик — авто)
-  if MX and L.matrix_w > 0 then
+  if MX and L.matrix_w > 0 and not L.pn then
     local bot = L.body_y + L.body_h
     local bw = ms('>') + 2 * L.pad
     local lx = L.matrix_w - 1
@@ -5047,6 +5209,7 @@ function D.frame(L, snap, rows, state, info)
       slices = L.slices_rect,
     }
     D.module_rects = rects          -- только для рамки фокуса: границы модулей — разделители D.SEP (1 px)
+    if L.pn then D.module_rects = D.pn_rects or rects end   -- панели (9 окт): прямоугольники листов
   end
   -- статус — в самом низу окна, под DSP-панелью (раньше делил y с ней и
   -- перекрывал её шапку)

@@ -252,15 +252,15 @@ end
 -- события), микровид — штрихи по позициям; заглушено — X поверх.
 -- Возвращает hover = { ri=, ci=, prev=, next=, btn= }.
 
-function MX.draw(L, snap, regions, info)
+function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- пустой проект (нет регионов) — матрица всё равно видна: кнопки, + (2 окт)
   local grid = MX.grid(snap, regions)
-  local W = L.matrix_w
+  local W = Wd or L.matrix_w                -- 9 окт, панели: ширина и верх / низ листа (x — 0, сдвиг буфером)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover = {}
   -- верх / низ матрицы: главный модуль может стоять в левой колонке (3 окт)
-  local hy = L.mx_top or L.header_y
-  local ybot = L.mx_bot or (L.body_y + L.body_h + (L.low_h or L.hsb_h or 0))
+  local hy = Y or L.mx_top or L.header_y
+  local ybot = Y and (Y + Hd) or L.mx_bot or (L.body_y + L.body_h + (L.low_h or L.hsb_h or 0))
   U.set(U.PANEL); gfx.rect(0, hy, W, ybot - hy, 1)
   hover.inside = mx >= 0 and mx < W and my >= hy and my < ybot      -- колесо над матрицей (5 окт)
   -- кнопки

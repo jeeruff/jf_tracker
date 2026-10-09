@@ -247,6 +247,7 @@ local state = {
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
+state.panes_ui = flag('panes_ui', false)          -- 9 окт: раскладка панелями tmux / zellij (бета)
 -- дерево панелей (9 окт): из ExtState panes; нет — один раз из прежних
 -- опций положения (пользователю ничего делать не нужно)
 state.panes = (function()
@@ -470,7 +471,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -5553,6 +5554,17 @@ ctx = {
   end,
   -- клик по модулю переносит в него фокус (по прямоугольникам модулей)
   focus_at = function(x, y)
+    -- панели (9 окт, бета): лист под мышью; вкладки — 'top' + toptab, как раньше
+    if L and L.pn then
+      local h = draw.panes.hit(L.pn, x, y, ctx.pn_hit)
+      ctx.pn_hit = h or ctx.pn_hit
+      if not h or h.kind == 'grip' then return end
+      local id = h.kind == 'tab' and h.id or h.cell.active_id
+      if h.kind == 'tab' then draw.panes.set_active(state.panes, id) end
+      if draw.panes.BY[id] and draw.panes.BY[id].tab then state.toptab = id; state.top = true; id = 'top' end
+      if id and id ~= state.focus then ctx.set_focus(id) end
+      return
+    end
     local function inr(r) return r and x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
     local f
     if state.pm_big then f = 'browser' end
@@ -5626,6 +5638,7 @@ ctx = {
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
+      flag('panes_ui', 'panes (beta)', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs); click a pane - focus, drag the line between panes - size. Beta: DSP, main and the tabs move in next'),
       flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
@@ -10299,6 +10312,30 @@ local function frame()
         click = { t = now2, zone = 'resize' }
         U.click = false
       end
+    end
+  end
+  -- панели (9 окт, бета): ручка между листами — протяжка (двойной щелчок —
+  -- поровну); подпись стека — активная вкладка (focus_at ниже ставит фокус)
+  if L.pn then
+    local pd = ctx.pn_drag
+    if pd then
+      if gfx.mouse_cap & 1 == 1 then
+        local cur = pd.g.ax == 'h' and gfx.mouse_x or gfx.mouse_y
+        if cur ~= pd.last then
+          draw.panes.drag_grip(state.panes, L.pn, pd.g, cur - pd.last); pd.last = cur; relayout()
+        end
+      else ctx.pn_drag = nil end
+    elseif U.click and hover.pgrip then
+      local now = reaper.time_precise()
+      if ctx.pn_click and now - ctx.pn_click < 0.35 then
+        local g = hover.pgrip
+        for i = 1, #g.node.fr do g.node.fr[i] = 1 / #g.node.fr end
+        state.panes.v = state.panes.v + 1; relayout(); ctx.pn_click = nil
+      else
+        ctx.pn_click = now
+        ctx.pn_drag = { g = hover.pgrip, last = hover.pgrip.ax == 'h' and gfx.mouse_x or gfx.mouse_y }
+      end
+      U.click = false
     end
   end
   -- смарт-панель (9 окт): щелчок по значению — выбор, мимо / ПКМ — закрыть;
