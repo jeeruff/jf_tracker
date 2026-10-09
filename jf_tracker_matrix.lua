@@ -278,32 +278,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
-  -- аранжировка (9 окт): < имя > справа в ряду кнопок, если есть хоть одна;
-  -- не влезает имя — только стрелки (имя в :arr / \ P a)
-  local an, ac, anum = ctx.arr_name and ctx.arr_name()
-  if an then
-    local aw = U.measure('<') + 2 * L.pad
-    local room = W - L.pad - bx - 2 * (aw + L.pad)
-    local lab = room >= U.measure('WW') + 2 * L.pad and ctx.fit and ctx.fit(an, room - 2 * L.pad) or nil
-    local parts = { { 'arrprev', '<' } }
-    if lab then parts[2] = { 'arrname', lab } end
-    parts[#parts + 1] = { 'arrnext', '>' }
-    local tot = 0
-    for _, p in ipairs(parts) do tot = tot + U.measure(p[2]) + 2 * L.pad + L.pad end
-    local ax = W - L.pad - tot + L.pad
-    if ax >= bx then
-      for _, p in ipairs(parts) do
-        local bw = U.measure(p[2]) + 2 * L.pad
-        local hot = mx >= ax and mx < ax + bw and my >= hy + 1 and my < hy + L.rh + 1
-        U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(ax, hy + 1, bw, L.rh, 1)
-        U.set(U.LINE); gfx.rect(ax, hy + 1, bw, L.rh, 0)
-        U.text(ax + L.pad, hy + 2, p[2], hot and U.AMBER or (p[1] == 'arrname' and U.CYAN or U.TEXT))
-        if hot then hover.btn = p[1] end
-        if ctx.hint then ctx.hint('mxbtn', ax, hy + 1, bw, L.rh, p[1]) end
-        ax = ax + bw + L.pad
-      end
-    end
-  end
   MX.ss_split_y = nil
   -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
   -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
@@ -338,6 +312,53 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     ctx.vtext(x + (L.mx_cell_w - L.th) / 2, ny, MX.name_h - 2, col.name ~= '' and col.name or tostring(ci),
       is_cur and U.AMBER or U.TEXT, U.PANEL)
     if col.rgb then U.set(col.rgb); gfx.rect(x + 1, ny + MX.name_h, L.mx_cell_w - 2, 2, 1) end
+    end
+  end
+  -- аранжировка (9 окт): пустой угол над слотами, левее имён треков —
+  -- имя и управление: < имя >, new dup del; строки — сколько влезает
+  do
+    local ax0, ax1, ay = L.pad, L.mx_label_w - L.pad, ny
+    local nrow = math.floor((MX.name_h + 2) / L.rh)
+    local an, ac, anum = nil, 0, 0
+    if ctx.arr_name then an, ac, anum = ctx.arr_name() end
+    local function btn(bx, by, label, id, on)
+      local bw = U.measure(label) + 2 * L.pad
+      if bx + bw > ax1 then return bx end
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
+      U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+      U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      if hot then hover.btn = id end
+      if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, id) end
+      return bx + bw + L.pad
+    end
+    if nrow >= 1 and ax1 - ax0 >= 8 * L.cw then
+      local rows = {}
+      if nrow >= 3 then rows[#rows + 1] = 'title' end
+      rows[#rows + 1] = 'name'
+      if nrow >= 2 then rows[#rows + 1] = 'ops' end
+      for _, r in ipairs(rows) do
+        if r == 'title' then
+          U.text(ax0, ay + 1, ctx.fit(anum > 0 and ('arrangement %d/%d'):format(ac, anum) or 'arrangement', ax1 - ax0), U.GREY)
+        elseif r == 'name' then
+          local bx = btn(ax0, ay, '<', 'arrprev')
+          local nw = ax1 - bx - (U.measure('>') + 3 * L.pad)
+          local lab = ctx.fit(an or 'none - new makes one', math.max(0, nw - 2 * L.pad))
+          local hot = mx >= bx and mx < bx + nw and my >= ay and my < ay + L.rh
+          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, ay, nw, L.rh, 1)
+          U.set(U.LINE); gfx.rect(bx, ay, nw, L.rh, 0)
+          U.text(bx + L.pad, ay + 1, lab, hot and U.AMBER or (an and U.CYAN or U.GREY))
+          if hot then hover.btn = 'arrname' end
+          if ctx.hint then ctx.hint('mxbtn', bx, ay, nw, L.rh, 'arrname') end
+          btn(bx + nw + L.pad, ay, '>', 'arrnext')
+        else
+          local bx = btn(ax0, ay, 'new', 'arrnew')
+          bx = btn(bx, ay, 'dup', 'arrdup')
+          bx = btn(bx, ay, 'del', 'arrdel')
+          if ctx.mx_launch_on then btn(bx, ay, 'clips', 'arrclips', ctx.mx_launch_on()) end
+        end
+        ay = ay + L.rh + 1
+      end
     end
   end
   local top = hy + L.mx_head_h
@@ -556,6 +577,18 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           local tw = U.measure(lt)
           U.set(U.PANEL); gfx.rect(x + math.floor((L.mx_cell_w - tw) / 2) - 1, y + 1, tw + 2, L.rh - 1, 1)
           U.text(x + math.floor((L.mx_cell_w - tw) / 2), y + 1, lt, U.CYAN)
+        end
+      end
+      -- клипы (9 окт, экспериментально): клетка — клип сессии; играет —
+      -- зелёная рамка и «>», ждёт границы — мигает янтарём
+      if ctx.mx_clip_state and g.state ~= 'empty' then
+        local cs = ctx.mx_clip_state(ri, ci)
+        if cs == 'live' then
+          U.set(U.GREEN); gfx.rect(x, y, L.mx_cell_w, rh, 0); gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 2, 0)
+          U.set(U.BG); gfx.rect(x + 2, y + 1, U.measure('>') + 2, L.rh - 2, 1)
+          U.text(x + 3, y + 1, '>', U.GREEN)
+        elseif cs == 'pend' and math.floor(reaper.time_precise() * 4) % 2 == 0 then
+          U.set(U.AMBER); gfx.rect(x, y, L.mx_cell_w, rh, 0)
         end
       end
       if MX.anchor then

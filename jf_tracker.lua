@@ -187,7 +187,8 @@ local state = {
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   bigfader = flag('bigfader', false),
   faderfocus = flag('faderfocus', true),          -- микшер: щелчок по фейдеру / кнобу — курсор трекера на канал (9 окт)
-  dbmarks = flag('dbmarks', true),                -- микшер: метки dB и риски в фейдере (9 окт, быстрая опция)
+  dbmarks = flag('dbmarks', true),
+  mxlaunch = flag('mxlaunch', false),             -- матрица как клипы (9 окт, экспериментально)                -- микшер: метки dB и риски в фейдере (9 окт, быстрая опция)
   panknob = flag('panknob', true),                -- микшер: пан кнобом при узком фейдере (9 окт)             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -482,7 +483,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3079,6 +3080,20 @@ ctx = {
       ctx.arr_k = k
     end
     return k.name, k.c, k.n
+  end,
+  -- матрица как клипы (9 окт, экспериментально, опция mxlaunch): клетка
+  -- слота = клип движка сессии (MX.SS); колонка трека → его первая
+  -- виртуальная колонка (лейн 1). Двойной щелчок по клетке — запуск
+  mx_launch_on = function() return state.mxlaunch end,
+  mx_vi = function(ci)
+    for vi, v in ipairs(ctx.ss_V().cols) do if v.ci == ci then return vi end end
+  end,
+  mx_clip_state = function(ri, ci)
+    if not state.mxlaunch then return nil end
+    local vi = ctx.mx_vi(ci); if not vi then return nil end
+    local p, l = MX.SS.pend[vi], MX.SS.live[vi]
+    if p and p.ri == ri then return 'pend' end
+    if l and l.ri == ri then return 'live' end
   end,
   arr = function(what, arg)
     local AR = draw.arr
@@ -5908,6 +5923,7 @@ ctx = {
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
+      flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
       flag('dbmarks', 'dB marks', 'mixer faders: the +6 0 -12 -24 -48 marks and ticks (f jumps to a mark)'),
       flag('panknob', 'pan knob', 'mixer with a narrow fader: pan / width as knobs (drag up or right - more, Shift fine); off - small sliders'),
       flag('bigfader', 'big fader', 'mixer: a wide fader with dB marks left of it (+6 0 -6 ...); off - a narrow box, marks as ticks only. Always big in pt-mode'),
@@ -5978,7 +5994,7 @@ ctx = {
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
-      { 'session', { 'clipsview', 'ssbsync', 'ssbars' } },
+      { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
     local byk, used = {}, {}
@@ -7445,7 +7461,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() end
+    if d == 'fold' then ctx.mx_fold_toggle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr() elseif d == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new ' elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
@@ -11445,7 +11461,11 @@ local function frame()
       elseif hover.matrix.btn == 'add' then ctx.mx_add()
       elseif hover.matrix.btn == 'arrprev' then ctx.arr('prev')
       elseif hover.matrix.btn == 'arrnext' then ctx.arr('next')
-      elseif hover.matrix.btn == 'arrname' then ctx.arr() end
+      elseif hover.matrix.btn == 'arrname' then ctx.arr()
+      elseif hover.matrix.btn == 'arrnew' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr new '
+      elseif hover.matrix.btn == 'arrdup' then ctx.arr('dup')
+      elseif hover.matrix.btn == 'arrdel' then ctx.arr('del')
+      elseif hover.matrix.btn == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
       ctx.set_focus('matrix')
@@ -11465,7 +11485,10 @@ local function frame()
       -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки (9 окт)
       if gfx.mouse_cap & 8 == 8 then MX.anchor = MX.anchor or { ri = MX.cur.ri, ci = MX.cur.ci } else MX.anchor = nil end
       MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci)
-      if dbl and click.zone == 'matrix' and click.row == hover.matrix.ri then
+      if dbl and click.zone == 'matrix' and click.row == hover.matrix.ri and state.mxlaunch then
+        local vi = ctx.mx_vi(hover.matrix.ci)
+        if vi then MX.SS.launch(hover.matrix.ri, vi, seq) end
+      elseif dbl and click.zone == 'matrix' and click.row == hover.matrix.ri then
         if reaper.GetPlayState() & 1 == 1 then
           ctx.region_space(seq[hover.matrix.ri])          -- играет: в очередь
         else
