@@ -134,7 +134,7 @@ function SP.draw(L, x, y, w, h, e, focused)
     if ctx.sp_frac then fr, centered = ctx.sp_frac(e, r.k) end
     local vw = math.max(U.measure('-00.0 dB'), U.measure(vt)) + L.pad
     -- 5 окт: имя | значение | дорожка — значение сразу за именем
-    local sx, sw = x + lw + vw, w - lw - vw - L.pad
+    local sx, sw = x + lw + vw, math.min(w - lw - vw - L.pad, L.cw * 16)   -- 9 окт: слайдер не во всю ширину (16 знаков)
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
     if fr and sw >= L.cw * 4 then
       local cy = ry + math.floor(L.rh / 2)

@@ -614,12 +614,24 @@ function PV.inst_preview(e, track, by_mouse)
   PV.inst(track, e.item, mode == 'sec' and 1 or nil)
   state.prev_hold = (mode == 'hold' and by_mouse) or nil
 end
+local ctx                                        -- 9 окт: раньше pool_select (ему нужны плагины трека)
 local function pool_select(n)
   state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
   local col = cur_col()
   if col and state.instfx then state.instfx[col.guid] = nil end   -- 9 окт: сэмпл вместо плагина-инструмента
   local pool = col and col.pool or {}
-  n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
+  -- 9 окт: сквозная нумерация lib — сэмплы (и пустые слоты), за ними
+  -- плагины-инструменты трека, последним — automation
+  local nsamp = #pool + draw.empty_slots(#pool)
+  local insts = (col and ctx and ctx.track_insts) and ctx.track_insts(col) or {}
+  n = math.max(1, math.min(nsamp + #insts + 1, n))
+  if n > nsamp then
+    vim.inst = n
+    local k = n - nsamp
+    if insts[k] then ctx.inst_fx_pick(col, insts[k].fx, false, true)
+    else if ctx and ctx.auto_select then ctx.auto_select() end end
+    return
+  end
   -- слайсы в lib не показываются (3 окт): шаг на слайс — дальше, к следующему
   -- исходнику (вниз) или к своему исходнику (вверх)
   if pool[n] and pool[n].parent then
@@ -669,7 +681,6 @@ local retro_current, retro_preview, retro_put, retro_loop
 -- то же для меню (hydra), monome и контрола: используются в ctx / hint_go раньше определения
 local track_actions, region_actions, event_actions, view_actions, mono_request, ctrl_action
 local MONO_ID = 9             -- id мода трекера на шине jf_mono
-local ctx
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
   peaks = function(e, n, spec) return model.peaks(e, n, spec) end,
@@ -2835,6 +2846,11 @@ ctx = {
   auto_on = function() return state.auto_inst and true or false end,
   auto_select = function()
     state.auto_inst = true
+    local c = cur_col()                                 -- 9 окт: номер automation — последний в lib
+    if c then
+      if state.instfx then state.instfx[c.guid] = nil end
+      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + #ctx.track_insts(c) + 1
+    end
     local n = #ctx.ai_list()
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
@@ -3103,6 +3119,58 @@ ctx = {
     end
     return k.name, k.c, k.n
   end,
+  -- список прыжков (9 окт, как Ctrl+O / Ctrl+I в Vim): место до прыжка
+  -- (f-метка, harpoon, gg / G) запоминается; Ctrl+O — назад, Ctrl+I — вперёд.
+  -- Место: модуль в фокусе + трек / строка трекера + ячейка матрицы + DSP
+  jl = { list = {}, pos = 0 },
+  jump_here = function()
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    return { focus = state.focus, guid = f and f.col and f.col.guid, row = vim.cur.row,
+             ri = MX.cur.ri, ci = MX.cur.ci, fx = dsp_sel.fx, param = dsp_sel.param }
+  end,
+  jump_mark = function()
+    local j = ctx.jl
+    while #j.list > j.pos do table.remove(j.list) end         -- ветка вперёд теряется (как в Vim)
+    local h = ctx.jump_here()
+    local last = j.list[#j.list]
+    if not (last and last.focus == h.focus and last.guid == h.guid and last.row == h.row and last.ri == h.ri and last.ci == h.ci) then
+      j.list[#j.list + 1] = h
+      if #j.list > 50 then table.remove(j.list, 1) end
+    end
+    j.pos = #j.list
+  end,
+  jump_go = function(loc)
+    if loc.guid then
+      for i, f in ipairs(L.flat) do if f.col and f.col.guid == loc.guid and not f.env then vim.cur.fi = i; break end end
+    end
+    vim.cur.row = loc.row or vim.cur.row
+    if loc.ri then MX.cur.ri, MX.cur.ci = loc.ri, loc.ci end
+    if loc.fx then dsp_sel.fx, dsp_sel.param = loc.fx, loc.param or 1 end
+    vim.ensure_visible()
+    if loc.focus and loc.focus ~= state.focus then
+      if state.panes_ui and L and L.pn and loc.focus ~= 'tracker' and ctx.pane_focus then ctx.pane_focus(loc.focus) end
+      ctx.set_focus(loc.focus)
+    end
+  end,
+  jump_back = function()
+    local j = ctx.jl
+    if j.pos == 0 then vim.msg = 'jumps: nothing to go back to'; return end
+    if j.pos == #j.list then                                  -- с конца — запомнить, где стоим (для Ctrl+I)
+      local h = ctx.jump_here()
+      j.list[#j.list + 1] = h; j.pos = #j.list
+    end
+    j.pos = j.pos - 1
+    ctx.jump_go(j.list[j.pos])
+    vim.msg = ('jump back %d/%d (Ctrl+I - forward)'):format(j.pos, #j.list)
+    if j.pos == 0 then j.pos = 1 end
+  end,
+  jump_fwd = function()
+    local j = ctx.jl
+    if j.pos >= #j.list then vim.msg = 'jumps: nothing forward'; return end
+    j.pos = j.pos + 1
+    ctx.jump_go(j.list[j.pos])
+    vim.msg = ('jump forward %d/%d'):format(j.pos, #j.list)
+  end,
   -- инструменты-плагины трека (9 окт): VSTi / VST3i / AUi / CLAPi / LV2i и
   -- JSFX-инструменты (по имени). Кэш по снимку. Выбранный в lib — state.instfx
   -- [guid] = fx: ноты с клавиатуры пишутся MIDI в трек (звучит плагин)
@@ -3131,12 +3199,23 @@ ctx = {
     if ctx.inst_fx(col) then return 'midi' end
     return inst and inst.item
   end,
-  inst_fx_pick = function(col, fx, dbl)
+  inst_fx_pick = function(col, fx, dbl, keys)     -- keys: выбор номером (клавиатура) — фокус не уводить
     if not col then return end
     state.instfx = state.instfx or {}
     state.instfx[col.guid] = fx
     state.auto_inst = false
+    -- номер в сквозной нумерации lib (vim.inst) — чтобы , . / Cmd+J K шли дальше от него
+    do
+      local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
+      for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then vim.inst = nsamp + k end end
+    end
     if dbl then reaper.TrackFX_Show(col.track, fx, 3); return end
+    if keys then
+      for k, f in ipairs(col.fx or {}) do if f.i == fx then dsp_sel.fx = k; dsp_sel.param = 1; break end end
+      local _, nm = reaper.TrackFX_GetFXName(col.track, fx, '')
+      vim.msg = ('inst %d: %s (plugin - note keys write MIDI)'):format(vim.inst or 0, (nm or ''):gsub('^[^:]*: ', ''))
+      return
+    end
     -- DSP — на этот эффект
     for k, f in ipairs(col.fx or {}) do if f.i == fx then dsp_sel.fx = k; dsp_sel.param = 1; break end end
     state.dsp_take = nil
@@ -3337,6 +3416,7 @@ ctx = {
     end
     local function go(e)
       if not e then vim.msg = 'harpoon: no such place'; return end
+      ctx.jump_mark()                                          -- 9 окт: Ctrl+O — обратно
       local c, ci = col_of(e.guid)
       if not c then vim.msg = 'harpoon: the track is gone (' .. name(e) .. ')'; return end
       if e.k == 'mx' then
@@ -7664,6 +7744,7 @@ SPROP.init(U, ctx)
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
 local function hint_go(t)
+  if ctx.jump_mark then ctx.jump_mark() end         -- 9 окт: f-прыжок — в список прыжков (Ctrl+O назад)
   local d = t.data
   if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда
   elseif t.kind == 'fxbbtn' then                                   -- 9 окт: fx list — папка / * / поиск
@@ -13084,7 +13165,8 @@ local function frame()
      and (gfx.getchar(65536) & 2) ~= 0 then
     local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
     if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10
-    elseif dn and dn:byte(87) ~= 0 then c = 23; c_raw = 23 end   -- Ctrl+W (9 окт, панели): тоже не доходит
+    elseif dn and dn:byte(87) ~= 0 then c = 23; c_raw = 23   -- Ctrl+W (9 окт, панели): тоже не доходит
+    elseif dn and dn:byte(79) ~= 0 then c = 15; c_raw = 15 end   -- Ctrl+O (9 окт, прыжок назад)
   end
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
@@ -13340,6 +13422,20 @@ local function frame()
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
+  -- 9 окт: ` (обратная кавычка, как `` в Vim) — прыжок назад, без Control
+  if c == 96 and (vim.mode == 'normal' or state.focus ~= 'tracker') and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and not vim.pending then   -- в INSERT / KEYS ` — note-off
+    ctx.jump_back(); c = 0
+  end
+  -- 9 окт: список прыжков — Ctrl+O назад, Ctrl+I вперёд (Ctrl+I = код Tab:
+  -- отличаем по физической I); не в строке команд / поиске / пикере
+  if (c == 15 or c == 9) and gfx.mouse_cap & 4 ~= 0 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra
+     and not (vim.mode == 'insert' and state.focus == 'tracker') then
+    if c == 15 then ctx.jump_back(); c = 0
+    elseif reaper.JS_VKeys_GetState then
+      local st = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.2)
+      if st and st:byte(73) ~= 0 then ctx.jump_fwd(); c = 0 end
+    end
+  end
   if c == 27 and state.routeview and not vim.picker and not vim.hydra then state.routeview = nil; vim.msg = 'routing: back'; c = 0 end   -- 9 окт: Esc закрывает диаграмму
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
   if state.measure and c == ('s'):byte() then ctx.shot_req = 'file'; c = 0 end   -- 8 окт: снимок линейки (одна клавиша)

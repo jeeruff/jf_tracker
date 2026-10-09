@@ -3023,12 +3023,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
   end
   local rows = D.pool_rows(pool, sort, col, info.cols)
-  rows[#rows + 1] = { auto = true }               -- automation как инструмент — последней строкой (5 окт)
   -- 9 окт: инструменты-плагины трека (VSTi / AUi / CLAPi, JSFX-инструменты) —
-  -- строки после automation; выбран — клавиши пишут MIDI-ноты в него
+  -- своя секция с номерами после сэмплов; выбран — клавиши пишут MIDI-ноты в
+  -- него. automation — самой последней строкой, со своим номером
+  local nsamp = #pool + D.empty_slots(#pool)
   local tins = info.track_insts and info.track_insts(col) or {}
   if #tins > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
-  for _, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind } end
+  for k, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end
+  rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент — последней строкой (5 окт)
   L.pool_rows = rows
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
@@ -3105,7 +3107,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local sel = info.auto_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, fit('~~ automation' .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
+      text(ix + 6, y + 1, fit(('%02d ~~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
     elseif row.instfx then
@@ -3114,7 +3116,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if sel then set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local kd = row.kind or 'fx'
-      text(ix + 6, y + 1, fit(row.name, w - 12 - ms(kd) - L.pad), sel and U.CYAN or U.TEXT)
+      text(ix + 6, y + 1, fit(('%02d '):format(row.num or 0) .. row.name, w - 12 - ms(kd) - L.pad), sel and U.CYAN or U.TEXT)
       text(ix + w - L.pad - 4 - ms(kd), y + 1, kd, sel and U.CYAN or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, instfx = row.instfx } end
       hint('poolinst', ix + 2, y, w - 4, L.rh, row.instfx)
