@@ -51,6 +51,7 @@ local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garde
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
+MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
 edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
@@ -2314,6 +2315,8 @@ ctx = {
     ctx.env_shape(e, row, (cur + d) % 6)
   end,
   envfmt = function() return state.envfmt or 'midi' end,
+  SM = MX.SMART,
+  smart_open = function(p) local at = ctx.smart_at; ctx.smart_at = nil; return MX.SMART.open(p, at) end,   -- 9 окт; at — от среднего щелчка, иначе якорь у курсора при рисовании
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
@@ -9784,6 +9787,18 @@ local function frame()
     end
   elseif not pop then ctx.pop_seen, ctx.pop_xy = nil, nil end
   draw.popup(L, pop, anchor)
+  -- смарт-панель (9 окт): у ячейки курсора (под ней, не влезает — над ней)
+  if MX.SMART.p then
+    local p = MX.SMART.p
+    if not p.anchor then
+      local f = L.flat[vim.cur.fi]
+      local r = vim.cur.row - (rows[1] and rows[1].row or 0)
+      if f and f.x and r >= 0 and r < L.nrows then p.anchor = { x = f.x, y = L.body_y + (r + 1) * L.rh + 1, top = L.body_y + r * L.rh }
+      else p.anchor = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y } end
+    end
+    MX.SMART.draw({ L = L, set = draw.set, text = draw.text, ms = draw.measure, fit = draw.fit,
+      C = { PANEL = U.PANEL, FRAME = U.mix(U.LINE, U.TEXT, 0.45), SEL = draw.CURROW, TEXT = U.TEXT, GREY = U.GREY, AMBER = U.AMBER, CYAN = U.CYAN } })
+  end
   -- линейка measure (7 окт): перекрестье у мыши, рамка от начала до мыши / конца, размер
   if state.measure then
     local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -10117,6 +10132,22 @@ local function frame()
         U.click = false
       end
     end
+  end
+  -- смарт-панель (9 окт): щелчок по значению — выбор, мимо / ПКМ — закрыть;
+  -- средний щелчок по ячейке — курсор туда и панель её поля
+  do
+    local mdown = gfx.mouse_cap & 64 == 64
+    local mclick = mdown and not ctx.smart_mdown
+    ctx.smart_mdown = mdown
+    if (U.click or U.rclick) and MX.SMART.p then
+      MX.SMART.click(gfx.mouse_x, gfx.mouse_y, U.rclick); U.click, U.rclick = false, false
+    elseif mclick and hover.row and hover.fi and not hover.row.clip and not OPT.active and not (vim.hydra or vim.picker) then
+      ctx.set_focus('tracker')
+      if vim.mode ~= 'visual' and vim.mode ~= 'vline' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
+      if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
+      vim.smart()
+    end
+    if MX.SMART.p and MX.SMART.inside(gfx.mouse_x, gfx.mouse_y) then gfx.mouse_wheel = 0; gfx.mouse_hwheel = 0 end
   end
   -- гидра / контекстное меню мышью (5 окт): клик по строке — её буква, мимо — закрыть
   if (U.click or U.rclick) and vim.hydra and not OPT.active then
@@ -12029,6 +12060,8 @@ local function frame()
     if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10 end
   end
   ctx.ctrlj_t = reaper.time_precise()
+  -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
+  if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
   local quit = false
   if c == keys.f1 then if ctx.mods().shift then state.khelp_big = false; ctx.tutorial() else ctx.help_big() end; c = 0 end
   if c == keys.f11 then toggle_dock(); c = 0 end

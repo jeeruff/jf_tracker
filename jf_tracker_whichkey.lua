@@ -20,7 +20,7 @@ local T = {
   y = { title = 'y - copy', items = { { 'y', 'row (3yy)' } } },
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },
   da = { title = 'da - delete all', items = { { 'w', 'every item of the track' } } },
-  g = { title = 'g - go', items = { { 'g', 'top of the track' }, { 'w', 'swap with the next event (3gw - third)' } } },
+  g = { title = 'g - go', items = { { 'g', 'top of the track' }, { 'w', 'swap with the next event (3gw - third)' }, { 's', 'smart panel: values of the field under the cursor, pick with the mouse' } } },
   z = { title = 'z - view', items = { { 'z', 'row to middle' }, { 't b', 'row top / bot' },
         { 'a', 'fold track' }, { 'C', '1-char strip' }, { 'f', 'fold folder' },
         { 'M', 'fold <-> all' }, { 's', 'session' }, { 'r', 'router' },

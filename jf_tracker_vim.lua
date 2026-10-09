@@ -1535,6 +1535,10 @@ function V.key_impl(c)
         else V.cur.row = t.row; finish_move() end
         V.count = nil; ensure_visible(); return
       end
+      if c == ('s'):byte() and not V.op then
+        -- gs (9 окт): смарт-панель — сетка значений поля курсора (мышью / h j k l + Enter)
+        V.count = nil; finish_move(); V.smart(); return
+      end
       if c == ('w'):byte() then
         -- gw (4 окт): событие под курсором меняется местами с N-м вперёд в
         -- этой колонке (3gw — с третьим)
@@ -1981,7 +1985,7 @@ local PENDING_HINT = {
   d = 'd: d delete track | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
-  g = 'g: g first row | Esc',
+  g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | Esc',
   z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom | s clips (session)',
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
@@ -2030,6 +2034,112 @@ function V.run_cmd(line)
   local r = run_cmd(line)
   if V.mode == 'visual' or V.mode == 'vline' then V.mode = 'normal' end
   return r
+end
+
+-- смарт-панель (9 окт, gs / средний щелчок; как Smart Select PlayerPro):
+-- сетка значений поля курсора у ячейки, выбор мышью или h j k l + Enter.
+-- Правит то же, что r / ввод: нота (пусто — вставить, есть — высота),
+-- vol / delay / команда (буква, потом значение), инструмент, огибающая, CC.
+-- В VISUAL — весь блок (как r)
+function V.smart()
+  local SM = ctx.SM
+  local f = flat()[V.cur.fi]
+  if not (SM and f) then return false end
+  local E = ctx.edit
+  local fi, row, fld = V.cur.fi, V.cur.row, V.cur.field or 1
+  local vis = V.mode == 'visual' or V.mode == 'vline'
+  local f0, f1, r0, r1 = fi, fi, row, row
+  if vis then f0, f1, r0, r1 = V.visual_range() end
+  local function heads() return V.heads_in(f0, f1, r0, r1) end
+  local hexf = (ctx.envfmt and ctx.envfmt() or 'midi') == 'hex'
+  local function done() if vis then V.mode = 'normal' end; V.cmdbuf = {} end
+  local where = (f.col and f.col.name or '') .. (' @ %04d'):format(row)
+  local items, cols, sel, title, pick
+  if f.ml then
+    if not (f.ml.kind == 'cc' or f.ml.kind == 'pc') then V.msg = 'smart: this MIDI lane has no values'; return false end
+    items, cols, sel = SM.values(128, nil, hexf, 'delete the events of this row')
+    title = ('%s %s  %s'):format(f.ml.kind:upper(), f.ml.num and tostring(f.ml.num) or '', where)
+    pick = function(it)
+      if it.v == 'clear' then ctx.ml_del(f, row) else ctx.ml_set(f, row, it.v) end
+      done()
+    end
+  elseif f.env then
+    local n = hexf and 256 or 128
+    items, cols, sel = SM.values(n, nil, hexf, 'delete the point of this row')
+    title = ('%s  %s'):format(f.env.name or 'envelope', where)
+    pick = function(it)
+      if it.v == 'clear' then ctx.env_del(f.env, row) else ctx.env_set(f.env, row, it.v / (n - 1)) end
+      done()
+    end
+  elseif V.cur.sub == 'inst' and fld == 1 then
+    items = {}
+    local h1 = heads()[1]
+    for i, e in pairs(f.col.pool or {}) do
+      if type(i) == 'number' and e then items[#items + 1] = { label = ('%02X %s'):format(i, e.name or ''), v = i, tip = e.name } end
+    end
+    table.sort(items, function(a, b) return a.v < b.v end)
+    if #items == 0 then V.msg = 'smart: no instruments on this track (lib)'; return false end
+    for k, it in ipairs(items) do if it.v == V.inst then sel = k end end
+    cols, title = 1, 'instrument  ' .. where
+    pick = function(it) if ctx.set_inst then ctx.set_inst(heads(), it.v) end; V.inst = it.v; done() end
+    if not h1 then V.msg = 'smart: an empty row - the instrument is chosen for the next notes' end
+  elseif fld == 1 then
+    local h1 = heads()[1]
+    items, cols, sel = SM.notes(h1 and h1.pitch, V.octave)
+    title = (h1 and ('note %s'):format(h1.note or '') or 'note') .. '  ' .. where
+    pick = function(it)
+      if it.v == nil then return SM.p end
+      local hs = heads()
+      if it.v == 'del' then E.delete(hs, lpb())
+      elseif it.v == 'off' then E.note_off(V.covering(fi, row), lpb(), row)
+      elseif #hs > 0 then E.set_pitch(hs, lpb(), it.v)
+      elseif not vis then
+        local lane = f.lane or f.col.lanes[1]
+        local inst = (f.col.pool or {})[V.inst]
+        local cell = f.sub and f.sub[row]
+        if cell and cell.kind == 'cont' and cell.of then E.note_off({ cell.of }, lpb(), row) end
+        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), row, it.v, V.vel, V.step_auto and 1 or V.step, inst and inst.item)
+        if ctx.state.preview and ctx.preview then ctx.preview(f.col.track, it.v, inst and inst.item, row, 1) end
+      end
+      done()
+    end
+  elseif fld == 2 or fld == 3 then
+    local h1 = heads()[1]
+    if not h1 then V.msg = 'smart: no event in this row'; return false end
+    local cur = fld == 2 and tonumber(h1.vol or '', 16) or (fld == 3 and math.floor((h1.delay or 0) + 0.5) or nil)
+    local n = (fld == 2 and h1.kind == 'midi') and 128 or 256
+    items, cols, sel = SM.values(n, cur, true, fld == 2 and 'volume back to default' or 'no delay')
+    title = (fld == 2 and 'volume' or 'delay xx/256 row') .. '  ' .. where
+    pick = function(it)
+      local hs = heads()
+      if fld == 2 then E.set_vol(hs, lpb(), it.v == 'clear' and 128 or it.v)
+      else E.set_delay(hs, lpb(), it.v == 'clear' and 0 or it.v) end
+      done()
+    end
+  else
+    local h1 = heads()[1]
+    if not h1 then V.msg = 'smart: no event in this row'; return false end
+    local have = (h1.fx or {})[fld - 3]
+    local function vals(letter, curx)
+      local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx')
+      local desc = ''
+      for _, e in ipairs(SM.FX) do if e[1] == letter then desc = e[2] end end
+      return { title = ('%sxx  %s  %s'):format(letter, desc, where), items = its, cols = cs, sel = sl,
+               on_pick = function(it)
+                 local hs = heads()
+                 if it.v == 'clear' then E.clear_fx(hs, lpb(), letter) else E.set_fx(hs, lpb(), letter, it.v) end
+                 done()
+               end }
+    end
+    if have then
+      local p = vals(have:sub(1, 1), tonumber(have:sub(2), 16))
+      return ctx.smart_open(p)
+    end
+    items, cols, sel = SM.fx_letters()
+    title = 'command  ' .. where
+    pick = function(it) return vals(it.v, nil) end
+  end
+  return ctx.smart_open({ title = title, items = items, cols = cols, sel = sel, on_pick = pick })
 end
 
 -- поле инструмента есть, если в раскладке есть колонка номера (не узкая колонка)

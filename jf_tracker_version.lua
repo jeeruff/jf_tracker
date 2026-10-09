@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'smart panel (gs or middle click on a cell, as Smart Select in PlayerPro): the values of the field under the cursor as a grid at the cell - notes by octave with OFF / delete, volume, delay, command letter then its value, instrument, envelope point, CC; hex or decimal as the values option; pick with the mouse or h j k l + Enter',
     'mixer: a narrow fader by default (Options: big fader - with dB marks, always in pt-mode); max peak above the box, empty without signal; folded tracks get a one-char fader',
     'matrix: Ctrl+Up / Ctrl+Down duplicate the slot above / below with muted tracks cleared (Paketti); transport buttons: cassette symbol over the word',
     'harmonizer: compact degree buttons; the chord on a staff and as a guitar tab (s / t); pan knob option, dB marks inside the narrow fader',
