@@ -3114,14 +3114,16 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       local fon = focused(id)
       if c.tab then
         local th = c.tab.h
-        set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, c.y + math.floor(th / 2), c.w, 1, 1)
+        local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
+        local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
+        set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
         for _, t in ipairs(c.tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
           if lbl ~= '' then
             local on = t.id == id
             local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
             local tx = t.x + L.pad
-            set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)
+            set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
             local col = on and (fon and D.FOCUS or U.AMBER) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
             text(tx, c.y + 1, lbl, col)
@@ -3190,14 +3192,14 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local sv = { L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab }
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = bh, 0, bw, 0, 0, true, true, id
         local dest0, mx0, my0, hint0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, D.clip
-        local dy = ct.y - cy0
+        local dy = ct.y - cy0 + 2                           -- содержимое на 2 px ниже рамки (blit ниже)
         gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil
         if hint0 then D.hint = function(kind, x, y, w, h, data) if y >= cy0 then return hint0(kind, x + ct.x, y + dy, w, h, data) end end end
         local ok, th = pcall(draw_topbar, L, info)
         gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = table.unpack(sv, 1, 8)
         if not ok then error(th, 0) end
-        gfx.blit(1020, 1, 0, 0, cy0, bw, ct.h, ct.x, ct.y, bw, ct.h)
+        gfx.blit(1020, 1, 0, 0, cy0 - 2, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 2 px сверху: кнопки вкладки не заходят на рамку
         if inside and type(th) == 'table' then for k, v in pairs(th) do if k ~= 'tab' then hover[k] = v end end end
       else
         text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)
@@ -3592,7 +3594,7 @@ function D.frame(L, snap, rows, state, info)
         local lblw = (bigf and fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
         local bx0, bw0 = sx + lblw, fx_w - lblw
         local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
-        local tick = U.readable(U.GREY, dark, 3)
+        local tick = U.mix(U.GREY, dark, 0.45)          -- 9 окт: риски темнее, как метки
         set(dark); gfx.rect(bx0, ty0 - 6, bw0, th + 9, 1)
         set((hot or kon) and U.AMBER or U.LINE); gfx.rect(bx0, ty0 - 6, bw0, th + 9, 0)
         -- метр: пики трека, шкала та же, что у фейдера (метки совпадают);
@@ -3637,11 +3639,11 @@ function D.frame(L, snap, rows, state, info)
         end
         if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 6 then hover.mixpk = col.track end
         local last_ly
-        for _, m in ipairs({ 6, 0, -6, -12, -24, -48 }) do
+        for _, m in ipairs(state.dbmarks ~= false and { 6, 0, -6, -12, -24, -48 } or {}) do   -- быстрая опция dB marks
           local yy = ypos(m)
-          set(m == 0 and U.readable(U.TEXT, dark, 4) or tick); gfx.rect(bx0 + 1, yy, 2, 1, 1); gfx.rect(bx0 + bw0 - 3, yy, 2, 1, 1)
+          set(m == 0 and U.mix(U.TEXT, dark, 0.35) or tick); gfx.rect(bx0 + 1, yy, 2, 1, 1); gfx.rect(bx0 + bw0 - 3, yy, 2, 1, 1)
           -- подпись — только если не налезает на предыдущую (без наложений)
-          local ly = yy - D.SPACE - math.floor((L.th or L.rh) / 2)   -- 9 окт: центр цифры — ровно на риске
+          local ly = yy - D.SPACE - math.floor((L.th or L.rh) / 2) - 2   -- 9 окт: цифры глифа выше середины ячейки — центр цифры на риске
           if (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
             if lblw > 0 then
