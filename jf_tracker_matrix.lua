@@ -371,7 +371,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if nrow >= 2 then rows[#rows + 1] = 'ops' end
       for _, r in ipairs(rows) do
         if r == 'title' then
-          U.text(ax0, ay + 1, ctx.fit(anum > 0 and ('arrangement %d/%d'):format(ac, anum) or 'arrangement', ax1 - ax0), U.GREY)
+          local nol = anum > 0 and ctx.arr_has_lanes and not ctx.arr_has_lanes()
+          U.text(ax0, ay + 1, ctx.fit(anum > 0 and (('arrangement %d/%d'):format(ac, anum) .. (nol and ' - no lanes' or '')) or 'arrangement', ax1 - ax0), nol and U.AMBER or U.GREY)
         elseif r == 'name' then
           local bx = btn(ax0, ay, '<', 'arrprev')
           local nw = ax1 - bx - (U.measure('>') + 3 * L.pad)

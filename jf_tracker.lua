@@ -3079,6 +3079,12 @@ ctx = {
     local list = draw.arr.decode(raw)
     return list, math.max(0, math.min(#list, tonumber(cur) or 0))
   end,
+  arr_has_lanes = function()                         -- 9 окт: блок матрицы — «no lanes», если в проекте нет лейнов
+    local sc = reaper.GetProjectStateChangeCount(0)
+    local c = ctx.arr_lc
+    if not c or c.sc ~= sc then c = { sc = sc, v = next(draw.arr.capture(reaper)) ~= nil }; ctx.arr_lc = c end
+    return c.v
+  end,
   arr_name = function()                              -- каждый кадр (матрица): разбор — только при смене строки
     local _, raw = reaper.GetProjExtState(0, EXT, 'arr')
     local _, cur = reaper.GetProjExtState(0, EXT, 'arr_cur')
@@ -3183,9 +3189,10 @@ ctx = {
       local base = (what == 'dup' and cur > 0) and list[cur].name or ((arg and arg ~= '') and arg or 'arr')
       if what == 'new' and arg and arg ~= '' then base = arg end
       local lanes = AR.capture(reaper)
-      if not next(lanes) then vim.msg = 'arr: no track has fixed lanes - an arrangement switches which lanes play (\\ r l: lanes on the cursor track)'; return end
       table.insert(list, cur + 1, { name = AR.next_name(list, base), lanes = lanes })
-      save(cur + 1); vim.msg = show(cur + 1)
+      save(cur + 1)
+      -- 9 окт: без лейнов тоже создаётся (имя есть), но переключать нечего — подсказка
+      vim.msg = show(cur + 1) .. (next(lanes) and '' or '  - no track has fixed lanes yet: an arrangement switches which lanes play (\\ r l: lanes on the cursor track)')
     elseif what == 'name' then
       if cur == 0 then vim.msg = 'arr: no current arrangement'; return end
       local nm = AR.clean(arg or '')
