@@ -190,6 +190,32 @@ do
   eq('last_row', snap.last_row, 20)
 end
 
+-- ── 3b. стык внутри строки (9 окт): обрубленный item кончается на задержке
+-- следующей ноты (свинг) — следующая нота в той же подколонке, в обоих порядках
+do
+  local d = 44 / 256 / 4                                  -- 44/256 строки в QN
+  local function run_case(first_late)
+    local a = { name = 'A', items = {} }
+    local early = { pos = qn2t(1.5), len = qn2t(3 + d) - qn2t(1.5), take = { name = 'p.wav' } }   -- строки 6..12+2C
+    local late  = { pos = qn2t(3 + d), len = qn2t(1.5), take = { name = 'n.wav' } }                -- строка 12, delay 2C
+    a.items = first_late and { late, early } or { early, late }
+    tracks = { a }
+    local la = M.build(4).cols[1].lanes[1]
+    local tag = first_late and ' (late first)' or ''
+    eq('join subs' .. tag, #la.subs, 1)
+    eq('join head 12' .. tag, la.subs[1][12] and la.subs[1][12].name, 'n.wav')
+    eq('join head 12 delay' .. tag, la.subs[1][12] and la.subs[1][12].delay, 44)
+    eq('join prev head' .. tag, la.subs[1][6] and la.subs[1][6].name, 'p.wav')
+  end
+  run_case(false); run_case(true)
+  -- настоящее перекрытие (хвост дальше задержки) — по-прежнему вторая подколонка
+  local a = { name = 'A', items = {
+    { pos = qn2t(1.5), len = qn2t(3 + 2 * d) - qn2t(1.5), take = { name = 'p.wav' } },
+    { pos = qn2t(3 + d), len = qn2t(1.5), take = { name = 'n.wav' } } } }
+  tracks = { a }
+  eq('overlap subs', #M.build(4).cols[1].lanes[1].subs, 2)
+end
+
 -- ── 4. снимок: MIDI, полифония, цикл, OFF ─────────────────────────────────
 do
   local it = { pos = qn2t(4), len = qn2t(4), loop = true }

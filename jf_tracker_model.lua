@@ -110,21 +110,35 @@ end
 -- Lane = список подколонок (sub); sub = карта строка → ячейка. Нота занимает
 -- строки [r0, r1] в первой подколонке, где они свободны. Это и полифония
 -- MIDI, и перекрывающиеся items на одном треке — один механизм.
-local function sub_free(sub, r0, r1)
-  for r = r0, r1 do if sub[r] then return false end end
+-- 9 окт: стык внутри строки (свинг / задержка) — хвост item, кончающийся
+-- на end_d/256 строки, не занимает её для головы с задержкой ≥ end_d (иначе
+-- обрубленный item уносил следующую ноту в соседнюю подколонку). d0 — задержка
+-- головы, e1 — где в строке r1 кончается событие (nil — до конца строки)
+local function sub_free(sub, r0, r1, d0, e1)
+  for r = r0, r1 do
+    local c = sub[r]
+    if c then
+      local ok = (r == r0 and d0 and c.end_d and c.end_d <= d0)
+              or (r == r1 and e1 and c.kind ~= 'cont' and (c.delay or 0) >= e1)
+      if not ok then return false end
+    end
+  end
   return true
 end
 
-local function place(lane, r0, r1, head, cont, tail)
-  if r1 < r0 then r1 = r0 end
+local function place(lane, r0, r1, head, cont, tail, e1)
+  if r1 < r0 then r1 = r0; e1 = nil end
   local sub
   for _, s in ipairs(lane.subs) do
-    if sub_free(s, r0, r1) then sub = s; break end
+    if sub_free(s, r0, r1, head.delay, e1) then sub = s; break end
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
   sub[r0] = head
   for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0 } end
-  if r1 > r0 then sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0 } end
+  if r1 > r0 and not (sub[r1] and sub[r1].kind ~= 'cont') then
+    sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0 }
+    if e1 then sub[r1].end_d = e1 end
+  end
   head.rows = r1 - r0 + 1
   if lane.last_row == nil or r1 > lane.last_row then lane.last_row = r1 end
   for i, s in ipairs(lane.subs) do
@@ -256,7 +270,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     end
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
-  local _, si = place(lane, r0, r1, head)
+  local _, si = place(lane, r0, r1, head, nil, nil, d1 > 0 and d1 or nil)
   -- огибающая громкости take (5 окт): точки — значениями в колонке vol на
   -- строках продолжения (кроссфейд и ручные рампы видны числами, как в Renoise)
   local env = take and R.GetTakeEnvelopeByName(take, 'Volume')
