@@ -325,13 +325,32 @@ end
 -- w / b (6 окт): события ТРЕКА курсора — все его подколонки и лейны
 -- огибающих (точки — тоже события), как слова текста в Vim: строка трека —
 -- строка текста, колонки — слева направо; курсор переходит в колонку события
-local function track_event(f, r)
-  if f.env then return env_has(f, r) end
+-- 9 окт: событие для w / b — голова item, note-off, строка с точкой огибающей
+-- громкости take (cell.vol); strict (W / B) — только головы аудио / MIDI item
+local function is_event(c, strict)
+  if strict then return is_head(c) end
+  return is_head(c) or (c and (c.kind == 'off' or (c.kind == 'cont' and c.vol ~= nil))) or false
+end
+local function track_event(f, r, strict)
+  if f.env then return (not strict) and env_has(f, r) end
   if f.ml or f.folded then return false end
-  for _, sub in ipairs(subs_of(f)) do if is_head(sub[r]) then return true end end
+  for _, sub in ipairs(subs_of(f)) do if is_event(sub[r], strict) then return true end end
   return false
 end
-local function next_track(fi, row, dir)
+-- событие в одной подколонке (операторы dw / d2w — прямоугольник своей подколонки)
+local function next_ev(fi, row, dir)
+  local f = flat()[fi]
+  if not f then return nil end
+  if f.env then return env_next(f, row, dir) end
+  local last = ctx.snap().last_row or 0
+  local r = row + dir
+  while r >= 0 and r <= last + 1 do
+    for _, sub in ipairs(subs_of(f)) do if is_event(sub[r]) then return r end end
+    r = r + dir
+  end
+  return nil
+end
+local function next_track(fi, row, dir, strict)
   local F = flat()
   local f0 = F[fi]
   if not f0 then return nil end
@@ -341,9 +360,9 @@ local function next_track(fi, row, dir)
   local r, first = row, true
   while r >= 0 and r <= last + 1 do
     if dir > 0 then
-      for _, i in ipairs(cols) do if (not first or i > fi) and track_event(F[i], r) then return i, r end end
+      for _, i in ipairs(cols) do if (not first or i > fi) and track_event(F[i], r, strict) then return i, r end end
     else
-      for k = #cols, 1, -1 do local i = cols[k]; if (not first or i < fi) and track_event(F[i], r) then return i, r end end
+      for k = #cols, 1, -1 do local i = cols[k]; if (not first or i < fi) and track_event(F[i], r, strict) then return i, r end end
     end
     first = false; r = r + dir
   end
@@ -387,9 +406,27 @@ local function motion(c, n, op)
   elseif (c == ('w'):byte() or c == ('b'):byte()) and op then
     -- оператор (dw yw cw …) — своя подколонка: прямоугольник через колонки
     -- трека удалял бы лишнее
+    -- 9 окт: dNw — N событий вперёд (с пустой строки — N следующих, не пустоту
+    -- до первого); событий не хватает — до конца трека / начала
     local r = cur.row
     local dir = c == ('w'):byte() and 1 or -1
-    for _ = 1, n do r = next_head(cur.fi, r, dir, false) or r end
+    local f = flat()[cur.fi]
+    if f and f.env then
+      for _ = 1, n do r = next_head(cur.fi, r, dir, false) or r end   -- огибающая — как было (точки)
+    else
+      local steps = n
+      if dir > 0 then
+        local on = false
+        if f then for _, sub in ipairs(subs_of(f)) do if is_event(sub[cur.row]) then on = true end end end
+        if not on then steps = n + 1 end
+      end
+      local last = ctx.snap().last_row or 0
+      for _ = 1, steps do
+        local nr = next_ev(cur.fi, r, dir)
+        if not nr then r = dir > 0 and (last + 1) or 0; break end
+        r = nr
+      end
+    end
     return { fi = cur.fi, row = r, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('w'):byte() or c == ('b'):byte() then
     -- движение w / b — по всем колонкам трека, точки огибающих тоже (6 окт)
@@ -402,10 +439,11 @@ local function motion(c, n, op)
     end
     return { fi = fi, row = r, field = 1, linewise = true }
   elseif c == ('W'):byte() or c == ('B'):byte() then
+    -- 9 окт: W / B — только головы аудио / MIDI item своего трека (w / b — любое событие)
     local fi, r = cur.fi, cur.row
     local dir = c == ('W'):byte() and 1 or -1
     for _ = 1, n do
-      local nfi, nr = next_any(fi, r, dir)
+      local nfi, nr = next_track(fi, r, dir, true)
       if not nfi then break end
       fi, r = nfi, nr
     end

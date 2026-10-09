@@ -194,13 +194,13 @@ keysin('10G'); eq('10G', V.cur.row, 9)
 keysin('}');   eq('} → next bar', V.cur.row, 16)
 keysin('{');   eq('{ → bar start', V.cur.row, 0)
 V.cur.fi = 3; V.cur.row = 0
-keysin('W');   eq('W: nearest event in any column (A sub 2 @2)', V.cur.row, 2); eq('W moves to that column', V.cur.fi, 2)
+keysin('W');   eq('W: next item of its own track (M @4)', V.cur.row, 4); eq('W stays on the track', V.cur.fi, 3)   -- 9 окт: W — только item своего трека
 V.cur.fi = 1; V.cur.row = 0
 keysin('W');   eq('W 1 → A sub2 @2', V.cur.fi * 100 + V.cur.row, 202)
-keysin('W');   eq('W 2 → M @4', V.cur.fi * 100 + V.cur.row, 304)
-keysin('W');   eq('W 3 → A sub1 @8', V.cur.fi * 100 + V.cur.row, 108)
-keysin('B');   eq('B → M @4', V.cur.fi * 100 + V.cur.row, 304)
-keysin('w');   eq('w stays in its column (M @12)', V.cur.fi * 100 + V.cur.row, 312)
+keysin('W');   eq('W 2 → A sub1 @8 (same track)', V.cur.fi * 100 + V.cur.row, 108)
+keysin('W');   eq('W 3 → A @16', V.cur.fi * 100 + V.cur.row, 116)
+keysin('B');   eq('B → A sub1 @8', V.cur.fi * 100 + V.cur.row, 108)
+keysin('w');   eq('w → next event of the track (@16)', V.cur.fi * 100 + V.cur.row, 116)
 -- прокрутка держит курсор
 V.cur.fi = 1; V.cur.row = 0; state.row0 = 0
 keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
@@ -545,7 +545,7 @@ V.cur = { fi = 1, row = 18, field = 1 }; keysin('p'); eq('env register on note c
 V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → range to 2nd point (exclusive)', last(), 'envdelr:Vol@0-8')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw from empty env row → next point', last(), 'envdelr:Vol@9-9')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('db'); eq('db from empty env row → back to previous point', last(), 'envdelr:Vol@3-5')
-V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W reaches env point in any column', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 20)
+V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W skips envelope points (items only)', V.cur.fi * 100 + V.cur.row, 117)
 -- шаг next (3 окт): на следующий объект трека — любая его подколонка
 reset()
 V.cur = { fi = 1, row = 0, field = 1 }
