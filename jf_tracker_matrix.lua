@@ -365,6 +365,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   MX.scroll = math.max(0, math.min(MX.scroll, math.max(0, #regions - nvis)))
   local aw = U.measure('<')
+  MX.loop_rows = {}
   for i = 1, nvis do
     local ri = MX.scroll + i
     local rg = regions[ri]
@@ -388,6 +389,16 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
+    -- 9 окт, луп как в Renoise: верхний / нижний край клетки (3 px) — тянуть луп
+    -- по слотам; строки в лупе REAPER — янтарная скобка слева
+    if hover.ri == ri and mx >= L.mx_label_w and mx < W - 6 then
+      if my - y <= 2 then hover.loopedge = { ri = ri, edge = 'top' }
+      elseif y + rh - 1 - my <= 2 then hover.loopedge = { ri = ri, edge = 'bottom' } end
+    end
+    local lr = info.loop_tr
+    if lr and lr[2] > lr[1] + 1e-4 and rg.pos and rg.pos >= lr[1] - 1e-4 and rg.rgnend <= lr[2] + 1e-4 then
+      MX.loop_rows[#MX.loop_rows + 1] = { ri = ri, y = y }
+    end
     -- цвет региона (2 окт): полоска у края и подкраска под номером и именем —
     -- тот же цвет, что на таймлайне REAPER, в уголке трекера и у номеров шагов
     if not rg.gap and info.region_rgb then
@@ -543,6 +554,22 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if hover.ri == ri and mx >= x and mx < x + L.mx_cell_w then hover.ci = ci end
       if ctx.hint then ctx.hint('mx', x, y, L.mx_cell_w, rh, { ri = ri, ci = ci }) end
       end
+    end
+  end
+  -- луп REAPER на слотах: скобка слева от клеток, линии по краям диапазона
+  do
+    local lrs = MX.loop_rows
+    if #lrs > 0 then
+      local x0, x1 = L.mx_label_w, W - 6
+      local ya, yb = lrs[1].y, lrs[#lrs].y + rh
+      U.set(U.AMBER)
+      gfx.rect(x0 - 3, ya, 2, yb - ya, 1)
+      gfx.rect(x0 - 3, ya, x1 - x0 + 3, 1, 1); gfx.rect(x0 - 3, yb - 1, x1 - x0 + 3, 1, 1)
+    end
+    local e = hover.loopedge
+    if e and MX.row_y[e.ri] then
+      local ey = MX.row_y[e.ri] + (e.edge == 'top' and 0 or rh - 2)
+      U.set(U.AMBER); gfx.rect(L.mx_label_w, ey, W - 6 - L.mx_label_w, 2, 1)
     end
   end
   do

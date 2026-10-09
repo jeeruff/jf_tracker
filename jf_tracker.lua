@@ -3115,6 +3115,14 @@ ctx = {
     local f = io.open(reaper.GetResourcePath() .. '/Data/jf_tracker_cmdhist.txt', 'w')
     if f then for _, l in ipairs(list) do f:write((l:gsub('\n', ' ')), '\n') end; f:close() end
   end,
+  -- луп слотов матрицы (9 окт): от начала слота a до конца слота b (любой порядок), повтор вкл
+  mx_set_loop = function(a, b)
+    local r0, r1 = seq[math.min(a, b)], seq[math.max(a, b)]
+    if not (r0 and r1) then return end
+    reaper.GetSet_LoopTimeRange(true, true, r0.pos, r1.rgnend, false)
+    reaper.GetSetRepeat(1)
+    vim.msg = ('loop: slots %d..%d'):format(math.min(a, b), math.max(a, b))
+  end,
   -- :z / :zi (9 окт, zoxide): браузер — в самую частую и недавнюю папку под слова
   browse_z = function(arg)
     local words = {}
@@ -7331,7 +7339,8 @@ SPROP.init(U, ctx)
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
 local function hint_go(t)
   local d = t.data
-  if t.kind == 'bar' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; state.row0 = math.max(0, math.min(state.row0, d.row))
+  if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда
+  elseif t.kind == 'bar' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; state.row0 = math.max(0, math.min(state.row0, d.row))
   elseif t.kind == 'env' then ctx.set_focus('tracker'); vim.cur.fi = d; vim.cur.field = 1
   elseif t.kind == 'header' or t.kind == 'scope' then
     ctx.set_focus('tracker')
@@ -9551,7 +9560,7 @@ local function frame()
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
+    vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode, loop_tr = { reaper.GetSet_LoopTimeRange(false, true, 0, 0, false) },
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
@@ -10374,6 +10383,7 @@ local function frame()
   elseif hover.sessrow then state.status = 'scene: click / Enter / O - launch every clip of the row (empty cells stop their tracks)'
   elseif hover.sesscol then state.status = 'track: click - stop its clip at the next boundary'
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
+  elseif hover.matrix and hover.matrix.loopedge then state.status = 'cell edge - click / drag: loop these slots (REAPER loop + repeat); a loop is there - its top / bottom edge moves'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
@@ -10599,6 +10609,13 @@ local function frame()
         U.click = false
       end
     end
+  end
+  -- луп слотов матрицы: протяжка за край (9 окт)
+  if ctx.mx_loopdrag then
+    if gfx.mouse_cap & 1 == 1 then
+      local ri = hover.matrix and hover.matrix.ri
+      if ri and ri ~= ctx.mx_loopdrag.last then ctx.mx_loopdrag.last = ri; ctx.mx_set_loop(ctx.mx_loopdrag.a, ri) end
+    else ctx.mx_loopdrag = nil end
   end
   -- панели (9 окт, бета): ручка между листами — протяжка (двойной щелчок —
   -- поровну); подпись стека — активная вкладка (focus_at ниже ставит фокус)
@@ -11288,6 +11305,19 @@ local function frame()
     elseif hover.lanebtn then
       ctx.lane_subs(hover.lanebtn.col, hover.lanebtn.lane, hover.lanebtn.d, hover.lanebtn.n)
       click = { t = now2, zone = 'lanebtn' }
+    elseif hover.matrix and hover.matrix.loopedge then
+      -- 9 окт, луп как в Renoise: край клетки — тянуть луп REAPER по слотам.
+      -- Луп есть — тянется его край (верхний — начало, нижний — конец), нет —
+      -- начинается со щелчка
+      local e = hover.matrix.loopedge
+      local a
+      for _, r in ipairs(MX.loop_rows or {}) do
+        if e.edge == 'top' and (not a or r.ri > a) then a = r.ri end
+        if e.edge == 'bottom' and (not a or r.ri < a) then a = r.ri end
+      end
+      ctx.mx_loopdrag = { a = a or e.ri }
+      ctx.mx_set_loop(ctx.mx_loopdrag.a, e.ri)
+      click = { t = now2, zone = 'mxloop' }
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       if hover.matrix.btn == 'zoom' then ctx.mx_zoom()

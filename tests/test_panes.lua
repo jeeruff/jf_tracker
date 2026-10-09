@@ -60,7 +60,7 @@ eq('hit tab kind', h.kind, 'tab'); eq('hit tab id', h.id, 'sample'); eq('hit tab
 h = PN.hit(lay, c.content.x + 5, c.content.y + 5); eq('hit panel', h.kind, 'panel'); eq('hit panel id', h.id, 'master')
 h = PN.hit(lay, c.hint.x + 5, c.hint.y + 5); eq('hit hint', h.kind, 'hint')
 local g = lay.grips[1]
-h = PN.hit(lay, g.x + 1, g.y + 10); eq('hit grip', h.kind, 'grip')
+h = PN.hit(lay, g.x + g.w // 2, g.y + g.h // 2); eq('hit grip', h.kind, 'grip')
 eq('miss', PN.hit(lay, -5, -5), nil)
 
 -- фокус по направлению из трекера
@@ -69,7 +69,7 @@ eq('tracker r', PN.focus_dir(lay, 'tracker', 'r'), 'browser')   -- наибол�
 eq('tracker u', PN.focus_dir(lay, 'tracker', 'u'), 'master')
 eq('tracker d', PN.focus_dir(lay, 'tracker', 'd'), 'dsp')
 eq('matrix l none', PN.focus_dir(lay, 'matrix', 'l'), nil)
-eq('inst d', PN.focus_dir(lay, 'inst', 'd'), 'browser')
+eq('inst d', PN.focus_dir(lay, 'inst', 'd'), 'slices')   -- справа: lib, slices, браузер
 
 -- move: своп в родителе
 m = PN.DEFAULT()
@@ -127,7 +127,7 @@ eq('split tracker', PN.split(m, 'notes', 'tracker', 'd'), false)
 m = PN.DEFAULT()
 ok('hide browser', PN.hide(m, 'browser')); eq('hidden', m.hidden.browser, true)
 lay = PN.layout(m, 1600, 900, M)
-ok('inst full right column', lay.by_panel.inst.h == 900)
+ok('slices to the bottom', lay.by_panel.slices.y + lay.by_panel.slices.h == 900)
 eq('hide tracker', PN.hide(m, 'tracker'), false)
 ok('show browser', PN.show(m, 'browser'))
 lay = PN.layout(m, 1600, 900, M)
@@ -151,11 +151,13 @@ local r = m.root
 ok('fr sum 1', math.abs(r.fr[1] + r.fr[2] + r.fr[3] - 1) < 1e-6)
 ok('neighbor keeps min', r.fr[2] >= 0.05)
 ok('equalize', PN.equalize(m, 'matrix'))
-ok('thirds', math.abs(r.fr[1] - 1 / 3) < 1e-6)
+local lc = r.kids[1]                                                    -- левая колонка: main над матрицей
+ok('halves in the left column', math.abs(lc.fr[1] - 0.5) < 1e-6)
 lay = PN.layout(m, 1600, 900, M)
 local gr = lay.grips[1]
 local f1 = gr.node.fr[gr.i]
-ok('drag grip', PN.drag_grip(m, lay, gr, 160))
+local nsz = gr.ax == 'h' and lay.nodes[gr.node].w or lay.nodes[gr.node].h
+ok('drag grip', PN.drag_grip(m, lay, gr, nsz * 0.1))
 ok('grip moved +0.1', math.abs(gr.node.fr[gr.i] - f1 - 0.1) < 1e-6)
 
 -- active / cycle

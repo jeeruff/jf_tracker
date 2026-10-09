@@ -25,6 +25,8 @@ local ALPHA = 'asdfghjklqweruiopzxcvnmtyb'
 -- чистил его каждый кадр, и после f меток не было вовсе)
 function H.reset() if not H.active then H.targets = {} end end
 
+H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1,
+            mx = 3, bar = 3, trsmark = 3, sess = 3 }
 function H.add(kind, x, y, w, h, data)
   if H.active then return end        -- во время набора список заморожен
   H.targets[#H.targets + 1] = { kind = kind, x = x, y = y, w = w, h = h, data = data }
@@ -40,7 +42,14 @@ function H.start()
   -- отрисовки
   local lw, lh = H.lw or 16, H.lh or 12
   local placed, k = {}, 0
-  for _, t in ipairs(H.targets) do
+  -- 9 окт: меток 676, целей бывает больше (клетки матрицы, строки) —
+  -- подписи панелей и вкладок, кнопки получают буквы первыми, массовые
+  -- цели — последними (порядок внутри уровня — как рисовались)
+  local order = {}
+  for i, t in ipairs(H.targets) do order[i] = { t = t, i = i, lv = H.LEVEL[t.kind] or 2 } end
+  table.sort(order, function(a, b) if a.lv ~= b.lv then return a.lv < b.lv end return a.i < b.i end)
+  for _, o in ipairs(order) do
+    local t = o.t
     t.label = nil
     local free = k < max
     if free then

@@ -3147,7 +3147,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if info.perf_draw then info.perf_draw(L, ct.x, ct.y, ct.w, ct.h)
         elseif MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
-            return MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+            return MX.draw(L, snap, info.regions or {}, { play_row = ph, loop_tr = info.loop_tr, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
@@ -4481,7 +4481,7 @@ function D.frame(L, snap, rows, state, info)
     local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
     info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, loop_tr = info.loop_tr, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
     -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
     -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)

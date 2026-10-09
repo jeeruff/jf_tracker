@@ -57,19 +57,19 @@ local function node(ax, fr, ...) return { ax = ax, kids = { ... }, fr = fr } end
 local function is_leaf(n) return n.panes ~= nil end
 PN.is_leaf = is_leaf
 
--- сегодняшний вид (9 окт): матрица слева, lib / браузер справа, сверху
--- main | вкладки | slices, снизу fx list | dsp; заметки спрятаны
+-- вид по умолчанию (9 окт): слева main над матрицей, сверху вкладки, снизу
+-- fx list | dsp, справа lib, slices, браузер; заметки спрятаны
 function PN.DEFAULT()
   local tabs = leaf(table.unpack(PN.TABS))
   for i, id in ipairs(tabs.panes) do if id == 'master' then tabs.active = i end end
   return PN.normalize({ v = 1,
     root = node('h', { 0.14, 0.68, 0.18 },
-      leaf('matrix'),
+      node('v', { 0.3, 0.7 }, leaf('ctrl'), leaf('matrix')),
       node('v', { 0.22, 0.60, 0.18 },
-        node('h', { 0.3, 0.55, 0.15 }, leaf('ctrl'), tabs, leaf('slices')),
+        tabs,
         leaf('tracker'),
         node('h', { 0.25, 0.75 }, leaf('fxb'), leaf('dsp'))),
-      node('v', { 0.40, 0.60 }, leaf('inst'), leaf('browser'))),
+      node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser'))),
     hidden = { notes = true } })
 end
 
@@ -421,10 +421,11 @@ function PN.move(model, id, dir)
     par.kids[ix], par.kids[ix + sg] = par.kids[ix + sg], par.kids[ix]
     return bump(model)
   end
-  -- вынуть и подняться (detach опустошает лист — вставляется новый)
+  -- вынуть и подняться (detach опустошает лист — вставляется новый); родитель
+  -- остался (2+ детей) — подъём с него самого, иначе — с того, кто занял место
   local came = detach(model, id)
   lf = leaf(id)
-  local cur = came
+  local cur = (#par.kids >= 2 and parent_of(model, par) ~= nil or model.root == par) and par or came
   while cur do
     local p, i = parent_of(model, cur)
     if not p then break end
@@ -628,39 +629,31 @@ function PN.migrate(old, W, H)
   local m = PN.DEFAULT()
   local root = m.root
   local left, mid, right = root.kids[1], root.kids[2], root.kids[3]
-  local top, bottom = mid.kids[1], mid.kids[3]
+  local bottom = mid.kids[3]
   local function frac(px, total, cur) if px and px > 0 then return math.max(0.05, math.min(0.6, px / total)) end return cur end
   root.fr[1] = frac(old.mxfold and old.mx_fold_px or old.mx_px, W, root.fr[1])
   root.fr[3] = frac(old.side_px, W, root.fr[3])
   mid.fr[1] = frac(old.top_px, H, mid.fr[1])
   right.fr[1] = frac(old.inst_px, H, right.fr[1])
   bottom.fr[1] = frac(old.fxb_px, W, bottom.fr[1])
-  -- остаток — трекеру (середине), чтобы пиксельные доли не сбивала нормировка
   root.fr[2] = math.max(0.2, 1 - root.fr[1] - root.fr[3])
   mid.fr[2] = math.max(0.3, 1 - mid.fr[1] - mid.fr[3])
-  right.fr[2] = 1 - right.fr[1]
   bottom.fr[2] = 1 - bottom.fr[1]
   norm_fr(root); norm_fr(mid); norm_fr(right); norm_fr(bottom)
-  -- main отдельно от вкладок (прежний ctrl_alone): ctrlpos top при вкладках не наверху — левый верх, над матрицей
-  if (old.ctrlpos or 'top') == 'top' and old.toppos and old.toppos ~= 'top' then
-    table.remove(top.kids, 1); table.remove(top.fr, 1); norm_fr(top)
-    root.kids[1] = node('v', { 0.3, 0.7 }, leaf('ctrl'), left)
-  elseif old.ctrlpos == 'mid' then
-    table.remove(top.kids, 1); table.remove(top.fr, 1); norm_fr(top)
-    root.kids[1] = node('v', { 0.7, 0.3 }, left, leaf('ctrl'))
-  elseif old.ctrlpos == 'bottom' then
-    table.remove(top.kids, 1); table.remove(top.fr, 1); norm_fr(top)
-    table.insert(bottom.kids, 1, leaf('ctrl')); table.insert(bottom.fr, 1, 0.25); norm_fr(bottom)
+  -- main: по умолчанию — левый верх (прежний ctrl_alone); вкладки наверху и
+  -- main там же — рядом с вкладками; mid — под матрицей; bottom — в нижней полосе
+  local ctrlpos = old.ctrlpos or 'top'
+  if ctrlpos == 'top' and old.toppos == 'top' then
+    detach(m, 'ctrl'); mid.kids[1] = node('h', { 0.3, 0.7 }, leaf('ctrl'), mid.kids[1])
+  elseif ctrlpos == 'mid' then
+    left.kids[1], left.kids[2] = left.kids[2], left.kids[1]; left.fr[1], left.fr[2] = left.fr[2], left.fr[1]
+  elseif ctrlpos == 'bottom' then
+    detach(m, 'ctrl'); table.insert(bottom.kids, 1, leaf('ctrl')); table.insert(bottom.fr, 1, 0.25); norm_fr(bottom)
   end
   if old.browserleft then
     detach(m, 'browser')
-    local lk = root.kids[1]
-    root.kids[1] = node('v', { 0.5, 0.5 }, lk, leaf('browser'))
-  end
-  if old.slicespos == 'split' then
-    detach(m, 'slices')
-    local rk = PN.find(m, 'inst')
-    insert_beside(m, rk, leaf('slices'), 'd', 0.35)
+    local lk = m.root.kids[1]
+    m.root.kids[1] = node('v', { 0.6, 0.4 }, lk, leaf('browser'))
   end
   PN.normalize(m)
   if old.toptab and PN.find(m, old.toptab) then PN.set_active(m, old.toptab) end
