@@ -2242,6 +2242,20 @@ local function add_empty(rows, pool)
 end
 function D.pool_rows(pool, sort, col, cols)
   local rows = {}
+  if sort == 'type' then
+    -- 9 окт: по типу — группы audio / video (заголовком), внутри — порядок пула;
+    -- automation — как всегда, последней строкой
+    for _, ty in ipairs({ 'audio', 'video' }) do
+      local first = true
+      for i, e in ipairs(pool) do
+        if not e.parent and (e.stype or 'audio') == ty then
+          if first then rows[#rows + 1] = { hdr = ty, name = ty }; first = false end
+          rows[#rows + 1] = { i = i }
+        end
+      end
+    end
+    return add_empty(rows, pool)
+  end
   if sort == 'len' or sort == 'mark' or sort == 'name' then
     local idx = {}
     for i = 1, #pool do idx[i] = i end
@@ -2747,6 +2761,16 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
                      { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' } }
     if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad, false, TILDE, nil } end
     cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + tew, false, 'preview', nil }
+    -- type (9 окт): у правого края строки заголовков — сортировка по типу
+    local tyw = ms('type')
+    local tyx = ix + w - L.pad - 4 - tyw
+    local prevx = cols_h[#cols_h][2] + ms(cols_h[#cols_h][4]) + L.pad
+    if tyx >= prevx then
+      local hot = mx >= tyx and mx < tyx + tyw and my >= hy2 and my < hy2 + L.rh
+      text(tyx, hy2, 'type', sort == 'type' and U.AMBER or (hot and U.TEXT or U.GREY))
+      if hot then hover.poolsortcol = 'type' end
+      hint('poolsortcol', tyx, hy2, tyw, L.rh, 'type')
+    end
     for k, h2 in ipairs(cols_h) do
       local x1 = cols_h[k + 1] and cols_h[k + 1][2] or (ix + w - L.pad)
       if h2[2] + ms(h2[4]) <= x1 then

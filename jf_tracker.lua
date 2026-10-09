@@ -5567,7 +5567,7 @@ ctx = {
       flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
-      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark' }, desc = 'lib order: by track / name / length / marks (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
+      { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
@@ -9979,7 +9979,7 @@ local function frame()
     state.status = st == 'on' and ('swap: the sample plays ' .. (file or '?') .. ' - click: back to the original file')
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
-  elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len; numbers stay'
+  elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
   elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
@@ -10533,7 +10533,7 @@ local function frame()
     elseif hover.poolsortcol then
       local k = hover.poolsortcol
       state.poolsort = (k == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or k
-      vim.msg = 'lib order: ' .. ({ track = 'tree by track', mark = 'marks @ $ *', name = 'name', len = 'length' })[state.poolsort]
+      vim.msg = 'lib order: ' .. ({ track = 'tree by track', mark = 'marks @ $ *', name = 'name', len = 'length', type = 'type: audio / video' })[state.poolsort]
       click = { t = now2, zone = 'poolsortcol' }
     elseif hover.poolsort then
       ctx.set_focus('inst')

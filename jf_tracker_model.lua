@@ -736,8 +736,13 @@ end
 
 pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   local gkey = key
+  local src0 = R.GetMediaItemTake_Source(take)
+  -- тип источника (9 окт, сортировка lib по типу): video / audio (MIDI в lib не попадает)
+  local ps = src0 and R.GetMediaSourceParent and R.GetMediaSourceParent(src0) or nil
+  local stype = src0 and R.GetMediaSourceType and R.GetMediaSourceType(ps or src0, '') or ''
   pool[at] = {
-    item = it, take = take, name = name, src = R.GetMediaItemTake_Source(take),
+    item = it, take = take, name = name, src = src0,
+    stype = (stype:upper():find('VIDEO', 1, true) and 'video') or 'audio',
     ord = tonumber((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ord', '', false)))),   -- порядок в lib (3 окт, перетаскивание)
     offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS'),
     len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
