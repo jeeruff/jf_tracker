@@ -3406,8 +3406,11 @@ function D.frame(L, snap, rows, state, info)
         -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
         -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
         if mixcol then
-          D.mcb_w = (lw1 - 2 * L.pad >= fxb + 2 * L.btn_w + 4 + L.pad + 5 * L.cw + 4) and 2 * L.btn_w or L.btn_w
-          D.mcb_h = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 6) - 2))
+          -- квадратные (9 окт): сторона — по высоте, не шире места, при котором эффекты остаются сбоку
+          local hmax = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 6) - 2))
+          local wmax = math.max(L.btn_w, lw1 - 2 * L.pad - fxb - 4 - L.pad - 5 * L.cw - 4)
+          D.mcb_w = math.max(L.btn_w, math.min(hmax, wmax))
+          D.mcb_h = D.mcb_w
         end
       end
       local function hbtn(b, x, by, bwk, bh)
@@ -3416,7 +3419,7 @@ function D.frame(L, snap, rows, state, info)
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
         set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
         set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, bh, 0)
-        text(x + math.floor((bwk - ms(b[1])) / 2), by + math.floor((bh - (L.rh - 2)) / 2), b[1], on and b[3] or BTXT)
+        text(x + math.floor((bwk - ms(b[1])) / 2), by + math.floor((bh - (L.rh - 2)) / 2), b[1], on and b[3] or (b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or BTXT))   -- 9 окт: R — красная всегда
         if b[4] == 'phase' then
           if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.trkio = { col = col, what = 'phase' } end
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })

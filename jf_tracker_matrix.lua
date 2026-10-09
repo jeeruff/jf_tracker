@@ -221,8 +221,11 @@ function MX.width(L, nregions, ncols)
   L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
   L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
-  L.mx_sig_w = MX.fold and 0 or (U.measure('15/16') + L.pad)         -- размер такта в начале региона (5 окт)
-  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + U.measure('WWWWWW') + L.pad + L.mx_sig_w + L.mx_dur_w)
+  -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
+  L.mx_sig_w = (MX.fold or MX.sig_same) and 0 or (U.measure('15/16') + L.pad)
+  -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
+  local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
+  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
   L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
@@ -253,6 +256,22 @@ end
 -- Возвращает hover = { ri=, ci=, prev=, next=, btn= }.
 
 function MX.draw(L, snap, regions, info, Y, Wd, Hd)
+  do   -- 9 окт: ширина имени региона на следующий кадр (MX.width) — по всем регионам, не по видимым
+    local w = 0
+    local s0, same = nil, true
+    for _, rg in ipairs(regions) do
+      if not rg.gap then
+        w = math.max(w, U.measure(rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))
+        if info.sig_at then
+          local n, d = info.sig_at(rg.pos)
+          local k = (n or 4) .. '/' .. (d or 4)
+          if s0 and k ~= s0 then same = false end
+          s0 = s0 or k
+        end
+      end
+    end
+    MX.rgname_px, MX.sig_same = w, same
+  end
   -- пустой проект (нет регионов) — матрица всё равно видна: кнопки, + (2 окт)
   local grid = MX.grid(snap, regions)
   local W = Wd or L.matrix_w                -- 9 окт, панели: ширина и верх / низ листа (x — 0, сдвиг буфером)
@@ -486,7 +505,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
-    U.text(nx, y + 1, ctx.fit(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))), nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
+    local rgn = rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)))
+    U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
     if MX.cur.ri == ri and MX.cur.ci == 0 then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
