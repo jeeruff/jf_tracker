@@ -3508,6 +3508,56 @@ ctx = {
     model.invalidate()
     vim.msg = (col.name ~= '' and col.name or 'track') .. ': ' .. what .. ' ' .. (on and 'on' or 'off')
   end,
+  -- t-операции (9 окт): цвет, дубль, перенос трека курсора
+  cur_col = function() return cur_col() end,
+  track_colour = function()
+    local col = cur_col(); if not (col and col.track) then return end
+    local tr = col.track
+    local PAL = { { 'red', 210, 70, 60 }, { 'orange', 230, 140, 50 }, { 'yellow', 220, 200, 70 }, { 'lime', 150, 210, 70 },
+                  { 'green', 70, 180, 90 }, { 'teal', 60, 180, 170 }, { 'cyan', 80, 190, 230 }, { 'blue', 80, 120, 220 },
+                  { 'violet', 150, 100, 220 }, { 'magenta', 210, 90, 190 }, { 'pink', 240, 150, 180 }, { 'grey', 140, 140, 140 } }
+    local items = {}
+    for _, c in ipairs(PAL) do items[#items + 1] = { label = c[1], col = { c[2] / 255, c[3] / 255, c[4] / 255 }, data = reaper.ColorToNative(c[2], c[3], c[4]) | 0x1000000 } end
+    items[#items + 1] = { label = 'random', data = 'rnd' }
+    items[#items + 1] = { label = 'default (theme)', data = 0 }
+    items[#items + 1] = { label = 'custom... (REAPER colour dialog)', data = 'dlg' }
+    vim.open_picker('colour of ' .. (col.name ~= '' and col.name or 'track'), items, function(it)
+      local v = it.data
+      if v == 'rnd' then v = reaper.ColorToNative(math.random(60, 240), math.random(60, 240), math.random(60, 240)) | 0x1000000 end
+      if v == 'dlg' then
+        local ok, c = reaper.GR_SelectColor(nil, reaper.GetTrackColor(tr))
+        if not ok or ok == 0 then return end
+        v = c | 0x1000000
+      end
+      edit.run('track colour', function() reaper.SetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR', v) end)
+      model.invalidate()
+      vim.msg = 'tc: ' .. it.label
+    end)
+  end,
+  track_dup = function()
+    local col = cur_col(); if not (col and col.track) then return false end
+    edit.run('duplicate track', function()
+      reaper.SetOnlyTrackSelected(col.track)
+      reaper.Main_OnCommand(40062, 0)                     -- Track: Duplicate tracks (копия встаёт после, выделена)
+    end)
+    model.invalidate()
+    ctx.goto_track = reaper.GetSelectedTrack(0, 0)
+    vim.msg = 'ty: ' .. (col.name ~= '' and col.name or 'track') .. ' duplicated'
+    return true
+  end,
+  track_move = function(d, n)
+    local col = cur_col(); if not (col and col.track) then return false end
+    local idx = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')) - 1
+    local to = math.max(0, math.min(reaper.CountTracks(0) - 1, idx + d * (n or 1)))
+    if to == idx then return false end
+    edit.run('move track', function()
+      reaper.SetOnlyTrackSelected(col.track)
+      reaper.ReorderSelectedTracks(d > 0 and to + 1 or to, 0)
+    end)
+    model.invalidate()
+    ctx.goto_track = col.track
+    return true
+  end,
   mono_toggle = function()
     state.slicemono = not state.slicemono; edit.mono = state.slicemono
     vim.msg = state.slicemono and 'mono: one voice per track - a new note cuts what still sounds on the track' or 'poly: notes may ring over each other (only the same subcolumn is cut)'

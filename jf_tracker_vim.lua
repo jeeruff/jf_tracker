@@ -1766,7 +1766,21 @@ function V.key_impl(c)
     elseif p == 't' then
       if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
       elseif (c == ('s'):byte() or c == ('r'):byte()) and ctx.bus_track and ctx.bus_track(c == ('s'):byte() and 'send' or 'recv') then finish_edit()   -- ts / tr
-      else finish_move() end
+      -- 9 окт: всё про трек — под t, мнемонично (which-key 't')
+      elseif c == ('y'):byte() and ctx.track_dup and ctx.track_dup() then finish_edit()
+      elseif (c == ('j'):byte() or c == ('k'):byte()) and ctx.track_move and ctx.track_move(c == ('j'):byte() and 1 or -1, n) then finish_edit()
+      else
+        local ch = string.char(c < 256 and c or 0)
+        local col = ctx.cur_col and ctx.cur_col()
+        if ch == 'n' and ctx.rename_track_prompt then ctx.rename_track_prompt(); V.count = nil; return   -- режим cmd уже включён
+        elseif ch == 'c' and ctx.track_colour then ctx.track_colour()
+        elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm()
+        elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)
+        elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
+        elseif ch == 'f' and ctx.fx_picker then ctx.fx_picker()
+        elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col) end
+        finish_move()
+      end
       V.count = nil; return
     elseif p == 'da' then
       -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)

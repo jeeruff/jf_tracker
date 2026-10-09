@@ -102,6 +102,12 @@ local function reset()
   V.init({
     edit = E, state = state, piano = keys.piano,
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
+    track_dup = function() calls[#calls + 1] = 'tdup'; return true end,                -- 9 окт: t-операции
+    track_move = function(d, n) calls[#calls + 1] = 'tmove:' .. d .. ':' .. (n or 1); return true end,
+    track_colour = function() calls[#calls + 1] = 'tcol' end, rec_arm = function() calls[#calls + 1] = 'tarm' end,
+    toggle_lanes = function() calls[#calls + 1] = 'tlanes' end, fx_picker = function() calls[#calls + 1] = 'tfx' end,
+    cur_col = function() return { name = 'A', guid = 'g' } end,
+    input_picker = function() calls[#calls + 1] = 'tin' end, route_menu = function() calls[#calls + 1] = 'troute' end,
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
     snap = function() return snap end, layout = function() return L end, relayout = layout,
     bar_of_row = function(row) local b = math.floor(row / 16) * 16; return b, b + 16 end,
@@ -227,6 +233,12 @@ reset()
 keysin('vM');      eq('vM mutes the event (kick)', last(), 'mute:kick')
 reset()
 keysin('M');       eq('M (Shift+m) mutes the track', last(), 'track:mute')
+-- t-операции (9 окт)
+for _, c in ipairs({ { 'ty', 'tdup' }, { '3tj', 'tmove:1:3' }, { 'tk', 'tmove:-1:1' }, { 'tc', 'tcol' }, { 'ta', 'tarm' },
+                     { 'tl', 'tlanes' }, { 'tf', 'tfx' }, { 'ti', 'tin' }, { 'tR', 'troute' } }) do
+  reset(); keysin(c[1]); eq('t-op ' .. c[1], last(), c[2]); eq('t-op ' .. c[1] .. ' clears pending', V.pending, nil)
+end
+reset()
 reset()
 keysin('S');       eq('S (Shift+s) solos the track', last(), 'track:solo')
 reset()
