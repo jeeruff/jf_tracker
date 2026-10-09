@@ -7520,6 +7520,8 @@ local function hint_go(t)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
   elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
+  elseif t.kind == 'dsprouting' then state.dsp_routing = not state.dsp_routing or nil   -- 9 окт
+  elseif t.kind == 'dsptarget' then ctx.set_focus('dsp'); ctx.dsp_toggle_target(d == 'take')
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
 end
@@ -9700,6 +9702,7 @@ local function frame()
     clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
+    dsp_routing = state.dsp_routing,                  -- 9 окт: маршрутизация всех треков в DSP
     draw_router = function(x, y, w, h)
       local root, _, title = ctx.db_tree()
       if not root then return {} end
@@ -10446,6 +10449,7 @@ local function frame()
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
+  elseif hover.dsprouting then state.status = 'routing: sends > and receives < of every track under its channel; click a row - routing window'
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -11567,6 +11571,10 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
+    elseif hover.dsprouting then
+      state.dsp_routing = not state.dsp_routing or nil
+      vim.msg = 'DSP routing (all tracks): ' .. (state.dsp_routing and 'on - under each channel what goes where, click: routing window' or 'off')
+      click = { t = now2, zone = 'dsprouting' }
     elseif hover.dsprouter then
       -- router (7 окт): щелчок — вкл / выкл в DSP FX, Shift+щелчок — большой роутер
       if gfx.mouse_cap & 8 == 8 then ctx.router_big() else ctx.dsp_big() end

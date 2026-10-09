@@ -25,7 +25,7 @@ local ALPHA = 'asdfghjklqweruiopzxcvnmtyb'
 -- чистил его каждый кадр, и после f меток не было вовсе)
 function H.reset() if not H.active then H.targets = {} end end
 
-H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1,
+H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1,
             mx = 3, bar = 3, trsmark = 3, sess = 3, mxname = 3, mxdur = 3, fxbrow = 3 }
 function H.add(kind, x, y, w, h, data)
   if H.active then return end        -- во время набора список заморожен
