@@ -57,6 +57,11 @@ function SP.fit_w(L, w, h)
   local per = math.max(1, math.floor((h - L.rh) / L.rh))
   local ncols = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
   local colw = math.floor((w + L.pad) / ncols)
+  -- 9 окт: колонка — по содержимому (имя + длинное значение / слайдер 16
+  -- знаков), не на всё место: пустоту справа — волне, кнопки над ней влезают
+  local lw = 0
+  for _, r in ipairs(SP.ROWS) do lw = math.max(lw, U.measure(r.label)) end
+  colw = math.min(colw, lw + 2 * L.pad + L.cw * 31)
   local need = math.min(ncols, math.ceil(#SP.ROWS / per))
   return math.min(w, need * colw)
 end
