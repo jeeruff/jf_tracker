@@ -3641,7 +3641,7 @@ function D.frame(L, snap, rows, state, info)
           local yy = ypos(m)
           set(m == 0 and U.readable(U.TEXT, dark, 4) or tick); gfx.rect(bx0 + 1, yy, 2, 1, 1); gfx.rect(bx0 + bw0 - 3, yy, 2, 1, 1)
           -- подпись — только если не налезает на предыдущую (без наложений)
-          local ly = yy - math.floor(L.rh / 2)
+          local ly = yy - D.SPACE - math.floor((L.th or L.rh) / 2)   -- 9 окт: центр цифры — ровно на риске
           if (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
             if lblw > 0 then

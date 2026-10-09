@@ -39,6 +39,25 @@ KH.PAGES = {
     { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (q 2 w 3 ... = S01 S02 ...); not sliced - the sample at that pitch. Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). Select: the slice list, Option+J / K, the last played' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
+  pane = { title = 'panes (tmux / zellij)', e = {
+    { k = '⌘h ⌘j ⌘k ⌘l', d = 'focus the pane on the left / below / above / on the right (like dwm), from any pane' },
+    { k = '⌘⇧h ⌘⇧j ⌘⇧k ⌘⇧l', d = 'move the pane there (out of its stack if it is a tab)' },
+    { k = '⌥Tab', d = 'next pane in the tree order (Shift - back)' },
+    { k = 'Ctrl+W', d = 'pane mode (sticky, Esc out): the keys below, the pane numbers on the borders' },
+    { k = 'h j k l  H J K L', d = 'focus / move by direction' },
+    { k = 'w W  1..9', d = 'next / previous pane, pane by number' },
+    { k = 'g + key', d = 'go to a panel (a hidden one appears): m matrix b browser l lib n main s slices o notes f fx d dsp r rec i item a automation M midi h harmonizer c scopes S master v video' },
+    { k = 's v + key', d = 'split below / right with that panel (it moves here)' },
+    { k = 'T + key  B', d = 'that panel into this stack (a tab) / this tab out of the stack' },
+    { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
+    { k = 'Tab', d = 'next tab of the stack' },
+    { k = '+ -  < >  =', d = 'height / width / equal in the parent' },
+    { k = 'z', d = 'zoom the pane to the window, again - back (also :big for item)' },
+    { k = 'c', d = 'hide the pane (g + key brings it back)' },
+    { k = 'Space  u', d = 'next layout (main-left, main-right, wide, stack, tracker) / undo' },
+    { k = ':pane', d = ':pane dsp with item, :pane browser hide | show | left | right, :pane matrix zoom, :pane reset, :pane wide; no argument - the layout string' },
+    { k = 'mouse', t = {}, d = 'click - focus; click a title - that tab; drag the line between panes - size, dblclick - equal; right-click a title - hide' },
+  } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
     { k = 'H L', d = 'previous / next track' },
@@ -206,7 +225,7 @@ KH.PAGES = {
     { k = 'rclick', t = {}, d = 'menu: launch / scene / stop / quantize / off' },
     { k = 'zz Esc', d = 'back to the matrix - the clips keep playing' },
     { k = 'Tab', d = 'tracker <-> session: clips in place of the tracker (same columns); in the session the keyboard is CLIP MODE - q..p a..l z..m launch the clip under the letter, Shift - the scene, 1..0 stop a track, ; jump labels; Shift+Tab - the focus backwards' },
-    { k = 'A-Tab C-Tab', d = 'focus round the modules (was Tab) / tabs of the top panel (was Option+Tab)' },
+    { k = 'A-Tab C-Tab', d = 'next pane in the tree order / next tab of the stack' },
     { k = 'zs', d = 'session (same as Tab): a clip is a 3-row block, a / A - its follow action (loop, next, previous, first, random, stop)' },
     { k = 'R', d = 'record into the clip: arms the track, the slot as the auto-punch selection, a bar of count-in, stops at the slot end' },
     { k = 'dd Del', d = 'delete the clip (its items in the slot)' },
@@ -434,7 +453,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
