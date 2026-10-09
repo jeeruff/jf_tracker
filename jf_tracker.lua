@@ -1890,6 +1890,84 @@ ctx = {
   -- огибающая: колонка огибающей под курсором трекера, иначе выбранная в
   -- REAPER (своя запись из снимка, если трек виден). Где: time selection,
   -- иначе регион курсора, иначе такт от строки курсора.
+  -- кривая автоматизации целиком (9 окт, страница curve вкладки automation):
+  -- огибающая под курсором (цель LFO) на весь отрезок переключателя proj |
+  -- region — регион курсора или весь проект. Кэш по изменениям проекта и
+  -- ширине; точки огибающей, границы слотов, курсор и плейхед. Щелчок —
+  -- курсор трекера на это время
+  curve_cache = {},
+  curve_draw = function(Lx, x, y, w, h)
+    local tgt = ctx.lfo_target()
+    local e = tgt and tgt.e
+    local env = e and e.env
+    if not (env and reaper.ValidatePtr(env, 'TrackEnvelope*')) then
+      U.text(x + Lx.pad, y + 2, ctx.fit('curve: put the cursor on an envelope lane (or select an envelope) - its whole curve shows here', w - 2 * Lx.pad), U.GREY)
+      return nil
+    end
+    local t0, t1 = 0, math.max(1, reaper.GetProjectLength(0))
+    if state.view_reg then
+      local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+      if rg then t0, t1 = rg.pos, rg.rgnend end
+    end
+    local head = ('%s   %s %.1f-%.1f s   (proj | region switch in the corner)'):format(tgt.label or 'envelope', state.view_reg and 'region' or 'project', t0, t1)
+    U.text(x + Lx.pad, y + 1, ctx.fit(head, w - 2 * Lx.pad), U.CYAN)
+    local gx, gy, gw, gh = x + Lx.pad, y + Lx.rh + 3, w - 2 * Lx.pad, h - Lx.rh - 5
+    if gw < 10 or gh < 10 then return nil end
+    U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
+    U.set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
+    local mn, mx2 = e.min or 0, e.max or 1
+    if mx2 - mn < 1e-9 then mx2 = mn + 1 end
+    local mode = reaper.GetEnvelopeScalingMode and reaper.GetEnvelopeScalingMode(env) or 0
+    local function frac(v)
+      if mode ~= 0 and reaper.ScaleFromEnvelopeMode then v = reaper.ScaleFromEnvelopeMode(mode, v) end
+      return math.max(0, math.min(1, (v - mn) / (mx2 - mn)))
+    end
+    local sc = reaper.GetProjectStateChangeCount(0)
+    local c = ctx.curve_cache
+    if c.env ~= env or c.sc ~= sc or c.w ~= gw or c.t0 ~= t0 or c.t1 ~= t1 then
+      local ys = {}
+      for i = 0, gw - 1 do
+        local _, v = reaper.Envelope_Evaluate(env, t0 + (t1 - t0) * i / math.max(1, gw - 1), 0, 0)
+        ys[i] = frac(v or 0)
+      end
+      local pts = {}
+      local np = reaper.CountEnvelopePoints(env)
+      for i = 0, np - 1 do
+        local _, t, v = reaper.GetEnvelopePoint(env, i)
+        if t >= t0 and t <= t1 then pts[#pts + 1] = { t, frac(v) } end
+        if #pts > 4000 then break end
+      end
+      ctx.curve_cache = { env = env, sc = sc, w = gw, t0 = t0, t1 = t1, ys = ys, pts = pts }
+      c = ctx.curve_cache
+    end
+    local function tx(t) return gx + math.floor((t - t0) / (t1 - t0) * (gw - 1) + 0.5) end
+    -- границы слотов (регионов) — тонко
+    U.set(U.mix(U.LINE, U.BG, 0.4))
+    for _, rg in ipairs(seq or {}) do if rg.pos > t0 and rg.pos < t1 then gfx.rect(tx(rg.pos), gy + 1, 1, gh - 2, 1) end end
+    -- кривая
+    local col2 = (ctx.env_colour and ctx.env_colour(e)) or U.GREEN
+    U.set(col2)
+    local px, py
+    for i = 0, gw - 1 do
+      local yy = gy + gh - 2 - math.floor(c.ys[i] * (gh - 4) + 0.5)
+      if px then gfx.line(px, py, gx + i, yy) end
+      px, py = gx + i, yy
+    end
+    -- точки
+    for _, p in ipairs(c.pts) do gfx.rect(tx(p[1]) - 1, gy + gh - 2 - math.floor(p[2] * (gh - 4) + 0.5) - 1, 3, 3, 1) end
+    -- курсор трекера и плейхед
+    local ct = edit.row_time(vim.cur.row, state.lpb, 0)
+    if ct >= t0 and ct <= t1 then U.set(U.AMBER); gfx.rect(tx(ct), gy + 1, 1, gh - 2, 1) end
+    if reaper.GetPlayState() & 1 == 1 then
+      local pp = reaper.GetPlayPosition()
+      if pp >= t0 and pp <= t1 then U.set(U.GREEN); gfx.rect(tx(pp), gy + 1, 1, gh - 2, 1) end
+    end
+    local mxp, myp = gfx.mouse_x, gfx.mouse_y
+    if mxp >= gx and mxp < gx + gw and myp >= gy and myp < gy + gh then
+      return { pane = 'curve', curve_t = t0 + (t1 - t0) * (mxp - gx) / math.max(1, gw - 1) }
+    end
+    return nil
+  end,
   lfo_target = function()
     local ae = state.ai_edit
     if ae and mod_pane == 'ai' and not ae.take and reaper.ValidatePtr(ae.env, 'TrackEnvelope*') then   -- огибающая take — время item, генератор пишет в проектном
@@ -10445,6 +10523,11 @@ local function frame()
         end
       end
       local function left(lx, ly, lw2, lh)
+        if mod_pane == 'curve' then                     -- 9 окт: кривая целиком
+          local hv = ctx.curve_draw(Lx, lx, ly, lw2, lh)
+          if hv then lfo_hover = lfo_hover or hv end
+          return nil
+        end
         if mod_pane == 'ai' then
           ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
           ctx.AIE.swing_qn = edit.swing_qn
@@ -10465,7 +10548,7 @@ local function frame()
         return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curves', 'lfo' } })
+        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' }, { 'curves', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -10478,7 +10561,7 @@ local function frame()
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' } } or { { 'params', 'params' }, { 'matrix', 'matrix' } })
+      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' } })   -- 9 окт: curve — кривая целиком
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
     end,
     sample_draw = function(x, y, w, h)
@@ -11735,6 +11818,9 @@ local function frame()
     elseif lfo_hover and state.top and state.toptab == 'modulation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
+      if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
+        vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
+      end
       if lfo_hover.field then
         LG.sel = lfo_hover.field
         local f = LG.FIELDS[lfo_hover.field]

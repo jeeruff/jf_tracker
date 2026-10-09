@@ -362,7 +362,9 @@ function PM.grid(w, cw, pad, rh, shape, thumb_on)
   -- вид, 6 окт): три строки, волна — в квадрате превью; превью — квадрат слева
   local rows_txt = shape == 'compact' and 3 or 4
   local card_h = rows_txt * rh + 3 * pad
-  local thumb = thumb_on ~= false and (card_h - 2 * pad) or 0
+  -- 9 окт: рамка карточки — card_h − pad; превью внутри неё с отступом pad
+  -- сверху и снизу (было card_h − 2 pad — ложилось на рамку и вылезало)
+  local thumb = thumb_on ~= false and math.max(4, card_h - 3 * pad - 1) or 0
   local min_w = thumb + (thumb > 0 and pad or 0) + 9 * cw + 2 * pad
   local cols = math.max(1, math.floor((w - pad) / (min_w + pad)))
   local card_w = math.floor((w - (cols + 1) * pad) / cols)

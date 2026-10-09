@@ -91,7 +91,7 @@ eq('square: narrow sidebar 2 cols', PM.grid(20 * 8, 8, 4, 10, 'square').cols, 2)
 eq('square: big 10 cols', PM.grid(1600, 16, 4, 18, 'square').cols, 10)
 -- wide (по умолчанию): высота три строки, превью квадрат слева, ширина >= превью + 9 символов
 local Gw = PM.grid(36 * 8, 8, 4, 10)
-eq('wide default shape', Gw.shape, 'wide'); eq('wide height 4 rows', Gw.card_h, 4 * 10 + 12); eq('wide thumb = height', Gw.thumb, Gw.card_h - 8)
+eq('wide default shape', Gw.shape, 'wide'); eq('wide height 4 rows', Gw.card_h, 4 * 10 + 12); eq('wide thumb inside the frame (card_h - 3 pad - 1)', Gw.thumb, Gw.card_h - 13)
 eq('wide sidebar 2 cols at 36cw', Gw.cols, 2); eq('wide narrow sidebar 1 col', PM.grid(20 * 8, 8, 4, 10).cols, 1); eq('wide 1600: many cols', PM.grid(1600, 8, 4, 10).cols >= 8, true)
 local Gc = PM.grid(36 * 8, 8, 4, 10, 'compact'); eq('compact 3 rows', Gc.card_h, 3 * 10 + 12); eq('compact side text', Gc.side, true)
 eq('shape cycle', PM.next_shape('wide') .. PM.next_shape('compact') .. PM.next_shape('square'), 'compactsquarewide')
