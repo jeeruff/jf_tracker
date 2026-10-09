@@ -612,6 +612,7 @@ end
 local function pool_select(n)
   state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
   local col = cur_col()
+  if col and state.instfx then state.instfx[col.guid] = nil end   -- 9 окт: сэмпл вместо плагина-инструмента
   local pool = col and col.pool or {}
   n = math.max(1, math.min(#pool + draw.empty_slots(#pool), n))
   -- слайсы в lib не показываются (3 окт): шаг на слайс — дальше, к следующему
@@ -714,7 +715,7 @@ ctx = {
   ins_advance = function(rows) vim.cur.row = vim.cur.row + math.max(1, rows or (vim.step_auto and 1 or vim.step)) end,
   insert_note_cmd = function(pitch, rows)
     local tr, lane, inst = ctx.ins_target(); if not tr then return end
-    edit.insert_note(tr, lane, state.lpb, vim.cur.row, pitch, vim.vel, rows or math.max(1, vim.step), inst and inst.item)
+    edit.insert_note(tr, lane, state.lpb, vim.cur.row, pitch, vim.vel, rows or math.max(1, vim.step), ctx.inst_src(cur_col(), inst))
     model.invalidate(); vim.msg = 'note ' .. model.note_name(pitch); ctx.ins_advance(rows)
   end,
   insert_slice_cmd = function(k, rows, semis)
@@ -3096,6 +3097,48 @@ ctx = {
       ctx.arr_k = k
     end
     return k.name, k.c, k.n
+  end,
+  -- инструменты-плагины трека (9 окт): VSTi / VST3i / AUi / CLAPi / LV2i и
+  -- JSFX-инструменты (по имени). Кэш по снимку. Выбранный в lib — state.instfx
+  -- [guid] = fx: ноты с клавиатуры пишутся MIDI в трек (звучит плагин)
+  track_insts = function(col)
+    if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return {} end
+    ctx.ti_cache = (ctx.ti_cache and ctx.ti_cache.snap == snap) and ctx.ti_cache or { snap = snap }
+    local c = ctx.ti_cache[col.guid]
+    if c then return c end
+    c = {}
+    for fx = 0, reaper.TrackFX_GetCount(col.track) - 1 do
+      local _, raw = reaper.TrackFX_GetFXName(col.track, fx, '')
+      raw = raw or ''
+      local lo = raw:lower()
+      if raw:match('^%a+i:') or (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true))) then
+        local nm = (raw:gsub('^[^:]*: ', ''))
+        for _, f in ipairs(col.fx or {}) do if f.i == fx and f.name and f.name ~= '' then nm = f.name; break end end   -- имя как в DSP (slixer, не описание JSFX)
+        c[#c + 1] = { fx = fx, name = nm, kind = (raw:match('^(%a+):') or 'fx'):lower() }   -- kind: js / vsti / vst3i / aui / clapi
+      end
+    end
+    ctx.ti_cache[col.guid] = c
+    return c
+  end,
+  inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
+  -- что пишет нота: 'midi' — выбран плагин-инструмент, иначе item сэмпла
+  inst_src = function(col, inst)
+    if ctx.inst_fx(col) then return 'midi' end
+    return inst and inst.item
+  end,
+  inst_fx_pick = function(col, fx, dbl)
+    if not col then return end
+    state.instfx = state.instfx or {}
+    state.instfx[col.guid] = fx
+    state.auto_inst = false
+    if dbl then reaper.TrackFX_Show(col.track, fx, 3); return end
+    -- DSP — на этот эффект
+    for k, f in ipairs(col.fx or {}) do if f.i == fx then dsp_sel.fx = k; dsp_sel.param = 1; break end end
+    state.dsp_take = nil
+    if state.panes_ui and L and L.pn then ctx.pane_focus('dsp') else state.dsp = true end
+    ctx.set_focus('dsp')
+    local _, nm = reaper.TrackFX_GetFXName(col.track, fx, '')
+    vim.msg = 'instrument: ' .. (nm or ''):gsub('^[^:]*: ', '') .. ' - note keys write MIDI to it (dblclick: its window; pick a sample in the lib to go back)'
   end,
   -- маршрутизация трека (9 окт): fzf-попап в стиле трекера (не нативное
   -- меню). Строки — цветом S R O: send > голубые, recv < зелёные, hw >
@@ -7392,6 +7435,7 @@ ctx = {
     return { title = 'keys (Esc)', items = items }
   end,
   preview = function(track, pitch, inst_item, row, step)
+    if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
     if inst_item and PV.available() then
       local has_midi = false
       for i = 0, reaper.CountTrackMediaItems(track) - 1 do
@@ -7400,6 +7444,30 @@ ctx = {
       end
       if not has_midi then PV.audio(track, inst_item, pitch - model.BASE_NOTE); return end
     end
+    -- 9 окт: MIDI-превью (проигрывание от строки) — только если на треке есть
+    -- кому звучать: плагин-инструмент или MIDI; пустой слот на пустом треке
+    -- молчит (W в KEYS запускала play всего проекта)
+    local has_midi = false
+    for i = 0, reaper.CountTrackMediaItems(track) - 1 do
+      local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(track, i))
+      if tk and reaper.TakeIsMIDI(tk) then has_midi = true; break end
+    end
+    local col
+    for _, c in ipairs(snap and snap.cols or {}) do if c.track == track then col = c; break end end
+    -- плагин-инструмент: нота прямо в него (виртуальная клавиатура REAPER —
+    -- слышит взведённый трек с MIDI-входом), note-off через 0.4 с
+    if col and #ctx.track_insts(col) > 0 and (not has_midi or ctx.inst_fx(col)) then
+      if reaper.GetMediaTrackInfo_Value(track, 'I_RECARM') ~= 1 then
+        vim.msg = 'instrument preview: arm the track (R) with a MIDI input - the plugin hears the keys then'
+        return
+      end
+      local p = math.max(0, math.min(127, math.floor(pitch)))
+      reaper.StuffMIDIMessage(0, 0x90, p, math.max(1, math.min(127, vim.vel or 100)))
+      ctx.note_offs = ctx.note_offs or {}
+      ctx.note_offs[#ctx.note_offs + 1] = { p = p, t = reaper.time_precise() + 0.4 }
+      return
+    end
+    if not has_midi then return end
     local t0 = edit.row_time(row, state.lpb, 0)
     local t1 = edit.row_time(row + math.max(1, step or 1), state.lpb, 0)
     PV.midi(t0, t1)
@@ -7690,6 +7758,7 @@ local function hint_go(t)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
   elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
+  elseif t.kind == 'poolinst' then ctx.inst_fx_pick(cur_col(), d)
   elseif t.kind == 'dsptarget' then ctx.set_focus('dsp'); ctx.dsp_toggle_target(d == 'take')
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
@@ -9646,6 +9715,14 @@ local function frame()
     end
   else ctx.mx_selk = nil end
 
+  -- 9 окт: note-off превью плагина-инструмента
+  if ctx.note_offs and #ctx.note_offs > 0 then
+    local now, keep = reaper.time_precise(), {}
+    for _, o in ipairs(ctx.note_offs) do
+      if now >= o.t then reaper.StuffMIDIMessage(0, 0x80, o.p, 0) else keep[#keep + 1] = o end
+    end
+    ctx.note_offs = keep
+  end
   draw.pmark('pre: lock sync')
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
   -- в REAPER → курсор трекера прыгает туда (вид — следом); курсор трекера
@@ -9962,6 +10039,7 @@ local function frame()
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
+    track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
@@ -10789,6 +10867,8 @@ local function frame()
     local m = hover.btn.col.recmon or 0
     state.status = hover.btn.col.name .. ': input monitoring ' .. ({ [0] = 'off', [1] = 'on', [2] = 'auto (tape)' })[m] .. ' - click: off → on → auto'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
+  elseif hover.pool and hover.pool.instfx then
+    state.status = 'instrument plugin: click - note keys write MIDI to it, DSP shows it; dblclick - its window'
   elseif hover.pool and hover.pool.auto then
     state.status = 'automation: automation items of the track as one instrument - the slices list shows them; a note key inserts the selected one, its rate by the key (C-4 = x1, an octave up = x2)'
   elseif hover.pool then
@@ -11865,6 +11945,10 @@ local function frame()
     elseif hover.pool and hover.pool.auto then
       ctx.set_focus('inst'); ctx.auto_select()
       click = { t = now2, zone = 'poolauto' }
+    elseif hover.pool and hover.pool.instfx then
+      -- 9 окт: плагин-инструмент: щелчок — выбрать (ноты — MIDI в него) и DSP на нём, двойной — его окно
+      ctx.inst_fx_pick(cur_col(), hover.pool.instfx, dbl and click.zone == 'poolinst' and click.row == hover.pool.instfx)
+      click = { t = now2, zone = 'poolinst', row = hover.pool.instfx }
     elseif hover.pool then
       ctx.set_focus('inst')
       state.prev_by_mouse = true

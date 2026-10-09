@@ -1673,6 +1673,8 @@ end
 -- len_rows. Иначе — копия item из DEPOT (instrument = item депо) с
 -- D_PITCH = pitch − BASE_NOTE; длина item — как у образца.
 function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_item)
+  local force_midi = depot_item == 'midi'                 -- 9 окт: выбран плагин-инструмент — нота MIDI
+  if force_midi then depot_item = nil end
   local t0 = E.swing_time(row, lpb)                       -- свинг (6 окт)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   local made
@@ -1709,7 +1711,7 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         finish_insert(track, lane_idx, it)
         made = it
       end
-    elseif mit or (not has_audio and not depot_item) then
+    elseif mit or force_midi or (not has_audio and not depot_item) then
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
     elseif depot_item then
       E.ensure_iid(depot_item)                          -- копия унесёт метку в чанке

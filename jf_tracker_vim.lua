@@ -1389,6 +1389,7 @@ function V.key_impl(c)
     -- Option + клавиша — последний слайс с питчем этой ноты (q = исходный)
     local f0 = flat()[V.cur.fi]
     local inst0 = f0 and (f0.col.pool or {})[V.inst]
+    if f0 and ctx.inst_fx and ctx.inst_fx(f0.col) then inst0 = nil end   -- 9 окт: плагин-инструмент — не слайсы
     local chq = (c < 256) and string.char(c) or ''
     local kp = piano_pitch(c)
     -- automation как инструмент (5 окт): клавиша — выбранный пул со скоростью по высоте
@@ -1465,6 +1466,7 @@ function V.key_impl(c)
       if f then
         local lane = f.lane or f.col.lanes[1]
         local inst = (f.col.pool or {})[V.inst]
+        if ctx.inst_fx and ctx.inst_fx(f.col) then inst = nil end   -- 9 окт: плагин-инструмент — MIDI
         -- живой арпеджиатор (3 окт, :arp live): нота — в держимый аккорд
         if V.arp_live and how == 'insert' and ctx.arp_live_key then
           ctx.arp_live_key({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,
@@ -1479,7 +1481,7 @@ function V.key_impl(c)
         end
         -- Shift+нота — только звук; Ctrl+нота — захват (F5, пока звук)
         if how == 'audition' or how == 'capture' then
-          if ctx.preview then ctx.preview(f.col.track, pitch, inst and inst.item, V.cur.row, V.step_auto and 1 or V.step) end
+          if ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, V.step_auto and 1 or V.step) end
           if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
           return
         end
@@ -1498,9 +1500,9 @@ function V.key_impl(c)
           end
         end
         local stp = V.step_auto and 1 or V.step
-        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, V.vel, stp, inst and inst.item)
+        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, V.vel, stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
         E.beside = false
-        if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, inst and inst.item, V.cur.row, stp) end
+        if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
         V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
       end
     end
@@ -1525,6 +1527,7 @@ function V.key_impl(c)
       if ctx.piano and ctx.piano[base] then
         local f0 = flat()[V.cur.fi]
         local inst0 = f0 and (f0.col.pool or {})[V.inst]
+        if f0 and ctx.inst_fx and ctx.inst_fx(f0.col) then inst0 = nil end   -- 9 окт: плагин-инструмент — не слайсы
         local chq = (base < 256) and string.char(base) or ''
         V.piano_last = ctx.piano[base]                         -- пианинка: последняя сыгранная клавиша
         -- нарезанный: нота — слайс по клавише; Option — выбранный с питчем; Cmd — весь
@@ -2155,10 +2158,11 @@ function V.smart()
       elseif not vis then
         local lane = f.lane or f.col.lanes[1]
         local inst = (f.col.pool or {})[V.inst]
+        if ctx.inst_fx and ctx.inst_fx(f.col) then inst = nil end   -- 9 окт: плагин-инструмент — MIDI
         local cell = f.sub and f.sub[row]
         if cell and cell.kind == 'cont' and cell.of then E.note_off({ cell.of }, lpb(), row) end
-        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), row, it.v, V.vel, V.step_auto and 1 or V.step, inst and inst.item)
-        if ctx.state.preview and ctx.preview then ctx.preview(f.col.track, it.v, inst and inst.item, row, 1) end
+        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), row, it.v, V.vel, V.step_auto and 1 or V.step, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
+        if ctx.state.preview and ctx.preview then ctx.preview(f.col.track, it.v, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), row, 1) end
       end
       done()
     end
