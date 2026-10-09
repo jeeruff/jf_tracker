@@ -3052,6 +3052,23 @@ ctx = {
       if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
     end
   end,
+  -- :z / :zi (9 окт, zoxide): браузер — в самую частую и недавнюю папку под слова
+  browse_z = function(arg)
+    local words = {}
+    for w in (arg or ''):gmatch('%S+') do words[#words + 1] = w end
+    local function there()
+      if state.panes_ui and L and L.pn then ctx.pane_focus('browser') else state.side = true; ctx.set_focus('browser') end
+    end
+    if #words == 0 then
+      local items = {}
+      for _, e in ipairs(B.zlist()) do items[#items + 1] = { label = e.path, data = e.path } end
+      if #items == 0 then vim.msg = 'z: no folders visited yet'; return end
+      vim.open_picker('z: visited folders (best first)', items, function(it) B.go(it.data); there(); vim.msg = 'z: ' .. it.data end)
+      return
+    end
+    local p = B.z(words)
+    if p then there(); vim.msg = 'z: ' .. p else vim.msg = 'z: no visited folder matches ' .. table.concat(words, ' ') end
+  end,
   -- :pane (9 окт): то же, что режим Ctrl+W, словами (для макросов и справки)
   pane_cmd = function(arg)
     local PN, m = draw.panes, state.panes

@@ -75,4 +75,29 @@ B.up()
 eq('pm folders: h goes back up', names(), 'songs,a beat,b tune')
 eq('pm folders: a project entry is a pm project', B.entries[2].pm and B.entries[2].path, '/proj/a beat.rpp')
 B.set_mode('files')
+-- zoxide (9 окт): частота × давность, слова по порядку, последнее — в имени папки
+do
+  local now = 1000000
+  local db = {}
+  for _ = 1, 3 do B.zadd(db, '/s/Drums/Kicks', now - 7200) end        -- 3 захода 2 часа назад (×2)
+  B.zadd(db, '/s/Drums/Snares', now - 60)                             -- 1 заход минуту назад (×4)
+  B.zadd(db, '/s/Bass', now - 700000)                                 -- старая (×0.25)
+  local r = B.zquery(db, { 'drums' }, now)
+  eq('z: last word must be in the folder name', #r, 0)
+  r = B.zquery(db, { 'dr', 'ki' }, now)
+  eq('z: words in order', r[1] and r[1].path, '/s/Drums/Kicks')
+  r = B.zquery(db, { 'k' }, now)
+  eq('z: frecency picks kicks (3x2) over snares (1x4)', r[1] and r[1].path, '/s/Drums/Kicks')
+  r = B.zquery(db, { 's' }, now, nil, '/s/Drums/Kicks')
+  eq('z: current folder skipped', r[1] and r[1].path, '/s/Drums/Snares')
+  r = B.zquery(db, { 'bass' }, now, function(p) return p ~= '/s/Bass' end)
+  eq('z: dead folder skipped', #r, 0)
+  eq('z: rank old', B.zrank({ n = 4, t = 0 }, now), 1)
+  eq('z: rank fresh', B.zrank({ n = 4, t = now }, now), 16)
+  local big = { ['/a'] = { n = 9999, t = now }, ['/b'] = { n = 0.5, t = now } }
+  B.zadd(big, '/c', now)
+  eq('z: aging forgets tiny', big['/b'], nil); eq('z: aging x0.9', math.floor(big['/a'].n), 8999); eq('z: just visited kept', big['/c'] and big['/c'].n, 1)
+  local all = B.zquery(db, {}, now)
+  eq('z: list all, best first', all[1].path, '/s/Drums/Kicks')
+end
 print(('%d checks, %d failed'):format(n, bad))

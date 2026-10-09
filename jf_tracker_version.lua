@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'browser: zoxide - every folder you open is remembered (often + recently); :z drums kick jumps to the best match, :zi lists them',
     'panes (tmux / zellij): the window is a tree of splits, every module a pane, stacks = tabs; titles in the pane border; Cmd+h j k l focus, Cmd+Shift+h j k l move, Ctrl+W pane mode (split, stack, swap, size, zoom, hide, layouts, undo), :pane; drag the line between panes; key hints in one line at the bottom; the layout lives in screensets; the old position options are gone (Options - panes off brings the old layout back)',
     'mixer: folder children get the same fader and pan knob as every channel of the same width',
     '\\ , opens the REAPER preferences',

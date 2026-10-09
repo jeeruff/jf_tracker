@@ -92,9 +92,89 @@ function B.init(c, root)
   B.refresh()
 end
 
+-- ── zoxide (9 окт): частота × давность заходов в папки ─────────────────
+-- Каждый заход в папку (B.go) — очко ей; ранг = очки × множитель давности
+-- (как zoxide: час ×4, день ×2, неделя ×0.5, старше ×0.25). Сумма очков
+-- больше B.ZMAX — всё ×0.9, совсем малые забываются. База — текст
+-- Data/jf_tracker_z.txt «очки<TAB>время<TAB>путь». :z слова — прыжок,
+-- :zi — список (fzf). Слова — по порядку в пути, последнее — в имени папки.
+B.ZMAX = 10000
+function B.zrank(e, now)
+  local age = now - (e.t or 0)
+  local k = age < 3600 and 4 or (age < 86400 and 2 or (age < 604800 and 0.5 or 0.25))
+  return (e.n or 0) * k
+end
+-- лучшие пути под слова; exists(path) → bool (проверка, что папка жива)
+function B.zquery(db, words, now, exists, cur)
+  local out = {}
+  for path, e in pairs(db) do
+    if path ~= cur then
+      local lp, pos, ok = path:lower(), 1, true
+      for i, w in ipairs(words) do
+        local a, b = lp:find(w:lower(), pos, true)
+        if not a then ok = false; break end
+        pos = b + 1
+        if i == #words then
+          local last = lp:match('([^/]+)/?$') or lp
+          if not last:find(w:lower(), 1, true) then ok = false end
+        end
+      end
+      if ok and (not exists or exists(path)) then out[#out + 1] = { path = path, rank = B.zrank(e, now) } end
+    end
+  end
+  table.sort(out, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return a.path < b.path end)
+  return out
+end
+function B.zadd(db, path, now)
+  -- сначала старение (сумма с новым очком больше предела), потом очко —
+  -- только что открытая папка не забывается
+  local sum = 1
+  for _, x in pairs(db) do sum = sum + x.n end
+  if sum > B.ZMAX then
+    for p, x in pairs(db) do x.n = x.n * 0.9; if x.n < 1 then db[p] = nil end end
+  end
+  local e = db[path]
+  if not e then e = { n = 0 }; db[path] = e end
+  e.n, e.t = e.n + 1, now
+end
+local function zfile() return R.GetResourcePath and (R.GetResourcePath() .. '/Data/jf_tracker_z.txt') or nil end
+function B.zload()
+  if B.zdb then return B.zdb end
+  B.zdb = {}
+  local f = zfile() and io.open(zfile(), 'r')
+  if f then
+    for line in f:lines() do
+      local n, t, p = line:match('^([%d%.]+)\t(%d+)\t(.+)$')
+      if n then B.zdb[p] = { n = tonumber(n), t = tonumber(t) } end
+    end
+    f:close()
+  end
+  return B.zdb
+end
+function B.zsave()
+  local fn = zfile()
+  if not (fn and B.zdb) then return end
+  if R.RecursiveCreateDirectory then R.RecursiveCreateDirectory(R.GetResourcePath() .. '/Data', 0) end
+  local f = io.open(fn, 'w')
+  if not f then return end
+  for p, e in pairs(B.zdb) do f:write(('%.2f\t%d\t%s\n'):format(e.n, e.t or 0, p)) end
+  f:close()
+end
+local function dir_exists(p) return R.EnumerateFiles and (R.EnumerateFiles(p, 0) ~= nil or R.EnumerateSubdirectories(p, 0) ~= nil) end
+-- :z слова → прыжок; nil — нет совпадений
+function B.z(words)
+  local list = B.zquery(B.zload(), words, os.time(), dir_exists, B.path)
+  if list[1] then B.go(list[1].path); return list[1].path end
+  return nil
+end
+function B.zlist()
+  return B.zquery(B.zload(), {}, os.time(), dir_exists, nil)
+end
+
 -- перейти в папку (с записью в историю)
 function B.go(path, no_hist)
   if not path or path == '' or path == B.path then return end
+  B.zadd(B.zload(), path, os.time()); B.zsave()      -- zoxide: заход в папку
   if not no_hist then
     B.back[#B.back + 1] = B.path
     if #B.back > 100 then table.remove(B.back, 1) end
