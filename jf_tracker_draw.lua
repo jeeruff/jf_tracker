@@ -3473,9 +3473,14 @@ function D.frame(L, snap, rows, state, info)
         -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
         if mixcol then
           -- квадратные (9 окт): сторона — по высоте, не шире места, при котором эффекты остаются сбоку
-          local hmax = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 6) - 2))
+          local hmax = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 7) - 2))   -- 7: R I M S ø trim SRO
           local wmax = math.max(L.btn_w, lw1 - 2 * L.pad - fxb - 4 - L.pad - 5 * L.cw - 4)
           D.mcb_w = math.max(L.btn_w, math.min(hmax, wmax))
+          -- SRO столбиком (не влез в ширину) выше квадрата — квадраты меньше, чтобы все 7 встали
+          if ms('SRO') + 4 > D.mcb_w then
+            local h2 = math.floor((fh0 - (3 * (L.rh - 4) + 4) - 2) / 6) - 2
+            D.mcb_w = math.max(L.btn_w, math.min(D.mcb_w, h2))
+          end
           D.mcb_h = D.mcb_w
         end
       end
@@ -3505,23 +3510,36 @@ function D.frame(L, snap, rows, state, info)
       -- route (9 окт): SRO вместо слова — S сенды, R ресивы, O аппаратные
       -- выходы; буква светится, если есть. Щелчок — окно маршрутизации трека.
       -- Без микшера — после ø, если влезает до trim; с микшером — в начале строки
+      -- 9 окт: с микшером — седьмой в столбике у фейдера (буквы столбиком,
+      -- если в ширину не влезают); не влезает по высоте — в строке шапки
+      local function sro(rx, ry, rw, rhh, vert)
+        local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, reaper.GetTrackNumSends(col.track, 1) > 0 }
+        local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + rhh + 2
+        set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry, rw, rhh, 1)
+        set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(rx, ry, rw, rhh, 0)
+        local th3 = L.rh - 4
+        local lx = vert and 0 or (rx + math.floor((rw - ms('SRO')) / 2))
+        local ly = vert and (ry + math.floor((rhh - 3 * th3) / 2) - 1) or (ry + math.floor((rhh - (L.rh - 2)) / 2))
+        for i, ch in ipairs({ 'S', 'R', 'O' }) do
+          local cc = has[i] and U.CYAN or U.mix(BTXT, U.PANEL, 0.5)
+          if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
+          else text(lx, ly, ch, cc); lx = lx + ms(ch) end
+        end
+        if hot then hover.btn = { col = col, what = 'route' } end
+        hint('btn', rx, ry, rw, rhh + 2, { col = col, what = 'route' })
+      end
+      D.sro_col = nil
       if not c.master and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+        if mixcol then
+          local vert = ms('SRO') + 4 > D.mcb_w
+          local rhh = vert and math.max(D.mcb_h, 3 * (L.rh - 4) + 4) or D.mcb_h
+          local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0)
+          if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
+        end
         local rw = ms('SRO') + 4
         local rx = mixcol and bx or (bx + 5 * (L.btn_w + 1))
         local lim = mixcol and (c.x + c.w - 1) or (trim_x - L.pad)
-        if rx + rw <= lim then
-          local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, reaper.GetTrackNumSends(col.track, 1) > 0 }
-          local hot = mx >= rx and mx < rx + rw and my >= by and my < by + L.rh
-          set(hot and D.CURROW or U.PANEL); gfx.rect(rx, by, rw, L.rh - 2, 1)
-          set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(rx, by, rw, L.rh - 2, 0)
-          local lx = rx + 2
-          for i, ch in ipairs({ 'S', 'R', 'O' }) do
-            text(lx, by, ch, has[i] and U.CYAN or U.mix(BTXT, U.PANEL, 0.5))
-            lx = lx + ms(ch)
-          end
-          if hot then hover.btn = { col = col, what = 'route' } end
-          hint('btn', rx, by, rw, L.rh, { col = col, what = 'route' })
-        end
+        if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, L.rh - 2, false) end
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
@@ -3797,6 +3815,8 @@ function D.frame(L, snap, rows, state, info)
             if b[4] == 'auto' and ms('trim') + 4 > D.mcb_w then b = { 'A', b[2], b[3], b[4] } end   -- узко — буквой
             hbtn(b, sx + fx_w + 2, y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
           end
+          local sc = D.sro_col
+          if sc then sc.draw(sx + fx_w + 2, y1 + 6 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
         end
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
