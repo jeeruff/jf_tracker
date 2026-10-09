@@ -162,7 +162,7 @@ KH.PAGES = {
     { k = 'd', d = 'Vim delete operator (d3w, dd), back to INSERT after' },
     { k = 'M', d = 'mute event under cursor (Shift+m)' },
     { k = 'f', d = 'next fx field (note > fx1 > fx2 ...)' },
-    { k = '`', d = 'note-off' },
+    { k = '` ~ C-`', d = 'note-off: ` this subcolumn, ~ (Shift+`) the whole track, Ctrl+` every track; :off / :off all' },
     { k = 'Esc', d = 'back to NORMAL' },
     { k = 'F1', d = 'the whole help' },
   } },

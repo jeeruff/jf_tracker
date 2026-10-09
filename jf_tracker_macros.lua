@@ -18,6 +18,8 @@ MR.BUILTIN = {
   { name = 'arp up',      body = ':arp up',       desc = 'the chord on the cursor row becomes an arpeggio up over its length' },
   { name = 'arp random',  body = ':arp random',   desc = 'the chord on the cursor row - a random arpeggio' },
   { name = 'repeat down', body = ':repeat',       desc = 'repeat the part of the region above the cursor down to the region end' },
+  { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
+  { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
 }
 
 -- клавиши ↔ строка
