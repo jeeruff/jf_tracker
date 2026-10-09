@@ -3436,6 +3436,27 @@ function D.frame(L, snap, rows, state, info)
         if x + bwk > c.x + c.w - 1 then break end
         if not mixcol then hbtn(b, x, by, bwk) end
       end
+      -- route (9 окт): SRO вместо слова — S сенды, R ресивы, O аппаратные
+      -- выходы; буква светится, если есть. Щелчок — окно маршрутизации трека.
+      -- Без микшера — после ø, если влезает до trim; с микшером — в начале строки
+      if not c.master and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+        local rw = ms('SRO') + 4
+        local rx = mixcol and bx or (bx + 5 * (L.btn_w + 1))
+        local lim = mixcol and (c.x + c.w - 1) or (trim_x - L.pad)
+        if rx + rw <= lim then
+          local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, reaper.GetTrackNumSends(col.track, 1) > 0 }
+          local hot = mx >= rx and mx < rx + rw and my >= by and my < by + L.rh
+          set(hot and D.CURROW or U.PANEL); gfx.rect(rx, by, rw, L.rh - 2, 1)
+          set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(rx, by, rw, L.rh - 2, 0)
+          local lx = rx + 2
+          for i, ch in ipairs({ 'S', 'R', 'O' }) do
+            text(lx, by, ch, has[i] and U.CYAN or U.mix(BTXT, U.PANEL, 0.5))
+            lx = lx + ms(ch)
+          end
+          if hot then hover.btn = { col = col, what = 'route' } end
+          hint('btn', rx, by, rw, L.rh, { col = col, what = 'route' })
+        end
+      end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live

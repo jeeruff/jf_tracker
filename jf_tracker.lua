@@ -7449,6 +7449,7 @@ local function hint_go(t)
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
     -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
+  elseif t.kind == 'btn' and d.what == 'route' then reaper.SetOnlyTrackSelected(d.col.track); reaper.Main_OnCommand(40293, 0)
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -11686,6 +11687,10 @@ local function frame()
       if gfx.mouse_cap & 8 == 8 then ctx.toggle_track_envs(hover.btn.col)
       elseif vim.picker and vim.picker.trim == hover.btn.col.guid then vim.picker = nil
       else ctx.automation_picker(hover.btn.col, true) end
+      click = { t = now2, zone = 'btn' }
+    elseif hover.btn and hover.btn.what == 'route' then
+      -- 9 окт: SRO — окно маршрутизации трека (как ROUTE в REAPER)
+      reaper.SetOnlyTrackSelected(hover.btn.col.track); reaper.Main_OnCommand(40293, 0)
       click = { t = now2, zone = 'btn' }
     elseif hover.btn then
       local tr, what = hover.btn.col.track, hover.btn.what
