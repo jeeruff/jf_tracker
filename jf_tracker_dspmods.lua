@@ -14,9 +14,12 @@ DM.modules = {
   {
     -- slixer (9 окт): пульт — колонка = группа (заголовок над ней), по 6
     -- строк; переключатели — словами (labels), не квадратиками
+    -- первая колонка (9 окт, часть 2) — волна деки: срезы, выбранный —
+    -- янтарём, головки играющих голосов — зелёным (gmem jf_slixer)
     match = 'jf_slixer',
     title = 'slixer',
-    cols = 4, rows = 6,
+    cols = 5, rows = 6,
+    view = 'slixer',
     groups = { 'SLICE', 'PLAY', 'LEVEL', 'ARP / TIME' },
     params = {
       { 'Slice mode',            'mode',    labels = { 'trans', 'equal', 'pitch' } },

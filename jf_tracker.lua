@@ -8679,6 +8679,60 @@ local function with_ns(ns, fn)
   if not ok then return nil end
   return a, b
 end
+-- slixer в DSP (9 окт): волна деки, срезы, головки голосов из gmem
+-- jf_slixer (блок TRKV = 200000, раскладка — в jf_slixer.jsfx у «вид для
+-- jf_tracker»). gmem общий для всех экземпляров: показываемому трекер пишет
+-- номер запроса в его скрытый параметр «Tracker view request» — тот
+-- становится владельцем и публикует данные. Запрос — только при смене
+-- экземпляра (или если владельца перехватили), не чаще 2 раз в секунду.
+ctx.slx = { guid = nil, serial = 0, t = 0, pkv = -1, peaks = {}, tick = -1, tick_t = 0 }
+function ctx.slixer_view(track, fxi)
+  local S = ctx.slx
+  if not (track and fxi and reaper.ValidatePtr(track, 'MediaTrack*')) then return nil end
+  local guid = reaper.TrackFX_GetFXGUID(track, fxi)
+  if S.guid ~= guid then
+    S.guid, S.pidx, S.pkv, S.peaks, S.serial = guid, nil, -1, {}, 0
+    for pi = reaper.TrackFX_GetNumParams(track, fxi) - 1, 0, -1 do
+      local _, pn = reaper.TrackFX_GetParamName(track, fxi, pi, '')
+      if pn == 'Tracker view request' then S.pidx = pi; break end
+    end
+  end
+  if not S.pidx then return { old = true } end            -- старая версия плагина без экспорта
+  local B = 200000
+  return with_ns('jf_slixer', function()
+    local owner, ready = reaper.gmem_read(B + 31), reaper.gmem_read(B)
+    local now = reaper.time_precise()
+    if owner ~= S.serial or S.serial == 0 then
+      if now - S.t > 0.5 then
+        S.serial = math.max(owner, ready, S.serial) + 1
+        if S.serial > 16000000 then S.serial = 1 end
+        reaper.TrackFX_SetParam(track, fxi, S.pidx, S.serial)
+        S.t, S.pkv = now, -1
+      end
+      return { wait = true }
+    end
+    if ready ~= S.serial then return { wait = true } end
+    local v = { frames = reaper.gmem_read(B + 1), sr = reaper.gmem_read(B + 2), nsl = math.floor(reaper.gmem_read(B + 3)),
+                sel = math.floor(reaper.gmem_read(B + 4)), starts = {}, ends = {}, voices = {}, vslice = {} }
+    for i = 0, math.min(v.nsl, 64) - 1 do v.starts[i + 1] = reaper.gmem_read(B + 100 + i); v.ends[i + 1] = reaper.gmem_read(B + 200 + i) end
+    for i = 0, math.min(16, math.floor(reaper.gmem_read(B + 6))) - 1 do
+      v.voices[i + 1] = reaper.gmem_read(B + 8 + i); v.vslice[i + 1] = math.floor(reaper.gmem_read(B + 24 + i))
+    end
+    local pkv = reaper.gmem_read(B + 40)
+    if pkv ~= S.pkv then
+      S.pkv = pkv
+      local n = math.floor(reaper.gmem_read(B + 5))
+      local mx, mn = {}, {}
+      for i = 0, n - 1 do mx[i + 1] = reaper.gmem_read(B + 300 + i * 2); mn[i + 1] = reaper.gmem_read(B + 301 + i * 2) end
+      S.peaks = { n = n, max = mx, min = mn }
+    end
+    v.peaks = S.peaks
+    local tick = reaper.gmem_read(B + 7)
+    if tick ~= S.tick then S.tick, S.tick_t = tick, now end
+    v.alive = now - S.tick_t < 1.5
+    return v
+  end)
+end
 -- chord follow (8 окт): линия аккордов трека с лейном аккордов (:chord) —
 -- в gmem jf_tracker_chord для эффекта jf_tracker_chordfollow (раскладка — в
 -- его заголовке). Пишется, когда меняется проект или трек-источник; без
@@ -10577,7 +10631,7 @@ local function frame()
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
-    dsp_view = function(kind, width)
+    dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
       -- данные (иначе две ширины слоя пиков спорят в gmem)
       if kind == 'rec' then
@@ -10589,6 +10643,18 @@ local function frame()
         if not (r and r.cur and col and r.cur.col.guid == col.guid) then r = false end
         view_cache.rec = r
         return r or nil
+      end
+      if kind == 'slixer' then
+        -- один slixer за кадр: первый блок в цепи (иначе два экземпляра
+        -- перехватывают владение друг у друга)
+        if view_cache.slixer ~= nil then
+          if view_cache.slixer_fx ~= width then return { other = true } end
+          return view_cache.slixer or nil
+        end
+        local t = dsp_target()
+        local v = (t and not t.take and t.col) and ctx.slixer_view(t.col.track, width) or nil
+        view_cache.slixer, view_cache.slixer_fx = v or false, width
+        return v
       end
       if kind ~= 'grain' then return nil end
       if view_cache.grain ~= nil then return view_cache.grain or nil end

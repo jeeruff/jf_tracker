@@ -5354,6 +5354,50 @@ function D.frame(L, snap, rows, state, info)
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
       end
+      if f.view == 'slixer' then
+        -- slixer (9 окт): волна деки во всю первую колонку; срезы — чередующейся
+        -- подложкой и линией начала, выбранный — янтарём, играющие голоса —
+        -- зелёными головками; внизу — число срезов и длина
+        pcol0 = 1
+        local wx, wy, ww, wh = bx + L.pad, by + L.rh + 1, pw, bh - 2 * L.rh - 4
+        local v = info.dsp_view and info.dsp_view('slixer', f.i)
+        set(U.PANEL); gfx.rect(wx, wy, ww, math.max(4, wh), 1)
+        set(U.LINE); gfx.rect(wx, wy, ww, math.max(4, wh), 0)
+        local st, stc = '', U.DIM
+        if v and v.frames and v.frames > 0 and wh > 6 then
+          local fr = v.frames
+          local function xof(p) return wx + math.floor(math.max(0, math.min(1, p / fr)) * (ww - 1)) end
+          for i = 1, v.nsl do
+            local a, b = xof(v.starts[i] or 0), xof(v.ends[i] or 0)
+            if b > a then
+              if i - 1 == v.sel then set(U.tint(U.AMBER, 0.28)) elseif i % 2 == 0 then set(U.tint(U.TEXT, 0.06)) else set(U.PANEL) end
+              gfx.rect(a, wy + 1, b - a, wh - 2, 1)
+            end
+          end
+          local pk = v.peaks
+          local cy, hh = wy + wh / 2, wh / 2 - 1
+          if pk and (pk.n or 0) > 0 then
+            set(U.readable(U.mix(U.CYAN, U.TEXT, 0.3), U.PANEL, 4.0))
+            for px = 0, ww - 1 do
+              local i = math.floor(px / ww * pk.n) + 1
+              local mxv, mnv = pk.max[i] or 0, pk.min[i] or 0
+              if mxv - mnv < 0.01 then mxv, mnv = 0.005, -0.005 end
+              gfx.line(wx + px, cy - math.min(1, mxv) * hh, wx + px, cy - math.max(-1, mnv) * hh)
+            end
+          end
+          for i = 1, v.nsl do
+            set(i - 1 == v.sel and U.AMBER or U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(xof(v.starts[i] or 0), wy + 1, 1, wh - 2, 1)
+          end
+          set(U.GREEN)
+          for _, p in ipairs(v.voices) do gfx.rect(xof(p), wy, 1, wh, 1) end
+          st = ('%d slices  %.2fs%s'):format(v.nsl, fr / math.max(1, v.sr or 48000), v.sel >= 0 and ('  sel %d'):format(v.sel + 1) or '')
+          stc = v.alive and U.GREY or U.DIM
+        elseif v and v.other then st = 'wave: shown on the first slixer of the chain'
+        elseif v and v.old then st = 'wave: update jf_slixer (no tracker view)'
+        elseif v and v.wait then st = 'wave: waiting for slixer...'
+        else st = 'wave: empty deck (load or record a sample)' end
+        text(wx, wy + math.max(4, wh) + 2, fit(st, ww), stc)
+      end
       local eq_only = f.view == 'eq' and info.eqgraph            -- ReaEQ: только график, во весь блок
       if f.view and D.FX_VIEWS[f.view] and not (f.view == 'eq' and not info.eqgraph) then
         -- вид встроенного эффекта REAPER (4 окт) — первая колонка
