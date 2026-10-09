@@ -23,7 +23,7 @@ local T = {
   g = { title = 'g - go', items = { { 'g', 'top of the track' }, { 'w', 'swap with the next event (3gw - third)' }, { 's', 'smart panel: values of the field under the cursor, pick with the mouse' } } },
   z = { title = 'z - view', items = { { 'z', 'row to middle' }, { 't b', 'row top / bot' },
         { 'a', 'fold track' }, { 'C', '1-char strip' }, { 'f', 'fold folder' },
-        { 'M', 'fold <-> all' }, { 'm', 'mixer on / off' }, { 's', 'session' }, { 'r', 'router' },
+        { 'M', 'fold <-> all' }, { 'm', 'mixer on / off' }, { '> <', 'all tracks wider / narrower' }, { '. ,', 'cursor track wider / narrower' }, { 's', 'session' }, { 'r', 'router' },
         { 'R', 'big router' } } },
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },

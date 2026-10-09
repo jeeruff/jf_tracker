@@ -1716,6 +1716,14 @@ function V.key_impl(c)
         local f = flat()[V.cur.fi]
         if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
       elseif c == ('m'):byte() then if ctx.toggle_mixer then ctx.toggle_mixer() end   -- 9 окт: zm — микшер вкл / выкл
+      -- 9 окт: ширина по шагу, как Cmd+колесо: z> z< — все треки, z. z, — трек курсора (счётчик: 3z>)
+      elseif (c == ('>'):byte() or c == ('<'):byte() or c == ('.'):byte() or c == (','):byte()) and ctx.width_step then
+        local d = (c == ('>'):byte() or c == ('.'):byte()) and 1 or -1
+        local f = flat()[V.cur.fi]
+        local col = f and f.col
+        for _ = 1, n do ctx.width_step(d, (c == ('.'):byte() or c == (','):byte()) and 'cur' or nil) end
+        if col then for i, g in ipairs(flat()) do if g.col == col then V.cur.fi = i; break end end end
+        clamp_cur()
       elseif c == ('M'):byte() then   -- zM (7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
         local any = false
         for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end

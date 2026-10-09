@@ -94,6 +94,8 @@ KH.PAGES = {
     { k = 'za zM', d = 'fold track: wave + notes, envelopes as a thin line / all <-> open all (:fold, :unfold)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
+    { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
+    { k = 'z. z,', d = 'the cursor track wider / narrower (its own width)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
     { k = 'env: field 2', d = 'segment shape: INSERT letters sqr slo fas fae bez, ^A ^X cycle, :shape fas' },
     { k = 'env: Ctrl+Opt+1..6', d = 'segment shape of the point on the row, in any field and mode: 1 lin 2 sqr 3 slo 4 fas 5 fae 6 bez' },

@@ -8729,6 +8729,42 @@ local function with_ns(ns, fn)
   if not ok then return nil end
   return a, b
 end
+-- ширина колонок треков по шагу (7–9 окт): одно место для колеса (Cmd /
+-- Cmd+Shift) и клавиш z> z< (все) / z. z, (трек курсора). which: nil — все
+-- треки (общий уровень), 'sel' — выделенные в REAPER (нет — как все),
+-- 'cur' — трек курсора (свой уровень). Уровень: 0 полоски … 3 нота + vol +
+-- delay, дальше колонки эффектов и нот; шире MAXLVL — «как у трека»
+function ctx.width_step(d, which)
+  local list = {}
+  if which == 'sel' then
+    for _, c2 in ipairs(snap and snap.cols or {}) do if c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.IsTrackSelected(c2.track) then list[#list + 1] = c2 end end
+  elseif which == 'cur' then
+    local c2 = cur_col(); if c2 then list[1] = c2 end
+  end
+  local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+  if #list > 0 then
+    state.wlevel = state.wlevel or {}
+    for _, c2 in ipairs(list) do
+      local cur = state.wlevel[c2.guid] or state.wzlevel or full
+      local nl = cur + d
+      state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
+    end
+    relayout()
+    vim.msg = which == 'cur' and ('width of ' .. (list[1].name ~= '' and list[1].name or 'the track') .. ' ' .. (d > 0 and 'wider' or 'narrower'))
+      or ('width of %d selected track(s) %s'):format(#list, d > 0 and 'wider' or 'narrower')
+    return
+  end
+  -- 7 окт: по одному полю за шаг (уровни 0..MAXLVL), от полной ширины
+  local cur = state.wzlevel or full
+  local nl = cur + d                                         -- d > 0 — шире
+  if nl > (L.MAXLVL or 10) then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека
+  state.wzlevel = nl
+  reaper.SetExtState(EXT, 'wzlevel', nl and tostring(nl) or '', true)
+  relayout()
+  if not nl then vim.msg = 'width: as set per track'; return end
+  local NAMES = { [0] = 'strips', 'notes', 'note + vol', 'note + vol + delay' }
+  vim.msg = 'width: ' .. (NAMES[nl] or (nl <= 3 + (L.MAXFX or 4) and ('+ ' .. (nl - 3) .. ' fx column(s)') or ('+ ' .. (nl - 3 - (L.MAXFX or 4)) .. ' note column(s)'))) .. '  (automation shows when a track is wider than 50 chars)'
+end
 -- slixer в DSP (9 окт): волна деки, срезы, головки голосов из gmem
 -- jf_slixer (блок TRKV = 200000, раскладка — в jf_slixer.jsfx у «вид для
 -- jf_tracker»). gmem общий для всех экземпляров: показываемому трекер пишет
@@ -13660,33 +13696,8 @@ local function frame()
       if nv ~= 0 then ctrl_action('lpb', nv > 0 and 1 or -1) end
       -- 8 окт: + Shift и есть выделенные треки (REAPER, Option+цифра) — ширина
       -- только у них (свой уровень трека), остальные как были
-      local selw = {}
-      if nh ~= 0 and gfx.mouse_cap & 8 == 8 then
-        for _, c2 in ipairs(snap and snap.cols or {}) do if c2.track and reaper.ValidatePtr(c2.track, 'MediaTrack*') and reaper.IsTrackSelected(c2.track) then selw[#selw + 1] = c2 end end
-      end
-      if nh ~= 0 and #selw > 0 then
-        state.wlevel = state.wlevel or {}
-        local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
-        for _, c2 in ipairs(selw) do
-          local cur = state.wlevel[c2.guid] or state.wzlevel or full
-          local nl = cur + (nh > 0 and 1 or -1)
-          state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
-        end
-        relayout()
-        vim.msg = ('width of %d selected track(s) %s'):format(#selw, nh > 0 and 'wider' or 'narrower')
-        nh = 0
-      end
-      if nh ~= 0 then
-        -- 7 окт: по одному полю за шаг (уровни 0..MAXLVL), от полной ширины
-        local cur = state.wzlevel or (3 + math.min(L.MAXFX or 4, state.fxcols or 0))
-        local nl = cur + (nh > 0 and 1 or -1)                  -- nh > 0 — шире (как прежний зум)
-        if nl > (L.MAXLVL or 10) then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека
-        state.wzlevel = nl
-        reaper.SetExtState(EXT, 'wzlevel', nl and tostring(nl) or '', true)
-        if not nl then vim.msg = 'width: as set per track'; nl = -1 end
-        local NAMES = { [0] = 'strips', 'notes', 'note + vol', 'note + vol + delay' }
-        if nl >= 0 then vim.msg = 'width: ' .. (NAMES[nl] or (nl <= 3 + (L.MAXFX or 4) and ('+ ' .. (nl - 3) .. ' fx column(s)') or ('+ ' .. (nl - 3 - (L.MAXFX or 4)) .. ' note column(s)'))) .. '  (automation shows when a track is wider than 50 chars)' end
-      end
+      -- + Shift — только выделенные в REAPER треки (8 окт)
+      if nh ~= 0 then ctx.width_step(nh > 0 and 1 or -1, gfx.mouse_cap & 8 == 8 and 'sel' or nil) end
       gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
     end
   end

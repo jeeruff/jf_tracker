@@ -107,6 +107,7 @@ local function reset()
     track_colour = function() calls[#calls + 1] = 'tcol' end, rec_arm = function() calls[#calls + 1] = 'tarm' end,
     toggle_lanes = function() calls[#calls + 1] = 'tlanes' end, fx_picker = function() calls[#calls + 1] = 'tfx' end,
     cur_col = function() return { name = 'A', guid = 'g' } end,
+    width_step = function(d, which) calls[#calls + 1] = 'w:' .. d .. ':' .. (which or 'all') end,
     input_picker = function() calls[#calls + 1] = 'tin' end, route_menu = function() calls[#calls + 1] = 'troute' end,
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
     snap = function() return snap end, layout = function() return L end, relayout = layout,
@@ -238,6 +239,11 @@ for _, c in ipairs({ { 'ty', 'tdup' }, { '3tj', 'tmove:1:3' }, { 'tk', 'tmove:-1
                      { 'tl', 'tlanes' }, { 'tf', 'tfx' }, { 'ti', 'tin' }, { 'tR', 'troute' } }) do
   reset(); keysin(c[1]); eq('t-op ' .. c[1], last(), c[2]); eq('t-op ' .. c[1] .. ' clears pending', V.pending, nil)
 end
+-- z> z< z. z, (9 окт): ширина по шагу
+for _, c in ipairs({ { 'z>', 'w:1:all' }, { 'z<', 'w:-1:all' }, { 'z.', 'w:1:cur' }, { 'z,', 'w:-1:cur' } }) do
+  reset(); keysin(c[1]); eq('width ' .. c[1], last(), c[2])
+end
+reset(); keysin('3z>'); eq('3z> - three steps', #calls, 3)
 reset()
 reset()
 keysin('S');       eq('S (Shift+s) solos the track', last(), 'track:solo')
