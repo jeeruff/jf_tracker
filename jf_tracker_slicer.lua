@@ -55,17 +55,19 @@ local function build_env(e)
   end
   if spl == 0 then return nil end
   local t = buf.table()
-  local env = { n = spl, rate = rate, span = span, v = {} }
+  local env = { n = spl, rate = rate, span = span, v = {}, max = 0 }
   local raw = (rv >> 20) & 0xF ~= 0
   for i = 1, spl do
     local a, b = t[i], raw and t[i] or t[n + i]     -- блок min — со сдвигом n запрошенных (4 окт)
     env.v[i] = math.max(math.abs(a or 0), math.abs(b or 0))
+    if env.v[i] > env.max then env.max = env.v[i] end
   end
   return env
 end
 
 function S.open(entry, track)
   S.entry, S.track = entry, track
+  S.env_t0, S.env_retry = nil, nil                  -- 9 окт: повтор пустой волны — заново для нового сэмпла
   S.env = build_env(entry)
   S.slices = {}
   for _, t in ipairs(entry.slices or {}) do S.slices[#S.slices + 1] = t end
@@ -495,6 +497,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.text(x, y + 1, ctx.fit('no instrument - the rec tab records one', w), U.GREY)
     return nil
   end
+  -- 9 окт: свежий файл (только записан / склеен) — пиков ещё нет или они
+  -- нулевые: волна была плоской до перезапуска. Пока пусто — перечитывать
+  -- раз в полсекунды (не дольше 30 с от открытия)
+  if S.active and S.entry and (not S.env or (S.env.max or 1) < 1e-7) then
+    local now = R.time_precise()
+    S.env_t0 = S.env_t0 or now
+    if now - S.env_t0 < 30 and now >= (S.env_retry or 0) then
+      S.env_retry = now + 0.5
+      local ok, env = pcall(build_env, S.entry)
+      if ok and env then S.env = env; if (env.max or 0) >= 1e-7 then S.msg = '' end end
+    end
+  else S.env_t0 = nil end
   local editing = S.active and S.entry and S.entry.item == e.item
   local rh = L.rh
   -- один заголовок в просмотре и правке (3 окт: двойной клик менял экран)

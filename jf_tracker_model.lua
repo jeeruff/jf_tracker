@@ -1217,6 +1217,7 @@ function build_one(tr, fx, out)
           if (spec.exact and names[pi] == want) or (not spec.exact and names[pi]:find(want, 1, true)) then
             params[#params + 1] = param_entry(tr, fx, pi, spec[2])
             params[#params].cat = M.param_cat(tr, fx, short, pi, names[pi], params[#params].kind)
+            params[#params].labels = spec.labels                     -- 9 окт: подписи положений (пульт slixer)
             if lay.wave and want == lay.wave.start then wa = #params end
             if lay.wave and want == lay.wave.stop then wb = #params end
             if lay.view_param and spec[2] == lay.view_param then e_view_p = #params end
@@ -1226,7 +1227,8 @@ function build_one(tr, fx, out)
           end
         end
       end
-      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1 }
+      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1,
+                  groups = lay.groups, rows = lay.rows }               -- 9 окт: колонка = группа с заголовком
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему
       if lay.view then e.view, e.view_p = lay.view, e_view_p end
       -- XY-пэд (TG33 vector): индексы параметров X / Y

@@ -3127,6 +3127,7 @@ end
 -- шкала фейдера микшера (8 окт): амплитуда в степени 1/4 от +12 dB — верх
 -- (около 0 dB) растянут, низ сжат, как у фейдеров пультов
 local FMAX = 10 ^ (12 / 20)
+D.FADER_W = function(L) return math.max(3 * L.cw + 4, ms('-48') + 6) end   -- ширина коробки фейдера (9 окт: была 5 знаков)
 D.mix_hold = {}   -- guid → удержание пиков фейдера (рисунок __): {db,t} L, {db,t} R; max / clip — нативные
 function D.fader_pos(db)
   if db <= -150 then return 0 end
@@ -3492,7 +3493,7 @@ function D.frame(L, snap, rows, state, info)
       local mixcol = false
       if L.mixer and not c.master then
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
-        local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + 5 * L.cw
+        local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + D.FADER_W(L)
         local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
         mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 6 * L.rh
         -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
@@ -3673,7 +3674,7 @@ function D.frame(L, snap, rows, state, info)
         local bigf = state.bigfader or state.ptmode
         -- 9 окт: отступ вложенности (дети папки) фейдер не сужает — у каналов
         -- одной ширины фейдер и кноб одинаковые (полосы отступа больше нет)
-        local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
+        local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + D.FADER_W(L))   -- 9 окт: 3 знака (метки -12 / -48), было 5 — на x2 слишком широко
         -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
         -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
@@ -5004,6 +5005,10 @@ function D.frame(L, snap, rows, state, info)
       -- Airwindows (4 окт): строка под именем — категория цветом и описание
       local awi = f.airwin and info.airwin_info and info.airwin_info(f.airwin)
       local aw_off = 0
+      -- 9 окт: группы (пульт slixer) — строка заголовков, колонка = rows строк;
+      -- не влезает по высоте — обычным списком
+      local grp = f.groups and f.rows and nfit - 1 >= f.rows
+      if grp then nfit = f.rows; aw_off = L.rh end
       if awi and nfit > 2 then
         nfit = nfit - 1; aw_off = L.rh
         local ay = by + L.rh + 1
@@ -5274,6 +5279,10 @@ function D.frame(L, snap, rows, state, info)
         if not cl and pi > nfit * (ncol - pcol0) then break end
         local colk = pcol0 + math.floor((pi - 1) / nfit)
         local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh
+        if grp and (pi - 1) % nfit == 0 then
+          local gt = f.groups[math.floor((pi - 1) / nfit) + 1]
+          if gt then text(bx + colk * bw1 + L.pad, by + L.rh + 1, fit(gt, pw), U.AMBER) end
+        end
         if cl then
           -- развёрнутый контейнер: своя колонка у каждого плагина, под именем;
           -- последняя строка — строка броска

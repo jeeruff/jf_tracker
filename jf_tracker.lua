@@ -6677,6 +6677,7 @@ ctx = {
     edit.fx_param(t.track, fx, p.i, (lo + hi) / 2)
   end,
   step_labels = function(f, p)
+    if p and p.labels and p.nsteps and #p.labels == p.nsteps then return p.labels end   -- 9 окт: свои подписи из реестра
     local t = dsp_target(); if not (t and f and p and p.nsteps) then return nil end
     local fx = p.fx or f.i
     local key = tostring(t.track) .. '|' .. fx .. '|' .. p.i .. '|' .. p.nsteps
