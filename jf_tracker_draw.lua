@@ -3106,7 +3106,7 @@ function D.frame(L, snap, rows, state, info)
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
-    if (col.depth or 0) > 0 and not c.folded then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end   -- 9 окт: у полоски закрывала фейдер
+    -- 9 окт: полосы отступа вложенного трека нет (лишний серый разделитель) — вложенность видна по отступу имени
     if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
     if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
