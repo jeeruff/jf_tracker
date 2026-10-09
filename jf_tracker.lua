@@ -6976,11 +6976,32 @@ ctx = {
               if state.notes_open then ctx.notes_target('project') else NT.target = 'project'; ctx.notes_toggle() end end },
           { key = 'c', label = 'notes of the item under the cursor', fn = function()
               if state.notes_open then ctx.notes_target('context') else NT.target = 'context'; ctx.notes_toggle() end end },
-          { key = 'd', label = 'dev notes: what to check (with debug on)', fn = function()
+          { key = 'N', label = 'dev notes: what to check (with debug on)', fn = function()
               if not state.debug then vim.msg = 'dev notes live in debug mode: turn debug on'; return end
               if state.notes_open then ctx.notes_target('dev') else NT.target = 'dev'; ctx.notes_toggle() end end },
           { key = 's', label = 'save the project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
           { key = 'S', label = 'save the project as …', fn = function() reaper.Main_OnCommand(40022, 0) end },   -- 9 окт: второй пункт project слит сюда
+          { key = 'x', label = 'close the project tab', fn = function() reaper.Main_OnCommand(40860, 0); model.invalidate() end },
+          -- 9 окт: удалить проект — с вопросом (по умолчанию «оставить»): вкладка
+          -- закрывается (REAPER сам спросит про сохранение), .rpp — в Корзину
+          { key = 'd', label = 'delete the project (asks first; the .rpp goes to the Trash)', fn = function()
+              local proj, fn = reaper.EnumProjects(-1, '')
+              if not fn or fn == '' then vim.msg = 'delete: the project is not saved to a file'; return end
+              local base = fn:match('[^/]+$') or fn
+              OPT.ask.open('delete the project?', base .. ' - the tab closes, the file goes to the Trash', {
+                { key = 'k', label = 'keep it', fn = function() vim.msg = 'project kept' end },
+                { key = 'd', label = 'delete: close the tab, .rpp to the Trash', fn = function()
+                  reaper.Main_OnCommand(40860, 0)
+                  for i = 0, 255 do local p = reaper.EnumProjects(i, ''); if not p then break end; if p == proj then vim.msg = 'delete: the tab is still open - nothing deleted'; return end end
+                  local home = os.getenv('HOME') or ''
+                  local dst = home .. '/.Trash/' .. base
+                  if reaper.file_exists(dst) then dst = home .. '/.Trash/' .. os.time() .. ' ' .. base end
+                  local ok, err = os.rename(fn, dst)
+                  model.invalidate()
+                  vim.msg = ok and ('project moved to the Trash: ' .. base) or ('delete: ' .. tostring(err))
+                end },
+              })
+            end },
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           { key = 'a', label = 'about', fn = function() ctrl_action('about', 0) end },
         } } end },
