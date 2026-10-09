@@ -71,5 +71,12 @@ pn, wd, l, r = CM.panpad(500, 1000, 1000, 1000)
 near(wd, -1, 'bottom = reversed'); near(l, 1, 'bottom: L right'); near(r, -1, 'bottom: R left')
 pn, wd, l, r = CM.panpad(750, 250, 1000, 1000)
 near(pn, 0.5, 'balance right'); near(l, 0, 'L = bal - w'); near(r, 1, 'R = bal + w')
+-- старт с трека под мышью (9 окт): мышь в зоне 3, старт — трек 7; вбок на зону — 8
+local gs = CM.gesture_step(nil, 250, 500, 10, 1000, 7)
+eq(gs.ti, 7, 'start on ti0')
+CM.gesture_step(gs, 350, 500, 10, 1000)
+eq(gs.ti, 8, 'next zone from ti0')
+CM.gesture_step(gs, 990, 500, 10, 1000)
+eq(gs.ti, 10, 'clamped at the last track')
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end

@@ -124,10 +124,16 @@ end
 -- g = CM.gesture (nil до начала); возвращает g с полями ti (1..N), mode
 -- 'pick' | 'fader', dy (пиксели вверх этого кадра в режиме fader)
 CM.G_LOCK, CM.G_UNLOCK = 4, 14          -- px: вертикаль включает фейдер, вбок — снова выбор
-function CM.gesture_step(g, mx, my, n, w)
+-- ti0 (9 окт) — трек, с которого начать (под мышью / курсором): зоны
+-- сдвигаются так, чтобы точка старта попала в него, дальше — вбок от него
+function CM.gesture_step(g, mx, my, n, w, ti0)
   n = math.max(1, n)
-  local function zone(x) return math.max(1, math.min(n, math.floor(x / math.max(1, w) * n) + 1)) end
-  if not g then return { ti = zone(mx), mode = 'pick', mx = mx, my = my, ax = 0, ay = 0, dy = 0 } end
+  local function zone0(x) return math.floor(x / math.max(1, w) * n) + 1 end
+  local function zone(x) return math.max(1, math.min(n, zone0(x) + (g and g.off or 0))) end
+  if not g then
+    local t = ti0 and math.max(1, math.min(n, ti0)) or math.max(1, math.min(n, zone0(mx)))
+    return { ti = t, off = t - zone0(mx), mode = 'pick', mx = mx, my = my, ax = 0, ay = 0, dy = 0 }
+  end
   local dx, dy = mx - g.mx, g.my - my
   g.mx, g.my, g.dy = mx, my, 0
   if g.mode == 'pick' then

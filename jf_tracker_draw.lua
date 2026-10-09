@@ -594,7 +594,7 @@ function D.layout(snap, state, nregions)
     end
       -- MIDI-лейны (6 окт, опция midi lanes): узкие колонки после огибающих
       c.mls = {}
-      if not hidden and state.midilanes ~= false and not c.compact and not state.ptmode then
+      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode then   -- 9 окт: сложенный — в знак, без MIDI-лейнов
         for _, ml in ipairs(col.mlanes or {}) do
           local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms(state.envfmt == 'hex' and 'FF' or '127')) + L.pad + ms('W')
           L.flat[#L.flat + 1] = { ci = ci, col = col, ml = ml, sub = {}, x = vis and lx or nil, w = mw }
@@ -3078,7 +3078,7 @@ function D.frame(L, snap, rows, state, info)
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
     if col.rgb and mode == 'line' and not c.folded then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
-    if (col.depth or 0) > 0 then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end
+    if (col.depth or 0) > 0 and not c.folded then set(U.DIM); gfx.rect(c.x + 1, hy, indent - 2, L.header_h - 1, 1) end   -- 9 окт: у полоски закрывала фейдер
     if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
     hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col)
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
@@ -3225,9 +3225,44 @@ function D.frame(L, snap, rows, state, info)
         if not side then D.mix_under_next = true end
         local fh = D.mix_under and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
-        text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY)
+        if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
+        if ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
         local pyy = y1 + L.rh
-        if col.panmode == 5 then
+        -- 9 окт: узкий фейдер — панорама кнобом (две строки, тянуть вверх /
+        -- вниз, Shift мелко); big fader — слайдерами, как было
+        local function knob(kx, ky, d, frac, what, val)
+          local r = math.floor((d - 1) / 2)
+          local cx, cy = kx + r, ky + r
+          local khot = mx >= kx and mx < kx + 2 * r + 1 and my >= ky and my < ky + 2 * r + 1
+          local ks = info.kslider
+          local kon = ks and ks.what == what and ks.col and ks.col.guid == col.guid
+          local kdark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
+          set(kdark); gfx.circle(cx, cy, r, 1, 0)
+          set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
+          -- шкала: от центра (верх) до значения — дуга цветом, риска — указатель
+          local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
+          set(U.readable(U.CYAN, kdark, 3)); gfx.arc(cx, cy, r - 2, math.min(0, a), math.max(0, a), 0)
+          set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 4))
+          gfx.line(cx, cy, cx + math.floor(math.sin(a) * (r - 1) + 0.5), cy - math.floor(math.cos(a) * (r - 1) + 0.5), 0)
+          if val and kx + 2 * r + 1 + L.pad + ms(val) <= sx + fx_w then text(kx + 2 * r + 1 + L.pad, ky + math.floor((2 * r + 1 - L.th) / 2), val, U.GREY) end
+          if khot then hover.trs = { col = col, what = what, knob = true, sv = frac } end
+          if D.csel_on(col.guid, what) then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
+          hint('trs', kx, ky, 2 * r + 1, 2 * r + 1, { col = col, what = what })
+        end
+        if not bigf then
+          local d2 = 2 * L.rh - 2
+          if col.panmode == 5 or col.panmode == 6 then
+            local d = math.min(d2, math.floor((fx_w - 2) / 2))
+            local a1, a2 = (col.panmode == 5) and 'pan' or 'panl', (col.panmode == 5) and 'width' or 'panr'
+            local v1 = (col.panmode == 5) and lv('pan', col.pan or 0) or lv('panl', col.panL or -1)
+            local v2 = (col.panmode == 5) and lv('width', col.width or 1) or lv('panr', col.panR or 1)
+            knob(sx, pyy, d, (v1 + 1) / 2, a1)
+            knob(sx + fx_w - d, pyy, d, (v2 + 1) / 2, a2)
+          else
+            local d = math.min(d2, fx_w)
+            knob(sx, pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
+          end
+        elseif col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
         elseif col.panmode == 6 then
@@ -3289,7 +3324,8 @@ function D.frame(L, snap, rows, state, info)
         local pty = ty0 - 6 - L.rh
         if hold.max > -60 then
           local ptxt = ('%+.1f'):format(hold.max)
-          text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3))
+          if ms(ptxt) > bw0 then ptxt = ('%+.0f'):format(hold.max) end                 -- 9 окт: не вылезать за коробку
+          if ms(ptxt) <= bw0 then text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3)) end
         end
         if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 6 then hover.mixpk = col.track end
         local last_ly

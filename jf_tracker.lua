@@ -10283,7 +10283,15 @@ local function frame()
         U.click, U.rclick = false, false
         goto cm_gest_done
       end
-      local g = CM.gesture_step(g0, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w)
+      local ti0
+      if not g0 then
+        -- 9 окт: старт — трек под мышью, иначе трек курсора
+        for _, c in ipairs(L and L.cols or {}) do
+          if c.x and gfx.mouse_x >= c.x and gfx.mouse_x < c.x + c.w then ti0 = c.ci; break end
+        end
+        if not ti0 then local f = L and L.flat and L.flat[vim.cur.fi]; ti0 = f and f.ci end
+      end
+      local g = CM.gesture_step(g0, gfx.mouse_x, gfx.mouse_y, #cols, gfx.w, ti0)
       ctx.cm_gest = g
       local col = cols[g.ti]
       if col then
@@ -10699,10 +10707,10 @@ local function frame()
         edit.track_value(t.col.track, TRS_KEY[t.what], TRS_RESET[t.what]); edit.track_undo('track ' .. t.what .. ' reset'); model.invalidate()
         trs_drag = nil
       else
-        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h }
+        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, my0 = gfx.mouse_y, f0 = t.sv }
       end
       -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
-      if t.vert and t.what == 'vol' then
+      if (t.vert and t.what == 'vol') or t.knob then   -- 9 окт: и кноб панорамы
         state.kslider = { col = t.col, what = 'vol' }
         vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(t.col.name or '')
       end
@@ -11593,8 +11601,11 @@ local function frame()
   end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then
-      local frac = trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
+      -- кноб (9 окт): относительно, вверх — вправо; 150 px — весь ход, Shift — ×10 мельче
+      local frac = trs_drag.knob and math.max(0, math.min(1, (trs_drag.f0 or 0.5) + (trs_drag.my0 - gfx.mouse_y) / (gfx.mouse_cap & 8 == 8 and 1500 or 150)))
+        or trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
         or math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
+      if trs_drag.knob then trs_drag.f0, trs_drag.my0 = frac, gfx.mouse_y end   -- шаг покадрово: Shift посреди протяжки без скачка
       local v = trs_drag.vert and 10 ^ (draw.fader_db(frac) / 20) or trs_value(trs_drag.what, frac)   -- вертикальный — своя шкала
       edit.track_value(trs_drag.col.track, TRS_KEY[trs_drag.what], v)
       trs_drag.v = v
