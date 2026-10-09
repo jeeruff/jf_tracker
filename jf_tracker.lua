@@ -43,6 +43,8 @@ MMX.CM = dofile(DIR .. '/jf_tracker_ctrlmouse.lua')   -- мышь с Ctrl: ун�
 MMX.HM.init(U, MMX.CH)
 MMX.HM.root = tonumber(reaper.GetExtState('jf_tracker', 'harmroot')) or 0
 MMX.HM.minor = reaper.GetExtState('jf_tracker', 'harmminor') == '1'
+MMX.HM.show_staff = reaper.GetExtState('jf_tracker', 'harmstaff') ~= '0'   -- 9 окт: стан / таб аккорда
+MMX.HM.show_tab = reaper.GetExtState('jf_tracker', 'harmtab') ~= '0'
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
@@ -178,7 +180,8 @@ local state = {
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
   pianosmall = flag('pianosmall', false),        -- маленькая клавиатура: клавиша по букве (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
-  bigfader = flag('bigfader', false),             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
+  bigfader = flag('bigfader', false),
+  panknob = flag('panknob', true),                -- микшер: пан кнобом при узком фейдере (9 окт)             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
   hdrinfo = flag('hdrinfo', false),               -- шапка трека: инструменты, инсерты, сенды (7 окт)
@@ -452,7 +455,7 @@ local function save_win()
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -4428,6 +4431,8 @@ ctx = {
     end
     reaper.SetExtState('jf_tracker', 'harmroot', tostring(MMX.HM.root), true)
     reaper.SetExtState('jf_tracker', 'harmminor', MMX.HM.minor and '1' or '0', true)
+    reaper.SetExtState('jf_tracker', 'harmstaff', MMX.HM.show_staff and '1' or '0', true)
+    reaper.SetExtState('jf_tracker', 'harmtab', MMX.HM.show_tab and '1' or '0', true)
     if r == true then vim.msg = 'harmonizer: ' .. MMX.HM.key_name() end
   end,
   chord_cmd = function(arg)
@@ -5461,6 +5466,7 @@ ctx = {
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
+      flag('panknob', 'pan knob', 'mixer with a narrow fader: pan / width as knobs (drag up or right - more, Shift fine); off - small sliders'),
       flag('bigfader', 'big fader', 'mixer: a wide fader with dB marks left of it (+6 0 -6 ...); off - a narrow box, marks as ticks only. Always big in pt-mode'),
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
@@ -10707,7 +10713,7 @@ local function frame()
         edit.track_value(t.col.track, TRS_KEY[t.what], TRS_RESET[t.what]); edit.track_undo('track ' .. t.what .. ' reset'); model.invalidate()
         trs_drag = nil
       else
-        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, my0 = gfx.mouse_y, f0 = t.sv }
+        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, my0 = gfx.mouse_y, mx0 = gfx.mouse_x, f0 = t.sv }
       end
       -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
       if (t.vert and t.what == 'vol') or t.knob then   -- 9 окт: и кноб панорамы
@@ -11601,11 +11607,12 @@ local function frame()
   end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then
-      -- кноб (9 окт): относительно, вверх — вправо; 150 px — весь ход, Shift — ×10 мельче
-      local frac = trs_drag.knob and math.max(0, math.min(1, (trs_drag.f0 or 0.5) + (trs_drag.my0 - gfx.mouse_y) / (gfx.mouse_cap & 8 == 8 and 1500 or 150)))
+      -- кноб (9 окт): относительно, вверх и вправо — больше (обе оси); 150 px —
+      -- весь ход, Shift — ×10 мельче
+      local frac = trs_drag.knob and math.max(0, math.min(1, (trs_drag.f0 or 0.5) + ((trs_drag.my0 - gfx.mouse_y) + (gfx.mouse_x - trs_drag.mx0)) / (gfx.mouse_cap & 8 == 8 and 1500 or 150)))
         or trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
         or math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
-      if trs_drag.knob then trs_drag.f0, trs_drag.my0 = frac, gfx.mouse_y end   -- шаг покадрово: Shift посреди протяжки без скачка
+      if trs_drag.knob then trs_drag.f0, trs_drag.my0, trs_drag.mx0 = frac, gfx.mouse_y, gfx.mouse_x end   -- шаг покадрово: Shift посреди протяжки без скачка
       local v = trs_drag.vert and 10 ^ (draw.fader_db(frac) / 20) or trs_value(trs_drag.what, frac)   -- вертикальный — своя шкала
       edit.track_value(trs_drag.col.track, TRS_KEY[trs_drag.what], v)
       trs_drag.v = v

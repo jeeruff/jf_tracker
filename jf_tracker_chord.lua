@@ -132,4 +132,71 @@ function CH.timeline(notes)
   return out
 end
 
+-- нотный стан (9 окт): высота → ступень (C-1 = 0, C4 = 28, E4 = 30 — нижняя
+-- линия скрипичного ключа) и знак (диезы, как CH.NAMES)
+local LETTER = { C = 0, D = 1, E = 2, F = 3, G = 4, A = 5, B = 6 }
+function CH.staff_step(p)
+  local nm = CH.NAMES[p % 12 + 1]
+  local oct = p // 12 - 1
+  return oct * 7 + LETTER[nm:sub(1, 1)], (nm:sub(2) ~= '' and nm:sub(2) or nil)
+end
+
+-- гитара (9 окт): аппликатура аккорда в стандартном строе (E A D G B E),
+-- лады по струнам от 6-й (низкой) к 1-й, −1 — не играть. Перебор окон по 4
+-- лада (и открытые струны): в басу — корень (или бас /X), все звуки
+-- аккорда, без заглушённых посередине, ближе к началу грифа
+CH.TUNING = { 40, 45, 50, 55, 59, 64 }
+local gcache = {}
+function CH.guitar(sym)
+  if gcache[sym] ~= nil then return gcache[sym] or nil end
+  local c = CH.parse(sym)
+  if not c then gcache[sym] = false; return nil end
+  local want, nwant = {}, 0
+  for _, i in ipairs(c.ints) do local pc = (c.root + i) % 12; if not want[pc] then want[pc] = true; nwant = nwant + 1 end end
+  local bass = c.bass or c.root
+  if not want[bass] then want[bass] = true; nwant = nwant + 1 end
+  local best, bscore
+  local fr = {}
+  for b = 0, 9 do
+    local opts = {}
+    for s = 1, 6 do
+      local o = { -1 }
+      for f = (b == 0 and 0 or b), b + 3 do if want[(CH.TUNING[s] + f) % 12] then o[#o + 1] = f end end
+      if b > 0 and want[CH.TUNING[s] % 12] then o[#o + 1] = 0 end
+      opts[s] = o
+    end
+    local function rec(s)
+      if s > 6 then
+        -- оценка
+        local low, n, inner, have, cnt, lo, hi = nil, 0, 0, {}, 0, 99, 0
+        local started, gap, fretted, opens = false, false, false, 0
+        for k = 1, 6 do
+          local f = fr[k]
+          if f >= 0 then
+            if gap then inner = inner + 1 end
+            started = true; n = n + 1
+            local pc = (CH.TUNING[k] + f) % 12
+            if not low then low = pc end
+            if not have[pc] then have[pc] = true; cnt = cnt + 1 end
+            if f > 0 then lo = math.min(lo, f); hi = math.max(hi, f); fretted = true
+            elseif fretted then opens = opens + 1 end                       -- открытая над прижатой — неудобно
+          elseif started then gap = true end
+        end
+        -- открытая сразу над прижатым басом (F: 1 0 3 …) — неудобно
+        local bopen = false
+        for k = 1, 5 do if fr[k] >= 0 then bopen = fr[k] > 0 and fr[k + 1] == 0; break end end
+        if not low or low ~= bass or n < math.min(4, nwant) then return end
+        -- заглушённая посередине: только если дальше снова звук
+        local sc = (nwant - cnt) * 20 + inner * 8 + (6 - n) * 2 + (hi > 0 and (hi - lo) or 0) + b * 1.5 + opens * (b > 0 and 4 or 0) + (bopen and 3 or 0)
+        if not bscore or sc < bscore then bscore = sc; best = { table.unpack(fr) } end
+        return
+      end
+      for _, f in ipairs(opts[s]) do fr[s] = f; rec(s + 1) end
+    end
+    rec(1)
+  end
+  gcache[sym] = best or false
+  return best
+end
+
 return CH

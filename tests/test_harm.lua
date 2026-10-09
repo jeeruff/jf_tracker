@@ -14,5 +14,14 @@ eq(CH.NAMES[r + 1] .. (m and 'm' or ''), 'A#m', 'detect A# minor from A#m + G#6'
 eq(HM.key(('3'):byte()).write, HM.degree(3), 'key 3 writes iii')
 eq(HM.key(('#'):byte()).write, HM.degree(3, true), 'shift-3 writes the seventh')
 eq(HM.key(27), 'leave', 'Esc leaves')
+-- стан и гитара (9 окт)
+local st, acc = CH.staff_step(64); eq(st, 30, 'E4 = bottom line'); eq(acc, nil, 'E natural')
+st, acc = CH.staff_step(61); eq(st, 28, 'C#4 on C4 step'); eq(acc, '#', 'C# sharp')
+eq(CH.staff_step(77), 38, 'F5 = top line')
+local function g(sym) local t = CH.guitar(sym); return t and table.concat(t, ' ') end
+eq(g('C'), '-1 3 2 0 1 0', 'open C'); eq(g('Am'), '-1 0 2 2 1 0', 'open Am')
+eq(g('F'), '1 3 3 2 1 1', 'F barre'); eq(g('Dm'), '-1 -1 0 2 3 1', 'open Dm')
+eq(g('E7'), '0 2 0 1 0 0', 'E7'); eq(g('C/E'):sub(1, 1), '0', 'C/E: E in the bass')
+eq(HM.key(('s'):byte()), true, 's toggles staff'); eq(HM.show_staff, false, 'staff off')
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end

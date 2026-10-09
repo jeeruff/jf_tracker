@@ -3242,14 +3242,16 @@ function D.frame(L, snap, rows, state, info)
           -- шкала: от центра (верх) до значения — дуга цветом, риска — указатель
           local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
           set(U.readable(U.CYAN, kdark, 3)); gfx.arc(cx, cy, r - 2, math.min(0, a), math.max(0, a), 0)
-          set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 4))
-          gfx.line(cx, cy, cx + math.floor(math.sin(a) * (r - 1) + 0.5), cy - math.floor(math.cos(a) * (r - 1) + 0.5), 0)
+          -- указатель — яркая точка на краю (9 окт, вместо линии)
+          set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
+          local pr = math.max(1, math.floor(r / 4))
+          gfx.circle(cx + math.floor(math.sin(a) * (r - pr - 1) + 0.5), cy - math.floor(math.cos(a) * (r - pr - 1) + 0.5), pr, 1, 0)
           if val and kx + 2 * r + 1 + L.pad + ms(val) <= sx + fx_w then text(kx + 2 * r + 1 + L.pad, ky + math.floor((2 * r + 1 - L.th) / 2), val, U.GREY) end
           if khot then hover.trs = { col = col, what = what, knob = true, sv = frac } end
           if D.csel_on(col.guid, what) then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
           hint('trs', kx, ky, 2 * r + 1, 2 * r + 1, { col = col, what = what })
         end
-        if not bigf then
+        if not bigf and state.panknob ~= false then
           local d2 = 2 * L.rh - 2
           if col.panmode == 5 or col.panmode == 6 then
             local d = math.min(d2, math.floor((fx_w - 2) / 2))
@@ -3334,11 +3336,19 @@ function D.frame(L, snap, rows, state, info)
           set(m == 0 and U.readable(U.TEXT, dark, 4) or tick); gfx.rect(bx0 + 1, yy, 2, 1, 1); gfx.rect(bx0 + bw0 - 3, yy, 2, 1, 1)
           -- подпись — только если не налезает на предыдущую (без наложений)
           local ly = yy - math.floor(L.rh / 2)
-          if lblw > 0 and (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
+          if (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
-            text(bx0 - 2 - ms(ml), ly, ml, m == 0 and U.TEXT or U.GREY)
-            hint('trsmark', bx0 - 2 - ms(ml), ly, ms(ml), L.rh, { col = col, db = m })   -- f: громкость на метку
-            last_ly = ly
+            if lblw > 0 then
+              text(bx0 - 2 - ms(ml), ly, ml, m == 0 and U.TEXT or U.GREY)
+              hint('trsmark', bx0 - 2 - ms(ml), ly, ms(ml), L.rh, { col = col, db = m })   -- f: громкость на метку
+              last_ly = ly
+            elseif ms(ml) <= bw0 - 2 then
+              -- 9 окт: узкий фейдер — метки внутри коробки, серым (f прыгает на них)
+              local lx = bx0 + math.floor((bw0 - ms(ml)) / 2)
+              text(lx, ly, ml, U.readable(U.GREY, dark, 3))
+              hint('trsmark', lx, ly, ms(ml), L.rh, { col = col, db = m })
+              last_ly = ly
+            end
           end
         end
         -- ручка [-]: колпачок в рамке поверх метра, риска посередине — уровень
