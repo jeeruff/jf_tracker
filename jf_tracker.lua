@@ -234,7 +234,10 @@ local state = {
   jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
-  slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
+  slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
+  pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
+  insmode = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'insmode')] or 'fixed',   -- 9 окт: инструмент при вставке
+  velrand = reaper.GetExtState(EXT, 'velrand') == '1',               -- 9 окт: разброс velocity при вставке   -- 9 окт: human слайсов, % (0 — выкл)   -- 9 окт: скорость Ctrl / Ctrl+Option-протяжки, %              -- схема маршрутизации над нижним микшером (9 окт)
   mixnames = ({ top = 'top', off = 'off' })[reaper.GetExtState(EXT, 'mixnames')] or 'bottom',   -- микшер снизу: имя трека в полосе (9 окт)
   meterstyle = reaper.GetExtState(EXT, 'meterstyle') == 'pt' and 'pt' or 'blocks',   -- метры: blocks / pt (4 окт)     -- упреждение курсора при игре, мс (3 окт)
   itemframe = (function() local v = reaper.GetExtState(EXT, 'itemframe'); return (v == 'wave' or v == 'off') and v or 'item' end)(),   -- рамка item (3 окт)
@@ -281,6 +284,8 @@ state.panes = (function()
     top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
     mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
 end)()
+-- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
+if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
 -- 9 окт (миграция 5): вкладка macros — в стек вкладок верхнего модуля
 if state.panes and reaper.GetExtState(EXT, 'panes_mig5') ~= '1' then
   local PNm = draw.panes
@@ -517,12 +522,12 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3314,6 +3319,91 @@ ctx = {
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
   mono_on = function() return state.slicemono end,
+  -- 9 окт: опция pm as a pane — показать панель pm в стеке браузера / спрятать
+  pmpane_apply = function()
+    if not (state.panes and draw.panes) then return end
+    local PNm = draw.panes
+    if state.pmpane then
+      if not PNm.visible(state.panes, 'pm') then
+        if PNm.visible(state.panes, 'browser') then PNm.stack(state.panes, 'pm', 'browser') else PNm.show(state.panes, 'pm') end
+      end
+    else
+      if PNm.visible(state.panes, 'pm') then PNm.hide(state.panes, 'pm') end
+      if B.mode == 'pm' then B.set_mode(B.bmode or 'files') end
+    end
+    relayout()
+  end,
+  -- 9 окт: точка огибающей громкости take в строке row (x на поле громкости)
+  take_vol_del = function(it, row)
+    if not reaper.ValidatePtr(it, 'MediaItem*') then return false end
+    local tk = reaper.GetActiveTake(it)
+    local env = tk and reaper.GetTakeEnvelopeByName(tk, 'Volume')
+    if not env then return false end
+    local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    local t0, t1 = edit.row_time(row, state.lpb, 0) - pos, edit.row_time(row + 1, state.lpb, 0) - pos
+    local done = false
+    edit.run('take volume point', function()
+      for i = reaper.CountEnvelopePoints(env) - 1, 0, -1 do
+        local _, t = reaper.GetEnvelopePoint(env, i)
+        local tt = t / ((rate ~= 0) and rate or 1)
+        if tt >= t0 - 1e-6 and tt < t1 - 1e-6 then reaper.DeleteEnvelopePointEx(env, -1, i); done = true end
+      end
+      reaper.Envelope_SortPoints(env)
+    end)
+    model.invalidate()
+    return done
+  end,
+  -- 9 окт: в панели pm нажали files / db / proj / kits — в панель browser с этим режимом
+  browser_from_pm = function(mode)
+    B.bmode = mode
+    ctx.b_owner = 'browser'
+    if ctx.pane_focus then ctx.pane_focus('browser') else ctx.set_focus('browser') end
+    B.set_mode(mode)
+  end,
+  -- ── вставка нот: режим инструмента / velocity (9 окт, меню блока step / inst) ──
+  -- сэмплы lib трека (без слайсов-детей и пустых слотов) — номера пула
+  ins_pool = function(col)
+    local out = {}
+    for i, e in ipairs(col and col.pool or {}) do if e.item and not e.parent then out[#out + 1] = i end end
+    return out
+  end,
+  ins_next = function(col)
+    local m = state.insmode or 'fixed'
+    if m == 'fixed' then return nil end
+    local list = ctx.ins_pool(col)
+    if #list == 0 then return nil end
+    local ni
+    if m == 'random' then ni = list[math.random(#list)]
+    else
+      ni = list[1]
+      for k, i in ipairs(list) do if i == vim.inst then ni = list[k % #list + 1] end end
+    end
+    vim.inst = ni
+    return ni
+  end,
+  ins_vel = function(v)
+    if not state.velrand then return v end
+    return math.max(1, math.min(127, math.floor((v or 100) + (math.random() * 2 - 1) * 8 + 0.5)))
+  end,
+  ins_menu = function()
+    local m = state.insmode or 'fixed'
+    local function mark(on) return on and '  *' or '' end
+    local items = {
+      { key = 'f', label = 'instrument: fixed (the selected one)' .. mark(m == 'fixed'), fn = function() state.insmode = 'fixed'; vim.msg = 'insert: fixed instrument' end },
+      { key = 'r', label = 'instrument: random from the lib, every note' .. mark(m == 'random'), fn = function() state.insmode = 'random'; vim.msg = 'insert: random instrument' end },
+      { key = 's', label = 'instrument: sequence - the next one every note' .. mark(m == 'seq'), fn = function() state.insmode = 'seq'; vim.msg = 'insert: instruments in sequence' end },
+      { key = '0', label = 'human off' .. mark((state.human or 0) == 0), fn = function() state.human = 0; edit.human = 0; vim.msg = 'human off' end },
+      { key = '1', label = 'human 25 %' .. mark(state.human == 25), fn = function() state.human = 25; edit.human = 25; vim.msg = 'human 25 %' end },
+      { key = '2', label = 'human 50 %' .. mark(state.human == 50), fn = function() state.human = 50; edit.human = 50; vim.msg = 'human 50 %' end },
+      { key = '4', label = 'human 100 %' .. mark(state.human == 100), fn = function() state.human = 100; edit.human = 100; vim.msg = 'human 100 %' end },
+      { key = 'v', label = 'velocity: random +-8 every note' .. mark(state.velrand), fn = function() state.velrand = not state.velrand; vim.msg = 'velocity random ' .. (state.velrand and 'on' or 'off') end },
+      { key = 'm', label = (state.slicemono and 'mono (a new note cuts the track) - switch to poly' or 'poly - switch to mono'), fn = function() ctx.mono_toggle() end },
+      { key = 'a', label = 'step auto (the step follows the note length)' .. mark(vim.step_auto), fn = function() vim.step_auto = not vim.step_auto; vim.msg = 'step: ' .. (vim.step_auto and 'auto' or tostring(vim.step)) end },
+    }
+    vim.open_hydra({ title = 'insert - ' .. (m == 'fixed' and ('inst ' .. (vim.inst or 0)) or m) .. ((state.human or 0) > 0 and ('  human ' .. state.human .. '%') or ''), items = items })
+    state.popup_at = { kind = 'strip', id = 'inst' }
+  end,
   -- ── вкладка macros (9 окт) ─────────────────────────────────────────────
   mac_file = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_macros.txt' end,
   mac_saved = function()
@@ -5742,7 +5832,7 @@ ctx = {
     w1, w2 = w1 or '', w2 or ''                  -- :pm без слова — просто вкладка (nil ломал проверку ниже)
     if not ctx.pm_cards() and w1 ~= '' then vim.msg = 'pm cards: turn on the option pm cards (jf_pm) first'; return end
     if w1 == 'big' then ctx.pm_big(); return end
-    if state.panes_ui and L and L.pn then ctx.pane_focus('pm') else state.side = true; B.set_mode('pm'); ctx.set_focus('browser') end
+    if state.pmpane and state.panes_ui and L and L.pn then ctx.pane_focus('pm') else state.side = true; B.set_mode('pm'); ctx.set_focus('browser') end
     if w1 == 'grid' or w1 == 'list' then B.click(w1 == 'grid' and 'pmgrid' or 'pmlist')
     elseif w1 == 'sort' and w2 ~= '' then B.pm_sort = w2; reaper.SetExtState(EXT, 'pmsort', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: sort by ' .. w2
     elseif w1 == 'daw' and w2 ~= '' then B.pm_daw = w2; reaper.SetExtState(EXT, 'pmdaw', w2, true); B.pm = nil; B.set_all(B.read_pm()); vim.msg = 'pm: daw ' .. w2
@@ -6393,6 +6483,7 @@ ctx = {
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
+      { key = 'pmpane', label = 'pm as a pane', kind = 'toggle', desc = 'pm (projects) as a pane of its own, stacked with the browser; off - a tab of the browser (fx is a pane either way)', get = function() return state.pmpane end, set = function(v) state.pmpane = v; ctx.pmpane_apply() end },
       flag('jumps', 'jump ruler', 'a row over the track headers, like relativenumber in Vim: how many tracks away each one is (L3 - 3L jumps right, H2 - 2H left), the cursor track shows its number'),
       flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu'),
       flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
@@ -6461,7 +6552,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'panes_ui', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -10015,7 +10106,9 @@ local function frame()
   -- 9 окт (исправлено): у браузера и pm один модуль и один список строк —
   -- режим переключается целиком (set_mode, список заново) у той панели,
   -- что видна; видны обе — у той, что в фокусе (вторая — подсказка)
-  if state.panes_ui and not state.pm_big then
+  B.pmpane = state.pmpane and state.panes_ui or nil   -- 9 окт: опция pm as a pane
+  if state.panes_ui and not state.pm_big and not state.pmpane then B.panes = true; if B.mode == 'fx' then B.mode = B.bmode or 'files' end end
+  if state.panes_ui and not state.pm_big and state.pmpane then
     B.panes = true
     if B.mode ~= 'pm' and B.mode ~= 'fx' then B.bmode = B.mode end
     local function vis(id) local c = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]; return c ~= nil and c.active_id == id end
@@ -10027,7 +10120,7 @@ local function frame()
     if want == 'pm' and B.mode ~= 'pm' then B.set_mode('pm')
     elseif want == 'browser' and (B.mode == 'pm' or B.mode == 'fx') then B.set_mode(B.bmode or 'files') end
     ctx.b_owner = want or ctx.b_owner
-  else B.panes = nil end
+  elseif not state.panes_ui then B.panes = nil end
   -- 9 окт: трек курсора левее начала прокрутки (колонки сменили ширину —
   -- огибающая, свёртка) — прокрутка к нему, а не «пропавший» трек
   do
@@ -10396,7 +10489,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
-      lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      insmode = state.insmode, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
@@ -12870,6 +12963,8 @@ local function frame()
       end
     else env_drag.key = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
+  elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
+    ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
   elseif U.rclick and hover.dspcomp then

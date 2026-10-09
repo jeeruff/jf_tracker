@@ -523,6 +523,19 @@ local function apply(op, f0, f1, r0, r1)
     if op == 'c' then V.mode = 'insert' end
     return true
   end
+  -- 9 окт: x / dl / dd на поле громкости строки-продолжения — точка огибающей
+  -- громкости take («00» после x-fade), не весь item
+  if (op == 'd' or op == 'x') and f0 == f1 and (V.cur.field or 1) == 2 and ctx.take_vol_del then
+    local fl = flat()[f0]
+    local n = 0
+    for r = r0, r1 do
+      for _, sub in ipairs(fl and subs_of(fl) or {}) do
+        local c = sub[r]
+        if c and c.kind == 'cont' and c.vol ~= nil and c.of and c.of.item then n = n + (ctx.take_vol_del(c.of.item, r) and 1 or 0) end
+      end
+    end
+    if n > 0 then V.msg = ('take volume point(s) deleted: %d'):format(n); return true end
+  end
   local heads = V.heads_in(f0, f1, r0, r1)
   local edited = true
   if op == 'd' or op == 'x' or op == 'c' then
@@ -1534,6 +1547,12 @@ function V.key_impl(c)
           if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
           return
         end
+        -- 9 окт: режим вставки инструмента (меню блока step / inst, правая кнопка):
+        -- random — случайный из lib, sequence — следующий по кругу
+        if ctx.ins_next and not (ctx.inst_fx and ctx.inst_fx(f.col)) then
+          local ni = ctx.ins_next(f.col)
+          if ni then inst = (f.col.pool or {})[ni] end
+        end
         -- нота поверх события: ПЕРЕЗАПИСЬ (старое удаляется), Option+нота —
         -- рядом, в новой подколонке, даже та же нота (решение пользователя 2 окт)
         local beside = how == 'beside'
@@ -1549,7 +1568,7 @@ function V.key_impl(c)
           end
         end
         local stp = V.step_auto and 1 or V.step
-        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, V.vel, stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
+        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
         E.beside = false
         if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
         V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()

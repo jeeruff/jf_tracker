@@ -705,6 +705,10 @@ end
 
 -- кнопки шапки: files | db | size | hide
 function B.click(what)
+  -- 9 окт: панели — кнопка файлового режима в панели pm переводит в панель browser
+  if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'kits') and ctx.browser_from_pm then
+    ctx.browser_from_pm(what); return
+  end
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
@@ -872,7 +876,7 @@ function B.key(c)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.panes and 'proj' or 'pm'), pm = 'proj', proj = 'kits', kits = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'kits', kits = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -931,7 +935,8 @@ function B.draw(U, L, x, y, w, h)
   do
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
-    for _, t in ipairs(B.panes and { 'files', 'db', 'proj', 'kits' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' })) do
+    -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'kits' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'kits' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' })) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -942,9 +947,10 @@ function B.draw(U, L, x, y, w, h)
     B.fx_hover = nil
     -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
     local mw = B.NMARKS * (U.measure('5') + 3 * L.pad)
-    if bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
+    if B.pmpane and B.mode == 'pm' then               -- 9 окт: панель pm — без закладок папок браузера
+    elseif bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
   end
-  do
+  if not (B.pmpane and B.mode == 'pm') then         -- 9 окт: панель pm — без файловых кнопок (find wave track sync …)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave },
