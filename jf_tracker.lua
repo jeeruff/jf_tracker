@@ -3303,7 +3303,9 @@ ctx = {
   end,
   jump_back = function()
     local j = ctx.jl
-    if j.pos == 0 then vim.msg = 'jumps: nothing to go back to'; return end
+    -- 9 окт: на первой записи (а за ней есть ещё) назад некуда — раньше pos
+    -- уходил в 0 и jump_go(nil) ронял трекер
+    if j.pos == 0 or (j.pos == 1 and #j.list > 1) then vim.msg = 'jumps: nothing to go back to'; return end
     if j.pos == #j.list then                                  -- с конца — запомнить, где стоим (для Ctrl+I)
       local h = ctx.jump_here()
       j.list[#j.list + 1] = h; j.pos = #j.list
@@ -3311,7 +3313,6 @@ ctx = {
     j.pos = j.pos - 1
     ctx.jump_go(j.list[j.pos])
     vim.msg = ('jump back %d/%d (Ctrl+I - forward)'):format(j.pos, #j.list)
-    if j.pos == 0 then j.pos = 1 end
   end,
   jump_fwd = function()
     local j = ctx.jl

@@ -107,6 +107,7 @@ local function reset()
     track_colour = function() calls[#calls + 1] = 'tcol' end, rec_arm = function() calls[#calls + 1] = 'tarm' end,
     toggle_lanes = function() calls[#calls + 1] = 'tlanes' end, fx_picker = function() calls[#calls + 1] = 'tfx' end,
     cur_col = function() return { name = 'A', guid = 'g' } end,
+    jump_mark = function() calls[#calls + 1] = 'jmark' end,
     width_step = function(d, which) calls[#calls + 1] = 'w:' .. d .. ':' .. (which or 'all') end,
     input_picker = function() calls[#calls + 1] = 'tin' end, route_menu = function() calls[#calls + 1] = 'troute' end,
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
@@ -244,6 +245,11 @@ for _, c in ipairs({ { 'z>', 'w:1:all' }, { 'z<', 'w:-1:all' }, { 'z.', 'w:1:cur
   reset(); keysin(c[1]); eq('width ' .. c[1], last(), c[2])
 end
 reset(); keysin('3z>'); eq('3z> - three steps', #calls, 3)
+-- gg / G — в список прыжков (9 окт); на месте — нет
+reset(); V.cur.row = 8; keysin('gg'); eq('gg marks a jump', last(), 'jmark'); eq('gg moved', V.cur.row, 0)
+reset(); V.cur.row = 0; keysin('gg'); eq('gg in place - no mark', #calls, 0)
+reset(); keysin('G'); eq('G marks a jump', last(), 'jmark')
+reset(); V.cur.row = 4; keysin('dgg'); eq('dgg - no jump mark', calls[1] ~= 'jmark', true)
 reset()
 reset()
 keysin('S');       eq('S (Shift+s) solos the track', last(), 'track:solo')

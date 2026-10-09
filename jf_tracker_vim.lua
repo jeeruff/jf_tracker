@@ -1675,7 +1675,10 @@ function V.key_impl(c)
         if V.op then
           local f0, f1, r0, r1 = range_or_event(V.op, t)
           local e = apply(V.op, f0, f1, r0, r1); V.op = nil; if e then finish_edit() else finish_move() end
-        else V.cur.row = t.row; finish_move() end
+        else
+          if t.row ~= V.cur.row and ctx.jump_mark then ctx.jump_mark() end   -- 9 окт: gg — в список прыжков
+          V.cur.row = t.row; finish_move()
+        end
         V.count = nil; ensure_visible(); return
       end
       if c == ('s'):byte() and not V.op then
@@ -1890,6 +1893,7 @@ function V.key_impl(c)
   -- движение
   local t = motion(c, n)
   if t then
+    if c == ('G'):byte() and t.row ~= V.cur.row and ctx.jump_mark then ctx.jump_mark() end   -- 9 окт: G — в список прыжков (Ctrl+O назад)
     V.cur.fi, V.cur.row = t.fi, t.row
     if t.field then V.cur.field = t.field; V.cur.sub = t.sub end
     clamp_cur(); ensure_visible(); V.count = nil; finish_move(); return
