@@ -3853,6 +3853,8 @@ function D.frame(L, snap, rows, state, info)
     U.TEXT, U.GREY = T0, G0
     set(U.LINE); gfx.rect(c.x, hy, 1, L.header_h, 1)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
+    -- 9 окт: фон полосы нижнего микшера — тоже «шапка» (щелчок выделяет трек)
+    if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
   set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
   -- уголок над номерами строк (2 окт; 7 окт): ряд 0 — proj | region, ряд 1 —

@@ -185,6 +185,7 @@ local state = {
   pianosmall = flag('pianosmall', false),        -- маленькая клавиатура: клавиша по букве (8 окт)
   notitle = flag('notitle', true),                -- плавающее окно без заголовка (быстрая опция title, 8 окт)
   bigfader = flag('bigfader', false),
+  faderfocus = flag('faderfocus', true),          -- микшер: щелчок по фейдеру / кнобу — курсор трекера на канал (9 окт)
   dbmarks = flag('dbmarks', true),                -- микшер: метки dB и риски в фейдере (9 окт, быстрая опция)
   panknob = flag('panknob', true),                -- микшер: пан кнобом при узком фейдере (9 окт)             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
@@ -479,7 +480,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -5788,6 +5789,7 @@ ctx = {
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
       flag('ptabs', 'project tabs', 'a thin row of the open REAPER project tabs on top of the main module; click - switch, * - unsaved changes'),
+      flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
       flag('dbmarks', 'dB marks', 'mixer faders: the +6 0 -12 -24 -48 marks and ticks (f jumps to a mark)'),
       flag('panknob', 'pan knob', 'mixer with a narrow fader: pan / width as knobs (drag up or right - more, Shift fine); off - small sliders'),
       flag('bigfader', 'big fader', 'mixer: a wide fader with dB marks left of it (+6 0 -6 ...); off - a narrow box, marks as ticks only. Always big in pt-mode'),
@@ -11150,6 +11152,14 @@ local function frame()
         trs_drag = nil
       else
         trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, my0 = gfx.mouse_y, mx0 = gfx.mouse_x, f0 = t.sv }
+      end
+      -- 9 окт: щелчок по полосе микшера всегда выделяет трек в REAPER; с опцией
+      -- fader click focus — ещё и курсор трекера на этот канал
+      if ((t.vert and t.what == 'vol') or t.knob) and t.col.track and reaper.ValidatePtr(t.col.track, 'MediaTrack*') then
+        reaper.SetOnlyTrackSelected(t.col.track)
+        if state.faderfocus ~= false then
+          for i, f in ipairs(L.flat) do if f.col == t.col then vim.cur.fi = i; vim.ensure_visible(); break end end
+        end
       end
       -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
       if (t.vert and t.what == 'vol') or t.knob then   -- 9 окт: и кноб панорамы
