@@ -201,7 +201,13 @@ local function alive(M, n)
   return false
 end
 local function leaf_min(M, n, ax)
-  if ax == 'v' then return (n.panes[1] == 'tracker' and 4 or 2) * M.rh + M.tab_h + M.hint_h end
+  if ax == 'v' then
+    local m = (n.panes[1] == 'tracker' and 4 or 2) * M.rh
+    -- панель может требовать своё (item: все параметры сэмпла) — по всему стеку,
+    -- чтобы высота не прыгала при смене вкладки
+    if M.minh then for _, id in ipairs(n.panes) do if avail(M, id) then local v = M.minh(id); if v and v > m then m = v end end end end
+    return m + M.tab_h + M.hint_h
+  end
   return 8 * M.cw
 end
 local function node_min(M, n, ax)

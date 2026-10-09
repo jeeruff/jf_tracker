@@ -101,8 +101,12 @@ function SP.draw(L, x, y, w, h, e, focused)
   local colw = math.floor((wc + L.pad) / ncols)
   local cap = per * ncols
   SP.scroll = SP.scroll or 0
-  if SP.sel > SP.scroll + cap then SP.scroll = SP.sel - cap end
-  if SP.sel <= SP.scroll then SP.scroll = SP.sel - 1 end
+  -- к выбранной строке — только когда выбор сменился (9 окт: колесо прокручивает свободно)
+  if SP.sel ~= SP.sel_seen then
+    SP.sel_seen = SP.sel
+    if SP.sel > SP.scroll + cap then SP.scroll = SP.sel - cap end
+    if SP.sel <= SP.scroll then SP.scroll = SP.sel - 1 end
+  end
   SP.scroll = math.max(0, math.min(SP.scroll, math.max(0, #SP.ROWS - cap)))
   if overflow and ctx.vbar then ctx.vbar('sprops', x + w - sbw, y + L.rh, sbw, per * L.rh, SP.scroll, cap, #SP.ROWS) end
   local n = math.min(#SP.ROWS, SP.scroll + cap)

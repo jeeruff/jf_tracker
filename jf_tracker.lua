@@ -32,6 +32,7 @@ OPT.tour = dofile(DIR .. '/jf_tracker_tour.lua')         -- интерактив
 OPT.ask = dofile(DIR .. '/jf_tracker_ask.lua')           -- вопрос посреди окна (3 окт); полем OPT: главный чанк у предела локальных
 local VER = dofile(DIR .. '/jf_tracker_version.lua')    -- версия и изменения (Options → about)
 local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель свойств сэмпла (вкладка Sample)
+draw.sprops_rows = #SPROP.ROWS                         -- 9 окт, панели: лист с item не ниже, чем нужно всем параметрам
 local MX = dofile(DIR .. '/jf_tracker_matrix.lua')
 local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
@@ -10342,7 +10343,7 @@ local function frame()
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
-    state.status = ('sample %s - wheel / H L: change, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
+    state.status = ('sample %s - H L / drag: change, wheel: scroll, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
   elseif hover.hsb then
     state.status = 'tracks: drag the bar, click beside it - a page; trackpad sideways / Shift+wheel scroll, Cmd+sideways - width zoom, Cmd+wheel - LPB zoom'
   elseif hover.trsbtn then
@@ -12226,10 +12227,10 @@ local function frame()
       end
     else SPROP.drag = nil end
   end
+  -- 9 окт: колесо над параметрами сэмпла — прокрутка списка, не значение
+  -- (значение — H L, протяжка, щелчок)
   if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
-    local e = cur_col() and (cur_col().pool or {})[vim.inst]
-    SPROP.sel = SPROP.hover.row or SPROP.sel
-    if e and SPROP.hover.k ~= 'fx' and SPROP.hover.k ~= 'norm' then ctx.sp_adjust(e, SPROP.hover.k, gfx.mouse_wheel > 0 and 1 or -1) end
+    SPROP.scroll = math.max(0, (SPROP.scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1))
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then
