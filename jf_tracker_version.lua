@@ -5,6 +5,9 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'panes (tmux / zellij): the window is a tree of splits, every module a pane, stacks = tabs; titles in the pane border; Cmd+h j k l focus, Cmd+Shift+h j k l move, Ctrl+W pane mode (split, stack, swap, size, zoom, hide, layouts, undo), :pane; drag the line between panes; key hints in one line at the bottom; the layout lives in screensets; the old position options are gone (Options - panes off brings the old layout back)',
+    'mixer: folder children get the same fader and pan knob as every channel of the same width',
+    '\\ , opens the REAPER preferences',
     'MIDI clips in the lib (MIDI items in the lib zone / LIB track): a mini piano roll instead of the waveform, a note key inserts a copy of the clip transposed from C-4, click opens the MIDI editor',
     'video items in the tracker show VID in the note field; Ixx / Oxx fade the picture too (item fades)',
     'video tab (after master): the Video window on / off, Video processor of the cursor track with presets and parameters, the list of video items (click: cursor there)',

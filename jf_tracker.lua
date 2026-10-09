@@ -247,7 +247,7 @@ local state = {
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
 }
-state.panes_ui = flag('panes_ui', false)          -- 9 окт: раскладка панелями tmux / zellij (бета)
+state.panes_ui = flag('panes_ui', true)           -- 9 окт: раскладка панелями tmux / zellij (по умолчанию; выкл — прежний вид)
 -- дерево панелей (9 окт): из ExtState panes; нет — один раз из прежних
 -- опций положения (пользователю ничего делать не нужно)
 state.panes = (function()
@@ -5740,9 +5740,6 @@ ctx = {
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
-      flag('top', 'top panel', 'control / item / modulate / midi'),
-      { key = 'toppos', label = 'top panel position', kind = 'cycle', values = { 'top', 'clips', 'mid', 'bottom' }, desc = 'tabs rec / item / modulate: above the tracker / under the clips (above the rows) / above DSP / below DSP', get = function() return state.toppos or 'mid' end, set = function(v) state.toppos = v end },
-      { key = 'ctrlpos', label = 'main module position', kind = 'cycle', values = { 'top', 'mid', 'bottom' }, desc = 'experimental: help / options / transport - top left, above DSP, in DSP', get = function() return state.ctrlpos or 'top' end, set = function(v) state.ctrlpos = v end },
       { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
       { key = 'seldrag', label = 'select block with', kind = 'cycle', values = { 'right', 'left' }, desc = 'right (default): right drag selects a block, left drag moves the event / the selected block under the mouse, a right click without moving opens the menu; left: left drag selects (Option+drag moves, as before)', get = function() return state.seldrag or 'right' end, set = function(v) state.seldrag = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
@@ -5773,8 +5770,7 @@ ctx = {
       flag('mixer', 'mixer', 'the track headers unfold into a mixer: a fader one lane wide (dragged vertically), pan / width under it, the fx with their TCP parameters right of it (one-lane track - under it); ø - phase invert'),
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
-      flag('panes_ui', 'panes (beta)', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs); click a pane - focus, drag the line between panes - size. Beta: DSP, main and the tabs move in next'),
-      flag('browserleft', 'browser left', 'lib + browser in the left column above the matrix (no sidebar on the right); the fx list becomes the fx tab of the browser'),
+      flag('panes_ui', 'panes', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs). Cmd+h j k l - focus, Cmd+Shift+h j k l - move, Ctrl+W - pane mode (split, stack, size, zoom, hide, layouts), :pane; click - focus, drag the line between panes - size. Off - the old fixed layout'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
@@ -5788,7 +5784,6 @@ ctx = {
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
-      flag('dsp', 'dsp panel', 'track fx at the bottom'),
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
@@ -5801,7 +5796,6 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
       flag('textonly', 'text only', 'cells show only the text: no wave behind the notes, no item fill, no item frame'),
-      { key = 'slicespos', label = 'slices', kind = 'cycle', values = { 'module', 'split' }, desc = 'slice list: its own module in the top panel, or the lower half of the lib when the item is sliced', get = function() return state.slicespos or 'module' end, set = function(v) state.slicespos = v end },
       { key = 'propspos', label = 'sample settings', kind = 'cycle', values = { 'left', 'right' }, desc = 'the sample properties in the item tab: left or right of the wave', get = function() return state.propspos or 'right' end, set = function(v) state.propspos = v end },
       { key = 'wavemode', label = 'wave', kind = 'cycle', values = { 'column', 'note', 'back', 'off' }, desc = 'wave: own column / in the note field / item background / none', get = function() return state.wavemode or 'column' end, set = function(v) ctx.wave_mode(v) end },
       { key = 'wave_os', label = 'wave detail', kind = 'cycle', values = { 1, 2, 4 }, desc = 'peaks per pixel in waves: higher = finer, slower', get = function() return state.wave_os or 1 end, set = function(v) state.wave_os = v; model.OVERSAMPLE = v; model.clear_peaks() end },

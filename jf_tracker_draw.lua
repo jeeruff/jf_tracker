@@ -3503,11 +3503,13 @@ function D.frame(L, snap, rows, state, info)
         -- 9 окт: по умолчанию — узкая коробка 5 знаков без подписей; big fader
         -- (и pt-mode) — с подписями dB слева
         local bigf = state.bigfader or state.ptmode
-        local fx_w = math.min(lw1 - 2 * L.pad - indent, (bigf and lblw0 or 0) + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
+        -- 9 окт: отступ вложенности (дети папки) фейдер не сужает — у каналов
+        -- одной ширины фейдер и кноб одинаковые (полосы отступа больше нет)
+        local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + 5 * L.cw)   -- коробка 5 знаков: «-12.3» сверху
         -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
         -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
-        local sx = sx
+        local sx = c.x + L.pad
         local sepx, sepc
         if not c.master then
           local need = sx + fx_w + L.pad
