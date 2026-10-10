@@ -483,3 +483,4 @@
 - [ ] props — отдельный модуль (Ctrl+W e): свойства item / слайса; вкладка item — волна во всю ширину; клики, колесо, J K H L R в фокусе props
 - [ ] lib: instruments — все проектные (чужие треки: -- имя, справа трек, щелчок — курсор на трек и выбор); automation и midi — своими секциями
 - [ ] lib: пустая строка перед instruments / automation / midi; опция lib tabs (panes and bars) — вкладки audio / instruments / automation / midi, F4 / Shift+F4 листает, щелчок, вкладка идёт за выбором (Cmd+цифра)
+- [ ] Cmd+Shift+hjkl (и HJKL в PANE): сосед — стек вкладок (2+) — панель встаёт в него вкладкой; иначе обычный перенос

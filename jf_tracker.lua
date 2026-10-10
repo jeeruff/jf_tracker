@@ -3497,6 +3497,18 @@ ctx = {
       end, state.tababc and 'tabs a-z is on - the order is alphabetical' or (id .. ' moved in the stack'))
     end
   end,
+  -- 10 окт: перенос по направлению: сосед там — стек вкладок (2+), панель встаёт в него вкладкой;
+  -- иначе — обычный перенос листа (сплит / обмен)
+  pane_move = function(id, dir)
+    local PNm = draw.panes
+    local to = L.pn and PNm.focus_dir(L.pn, id, dir)
+    local tc = to and L.pn.by_panel[to]
+    local mine = PNm.find(state.panes, id)
+    if to and to ~= 'tracker' and tc and tc.node and #tc.node.panes >= 2 and tc.node ~= mine then
+      return ctx.pane_do(function() return PNm.stack(state.panes, id, to) end, 'pane ' .. id .. ' → tab in the stack of ' .. to)
+    end
+    return ctx.pane_do(function() return PNm.move(state.panes, id, dir) end, 'pane ' .. id .. ' moved')
+  end,
   pane_do = function(fn, msg)
     local before = draw.panes.encode(state.panes)
     if fn() then
@@ -3542,7 +3554,7 @@ ctx = {
     if DIR[ch] or ARR[c] then
       local to = PN.focus_dir(L.pn, id, DIR[ch] or ARR[c]); if to then ctx.pane_focus(to) end
     elseif DIR[ch:lower()] then
-      ctx.pane_do(function() return PN.move(m, id, DIR[ch:lower()]) end, 'pane ' .. id .. ' moved')
+      ctx.pane_move(id, DIR[ch:lower()])
     elseif ch == 'w' or ch == 'W' then
       local o, a = L.pn.order, PN.active_of(m, id)
       for i, x in ipairs(o) do if x == a then ctx.pane_focus(o[(i - 1 + (ch == 'w' and 1 or -1)) % #o + 1]); break end end
@@ -15125,7 +15137,7 @@ local function frame()
       local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
-        if m.shift then ctx.pane_do(function() return draw.panes.move(state.panes, id, DIR[ch]) end, 'pane ' .. id .. ' moved')
+        if m.shift then ctx.pane_move(id, DIR[ch])
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
         c = 0
       end
