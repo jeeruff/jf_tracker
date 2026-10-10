@@ -4880,12 +4880,24 @@ ctx = {
     ctx.slot_op('matrix make unique', function() name, n = alias.make_unique(regions, rg) end)
     vim.msg = ('make unique: "%s" is now "%s" - %d item(s) unlinked'):format(rg.name, name, n)
   end,
-  slot_delete = function()
+  slot_delete = function(n)
     local rg = seq[MX.cur.ri]
     if not rg then return end
     local sl = alias.slot_snapshot(seq, snap, MX.cur.ri)
     state.mx_reg = { kind = 'slot', sl = sl }
-    ctx.slot_op('matrix delete slot', function() alias.delete_slot(rg) end)
+    -- 10 окт: Ndd — N слотов одним undo; с конца, чтобы сдвиг времени не трогал ещё не удалённые
+    n = math.max(1, math.min(n or 1, #seq - MX.cur.ri + 1))
+    local list = {}
+    for i = MX.cur.ri, MX.cur.ri + n - 1 do list[#list + 1] = seq[i] end
+    ctx.slot_op(n > 1 and ('matrix delete %d slots'):format(n) or 'matrix delete slot', function()
+      for i = #list, 1, -1 do alias.delete_slot(list[i]) end
+    end)
+    if n > 1 then
+      if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
+      if #seq > 0 then MX.goto_cell(seq, snap, MX.cur.ri, MX.cur.ci) else ctx.set_focus('tracker') end
+      vim.msg = ('deleted %d slots - p puts the first back, u undo'):format(n)
+      return
+    end
     if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
     if #seq > 0 then MX.goto_cell(seq, snap, MX.cur.ri, MX.cur.ci) else ctx.set_focus('tracker') end
     vim.msg = ('deleted slot %s (%d item(s)) - p puts it back, u undo'):format(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. rg.idx)), sl and sl.nitems or 0)
@@ -9367,7 +9379,10 @@ local function context_menu(hover, anchor)
         have[first] = true
         local k = pick_key(#first == 1 and first or nil, e.d)
         local foc = ctx.CTX_FOCUS[page]
-        if k then hitems[#hitems + 1] = { key = k, label = e.d, hk = (e.k ~= k) and e.k or nil, fn = function()
+        -- 10 окт: в меню — короткая подпись (e.m или начало описания), полное — в справке ?
+        local lbl = e.m or e.d:gsub(' %(.*$', ''):gsub('; .*$', '')
+        if not e.m and #lbl > 48 then lbl = lbl:gsub(' %- .*$', '') end
+        if k then hitems[#hitems + 1] = { key = k, label = lbl, hk = (e.k ~= k) and e.k or nil, fn = function()
           if foc and state.focus ~= foc then ctx.set_focus(foc) end
           for _, cd in ipairs(codes) do ctx.keyq[#ctx.keyq + 1] = cd end
         end } end

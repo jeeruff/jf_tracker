@@ -721,7 +721,8 @@ function MX.key(c, regions, snap)
     local op = MX.pending
     MX.pending = nil
     if c == 27 then return true end
-    if op == 'd' and ch == 'd' then ctx.slot_delete()
+    local pcount = MX.pcount; MX.pcount = nil
+    if op == 'd' and ch == 'd' then ctx.slot_delete(pcount)
     elseif op == 'y' and ch == 'y' then ctx.slot_yank()
     elseif op == 'y' and ch == 'p' then ctx.slot_new('clone')        -- yp — дубль (5 окт: одна клавиша на функцию)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
@@ -790,7 +791,7 @@ function MX.key(c, regions, snap)
   end
   local count = MX.count
   MX.count = nil
-  if OPS[ch] then MX.pending = ch; ctx.msg(ch .. '...'); return true end
+  if OPS[ch] then MX.pending, MX.pcount = ch, count; ctx.msg((count and (count .. ' ') or '') .. ch .. '...'); return true end   -- 10 окт: счётчик доживает до второй клавиши (5dd)
   -- Ctrl+Up / Ctrl+Down (9 окт, как Paketti в Renoise): дубль слота выше / ниже,
   -- в копии заглушённые треки пустые
   if mods.ctrl and (c == 30064 or c == 1685026670) then ctx.slot_new('clone_nomute', c == 30064); return true end
