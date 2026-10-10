@@ -246,7 +246,7 @@ local function place_leaf(lay, M, n, x, y, w, h)
   local cell = { node = n, x = x, y = y, w = w, h = h, tabs = {} }
   local tracker = n.panes[1] == 'tracker'
   local th = tracker and 0 or M.tab_h
-  local hh = (tracker or M.hint_h == 0) and 0 or M.hint_h
+  local hh = (M.hint_h == 0) and 0 or M.hint_h          -- 10 окт: строка клавиш — и у трекера
   -- активная доступная панель: активная, иначе первая доступная
   local act = n.panes[n.active]
   if not avail(M, act) then for _, id in ipairs(n.panes) do if avail(M, id) then act = id; break end end end

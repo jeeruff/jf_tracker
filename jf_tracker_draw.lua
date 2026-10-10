@@ -601,7 +601,7 @@ function D.layout(snap, state, nregions)
   L.pn = nil
   if state.panes_ui and D.panes and state.panes then
     -- zellij: подсказки клавиш панели в фокусе — одной строкой внизу окна, над статусом
-    L.pn_keys = (state.hints and state.hintpos ~= 'panes') and (L.rh + 1) or 0
+    L.pn_keys = (state.hints and state.hintpos == 'status') and (L.rh + 1) or 0
     L.status_h = (L.statpos == 'bottom' and (L.rh + 4) or 0) + L.pn_keys
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
@@ -3573,6 +3573,10 @@ function D.panes_frame(L, snap, state, info, hover, ph)
     local id = c.active_id
     if id == 'tracker' then
       rects.tracker = { c.x, c.y, c.w, c.h }
+      if c.hint and info.hint_bars then           -- 10 окт: и у трекера своя строка клавиш (hints where = panes)
+        D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
+          info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
+      end
     elseif id then
       local ct = c.content
       set(U.PANEL); gfx.rect(c.x, c.y, c.w, c.h, 1)
