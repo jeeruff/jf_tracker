@@ -808,7 +808,10 @@ local function text(x, y, s, col, bg)
     gfx.blit(e.ov, 1, 0, 0, 0, e.w * k, e.h * k, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
   else
     gfx.mode = (bg and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании
-    gfx.blit(e.id, 1, 0, 0, 0, e.w, e.h, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
+    -- 10 окт: с подложкой — без запаса +2 px справа (он нужен только ×1.5): при ×2 он
+    -- торчал из блока курсора ступенькой
+    local sw = bg and math.max(1, e.w - 2) or e.w
+    gfx.blit(e.id, 1, 0, 0, 0, sw, e.h, math.floor(x), math.floor(y), sw * D.SCALE, e.h * D.SCALE)
   end
   gfx.mode = mode
 end
@@ -1276,14 +1279,14 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.GREEN))
-    elseif inv ~= 'inst' then text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end   -- 10 окт: под курсором — без точек
+    else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
   end
   if not cell then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
     draw_inst()
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
-      if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
+      text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
     end
     return
   end
@@ -1343,7 +1346,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
         local skip = fld == 2 and cell.vol ~= nil
         if not skip then
           local fx = D.field_rect(L, fld)
-          if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
+          text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
         end
       end
       -- точка огибающей громкости take на этой строке (5 окт)
@@ -1360,7 +1363,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT))
       for fld = 2, nf do
         local fx = D.field_rect(L, fld)
-        if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
+        text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
       end
     end
   end
