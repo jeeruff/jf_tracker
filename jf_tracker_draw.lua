@@ -3168,9 +3168,22 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- него. automation — самой последней строкой, со своим номером
   local nsamp = #pool + D.empty_slots(#pool)
   local tins = info.track_insts and info.track_insts(col) or {}
-  if #tins > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
+  -- 10 окт: инструменты — все проектные: свои (трека курсора) с номерами, чужие — с именем трека,
+  -- щелчок переводит курсор на тот трек; automation и midi — своими секциями, как instruments
+  local others = {}
+  if info.track_insts then
+    for _, c in ipairs(info.cols or {}) do
+      if c ~= col and c.track ~= (col and col.track) then
+        for _, fi in ipairs(info.track_insts(c)) do others[#others + 1] = { instfx = fi.fx, name = fi.name, kind = c.name or fi.kind, col = c } end
+      end
+    end
+  end
+  if #tins + #others > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
   for k, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end
-  rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент — последней строкой (5 окт)
+  for _, o in ipairs(others) do rows[#rows + 1] = o end
+  rows[#rows + 1] = { hdr = 'automation', name = '' }
+  rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент (5 окт)
+  rows[#rows + 1] = { hdr = 'midi', name = '' }
   rows[#rows + 1] = { midi = true, num = nsamp + #tins + 2 }   -- MIDI-клипы трека / проекта (10 окт)
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
@@ -3267,14 +3280,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
     elseif row.instfx then
-      local sel = info.inst_fx and info.inst_fx(col) == row.instfx
+      local rc = row.col or col
+      local sel = info.inst_fx and info.inst_fx(rc) == row.instfx and not row.col
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local kd = row.kind or 'fx'
-      text(ix + 6, y + 1, fit(('%02d '):format(row.num or 0) .. row.name, w - 12 - ms(kd) - L.pad), sel and U.CYAN or U.TEXT)
-      text(ix + w - L.pad - 4 - ms(kd), y + 1, kd, sel and U.CYAN or U.GREY)
-      if hot then hover.pool = { ci = info.pool_ci, instfx = row.instfx } end
+      if row.col and row.col.rgb then set(row.col.rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1) end   -- чужой трек — его цветом
+      local kw = math.min(ms(kd), math.floor(w * 0.35))
+      text(ix + 6, y + 1, fit((row.num and ('%02d '):format(row.num) or '-- ') .. row.name, w - 12 - kw - L.pad), sel and U.CYAN or (row.col and U.GREY or U.TEXT))
+      text(ix + w - L.pad - 4 - kw, y + 1, fit(kd, kw), sel and U.CYAN or U.GREY)
+      if hot then hover.pool = { ci = info.pool_ci, instfx = row.instfx, col = row.col } end
       hint('poolinst', ix + 2, y, w - 4, L.rh, row.instfx)
     elseif row.empty then
       -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека

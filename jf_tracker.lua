@@ -13951,7 +13951,11 @@ local function frame()
       click = { t = now2, zone = 'poolmidi' }
     elseif hover.pool and hover.pool.instfx then
       -- 9 окт: плагин-инструмент: щелчок — выбрать (ноты — MIDI в него) и DSP на нём, двойной — его окно
-      ctx.inst_fx_pick(cur_col(), hover.pool.instfx, dbl and click.zone == 'poolinst' and click.row == hover.pool.instfx)
+      local pc = hover.pool.col
+      if pc and L and L.flat then                    -- 10 окт: инструмент другого трека — курсор на тот трек
+        for fi2, f2 in ipairs(L.flat) do if f2.col == pc or (f2.col and f2.col.guid == pc.guid) then vim.cur.fi = fi2; break end end
+      end
+      ctx.inst_fx_pick(pc or cur_col(), hover.pool.instfx, dbl and click.zone == 'poolinst' and click.row == hover.pool.instfx)
       click = { t = now2, zone = 'poolinst', row = hover.pool.instfx }
     elseif hover.pool then
       ctx.set_focus('inst')
