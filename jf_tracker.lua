@@ -24,6 +24,7 @@ local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
 draw.arr = dofile(DIR .. '/jf_tracker_arr.lua')           -- аранжировки = наборы играющих лейнов (9 окт)
+draw.llm = dofile(DIR .. '/jf_tracker_llm.lua')         -- 10 окт: мост к модели / MCP (ExtState llm_in → файл ответа)
 draw.panes = dofile(DIR .. '/jf_tracker_panes.lua')     -- раскладка окна как tmux / zellij (9 окт); полем draw: предел локальных
 local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
@@ -250,6 +251,7 @@ local state = {
   waveinv = reaper.GetExtState(EXT, 'waveinv') == '1',
   tababc = reaper.GetExtState(EXT, 'tababc') == '1',
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
+  llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
   automidi = reaper.GetExtState(EXT, 'automidi') ~= '0',   -- 10 окт: плагин-инструмент на треке с аудиовходом — вход на все MIDI
   hintpos = reaper.GetExtState(EXT, 'hintpos') == 'status' and 'status' or 'panes',   -- 10 окт: либо под каждым модулем, либо одной строкой внизу
@@ -598,7 +600,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3511,6 +3513,62 @@ ctx = {
       return ctx.pane_do(function() return PNm.stack(state.panes, id, to) end, 'pane ' .. id .. ' → tab in the stack of ' .. to)
     end
     return ctx.pane_do(function() return PNm.move(state.panes, id, dir) end, 'pane ' .. id .. ' moved')
+  end,
+  -- 10 окт: мост к модели (draw.llm): запрос jf_tracker/llm_in = «id|op|payload», ответ — файл + llm_ack
+  llm_out = function(id, text)
+    local dir = reaper.GetResourcePath() .. '/Data'
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local f = io.open(dir .. '/jf_tracker_llm_out.txt', 'w')
+    if f then f:write(id .. '\n' .. (text or '')); f:close() end
+    reaper.SetExtState(EXT, 'llm_ack', id, false)
+  end,
+  llm_run = function(p)
+    local LLM, res = draw.llm, {}
+    for _, step in ipairs(p.steps) do
+      if step.kind == 'cmd' then
+        vim.msg = ''
+        local ok, err = pcall(vim.run_cmd, step.text)
+        res[#res + 1] = (':%s -> %s'):format(step.text, ok and (vim.msg ~= '' and vim.msg or 'ok') or ('ERROR ' .. tostring(err)))
+      else
+        for _, cd in ipairs(LLM.key_codes(step.text)) do ctx.keyq[#ctx.keyq + 1] = cd end
+        res[#res + 1] = ('keys %s -> queued'):format(step.text)
+      end
+    end
+    p.res, p.wait_keys = res, #ctx.keyq > 0
+    if not p.wait_keys then ctx.llm_out(p.id, table.concat(res, '\n')); draw.llm.pending = nil end
+  end,
+  llm_poll = function()
+    local LLM = draw.llm
+    local p = LLM.pending
+    if p and p.wait_keys and #ctx.keyq == 0 then
+      p.res[#p.res + 1] = 'after keys: ' .. (vim.msg ~= '' and vim.msg or 'ok') .. ('  (mode %s, row %d)'):format(vim.mode, vim.cur.row or 0)
+      ctx.llm_out(p.id, table.concat(p.res, '\n')); LLM.pending = nil
+    end
+    local raw = reaper.GetExtState(EXT, 'llm_in')
+    if raw == '' or raw == LLM.last then return end
+    LLM.last = raw
+    local id, op, payload = LLM.parse(raw)
+    if not id then return end
+    if (state.llm or 'off') == 'off' then ctx.llm_out(id, 'OFF: the bridge is off in the tracker (options -> sound and samples -> LLM / MCP bridge)'); return end
+    if op == 'state' then ctx.llm_out(id, LLM.state_text({ snap = snap, L = L, vim = vim, state = state, seq = seq, cur_col = cur_col,
+        bpm = reaper.Master_GetTempo(), playing = reaper.GetPlayState() & 1 == 1 }, tonumber(payload)))
+    elseif op == 'help' then ctx.llm_out(id, LLM.help_text(KH, payload))
+    elseif op == 'run' then
+      if LLM.pending then ctx.llm_out(id, 'BUSY: the previous run is not done yet'); return end
+      local steps = LLM.split_run(payload)
+      if #steps == 0 then ctx.llm_out(id, 'nothing to run'); return end
+      local pr = { id = id, steps = steps }
+      LLM.pending = pr
+      if state.llm == 'ask' then
+        local lines = {}
+        for _, st in ipairs(steps) do lines[#lines + 1] = (st.kind == 'cmd' and ':' or 'keys ') .. st.text end
+        vim.open_hydra({ title = 'LLM wants to run: ' .. table.concat(lines, '  '), items = {
+          { key = 'y', label = 'yes - run ' .. #steps .. ' step(s)', fn = function() ctx.llm_run(pr) end },
+          { key = 'n', label = 'no', fn = function() ctx.llm_out(id, 'DECLINED by the user'); LLM.pending = nil end },
+        } })
+        pr.asked = reaper.time_precise()
+      else ctx.llm_run(pr) end
+    else ctx.llm_out(id, 'unknown op ' .. tostring(op) .. ' (state, help, run)') end
   end,
   pane_do = function(fn, msg)
     local before = draw.panes.encode(state.panes)
@@ -7299,6 +7357,7 @@ ctx = {
       { sep = true, title = 'layout' },
       { key = 'envfmt', label = 'values', kind = 'cycle', values = { 'midi', 'hex' }, desc = 'envelope points and CC / PC lanes: midi 0..127 typed in decimal (ends by itself when one more digit cannot fit; 005 = 5, Enter ends early) or hex 00..FF', get = function() return state.envfmt or 'midi' end, set = function(v) state.envfmt = v end },
       { key = 'seldrag', label = 'select block with', kind = 'cycle', values = { 'right', 'left' }, desc = 'right (default): right drag selects a block, left drag moves the event / the selected block under the mouse, a right click without moving opens the menu; left: left drag selects (Option+drag moves, as before)', get = function() return state.seldrag or 'right' end, set = function(v) state.seldrag = v end },
+      { key = 'llm', label = 'LLM / MCP bridge', kind = 'cycle', values = { 'off', 'ask', 'on' }, desc = 'a language model (Claude through MCP, tools/jf_tracker_mcp.py) reads the tracker and runs its commands; ask - every run waits for y in a popup, on - runs at once, off - the bridge is silent. Each :command is one undo step', get = function() return state.llm or 'off' end, set = function(v) state.llm = v end },
       { key = 'hintpos', label = 'hints where', kind = 'cycle', values = { 'panes', 'status' }, desc = 'key hints (option hints on): panes - a row under every module; status - one big row at the bottom for the focused module, as before (hover it: all the keys)', get = function() return state.hintpos or 'panes' end, set = function(v) state.hintpos = v; relayout() end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
@@ -7412,7 +7471,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'llm', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -15126,6 +15185,7 @@ local function frame()
   end
   if SL.qpreview and not (OPT.active and OPT.compact and (OPT.compact.title or ''):match('^quantize')) then SL.qpreview = false end   -- панель закрыта — без превью
   local c_raw = c                                                  -- журнал клавиш (4 окт)
+  do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')

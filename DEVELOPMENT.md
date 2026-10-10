@@ -470,6 +470,14 @@ return {
 
 ## Потом: модель в трекере через API / MCP (10 окт, после API вкладок)
 
+**Сделано 10 окт — MCP первым:** `jf_tracker_llm.lua` (разбор, снимок, справка; тест
+`tests/test_llm.lua`) + `ctx.llm_poll` раз в кадр + `tools/jf_tracker_mcp.py`
+(инструменты `tracker_state`, `tracker_help`, `tracker_run`; `uv run --with mcp`,
+mcp 1.x и 2.x). Опция `LLM / MCP bridge` = off | ask | on (ask — y во всплывашке).
+Канал: ExtState `llm_in` через веб 8080 → файл `Data/jf_tracker_llm_out.txt` + `llm_ack`.
+Дальше: локальная модель (Ollama / llama-server) и ключ Claude — тем же мостом,
+строка `:ask текст` в трекере.
+
 Простая языковая модель управляет трекером словами: «сделай 4 такта бочки на
 каждую долю», «транспонируй припев на терцию», «назови слоты по секциям».
 

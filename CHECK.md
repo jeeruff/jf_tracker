@@ -487,3 +487,4 @@
 - [ ] хинты: опция hints where — panes (строка под каждым модулем, у трекера тоже) или status (одна большая внизу, наведение — полный список); не обе сразу
 - [ ] опция auto MIDI input (вкл): играешь в трек с плагином-инструментом, а вход аудио — вход на все MIDI, мониторинг вкл
 - [ ] опция properties with item (вкл): панель properties видна только когда активна вкладка item; выкл — всегда
+- [ ] мост LLM / MCP: опция LLM / MCP bridge (sound and samples) = ask; claude mcp add jf-tracker -- uv run --with mcp python "…/tools/jf_tracker_mcp.py"; tracker_state / tracker_help читают, tracker_run просит y
