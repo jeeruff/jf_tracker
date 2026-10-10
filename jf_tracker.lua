@@ -3075,6 +3075,15 @@ ctx = {
     vim.msg = ('midi clip %s %+d'):format(a.label ~= '' and a.label or 'midi', pitch - model.BASE_NOTE)
     return true
   end,
+  -- предпрослушка клипа (10 окт): без транспорта — источник take через
+  -- CF_Preview во вход ЕГО трека (MIDI идёт в инструмент трека, как превью
+  -- Media Explorer через трек); first second — 1 с; Esc / Space — стоп
+  mc_preview = function(a)
+    if not (a and reaper.ValidatePtr(a.item, 'MediaItem*')) then return end
+    if not PV.available() then vim.msg = 'midi preview needs SWS (CF_Preview)'; return end
+    if not PV.out_track(a.track) then vim.msg = 'midi preview: the clip track is armed with monitoring off - nothing would sound'; return end
+    PV.inst(a.track, a.item, (state.prevmode or 'full') == 'sec' and 1 or nil)
+  end,
   mc_jump = function(a)
     if not (a and reaper.ValidatePtr(a.item, 'MediaItem*') and L) then return end
     ctx.jump_mark()
@@ -12527,7 +12536,7 @@ local function frame()
         local same = click.zone == 'slicelist' and click.row == hover.slices
         ctx.mc_sel = hover.slices; local a = ctx.mc_list()[hover.slices]
         vim.msg = a and ('midi clip %s (row %04d): a note key inserts a copy, double click / Enter - go there'):format(a.label ~= '' and a.label or 'midi', a.row) or ''
-        if dbl and same and a then ctx.mc_jump(a) end
+        if dbl and same and a then PV.stop(); ctx.mc_jump(a) elseif a then ctx.mc_preview(a) end
         click = { t = now2, zone = 'slicelist', row = hover.slices }; goto ai_click_done
       elseif state.auto_inst then
         local same = click.zone == 'slicelist' and click.row == hover.slices
@@ -14401,8 +14410,9 @@ local function frame()
         if state.midi_inst then
           -- MIDI-клипы (10 окт): j k J K g G — выбор, a — трек / проект, Enter — туда
           local nl = #ctx.mc_list()
-          local function mv(i) ctx.mc_sel = math.max(1, math.min(math.max(1, nl), i)); local a = ctx.mc_list()[ctx.mc_sel]; if a then vim.msg = ('midi clip %s (row %04d)'):format(a.label ~= '' and a.label or 'midi', a.row) end end
-          if c == 27 then ctx.set_focus('tracker')
+          local function mv(i) ctx.mc_sel = math.max(1, math.min(math.max(1, nl), i)); local a = ctx.mc_list()[ctx.mc_sel]; if a then vim.msg = ('midi clip %s (row %04d)'):format(a.label ~= '' and a.label or 'midi', a.row); ctx.mc_preview(a) end end
+          if c == 27 then PV.stop(); ctx.set_focus('tracker')
+          elseif ch == ' ' then if PV.playing() then PV.stop() else ctx.mc_preview(ctx.mc_list()[ctx.mc_sel]) end
           elseif ch == 'j' or c == keys.down then mv(ctx.mc_sel + 1)
           elseif ch == 'k' or c == keys.up then mv(ctx.mc_sel - 1)
           elseif ch == 'J' then mv(ctx.mc_sel + 8)
@@ -14410,7 +14420,7 @@ local function frame()
           elseif ch == 'g' then mv(1)
           elseif ch == 'G' then mv(nl)
           elseif ch == 'a' then ctx.mc_scope_set()
-          elseif c == 13 then ctx.mc_jump(ctx.mc_list()[ctx.mc_sel])
+          elseif c == 13 then PV.stop(); ctx.mc_jump(ctx.mc_list()[ctx.mc_sel])
           else return vim.key(c) end
           return
         end

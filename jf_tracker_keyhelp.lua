@@ -219,7 +219,7 @@ KH.PAGES = {
     { k = 'v', d = 'range from here: j k extend, d / x cut, y yank, Esc' },
     { k = 'Enter s', d = 'open in sample tab (slicer)' },
     { k = '~~', t = {}, d = 'automation: the last row - automation items of the track as one instrument (j past the last slot); the slices list shows them, a note key / MIDI note inserts the selected one, rate by the key (C-4 = x1, octave up = x2); Opt+Enter on an automation item picks it' },
-    { k = '##', t = {}, d = 'midi clips: the row under automation - MIDI items of the track (a in the slices list: the whole project); j k pick, a note key / MIDI note inserts a copy at the cursor (C-4 = as is, else transposed; the original stays), Enter / double click - go to the clip (Ctrl+O back)' },
+    { k = '##', t = {}, d = 'midi clips: the row under automation - MIDI items of the track (a in the slices list: the whole project); j k pick, a note key / MIDI note inserts a copy at the cursor (C-4 = as is, else transposed; the original stays), Enter / double click - go to the clip (Ctrl+O back); a click / j k previews it through its track (no transport), Space stops' },
     { k = 'Space', d = 'preview (how its note sounds: offset, rate, pitch); Esc stops' },
     { k = 'a', d = 'preview on select on / off (button preview; rclick: full / hold / first second)' },
     { k = 'bsync', d = 'header button: beatsync - the item lasts N beats at the tempo where each note sits (wheel in the item panel: N)' },
