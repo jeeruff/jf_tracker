@@ -6035,7 +6035,8 @@ ctx = {
     if pname and pname ~= '' then return false end
     local names = {}
     for i = 0, reaper.CountTracks(0) - 1 do local _, nm = reaper.GetTrackName(reaper.GetTrack(0, i)); names[#names + 1] = nm end
-    return table.concat(names, ',') == 'A drums,B lanes,M synth,DEPOT'
+    local s = ',' .. table.concat(names, ',') .. ','
+    return s:find(',A drums,', 1, true) ~= nil and s:find(',M synth,', 1, true) ~= nil   -- 10 окт: тесты добавляют треки (tt) — не точный список
   end,
   -- zs / быстрая опция clips: тело трекера ↔ клипы сессии
   clips_toggle = function()

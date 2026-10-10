@@ -79,3 +79,4 @@ else
 end
 local f = io.open(OUT, 'w'); f:write(table.concat(out, '\n') .. '\n'); f:close()
 R.SetExtState('jf_tracker', 'live_dump', tostring(#out) .. ' lines ' .. os.date('%H:%M:%S'), false)
+R.defer(function() end)   -- без точки undo «ReaScript: Run» (иначе u в тесте откатывает её, а не правку)

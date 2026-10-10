@@ -38,7 +38,8 @@ MOD = {'C': 32, 'M': 4, 'A': 16, 'S': 8}       # gfx.mouse_cap на macOS: 32 Ct
 
 def get(key):
     with urllib.request.urlopen(f'{W}/GET/EXTSTATE/{EXT}/{key}', timeout=3) as r:
-        return r.read().decode('utf-8', 'replace').strip().split('\t', 3)[-1] if r else ''
+        f = r.read().decode('utf-8', 'replace').rstrip('\r\n').split('\t', 3)
+        return f[3] if len(f) > 3 else ''
 
 
 def setext(key, val):
@@ -58,6 +59,7 @@ def alive(sec=1.5):
 
 
 _n = [int(time.time()) % 100000]
+TRACE = []
 
 
 def key(code, cap=0, timeout=3.0):
@@ -65,6 +67,7 @@ def key(code, cap=0, timeout=3.0):
     _n[0] += 1
     tok = f'{code},{cap}#{_n[0]}'
     setext('inject', tok)
+    TRACE.append(tok)
     t0 = time.time()
     while time.time() - t0 < timeout:
         a = get('inject_ack')
@@ -72,6 +75,7 @@ def key(code, cap=0, timeout=3.0):
             rest = a[len(tok) + 1:]
             if rest.startswith('REFUSED'):
                 raise SystemExit(f'STOP: {rest} (активна не песочница?)')
+            TRACE[-1] = f'{tok} {rest}'
             return rest
         time.sleep(0.03)
     raise SystemExit(f'STOP: no ack for {tok} in {timeout}s — трекер мёртв? hb={hb()!r}')
@@ -111,6 +115,7 @@ def cmd(text):
 
 
 def ack_fields(a):
+    if isinstance(a, dict): return a
     m = re.match(r'ok (\S+) (\S+) row(-?\d+) fi(\d+) fld(\S+) msg=(.*)', a)
     return {'mode': m.group(1), 'focus': m.group(2), 'row': int(m.group(3)), 'fi': int(m.group(4)), 'field': m.group(5), 'msg': m.group(6)} if m else {}
 
@@ -165,12 +170,19 @@ def baseline():
     lines = dump(); open(BASE, 'w', encoding='utf-8').write('\n'.join(lines) + '\n'); return Dump(lines)
 
 
+def same(a, b):
+    """проект тот же: все строки кроме PROJECT (курсор, вершина undo)"""
+    f = lambda d: [re.sub(r' sel=\d', '', l) for l in d.lines if not l.startswith('PROJECT')]   # выделение трека следует за курсором — не правка
+    return f(a) == f(b)
+
+
 def rewind(max_undo=40):
-    """u, пока вершина undo не «jf_tracker sandbox» — проект как после sandbox_setup"""
-    keys('<esc><esc>')
+    """u, пока проект не совпадёт с базой (или вершина undo — «jf_tracker sandbox» / пусто)"""
+    reset()
+    base = Dump(open(BASE, encoding='utf-8').read().splitlines()) if os.path.exists(BASE) else None
     for _ in range(max_undo):
         d = Dump(dump())
-        if d.undo() in ('jf_tracker sandbox', 'nil', ''): return d
+        if (base and same(d, base)) or d.undo() in ('jf_tracker sandbox', 'nil', ''): return d
         keys('u')
     return Dump(dump())
 
@@ -224,12 +236,26 @@ class T:
 
 def reset():
     """в NORMAL, курсор в начало (строка 0, первый трек)"""
-    keys('<esc><esc>')
+    # Esc в трекере переключает NORMAL <-> INSERT (как edit mode в Renoise): жмём, пока не NORMAL
+    a = ack_fields(key(27))
+    for _ in range(3):
+        if a.get('mode') == 'normal': break
+        a = ack_fields(key(27))
     a = ack_fields(keys('gg'))
-    for _ in range(8):
-        if a.get('fi', 1) <= 1: break
+    for _ in range(40):                     # h ходит по полям; до трека 1, поле 1 (нота)
+        if a.get('fi', 1) <= 1 and a.get('field') == '1': break
         a = ack_fields(keys('h'))
     return a
+
+
+def track(n):
+    """курсор на трек n (1 = первый), поле 1 (нота); l / h ходят по полям"""
+    a = ack_fields(key(27)); a = ack_fields(key(27)) if a.get('mode') != 'normal' else a
+    for _ in range(80):
+        fi, fld = a.get('fi', 1), a.get('field')
+        if fi == n and fld == '1': return a
+        a = ack_fields(keys('l' if fi < n else 'h'))        # fi == n, поле не 1 → h к полю 1
+    raise SystemExit(f'track({n}): cannot reach, last {a}')
 
 
 @scenario
@@ -240,7 +266,9 @@ def smoke(t):
     b = ack_fields(keys('j'))
     t.ok('j = row+1', b.get('row') == a.get('row', 0) + 1, f'{a} -> {b}')
     c = ack_fields(keys('l'))
-    t.ok('l = next track', c.get('fi') == b.get('fi') + 1, f'{b} -> {c}')
+    t.ok('l = next field or track', (c.get('fi'), c.get('field')) != (b.get('fi'), b.get('field')), f'{b} -> {c}')
+    c = track(2)
+    t.ok('track(2) reaches B lanes', c.get('fi') == 2, str(c))
     d = ack_fields(keys('i'))
     t.ok('i = INSERT', d.get('mode') == 'insert', str(d))
     e = ack_fields(keys('<esc>'))
@@ -255,7 +283,7 @@ def insert_audio(t):
     reset()
     before = Dump(dump())
     n0 = len(before.items('A drums'))
-    keys('jjjj')                     # строка 4 (свободная при LPB 4: 0.5 c)
+    track(1); keys('jjjj')           # строка 4 (свободная при LPB 4: 0.5 c), поле ноты
     a = ack_fields(keys('i'))
     t.ok('INSERT', a.get('mode') == 'insert', str(a))
     b = ack_fields(keys('q'))
@@ -272,8 +300,7 @@ def insert_audio(t):
 @scenario
 def insert_midi(t):
     """INSERT на MIDI-треке M: нота в MIDI item"""
-    reset()
-    keys('ll')                       # 3-й трек M synth
+    track(3)                         # M synth
     before = Dump(dump())
     nn0 = len(before.notes('M synth'))
     for _ in range(8): keys('j')     # строка 8 = 1.0 c... item начинается на 2.0 c (строка 16)
@@ -363,18 +390,29 @@ def delete_ops(t):
     reset()
     before = Dump(dump())
     n0 = len(before.items('A drums'))
-    a = ack_fields(keys('dd'))
-    t.note('after dd on row 0 of A: ' + str(a))
+    a = ack_fields(keys('dw'))          # dd в NORMAL удаляет ТРЕК (так задумано); событие — dw
+    t.note('after dw on row 0 of A: ' + str(a))
     after = Dump(dump())
     t.note('items A: %d -> %d' % (n0, len(after.items('A drums'))))
     keys('u')
     back = Dump(dump())
+    t.ok('dw removed one event', len(after.items('A drums')) == n0 - 1, '%d -> %d' % (n0, len(after.items('A drums'))))
     t.ok('u restores', len(back.items('A drums')) == n0)
 
 
 def run(names):
     lines = ['# live run ' + time.strftime('%Y-%m-%d %H:%M'), '']
     total = fails = 0
+    lpb0 = get('lpb') or '4'
+    reset(); cmd('lpb 4')                      # строка = 0.125 с при 120 BPM; в конце — как было
+    try:
+        _run(names, lines, total, fails)
+    finally:
+        try: reset(); cmd(f'lpb {lpb0}')
+        except SystemExit: pass
+
+
+def _run(names, lines, total, fails):
     for n in names:
         fn = SCEN.get(n)
         if not fn: print('no scenario', n); continue
@@ -391,10 +429,12 @@ def run(names):
             base = Dump(open(BASE, encoding='utf-8').read().splitlines()) if os.path.exists(BASE) else None
             invariants(Dump(dump()), t, base)
             d = rewind()
-            t.ok('rewind to sandbox base', base is None or d.lines[1:] == base.lines[1:], 'project differs from base after undo: ' + ' / '.join(l for l in d.lines if base and l not in base.lines)[:300])
+            t.ok('rewind to sandbox base', base is None or same(d, base), 'differs from base after undo: ' + ' / '.join(l for l in d.lines + base.lines if base and (l not in base.lines or l not in d.lines) and not l.startswith('PROJECT'))[:400])
         except SystemExit as e:
             t.ok('rewind', False, str(e)); print(e); lines.append(f'## {n}\n- STOP: {e}\n'); break
         lines.append(f'## {n}')
+        lines.append('- keys: ' + ' ; '.join(x.replace(' msg=', ' «')[:70] for x in TRACE[-60:]))
+        TRACE.clear()
         for ok, what, detail in t.res:
             if ok is None: lines.append(f'- note: {what}')
             else:
@@ -416,6 +456,16 @@ if __name__ == '__main__':
     elif args[0] == 'diff':
         new, d = diff(); print('\n'.join(d) if d else '(no change)')
     elif args[0] == 'run': run(list(SCEN) if args[1:] == ['all'] or not args[1:] else args[1:])
+    elif args[0] == 'setup':
+        # новая вкладка-песочница: 40859, sandbox_setup, регионы intro/A/B, база
+        action(40859); time.sleep(1.5)
+        for f in ('sandbox_setup.lua', 'sandbox_regions.lua'):
+            setext('sandbox', ''); subprocess.Popen([REAPER, '-nonewinst', os.path.join(HERE, f)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            for _ in range(50):
+                time.sleep(0.1)
+                if get('sandbox'): break
+            print(f, '->', get('sandbox'))
+        time.sleep(1); print('\n'.join(baseline().lines[:6]))
     elif args[0] == 'base': print('\n'.join(baseline().lines[:3]) + '\n... base saved')
     elif args[0] == 'rewind': print(rewind().undo())
     elif args[0] == 'list': print(' '.join(SCEN))
