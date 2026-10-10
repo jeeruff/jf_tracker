@@ -235,7 +235,8 @@ local state = {
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
-  hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
+  hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',
+  escstop = reaper.GetExtState(EXT, 'escstop') == '1',   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -570,7 +571,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -6885,6 +6886,7 @@ ctx = {
       { key = 'seldrag', label = 'select block with', kind = 'cycle', values = { 'right', 'left' }, desc = 'right (default): right drag selects a block, left drag moves the event / the selected block under the mouse, a right click without moving opens the menu; left: left drag selects (Option+drag moves, as before)', get = function() return state.seldrag or 'right' end, set = function(v) state.seldrag = v end },
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
+      flag('escstop', 'Esc stops playback', 'while the project plays, Esc stops it (instead of switching NORMAL / INSERT); not while recording - there Esc deletes the take; menus, the command line and VISUAL keep their Esc'),
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
       flag('bigbpm', 'big time and BPM', 'the position and the BPM two rows tall in the transport bar under the tracker'),
@@ -14355,6 +14357,16 @@ local function frame()
     end
   end
   -- Shift+Esc (5 окт): снять time selection REAPER — в любом модуле, вне ввода
+  -- 10 окт: опция Esc stops playback — идёт воспроизведение (не запись: там
+  -- Esc — удалить дубль) и Esc ни к чему не относится (меню, команда,
+  -- оператор, VISUAL) — стоп транспорта вместо смены режима
+  if c == 27 and state.escstop and not ctx.mods().shift and (reaper.GetPlayState() & 1) == 1 and (reaper.GetPlayState() & 4) == 0
+     and not vim.picker and not vim.hydra and not vim.pending and not vim.op and vim.mode ~= 'cmd' and vim.mode ~= 'search'
+     and vim.mode ~= 'visual' and vim.mode ~= 'vline' and not OPT.active and not (MX.SMART and MX.SMART.active()) then
+    reaper.OnStopButton()
+    vim.msg = 'stop (Esc - option Esc stops playback)'
+    c = 0
+  end
   if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
     reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
     vim.msg = 'time selection removed'
