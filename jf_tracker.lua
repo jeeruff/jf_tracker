@@ -11715,6 +11715,7 @@ local function frame()
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
+    file_len = function(path) return model.file_len(path) end,
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)

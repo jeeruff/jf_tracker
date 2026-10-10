@@ -1910,6 +1910,8 @@ function M.file_peaks(path, npix)
   if not e or e.len <= 0 then return nil end
   return M.peaks(e, npix)
 end
+-- длина файла из того же кеша (после file_peaks), секунды; nil — не знаем
+function M.file_len(path) local e = file_src[path]; return e and e.len or nil end
 
 function M.clear_peaks() peaks = new_peaks(); building = {} end
 M.peaks_cache_size = function() local n = 0; for _ in pairs(peaks) do n = n + 1 end; return n end

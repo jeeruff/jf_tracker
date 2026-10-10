@@ -5805,36 +5805,41 @@ function D.frame(L, snap, rows, state, info)
             gfx.triangle(lx, gy + tri, lx - tri, gy, lx + tri, gy)
           end
         end
-        -- 10 окт: ADSR поверх волны (правая треть): атака — подъём, спад до sustain, удержание, release
+        -- 10 окт: ADSR прямо на волне, во времени сэмпла: атака от start, release кончается
+        -- на end зоны (нота «держится» до конца звука); три ручки тянутся мышью
         if f.rs5k and wh > 3 * L.rh then
           local function pv(sub) for pi2, p2 in ipairs(f.params) do if p2.name == sub then return vals[pi2] end end end
           local at, de, su, re = pv('attack'), pv('decay'), pv('sustain'), pv('release')
           if at and de and su and re then
-            local ax0, aw0 = wx + math.floor(ww * 0.66), math.floor(ww * 0.33) - 2
-            local ay0, ah0 = wy + 3, wh - 6
+            local gx0 = wx + math.floor(na * (ww - 1) + 0.5)
+            local gx1 = math.max(gx0 + 8, wx + math.floor(nb * (ww - 1) + 0.5))
+            local ay0, ah0 = gy + 2, math.max(4, gh - 4)
             local tA = (tonumber(at.s) or 1) / 1000; local tD = (tonumber(de.s) or 250) / 1000; local tR = (tonumber(re.s) or 1) / 1000
             local sdb = tonumber(su.s) or 0
             local sl = sdb <= -60 and 0 or math.min(1, 10 ^ (sdb / 20) / 2)   -- 0 dB — половина высоты (как в RS5K: sustain до +6)
-            local tot = math.max(1e-3, tA + tD + tR + 0.3)
-            local function X(t) return ax0 + math.floor(t / tot * aw0) end
+            local flen = f.file and info.file_len and info.file_len(f.file)
+            local dur = flen and flen > 0 and (nb - na) * flen or nil
+            local pps = dur and (gx1 - gx0) / math.max(1e-3, dur) or (gx1 - gx0) / math.max(1e-3, tA + tD + tR + 0.3)
+            local function X(t) return math.min(gx1, gx0 + math.floor(t * pps + 0.5)) end
             local function Y(v) return ay0 + ah0 - math.floor(v * ah0) end
-            set(U.tint(U.BG, 0.5)); gfx.rect(ax0, ay0, aw0, ah0, 1)
+            local x1, x2 = X(tA), X(tA + tD)
+            local x3 = math.max(x2, gx1 - math.floor(tR * pps + 0.5))
             set(U.GREEN)
-            local x1, x2, x3, x4 = X(tA), X(tA + tD), X(tA + tD + 0.3), X(tot)
-            gfx.line(ax0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), x4, Y(0))
-            text(ax0 + 2, ay0, fit(('A %s  D %s  S %s  R %s'):format(at.s, de.s, su.s, re.s), aw0 - 4), U.GREY)
-            -- 10 окт: ADSR мышью — три ручки: A (вбок), D+S (вбок / вверх-вниз), R (вбок); тянется ближайшая
-            local hs = { { 'a', x1, Y(1) }, { 'ds', x2, Y(sl) }, { 'r', x4, Y(0) } }
-            local inbox = not drag and mx >= ax0 and mx < ax0 + aw0 and my >= ay0 and my < ay0 + ah0
+            gfx.line(gx0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), gx1, Y(0))
+            local lab = ('A %s  D %s  S %s  R %s'):format(at.s, de.s, su.s, re.s)
+            text(wx + ww - ms(lab) - 4 >= wx + math.floor(ww * 0.4) and (wx + ww - ms(lab) - 4) or (wx + math.floor(ww * 0.4)), wy + 1, fit(lab, math.floor(ww * 0.6) - 4), U.GREEN)
+            local hs = { { 'a', x1, Y(1) }, { 'ds', x2, Y(sl) }, { 'r', x3, Y(sl) } }
             local near, nd
-            if inbox then for _, hp in ipairs(hs) do local dd = math.abs(mx - hp[2]) + 0.3 * math.abs(my - hp[3]); if not nd or dd < nd then near, nd = hp[1], dd end end end
+            if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
+              for _, hp in ipairs(hs) do local dd = math.abs(mx - hp[2]) + math.abs(my - hp[3]); if dd <= 1.5 * L.rh and (not nd or dd < nd) then near, nd = hp[1], dd end end
+            end
             local ad = info.adsr_drag and info.adsr_drag()
             local rr = math.max(2, math.floor(L.rh / 4))
             for _, hp in ipairs(hs) do
               local on = (near == hp[1]) or (ad and ad.f == f and ad.part == hp[1])
               set(on and U.AMBER or U.GREEN); gfx.rect(hp[2] - rr, hp[3] - rr, 2 * rr + 1, 2 * rr + 1, on and 1 or 0)
             end
-            if inbox then hover.dspadsr = { fx = k, f = f, part = near, w = aw0, h = ah0 } end
+            if near then hover.dspadsr = { fx = k, f = f, part = near, w = math.max(1, gx1 - gx0), h = ah0 } end
           end
         end
         if not drag and not hover.dspadsr and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
