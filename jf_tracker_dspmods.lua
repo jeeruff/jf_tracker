@@ -18,7 +18,7 @@ DM.modules = {
     -- янтарём, головки играющих голосов — зелёным (gmem jf_slixer)
     match = 'jf_slixer',
     title = 'slixer',
-    cols = 5, rows = 6,
+    cols = 4, rows = 6,                        -- 10 окт: волна — полосой сверху (не колонкой)
     view = 'slixer',
     groups = { 'SLICE', 'PLAY', 'LEVEL', 'ARP / TIME' },
     params = {

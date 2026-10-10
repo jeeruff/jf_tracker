@@ -5302,8 +5302,23 @@ function D.frame(L, snap, rows, state, info)
       local aw_off = 0
       -- 9 окт: группы (пульт slixer) — строка заголовков, колонка = rows строк;
       -- не влезает по высоте — обычным списком
+      -- 10 окт: волна slixer / grain — полосой сверху во всю ширину блока (до 5
+      -- строк + строка статуса у slixer), параметры под ней во всех колонках;
+      -- не влезает по высоте — прежняя колонка слева
+      local wtop, wtop_wh = 0, 0
+      if (f.view == 'slixer' or f.view == 'grain') and not f.container then
+        local need = f.rows and (f.rows + (f.groups and 1 or 0)) or math.ceil(#f.params / math.max(1, ncol))
+        local srow = f.view == 'slixer' and 1 or 0
+        local wrows = math.min(5, nfit - need - srow)
+        if wrows >= 2 then
+          wtop_wh = wrows * L.rh
+          wtop = wtop_wh + srow * L.rh + 3
+          nfit = nfit - wrows - srow - 1
+          aw_off = wtop
+        end
+      end
       local grp = f.groups and f.rows and nfit - 1 >= f.rows
-      if grp then nfit = f.rows; aw_off = L.rh end
+      if grp then nfit = f.rows; aw_off = wtop + L.rh end
       if awi and nfit > 2 then
         nfit = nfit - 1; aw_off = L.rh
         local ay = by + L.rh + 1
@@ -5402,8 +5417,8 @@ function D.frame(L, snap, rows, state, info)
       if f.view == 'grain' then
         -- гранулятор: облако — 16 колонок волны, точки зёрен (свежее выше),
         -- окно зума, позиция головки зёрен, голова записи (красная)
-        pcol0 = 1
         local wx, wy, ww, wh = bx + L.pad, by + L.rh + 1, pw, bh - L.rh - 4
+        if wtop > 0 then ww, wh = bw - 2 * L.pad, wtop_wh else pcol0 = 1 end
         local g = info.dsp_view and info.dsp_view('grain')
         set(U.PANEL); gfx.rect(wx, wy, ww, wh, 1)
         set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
@@ -5435,8 +5450,8 @@ function D.frame(L, snap, rows, state, info)
         -- slixer (9 окт): волна деки во всю первую колонку; срезы — чередующейся
         -- подложкой и линией начала, выбранный — янтарём, играющие голоса —
         -- зелёными головками; внизу — число срезов и длина
-        pcol0 = 1
         local wx, wy, ww, wh = bx + L.pad, by + L.rh + 1, pw, bh - 2 * L.rh - 4
+        if wtop > 0 then ww, wh = bw - 2 * L.pad, wtop_wh else pcol0 = 1 end
         local v = info.dsp_view and info.dsp_view('slixer', f.i)
         set(U.PANEL); gfx.rect(wx, wy, ww, math.max(4, wh), 1)
         set(U.LINE); gfx.rect(wx, wy, ww, math.max(4, wh), 0)
@@ -5620,7 +5635,7 @@ function D.frame(L, snap, rows, state, info)
         local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh
         if grp and (pi - 1) % nfit == 0 then
           local gt = f.groups[math.floor((pi - 1) / nfit) + 1]
-          if gt then text(bx + colk * bw1 + L.pad, by + L.rh + 1, fit(gt, pw), U.AMBER) end
+          if gt then text(bx + colk * bw1 + L.pad, by + L.rh + 1 + wtop, fit(gt, pw), U.AMBER) end
         end
         if cl then
           -- развёрнутый контейнер: своя колонка у каждого плагина, под именем;
