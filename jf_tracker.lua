@@ -156,7 +156,7 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
-  ttf = ({ bigblue = 'bigblue', iosevka = 'iosevka' })[reaper.GetExtState(EXT, 'ttf')] or 'off',   -- шрифт: битмап или пиксельный TTF (5 окт)
+  ttf = draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] and reaper.GetExtState(EXT, 'ttf') or 'off',   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
   opt_tab = reaper.GetExtState(EXT, 'opttab') ~= '' and reaper.GetExtState(EXT, 'opttab') or nil,   -- последняя вкладка опций (5 окт)
   -- время и BPM мелко (5 окт, просьба): новый ключ — прежнее «вкл» не тянется
   bigbpm = flag('bigbpm2', false),
@@ -3515,6 +3515,20 @@ ctx = {
     state.slicepick = ({ key = 'random', random = 'seq', seq = 'key' })[state.slicepick or 'key']
     vim.msg = 'slices: ' .. ({ key = 'by key (q 2 w ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
   end,
+  -- :font (10 окт): шрифт трекера по имени / next / prev / off
+  font_set = function(arg)
+    arg = (arg or ''):match('^%s*(.-)%s*$')
+    local list = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do list[#list + 1] = k end
+    local i = 1; for k, v in ipairs(list) do if v == (state.ttf or 'off') then i = k end end
+    local to
+    if arg == 'next' then to = list[i % #list + 1]
+    elseif arg == 'prev' then to = list[(i - 2) % #list + 1]
+    elseif arg == 'off' or draw.TTF_FACES[arg] then to = arg end
+    if not to then vim.msg = 'fonts: ' .. table.concat(list, ' '); return end
+    state.ttf = to; draw.set_font(state); relayout()
+    local f = draw.TTF_FACES[to]
+    vim.msg = 'font: ' .. (f and (to .. ' - ' .. f.d) or 'off (REAPER bitmap)') .. '   :font next / prev'
+  end,
   -- ── аудиоустройство (10 окт): jf_tracker_audio.lua ──────────────────────
   audio = function() ctx.AU = ctx.AU or dofile(DIR .. '/jf_tracker_audio.lua'); return ctx.AU end,
   audio_set = function(want)
@@ -6740,7 +6754,7 @@ ctx = {
       { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
       { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
       { sep = true, title = 'look' },
-      { key = 'ttf', label = 'font', kind = 'cycle', values = { 'off', 'bigblue', 'iosevka' }, desc = 'off - the REAPER bitmap; bigblue - BigBlueTerm, pixel DOS font; iosevka - Iosevka Term, narrow vector font with the most symbols (font scale = their size)', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
+      { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },

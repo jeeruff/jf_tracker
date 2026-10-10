@@ -131,10 +131,39 @@ end
 
 -- пиксельные TTF (5 окт, опция font): кириллица, греческий, блоки, рамки —
 -- без гибрида; px — родной размер (кегль = px × масштаб — чётко)
+-- 10 окт: больше терминальных моноширинных (все — Nerd Fonts, уже стоят у
+-- пользователя); D.TTF_LIST — порядок в опции font: пиксельные, потом векторные
 D.TTF_FACES = {
-  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12 },    -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
-  iosevka = { face = 'IosevkaTerm Nerd Font Mono', px = 14 },        -- вектор, узкий, 7429 символов
+  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12, d = 'BigBlueTerm+, pixel DOS' },   -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
+  bb437 = { face = 'BigBlueTerm437 Nerd Font Mono', px = 12, d = 'BigBlueTerm 437, pixel IBM PC code page' },
+  departure = { face = 'DepartureMono Nerd Font Mono', px = 11, d = 'Departure Mono, pixel' },
+  gohu11 = { face = 'GohuFont 11 Nerd Font Mono', px = 11, d = 'Gohu 11, pixel X11 terminal' },
+  gohu14 = { face = 'GohuFont 14 Nerd Font Mono', px = 14, d = 'Gohu 14, pixel X11 terminal' },
+  terminess = { face = 'Terminess Nerd Font Mono', px = 12, d = 'Terminus, the Linux console font' },
+  proggy = { face = 'ProggyClean Nerd Font Mono', px = 13, d = 'ProggyClean, pixel' },
+  profont = { face = 'ProFont IIx Nerd Font Mono', px = 12, d = 'ProFont, classic Mac terminal' },
+  ['3270'] = { face = '3270 Nerd Font Mono', px = 14, d = 'IBM 3270 terminal' },
+  shure = { face = 'ShureTechMono Nerd Font Mono', px = 14, d = 'Share Tech Mono, techy' },
+  monocraft = { face = 'Monocraft', px = 12, d = 'Monocraft, Minecraft-like pixel' },
+  iosevka = { face = 'IosevkaTerm Nerd Font Mono', px = 14, d = 'Iosevka Term, narrow vector, the most symbols' },        -- вектор, узкий, 7429 символов
+  iosevkaslab = { face = 'IosevkaTermSlab Nerd Font Mono', px = 14, d = 'Iosevka Term Slab, narrow with serifs' },
+  jetbrains = { face = 'JetBrainsMono Nerd Font Mono', px = 14, d = 'JetBrains Mono' },
+  hack = { face = 'Hack Nerd Font Mono', px = 14, d = 'Hack' },
+  fira = { face = 'FiraMono Nerd Font Mono', px = 14, d = 'Fira Mono' },
+  inconsolata = { face = 'Inconsolata Nerd Font Mono', px = 14, d = 'Inconsolata' },
+  commit = { face = 'CommitMono Nerd Font Mono', px = 14, d = 'Commit Mono' },
+  plex = { face = 'BlexMono Nerd Font Mono', px = 14, d = 'IBM Plex Mono' },
+  cascadia = { face = 'CaskaydiaMono Nerd Font Mono', px = 14, d = 'Cascadia Mono' },
+  geist = { face = 'GeistMono Nerd Font Mono', px = 14, d = 'Geist Mono' },
+  victor = { face = 'VictorMono Nerd Font Mono', px = 14, d = 'Victor Mono, narrow' },
+  space = { face = 'SpaceMono Nerd Font Mono', px = 14, d = 'Space Mono, wide retro' },
+  ubuntu = { face = 'UbuntuMono Nerd Font Mono', px = 14, d = 'Ubuntu Mono, narrow' },
+  mononoki = { face = 'Mononoki Nerd Font Mono', px = 14, d = 'mononoki' },
+  proto = { face = '0xProto Nerd Font Mono', px = 14, d = '0xProto' },
+  monaspace = { face = 'MonaspiceNe Nerd Font Mono', px = 14, d = 'Monaspace Neon' },
 }
+D.TTF_LIST = { 'bigblue', 'bb437', 'departure', 'gohu11', 'gohu14', 'terminess', 'proggy', 'profont', '3270', 'shure', 'monocraft',
+  'iosevka', 'iosevkaslab', 'jetbrains', 'hack', 'fira', 'inconsolata', 'commit', 'plex', 'cascadia', 'geist', 'victor', 'space', 'ubuntu', 'mononoki', 'proto', 'monaspace' }
 function D.set_font(state)
   local tf = D.TTF_FACES[state.ttf or 'off']
   D.ttf = tf and true or false
