@@ -6289,6 +6289,25 @@ ctx = {
   end,
   -- список входов (3 окт): fzf под строкой входа; текущий отмечен ●; повторный
   -- клик по той же строке закрывает (picker.inp = guid трека)
+  -- tI (10 окт): вход трека — активный источник. Не своя логика: экшен
+  -- пользователя «Custom: jf_smart_set_input.lua» (слушает 0.6 с: MIDI-нота →
+  -- устройство и канал, иначе аудиовход, последним вышедший из тишины) на
+  -- треке курсора. Экшен ищется по имени (CF_EnumerateActions, SWS) — хеш _RS
+  -- меняется при перерегистрации
+  smart_input = function(col)
+    if not (col and col.track) then return end
+    if not ctx.smart_input_cmd and reaper.CF_EnumerateActions then
+      for i = 0, 100000 do
+        local id, name = reaper.CF_EnumerateActions(0, i, '')   -- не через and: он режет второе значение
+        if not id or id <= 0 then break end
+        if name and name:find('jf_smart_set_input', 1, true) then ctx.smart_input_cmd = id; break end
+      end
+    end
+    if not ctx.smart_input_cmd then vim.msg = 'tI: register the script jf_smart_set_input.lua as an action (Actions > Load ReaScript)'; return end
+    reaper.SetOnlyTrackSelected(col.track)
+    reaper.Main_OnCommand(ctx.smart_input_cmd, 0)
+    vim.msg = ('tI: %s listens 0.6 s - play the source (a MIDI key or audio)'):format(col.name or 'track')
+  end,
   input_picker = function(col, anchor)
     if not col then return end
     if vim.picker and vim.picker.inp == col.guid then vim.picker = nil; return end

@@ -1790,6 +1790,7 @@ function V.key_impl(c)
         elseif ch == 'c' and ctx.track_colour then ctx.track_colour()
         elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm()
         elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)
+        elseif ch == 'I' and ctx.smart_input and col then ctx.smart_input(col)   -- 10 окт: tI — активный вход (jf_smart_set_input)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
         elseif ch == 'f' and ctx.fx_picker then ctx.fx_picker()
         elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col) end

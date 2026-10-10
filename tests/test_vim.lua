@@ -110,7 +110,7 @@ local function reset()
     cur_col = function() return { name = 'A', guid = 'g' } end,
     jump_mark = function() calls[#calls + 1] = 'jmark' end,
     width_step = function(d, which) calls[#calls + 1] = 'w:' .. d .. ':' .. (which or 'all') end,
-    input_picker = function() calls[#calls + 1] = 'tin' end, route_menu = function() calls[#calls + 1] = 'troute' end,
+    input_picker = function() calls[#calls + 1] = 'tin' end, smart_input = function() calls[#calls + 1] = 'tsmart' end, route_menu = function() calls[#calls + 1] = 'troute' end,
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
     snap = function() return snap end, layout = function() return L end, relayout = layout,
     bar_of_row = function(row) local b = math.floor(row / 16) * 16; return b, b + 16 end,
@@ -238,7 +238,7 @@ reset()
 keysin('M');       eq('M (Shift+m) mutes the track', last(), 'track:mute')
 -- t-операции (9 окт)
 for _, c in ipairs({ { 'ty', 'tdup' }, { '3tj', 'tmove:1:3' }, { 'tk', 'tmove:-1:1' }, { 'tc', 'tcol' }, { 'ta', 'tarm' },
-                     { 'tl', 'tlanes' }, { 'tf', 'tfx' }, { 'ti', 'tin' }, { 'tR', 'troute' } }) do
+                     { 'tl', 'tlanes' }, { 'tf', 'tfx' }, { 'ti', 'tin' }, { 'tI', 'tsmart' }, { 'tR', 'troute' } }) do
   reset(); keysin(c[1]); eq('t-op ' .. c[1], last(), c[2]); eq('t-op ' .. c[1] .. ' clears pending', V.pending, nil)
 end
 -- z> z< z. z, (9 окт): ширина по шагу
