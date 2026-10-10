@@ -316,11 +316,15 @@ function D.panes_layout(state, L, nregions, ncols)
   local m = state.panes
   local H = gfx.h - L.status_h
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
+  -- 10 окт: properties — только когда вкладка item активна в своём стеке
+  local it = 0
+  do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
   s.ab = state.tababc and 1 or 0
+  s.it = it
   s.hi = (state.hints and state.hintpos ~= 'status') and 1 or 0
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
@@ -332,6 +336,7 @@ function D.panes_layout(state, L, nregions, ncols)
   M.avail = function(id)
     local p = D.panes.BY[id]
     local a = p and p.avail
+    if a == 'itemtab' then return it == 1 end
     if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
     return true
   end
