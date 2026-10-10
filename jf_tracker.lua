@@ -240,7 +240,8 @@ local state = {
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
   hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',
   escstop = reaper.GetExtState(EXT, 'escstop') == '1',
-  escmode = reaper.GetExtState(EXT, 'escmode') == 'vim' and 'vim' or 'renoise',   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
+  escmode = reaper.GetExtState(EXT, 'escmode') == 'vim' and 'vim' or 'renoise',
+  hidereaper = reaper.GetExtState(EXT, 'hidereaper') == '1',   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -575,7 +576,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -5824,13 +5825,21 @@ ctx = {
       vim.open_picker('link ' .. pname .. ' to', items, function(it) edit.mod_set(tr, fx, pi, 'plink', true, it.data.fx, it.data.param) end)
     end)
     if flag('plink') then add('Unlink parameter', function() edit.mod_set(tr, fx, pi, 'plink', false) end) end
-    add('Open parameter modulation window', function()
+    add('Parameter modulation window in REAPER', function()
       local v = reaper.TrackFX_GetParamNormalized(tr, fx, pi); reaper.TrackFX_SetParamNormalized(tr, fx, pi, v)
       local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
       if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
+    end, nil, true)
+    -- 10 окт: огибающая — В ТРЕКЕРЕ: колонка трека открыта, курсор на ней, фокус в трекер
+    -- (трекер показывает огибающие, видимые в REAPER, — лейн в аранжировке появится и там)
+    add('Automation envelope (in the tracker)', function()
+      local env
+      edit.run('show envelope', function() env = reaper.GetFXEnvelope(tr, fx, pi, true) end)
+      if not env then vim.msg = 'no envelope for ' .. pname; return end
+      state.trackenvs[reaper.GetTrackGUID(tr)] = true
+      ctx.env_jump = { env = env, name = pname }; model.invalidate()
     end)
-    add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(tr, fx, pi, true) end); state.envs = true; model.invalidate() end)
-    add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end)
+    add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in the track header in REAPER (TCP)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end, nil, true)
     add('Default value', function() edit.fx_param_default(tr, fx, pi); vim.msg = pname .. ': default' end)
     add('--', function() end)
   end,
@@ -5838,7 +5847,7 @@ ctx = {
   fx_menu_items = function(tr, fx, fname, add)
     local en = reaper.TrackFX_GetEnabled(tr, fx)
     add((en and 'Bypass ' or 'Enable ') .. (fname or 'fx'), function() edit.fx_bypass(tr, fx) end)
-    add('Open FX window', function() edit.fx_show(tr, fx) end)
+    add('FX window in REAPER', function() edit.fx_show(tr, fx) end, nil, true)
     add('Show in DSP', function()
       for i, f in ipairs(L.flat or {}) do if f.col and f.col.track == tr then vim.cur.fi = i; break end end
       state.dsp = true; relayout()
@@ -6972,6 +6981,7 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      flag('hidereaper', 'hide REAPER items in menus', 'right-click menus collect what opens REAPER windows (FX window, modulation window, track header, native FX browser) in a submenu "in REAPER"; on - that submenu is hidden, menus show only what works in the tracker'),
       flag('escstop', 'Esc stops playback', 'while the project plays, Esc stops it (instead of switching NORMAL / INSERT); not while recording - there Esc deletes the take; menus, the command line and VISUAL keep their Esc'),
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
@@ -7067,7 +7077,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -8966,9 +8976,12 @@ local function context_menu(hover, anchor)
     if k then used[k] = true end
     return k
   end
+  local rp = {}                                      -- 10 окт: пункты «в REAPER» — своим подменю
   for _, it in ipairs(items) do
     local label = it[1]
-    if label ~= '--' then
+    if it.reaper then
+      if not state.hidereaper then rp[#rp + 1] = { key = nil, label = (label:gsub('^!', '')), fn = it[2] } end
+    elseif label ~= '--' then
       local on = label:sub(1, 1) == '!'
       if on then label = label:sub(2) end
       -- «… (Space)» → хоткей в свою колонку
@@ -8984,6 +8997,17 @@ local function context_menu(hover, anchor)
       if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
       if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2], hk = hk } end
     end
+  end
+  if #rp > 0 then
+    local k = pick_key('R', 'in REAPER')
+    local ru = {}
+    local sub = { title = 'in REAPER', items = {} }
+    for _, r in ipairs(rp) do
+      local rk
+      for ch in r.label:lower():gmatch('%a') do if not ru[ch] then rk = ch; break end end
+      if rk then ru[rk] = true; sub.items[#sub.items + 1] = { key = rk, label = r.label, fn = r.fn } end
+    end
+    if k then hitems[#hitems + 1] = { key = k, label = 'in REAPER …', sub = function() return sub end } end
   end
   -- 6 окт: меню отдельной кнопки (preview, имя лейна огибающей) — только её
   -- пункты, без хоткеев модуля в фокусе (ПКМ на preview давал всё меню матрицы)
@@ -9019,7 +9043,8 @@ end
 ctx.open_context = context_menu          -- для \ из ctx.context_key (объявлен выше этого места)
 function ctx.context_items(hover)
   local items = {}
-  local function add(label, fn, key) items[#items + 1] = { label, fn, key = key } end
+  -- rp (10 окт): пункт делает что-то в окнах REAPER — уходит в подменю «in REAPER …»
+  local function add(label, fn, key, rp) items[#items + 1] = { label, fn, key = key, reaper = rp } end
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local lpb = state.lpb
   if type(hover.fxb) == 'table' and hover.fxb.row then
@@ -9046,7 +9071,7 @@ function ctx.context_items(hover)
         FB.push_recent(it); ctx.fxb_save(); model.invalidate()
       end)
       add((FB.is_fav(it) and '!' or '') .. 'Favourite', function() FB.toggle_fav(it); ctx.fxb_save() end)
-      add('Native FX browser', function() reaper.Main_OnCommand(40271, 0) end)
+      add('FX browser in REAPER', function() reaper.Main_OnCommand(40271, 0) end, nil, true)
     end
   elseif hover.hdrparam or hover.hdrfx or hover.dbparam or hover.dbnode then
     -- 8 окт: ПКМ по эффекту / параметру в строке effects и в роутере — меню
@@ -11912,6 +11937,16 @@ local function frame()
     end
   elseif not pop then ctx.pop_seen, ctx.pop_xy = nil, nil end
   draw.popup(L, pop, anchor)
+  -- 10 окт: «Automation envelope (in the tracker)» — курсор на колонку огибающей, когда она появилась
+  if ctx.env_jump and L and L.flat then
+    for i, f in ipairs(L.flat) do
+      if f.env and f.env.env == ctx.env_jump.env then
+        vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil; vim.ensure_visible(); ctx.set_focus('tracker')
+        vim.msg = 'envelope ' .. ctx.env_jump.name .. ': in the tracker (a points / INSERT values)'; ctx.env_jump = nil; break
+      end
+    end
+    if ctx.env_jump then ctx.env_jump.n = (ctx.env_jump.n or 0) + 1; if ctx.env_jump.n > 30 then vim.msg = 'envelope created; open envelopes (:env) to see it'; ctx.env_jump = nil end end
+  end
   -- beacon (10 окт, как beacon-mode в Emacs): курсор трекера перелетел далеко —
   -- на новом месте полоса во всю ширину до правого края тела, за 0.5 с стягивается
   -- к курсору и гаснет. Только в теле трекера (границы модуля)
