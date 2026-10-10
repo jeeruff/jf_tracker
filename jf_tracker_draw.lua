@@ -316,15 +316,16 @@ function D.panes_layout(state, L, nregions, ncols)
   local m = state.panes
   local H = gfx.h - L.status_h
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.ab == (state.tababc and 1 or 0) then
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.ab == (state.tababc and 1 or 0) and s.hi == (state.hints and 1 or 0) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
   s.ab = state.tababc and 1 or 0
+  s.hi = state.hints and 1 or 0
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
   M.tab_h = L.rh + 2                                    -- подпись листа — в верхней линии рамки (zellij)
-  M.hint_h = 0                                          -- подсказки — в строке статуса
+  M.hint_h = state.hints and (L.rh + 1) or 0           -- 10 окт: хинты включены — своя строка клавиш под каждой панелью
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
   M.minh = function(id) if id == 'sample' and D.sprops_rows then return (math.ceil(D.sprops_rows / 2) + 1) * L.rh + 2 * L.rh + 10 end end
@@ -3690,6 +3691,12 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       end
       D.clip = nil
       rects[(PN.BY[id].tab and 'top') or id] = { ct.x, ct.y, ct.w, ct.h }
+      -- 10 окт: строка клавиш панели (хинты включены) — в самом низу листа
+      if c.hint and info.hint_bars then
+        local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
+        local hl = setmetatable({ hint_h = c.hint.h }, { __index = L })
+        D.hint_bar(hl, c.hint.x, c.hint.y, c.hint.w, info.hint_bars(page) or D.PANE_KEYS, fon)
+      end
     end
   end
   -- линии раздела и ручки: ручка под мышью — янтарём
@@ -6161,6 +6168,14 @@ function D.frame(L, snap, rows, state, info)
     if not state.pane_mode and info.hint_bars then
       local items = info.hint_bars(page) or D.PANE_KEYS
       D.hint_bar(setmetatable({ hint_h = L.pn_keys }, { __index = L }), 0, sy, gfx.w, items, true)
+      -- 10 окт: мышь над строкой клавиш — полный набор клавиш модуля в фокусе (страница справки)
+      local mx2, my2 = gfx.mouse_x, gfx.mouse_y
+      local P = info.key_page and info.key_page(page)
+      if P and my2 >= sy and my2 < sy + L.pn_keys and mx2 >= 0 and mx2 < gfx.w then
+        local lines = {}
+        for _, e in ipairs(P.e or {}) do lines[#lines + 1] = { key = e.k, text = e.m or e.d } end
+        if #lines > 0 then D.popup(L, { kind = 'info', title = 'keys: ' .. (P.title or page) .. '  (? - full help)', lines = lines }, { x = L.pad, y = sy, above = true }) end
+      end
     end
     sy, sh = sy + L.pn_keys, sh - L.pn_keys
   end

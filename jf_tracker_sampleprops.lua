@@ -217,8 +217,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   local RH = L.rh * SP.szoom
   -- подсказка клавиш (4 окт): только с опцией hints, нижней строкой
   local hints = ctx.state and ctx.state.hints
-  local n = math.max(1, math.floor((h - L.rh - (hints and L.rh or 0)) / RH))
-  if hints then U.text(x + L.pad, y + h - L.rh, ctx.fit('opt+j k: step', w - L.pad), U.GREY) end
+  local n = math.max(1, math.floor((h - L.rh) / RH))   -- 10 окт: клавиши — строкой хинтов панели
   SP.slice_scroll = SP.slice_scroll or 0
   local si = 1
   for i, r in ipairs(rows) do if r.k == sel then si = i end end
