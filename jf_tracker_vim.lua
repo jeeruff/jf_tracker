@@ -1137,8 +1137,17 @@ function V.key_impl(c)
   -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)
   if V.picker then V.picker_key(c); return end
   if V.hydra then V.hydra_key(c); return end
-  -- слайсер (оверлей) перехватывает всё остальное
-  if ctx.slicer_active and ctx.slicer_active() then ctx.slicer_key(c); return end
+  -- слайсер (оверлей) перехватывает всё остальное — кроме выбора инструмента /
+  -- трека (10 окт: Opt+J / K из браузера молча съедал открытый слайсер):
+  -- Option+hjkl, Option+цифра, Cmd+цифра идут дальше, как без слайсера
+  if ctx.slicer_active and ctx.slicer_active() then
+    local m0 = ctx.mods and ctx.mods() or {}
+    local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+    local SEL = { [729] = true, [8710] = true, [730] = true, [172] = true,
+                  [161] = true, [8482] = true, [163] = true, [162] = true, [8734] = true, [167] = true, [182] = true, [8226] = true, [170] = true, [186] = true }
+    local pass = SEL[cp] or ((m0.cmd or m0.alt) and not m0.ctrl and c >= ('0'):byte() and c <= ('9'):byte())
+    if not pass then ctx.slicer_key(c); return end
+  end
 
   -- командная строка (+ подсказка и Tab-дополнение)
   if V.mode == 'cmd' then

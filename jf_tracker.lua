@@ -3043,6 +3043,8 @@ ctx = {
     local lpb = state.lpb or 4
     for _, tr in ipairs(tracks) do
       local _, tname = reaper.GetTrackName(tr)
+      -- трек LIB (библиотека) — не песня: его MIDI-клипы и так в lib своими строками
+      if model.is_lib_name(tname) then goto next_track end
       for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
         local it = reaper.GetTrackMediaItem(tr, k)
         local tk = reaper.GetActiveTake(it)
@@ -3060,6 +3062,7 @@ ctx = {
             row = math.floor(reaper.TimeMap2_timeToQN(0, pos) * lpb + 1e-6), notes = notes, lo = lo, hi = hi }
         end
       end
+      ::next_track::
     end
     ctx.mc_cache = { snap = snap, col = col, scope = scope, list = list }
     if ctx.mc_sel > #list then ctx.mc_sel = math.max(1, #list) end
@@ -14635,7 +14638,7 @@ local function frame()
         elseif state.toptab == 'sample' and SPROP.key(c, cur_col() and (cur_col().pool or {})[vim.inst]) then
           -- панель свойств: J K строка, H L значение, R сброс
         elseif state.toptab == 'sample' and SL.active then
-          SL.key(c)
+          vim.key(c)                                   -- 10 окт: через vim — там правило «выбор инструмента мимо слайсера»
           if not SL.active then ctx.set_focus('tracker') end
         elseif state.toptab == 'retro' then
           if c == 27 then ctx.set_focus('tracker')

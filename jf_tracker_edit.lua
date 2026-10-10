@@ -2746,6 +2746,10 @@ function E.lib_track(create)
   R.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1)
   R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 2)
   R.SetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES', 1)
+  -- 10 окт: спрятан в REAPER (TCP и микшер) — это хранилище, не трек песни
+  R.SetMediaTrackInfo_Value(tr, 'B_SHOWINTCP', 0)
+  R.SetMediaTrackInfo_Value(tr, 'B_SHOWINMIXER', 0)
+  R.TrackList_AdjustWindows(false)
   return tr
 end
 -- место под новый инструмент: трек LIB, свободный лейн (первый пустой или

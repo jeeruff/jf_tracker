@@ -299,3 +299,9 @@
 - [ ] options → font (h l): off, потом пиксельные bigblue, bb437, departure, gohu11, gohu14, terminess, proggy, profont, 3270, shure, monocraft, потом векторные iosevka, iosevkaslab, jetbrains, hack, fira, inconsolata, commit, plex, cascadia, geist, victor, space, ubuntu, mononoki, proto, monaspace
 - [ ] `:font next` / `:font prev` — перебор с описанием в статусе, `:font gohu14` — по имени, `:font off` — битмап; выбор помнится
 - [ ] если какой-то выглядит как системный по умолчанию — имя семейства не совпало, скажи какой
+
+## Opt+hjkl при открытом слайсере, трек LIB (10 окт)
+- [ ] открой слайсер (вкладка item), перейди в браузер: Opt+J / K — следующий / предыдущий инструмент lib, Opt+H / L — трек, Opt / Cmd+цифра — инструмент N; раньше слайсер их молча съедал (видно в debug-журнале: slicer:398)
+- [ ] остальные клавиши при открытом слайсере — как раньше, ему
+- [ ] новый трек LIB (в новом проекте, первый файл в lib) создаётся спрятанным в TCP и микшере REAPER
+- [ ] midi clips → project: клипы трека LIB в списке не появляются

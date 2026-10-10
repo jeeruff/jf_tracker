@@ -123,6 +123,7 @@ local function reset()
     set_pitchmode = function(col, m) calls[#calls + 1] = 'pitchmode:' .. col.name .. ':' .. m end,
     sync_here = function() calls[#calls + 1] = 'sync'; return 1 end,
     pool_select = function(n) calls[#calls + 1] = 'pool:' .. n; V.inst = n end,
+    slicer_active = function() return SLICER end, slicer_key = function(c) calls[#calls + 1] = 'slkey:' .. c end,   -- 10 окт
     set_font = function(n) calls[#calls + 1] = 'font:' .. n end,
     browse = function(p) calls[#calls + 1] = 'browse:' .. tostring(p) end,
     hydra_root = function() return { title = 'root', items = {
@@ -725,5 +726,13 @@ eq('Shift+Down = Shift+j: VISUAL', V.mode, 'visual'); eq('Shift+Down moved a row
 V.key(27); reset()
 ctrl_down = true; V.key(1919379572); ctrl_down = false
 eq('Ctrl+Right = Ctrl+l: matrix move', last(), 'mx:1,0')
+-- 10 окт: открытый слайсер не съедает выбор инструмента (Opt+J / K, Opt / Cmd+цифра)
+reset(); SLICER = true; V.inst = 2
+alt_down = true; V.key(8710); alt_down = false
+eq('slicer open: Option+J still picks the next instrument', last(), 'pool:3')
+cmd_down = true; V.key(('4'):byte()); cmd_down = false
+eq('slicer open: Cmd+4 picks instrument 4', last(), 'pool:4')
+V.key(('x'):byte()); eq('slicer open: other keys go to the slicer', last(), 'slkey:120')
+SLICER = nil
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
