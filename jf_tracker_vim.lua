@@ -1720,8 +1720,20 @@ function V.key_impl(c)
     V.pending = nil
     if c == ESC then V.count = nil; finish_move(); return end
     if p == 'g' then
+      -- 10 окт: g + цифры + Enter (или g) — на строку с этим номером (g12 ↵ → 0012); Esc — отмена
+      if c >= 48 and c <= 57 and not V.op then
+        V.gnum = (V.gnum or '') .. string.char(c); V.pending = 'g'
+        V.msg = 'g' .. V.gnum .. ' - Enter: go to row ' .. ('%04d'):format(tonumber(V.gnum)); return
+      end
+      if V.gnum and (c == 13 or c == ('g'):byte()) and not V.op then
+        local r = tonumber(V.gnum) or 0; V.gnum = nil
+        if r ~= V.cur.row and ctx.jump_mark then ctx.jump_mark() end
+        V.cur.row = math.max(0, r); V.count = nil; finish_move(); ensure_visible(); return
+      end
+      V.gnum = nil
       if c == ('g'):byte() then
-        local t = { fi = V.cur.fi, row = V.count and (n - 1) or 0, linewise = true }
+        -- 10 окт: Ngg — строка N, как её подпись (0012 = 12gg); было N−1, как строки Vim с 1
+        local t = { fi = V.cur.fi, row = V.count and n or 0, linewise = true }
         if V.op then
           local f0, f1, r0, r1 = range_or_event(V.op, t)
           local e = apply(V.op, f0, f1, r0, r1); V.op = nil; if e then finish_edit() else finish_move() end

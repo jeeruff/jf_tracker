@@ -477,7 +477,8 @@ function D.layout(snap, state, nregions)
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
   L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0)) or 0
   L.top_first = L.toppos == 'top'
-  L.jr_h = state.jumps and L.rh or 0                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
+  L.jr_h = state.jumps and L.rh or 0
+  D.jr_bg = state.jrbg                                -- 10 окт: подложка линейки прыжков (опция)                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
   L.header_y = (L.toppos == 'top' and L.top_h or 0) + (L.tppos == 'top' and L.tp_h or 0)
   L.meter_h = 0
   -- шапка трека (2 окт): имя | R I M S A | громкость | панорама | лейн −+ / огибающие | подписи
@@ -614,7 +615,9 @@ function D.layout(snap, state, nregions)
     L.fxrow_y = L.header_y + L.header_h
     L.sess_y = L.fxrow_y + L.fxrow_h
     local bot = tr.y + tr.h
-    L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
+    -- 10 окт: развёрнут другой модуль (zoom, например big item) — клипов сессии над трекером нет
+    local zoomed_other = state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker'
+    L.sess_h = (state.clipsview and not zoomed_other) and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
     L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
     L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
     L.mix_y = L.body_y + L.body_h
@@ -4448,7 +4451,8 @@ function D.frame(L, snap, rows, state, info)
     -- сколько нажатий до неё (как 3l / 2h; голубые — слева); ячейка курсора — пусто.
     -- Порядок — как ходит l (info.vorder = vim.vorder); подполе инструмента не считается (Nl его пропускает)
     local jy = L.body_y - L.jr_h
-    set(U.PANEL); gfx.rect(tx0, jy, W - tx0, L.jr_h, 1)
+    -- 10 окт: подложка — опцией (по умолчанию нет: фон окна); цифры приглушены
+    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0, jy, W - tx0, L.jr_h, 1)
     local vc, vo = info.vcur, info.vorder
     if vc and vo and L.flat then
       local idx, cur_i = 0, nil
@@ -4472,9 +4476,9 @@ function D.frame(L, snap, rows, state, info)
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           local cx = p.f.x + (fx or 0)
-          local lab = tostring(math.abs(d))
+          local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
           if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W then
-            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d == 0 and U.AMBER or (d < 0 and U.CYAN or U.GREY))   -- 0 — ячейка курсора
+            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
           end
         end
       end
@@ -5047,12 +5051,13 @@ function D.frame(L, snap, rows, state, info)
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
   if L.jl_w > 0 and #rows > 0 then
     local cr = info.vcur and info.vcur.row          -- курсор трекера (cur_row — edit-курсор REAPER)
-    set(U.PANEL); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
+    -- 10 окт: как верхняя линейка — подложка опцией jump ruler background, 0 у курсора, цифры приглушены
+    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
     for i, r in ipairs(rows) do
       local d = cr and (r.row - cr)
-      if d and d ~= 0 and not r.clip and math.abs(d) < 100 then
-        local lab = tostring(math.abs(d))
-        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d < 0 and U.CYAN or U.GREY)
+      if d and not r.clip and math.abs(d) < 100 then
+        local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
+        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
   end

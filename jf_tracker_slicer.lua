@@ -279,8 +279,24 @@ end
 -- первый светлый, после светлого — первый тёмный; одинаковые подряд (ролл
 -- хетов, дубль бочки) сливаются в один слайс. Чтение — аудио-аксессор take
 S.SMART_GAP = 0.06
+local function brightness(x, n)
+  local en, df = 0, 0
+  for i = 2, n do local a = x[i] or 0; en = en + a * a; local d = a - (x[i - 1] or 0); df = df + d * d end
+  if en < 1e-9 then return nil end
+  return df / en
+end
 function S.brightness_reader()
   local e = S.entry
+  -- 10 окт: сперва WAV напрямую (смещение / скорость item): аудио-аксессор заглушённого
+  -- item (lib — заглушённый трек) отдаёт тишину — smart slice находил 0 dark / 0 bright
+  if S.sg and e and e.fpath and e.fpath:lower():match('%.wav$') then
+    local fr, fsr = S.sg.wav_reader(e.fpath)
+    if fr then
+      local offs, rate = e.offs or 0, (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
+      local n = math.floor(fsr * 0.025)
+      return function(t) return brightness(fr(offs + t * rate, n), n) end, function() end
+    end
+  end
   if not (e and e.take and R.ValidatePtr(e.take, 'MediaItem_Take*')) then return nil end
   local acc = R.CreateTakeAudioAccessor(e.take)
   if not acc then return nil end
@@ -293,11 +309,7 @@ function S.brightness_reader()
   return function(t)
     buf.clear()
     if R.GetAudioAccessorSamples(acc, sr, 1, st + t, n, buf) < 0 then return nil end
-    local x = buf.table()
-    local en, df = 0, 0
-    for i = 2, n do local a = x[i] or 0; en = en + a * a; local d = a - (x[i - 1] or 0); df = df + d * d end
-    if en < 1e-9 then return nil end
-    return df / en
+    return brightness(buf.table(), n)
   end, function() R.DestroyAudioAccessor(acc) end
 end
 
@@ -947,15 +959,28 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local pk = 0.02
       for i = 1, n do local v = math.abs(smp[i] or 0); if v > pk then pk = v end end
       U.set(sgz and U.TEXT or base)
-      for px = 0, w - 1 do
-        local i0, i1 = math.floor(px / w * n) + 1, math.max(math.floor(px / w * n) + 1, math.floor((px + 1) / w * n))
-        local mn, mx3 = 1e9, -1e9
-        for i = i0, math.min(n, i1) do local v = smp[i] or 0; if v < mn then mn = v end; if v > mx3 then mx3 = v end end
+      local function spcol(tt)
         if spk and spk.spec and spk.n > 0 and ctx.spec_colour then
-          local tt = t0 + (px + 0.5) / w * 2 * W2
           local cc = ctx.spec_colour(spk.spec[math.max(1, math.min(spk.n, math.floor(tt / len * spk.n) + 1))])
           gfx.set(cc[1], cc[2], cc[3], 1)
         end
+      end
+      if n / w < 4 then
+        -- 10 окт: мало сэмплов на пиксель — сплошная линия через сэмплы (чёрточки min..max рассыпались в точки)
+        local px0, py0
+        for i = 1, n do
+          local xx = x + (i - 0.5) / n * w
+          local yy = zc - (smp[i] or 0) / pk * zh2
+          spcol(t0 + (i - 0.5) / n * 2 * W2)
+          if px0 then gfx.line(px0, py0, xx, yy, 1) end
+          px0, py0 = xx, yy
+        end
+      end
+      for px = 0, (n / w < 4) and -1 or (w - 1) do
+        local i0, i1 = math.floor(px / w * n) + 1, math.max(math.floor(px / w * n) + 1, math.floor((px + 1) / w * n))
+        local mn, mx3 = 1e9, -1e9
+        for i = i0, math.min(n, i1) do local v = smp[i] or 0; if v < mn then mn = v end; if v > mx3 then mx3 = v end end
+        spcol(t0 + (px + 0.5) / w * 2 * W2)
         if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
       end
     else U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
