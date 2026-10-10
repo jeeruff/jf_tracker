@@ -710,6 +710,7 @@ end
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
 -- когда e — его исходник (слайс/кусок показывается на фоне целого сэмпла)
 function S.draw_in(U, L, x, y, w, h, e, track, zone)
+  S.ap_hot = false
   if not e then
     -- пустой трек: запись — во вкладке rec (3 окт)
     U.text(x, y + 1, ctx.fit('no instrument - the rec tab records one', w), U.GREY)
@@ -1142,6 +1143,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local apw = U.measure(apl) + 2 * L.pad
     local apx, apy = x + w - apw - 2, zy + 1
     local aphot = mx2 >= apx and mx2 < apx + apw and my2 >= apy and my2 < apy + rh
+    S.ap_hot = aphot
     U.set(ap_on and U.tint(U.CYAN, 0.3) or (aphot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(apx, apy, apw, rh - 1, 1)
     U.set(ap_on and U.CYAN or (aphot and U.AMBER or U.LINE)); gfx.rect(apx, apy, apw, rh - 1, 0)
     U.text(apx + L.pad, apy, apl, ap_on and U.CYAN or (aphot and U.AMBER or U.TEXT))
