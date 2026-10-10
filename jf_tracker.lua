@@ -4830,6 +4830,22 @@ ctx = {
     local w = ctx.sprops_maxw or r[3]
     local nc = math.max(1, math.floor((w + L.pad) / math.min(w, L.cw * 36)))
     local need = (math.ceil(#SPROP.ROWS / nc) + 1) * L.rh + 2
+    -- 10 окт: панели — свой лист (properties или item) растёт по высоте, пока свойства не влезут
+    if state.panes_ui and state.panes and L.pn then
+      local id = ctx.sp_in_pane and 'sprops' or 'sample'
+      local PNm = draw.panes
+      local prev
+      for _ = 1, 60 do
+        local c = L.pn.by_panel[id]
+        if not c or c.content.h >= need or c.content.h == prev then break end
+        prev = c.content.h
+        if not PNm.resize(state.panes, id, 'v', 0.01) then break end
+        relayout()
+      end
+      ctx.sprops_fit_need = need
+      vim.msg = 'properties fit (' .. #SPROP.ROWS .. ' rows)'
+      return
+    end
     state.top_px = math.floor(L.top_h + (need - r[4]))
     ctx.relayout()
     vim.msg = 'top panel fits the sample properties'
@@ -12140,7 +12156,7 @@ local function frame()
     end,
     sprops_draw = function(Lx, x, y, w, h)
       local se = ctx.sp_sel
-      if not se then U.text(x, y, ctx.fit('props: open an instrument in the item tab', w), U.GREY); SPROP.hover = nil; return end
+      if not se then U.text(x, y, ctx.fit('properties: open an instrument in the item tab', w), U.GREY); SPROP.hover = nil; return end
       if se.file then
         local _, _, ppath = PV.position()
         SPROP.draw_info(Lx, x, y, w, h, ctx.file_info(se.path), ppath == se.path)
