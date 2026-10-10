@@ -299,6 +299,21 @@ if state.panes and reaper.GetExtState(EXT, 'panes_mig7') ~= '1' then
   end
   reaper.SetExtState(EXT, 'panes_mig7', '1', true)
 end
+-- 10 окт (миграция 8): clips — панель-вкладка в стеке верхнего модуля (рядом
+-- с macros / item), один раз поверх текущей раскладки
+if state.panes and reaper.GetExtState(EXT, 'panes_mig8') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.find(state.panes, 'clips') then
+    local host = (PNm.visible(state.panes, 'macros') and 'macros') or (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    if host then
+      local lf = PNm.find(state.panes, host)
+      local act = lf and lf.active
+      PNm.stack(state.panes, 'clips', host)
+      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
+    end
+  end
+  reaper.SetExtState(EXT, 'panes_mig8', '1', true)
+end
 -- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
 -- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
 if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
@@ -2873,7 +2888,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'macros', 'scopes', 'master', 'video' }   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video' }   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -5636,6 +5651,18 @@ ctx = {
   ss_is_big = function() return state.ss_big and true or false end,
   -- 7 окт: колонки сессии — по лейнам (MX.vcols), клетки — MX.vgrid
   ss_V = function() return snap and MX.vcols(snap) or { cols = {} } end,
+  -- 10 окт: клип курсора сессии — копия / вставка / вырезать через ячейки
+  -- матрицы (тот же буфер, что Ctrl+C / Ctrl+V матрицы)
+  ss_cell_op = function(what, ri, ci)
+    local v = ctx.ss_V()
+    local col = v.cols and v.cols[ci]
+    local mci = ci
+    if col and snap then for k, c in ipairs(snap.cols) do if c == col then mci = k end end end
+    local r0, c0, a0 = MX.cur.ri, MX.cur.ci, MX.anchor
+    MX.anchor = nil; MX.cur.ri, MX.cur.ci = ri, mci
+    ctx.mx_block(what)
+    MX.cur.ri, MX.cur.ci, MX.anchor = r0, c0, a0
+  end,
   ss_G = function() return snap and MX.vgrid(snap, seq) or {} end,
   -- инфо трека для шапки (7 окт): кэш на полсекунды по треку
   hdr_cache = {},

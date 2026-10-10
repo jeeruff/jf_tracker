@@ -361,6 +361,27 @@ function SS.key_body(c, ch, seq, snap, grid, ncols)
     return true
   end
   if SS.pending_d and ch ~= 'd' then SS.pending_d = nil; if c == 27 then return true end end
+  -- 10 окт: yy — копия клипа, yp — дубль строкой ниже, p / P — вставить на курсор
+  if SS.pending_y then
+    SS.pending_y = nil
+    if ch == 'y' and ctx.ss_cell_op then ctx.ss_cell_op('copy', SS.cur.ri, SS.cur.ci)
+    elseif ch == 'p' and ctx.ss_cell_op then
+      ctx.ss_cell_op('copy', SS.cur.ri, SS.cur.ci)
+      if seq[SS.cur.ri + 1] then SS.cur.ri = SS.cur.ri + 1; ctx.ss_cell_op('paste', SS.cur.ri, SS.cur.ci) end
+    end
+    return true
+  end
+  if ch == 'y' then SS.pending_y = true; ctx.msg('y: y - copy the clip, p - duplicate below | Esc'); return true end
+  if (ch == 'p' or ch == 'P') and ctx.ss_cell_op then ctx.ss_cell_op('paste', SS.cur.ri, SS.cur.ci); return true end
+  -- 10 окт: w / b — следующий / предыдущий клип по колонке (вертикально, как
+  -- w в трекере); пустые слоты мимо
+  if ch == 'w' or ch == 'b' then
+    local d = ch == 'b' and -1 or 1
+    local ri = SS.cur.ri + d
+    while seq[ri] and not (grid[ri] and grid[ri][SS.cur.ci] and grid[ri][SS.cur.ci].state ~= 'empty') do ri = ri + d end
+    if seq[ri] then SS.cur.ri = ri; clamp(seq, ncols); SS.follow(seq) else ctx.msg(ch == 'b' and 'no clip above' or 'no clip below') end
+    return true
+  end
   if ch == 'j' or c == 1685026670 then SS.cur.ri = SS.cur.ri + 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'k' or c == 30064 then SS.cur.ri = SS.cur.ri - 1; clamp(seq, ncols); SS.follow(seq)
   elseif ch == 'h' or c == 1818584692 then SS.cur.ci = SS.cur.ci - 1; clamp(seq, ncols)
