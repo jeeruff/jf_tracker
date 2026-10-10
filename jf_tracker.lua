@@ -244,7 +244,8 @@ local state = {
   hidereaper = reaper.GetExtState(EXT, 'hidereaper') == '1',
   slicemk = reaper.GetExtState(EXT, 'slicemk') == 'click' and 'click' or 'double',
   edgezoom = reaper.GetExtState(EXT, 'edgezoom') ~= '0',
-  wavebar = reaper.GetExtState(EXT, 'wavebar') ~= '0',   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
+  wavebar = reaper.GetExtState(EXT, 'wavebar') ~= '0',
+  slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',   -- 10 окт: слайсер, кнопка follow   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -579,7 +580,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('slicefollow', state.slicefollow and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -8974,10 +8975,9 @@ end
 
 function view_actions()
   return {
-    { (state.top and '!' or '') .. 'Top bar (:top)', key = 'p', fn = function() state.top = not state.top end },
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
     { 'Options window', key = 'o', fn = function() ctx.options() end },
-    { 'Remove old scope bridges (:scopes)', key = 'R', fn = ctx.toggle_scopes },
+    { 'Theme and fonts (options tab)', key = 't', fn = function() ctx.options(); OPT.set_tab('theme') end },   -- 10 окт: вместо Font +1 / -1 / bitmap
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
     { 'Loop region under cursor', key = 'l', fn = function()
@@ -8986,9 +8986,6 @@ function view_actions()
       end },
     { (state.side and '!' or '') .. 'Browser sidebar (:side)', key = 'b', fn = function() state.side = not state.side end },
     { (state.envs and '!' or '') .. 'Envelopes (:env)', key = 'e', fn = function() state.envs = not state.envs end },
-    { 'Font +1', key = 'f', fn = function() ctx.set_font(math.max(0, (state.font or 0) + 1)) end },
-    { 'Font -1', key = 'F', fn = function() ctx.set_font(math.max(0, (state.font or 0) - 1)) end },
-    { 'Bitmap font', key = '0', fn = function() ctx.set_font(0) end },
     { 'FX columns +1', key = 'x', fn = function() state.fxcols = math.min(4, state.fxcols + 1) end },
     { 'FX columns -1', key = 'X', fn = function() state.fxcols = math.max(0, state.fxcols - 1) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
@@ -9054,7 +9051,7 @@ local function context_menu(hover, anchor)
       if hk then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end end
       local k = pick_key(it.key, label)
       if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
-      if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  *' or ''), fn = it[2], hk = hk } end
+      if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  (on)' or ''), fn = it[2], hk = hk } end   -- 10 окт: «(on)» вместо непонятной звёздочки
     end
   end
   if #rp > 0 then
@@ -9298,6 +9295,16 @@ function ctx.context_items(hover)
     if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
     for _, a in ipairs(event_actions(hover)) do add(a[1], a.fn, a.key) end
     if hover.col then for _, a in ipairs(track_actions(hover.col)) do add(a[1], a.fn, a.key) end end
+  elseif hover.matrix then
+    -- 10 окт: пустое место матрицы — её собственное меню (раньше общий «view»)
+    add('New slot at the end (+)', function() ctx.mx_add() end, '+')
+    add((MX.fill and '!' or '') .. 'Fill: cells show their content (f)', function() MX.fill = not MX.fill end, 'f')
+    add('Trim items to their regions (t)', function() ctx.mx_trim() end, 't')
+    add((MX.ruler and '!' or '') .. 'Ruler (R)', function() ctx.mx_ruler_toggle() end, 'R')
+    add((MX.loops and '!' or '') .. 'Loops layer', function() ctx.mx_loops_toggle() end, 'l')
+    add((MX.zoom == 'detail' and '!' or '') .. 'Detail view (z)', function() ctx.mx_zoom() end, 'z')
+    add('Session: clips over the whole window (zz)', function() ctx.ss_big() end, 's')
+    add('Arrangement …', function() ctx.arr() end, 'a')
   else
     for _, a in ipairs(view_actions()) do add(a[1], a.fn, a.key) end
   end

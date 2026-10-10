@@ -368,6 +368,8 @@ function S.preview(k)
   -- 8 окт: slice playthru — нота слайса играет до конца сэмпла, превью так же
   if S.entry.item and ctx.edit and ctx.edit.playthru and ctx.edit.playthru(S.entry.item) then t1 = S.entry.len end
   ctx.preview_slice(S.track, S.entry, t0, t1)
+  -- 10 окт: кнопка follow — сыгранный на клавиатуре слайс становится выбранным (список, зона, зум края)
+  if ctx.state and ctx.state.slicefollow and ctx.select_slice then ctx.select_slice(S.entry, k); S.zedge_k, S.zedge_e = k, S.entry.item or S.entry.path end
 end
 
 -- прослушивание слайса (4 окт): хроматическая раскладка q 2 w 3 e r 5 t …, как
@@ -440,6 +442,14 @@ end
 
 -- кнопка нарезки (2 окт): равные части / транзиенты / чувствительность / сброс
 function S.button(id)
+  if id == 'follow' then                             -- 10 окт: сыгранный на клавиатуре слайс — выбранный
+    if ctx.state then
+      ctx.state.slicefollow = not ctx.state.slicefollow
+      if ctx.save_flag then ctx.save_flag('slicefollow', ctx.state.slicefollow) end
+      S.msg = 'follow ' .. (ctx.state.slicefollow and 'on: the slice you play on the keyboard becomes the selected one' or 'off')
+    end
+    return
+  end
   if id == 'mono' then                               -- 9 окт: один голос на трек при вставке / poly
     if ctx.mono_toggle then ctx.mono_toggle() end
     return
@@ -640,7 +650,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'autotrim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { 'mono', 'mono' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       local lim = brow == 0 and (x + hint_w) or (x + w)
@@ -650,7 +660,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
       local by = y + rh + brow * rh
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
-      local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e)) or (b[2] == 'mono' and ctx.mono_on and ctx.mono_on())   -- playthru (6 окт): горит, когда включён
+      local on = (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e)) or (b[2] == 'mono' and ctx.mono_on and ctx.mono_on()) or (b[2] == 'follow' and ctx.state and ctx.state.slicefollow)   -- playthru (6 окт): горит, когда включён
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
       U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, by, bw, rh, 0)
       U.text(bx + L.pad, by + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
