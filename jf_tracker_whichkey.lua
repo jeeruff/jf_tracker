@@ -21,7 +21,7 @@ local T = {
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },
   da = { title = 'da - delete all', items = { { 'w', 'every item of the track' } } },
   g = { title = 'g - go', items = { { 'g', 'top of the track' }, { '12 Enter', 'go to row 0012 (also 12gg)' }, { 'w', 'swap with the next event (3gw - third)' }, { 's', 'smart panel: values of the field under the cursor, pick with the mouse' } } },
-  z = { title = 'z - view', items = { { 't', 'transpose: -24..+24, selection / column / track / pattern' }, { 'z', 'row to middle' }, { 't b', 'row top / bot' },
+  z = { title = 'z - view', items = { { 't', 'transpose: -24..+24, selection / column / track / pattern' }, { 'z', 'row to middle' }, { 'b', 'row to the bottom' },
         { 'a', 'fold track' }, { 'C', '1-char strip' }, { 'f', 'fold folder' },
         { 'M', 'fold <-> all' }, { 'm', 'mixer on / off' }, { '> <', 'all tracks wider / narrower' }, { '. ,', 'cursor track wider / narrower' }, { 's', 'session' }, { 'r', 'router' }, { 'B', 'audio buffer' },
         { 'R', 'big router' } } },
