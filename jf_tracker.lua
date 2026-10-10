@@ -2565,14 +2565,19 @@ ctx = {
     end
     for _, it in ipairs(rest) do items[#items + 1] = it end
     if #items == 0 then vim.msg = 'nothing to automate'; return end
-    vim.open_picker('automation ' .. col.name .. ' (rclick trim: all parameters)', items, function(it)
+    vim.open_picker('automation ' .. col.name .. ' - ● shown, Enter: show / hide (as in REAPER)', items, function(it)
       local r = it.data
       local env = PP.env_of(tr, r, false)
       local vis = env and select(2, reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)) == '1'
-      if not vis then PP.toggle_env(tr, r) end
+      -- 10 окт: зеркально REAPER — видна: спрятать (и в трекере, и в аранжировке), нет — показать
+      if vis then
+        edit.run('hide envelope', function() reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '0', true) end)
+        model.invalidate(); vim.msg = 'envelope hidden: ' .. r.label .. ' (in REAPER too)'; return
+      end
+      PP.toggle_env(tr, r)
       state.trackenvs[col.guid] = true
       model.invalidate()
-      vim.msg = 'envelope: ' .. r.label
+      vim.msg = 'envelope shown: ' .. r.label .. ' (in REAPER too; pick it again - hide)'
     end)
     if from_btn then vim.picker.trim = col.guid; state.popup_at = { kind = 'trim', guid = col.guid } end
   end,
