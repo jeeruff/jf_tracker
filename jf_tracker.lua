@@ -1859,6 +1859,41 @@ ctx = {
       or ('tr: new track "source" -> %s'):format(table.concat(names, ', ') .. (#tgt > 4 and ' ...' or ''))
     return true
   end,
+  -- 10 окт: td / tx / tp — удалить / вырезать / вставить N треков с трека курсора
+  -- (N видимых колонок подряд, LIB не трогается); вырезка — буфер REAPER (Track: Cut tracks)
+  tracks_op = function(what, n)
+    n = math.max(1, math.min(64, n or 1))
+    local col = cur_col()
+    if what == 'paste' then
+      edit.run('paste tracks', function()
+        if col and reaper.ValidatePtr(col.track, 'MediaTrack*') then reaper.SetOnlyTrackSelected(col.track) end
+        for _ = 1, n do reaper.Main_OnCommand(40058, 0) end       -- Item: Paste items/tracks (после выделенного)
+      end)
+      model.invalidate(); vim.msg = 'tp: tracks pasted after ' .. (col and col.name or 'the last track'); return true
+    end
+    if not (col and reaper.ValidatePtr(col.track, 'MediaTrack*')) then vim.msg = 'no track at the cursor'; return false end
+    local list, seen = {}, {}
+    local start
+    for i, c in ipairs(snap.cols or {}) do if c.track == col.track then start = i end end
+    for i = start or 1, #(snap.cols or {}) do
+      local c = snap.cols[i]
+      if c.track and not seen[c.track] and reaper.ValidatePtr(c.track, 'MediaTrack*') then seen[c.track] = true; list[#list + 1] = c end
+      if #list >= n then break end
+    end
+    local names = {}
+    for _, c in ipairs(list) do names[#names + 1] = c.name or '' end
+    -- 10 окт: как в Vim — удаление и есть вырезка (d кладёт в регистр): td и tx оба в буфер, tp вставляет
+    if what == 'cut' or what == 'delete' then
+      edit.run('cut tracks', function()
+        reaper.SetOnlyTrackSelected(list[1].track)
+        for k = 2, #list do reaper.SetTrackSelected(list[k].track, true) end
+        reaper.Main_OnCommand(40337, 0)                     -- Track: Cut tracks (в буфер REAPER)
+      end)
+      vim.msg = ('%s: %d track(s) deleted: %s  (tp - paste them, ctrl+z - back)'):format(what == 'cut' and 'tx' or 'td', #list, table.concat(names, ', '))
+    end
+    model.invalidate()
+    return true
+  end,
   delete_track = function()
     local f = L.flat[vim.cur.fi]
     if not (f and f.col and reaper.ValidatePtr(f.col.track, 'MediaTrack*')) then return false end
@@ -8869,8 +8904,23 @@ function track_actions(col)
     { 'Mute track', key = 'm', fn = function() edit.run('track mute', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1 and 0 or 1) end) end },
     { 'Solo track', key = 's', fn = function() edit.run('track solo', function() reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0 and 0 or 1) end) end },
     { (state.folds[col.guid] and 'Unfold' or 'Fold') .. ' track (za)', key = 'f', fn = function() ctx.fold(col, not state.folds[col.guid]) end },
-    { 'Select track in REAPER', key = 'l', fn = function() reaper.SetOnlyTrackSelected(tr) end },
-    { 'CC lane (ReaControlMIDI, :cc)', key = 'c', fn = function() ctx.cc_lane() end },
+    { 'Select track in REAPER', key = 'L', fn = function() reaper.SetOnlyTrackSelected(tr) end },
+    { 'CC lane (ReaControlMIDI, :cc)', key = 'C', fn = function() ctx.cc_lane() end },
+    -- 10 окт: всё про трек и его вид — те же действия, что клавиши t…
+    { 'Rename (tn)', key = 'n', fn = function() ctx.rename_track_prompt() end },
+    { 'Colour (tc)', key = 'c', fn = function() ctx.track_colour() end },
+    { (col.armed and '!' or '') .. 'Arm for recording (ta)', key = 'a', fn = function() ctx.rec_arm() end },
+    { 'Input … (ti)', key = 'i', fn = function() ctx.input_picker(col) end },
+    { 'Smart input: the most active (tI)', key = 'I', fn = function() ctx.smart_input(col) end },
+    { 'Fixed lanes on / off (tl)', key = 'l', fn = function() ctx.toggle_lanes() end },
+    { 'Add FX … (tf)', key = 'x', fn = function() ctx.fx_picker() end },
+    { 'Routing … (tR)', key = 'R', fn = function() ctx.route_menu(col) end },
+    { 'New track after (tt)', key = 't', fn = function() ctx.new_track(1) end },
+    { 'Duplicate (ty)', key = 'y', fn = function() ctx.track_dup() end },
+    { 'Move down (tj)', key = 'j', fn = function() ctx.track_move(1, 1) end },
+    { 'Move up (tk)', key = 'k', fn = function() ctx.track_move(-1, 1) end },
+    { 'Delete track - to the buffer (td)', key = 'd', fn = function() ctx.tracks_op('delete', 1) end },
+    { 'Paste tracks after (tp)', key = 'p', fn = function() ctx.tracks_op('paste', 1) end },
     { (state.pitchmodes[col.guid] == 'resample' and '!' or '') .. 'Pitch mode: resample', key = 'r', fn = function() ctx.set_pitchmode(col, 'resample') end },
     { (state.pitchmodes[col.guid] ~= 'resample' and '!' or '') .. 'Pitch mode: shift', key = 'h', fn = function() ctx.set_pitchmode(col, 'shift') end },
   }
@@ -10426,6 +10476,15 @@ local function poll_cmd()
   elseif name == 'dev' then ctx.dev_set(v:match('^dev%s+(%a+)') or '')   -- тест: :dev on|off
   elseif name == 'logo' then ctx.logo_show(v:match('^logo%s+([%a_]+)') or '')   -- тест: :logo имя
   elseif name == 'esc' then vim.picker, vim.hydra = nil, nil; state.khelp_big = false; OPT.close()   -- тест: закрыть всплывашки (и опции)
+  elseif name == 'fielddump' then   -- тест (10 окт): поля колонки курсора — x и ширина, порядок l (только чтение)
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local G = f and (f.G or L)
+    local out = { ('fi %d x %s w %s field %s sub %s nf %s'):format(vim.cur.fi, tostring(f and f.x), tostring(f and f.w), tostring(vim.cur.field), tostring(vim.cur.sub), tostring(G and G.nfields)) }
+    if G then
+      out[#out + 1] = ('note %s/%s inst %s vol %s/%s del %s/%s fx1 %s/%s'):format(tostring(G.x_note), tostring(G.w_note), tostring(G.x_inst), tostring(G.x_vol), tostring(G.w_vol), tostring(G.x_del), tostring(G.w_del), tostring(G.x_fx and G.x_fx[1]), tostring(G.w_fx))
+      out[#out + 1] = 'order ' .. table.concat(vim.vorder(vim.cur.fi), ',')
+    end
+    reaper.SetExtState(EXT, 'fdump', table.concat(out, ' | '), false)
   elseif name == 'opttab' then OPT.set_tab(v:match('^opttab%s+(%a+)') or 'options')   -- тест (10 окт): вкладка окна Options, только вид
   elseif name == 'flag' then   -- тест: flag <ключ> on|off — опция-флаг, с сохранением
     local k, v2 = v:match('^flag%s+([%w_]+)%s+(%a+)')

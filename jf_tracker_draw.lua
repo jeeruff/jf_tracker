@@ -4454,20 +4454,27 @@ function D.frame(L, snap, rows, state, info)
       local idx, cur_i = 0, nil
       local pos = {}
       for fi, f in ipairs(L.flat) do
+        local G = f.G or L
+        local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst ~= nil
         for _, fld in ipairs(vo(fi)) do
           idx = idx + 1
-          if fi == vc.fi and fld == (vc.field or 1) then cur_i = idx end
+          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' then cur_i = idx end
           if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld } end
+          if fld == 1 and inst_ok then          -- подполе инструмента — тоже шаг (10 окт)
+            idx = idx + 1
+            if fi == vc.fi and vc.sub == 'inst' then cur_i = idx end
+            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'inst' } end
+          end
         end
       end
       for _, p in ipairs(pos) do
         local d = cur_i and (p.i - cur_i) or nil
-        if d and d ~= 0 then
+        if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           local cx = p.f.x + (fx or 0)
           local lab = tostring(math.abs(d))
           if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W then
-            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d < 0 and U.CYAN or U.GREY)
+            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d == 0 and U.AMBER or (d < 0 and U.CYAN or U.GREY))   -- 0 — ячейка курсора
           end
         end
       end

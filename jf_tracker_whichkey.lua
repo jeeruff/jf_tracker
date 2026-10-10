@@ -32,7 +32,7 @@ local T = {
         { 'panels', 'm matrix  b browser  l lib  n main' }, { '', 's slices  o notes  f fx list  d dsp' },
         { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video' } } },
   ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'd', 'unpin this place' } } },
-  t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },
+  t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 'd', 'delete tracks (5td), to the buffer' }, { 'x', 'cut tracks' }, { 'p', 'paste tracks' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },
         { 'n', 'rename' }, { 'c', 'colour' }, { 'y', 'duplicate' }, { 'a', 'rec arm' }, { 'i', 'input (list)' }, { 'I', 'input: the active one' },
         { 'l', 'fixed lanes on / off' }, { 'f', 'add fx (fzf)' }, { 'R', 'routing (S R O)' }, { 'j k', 'move right / left (3tj)' } } },
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },

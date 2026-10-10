@@ -384,7 +384,8 @@ local function event_end(fi, row)
 end
 
 -- Возвращает цель {fi=, row=, exclusive=, linewise=} или nil.
-local function motion(c, n, op)
+local motion
+function motion(c, n, op)
   local cur = V.cur
   local last = ctx.snap().last_row or 0
   local L = ctx.layout()
@@ -397,6 +398,19 @@ local function motion(c, n, op)
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'inst' then
     return { fi = cur.fi, row = cur.row, field = 1 }
+  elseif (c == ('h'):byte() or c == LEFT or c == ('l'):byte() or c == RIGHT) and n > 1 then
+    -- 10 окт: Nl / Nh = N одиночных шагов — каждая ячейка, куда встаёт l (и подполе
+    -- инструмента), — шаг, как на линейке прыжков
+    local save = V.cur
+    local t = { fi = cur.fi, row = cur.row, field = cur.field, sub = cur.sub }
+    for _ = 1, n do
+      V.cur = { fi = t.fi, row = t.row, field = t.field or 1, sub = t.sub }
+      local s1 = motion(c, 1, op)
+      if not s1 then break end
+      t = { fi = s1.fi or t.fi, row = s1.row or t.row, field = s1.field or 1, sub = s1.sub }
+    end
+    V.cur = save
+    return t
   elseif c == ('h'):byte() or c == LEFT then local fi, fld = step_field(-1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('l'):byte() or c == RIGHT then local fi, fld = step_field(1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('H'):byte() or c == ('L'):byte() then
@@ -1815,6 +1829,8 @@ function V.key_impl(c)
       V.count = nil; return
     elseif p == 't' then
       if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
+      -- 10 окт: td / tx / tp — удалить / вырезать / вставить N треков (5td — пять)
+      elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('p'):byte()) and ctx.tracks_op and ctx.tracks_op(c == ('d'):byte() and 'delete' or (c == ('x'):byte() and 'cut' or 'paste'), n) then finish_edit()
       elseif (c == ('s'):byte() or c == ('r'):byte()) and ctx.bus_track and ctx.bus_track(c == ('s'):byte() and 'send' or 'recv') then finish_edit()   -- ts / tr
       -- 9 окт: всё про трек — под t, мнемонично (which-key 't')
       elseif c == ('y'):byte() and ctx.track_dup and ctx.track_dup() then finish_edit()
@@ -1838,11 +1854,7 @@ function V.key_impl(c)
       if c == ('w'):byte() and ctx.clear_track(true) then finish_edit() else finish_move() end
       V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
-      -- dd в NORMAL (4 окт) — удалить трек курсора; в INSERT dd — событие строки
-      if p == 'd' and c == ('d'):byte() and not V.back_insert then
-        if ctx.delete_track() then finish_edit() else finish_move() end
-        V.count = nil; return
-      end
+      -- 10 окт: dd — строки (5dd — пять, как в Vim); трек удаляет td (было dd с 4 окт)
       if c == p:byte() then      -- dd yy cc: n строк
         local f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1
         local e = apply(p, f0, f1, r0, r1); V.count = nil
