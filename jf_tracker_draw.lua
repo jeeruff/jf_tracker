@@ -3499,13 +3499,20 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
         local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
         set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
+        local stack = #c.tabs > 1                         -- 10 окт: стек — вкладки |rec|item|clips|, одна панель — подпись на линии
         for _, t in ipairs(c.tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
           if lbl ~= '' then
             local on = t.id == id
             local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
             local tx = t.x + L.pad
-            set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
+            if stack then
+              local bx, bw = tx - L.pad // 2 - 1, ms(lbl) + L.pad + 2
+              set(on and U.tint(fon and D.FOCUS or U.AMBER, 0.30) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
+              set(on and (fon and D.FOCUS or U.AMBER) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
+            else
+              set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
+            end
             local col = on and (fon and D.FOCUS or U.AMBER) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
             text(tx, c.y + 1, lbl, col)
