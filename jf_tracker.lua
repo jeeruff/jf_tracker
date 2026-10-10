@@ -8631,7 +8631,7 @@ ctx = {
   end,
   set_focus = function(f)
     -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
-    if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' then return end   -- поиск эффектов — по клику (5 окт)
+    if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' and f ~= 'slices' then return end   -- 10 окт: и список слайсов — щелчок даёт фокус (j k)   -- поиск эффектов — по клику (5 окт)
     if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад
     if f == 'matrix' and #seq == 0 then f = 'tracker' end
     if state.panes_ui and L and L.pn then
