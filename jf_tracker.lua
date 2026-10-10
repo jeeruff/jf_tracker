@@ -8001,6 +8001,81 @@ ctx = {
     model.invalidate()
     vim.msg = 'RS5K sample: ' .. (path:match('[^/]+$') or path)
   end,
+  -- 10 окт: кнопки RS5K над волной — режим, browse, item, list, detect pitch
+  rs5k_do = function(f, what)
+    local col = dsp_target(); if not (col and f) then return end
+    local tr, fx = col.track, f.i
+    if model.is_take(tr) then vim.msg = 'RS5K: take FX - use the plugin window'; return end
+    local m = what:match('^mode(%d)$')
+    if m then
+      edit.run('RS5K mode', function() reaper.TrackFX_SetNamedConfigParm(tr, fx, 'MODE', m) end)
+      model.invalidate(); vim.msg = 'RS5K mode: ' .. ({ [0] = 'freely configurable (shifted)', [1] = 'sample (ignores the MIDI note)', [2] = 'note (semitone shifted)' })[tonumber(m)]
+    elseif what == 'browse' then
+      local ok, path = reaper.GetUserFileNameForRead('', 'RS5K sample', '')
+      if ok and path ~= '' then ctx.rs5k_file(f, path) end
+    elseif what == 'item' then
+      -- выбранный item REAPER, иначе — инструмент, выбранный в lib
+      local it = reaper.GetSelectedMediaItem(0, 0)
+      local tk = it and reaper.GetActiveTake(it)
+      local path
+      if tk and not reaper.TakeIsMIDI(tk) then path = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '') end
+      if not path or path == '' then local c = cur_col(); local e = c and (c.pool or {})[vim.inst]; path = e and e.fpath end
+      if path and path ~= '' then ctx.rs5k_file(f, path) else vim.msg = 'RS5K item: select an audio item in REAPER or a sample in the lib' end
+    elseif what == 'list' then
+      local items = { { label = '+ add a file … (browse)', data = { add = true } } }
+      for fi = 0, 127 do
+        local ok, fl = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'FILE' .. fi)
+        if not (ok and fl ~= '') then break end
+        items[#items + 1] = { label = ('- remove %d: %s'):format(fi + 1, fl:match('[^/]+$') or fl), data = { del = fi } }
+      end
+      vim.open_picker('RS5K files (' .. (#items - 1) .. ') - Enter', items, function(it)
+        if it.data.add then
+          local ok, path = reaper.GetUserFileNameForRead('', 'add to RS5K', '')
+          if ok and path ~= '' then
+            path = edit.media_copy(path)
+            edit.run('RS5K add file', function() reaper.TrackFX_SetNamedConfigParm(tr, fx, '+FILE0', path); reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '') end)
+            model.invalidate(); vim.msg = 'RS5K: + ' .. (path:match('[^/]+$') or path)
+          end
+        else
+          edit.run('RS5K remove file', function() reaper.TrackFX_SetNamedConfigParm(tr, fx, '-FILE' .. it.data.del, ''); reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '') end)
+          model.invalidate(); vim.msg = 'RS5K: file removed'
+        end
+      end)
+    elseif what == 'detect' then
+      local ok, fl = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'FILE0')
+      if not (ok and fl ~= '') then vim.msg = 'detect pitch: no sample'; return end
+      local fr, sr = SL.sg.wav_reader(fl)
+      if not fr then vim.msg = 'detect pitch: only WAV files'; return end
+      local ns0 = reaper.TrackFX_GetParamNormalized(tr, fx, 13)                -- Sample start offset (доля)
+      local _, _, flen = SL.sg.wav_reader(fl)
+      local n = math.floor(sr * 0.08)
+      local x = fr((flen or 1) * ns0 + 0.05, n)
+      local lo, hi = math.floor(sr / 1000), math.floor(sr / 50)
+      local best, bl = 0, nil
+      local e0 = 0; for i = 1, n do e0 = e0 + x[i] * x[i] end
+      if e0 < 1e-6 then vim.msg = 'detect pitch: silence there'; return end
+      for lag = lo, math.min(hi, n - 1) do
+        local acc = 0
+        for i = 1, n - lag do acc = acc + x[i] * x[i + lag] end
+        acc = acc / e0
+        if acc > best then best, bl = acc, lag end
+      end
+      if not bl or best < 0.45 then vim.msg = ('detect pitch: no clear pitch (%.2f)'):format(best); return end
+      local hz = sr / bl
+      local root = math.floor(69 + 12 * math.log(hz / 440, 2) + 0.5)
+      -- Pitch for start / end note: −80..+80; root звучит в оригинале на ноте root
+      local nlo = math.floor(reaper.TrackFX_GetParamNormalized(tr, fx, 3) * 127 + 0.5)
+      local nhi = math.floor(reaper.TrackFX_GetParamNormalized(tr, fx, 4) * 127 + 0.5)
+      local function norm(v) return math.max(0, math.min(1, (v + 80) / 160)) end
+      edit.run('RS5K detect pitch', function()
+        reaper.TrackFX_SetParamNormalized(tr, fx, 5, norm(nlo - root))
+        reaper.TrackFX_SetParamNormalized(tr, fx, 6, norm(nhi - root))
+      end)
+      model.invalidate()
+      local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+      vim.msg = ('detect pitch: %.1f Hz = %s%d (root set; mode note plays it on that key)'):format(hz, NN[root % 12 + 1], root // 12 - 1)
+    end
+  end,
   -- трек из проекта pm (chunk) → новый трек после трека курсора
   drop_track = function(e, proj_e)
     local c = cur_col()
@@ -13258,6 +13333,7 @@ local function frame()
       ::sprop_done::
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
+    elseif hover.rs5k then ctx.rs5k_do(hover.rs5k.f, hover.rs5k.what); click = { t = now2, zone = 'rs5k' }   -- 10 окт: кнопки RS5K
     elseif hover.mixpk then
       -- 10 окт: Shift+щелчок — сброс пиков / клипов у ВСЕХ треков и мастера (как Ctrl+щелчок в микшере REAPER)
       local function rst(tr) for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(tr, ch, true) end end

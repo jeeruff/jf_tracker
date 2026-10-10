@@ -1255,6 +1255,7 @@ function build_one(tr, fx, out)
             params[#params + 1] = param_entry(tr, fx, pi, spec[2])
             params[#params].cat = M.param_cat(tr, fx, short, pi, names[pi], params[#params].kind)
             params[#params].labels = spec.labels                     -- 9 окт: подписи положений (пульт slixer)
+            params[#params].show = spec.show                         -- 10 окт: вид значения (RS5K: note / root / chan)
             if lay.wave and want == lay.wave.start then wa = #params end
             if lay.wave and want == lay.wave.stop then wb = #params end
             if lay.view_param and spec[2] == lay.view_param then e_view_p = #params end
@@ -1264,7 +1265,7 @@ function build_one(tr, fx, out)
           end
         end
       end
-      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1,
+      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
                   groups = lay.groups, rows = lay.rows }               -- 9 окт: колонка = группа с заголовком
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему
       if lay.view then e.view, e.view_p = lay.view, e_view_p end
@@ -1274,6 +1275,13 @@ function build_one(tr, fx, out)
       if lay.wave and A.GetNamedConfigParm then
         local ok, file = A.GetNamedConfigParm(tr, fx, 'FILE0')
         e.wave, e.file, e.wave_a, e.wave_b = true, ok and file ~= '' and file or nil, wa, wb
+        -- 10 окт: RS5K — режим (named config MODE: 0 freely, 1 sample, 2 note) и число файлов FILE0..n
+        if lay.rs5k then
+          local okm, m = A.GetNamedConfigParm(tr, fx, 'MODE'); e.rs5k_mode = okm and tonumber(m) or nil
+          local nf = 0
+          for fi = 0, 127 do local okf, fl = A.GetNamedConfigParm(tr, fx, 'FILE' .. fi); if okf and fl ~= '' then nf = fi + 1 else break end end
+          e.rs5k_n = nf
+        end
       end
       out[#out + 1] = e
     else

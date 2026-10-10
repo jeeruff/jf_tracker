@@ -5489,10 +5489,10 @@ function D.frame(L, snap, rows, state, info)
       -- строк + строка статуса у slixer), параметры под ней во всех колонках;
       -- не влезает по высоте — прежняя колонка слева
       local wtop, wtop_wh = 0, 0
-      if (f.view == 'slixer' or f.view == 'grain') and not f.container then
+      if (f.view == 'slixer' or f.view == 'grain' or f.rs5k) and not f.container then   -- 10 окт: RS5K — тоже полосой сверху
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or math.ceil(#f.params / math.max(1, ncol))
-        local srow = f.view == 'slixer' and 1 or 0
-        local wrows = math.min(5, nfit - need - srow)
+        local srow = (f.view == 'slixer' or f.rs5k) and 1 or 0         -- RS5K: строка кнопок над волной
+        local wrows = math.min(f.rs5k and 6 or 5, nfit - need - srow)
         if wrows >= 2 then
           wtop_wh = wrows * L.rh
           wtop = wtop_wh + srow * L.rh + 3
@@ -5761,13 +5761,34 @@ function D.frame(L, snap, rows, state, info)
         pcol0 = 1
         local wx, wy = bx + L.pad, by + L.rh + 1
         local ww, wh = pw, bh - L.rh - 4
+        -- 10 окт: полосой сверху во всю ширину блока; над ней строка кнопок (режим, файлы, pitch)
+        if wtop > 0 then
+          pcol0 = 0
+          ww, wh = bw - 2 * L.pad, wtop_wh
+          local bxr = wx
+          local mode = f.rs5k_mode
+          local function rbtn(lbl, what, on)
+            local w2 = ms(lbl) + 2 * L.pad
+            if bxr + w2 > wx + ww then return end
+            local hot = not drag and mx >= bxr and mx < bxr + w2 and my >= wy and my < wy + L.rh
+            set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(bxr, wy, w2, L.rh - 1, 1)
+            set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(bxr, wy, w2, L.rh - 1, 0)
+            text(bxr + L.pad, wy, lbl, on and U.CYAN or (hot and U.AMBER or U.TEXT))
+            if hot then hover.rs5k = { fx = k, f = f, what = what } end
+            bxr = bxr + w2 + 2
+          end
+          rbtn('freely', 'mode0', mode == 0); rbtn('sample', 'mode1', mode == 1); rbtn('note', 'mode2', mode == 2)
+          bxr = bxr + L.pad
+          rbtn('browse', 'browse'); rbtn('item', 'item'); rbtn('list' .. ((f.rs5k_n or 0) > 1 and (' ' .. f.rs5k_n) or ''), 'list'); rbtn('detect pitch', 'detect')
+          wy = wy + L.rh
+        end
         local na = f.wave_a and vals[f.wave_a] and vals[f.wave_a].n or 0
         local nb = f.wave_b and vals[f.wave_b] and vals[f.wave_b].n or 1
         set(U.PANEL); gfx.rect(wx, wy, ww, wh, 1)
         set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
         local name = f.file and (f.file:match('[^/]+$') or f.file) or 'no sample - drop a file from the browser here'
         local th = L.rh
-        text(wx + 2, wy + 1, fit(name, ww - 4), f.file and U.GREY or U.DIM)
+        text(wx + 2, wy + 1, fit(name, (f.rs5k and math.floor(ww * 0.64) or ww) - 4), f.file and U.GREY or U.DIM)   -- 10 окт: справа — ADSR
         local gy, gh = wy + th + 1, wh - th - 2
         if f.file and gh > 4 and ww > 8 then
           local pk = info.file_peaks and info.file_peaks(f.file, ww)
@@ -5788,6 +5809,26 @@ function D.frame(L, snap, rows, state, info)
             set(U.AMBER); gfx.rect(lx, gy, 1, gh, 1)
             local tri = math.max(3, math.floor(L.rh / 3))
             gfx.triangle(lx, gy + tri, lx - tri, gy, lx + tri, gy)
+          end
+        end
+        -- 10 окт: ADSR поверх волны (правая треть): атака — подъём, спад до sustain, удержание, release
+        if f.rs5k and wh > 3 * L.rh then
+          local function pv(sub) for pi2, p2 in ipairs(f.params) do if p2.name == sub then return vals[pi2] end end end
+          local at, de, su, re = pv('attack'), pv('decay'), pv('sustain'), pv('release')
+          if at and de and su and re then
+            local ax0, aw0 = wx + math.floor(ww * 0.66), math.floor(ww * 0.33) - 2
+            local ay0, ah0 = wy + 3, wh - 6
+            local tA = (tonumber(at.s) or 1) / 1000; local tD = (tonumber(de.s) or 250) / 1000; local tR = (tonumber(re.s) or 1) / 1000
+            local sdb = tonumber(su.s) or 0
+            local sl = sdb <= -60 and 0 or math.min(1, 10 ^ (sdb / 20) / 2)   -- 0 dB — половина высоты (как в RS5K: sustain до +6)
+            local tot = math.max(1e-3, tA + tD + tR + 0.3)
+            local function X(t) return ax0 + math.floor(t / tot * aw0) end
+            local function Y(v) return ay0 + ah0 - math.floor(v * ah0) end
+            set(U.tint(U.BG, 0.5)); gfx.rect(ax0, ay0, aw0, ah0, 1)
+            set(U.GREEN)
+            local x1, x2, x3, x4 = X(tA), X(tA + tD), X(tA + tD + 0.3), X(tot)
+            gfx.line(ax0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), x4, Y(0))
+            text(ax0 + 2, ay0, fit(('A %s  D %s  S %s  R %s'):format(at.s, de.s, su.s, re.s), aw0 - 4), U.GREY)
           end
         end
         if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
@@ -5879,7 +5920,26 @@ function D.frame(L, snap, rows, state, info)
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
-        if vw > 4 and not steps_inline then text(vx, py, fit(v.s, vw), U.GREY) end
+        if vw > 4 and not steps_inline then
+          -- 10 окт: вид значения из реестра (RS5K): нота именем, root — нота оригинала, канал 0 — all
+          local vs = v.s
+          local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+          local function nname(n)
+            n = math.floor((n or 0) + 0.5)
+            local o = n // 12 - 1
+            local b = NN[n % 12 + 1]
+            if o < 0 then b = b:gsub('%-$', '') end          -- октава −1: «C-1», не «C--1»
+            return b .. o
+          end
+          if p.show == 'note' and tonumber(v.s) then vs = nname(tonumber(v.s))
+          elseif p.show == 'root' and tonumber(v.s) then
+            local lo = 0
+            for pi2, p2 in ipairs(f.params) do if p2.show == 'note' and p2.name == 'note lo' then lo = tonumber((vals[pi2] or {}).s) or 0 end end
+            vs = nname(lo - tonumber(v.s))                 -- нота оригинала; сдвиг — в статусе
+          elseif p.show == 'chan' then vs = (v.s == '0') and 'all' or v.s
+          elseif p.labels and #p.labels == 2 then vs = p.labels[(v.n >= 0.5) and 2 or 1] end
+          text(vx, py, fit(vs, vw), U.GREY)
+        end
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
@@ -5891,7 +5951,7 @@ function D.frame(L, snap, rows, state, info)
         ::next_param::
       end
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
-      if not drag and not hover.dsp and not hover.dspbtn and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
+      if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       bx = bx + bw + L.pad
       end
       ::next_block::
