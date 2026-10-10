@@ -3430,6 +3430,62 @@ ctx = {
     ctx.pane_do(function() return draw.panes.zoom(state.panes, id) end, state.panes.zoom == id and (id .. ' back in its pane') or (id .. ' zoomed - zz back'))
     return true
   end,
+  -- 10 окт: перенос вкладки мышью — куда упадёт: на ярлыки / в центр листа — в его стек,
+  -- в крайнюю четверть листа — сплитом с той стороны; на свой ярлык — порядок в стеке
+  tab_drop_at = function(id, mx, my)
+    local h = L.pn and draw.panes.hit(L.pn, mx, my, {})
+    local c = h and h.cell
+    if not c or not c.active_id then return nil end
+    local at = c.active_id
+    local mine = false
+    for _, t in ipairs(c.tabs or {}) do if t.id == id then mine = true end end
+    if h.kind == 'tab' or h.kind == 'tabbar' then
+      if mine then
+        local idx = #c.tabs
+        for i, t in ipairs(c.tabs) do if mx < t.x + t.w / 2 then idx = i; break end end
+        return { kind = 'order', at = at, index = idx, rect = { c.tab.x, c.tab.y, c.tab.w, c.tab.h } }
+      end
+      if at == 'tracker' then return nil end
+      return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
+    end
+    local fx, fy = (mx - c.x) / math.max(1, c.w), (my - c.y) / math.max(1, c.h)
+    local dir, d = nil, 0.25
+    if fx < d then dir = 'l' elseif fx > 1 - d then dir = 'r' elseif fy < d then dir = 'u' elseif fy > 1 - d then dir = 'd' end
+    if dir then
+      if mine and #c.tabs == 1 then return nil end            -- единственную вкладку рядом с собой — некуда
+      local r = { c.x, c.y, c.w, c.h }
+      if dir == 'l' then r[3] = math.floor(c.w / 2) elseif dir == 'r' then r[1] = c.x + math.floor(c.w / 2); r[3] = c.w - math.floor(c.w / 2)
+      elseif dir == 'u' then r[4] = math.floor(c.h / 2) else r[2] = c.y + math.floor(c.h / 2); r[4] = c.h - math.floor(c.h / 2) end
+      return { kind = 'split', at = at, dir = dir, rect = r }
+    end
+    if mine or at == 'tracker' then return nil end
+    return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
+  end,
+  tab_drop = function(id, t)
+    local PNm = draw.panes
+    if t.kind == 'stack' then
+      ctx.pane_do(function() return PNm.stack(state.panes, id, t.at) end, id .. ' → stack of ' .. t.at)
+    elseif t.kind == 'split' then
+      if t.at == id then
+        ctx.pane_do(function() return PNm.unstack(state.panes, id, t.dir) end, id .. ' out of the stack')
+      else
+        ctx.pane_do(function() return PNm.split(state.panes, t.at, id, t.dir, 0.5) end, id .. ' split beside ' .. t.at)
+      end
+    elseif t.kind == 'order' then
+      ctx.pane_do(function()
+        local lf = PNm.find(state.panes, id)
+        if not lf then return false end
+        local from
+        for k, pid in ipairs(lf.panes) do if pid == id then from = k end end
+        local to = math.max(1, math.min(#lf.panes, t.index))
+        if not from or from == to then return false end
+        table.remove(lf.panes, from); table.insert(lf.panes, to, id)
+        lf.active = to
+        state.panes.v = state.panes.v + 1
+        return true
+      end, state.tababc and 'tabs a-z is on - the order is alphabetical' or (id .. ' moved in the stack'))
+    end
+  end,
   pane_do = function(fn, msg)
     local before = draw.panes.encode(state.panes)
     if fn() then
@@ -12292,6 +12348,15 @@ local function frame()
   HN.draw(U, L)
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
+  if ctx.tab_drag and ctx.tab_drag.active then
+    local t = ctx.tab_drag.target
+    if t then
+      local r = t.rect
+      U.set(U.AMBER); gfx.a = 0.15; gfx.rect(r[1], r[2], r[3], r[4], 1); gfx.a = 1
+      gfx.rect(r[1], r[2], r[3], r[4], 0); gfx.rect(r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, 0)
+    end
+    draw.ghost(draw.ic and draw.ic(ctx.tab_drag.id, draw.panes.BY[ctx.tab_drag.id] and draw.panes.BY[ctx.tab_drag.id].label or ctx.tab_drag.id) or ctx.tab_drag.id)
+  end
   if fxb_drag and fxb_drag.active then draw.ghost('+ ' .. FB.short(fxb_drag.it.label)) end
   if ctx.ins_drag and ctx.ins_drag.active then   -- 9 окт: вставка на другой трек
     local d = ctx.ins_drag
@@ -12792,6 +12857,9 @@ local function frame()
       end
     else ctx.mx_rep = nil end
   end
+  if U.click and hover.ptab and hover.ptab.id and hover.ptab.id ~= 'tracker' and not ctx.tab_drag then
+    ctx.tab_drag = { id = hover.ptab.id, x0 = gfx.mouse_x, y0 = gfx.mouse_y }   -- 10 окт: перенос вкладки мышью (порог 8 px)
+  end
   -- панели (9 окт, бета): ручка между листами — протяжка (двойной щелчок —
   -- поровну); подпись стека — активная вкладка (focus_at ниже ставит фокус)
   if L.pn then
@@ -12803,6 +12871,19 @@ local function frame()
           draw.panes.drag_grip(state.panes, L.pn, pd.g, cur - pd.last); pd.last = cur; relayout()
         end
       else ctx.pn_drag = nil end
+    elseif ctx.tab_drag then
+      local td = ctx.tab_drag
+      if gfx.mouse_cap & 1 == 1 then
+        if not td.active and (math.abs(gfx.mouse_x - td.x0) > 8 or math.abs(gfx.mouse_y - td.y0) > 8) then td.active = true end
+        if td.active then
+          td.target = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y)
+          state.status = 'drag tab ' .. td.id .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
+            or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or 'nowhere - let go to cancel')
+        end
+      else
+        if td.active and td.target then ctx.tab_drop(td.id, td.target) end
+        ctx.tab_drag = nil
+      end
     elseif U.rclick and hover.ptab then
       -- ПКМ по подписи — скрыть панель (вернуть: Ctrl+W g + буква, кнопка, :pane … show)
       local id = hover.ptab.id
