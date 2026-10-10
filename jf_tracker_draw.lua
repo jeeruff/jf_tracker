@@ -3889,12 +3889,18 @@ function D.frame(L, snap, rows, state, info)
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
         local sx = c.x + L.pad
         -- 10 окт: у мастера по тонкому столбику громкости (LUFS) слева и справа от фейдера
-        local lufs_w = (c.master and col.track) and math.max(3, math.floor(L.cw / 2)) or 0
+        -- 10 окт: пропорции мастера — столбики LUFS втрое шире прежних, коробка
+        -- пиков в 2.5 раза уже прежней широкой; справа всегда место под эффекты
+        -- мастера (от 3 букв)
+        local lufs_w = (c.master and col.track) and 3 * math.max(3, math.floor(L.cw / 2)) or 0
         if lufs_w > 0 then sx = sx + lufs_w + 2 end
         -- 10 окт: мастер без эффектов — свёрнут в широкий фейдер (вся полоса;
         -- пики L R посередине, LUFS по краям, имя — в строке значения)
-        local mwide = lufs_w > 0 and reaper.ValidatePtr(col.track, 'MediaTrack*') and reaper.TrackFX_GetCount(col.track) == 0
-        if mwide then fx_w = math.max(fx_w, c.w - 2 * L.pad - 2 * (lufs_w + 2)) end
+        local mfx_need = 3 * ms('W') + 2 * L.pad + 4                 -- место эффектов мастера: 3 буквы
+        if lufs_w > 0 then
+          local room = c.w - 2 * L.pad - 2 * (lufs_w + 2)
+          fx_w = math.max(6, math.min(math.floor(room / 2.5), room - mfx_need))
+        end
         local sepx, sepc
         local colw = mixcol and (D.mcb_w + 2) or 0      -- столбик кнопок справа от фейдера
         if not c.master then
@@ -3913,13 +3919,16 @@ function D.frame(L, snap, rows, state, info)
         -- одна на всех треках: решает ширина трека, а она у треков своя —
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
-        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + lufs_w + 2 + L.pad + 2) >= 5 * L.cw
+        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + lufs_w + 2 + L.pad + 2) >= ((lufs_w > 0) and (mfx_need - 2 * L.pad) or 5 * L.cw)
         if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
         local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
-        if mwide and ms('master') + L.pad + ms(vtxt) <= fx_w then
-          text(sx, y1, 'master', U.AMBER); text(sx + fx_w - ms(vtxt), y1, vtxt, U.GREY)
+        if lufs_w > 0 then
+          -- мастер: имя слева и dB справа — строкой во всю полосу, эффекты под ней
+          local vw = ms(vtxt)
+          text(c.x + c.w - L.pad - vw, y1, vtxt, U.GREY)
+          text(c.x + L.pad, y1, fit('master', c.w - 3 * L.pad - vw), U.AMBER)
         elseif ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
         local pyy = y1 + L.rh
         -- 9 окт: узкий фейдер — панорама кнобом (две строки, тянуть вверх /
@@ -4107,8 +4116,11 @@ function D.frame(L, snap, rows, state, info)
             if sepx then
               local ly0 = L.mix_bottom and L.mix_y or (y1 - 1)               -- от горизонтали над микшером — встык
               set(sepc); gfx.rect(sepx, ly0, 1, (L.mix_bottom and L.mix_h or H + 1), 1)
-            else set(U.LINE); gfx.rect(ex - 2, ey, 1, eh, 1) end
-            if c.master then text(ex + 2, ey, fit('master', ew - 2), U.AMBER); ey, eh = ey + L.rh, eh - L.rh end   -- имя — над эффектами мастера
+            else local o = (c.master and lufs_w > 0) and L.rh or 0; set(U.LINE); gfx.rect(ex - 2, ey + o, 1, eh - o, 1) end   -- не через строку имени мастера
+            if c.master then
+              if lufs_w == 0 then text(ex + 2, ey, fit('master', ew - 2), U.AMBER) end
+              ey, eh = ey + L.rh, eh - L.rh                       -- строка имени (с LUFS — во всю полосу, выше)
+            end   -- имя — над эффектами мастера (с LUFS — строкой сверху)
           else
             ex, ey, ew, eh = c.x + 2, y1 + fh, c.w - 4, H - fh
             set(U.LINE); gfx.rect(ex, ey - 1, ew, 1, 1)
