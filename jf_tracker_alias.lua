@@ -339,7 +339,8 @@ end
 -- Возвращает число правок. Библиотека (=LIB) не трогается.
 -- Лайв (2 окт): один проход по items трека, регион item — бинарным поиском
 -- по отсортированным регионам (было регионы × треки × items × items).
-function A.trim(regions)
+-- only (10 окт) — набор items, которые можно резать (созданные / сдвинутые правкой); nil — все
+function A.trim(regions, only)
   local regs = {}
   for _, rg in ipairs(regions) do if not rg.lib then regs[#regs + 1] = rg end end
   if #regs == 0 then return 0 end
@@ -381,7 +382,7 @@ function A.trim(regions)
       local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
       list[#list + 1] = { it, pos, pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH') }
     end
-    for _, e in ipairs(list) do fix(e[1], e[2], e[3], 0) end
+    for _, e in ipairs(list) do if not only or only[e[1]] then fix(e[1], e[2], e[3], 0) end end
   end
   return n
 end

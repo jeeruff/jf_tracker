@@ -105,6 +105,19 @@ end
 -- E.after — хук после каждой правки, ВНУТРИ того же undo-блока (синхронизация
 -- алиасов паттернов, jf_tracker_alias.lua). Защита от рекурсии — E.in_after.
 E.after = nil
+-- items, которые текущая правка создала или изменила (позиция / длина); nil — неизвестно
+function E.changed_items()
+  if not E.pre_items then return nil end
+  local out = {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, ii)
+      if E.pre_items[it] ~= R.GetMediaItemInfo_Value(it, 'D_POSITION') .. ' ' .. R.GetMediaItemInfo_Value(it, 'D_LENGTH') then out[it] = true end
+    end
+  end
+  return out
+end
 
 -- ── страховка сэмплов (2 окт) ─────────────────────────────────────────────
 -- Инструменты трека живут в его items: удалил последний item с файлом —
@@ -180,6 +193,19 @@ local function run(desc, fn)
   if depth == 1 then
     E.rescued = nil
     rf_cache = {}
+    -- 10 окт: отпечаток items до правки — hard pattern edges режет только то, что
+    -- правка создала или сдвинула (живой тест: q резал чужой MIDI item через границу)
+    E.pre_items = nil
+    if R.CountTracks and R.CountTrackMediaItems then
+      E.pre_items = {}
+      for ti = 0, R.CountTracks(0) - 1 do
+        local tr = R.GetTrack(0, ti)
+        for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+          local it = R.GetTrackMediaItem(tr, ii)
+          E.pre_items[it] = R.GetMediaItemInfo_Value(it, 'D_POSITION') .. ' ' .. R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        end
+      end
+    end
     if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
   end
   R.Undo_BeginBlock2(0)
@@ -193,7 +219,7 @@ local function run(desc, fn)
   end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil; rf_cache = nil end
+  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()

@@ -180,9 +180,11 @@ def rewind(max_undo=40):
     """u, пока проект не совпадёт с базой (или вершина undo — «jf_tracker sandbox» / пусто)"""
     reset()
     base = Dump(open(BASE, encoding='utf-8').read().splitlines()) if os.path.exists(BASE) else None
+    stop = base.undo() if base else 'jf_tracker sandbox regions'
     for _ in range(max_undo):
         d = Dump(dump())
-        if (base and same(d, base)) or d.undo() in ('jf_tracker sandbox', 'nil', ''): return d
+        # никогда не глубже точки undo базы (10 окт: откат снёс регионы, потом всю песочницу)
+        if d.undo() == stop or d.undo() in ('jf_tracker sandbox', 'jf_tracker sandbox regions', 'nil', ''): return d
         keys('u')
     return Dump(dump())
 
@@ -201,6 +203,11 @@ def invariants(d, t, base=None):
             if base and cur != [l for l in base.track(name) if l.startswith('  ITEM')]: bad.append(name + ' track changed')
     t.ok('invariants', not bad, '; '.join(bad))
     return not bad
+
+
+def undo_one(before):
+    """u только если проект изменился с before (иначе u откатит чужую точку — регионы песочницы)"""
+    if not same(Dump(dump()), before): keys('u')
 
 
 def errors(since_size):
@@ -292,7 +299,7 @@ def insert_audio(t):
     after = Dump(dump())
     n1 = len(after.items('A drums'))
     t.ok('q inserted one item on A', n1 == n0 + 1, f'{n0} -> {n1}: ' + ' / '.join(after.items('A drums')))
-    keys('u')
+    undo_one(before)
     back = Dump(dump())
     t.ok('u removes it', len(back.items('A drums')) == n0, ' / '.join(back.items('A drums')))
 
@@ -314,12 +321,16 @@ def insert_midi(t):
     keys('<esc>')
     after = Dump(dump())
     nn1 = len(after.notes('M synth'))
-    t.ok('q added one MIDI note', nn1 == nn0 + 1, f'{nn0} -> {nn1}')
+    # q пишет ВЫБРАННЫЙ инструмент lib (в песочнице — amen, аудио); MIDI-нота — после выбора MIDI-инструмента
+    # (строка midi в lib) — сценарий 29 в LIVE_PLAN.md. Здесь: MIDI item цел, мусора нет
+    t.note(f'MIDI notes {nn0} -> {nn1} (q writes the selected lib instrument, here audio)')
+    midi = [l for l in after.items('M synth') if l.endswith('MIDI')]
+    t.ok('MIDI item intact (4.0 s)', midi and abs(Dump.num(after, midi[0], 'len') - 4.0) < 1e-3, ' / '.join(midi))
     new = [l for l in after.notes('M synth') if l not in before.notes('M synth')]
     t.note('new notes: ' + ' / '.join(new))
-    keys('u')
+    undo_one(before)
     back = Dump(dump())
-    t.ok('u removes the note', len(back.notes('M synth')) == nn0)
+    t.ok('u restores M', back.items('M synth') == before.items('M synth'))
 
 
 @scenario
@@ -332,7 +343,7 @@ def tracks(t):
     after = Dump(dump())
     t.ok('tt adds a track', len(after.tracks()) == len(before.tracks()) + 1, str(after.tracks()))
     t.ok('new track is after A', after.tracks()[1] not in ('B lanes',) if len(after.tracks()) > len(before.tracks()) else False, str(after.tracks()))
-    keys('u')
+    undo_one(before)
     back = Dump(dump())
     t.ok('u removes the track', back.tracks() == before.tracks(), str(back.tracks()))
 
@@ -347,7 +358,7 @@ def regions(t):
     t.note('after :add: ' + str(a))
     after = Dump(dump())
     t.ok(':add makes a region', len(after.regions()) == r0 + 1, ' / '.join(after.regions()))
-    keys('u')
+    undo_one(before)
     back = Dump(dump())
     t.ok('u removes it', len(back.regions()) == r0, ' / '.join(back.regions()))
 
@@ -359,15 +370,30 @@ def length(t):
     before = Dump(dump())
     amen = [l for l in before.items('A drums') if '"amen"' in l]
     t.ok('amen item present', len(amen) == 1, str(amen))
-    a = ack_fields(cmd('len 2'))
+    a = ack_fields(cmd('len 2'))        # :len — длина РЕГИОНА (паттерна), не события; на строке 0 трек A
     t.note('after :len 2 on row 0 (amen head): ' + str(a))
     after = Dump(dump())
     amen2 = [l for l in after.items('A drums') if '"amen"' in l]
     t.note('amen now: ' + str(amen2))
-    if amen2: t.ok('len changed to 2 rows (0.25 s)', abs(Dump.num(after, amen2[0], 'len') - 0.25) < 1e-3, amen2[0])
-    keys('u')
+    t.note('regions after :len 2: ' + ' / '.join(after.regions()))
+    undo_one(before)
     back = Dump(dump())
     t.ok('u restores length', [l for l in back.items('A drums') if '"amen"' in l] == amen)
+
+
+@scenario
+def hard_edges(t):
+    """10 окт, баг: q рядом с чужим item через границу регионов (M: 2–6 с через A|B) резал его до 4.0"""
+    reset(); track(3)
+    for _ in range(23): key(ord('j'))
+    before = Dump(dump())
+    keys('i'); keys('q'); keys('<esc>')
+    after = Dump(dump())
+    midi = [l for l in after.items('M synth') if l.endswith('MIDI')]
+    t.ok('foreign MIDI item keeps 4.0 s', midi and abs(Dump.num(after, midi[0], 'len') - 4.0) < 1e-3, ' / '.join(midi))
+    new = [l for l in after.items('M synth') if l not in before.items('M synth') and not l.endswith('MIDI')]
+    t.note('what q wrote on the MIDI track: ' + (' / '.join(new) or 'nothing'))
+    undo_one(before)
 
 
 @scenario
@@ -394,7 +420,7 @@ def delete_ops(t):
     t.note('after dw on row 0 of A: ' + str(a))
     after = Dump(dump())
     t.note('items A: %d -> %d' % (n0, len(after.items('A drums'))))
-    keys('u')
+    undo_one(before)
     back = Dump(dump())
     t.ok('dw removed one event', len(after.items('A drums')) == n0 - 1, '%d -> %d' % (n0, len(after.items('A drums'))))
     t.ok('u restores', len(back.items('A drums')) == n0)
@@ -458,14 +484,15 @@ if __name__ == '__main__':
     elif args[0] == 'run': run(list(SCEN) if args[1:] == ['all'] or not args[1:] else args[1:])
     elif args[0] == 'setup':
         # новая вкладка-песочница: 40859, sandbox_setup, регионы intro/A/B, база
-        action(40859); time.sleep(1.5)
+        if not (len(args) > 1 and args[1] == 'here'): action(40859); time.sleep(1.5)   # setup here — в текущей пустой вкладке
         for f in ('sandbox_setup.lua', 'sandbox_regions.lua'):
             setext('sandbox', ''); subprocess.Popen([REAPER, '-nonewinst', os.path.join(HERE, f)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             for _ in range(50):
                 time.sleep(0.1)
                 if get('sandbox'): break
             print(f, '->', get('sandbox'))
-        time.sleep(1); print('\n'.join(baseline().lines[:6]))
+        time.sleep(2.5)                      # трекер увидел проект и дописал свои маркеры =START / =END — база после них
+        print('\n'.join(baseline().lines[:8]))
     elif args[0] == 'base': print('\n'.join(baseline().lines[:3]) + '\n... base saved')
     elif args[0] == 'rewind': print(rewind().undo())
     elif args[0] == 'list': print(' '.join(SCEN))

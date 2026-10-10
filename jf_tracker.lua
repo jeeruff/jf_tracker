@@ -8437,14 +8437,14 @@ edit.after = function(desc)
   local hard = state.hardedges ~= false
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
-  if desc == 'add region' then if hard then model.invalidate(); alias.trim(model.regions(state.lpb)) end; return end
+  if desc == 'add region' then if hard then model.invalidate(); alias.trim(model.regions(state.lpb), edit.changed_items()) end; return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
   if state.autosync then
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if rg then alias.sync(regions, rg) end
   end
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
-  if hard then alias.trim(regions) end
+  if hard then alias.trim(regions, edit.changed_items()) end
 end
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
@@ -14935,7 +14935,7 @@ local function frame()
   end
   if ctx.inject_pending then
     reaper.SetExtState(EXT, 'inject_ack', ('%s ok %s %s%s row%d fi%d fld%s msg=%s'):format(ctx.inject_pending, vim.mode, state.focus,
-      state.focus == 'top' and (':' .. tostring(state.toptab)) or '', vim.cur.row, vim.cur.fi, tostring(vim.cur.field), tostring(vim.msg or ''):sub(1, 80)), false)
+      state.focus == 'top' and (':' .. tostring(state.toptab)) or '', vim.cur.row, vim.cur.fi, tostring(vim.cur.field) .. (vim.cur.sub and ('/' .. tostring(vim.cur.sub)) or ''), tostring(vim.msg or ''):sub(1, 80)), false)
     ctx.inject_pending = nil
   end
   inject_cap = nil
