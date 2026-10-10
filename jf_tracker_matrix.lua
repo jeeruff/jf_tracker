@@ -387,6 +387,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         else
           local bx = btn(ax0, ay, 'new', 'arrnew')
           bx = btn(bx, ay, 'dup', 'arrdup')
+          bx = btn(bx, ay, 'clear', 'arrclear')         -- 10 окт: пустой лист (новые пустые лейны)
           bx = btn(bx, ay, 'del', 'arrdel')
           if ctx.mx_launch_on then btn(bx, ay, 'clips', 'arrclips', ctx.mx_launch_on()) end
         end

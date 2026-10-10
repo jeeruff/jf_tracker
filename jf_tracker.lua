@@ -4022,6 +4022,48 @@ ctx = {
       save(cur + 1)
       -- 9 окт: без лейнов тоже создаётся (имя есть), но переключать нечего — подсказка
       vim.msg = show(cur + 1) .. (next(lanes) and '' or '  - no track has fixed lanes yet: an arrangement switches which lanes play (\\ r l: lanes on the cursor track)')
+    elseif what == 'clear' then
+      -- 10 окт: пустой лист — каждому треку (кроме LIB) новый пустой fixed lane,
+      -- играет только он; старое остаётся в прежних лейнах. Прежнее состояние
+      -- сохраняется аранжировкой «… before clear» (в ней новый лейн молчит),
+      -- если такого набора ещё нет в списке — к старому всегда можно вернуться
+      local before = AR.capture(reaper)               -- только треки, где лейнов > 1
+      local n, back = 0, {}
+      edit.run('clear arrangement', function()
+        for i = 0, reaper.CountTracks(0) - 1 do
+          local tr = reaper.GetTrack(0, i)
+          local _, tn = reaper.GetTrackName(tr)
+          if not model.is_lib_name(tn) then
+            if reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2 then reaper.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 2) end
+            local nl = math.max(1, math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES')))
+            local g = reaper.GetTrackGUID(tr)
+            local d = {}
+            for k = 1, nl do d[k] = (before[g] and before[g][k]) or (nl == 1 and 1 or 0) end
+            d[nl + 1] = 0; back[g] = d                      -- «до»: старые лейны как играли, новый молчит
+            reaper.SetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES', nl + 1)
+            reaper.SetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. nl, 1)          -- 1 — играет только он
+            for k = 0, nl - 1 do reaper.SetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. k, 0) end
+            n = n + 1
+          end
+        end
+      end)
+      reaper.UpdateArrange()
+      local key = AR.encode({ { name = 'x', lanes = before } })
+      local held = false
+      for i, a in ipairs(list) do if i ~= cur and next(a.lanes) and AR.encode({ { name = 'x', lanes = a.lanes } }) == key then held = true end end
+      local base = cur > 0 and list[cur].name or 'arr'
+      local c
+      if cur > 0 then
+        c = cur
+        if not held then table.insert(list, cur + 1, { name = AR.next_name(list, base .. ' before clear'), lanes = back }) end
+      else
+        list[#list + 1] = { name = AR.next_name(list, 'arr before clear'), lanes = back }
+        list[#list + 1] = { name = AR.next_name(list, 'arr'), lanes = {} }
+        c = #list
+      end
+      list[c].lanes = AR.capture(reaper)
+      save(c); model.invalidate()
+      vim.msg = ('arr cleared: %d tracks got an empty lane  (%s)%s'):format(n, show(c), (held and cur > 0) and '' or ('  - the old one: "' .. base .. ' before clear", < > switch'))
     elseif what == 'name' then
       if cur == 0 then vim.msg = 'arr: no current arrangement'; return end
       local nm = AR.clean(arg or '')
@@ -10540,6 +10582,11 @@ local function frame()
   if model.OFF_END ~= (state.offend or false) then model.OFF_END, edit.OFF_END = state.offend or false, state.offend or false; model.invalidate() end   -- OFF в конце строки (опция, 8 окт)
   if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
   theme_check()
+  do   -- 10 окт: есть аранжировки — в колонках только играющие лейны
+    local _, _, narr = ctx.arr_name()
+    local on = (narr or 0) > 0
+    if model.ARR_PLAYING_ONLY ~= on then model.ARR_PLAYING_ONLY = on; model.invalidate() end
+  end
   if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end
   if state.toptab == 'garden' and not state.dev then state.toptab = 'master' end   -- Orca — только .dev   -- вкладка grid выключена в опциях
   -- заметки: автозапись через секунду после правки; context следует за item под курсором
@@ -12977,6 +13024,11 @@ local function frame()
       elseif hover.matrix.btn == 'arrname' then ctx.arr_rename_prompt()
       elseif hover.matrix.btn == 'arrnew' then ctx.arr('new')
       elseif hover.matrix.btn == 'arrdup' then ctx.arr('dup')
+      elseif hover.matrix.btn == 'arrclear' then
+        OPT.ask.open('clear the arrangement?', 'every track gets a new empty lane that plays alone; the old lanes stay (kept as "... before clear")', {
+          { key = 'k', label = 'keep', fn = function() vim.msg = 'arrangement kept' end },
+          { key = 'c', label = 'clear', fn = function() ctx.arr('clear') end },
+        })
       elseif hover.matrix.btn == 'arrdel' then ctx.arr('del')
       elseif hover.matrix.btn == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
       click = { t = now2, zone = 'mxbtn' }

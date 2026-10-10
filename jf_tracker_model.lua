@@ -441,18 +441,27 @@ function M.build(lpb)
       end
       local nl = 1
       if fixed then nl = math.max(1, math.floor(R.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES'))) end
+      -- 10 окт: есть аранжировки (M.ARR_PLAYING_ONLY) — видны только играющие лейны
+      -- (аранжировка = какие лейны играют; clear — новый пустой лейн); список
+      -- плотный, номер лейна — lane.idx, items находят свой лейн по byidx
+      local byidx = {}
       for l = 0, nl - 1 do
         local lname = ''
         if fixed then
           local ok, s = R.GetSetMediaTrackInfo_String(tr, 'P_LANENAME:' .. l, '', false)
           if ok then lname = s end
         end
-        col.lanes[l + 1] = { idx = l, name = lname, subs = { {} }, items = {} }
+        local hide = fixed and M.ARR_PLAYING_ONLY and nl > 1 and R.GetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. l) == 0
+        if not hide then
+          local ln = { idx = l, name = lname, subs = { {} }, items = {} }
+          col.lanes[#col.lanes + 1] = ln; byidx[l] = ln
+        end
       end
+      if #col.lanes == 0 then local ln = { idx = 0, name = '', subs = { {} }, items = {} }; col.lanes[1] = ln; byidx[0] = ln end
       for ii = 0, R.CountTrackMediaItems(tr) - 1 do
         local it = R.GetTrackMediaItem(tr, ii)
         local lane_i = fixed and math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) or 0
-        local lane = col.lanes[lane_i + 1]
+        local lane = byidx[lane_i]
         -- items на невидимой lane (C_LANEPLAYS = -1) в колонки не попадают;
         -- items за маркером =END (склад сэмплов, =LIB) трекер не показывает (2 окт)
         if lane and snap.end_pos then

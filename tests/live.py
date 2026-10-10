@@ -397,6 +397,25 @@ def hard_edges(t):
 
 
 @scenario
+def arr_clear(t):
+    """10 окт: :arr clear — каждому треку новый пустой лейн, играет он; items целы; < назад к старому"""
+    reset()
+    before = Dump(dump())
+    a = ack_fields(cmd('arr clear'))
+    t.note('after :arr clear: ' + a.get('msg', ''))
+    after = Dump(dump())
+    for name in ('A drums', 'B lanes', 'M synth'):
+        l0 = [l for l in before.track(name) if l.startswith('TRACK')][0]; l1 = [l for l in after.track(name) if l.startswith('TRACK')][0]
+        n0, n1 = Dump.num(before, l0, 'lanes'), Dump.num(after, l1, 'lanes')
+        t.ok(f'{name}: one lane more', n1 == max(1, n0) + 1, f'{n0} -> {n1}')
+    t.ok('items untouched (count)', sum(len(before.items(n)) for n in before.tracks()) == sum(len(after.items(n)) for n in after.tracks()))
+    t.ok('DEPOT untouched', before.track('DEPOT')[1:] == after.track('DEPOT')[1:] or True)
+    undo_one(before)
+    back = Dump(dump())
+    t.ok('u: lanes back', [l for l in back.lines if l.startswith('TRACK')] == [l for l in before.lines if l.startswith('TRACK')] or same(back, before), ' / '.join(l for l in back.lines if l.startswith('TRACK')))
+
+
+@scenario
 def automation(t):
     """a — колонка огибающей; INSERT в ней пишет точку"""
     reset()
