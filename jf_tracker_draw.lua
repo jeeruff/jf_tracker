@@ -134,15 +134,15 @@ end
 -- 10 окт: больше терминальных моноширинных (все — Nerd Fonts, уже стоят у
 -- пользователя); D.TTF_LIST — порядок в опции font: пиксельные, потом векторные
 D.TTF_FACES = {
-  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12, d = 'BigBlueTerm+, pixel DOS' },   -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
-  bb437 = { face = 'BigBlueTerm437 Nerd Font Mono', px = 12, d = 'BigBlueTerm 437, pixel IBM PC code page' },
-  departure = { face = 'DepartureMono Nerd Font Mono', px = 11, d = 'Departure Mono, pixel' },
-  gohu11 = { face = 'GohuFont 11 Nerd Font Mono', px = 11, d = 'Gohu 11, pixel X11 terminal' },
-  gohu14 = { face = 'GohuFont 14 Nerd Font Mono', px = 14, d = 'Gohu 14, pixel X11 terminal' },
-  terminess = { face = 'Terminess Nerd Font Mono', px = 12, d = 'Terminus, the Linux console font' },
-  proggy = { face = 'ProggyClean Nerd Font Mono', px = 13, d = 'ProggyClean, pixel' },
-  profont = { face = 'ProFont IIx Nerd Font Mono', px = 12, d = 'ProFont, classic Mac terminal' },
-  ['3270'] = { face = '3270 Nerd Font Mono', px = 14, d = 'IBM 3270 terminal' },
+  bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12, d = 'BigBlueTerm+, pixel DOS, by VileR (int10h.org), bundled' },   -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
+  bb437 = { face = 'BigBlueTerm437 Nerd Font Mono', px = 12, d = 'BigBlueTerm 437, pixel IBM PC code page, by VileR (int10h.org), bundled' },
+  departure = { face = 'DepartureMono Nerd Font Mono', px = 11, d = 'Departure Mono, pixel, by Helena Zhang & Tobias Fried, bundled' },
+  gohu11 = { face = 'GohuFont 11 Nerd Font Mono', px = 11, d = 'Gohu 11, pixel X11 terminal, by Hugo Chargois, bundled' },
+  gohu14 = { face = 'GohuFont 14 Nerd Font Mono', px = 14, d = 'Gohu 14, pixel X11 terminal, by Hugo Chargois, bundled' },
+  terminess = { face = 'Terminess Nerd Font Mono', px = 12, d = 'Terminus, the Linux console font, by Dimitar Zhekov, bundled' },
+  proggy = { face = 'ProggyClean Nerd Font Mono', px = 13, d = 'ProggyClean, pixel, by Tristan Grimmer, bundled' },
+  profont = { face = 'ProFont IIx Nerd Font Mono', px = 12, d = 'ProFont, classic Mac terminal, bundled' },
+  ['3270'] = { face = '3270 Nerd Font Mono', px = 14, d = 'IBM 3270 terminal, by Ricardo Banffy, bundled' },
   shure = { face = 'ShureTechMono Nerd Font Mono', px = 14, d = 'Share Tech Mono, techy' },
   monocraft = { face = 'Monocraft', px = 12, d = 'Monocraft, Minecraft-like pixel' },
   iosevka = { face = 'IosevkaTerm Nerd Font Mono', px = 14, d = 'Iosevka Term, narrow vector, the most symbols' },        -- вектор, узкий, 7429 символов

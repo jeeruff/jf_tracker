@@ -3618,6 +3618,27 @@ ctx = {
       on_pick = function(it) ctx.lib_seps_put(gkey, it.v); vim.msg = 'separator: ' .. it.v .. '  (right click on it - change / remove)' end })
   end,
   lib_sep_remove = function(gkey) ctx.lib_seps_put(gkey, nil); vim.msg = 'separator removed' end,
+  -- 10 окт: пиксельные шрифты из fonts/ → ~/Library/Fonts (только копия файлов, без шелла)
+  fonts_install = function()
+    local home = os.getenv('HOME')
+    if not home or reaper.GetOS():match('^Win') then return 'fonts: on Windows double-click the files in ' .. DIR .. '/fonts (Install)' end
+    local dst, n, have, i = home .. '/Library/Fonts/', 0, 0, 0
+    while true do
+      local f = reaper.EnumerateFiles(DIR .. '/fonts', i); i = i + 1
+      if not f then break end
+      if f:match('%.[ot]tf$') then
+        local ex = io.open(dst .. f, 'rb')
+        if ex then ex:close(); have = have + 1
+        else
+          local src = io.open(DIR .. '/fonts/' .. f, 'rb')
+          local data = src and src:read('a'); if src then src:close() end
+          local out = data and io.open(dst .. f, 'wb')
+          if out then out:write(data); out:close(); n = n + 1 end
+        end
+      end
+    end
+    return ('fonts: %d installed, %d were there already  (authors, licences - fonts/README.md; not in the list yet - restart REAPER)'):format(n, have)
+  end,
   -- :font (10 окт): шрифт трекера по имени / next / prev / off
   font_set = function(arg)
     arg = (arg or ''):match('^%s*(.-)%s*$')
@@ -6876,6 +6897,7 @@ ctx = {
       { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
       { sep = true, title = 'look' },
       { label = 'own font', kind = 'action', value = (state.ttfcustom or '') ~= '' and (state.ttfcustom .. ' ' .. (state.ttfpx or 14)) or 'none', desc = 'any installed font by its family name (as in Font Book), optional size in px at the end: Enter opens :font - type e.g. Menlo 13; it becomes "custom" in the font list', fn = function() OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'font ' .. (state.ttfcustom or '') end },
+      { label = 'install bundled fonts', kind = 'action', value = 'fonts/', desc = 'copies the pixel fonts that come with the tracker (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270) into your user fonts folder; authors and licences - fonts/README.md. A font not shown yet - restart REAPER', fn = function() vim.msg = ctx.fonts_install() end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },

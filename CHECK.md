@@ -355,3 +355,5 @@
 - options → own font → Enter: открывается `:font …`; набрать `Menlo 13` → трекер в Menlo 13px, в списке font появился `custom`
 - `:font Имя` с несуществующим именем — macOS подставит запасной шрифт, сообщение об этом
 - перезапуск трекера — свой шрифт сохранился
+- options → look → install bundled fonts: сообщение «0 installed, 9 were there already» (у тебя уже стоят); на чистом Mac — копирует 9 файлов в ~/Library/Fonts
+- в описании пиксельных шрифтов (font) видны авторы, fonts/README.md — таблица авторов и лицензий
