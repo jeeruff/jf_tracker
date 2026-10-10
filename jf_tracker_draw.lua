@@ -2217,9 +2217,13 @@ local function draw_ctrl(L, info, H, hover)
       if i > fitn or (i == fitn and n > fitn) then text(x + 2, y + 1, '+' .. (n - i + 1), U.CYAN); break end
       local w2 = (i == fitn) and (L.pad + tw - x) or bw
       local hot = mx >= x and mx < x + w2 - 2 and my >= y and my < y + L.rh
-      set(t.on and U.tint(U.AMBER, 0.3) or (hot and D.CURROW or U.PANEL)); gfx.rect(x, y, w2 - 2, L.rh, 1)
-      set(t.on and U.AMBER or (hot and U.AMBER or U.LINE)); gfx.rect(x, y, w2 - 2, L.rh, 0)
-      text(x + 3, y + 1, fit((t.dirty and '*' or '') .. t.name, w2 - 8), (t.on or hot) and U.AMBER or U.GREY)
+      -- 10 окт: вкладки, а не кнопки — как ярлыки стека панелей: |a|b|c| на общей линии,
+      -- активная подсвечена и «открыта» книзу, у неактивных — только разделители
+      if i == 1 then set(U.LINE); gfx.rect(L.pad, y + L.rh, tw, 1, 1) end
+      set(t.on and U.tint(U.AMBER, 0.30) or (hot and D.CURROW or U.PANEL)); gfx.rect(x, y, w2 - 1, L.rh, 1)
+      set(t.on and U.AMBER or U.LINE); gfx.rect(x, y, 1, L.rh, 1); gfx.rect(x + w2 - 2, y, 1, L.rh, 1)
+      if t.on then gfx.rect(x, y, w2 - 1, 1, 1); set(U.tint(U.AMBER, 0.30)); gfx.rect(x + 1, y + L.rh, w2 - 3, 1, 1) end
+      text(x + 4, y + 1, fit((t.dirty and '*' or '') .. t.name, w2 - 8), t.on and U.AMBER or (hot and U.TEXT or U.GREY))
       if hot then hover.ctrl = 'ptab:' .. (i - 1) end
       hint('ctrl', x, y, w2 - 2, L.rh, 'ptab:' .. (i - 1))
       x = x + w2
