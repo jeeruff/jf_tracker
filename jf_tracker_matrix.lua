@@ -245,7 +245,6 @@ function MX.width(L, nregions, ncols)
   local bw = L.pad
   for _, b in ipairs(btns()) do
     local label = b[2]
-    if b[1] == 'fill' then label = 'grid' end
     if ctx and ctx.ic then label = ctx.ic(b[1], label) end
     bw = bw + U.measure(label) + 2 * L.pad + L.pad
   end
@@ -299,13 +298,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   local bx = L.pad
   for _, b in ipairs(btns()) do
     local label = b[2]
-    if b[1] == 'fill' then label = MX.fill and 'fill' or 'grid' end
     if ctx.ic then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fill' and MX.fill) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad

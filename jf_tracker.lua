@@ -4015,7 +4015,15 @@ ctx = {
     end
     local function show(c) return ('arr %d/%d: %s'):format(c, #list, list[c].name) end
     if cur > 0 then list[cur].lanes = AR.capture(reaper) end        -- текущая = то, что играет сейчас
-    if what == 'new' or what == 'dup' then
+    if what == 'new' then
+      -- 10 окт: new — ПУСТАЯ аранжировка (иначе то же, что dup): старое состояние
+      -- остаётся текущей аранжировкой (нет ни одной — clear сохранит его как «… before clear»),
+      -- новая встаёт за ней и сразу очищается — каждому треку пустой лейн
+      local nm = AR.next_name(list, (arg and arg ~= '') and arg or (cur > 0 and list[cur].name or 'arr'))
+      table.insert(list, cur + 1, { name = nm, lanes = cur > 0 and AR.copy(list[cur].lanes) or {} })
+      save(cur + 1)
+      return ctx.arr('clear')
+    elseif what == 'dup' then
       local base = (what == 'dup' and cur > 0) and list[cur].name or ((arg and arg ~= '') and arg or 'arr')
       if what == 'new' and arg and arg ~= '' then base = arg end
       local lanes = AR.capture(reaper)
@@ -8298,7 +8306,7 @@ ctx = {
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           -- 9 окт: a — аранжировки (наборы играющих лейнов); about — \ A
           { key = 'a', label = 'arrangement' .. (ctx.arr_name() and (': ' .. ctx.arr_name()) or '') .. ' …', sub = function() return { title = 'arrangement', items = {
-              { key = 'n', label = 'new, from the lanes that play now (r renames)', fn = function() ctx.arr('new') end },
+              { key = 'n', label = 'new, empty: every track gets an empty lane (r renames)', fn = function() ctx.arr('new') end },
               { key = 'r', label = 'rename the current one', fn = function() ctx.arr_rename_prompt() end },
               { key = 'y', label = 'duplicate the current one', fn = function() ctx.arr('dup') end },
               { key = 'd', label = 'delete the current one (asks; lanes stay)', fn = function() ctx.arr('del') end },
