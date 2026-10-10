@@ -158,6 +158,7 @@ local function vpos(fi, fld)
   return 1
 end
 function V.last_field(fi) local o = vorder(fi); return o[#o] end
+V.vorder = vorder                    -- 10 окт: линейка прыжков по ячейкам (порядок полей, как ходит l)
 
 -- шаг по полям: через границу подколонки
 local function step_field(dir, n)
@@ -1258,10 +1259,15 @@ function V.key_impl(c)
     V.count = nil; return
   end
   local hk = HJKL[c]
-  -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора,
-  -- Shift+Opt+J — все треки
-  if mods.alt and (mods.ctrl or mods.shift) and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
-    if ctx.repeat_pattern then ctx.repeat_pattern(mods.shift and not mods.ctrl) end
+  -- 10 окт: Shift+Opt+J / K — транспоз выбранного инструмента −1 / +1 полутон (счётчик — на N)
+  if mods.alt and mods.shift and not mods.ctrl and not mods.cmd and (hk == 'j' or hk == 'k' or c == DOWN or c == UP) and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if ctx.inst_transpose then ctx.inst_transpose(((hk == 'k' or c == UP) and 1 or -1) * n) end
+    V.count = nil; return
+  end
+  -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора;
+  -- все треки — :repeat all (Shift+Opt+J с 10 окт — транспоз)
+  if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if ctx.repeat_pattern then ctx.repeat_pattern(false) end
     V.count = nil; return
   end
   if hk and (mods.ctrl or mods.alt or mods.cmd) and V.mode ~= 'cmd' and V.mode ~= 'search' then

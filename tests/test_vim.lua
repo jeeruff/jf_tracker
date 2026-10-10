@@ -152,6 +152,7 @@ local function reset()
     insert_note_cmd = function(p, r) calls[#calls + 1] = ('notecmd:%d:%s'):format(p, tostring(r)) end,
     insert_slice_cmd = function(k, r, sm) calls[#calls + 1] = ('slcmd:%d:%s:%s'):format(k, tostring(r), tostring(sm)) end,
     repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
+    inst_transpose = function(d) calls[#calls + 1] = 'transpose:' .. d end,   -- 10 окт: Shift+Opt+J / K
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     envfmt = function() return TEST_ENVFMT or 'midi' end,
@@ -635,7 +636,7 @@ alt_down = false
 reset()
 ctrl_down, alt_down = true, true; V.key(10); eq('Ctrl+Opt+J repeats on the track', last(), 'repeat:track')
 V.key(1685026670); eq('Ctrl+Opt+Down too', last(), 'repeat:track')
-ctrl_down, shift_down = false, true; V.key(8710); eq('Shift+Opt+J repeats on all tracks', last(), 'repeat:all')
+ctrl_down, shift_down = false, true; V.key(8710); eq('Shift+Opt+J transposes the instrument down', last(), 'transpose:-1')   -- 10 окт: было repeat all (теперь :repeat all)
 alt_down, shift_down = false, false
 -- слайс = нота (4 окт): обычная MIDI-клавиатура, C-4 = слайс 1
 reset()

@@ -6651,6 +6651,15 @@ ctx = {
   end,
   -- панель item (2 окт) правит ИНСТРУМЕНТ (3 окт): все его копии, см. edit.inst_prop
   playthru_of = function(e) return e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.playthru(e.item) or false end,
+  -- 10 окт: Shift+Opt+J / K — транспоз инструмента, выбранного в lib (слайс — его исходник)
+  inst_transpose = function(d)
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if e and e.parent then e = e.parent end
+    if not (e and e.item) then vim.msg = 'transpose: pick a sample in the lib'; return end
+    ctx.sp_adjust(e, 'st', d)
+    local p = reaper.ValidatePtr(e.take, 'MediaItem_Take*') and reaper.GetMediaItemTakeInfo_Value(e.take, 'D_PITCH') or 0
+    vim.msg = ('%s: transpose %+d st  (Shift+Opt+J / K)'):format(e.name or 'instrument', math.floor(p + 0.5))
+  end,
   sp_adjust = function(e, k, d)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
@@ -11327,6 +11336,7 @@ local function frame()
       return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) }
     end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
+    vorder = vim.vorder,                            -- 10 окт: линейка прыжков по ячейкам
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),

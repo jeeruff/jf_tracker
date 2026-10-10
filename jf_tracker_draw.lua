@@ -4444,18 +4444,36 @@ function D.frame(L, snap, rows, state, info)
   -- Vim по горизонтали: у каждого трека — сколько до него от курсора (3L / 3H
   -- прыгают туда), у трека курсора — его номер янтарём
   if (L.jr_h or 0) > 0 then
-    local jy = L.body_y - L.jr_h                       -- между клипами и строками (просьба 9 окт)
+    -- 10 окт: линейка прыжков ПО ЯЧЕЙКАМ — над каждой ячейкой, куда встаёт l / h,
+    -- сколько нажатий до неё (как 3l / 2h; голубые — слева); ячейка курсора — пусто.
+    -- Порядок — как ходит l (info.vorder = vim.vorder); подполе инструмента не считается (Nl его пропускает)
+    local jy = L.body_y - L.jr_h
     set(U.PANEL); gfx.rect(tx0, jy, W - tx0, L.jr_h, 1)
-    local cci = info.cur_ci
-    for _, c in ipairs(L.cols or {}) do
-      if c.x and c.ci and not c.master then
-        local d = cci and (c.ci - cci) or nil
-        local lab = (d == 0 or not d) and tostring(c.ci) or tostring(math.abs(d))
-        local col2 = (d == 0) and U.AMBER or (d and d < 0 and U.CYAN or U.GREY)
-        -- 10 окт: без букв H / L — просто число, сторона видна цветом (голубой — слева)
-        if ms(lab) <= c.w - 2 then text(c.x + math.floor((c.w - ms(lab)) / 2), jy, lab, col2) end
-        set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1)
+    local vc, vo = info.vcur, info.vorder
+    if vc and vo and L.flat then
+      local idx, cur_i = 0, nil
+      local pos = {}
+      for fi, f in ipairs(L.flat) do
+        for _, fld in ipairs(vo(fi)) do
+          idx = idx + 1
+          if fi == vc.fi and fld == (vc.field or 1) then cur_i = idx end
+          if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld } end
+        end
       end
+      for _, p in ipairs(pos) do
+        local d = cur_i and (p.i - cur_i) or nil
+        if d and d ~= 0 then
+          local fx, fw = D.field_rect(p.f.G or L, p.fld)
+          local cx = p.f.x + (fx or 0)
+          local lab = tostring(math.abs(d))
+          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W then
+            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d < 0 and U.CYAN or U.GREY)
+          end
+        end
+      end
+    end
+    for _, c in ipairs(L.cols or {}) do
+      if c.x and c.ci and not c.master then set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1) end
     end
   end
   if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end   -- от левого края модуля: и над мастером
