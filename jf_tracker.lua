@@ -12583,7 +12583,7 @@ local function frame()
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
     elseif hover.mixpk then
-      if reaper.ValidatePtr(hover.mixpk, 'MediaTrack*') then reaper.Track_GetPeakHoldDB(hover.mixpk, 0, true); reaper.Track_GetPeakHoldDB(hover.mixpk, 1, true) end
+      if reaper.ValidatePtr(hover.mixpk, 'MediaTrack*') then for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(hover.mixpk, ch, true) end end
       click = { t = now2, zone = 'mixpk' }   -- сброс макс. пика / клипа — нативный, как щелчок в микшере REAPER
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)

@@ -3836,6 +3836,7 @@ function D.frame(L, snap, rows, state, info)
         -- эффекты с параметрами — сбоку (если влезают) / под фейдером
         local y1 = L.mix_bottom and (L.mix_y + 3 + (L.route_h or 0)) or (hy + 2 * L.rh + 1)
         local H = L.mix_rows * L.rh
+        if c.master then D.lufs_row_y = nil end
         if L.mix_bottom then
           hset(rbg); gfx.rect(c.x + 1, L.mix_y, c.w - 1, L.mix_h, 1)
           set(D.SEP); gfx.rect(c.x, L.mix_y, c.w + 1, D.SEPW, 1)
@@ -3849,8 +3850,9 @@ function D.frame(L, snap, rows, state, info)
           if state.hdrin ~= false and not c.master then H = H - L.rh; mixin_y = y1 + H end   -- вход — над именем, под эффектами
           -- 9 окт: мастер — кнопка routing внизу полосы (аппаратные выходы, окно)
           if c.master and col.track then
-            H = H - L.rh
-            local ry, rx, rw = y1 + H, c.x + L.pad, math.min(c.w - 2 * L.pad, ms('routing') + 2 * L.pad)
+            H = H - 2 * L.rh                              -- 10 окт: строка среднего LUFS над routing
+            D.lufs_row_y = y1 + H
+            local ry, rx, rw = y1 + H + L.rh, c.x + L.pad, math.min(c.w - 2 * L.pad, ms('routing') + 2 * L.pad)
             local hw = reaper.GetTrackNumSends(col.track, 1) > 0
             local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
             set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry + 1, rw, L.rh - 2, 1)
@@ -3886,6 +3888,13 @@ function D.frame(L, snap, rows, state, info)
         -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
         local sx = c.x + L.pad
+        -- 10 окт: у мастера по тонкому столбику громкости (LUFS) слева и справа от фейдера
+        local lufs_w = (c.master and col.track) and math.max(3, math.floor(L.cw / 2)) or 0
+        if lufs_w > 0 then sx = sx + lufs_w + 2 end
+        -- 10 окт: мастер без эффектов — свёрнут в широкий фейдер (вся полоса;
+        -- пики L R посередине, LUFS по краям, имя — в строке значения)
+        local mwide = lufs_w > 0 and reaper.ValidatePtr(col.track, 'MediaTrack*') and reaper.TrackFX_GetCount(col.track) == 0
+        if mwide then fx_w = math.max(fx_w, c.w - 2 * L.pad - 2 * (lufs_w + 2)) end
         local sepx, sepc
         local colw = mixcol and (D.mcb_w + 2) or 0      -- столбик кнопок справа от фейдера
         if not c.master then
@@ -3904,12 +3913,14 @@ function D.frame(L, snap, rows, state, info)
         -- одна на всех треках: решает ширина трека, а она у треков своя —
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
-        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + L.pad + 2) >= 5 * L.cw
+        local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + lufs_w + 2 + L.pad + 2) >= 5 * L.cw
         if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
         local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
-        if ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
+        if mwide and ms('master') + L.pad + ms(vtxt) <= fx_w then
+          text(sx, y1, 'master', U.AMBER); text(sx + fx_w - ms(vtxt), y1, vtxt, U.GREY)
+        elseif ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
         local pyy = y1 + L.rh
         -- 9 окт: узкий фейдер — панорама кнобом (две строки, тянуть вверх /
         -- вниз, Shift мелко); big fader — слайдерами, как было
@@ -4034,6 +4045,38 @@ function D.frame(L, snap, rows, state, info)
             end
           end
         end
+        -- 10 окт: громкость мастера — нативная (Track_GetPeakInfo 1024 / 1025,
+        -- как VU мастера REAPER в режиме loudness): тонкие столбики по бокам
+        -- коробки в той же шкале, риска — удержание REAPER (сброс — щелчок по
+        -- числу пика). Среднее — строкой над routing: энергия momentary за
+        -- время воспроизведения (гейт -70), с нового старта — заново
+        if lufs_w > 0 and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+          for k2, ch in ipairs({ 1024, 1025 }) do
+            local v = reaper.Track_GetPeakInfo(col.track, ch)
+            local ldb = v > 1e-6 and 20 * math.log(v, 10) or -150
+            local hdb = reaper.Track_GetPeakHoldDB(col.track, ch, false) * 100
+            local lx0 = k2 == 1 and (bx0 - 2 - lufs_w) or (bx0 + bw0 + 2)
+            set(dark); gfx.rect(lx0, ty0 - 6, lufs_w, th + 9, 1)
+            if ldb > -60 then local ya = ypos(math.min(ldb, 12)); set(U.CYAN); gfx.rect(lx0, ya, lufs_w, ty0 + th - ya, 1) end
+            if hdb > -60 then set(U.TEXT); gfx.rect(lx0, ypos(math.min(hdb, 12)), lufs_w, 1, 1) end
+            if k2 == 1 then
+              local li = D.lufs_int or { e = 0, n = 0 }
+              D.lufs_int = li
+              local playing = reaper.GetPlayState() & 1 == 1
+              if playing and not li.was then li.e, li.n = 0, 0 end
+              li.was = playing
+              if playing and ldb > -70 then li.e = li.e + 10 ^ (ldb / 10); li.n = li.n + 1 end
+            end
+          end
+          local li = D.lufs_int
+          if D.lufs_row_y and li and li.n > 0 then
+            local lt = ('%.1f LUFS'):format(10 * math.log(li.e / li.n, 10))
+            if ms(lt) > c.w - 2 * L.pad then lt = ('%.1f'):format(10 * math.log(li.e / li.n, 10)) end
+            if ms(lt) <= c.w - 2 * L.pad then text(c.x + L.pad, D.lufs_row_y, lt, U.CYAN) end
+          elseif D.lufs_row_y and ms('-- LUFS') <= c.w - 2 * L.pad then
+            text(c.x + L.pad, D.lufs_row_y, '-- LUFS', U.GREY)        -- среднее появится при воспроизведении
+          end
+        end
         -- ручка [-]: колпачок в рамке поверх метра, риска посередине — уровень
         local hy2 = ypos(db)
         local chh = math.max(5, math.floor(L.rh * 0.6)) | 1
@@ -4049,15 +4092,15 @@ function D.frame(L, snap, rows, state, info)
           for k = 1, 6 do
             local b = labels[k]
             if b[4] == 'auto' and ms('trim') + 4 > D.mcb_w then b = { 'A', b[2], b[3], b[4] } end   -- узко — буквой
-            hbtn(b, sx + fx_w + 2, y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
+            hbtn(b, sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
           end
           local sc = D.sro_col
-          if sc then sc.draw(sx + fx_w + 2, y1 + 6 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
+          if sc then sc.draw(sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + 6 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
         end
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
         if info.fx_stack and (side or not c.master) then
-          local sx1 = sepx and (sepx + 2) or (sx + fx_w + colw + L.pad + 2)
+          local sx1 = sepx and (sepx + 2) or (sx + fx_w + colw + lufs_w + L.pad + 2)
           local ex, ey, ew, eh
           if side then
             ex, ey, ew, eh = sx1, y1, c.x + c.w - 2 - sx1, H
