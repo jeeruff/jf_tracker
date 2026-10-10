@@ -731,6 +731,13 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- S.wave = прямоугольник волны и длина — main считает долю и правит item
   S.zone_hot = nil
   S.wave = { x = x, y = wy, w = w, h = wh, len = len, va = va, vb = vb }
+  -- 10 окт: тянешь линию слайса — край зоны выделенного слайса идёт за ней сразу (не после отпускания)
+  if zone and S.drag and S.drag.kind == 'slice' and S.drag.t0 and S.slices[S.drag.k] then
+    local nt = S.slices[S.drag.k]
+    zone = { zone[1], zone[2], zone[3] }
+    if math.abs(zone[1] - S.drag.t0) < 1e-6 then zone[1] = nt end
+    if math.abs(zone[2] - S.drag.t0) < 1e-6 then zone[2] = nt end
+  end
   if zone then
     local za, zb = math.max(0, math.min(len, zone[1])), math.max(0, math.min(len, zone[2]))
     local px0, px1 = math.max(x, math.min(x + w, tx(za))), math.max(x, math.min(x + w, tx(zb)))
@@ -762,10 +769,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
     -- MIDI-нота слайса (4 окт) — справа от треугольника начала (C4, C#4 …)
-    if ctx.slice_note and zone[3] then
-      local nn = ctx.slice_note(zone)
-      if nn and px0 + 10 + U.measure(nn) < px1 then U.text(px0 + 10, TY - 1, nn, U.AMBER) end
-    end
+    -- 10 окт: нота зоны сверху убрана — у каждой линии слайса своя нота внизу
     S.zone_px0 = px0
     -- полоса переноса всей зоны
     local mhot = S.zone_hot == 'move' or dragging == 'move'
@@ -823,22 +827,25 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if hot then hover_slice = k end
     local onkey = key_of[k] ~= nil
     U.set(hot and U.TEXT or (onkey and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
-    -- 10 окт: подпись в три строки — номер слайса (как в списке, 01 … 0E), клавиша,
-    -- нота MIDI, которую он играет; у выделенного тоже (раньше номер пропадал)
+    -- 10 окт: номер — сверху слева; нота MIDI — внизу слева; клавиша — над нотой,
+    -- только с включённой клавиатурой; у выделенного слайса — на тех же местах
     local base = (ctx and ctx.slice_base and ctx.slice_base()) or 61
     local p = base + k - 1
     local NM = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
-    local rows3 = { ('%02X'):format(k), key_of[k] or '', (p >= 0 and p <= 127) and (NM[p % 12 + 1] .. (p // 12 - 1)) or '' }
-    local zy = (zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3) and rh or 0   -- там подпись ноты зоны — ниже неё
-    local lw = 0
-    for _, s3 in ipairs(rows3) do if s3 ~= '' then lw = math.max(lw, U.measure(s3)) end end
+    local num = ('%02X'):format(k)
+    local note = (p >= 0 and p <= 127) and (NM[p % 12 + 1] .. (p // 12 - 1)) or ''
+    local keyl = (ctx and ctx.piano_on and ctx.piano_on()) and (key_of[k] or '') or ''
+    local lw = math.max(U.measure(num), U.measure(note), keyl ~= '' and U.measure(keyl) or 0)
+    local edge = zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3
+    local lx = px + (edge and 9 or 3)                    -- у края зоны — правее треугольника
     local nx = slices[k + 1] and math.min(x + w, tx(slices[k + 1])) or (x + w)
-    if px + 3 + lw <= nx - 1 and px + 3 >= lab_end + 2 and wh >= 4 * rh then
+    if lx + lw <= nx - 1 and lx >= lab_end + 2 and wh >= 3 * rh + 8 then
       local cc = hot and U.TEXT or (onkey and U.AMBER or U.CYAN)
-      for i3, s3 in ipairs(rows3) do
-        if s3 ~= '' then U.text(px + 3, wy + 1 + zy + (i3 - 1) * rh, s3, i3 == 3 and (hot and U.TEXT or U.GREY) or cc) end
-      end
-      lab_end = px + 3 + lw
+      U.text(lx, wy + 1, num, cc)
+      local by = wy + wh - rh - 7                        -- над полосой переноса зоны
+      U.text(lx, by, note, hot and U.TEXT or U.GREY)
+      if keyl ~= '' then U.text(lx, by - rh, keyl, cc) end
+      lab_end = lx + lw
     end
     ::next_slice::
   end
