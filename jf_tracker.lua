@@ -180,7 +180,8 @@ local state = {
   mixpos = reaper.GetExtState(EXT, 'mixpos') == 'bottom' and 'bottom' or 'top',   -- микшер над / под трекером (кнопки v ^, 8 окт)
   ptabs = flag('ptabs', true),                    -- строка вкладок проектов над главным модулем (8 окт)
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
-  phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 4,
+  phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
+  beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
   bigcur = flag('bigcur', false),                 -- fixed cursor: строка курсора лупой ×2 (8 окт)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
@@ -564,7 +565,7 @@ local function save_win()
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
-  S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 4)); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
+  S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
@@ -6978,8 +6979,9 @@ ctx = {
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
+      flag('beacon', 'cursor beacon', 'a jump of the tracker cursor (G gg, Ctrl+O, f-labels, a far track, the search) flashes a bar at its new place that shrinks to the cursor in half a second, as beacon-mode in Emacs - the eye finds where it landed'),
       flag('bigcur', 'big fixed cursor', 'with the fixed cursor (centre) its row is drawn twice as big: two rows high, half the width around the cursor field; the rows below move one row down. Off while f-hints are shown'),
-      { key = 'phtail', label = 'playhead tail', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, a gradient of the playhead colour (0 - just the row)', get = function() return state.phtail or 4 end, set = function(v) state.phtail = v end },
+      { key = 'phtail', label = 'playhead shade', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, a gradient of the playhead colour (0, default - the playhead is a plain row, like the cursor)', get = function() return state.phtail or 0 end, set = function(v) state.phtail = v end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
       flag('pianokeys', 'keys', 'the keyboard under the tracker (which key plays which note) even with hints off'),
@@ -7056,7 +7058,7 @@ ctx = {
     local SECT = {
       { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'statpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
-      { 'cursor and editing', { 'jumps', 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'jumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
@@ -11849,6 +11851,29 @@ local function frame()
     end
   elseif not pop then ctx.pop_seen, ctx.pop_xy = nil, nil end
   draw.popup(L, pop, anchor)
+  -- beacon (10 окт, как beacon-mode в Emacs): курсор трекера перелетел далеко —
+  -- на новом месте полоса во всю ширину до правого края тела, за 0.5 с стягивается
+  -- к курсору и гаснет. Только в теле трекера (границы модуля)
+  if state.beacon and L and L.flat and rows and rows[1] then
+    local b, cur = ctx.beacon, { fi = vim.cur.fi, row = vim.cur.row }
+    local last = ctx.beacon_last
+    if last and (math.abs(cur.row - last.row) >= 8 or math.abs(cur.fi - last.fi) >= 3) then
+      ctx.beacon = { t = reaper.time_precise() }; b = ctx.beacon
+    end
+    ctx.beacon_last = cur
+    if b then
+      local k = (reaper.time_precise() - b.t) / 0.5
+      local f = L.flat[vim.cur.fi]
+      local r = vim.cur.row - rows[1].row
+      if k >= 1 or not (f and f.x) or r < 0 or r >= (L.nrows or 0) then ctx.beacon = nil
+      else
+        local x0, x1 = math.max(L.matrix_w or 0, f.x), (L.win_w or gfx.w)
+        local y = L.body_y + r * L.rh
+        local w = math.floor((x1 - x0) * (1 - k) ^ 2)
+        U.set(U.AMBER, 0.55 * (1 - k)); gfx.rect(x0, y, math.max(f.w or L.cw, w), L.rh, 1)
+      end
+    end
+  end
   -- смарт-панель (9 окт): у ячейки курсора (под ней, не влезает — над ней)
   if MX.SMART.p then
     local p = MX.SMART.p

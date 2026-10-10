@@ -3614,7 +3614,7 @@ end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
-  D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 4))
+  D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
   D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
