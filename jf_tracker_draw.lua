@@ -6068,7 +6068,7 @@ end
 -- содержимого, высота — от числа строк (до половины окна).
 -- anchor = { x, y } — место правки: всплывашка под ним (не влезает — над ним)
 function D.popup(L, p, anchor)
-  D.popup_hot, D.popup_rect = nil, nil
+  D.popup_hot, D.popup_rect, D.popup_pick = nil, nil, nil
   if not p or not p.lines then return end
   local W = gfx.w
   local sy = L.body_y + L.body_h
@@ -6126,8 +6126,11 @@ function D.popup(L, p, anchor)
     local ly = y + L.pad + (ri + 1) * L.rh
     if lx + colw > x + w + L.pad then break end
     -- мышь (5 окт): строка гидры под мышью подсвечена, клик — её буква
-    local mhot = p.kind == 'hydra' and gfx.mouse_x >= lx and gfx.mouse_x < lx + colw - L.pad and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
-    if mhot then D.popup_hot = ln.key end
+    -- 10 окт: и пикер (fzf-список) — строка под мышью подсвечена, клик — выбор
+    local pick_ok = p.kind == 'picker' and p.first and i <= (p.nmatch or 0) - p.first + 1
+    local mhot = (p.kind == 'hydra' or pick_ok) and gfx.mouse_x >= lx and gfx.mouse_x < lx + colw - L.pad and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
+    if mhot and p.kind == 'hydra' then D.popup_hot = ln.key end
+    if mhot and pick_ok then D.popup_pick = p.first + i - 1 end
     if p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
     if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end

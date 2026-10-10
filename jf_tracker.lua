@@ -12009,6 +12009,20 @@ local function frame()
     end
     if MX.SMART.p and MX.SMART.inside(gfx.mouse_x, gfx.mouse_y) then gfx.mouse_wheel = 0; gfx.mouse_hwheel = 0 end
   end
+  -- пикер мышью (10 окт): щелчок по строке — выбрать (как Enter), мимо или ПКМ —
+  -- закрыть (как Esc), колесо над ним — выбор вверх / вниз
+  if vim.picker and not OPT.active then
+    local r = draw.popup_rect
+    local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
+    if U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker_key(13); U.click = false
+    elseif (U.click or U.rclick) and not inside then vim.picker_key(27); U.click, U.rclick = false, false
+    elseif U.click or U.rclick then U.click, U.rclick = false, false end
+    if inside and gfx.mouse_wheel ~= 0 and vim.picker then
+      local pk = vim.picker
+      pk.sel = math.max(1, math.min(#pk.matches, pk.sel + (gfx.mouse_wheel > 0 and -1 or 1)))
+      gfx.mouse_wheel = 0
+    end
+  end
   -- гидра / контекстное меню мышью (5 окт): клик по строке — её буква, мимо — закрыть
   if (U.click or U.rclick) and vim.hydra and not OPT.active then
     if draw.popup_hot and U.click then vim.hydra_key(draw.popup_hot:byte())
