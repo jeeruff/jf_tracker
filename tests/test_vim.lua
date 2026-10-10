@@ -101,6 +101,7 @@ local function reset()
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
     edit = E, state = state, piano = keys.piano,
+    esc_vim = function() return ESC_VIM end,   -- 10 окт: опция Esc mode
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
     slice_pick = function(n, k) if PICK then return PICK(n, k) end; return k end,  -- 10 окт: режим слайса
     track_dup = function() calls[#calls + 1] = 'tdup'; return true end,                -- 9 окт: t-операции
@@ -703,6 +704,11 @@ keysin('iw'); eq('INSERT with the keyboard hidden still writes notes', last(), '
 PIANO_ON = nil; V.key(27)
 -- Esc переключает INSERT (4 окт, как Renoise)
 reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
+-- 10 окт: опция Esc mode = vim — Esc только NORMAL, сколько ни жми
+do ESC_VIM = true
+  reset(); V.key(27); eq('vim Esc: NORMAL stays NORMAL', V.mode, 'normal'); V.key(27); eq('vim Esc twice: NORMAL', V.mode, 'normal')
+  V.key(('i'):byte()); eq('vim Esc mode: i -> INSERT', V.mode, 'insert'); V.key(27); eq('vim Esc mode: INSERT Esc -> NORMAL', V.mode, 'normal')
+  ESC_VIM = nil end
 keysin('3'); V.key(27); eq('Esc with a count only clears it', V.mode, 'normal')
 -- 5 окт: клавиатура вкл (m) — hjkl в NORMAL ходят, верхний ряд играет
 reset(); AUTO_KBD = false

@@ -1654,7 +1654,8 @@ function V.key_impl(c)
       return
     end
     if V.piano then
-      if V.mode == 'normal' and (c == ESC or c == 13) then V.mode = 'insert'; V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
+      if V.mode == 'normal' and (c == 13 or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i
+      V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
       if c == ('z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
       if c == ('x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
       local mods = ctx.mods and ctx.mods() or {}
@@ -2055,7 +2056,8 @@ function V.key_impl(c)
   elseif c == ESC then
     -- Esc (4 окт, как Edit mode в Renoise): из NORMAL — в INSERT; набранный
     -- счётчик Esc сначала только сбрасывает (как в Vim)
-    if V.count then V.count = nil; finish_move() else V.mode = 'insert'; V.msg = '' end
+    -- 10 окт: опция Esc mode = vim — Esc только NORMAL (сбрасывает счётчик и сообщение)
+    if V.count then V.count = nil; finish_move() elseif ctx.esc_vim and ctx.esc_vim() then V.msg = ''; finish_move() else V.mode = 'insert'; V.msg = '' end
   elseif ch == '+' or ch == '=' then ctx.set_lpb(nil, 1)
   elseif ch == '-' then ctx.set_lpb(nil, -1)
   end
