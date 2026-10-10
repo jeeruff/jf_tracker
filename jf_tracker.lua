@@ -706,7 +706,7 @@ local function pool_select(n)
   local e = pool[n]
   -- выбор инструмента возвращает сэмпл-модуль к нему (если там был файл браузера)
   if SL.entry and SL.entry.file then SL.close(); SL.entry = nil end
-  vim.msg = ('inst %d: %s%s'):format(n, e.name, (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '')
+  vim.msg = ('inst %02d: %s%s'):format(e.num or n, e.name, (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '')
   if state.poolprev and PV.available() then PV.inst_preview(e, col.track, state.prev_by_mouse) end
 end
 
@@ -8688,7 +8688,7 @@ ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', in
                     sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
-  if hover.matrix then return 'matrix' elseif hover.pool then return 'inst' elseif hover.dsp then return 'dsp'
+  if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus
@@ -10525,7 +10525,14 @@ local function frame()
     beat_info.rows_bar = math.floor(beat_info.num * 4 / math.max(1, beat_info.den) * state.lpb + 0.5)
   end
   local changed
+  -- 10 окт: выбранный инструмент — по ключу, не по номеру: вставка ноты
+  -- переставляет пул (сэмпл песни поднимается), и номер начинал указывать
+  -- на другой инструмент («первый, второй и залипает на втором»)
+  do local e = snap and snap.pool and not state.auto_inst and not state.midi_inst and snap.pool[vim.inst or 0]; ctx.inst_gkey = e and e.gkey or nil end
   snap, changed = model.snapshot(state.lpb)
+  if changed and ctx.inst_gkey and snap and snap.pool and not (snap.pool[vim.inst or 0] and snap.pool[vim.inst].gkey == ctx.inst_gkey) then
+    for i, e in ipairs(snap.pool) do if e.gkey == ctx.inst_gkey then vim.inst = i; break end end
+  end
   draw.inst_of = snap and snap.inst_of
   draw.inst_num = snap and snap.inst_num
   draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
