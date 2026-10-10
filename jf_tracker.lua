@@ -8976,8 +8976,8 @@ end
 function region_actions(rg)
   if not rg then return {} end
   return {
-    { 'Queue / play region (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
-    { 'Jump now', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },
+    { 'Queue: play this pattern after the current one (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
+    { 'Go here now: the play cursor to this pattern, no waiting', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
     { 'Mute cell (M)', key = 'm', fn = function() MX.toggle_mute(seq, snap) end },
     { 'Next pattern in slot (>)', key = 'n', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
     { 'Previous pattern in slot (<)', key = 'b', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
