@@ -31,6 +31,7 @@ PN.PANELS = {
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
+  { id = 'sprops',     label = 'props',      key = 'e', hint = 'sample',  side = 'right' },   -- 10 окт: свойства item / слайса — свой модуль (был справа во вкладке item)
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)

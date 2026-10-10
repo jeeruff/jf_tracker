@@ -304,6 +304,14 @@ state.panes = (function()
 end)()
 -- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
 if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
+-- 10 окт: props — свой модуль; один раз показать справа от вкладки item (дальше — как пользователь разложит)
+if state.panes and reaper.GetExtState(EXT, 'sprops_init') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'sprops') then
+    if PNm.visible(state.panes, 'sample') then PNm.split(state.panes, 'sample', 'sprops', 'r', 0.4) else PNm.show(state.panes, 'sprops') end
+  end
+  reaper.SetExtState(EXT, 'sprops_init', '1', true)
+end
 -- 9 окт (миграция 7): старый F3 раскрыл скрытые вкладки отдельными панелями —
 -- вкладка своей панелью (одна в листе) снова скрыта; стек вкладок не трогаем
 if state.panes and reaper.GetExtState(EXT, 'panes_mig7') ~= '1' then
@@ -3887,6 +3895,13 @@ ctx = {
       local l = A.live()
       vim.msg = ('audio: %s  %s Hz  %s smp - :audio dev <name> | bs N | sr N | bs off | sr off'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'))
     end
+  end,
+  -- 10 окт: свойства нарисованы в этом кадре (вкладка item или модуль props) и мышь над ними
+  sp_live = function()
+    local r = ctx.sprops_rect
+    if not (r and reaper.time_precise() - (r.t or 0) < 0.25) then return false end
+    local mx, my = gfx.mouse_x, gfx.mouse_y
+    return mx >= r[1] and mx < r[1] + r[3] and my >= r[2] and my < r[2] + r[4]
   end,
   ins_vel = function(v)
     if not state.velrand then return v end
@@ -12058,6 +12073,12 @@ local function frame()
           end
         else state.ss_zone = nil end   -- 8 окт: клип не этого файла — зоны нет
       else state.ss_zone = nil end
+      -- 10 окт: свойства — отдельный модуль props; видим — вкладка item отдаёт волне всю ширину
+      ctx.sp_sel = sel_e
+      if state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops') then
+        SPROP.hover_tab = nil
+        return SL.draw_in(U, L, x, y, w, h, e, col and col.track, zone)
+      end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       ctx.sprops_maxw = pw
       if sel_e and not sel_e.file then pw = SPROP.fit_w(L, pw, h) end           -- только занятые колонки, остаток — волне
@@ -12073,6 +12094,7 @@ local function frame()
         else
           SPROP.draw(L, px, y, pw, h, sel_e, state.focus == 'top')
           ctx.sprops_rect = { px, y, pw, h, t = reaper.time_precise() }   -- якорь меню нарезки (5 окт)
+          ctx.sp_in_pane = false
         end
       else pw = 0; SPROP.hover = nil end
       if pleft then
@@ -12080,6 +12102,18 @@ local function frame()
         return SL.draw_in(U, L, wx, y, x + w - wx, h, e, col and col.track, zone)
       end
       return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
+    end,
+    sprops_draw = function(Lx, x, y, w, h)
+      local se = ctx.sp_sel
+      if not se then U.text(x, y, ctx.fit('props: open an instrument in the item tab', w), U.GREY); SPROP.hover = nil; return end
+      if se.file then
+        local _, _, ppath = PV.position()
+        SPROP.draw_info(Lx, x, y, w, h, ctx.file_info(se.path), ppath == se.path)
+      else
+        SPROP.draw(Lx, x, y, w, h, se, state.focus == 'sprops')
+        ctx.sprops_rect = { x, y, w, h, t = reaper.time_precise() }
+        ctx.sp_in_pane = true
+      end
     end,
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
@@ -12674,7 +12708,7 @@ local function frame()
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
-  elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
+  elseif SPROP.hover and not SPROP.hover.title and ctx.sp_live() then
     local rk = SPROP.ROWS[SPROP.hover.row].k
     local extra = ({ bsync = '  |  beatsync: L - on (beats from the length), H L / wheel - beats, R - off', norm = '  |  normalize: L or click - to peak 0 dB' })[rk] or ''
     state.status = ('sample %s - H L / drag: change, wheel: scroll, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label) .. extra
@@ -13570,8 +13604,8 @@ local function frame()
       elseif root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
       click = { t = now2, zone = 'slicelist' }
       ::ai_click_done::
-    elseif SPROP.hover and state.top and state.toptab == 'sample' then
-      ctx.set_focus('top')
+    elseif SPROP.hover and ctx.sp_live() then
+      ctx.set_focus(ctx.sp_in_pane and 'sprops' or 'top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
       if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
       if SPROP.hover.fit then ctx.sprops_fit(); click = { t = now2, zone = 'spropfit' }; goto sprop_done end
@@ -14831,7 +14865,7 @@ local function frame()
   end
   -- 9 окт: колесо над параметрами сэмпла — прокрутка списка, не значение
   -- (значение — H L, протяжка, щелчок)
-  if gfx.mouse_wheel ~= 0 and SPROP.hover and state.top and state.toptab == 'sample' then
+  if gfx.mouse_wheel ~= 0 and SPROP.hover and ctx.sp_live() then
     SPROP.scroll = math.max(0, (SPROP.scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1))
     gfx.mouse_wheel = 0
   end
@@ -15532,6 +15566,11 @@ local function frame()
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
+      elseif state.focus == 'sprops' then
+        -- 10 окт: модуль props — J K строка, H L значение, R сброс (как во вкладке item); остальное — vim
+        local se = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
+        if c == 27 then ctx.set_focus('tracker')
+        elseif not SPROP.key(c, se) then vim.key(c) end
       elseif state.focus == 'slices' and state.slices_on then
         -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер
         local ch = c < 256 and string.char(c) or ''
