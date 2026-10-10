@@ -3515,6 +3515,71 @@ ctx = {
     state.slicepick = ({ key = 'random', random = 'seq', seq = 'key' })[state.slicepick or 'key']
     vim.msg = 'slices: ' .. ({ key = 'by key (q 2 w ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
   end,
+  -- ── аудиоустройство (10 окт): jf_tracker_audio.lua ──────────────────────
+  audio = function() ctx.AU = ctx.AU or dofile(DIR .. '/jf_tracker_audio.lua'); return ctx.AU end,
+  audio_set = function(want)
+    local A = ctx.audio()
+    local ok, msg = A.apply(want)
+    if ok and want.dev then A.remember(want.dev) end
+    ctx.au_want = nil
+    vim.msg = msg
+    return ok
+  end,
+  audio_items = function()
+    local A = ctx.audio()
+    local cur = A.read()
+    local items = { { sep = true, title = 'audio', group = 'audio' } }
+    if not cur then
+      items[#items + 1] = { label = 'audio device', kind = 'action', value = '-', desc = 'only CoreAudio (macOS) settings can be changed from the tracker', fn = function() end }
+      return items
+    end
+    ctx.au_want = ctx.au_want or { dev = cur.dev, sr = cur.sr, sruse = cur.sruse, bs = cur.bs, bsuse = cur.bsuse }
+    local w = ctx.au_want
+    local devs = A.history()
+    local function changed() return #A.diff(A.read() or cur, w) > 0 end
+    items[#items + 1] = { label = 'now', kind = 'action', desc = 'what REAPER has open now (device, sample rate, buffer)',
+      value = (function() local l = A.live(); return ('%s  %s Hz  %s smp%s'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'), l.running and '' or '  STOPPED') end)(), fn = function() end }
+    items[#items + 1] = { label = 'device', kind = 'cycle', values = devs, desc = 'devices the tracker has seen open; a new one - type its name: the row below (as in REAPER Preferences > Audio > Device)',
+      get = function() return w.dev end, set = function(v) w.dev = v end }
+    items[#items + 1] = { label = 'device by name', kind = 'action', value = ':audio dev', desc = 'type the device name as REAPER shows it (e.g. MHLink [46236]); applied at once and remembered in the list',
+      fn = function() OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'audio dev ' end }
+    local srv = { 'off' }; for _, v in ipairs(A.SR) do srv[#srv + 1] = v end
+    items[#items + 1] = { label = 'sample rate', kind = 'cycle', values = srv, desc = 'request this sample rate (off - the device decides); projects may still override it (REAPER preference)',
+      get = function() return w.sruse and w.sr or 'off' end, set = function(v) if v == 'off' then w.sruse = false else w.sruse, w.sr = true, v end end }
+    local bsv = { 'off' }; for _, v in ipairs(A.BS) do bsv[#bsv + 1] = v end
+    items[#items + 1] = { label = 'buffer', kind = 'cycle', values = bsv, desc = 'request this block size in samples (off - the device decides); smaller - less latency, more CPU; zB - the same as a menu',
+      get = function() return w.bsuse and w.bs or 'off' end, set = function(v) if v == 'off' then w.bsuse = false else w.bsuse, w.bs = true, v end end }
+    items[#items + 1] = { label = 'apply', kind = 'action', value = changed() and 'restart audio' or 'no changes', desc = 'write the settings to REAPER and restart the audio device (a short dropout); Preferences show the same values',
+      fn = function() ctx.audio_set(w); OPT.close() end }
+    return items
+  end,
+  audio_bs_menu = function()
+    local A = ctx.audio()
+    local cur = A.read()
+    if not cur then vim.msg = 'audio: only CoreAudio (macOS) settings are supported'; return end
+    local l = A.live()
+    local items = {}
+    for k, v in ipairs(A.BS) do
+      local on = (l.bs == v)
+      items[#items + 1] = { key = tostring(k), label = ('%4d samples  %5.1f ms'):format(v, 1000 * v / math.max(1, l.sr or cur.sr or 48000)) .. (on and '  *' or ''),
+        fn = function() ctx.audio_set({ bs = v, bsuse = true }) end }
+    end
+    items[#items + 1] = { key = 'o', label = 'off - the device decides' .. ((not cur.bsuse) and '  *' or ''), fn = function() ctx.audio_set({ bsuse = false }) end }
+    vim.open_hydra({ title = ('buffer - now %s smp, %s'):format(tostring(l.bs or '?'), l.dev or '?'), items = items })
+  end,
+  audio_cmd = function(arg)
+    local A = ctx.audio()
+    local what, rest = (arg or ''):match('^%s*(%S*)%s*(.-)%s*$')
+    if what == 'dev' and rest ~= '' then ctx.audio_set({ dev = rest })
+    elseif what == 'bs' and rest == 'off' then ctx.audio_set({ bsuse = false })
+    elseif what == 'bs' and tonumber(rest) then ctx.audio_set({ bs = math.floor(tonumber(rest)), bsuse = true })
+    elseif what == 'sr' and rest == 'off' then ctx.audio_set({ sruse = false })
+    elseif what == 'sr' and tonumber(rest) then ctx.audio_set({ sr = math.floor(tonumber(rest)), sruse = true })
+    else
+      local l = A.live()
+      vim.msg = ('audio: %s  %s Hz  %s smp - :audio dev <name> | bs N | sr N | bs off | sr off'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'))
+    end
+  end,
   ins_vel = function(v)
     if not state.velrand then return v end
     return math.max(1, math.min(127, math.floor((v or 100) + (math.random() * 2 - 1) * 8 + 0.5)))
@@ -6792,6 +6857,8 @@ ctx = {
     add_sect('other', rest)
     -- hotkeys (5 окт): все клавиши со страниц ? — клавиша, модуль, описание;
     -- / ищет по клавише, описанию и модулю
+    -- audio (10 окт): устройство REAPER в стиле трекера; правки копятся, apply применяет
+    for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
       local page = KH.PAGES[pg]
@@ -7849,7 +7916,7 @@ ctx = {
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
-    if state.hints then vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes, z x octave, INSERT writes them' or 'keyboard off (m): Vim keys'
+    if state.hints then vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes in NORMAL, z x octave' or 'keyboard hidden (m): NORMAL is plain Vim, INSERT still writes notes'
     else vim.msg = state.piano_show and 'keyboard on' or 'keyboard off' end   -- длинно — только с хинтами (5 окт)
     relayout()
   end,

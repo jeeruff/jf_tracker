@@ -57,11 +57,21 @@ function O.open(items, tab)
   O.all = items or O.all
   -- вкладки по разделам убраны (5 окт, «дурацкая идея»); остались две —
   -- options и hotkeys (группы заголовков); без групп — одна страница
+  -- 10 окт: вкладки — options и группы заголовков по порядку (audio, hotkeys)
   O.tabs = {}
   for _, it in ipairs(O.all) do
-    if it.sep and it.group then O.tabs = { 'options', 'hotkeys' }; break end
+    if it.sep and it.group then
+      if #O.tabs == 0 then O.tabs[1] = 'options' end
+      local dup = false
+      for _, t in ipairs(O.tabs) do if t == it.group then dup = true end end
+      if not dup then O.tabs[#O.tabs + 1] = it.group end
+    end
   end
-  if #O.tabs > 0 then O.tab = (tab == 'hotkeys') and 'hotkeys' or 'options' else O.tab = 'all' end
+  O.tab = 'all'
+  if #O.tabs > 0 then
+    O.tab = 'options'
+    for _, t in ipairs(O.tabs) do if t == tab then O.tab = t end end
+  end
   O.query, O.typing = '', false
   O.page = 'list'
   O.active = true
@@ -491,7 +501,7 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  if not O.compact then U.text(hx, by + 2, ctx.fit((#O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: options / hotkeys   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'), bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
+  if not O.compact then U.text(hx, by + 2, ctx.fit((#O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'), bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска

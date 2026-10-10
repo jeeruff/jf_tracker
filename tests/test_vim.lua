@@ -693,6 +693,10 @@ reset()
 keysin('iq'); eq('INSERT: q writes C-4 at once', last(), 'ins:trA@0:60:1'); eq('INSERT: keyboard on', V.piano, true)
 keysin('m'); eq('INSERT: m does not turn it off', V.piano, true)
 V.key(27); eq('Esc: NORMAL, keyboard off', V.piano, false)
+-- 10 окт: INSERT KEYS слит с INSERT — клавиатура спрятана, ноты всё равно пишутся
+reset(); PIANO_ON = false
+keysin('iw'); eq('INSERT with the keyboard hidden still writes notes', last(), 'ins:trA@0:62:1')
+PIANO_ON = nil; V.key(27)
 -- Esc переключает INSERT (4 окт, как Renoise)
 reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
 keysin('3'); V.key(27); eq('Esc with a count only clears it', V.mode, 'normal')
