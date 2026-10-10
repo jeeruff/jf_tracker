@@ -1193,7 +1193,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
     U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
     if ctx.hints_on and ctx.hints_on() and ZH > 3 * rh then
-      U.text(x + 4, zy + ZH - rh - 1, ctx.fit(zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8), U.DIM)
+      U.text(x + 4, zy + ZH - rh - 1, ctx.fit(zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8), U.GREY)
     end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1

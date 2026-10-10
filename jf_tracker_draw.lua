@@ -1075,6 +1075,7 @@ function D.route_strip(L, info, hover, x0, x1)
   D.rt_need = need == 0 and (L.rh + 4) or (math.max(3, math.min(10, need)) * cw1 + wires_h + 6)   -- нет выходов — одна строка
 end
 
+D.PANE_KEYS = { { 'Cmd+hjkl', 'panel' }, { 'Cmd+Shift+hjkl', 'move' }, { 'Ctrl+W', 'panes' }, { 'F2', 'tracker' }, { '?', 'help' } }
 function D.hint_bar(L, x, y, w, items, active)
   if not L.hint_h or L.hint_h <= 0 or not items or w <= 0 then return end
   set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
@@ -1087,7 +1088,7 @@ function D.hint_bar(L, x, y, w, items, active)
     local kw, dw = ms(it[1]), ms(it[2])
     if cx + kw + sp + dw > x + w - L.pad then break end
     text(cx, y + 1, it[1], active and U.AMBER or U.GREY)
-    text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.mix(U.GREY, U.PANEL, 0.25))
+    text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.GREY)
     cx = cx + kw + sp + dw + 2 * sp
   end
 end
@@ -6155,7 +6156,12 @@ function D.frame(L, snap, rows, state, info)
       or (f == 'top' and D.panes.BY[info.toptab or ''] and D.panes.BY[info.toptab].hint)
       or (f == 'browser' and (info.browser_page or 'browser')) or (f == 'slices' and 'inst') or f
     set(U.PANEL); gfx.rect(0, sy, gfx.w, L.pn_keys, 1)
-    if not state.pane_mode and info.hint_bars then D.hint_bar(L, 0, sy, gfx.w, info.hint_bars(page), true) end
+    -- 10 окт: у панелей hint_h = 0 — hint_bar выходил сразу, строка была пустой; высота — своя
+    -- нет своей строки у модуля — общие клавиши панелей
+    if not state.pane_mode and info.hint_bars then
+      local items = info.hint_bars(page) or D.PANE_KEYS
+      D.hint_bar(setmetatable({ hint_h = L.pn_keys }, { __index = L }), 0, sy, gfx.w, items, true)
+    end
     sy, sh = sy + L.pn_keys, sh - L.pn_keys
   end
   if L.status_in > 0 then
