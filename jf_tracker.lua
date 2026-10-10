@@ -3589,6 +3589,10 @@ ctx = {
     for fx = 0, reaper.TrackFX_GetCount(col.track) - 1 do
       local _, raw = reaper.TrackFX_GetFXName(col.track, fx, '')
       raw = raw or ''
+      -- 10 окт: переименованный плагин (RS5K берёт имя сэмпла) терял префикс «VSTi:» и выпадал из lib —
+      -- узнаём по original_name
+      local okn, orig = reaper.TrackFX_GetNamedConfigParm(col.track, fx, 'original_name')
+      if okn and orig ~= '' and not raw:match('^%a+i?:') then raw = orig end
       local lo = raw:lower()
       if raw:match('^%a+i:') or (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true))) then
         local nm = (raw:gsub('^[^:]*: ', ''))
@@ -12046,6 +12050,34 @@ local function frame()
         local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
         draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #list)
         return hv
+      end
+      -- 10 окт (по приколу): выбран RS5K в DSP — вместо слайсов список его сэмплов FILE0..n
+      do
+        local t = dsp_target()
+        local f = state.focus == 'dsp' and t and not t.take and t.fx and t.fx[dsp_sel.fx]
+        if f and f.rs5k and reaper.ValidatePtr(t.track, 'MediaTrack*') then
+          local key = tostring(t.track) .. ':' .. f.i .. ':' .. (f.rs5k_n or 0) .. ':' .. tostring(f.file)
+          local fl = ctx.rs5k_files_c
+          if not (fl and fl.key == key) then
+            fl = { key = key }
+            for fi = 0, 127 do
+              local ok, nm = reaper.TrackFX_GetNamedConfigParm(t.track, f.i, 'FILE' .. fi)
+              if not ok or nm == '' then break end
+              fl[#fl + 1] = nm
+            end
+            ctx.rs5k_files_c = fl
+          end
+          U.text(x, y, ctx.fit(('samples %d  -  %s'):format(#fl, f.name or 'RS5K'), w - 5), U.AMBER)
+          local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+          for i = 1, math.min(#fl, nvis) do
+            local ry = y + i * Lx.rh
+            local col = U.TEXT
+            if i == 1 then col = U.list_cursor(x, ry, w - 5, Lx.rh, false) end
+            U.text(x, ry, ctx.fit(('%02d %s'):format(i - 1, fl[i]:match('[^/]+$') or fl[i]), w - 5), col)
+          end
+          if #fl == 0 then U.text(x, y + Lx.rh, ctx.fit('no samples - browse / drop a file on the wave', w - 5), U.GREY) end
+          return nil
+        end
       end
       if state.midi_inst then                       -- MIDI-клипы трека / проекта (10 окт)
         local list = ctx.mc_list()

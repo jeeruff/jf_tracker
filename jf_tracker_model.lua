@@ -1163,6 +1163,12 @@ function build_one(tr, fx, out)
     local short = (name or ''):gsub('^[^:]*: ', '')
     local um = M.user_mods and M.user_mods[short]
     local lay = (not um) and M.dspmods and M.dspmods.match(short)
+    -- 10 окт: переименованный плагин (RS5K берёт имя сэмпла) — раскладка по original_name, имя — своё
+    local renamed
+    if not lay and not um and M.dspmods and A.GetNamedConfigParm then
+      local okn, orig = A.GetNamedConfigParm(tr, fx, 'original_name')
+      if okn and orig and orig ~= '' then lay = M.dspmods.match((orig:gsub('^[^:]*: ', ''))); renamed = lay and short end
+    end
     local kids = A.GetNamedConfigParm and container_children(tr, fx)
     if kids then
       -- контейнер: сначала его макросы (нативные container_map — параметры
@@ -1265,7 +1271,7 @@ function build_one(tr, fx, out)
           end
         end
       end
-      local e = { i = fx, name = lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
+      local e = { i = fx, name = renamed or lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
                   groups = lay.groups, rows = lay.rows }               -- 9 окт: колонка = группа с заголовком
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему
       if lay.view then e.view, e.view_p = lay.view, e_view_p end

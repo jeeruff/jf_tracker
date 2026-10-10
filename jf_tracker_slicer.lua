@@ -1093,7 +1093,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     tr.b, tr.at = math.max(tr.b, pht), now
   end
   local trl = S.trail and S.trail.item == e.item and S.trail
-  local tra = trl and (pht and 0.22 or 0.22 * (1 - (now - trl.at) / 1.5)) or 0
+  local tra = trl and (pht and 0.16 or 0.16 * (1 - (now - trl.at) / 0.6)) or 0   -- 10 окт: тусклее, гаснет за 0.6 с
   if trl and tra <= 0 then S.trail, trl = nil, nil end
   local function trail_rect(t0z, t1z, x0, w0, y0, h0)       -- след в окне t0z..t1z шириной w0
     if not trl then return end
@@ -1101,7 +1101,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if b2 <= a2 then return end
     local px0 = x0 + math.floor((a2 - t0z) / (t1z - t0z) * w0)
     local px1 = x0 + math.floor((b2 - t0z) / (t1z - t0z) * w0)
-    U.set(U.TEXT); gfx.a = tra; gfx.rect(px0, y0, math.max(1, px1 - px0), h0, 1); gfx.a = 1
+    -- градиент одной нативной gradrect: у начала прозрачно, к плейхеду ярче
+    local ww = math.max(1, px1 - px0)
+    local c = U.TEXT
+    local span2 = math.max(1e-6, trl.b - trl.a)
+    local al0, al1 = tra * (a2 - trl.a) / span2, tra * (b2 - trl.a) / span2   -- окно зума режет след — яркость по месту, не заново
+    gfx.gradrect(px0, y0, ww, h0, c[1], c[2], c[3], al0, 0, 0, 0, (al1 - al0) / ww)
   end
   trail_rect(va, vb, x, w, wy, wh)
   if pht and pht >= va and pht <= vb then U.set(U.TEXT); gfx.rect(tx(pht), wy, 1, wh, 1) end
