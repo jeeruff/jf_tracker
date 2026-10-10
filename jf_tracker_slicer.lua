@@ -854,6 +854,19 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- волна правки — теми же пиками item, что просмотр (3 окт): огибающая
   -- S.env читалась линейно и растягивала файл на всю ширину, а item в лупе
   -- за концом файла играет начало — картинки расходились. S.env — для детекции
+  -- 10 окт: выделенный слайс — не фоном, а волной чуть ярче; опция waveinv — инверсно:
+  -- светлый блок, волна в нём вырезана тёмным
+  local zx0, zx1, zcol, zin_prev
+  local wave_view = S.view ~= 'sgram' and S.view ~= 'spec'
+  if zone and wave_view then
+    zx0 = math.max(x, math.min(x + w, tx(math.max(0, math.min(len, zone[1])))))
+    zx1 = math.max(x, math.min(x + w, tx(math.max(0, math.min(len, zone[2])))))
+    if ctx.state and ctx.state.waveinv then
+      U.set(U.mix(base, U.BG, 0.15)); gfx.rect(zx0, wy, math.max(1, zx1 - zx0), wh, 1)
+      zcol = U.BG
+    else zcol = U.mix(base, { 1, 1, 1 }, 0.35) end
+    U.set(base)
+  end
   local env = (editing and S.view == 'peaks' and not (ctx.peaks and e.item)) and S.env or nil
   local sgj = S.view == 'sgram' and ctx.sgram and ctx.sgram(e)
   if sgj then
@@ -883,6 +896,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local i1 = idx_of(px + 1, env.n) - 1
       local m = 0
       for i = i0, math.max(i0, i1) do if env.v[i] and env.v[i] > m then m = env.v[i] end end
+      local inz = zx0 and x + px >= zx0 and x + px < zx1
+      if inz ~= zin_prev then U.set(inz and zcol or base); zin_prev = inz end
       gfx.line(x + px, cy - m * hh, x + px, cy + m * hh)
     end
   else
@@ -893,8 +908,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         local idx = idx_of(px, pk.n)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
         if b - a < 0.02 then a, b = -0.01, 0.01 end
+        local inz = zx0 and x + px >= zx0 and x + px < zx1
+        if inz ~= zin_prev then U.set(inz and zcol or base); zin_prev = inz end
         gfx.line(x + px, cy - b * hh, x + px, cy - a * hh)
       end
+      U.set(base)
     else gfx.line(x, cy, x + w, cy) end
   end
   -- позиция проигрывания файла из браузера (превью) и на большой волне (2 окт)
@@ -968,7 +986,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if myw >= TY and myw < TY + TH and math.min(da, db) <= 6 then S.zone_hot = (da <= db) and 'a' or 'b'
       elseif myw >= BY - 2 and mxw >= px0 and mxw <= px1 then S.zone_hot = 'move' end
     end
-    U.set(U.TEXT); gfx.a = 0.10; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1
+    if not wave_view then U.set(U.TEXT); gfx.a = 0.10; gfx.rect(px0, wy, math.max(1, px1 - px0), wh, 1); gfx.a = 1 end   -- спектр / спектрограмма — фоном, как было
     for _, ed in ipairs({ { 'a', px0 }, { 'b', math.max(px0, px1 - 1) } }) do
       local hot = S.zone_hot == ed[1] or dragging == ed[1]
       U.set(hot and U.AMBER or U.TEXT); gfx.a = hot and 1 or 0.55
@@ -1109,7 +1127,6 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.gradrect(px0, y0, ww, h0, c[1], c[2], c[3], al0, 0, 0, 0, (al1 - al0) / ww)
   end
   trail_rect(va, vb, x, w, wy, wh)
-  if pht and pht >= va and pht <= vb then U.set(U.TEXT); gfx.rect(tx(pht), wy, 1, wh, 1) end
   if ZH > 0 then
     local zy = wy + wh + 2
     local W2 = S.zwin or 0.04
