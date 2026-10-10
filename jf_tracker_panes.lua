@@ -83,6 +83,22 @@ local function walk(n, fn, parent, idx)
   if not is_leaf(n) then for i, k in ipairs(n.kids) do walk(k, fn, n, i) end end
 end
 
+-- 10 окт: вкладки стеков по алфавиту (опция tababc) — порядок в самой модели, тогда
+-- и ярлыки, и Tab / Ctrl+Tab идут одинаково; активная остаётся активной
+function PN.sort_stacks(model)
+  walk(model.root, function(n)
+    if is_leaf(n) and #n.panes > 1 then
+      local act = n.panes[n.active]
+      table.sort(n.panes, function(a, b)
+        local la, lb = (PN.BY[a] and PN.BY[a].label or a):lower(), (PN.BY[b] and PN.BY[b].label or b):lower()
+        if la ~= lb then return la < lb end
+        return a < b
+      end)
+      for k, id in ipairs(n.panes) do if id == act then n.active = k end end
+    end
+  end)
+end
+
 -- лист с id, его родитель и индекс (nil — скрыта / нет)
 function PN.find(model, id)
   local lf, par, ix, pi
