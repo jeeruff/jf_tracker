@@ -1153,10 +1153,8 @@ function B.draw(U, L, x, y, w, h)
     local e = B.entries[idx]
     if not e then break end
     local ry = y + (i - 1) * L.rh
-    if idx == B.cur then
-      U.set(B.focus and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 2, L.rh, 1)
-    end
-    local col = (idx == B.cur and B.focus) and U.BG or ((e.dir or e.db) and U.CYAN or ((e.pm or e.trk or e.rgn) and U.AMBER or U.TEXT))
+    local curc = idx == B.cur and U.list_cursor(x + 1, ry, w - 2, L.rh, B.focus)   -- 10 окт: курсор как в lib
+    local col = (idx == B.cur and B.focus) and curc or ((e.dir or e.db) and U.CYAN or ((e.pm or e.trk or e.rgn) and U.AMBER or U.TEXT))
     -- отмеченная (10 окт): янтарная подложка и полоска слева, имя янтарём
     local marked = B.sel[B.mkey(e)] ~= nil
     if marked then
@@ -1173,7 +1171,7 @@ function B.draw(U, L, x, y, w, h)
     if e.meta then
       local nw = U.measure(glyph .. e.name) + L.pad
       if nw + U.measure('000bpm') < tw then
-        U.text(x + L.pad + nw, ry + 1, ctx.fit(e.meta, tw - nw), (idx == B.cur and B.focus) and U.BG or U.GREY)
+        U.text(x + L.pad + nw, ry + 1, ctx.fit(e.meta, tw - nw), (idx == B.cur and B.focus) and U.TEXT or U.GREY)
       end
     end
     if B.wave and is_file and ctx.file_peaks then
@@ -1181,7 +1179,7 @@ function B.draw(U, L, x, y, w, h)
       local wx, ww = x + L.pad + tw + L.pad, w - 2 * L.pad - tw - L.pad
       local pk = ww > 8 and ctx.file_peaks(B.full(e), ww)
       local cy, hh = ry + L.rh / 2, L.rh / 2 - 1
-      U.set((idx == B.cur and B.focus) and U.BG or U.readable(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 4.0))
+      U.set((idx == B.cur and B.focus) and U.AMBER or U.readable(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 4.0))
       if pk and pk.n > 0 then
         for px = 0, ww - 1 do
           local i = math.floor(px / ww * pk.n) + 1

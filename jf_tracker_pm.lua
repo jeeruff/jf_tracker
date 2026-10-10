@@ -726,8 +726,8 @@ function PM.draw_big(L, B, x, y, w, h)
       local idx = (B.scroll or 0) + i
       local e = B.entries[idx]; if not e then break end
       local ry = gy + (i - 1) * L.rh
-      if idx == B.cur then U.set(U.TEXT); gfx.rect(x + 1, ry, w - 2, L.rh, 1) end
-      U.text(x + L.pad, ry + 1, ctx.fit('@' .. e.name .. (e.meta and ('  ' .. e.meta) or ''), w - 2 * L.pad), idx == B.cur and U.BG or U.AMBER)
+      local curc = idx == B.cur and U.list_cursor(x + 1, ry, w - 2, L.rh, true)   -- 10 окт: курсор как в lib
+      U.text(x + L.pad, ry + 1, ctx.fit('@' .. e.name .. (e.meta and ('  ' .. e.meta) or ''), w - 2 * L.pad), idx == B.cur and U.TEXT or U.AMBER)
       if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then hover.browser = idx end
     end
   end

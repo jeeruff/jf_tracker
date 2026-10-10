@@ -98,6 +98,14 @@ function U.text(x, y, s, col)
   gfx.drawstr(s)
 end
 
+-- курсор списка (10 окт, стандарт): одна полоса для всех списков — как в lib:
+-- тонированный акцент, текст акцентом; читается в любой теме (mono, светлые).
+-- Было в браузере: сплошная полоса цветом текста и текст цветом фона — при ×2
+-- текст блитится аддитивно, тёмный на светлом пропадал. Возвращает цвет текста
+function U.list_cursor(x, y, w, h, focused)
+  set(U.tint(U.AMBER, focused and 0.30 or 0.14)); gfx.rect(x, y, w, h, 1)
+  return focused and U.AMBER or U.TEXT
+end
 function U.textc(x, y, w, s, col)
   U.text(x + (w - gfx.measurestr(s)) / 2, y, s, col)
 end

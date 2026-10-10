@@ -269,12 +269,12 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     end
     do
     local sel = idx == FB.cur
-    if sel then U.set(focused and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 3, L.rh, 1) end
+    local curc = sel and U.list_cursor(x + 1, ry, w - 3, L.rh, focused)   -- 10 окт: курсор как в lib
     local name, kind = FB.short(r.it.label)
     if FB.is_fav(r.it) then name = '* ' .. name end          -- избранное видно в любой папке
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
-    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and U.BG or U.TEXT)
-    if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.BG or U.DIM) end
+    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or U.TEXT)
+    if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
     if FB.hint then FB.hint('fxbrow', x + 1, ry, w - 3, L.rh, idx) end
     end
