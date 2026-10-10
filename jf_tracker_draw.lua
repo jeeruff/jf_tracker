@@ -3815,7 +3815,7 @@ function D.frame(L, snap, rows, state, info)
       if L.mixer and not c.master then
         local lw1 = (#c.lanes > 1 and c.lanes[1].w) or c.w
         local fxb = ((state.bigfader or state.ptmode) and (ms('-48') + 2) or 0) + D.FADER_W(L)
-        local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
+        local fh0 = (L.mix_rows - (tonumber(D.mix_under) or 0)) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
         mixcol = lw1 - 2 * L.pad >= fxb + L.btn_w + 2 and fh0 >= 6 * L.rh
         -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
         -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
@@ -3881,7 +3881,7 @@ function D.frame(L, snap, rows, state, info)
         if mixcol then
           local vert = ms('SRO') + 4 > D.mcb_w
           local rhh = vert and math.max(D.mcb_h, 3 * (L.rh - 4) + 4) or D.mcb_h
-          local fh0 = (D.mix_under and (L.mix_rows - 3) or L.mix_rows) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
+          local fh0 = (L.mix_rows - (tonumber(D.mix_under) or 0)) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
           if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
         end
         local rw = ms('SRO') + 4
@@ -4060,8 +4060,14 @@ function D.frame(L, snap, rows, state, info)
         -- поэтому всегда берём меньшую (H − 3 строки), если хоть один трек
         -- узкий (L.mix_under — с прошлого кадра)
         local side = sepx ~= nil or c.x + c.w - 2 - (sx + fx_w + colw + lufs_w + 2 + L.pad + 2) >= ((lufs_w > 0) and (mfx_need - 2 * L.pad) or 5 * L.cw)
-        if not side and not c.master then D.mix_under_next = true end   -- узкий master не перестраивает треки (9 окт)
-        local fh = (D.mix_under and not (c.master and not side)) and (H - 3 * L.rh) or H
+        -- 10 окт: резерв под эффекты под фейдером — по числу эффектов (0..3 строки), не всегда 3:
+        -- без эффектов фейдеры на всю высоту (было пустое место снизу)
+        if not side and not c.master then
+          local nfx = math.min(3, #((c.col and c.col.fx) or {}))
+          D.mix_under_next = math.max(tonumber(D.mix_under_next) or 0, nfx)
+        end   -- узкий master не перестраивает треки (9 окт)
+        local und = tonumber(D.mix_under) or 0
+        local fh = (und > 0 and not (c.master and not side)) and (H - und * L.rh) or H
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
         if lufs_w > 0 then

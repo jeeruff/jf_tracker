@@ -13259,7 +13259,12 @@ local function frame()
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
     elseif hover.mixpk then
-      if reaper.ValidatePtr(hover.mixpk, 'MediaTrack*') then for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(hover.mixpk, ch, true) end end
+      -- 10 окт: Shift+щелчок — сброс пиков / клипов у ВСЕХ треков и мастера (как Ctrl+щелчок в микшере REAPER)
+      local function rst(tr) for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(tr, ch, true) end end
+      if ctx.mods().shift then
+        for i = 0, reaper.CountTracks(0) - 1 do rst(reaper.GetTrack(0, i)) end
+        rst(reaper.GetMasterTrack(0)); vim.msg = 'peaks reset on all tracks'
+      elseif reaper.ValidatePtr(hover.mixpk, 'MediaTrack*') then rst(hover.mixpk) end
       click = { t = now2, zone = 'mixpk' }   -- сброс макс. пика / клипа — нативный, как щелчок в микшере REAPER
     elseif hover.trkio then
       ctx.track_io(hover.trkio.col, hover.trkio.what)
@@ -13620,7 +13625,22 @@ local function frame()
       if not ok then vim.msg = tostring(e):match('[^\n]*$') end
       click = { t = now2, zone = 'envhead' }
     elseif hover.header_col then
-      reaper.SetOnlyTrackSelected(hover.header_col.track)
+      -- 10 окт: выбор треков как в REAPER — щелчок: только этот; Shift: диапазон от прошлого;
+      -- Cmd: добавить / убрать
+      do
+        local tr = hover.header_col.track
+        local m = ctx.mods()
+        if reaper.ValidatePtr(tr, 'MediaTrack*') then
+          if m.cmd then reaper.SetTrackSelected(tr, not reaper.IsTrackSelected(tr)); ctx.sel_anchor = tr
+          elseif m.shift and ctx.sel_anchor and reaper.ValidatePtr(ctx.sel_anchor, 'MediaTrack*') then
+            local a = math.floor(reaper.GetMediaTrackInfo_Value(ctx.sel_anchor, 'IP_TRACKNUMBER'))
+            local b = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER'))
+            if a > b then a, b = b, a end
+            for i = a, b do reaper.SetTrackSelected(reaper.GetTrack(0, i - 1), true) end
+          else reaper.SetOnlyTrackSelected(tr); ctx.sel_anchor = tr end
+          vim.msg = ('%d track(s) selected  (Shift+click: range, Cmd+click: add / remove)'):format(reaper.CountSelectedTracks(0))
+        end
+      end
       -- двойной клик по имени трека — переименовать (строка :tname с текущим именем)
       if dbl and click.zone == 'header' and click.guid == hover.header_col.guid and gfx.mouse_y < L.header_y + L.rh then
         ctx.rename_track_prompt(hover.header_col)
