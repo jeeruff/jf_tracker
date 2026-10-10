@@ -3923,29 +3923,66 @@ ctx = {
   end,
   -- t-операции (9 окт): цвет, дубль, перенос трека курсора
   cur_col = function() return cur_col() end,
+  -- 10 окт: цвет трека — сетка образцов (каждая ячейка своим цветом + hex), а не список слов;
+  -- 12 оттенков × тёмный / средний / светлый, серые, random, default, свой — диалог REAPER или :tcolor #rrggbb
   track_colour = function()
     local col = cur_col(); if not (col and col.track) then return end
     local tr = col.track
-    local PAL = { { 'red', 210, 70, 60 }, { 'orange', 230, 140, 50 }, { 'yellow', 220, 200, 70 }, { 'lime', 150, 210, 70 },
-                  { 'green', 70, 180, 90 }, { 'teal', 60, 180, 170 }, { 'cyan', 80, 190, 230 }, { 'blue', 80, 120, 220 },
-                  { 'violet', 150, 100, 220 }, { 'magenta', 210, 90, 190 }, { 'pink', 240, 150, 180 }, { 'grey', 140, 140, 140 } }
+    local HUES = { { 'red', 210, 70, 60 }, { 'orange', 230, 140, 50 }, { 'yellow', 220, 200, 70 }, { 'lime', 150, 210, 70 },
+                   { 'green', 70, 180, 90 }, { 'teal', 60, 180, 170 }, { 'cyan', 80, 190, 230 }, { 'blue', 80, 120, 220 },
+                   { 'violet', 150, 100, 220 }, { 'magenta', 210, 90, 190 }, { 'pink', 240, 150, 180 }, { 'brown', 150, 100, 60 } }
+    local function cl(v) return math.max(0, math.min(255, math.floor(v + 0.5))) end
+    local cur = reaper.GetTrackColor(tr)
     local items = {}
-    for _, c in ipairs(PAL) do items[#items + 1] = { label = c[1], col = { c[2] / 255, c[3] / 255, c[4] / 255 }, data = reaper.ColorToNative(c[2], c[3], c[4]) | 0x1000000 } end
-    items[#items + 1] = { label = 'random', data = 'rnd' }
-    items[#items + 1] = { label = 'default (theme)', data = 0 }
-    items[#items + 1] = { label = 'custom... (REAPER colour dialog)', data = 'dlg' }
-    vim.open_picker('colour of ' .. (col.name ~= '' and col.name or 'track'), items, function(it)
-      local v = it.data
-      if v == 'rnd' then v = reaper.ColorToNative(math.random(60, 240), math.random(60, 240), math.random(60, 240)) | 0x1000000 end
-      if v == 'dlg' then
-        local ok, c = reaper.GR_SelectColor(nil, reaper.GetTrackColor(tr))
-        if not ok or ok == 0 then return end
-        v = c | 0x1000000
+    local function add(name, r, g, b)
+      local hex = ('#%02X%02X%02X'):format(r, g, b)
+      local nat = reaper.ColorToNative(r, g, b) | 0x1000000
+      local rgb = { r / 255, g / 255, b / 255 }
+      local lum = 0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]
+      local fg = lum > 0.55 and { 0, 0, 0 } or { 1, 1, 1 }
+      items[#items + 1] = { label = name .. ' ' .. hex, v = nat, on = (cur | 0x1000000) == nat, tip = name .. '  ' .. hex,
+        draw = function(x, y, w, h)
+          gfx.set(rgb[1], rgb[2], rgb[3], 1); gfx.rect(x, y, w, h, 1)
+          draw.text(x + 3, y + math.floor((h - L.rh) / 2) + 1, draw.fit(hex, w - 6), fg, rgb)
+        end }
+    end
+    for _, lvl in ipairs({ 0.55, 1.0, 1.35 }) do
+      for _, c in ipairs(HUES) do
+        local r, g, b = c[2], c[3], c[4]
+        if lvl > 1 then r, g, b = r + (255 - r) * (lvl - 1) * 1.4, g + (255 - g) * (lvl - 1) * 1.4, b + (255 - b) * (lvl - 1) * 1.4
+        else r, g, b = r * lvl, g * lvl, b * lvl end
+        add(c[1] .. (lvl < 1 and ' dark' or (lvl > 1 and ' light' or '')), cl(r), cl(g), cl(b))
       end
-      edit.run('track colour', function() reaper.SetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR', v) end)
-      model.invalidate()
-      vim.msg = 'tc: ' .. it.label
-    end)
+    end
+    for k = 0, 11 do local v = cl(20 + k * 21); add('grey', v, v, v) end
+    local function act(label, v, tip) items[#items + 1] = { label = label, v = v, tip = tip } end
+    act('random', 'rnd', 'a random colour'); act('default', 0, 'the theme colour (no custom colour)')
+    act('custom', 'dlg', 'REAPER colour dialog; or type :tcolor #rrggbb')
+    local sel = 1
+    for i, it in ipairs(items) do if it.on then sel = i end end
+    ctx.smart_open({ title = 'colour of ' .. (col.name ~= '' and col.name or 'track') .. ' - h j k l, Enter', items = items, cols = 12, sel = sel,
+      cell_w = draw.measure('#000000') + 8,
+      on_pick = function(it)
+        local v = it.v
+        if v == 'rnd' then v = reaper.ColorToNative(math.random(60, 240), math.random(60, 240), math.random(60, 240)) | 0x1000000 end
+        if v == 'dlg' then
+          local ok, c = reaper.GR_SelectColor(nil, reaper.GetTrackColor(tr))
+          if not ok or ok == 0 then return end
+          v = c | 0x1000000
+        end
+        edit.run('track colour', function() reaper.SetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR', v) end)
+        model.invalidate()
+        vim.msg = 'tc: ' .. it.label
+      end })
+  end,
+  -- :tcolor #rrggbb — цвет трека курсора кодом
+  track_colour_hex = function(hex)
+    local col = cur_col(); if not (col and col.track) then return end
+    local r, g, b = (hex or ''):match('#?(%x%x)(%x%x)(%x%x)')
+    if not r then vim.msg = 'tcolor: #rrggbb, like :tcolor #e06040'; return end
+    local v = reaper.ColorToNative(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16)) | 0x1000000
+    edit.run('track colour', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_CUSTOMCOLOR', v) end)
+    model.invalidate(); vim.msg = 'tc: #' .. (r .. g .. b):upper()
   end,
   track_dup = function()
     local col = cur_col(); if not (col and col.track) then return false end
