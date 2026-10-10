@@ -8001,6 +8001,43 @@ ctx = {
     model.invalidate()
     vim.msg = 'RS5K sample: ' .. (path:match('[^/]+$') or path)
   end,
+  -- 10 окт: «в сэмплер» — кусок item (весь, или t0..t1 секунд item — слайс) в RS5K трека курсора:
+  -- RS5K на треке нет — добавляется; FILE0 = файл item, start / end — доли файла
+  to_sampler = function(item, t0, t1, label)
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'sampler: no item'; return end
+    local tk = reaper.GetActiveTake(item)
+    if not tk or reaper.TakeIsMIDI(tk) then vim.msg = 'sampler: audio only'; return end
+    local src = reaper.GetMediaItemTake_Source(tk)
+    local par = reaper.GetMediaSourceParent and reaper.GetMediaSourceParent(src) or nil
+    local fsrc = par or src
+    local path = reaper.GetMediaSourceFileName(fsrc, '')
+    local flen = reaper.GetMediaSourceLength(fsrc)
+    if not path or path == '' or not flen or flen <= 0 then vim.msg = 'sampler: no file'; return end
+    local col = cur_col(); if not (col and col.track) then vim.msg = 'sampler: no track at the cursor'; return end
+    local tr = col.track
+    local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+    local ilen = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    t0, t1 = t0 or 0, t1 or ilen
+    local a = math.max(0, math.min(1, (offs + t0 * rate) / flen))
+    local b = math.max(a + 0.0001, math.min(1, (offs + t1 * rate) / flen))
+    local fx
+    for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+      local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+      if nm:lower():find('reasamplomatic', 1, true) then fx = i; break end
+    end
+    edit.run('to the sampler', function()
+      if not fx then fx = reaper.TrackFX_AddByName(tr, 'ReaSamplOmatic5000 (Cockos)', false, -1) end
+      if fx and fx >= 0 then
+        reaper.TrackFX_SetNamedConfigParm(tr, fx, 'FILE0', path)
+        reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
+        reaper.TrackFX_SetParamNormalized(tr, fx, 13, a)          -- Sample start offset
+        reaper.TrackFX_SetParamNormalized(tr, fx, 14, b)          -- Sample end offset
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('sampler: %s -> RS5K on %s (%.3f-%.3f of the file)'):format(label or 'item', col.name or 'track', a, b)
+  end,
   -- 10 окт: кнопки RS5K над волной — режим, browse, item, list, detect pitch
   rs5k_do = function(f, what)
     local col = dsp_target(); if not (col and f) then return end
@@ -9113,6 +9150,7 @@ function event_actions(hover)
       reaper.Main_OnCommand(40153, 0)
     end, 'i')
     add('Select item in REAPER', function() select_item_in_reaper(head.item) end, 'l')
+    if head.kind == 'audio' then add('To the sampler (RS5K on this track)', function() ctx.to_sampler(head.item, nil, nil, head.name) end, 'S') end   -- 10 окт
     if head.kind == 'audio' then
       add('Quantize the nearest peak to the row grid', function() ctx.peak_quantize() end, 'q')
       add('Move the nearest peak to ... (j k a row, Enter)', function() ctx.peak_pick() end, 'Q')
@@ -9354,6 +9392,11 @@ function ctx.context_items(hover)
     if root then ctx.ssel.item = root.item; ctx.ssel.k = k end
     local nm = k > 0 and ('S%02X'):format(k) or 'whole sample'
     add('Insert ' .. nm .. ' at the cursor (Enter)', function() ctx.slice_list_do('insert', k) end, 'i')
+    if root and root.item then   -- 10 окт: слайс / весь сэмпл — в RS5K трека курсора
+      local t0, t1 = 0, root.len
+      if k > 0 and root.slices and root.slices[k] then t0, t1 = root.slices[k], root.slices[k + 1] or root.len end
+      add('To the sampler: ' .. nm .. ' (RS5K on the cursor track)', function() ctx.to_sampler(root.item, t0, t1, nm) end, 'S')
+    end
     add('Listen (Space)', function() ctx.slice_list_do('play', k) end, 'l')
     add('Insert all slices in a row (a)', function() ctx.slice_list_do('all', k) end, 'a')
     if k > 0 then add('Delete slice ' .. nm .. ' (x)', function() ctx.slice_list_do('delete', k) end, 'x') end
@@ -9378,6 +9421,11 @@ function ctx.context_items(hover)
     if e then
       add('Select instrument', function() pool_select(i) end, 's')
       add('Preview', function() ctx.inst_preview(e, col.track) end, 'v')
+      if e.item and e.stype == 'audio' then   -- 10 окт: инструмент / слайс lib — в RS5K трека курсора
+        local t0, t1 = 0, e.len
+        if e.parent and e.slice_k and e.parent.slices then local p0 = e.parent; t0, t1 = p0.slices[e.slice_k] or 0, p0.slices[e.slice_k + 1] or p0.len; add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(p0.item, t0, t1, e.name) end, 'S')
+        else add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(e.item, t0, t1, e.name) end, 'S') end
+      end
       add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
       add('Rename … (:iname)', function() pool_select(i); ctx.rename_inst_prompt() end, 'n')
       add('Copy (yy)', function() ctx.inst_yank(i, i) end, 'y')
