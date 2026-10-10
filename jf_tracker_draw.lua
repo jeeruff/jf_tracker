@@ -442,7 +442,11 @@ function D.layout(snap, state, nregions)
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
   -- две узкие дорожки с вертикальным текстом: регионы (полоса цвета) и маркеры
-  L.ruler_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
+  L.rg_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
+  -- 10 окт: линейка прыжков по строкам (relativenumber Vim) — колонка на 2 цифры
+  -- левее полосы регионов; регионы сдвигаются на неё
+  L.jl_w = state.rowjumps and (ms('99') + L.pad + 2) or 0
+  L.ruler_w = L.jl_w + L.rg_w
   -- линейка таймлайна между полосами регионов и номерами (3 окт, опция tlruler): метки REAPER
   -- на долях — beats (такт.доля), time (время), both
   local tlr = state.tlruler or 'off'
@@ -4433,8 +4437,7 @@ function D.frame(L, snap, rows, state, info)
         local d = cci and (c.ci - cci) or nil
         local lab = (d == 0 or not d) and tostring(c.ci) or tostring(math.abs(d))
         local col2 = (d == 0) and U.AMBER or (d and d < 0 and U.CYAN or U.GREY)
-        if d and d ~= 0 then lab = (d < 0 and 'H' or 'L') .. lab end
-        if ms(lab) > c.w - 2 then lab = (d == 0 or not d) and tostring(c.ci) or tostring(math.abs(d)) end
+        -- 10 окт: без букв H / L — просто число, сторона видна цветом (голубой — слева)
         if ms(lab) <= c.w - 2 then text(c.x + math.floor((c.w - ms(lab)) / 2), jy, lab, col2) end
         set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1)
       end
@@ -5002,11 +5005,22 @@ function D.frame(L, snap, rows, state, info)
     for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
-  if L.ruler_w > 0 and info.ruler and #rows > 0 then
+  if L.jl_w > 0 and #rows > 0 then
+    local cr = info.vcur and info.vcur.row          -- курсор трекера (cur_row — edit-курсор REAPER)
+    set(U.PANEL); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
+    for i, r in ipairs(rows) do
+      local d = cr and (r.row - cr)
+      if d and d ~= 0 and not r.clip and math.abs(d) < 100 then
+        local lab = tostring(math.abs(d))
+        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d < 0 and U.CYAN or U.GREY)
+      end
+    end
+  end
+  if L.rg_w > 0 and info.ruler and #rows > 0 then
     local row0, nr = rows[1].row, #rows
     local function ry(row) return L.body_y + (row - row0) * L.rh end
     local bot = L.body_y + nr * L.rh
-    local laneR, laneM = tx0 + 3, tx0 + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт)
+    local laneR, laneM = tx0 + L.jl_w + 3, tx0 + L.jl_w + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт); jl_w — линейка прыжков
     local c0 = info.view_clip and info.view_clip[1] or -math.huge
     local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
@@ -5031,10 +5045,10 @@ function D.frame(L, snap, rows, state, info)
       local y = ry(m.row)
       local ynext = mks[k + 1] and ry(mks[k + 1].row) or bot
       local c = m.mk.rgb or U.AMBER
-      set(c); gfx.rect(laneR, y, L.ruler_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
+      set(c); gfx.rect(laneR, y, L.rg_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
       if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
-    if mx >= tx0 and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
+    if mx >= tx0 + L.jl_w and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
