@@ -1068,6 +1068,8 @@ local function keys_control(c)
     if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
     V.count = nil; V.hexbuf = nil; return true
   elseif ch == 'g' then V.cur.row = 0; ensure_visible(); return true
+  elseif (ch == '-' or ch == '+' or ch == '=') and (V.cur.field or 1) == 1 then   -- 10 окт: LPB, как в NORMAL
+    ctx.set_lpb(nil, ch == '-' and -1 or 1); V.msg = 'LPB ' .. ctx.state.lpb; return true
   elseif ch == 'b' or ch == 'n' then
     local m = motion((ch == 'b' and '{' or '}'):byte(), 1)
     if m then V.cur.fi, V.cur.row = m.fi, m.row; clamp_cur(); ensure_visible() end

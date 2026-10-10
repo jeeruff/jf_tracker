@@ -41,7 +41,7 @@ KH.PAGES = {
     { k = 'Opt+1..0', d = 'instrument 1..10 of the lib' },
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back); in INSERT Cmd+digit is a note' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto off' },
-    { k = 'Ctrl - +', d = 'LPB down / up, in any mode (- + alone in NORMAL too); Cmd - + - font size' },
+    { k = 'Ctrl - +', d = 'step down / up by one, in any mode (as in Renoise); - + alone - LPB (NORMAL, INSERT on the note field); Cmd - + - font size' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   pane = { title = 'panes (tmux / zellij)', e = {

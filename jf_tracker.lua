@@ -14515,10 +14515,10 @@ local function frame()
   -- Ctrl + / Ctrl - : масштаб битмапа шагом 0.25 (просьба 1 окт); в TTF-режиме — кегль
   -- (на Mac Ctrl+минус может прийти кодом 31 = ^_ ; плюс — 61 '=' или 43 '+')
   -- масштаб шрифта: Cmd + = / - (5 окт: как привычно на маке); 10 окт: Ctrl + = / -
-  -- — LPB в любом режиме (в пару к Ctrl+цифре = шаг)
+  -- — шаг ±1 в любом режиме, как в Renoise (Ctrl+цифра — шаг 0..9); LPB — - + без модификаторов
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    set_lpb(nil, (c == 45 or c == 95 or c == 31) and -1 or 1)
-    vim.msg = 'LPB ' .. state.lpb .. '  (Ctrl - / +; Cmd - / + - font size)'
+    vim.step = math.max(0, math.min(64, (vim.step or 1) + ((c == 45 or c == 95 or c == 31) and -1 or 1))); vim.step_auto = false
+    vim.msg = 'step ' .. vim.step .. '  (Ctrl - / +, Ctrl+0..9; - + - LPB)'
     c = 0
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
