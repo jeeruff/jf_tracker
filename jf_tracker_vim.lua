@@ -1772,7 +1772,7 @@ function V.key_impl(c)
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
-      elseif c == ('t'):byte() then st.row0 = V.cur.row
+      elseif c == ('t'):byte() then V.transpose_smart()          -- 10 окт: zt — транспозиция (было прокрутка курсора наверх)
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
         local f = flat()[V.cur.fi]
@@ -2273,6 +2273,55 @@ function V.popup()
   return nil
 end
 
+-- 10 окт: транспозиция как в Renoise (F1 / F2 — полутон, F11 / F12 — октава):
+-- scope = 'sel' (выделение, иначе событие строки курсора) | 'col' (колонка, паттерн)
+-- | 'track' (все колонки трека, паттерн) | 'pattern' (все треки, паттерн)
+V.TSCOPE = { sel = 'selection', col = 'column', track = 'track', pattern = 'pattern' }
+function V.transpose_scope(scope, d)
+  local F = flat()
+  local f0, f1, r0, r1
+  if scope == 'sel' then
+    if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range()
+    else f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row end
+  else
+    local a, b = ctx.region_rows and ctx.region_rows()
+    r0, r1 = a or 0, b or ((ctx.snap().last_row or 0))
+    if scope == 'col' then f0, f1 = V.cur.fi, V.cur.fi
+    elseif scope == 'track' then
+      local ci = F[V.cur.fi] and F[V.cur.fi].ci
+      for i, f in ipairs(F) do if f.ci == ci and not f.env then f0 = f0 or i; f1 = i end end
+    else f0, f1 = 1, #F end
+  end
+  if not f0 then return false end
+  local heads = V.heads_in(f0, f1, r0, r1)
+  local notes = {}
+  for _, h in ipairs(heads) do if h.kind == 'midi' or h.kind == 'audio' then notes[#notes + 1] = h end end
+  if #notes == 0 then V.msg = ('transpose %s: no notes'):format(V.TSCOPE[scope] or scope); return false end
+  ctx.edit.transpose(notes, lpb(), d)
+  V.last_edit = nil
+  V.msg = ('transpose %s %+d: %d note(s)'):format(V.TSCOPE[scope] or scope, d, #notes)
+  return true
+end
+-- zt — умная выпадашка транспозиции: −24 … +24 и где (выделение / колонка / трек / паттерн)
+function V.transpose_smart(scope)
+  if not ctx.smart_open then return end
+  scope = scope or 'sel'
+  local items = {}
+  for d = -24, 24 do
+    items[#items + 1] = { label = d == 0 and '0' or ('%+d'):format(d), v = d, on = d == 0, dim = d == 0,
+      tip = ('transpose the %s %+d semitone(s)'):format(V.TSCOPE[scope], d) }
+  end
+  while #items % 12 ~= 0 do items[#items + 1] = { label = '', dim = true } end
+  for _, sc in ipairs({ 'sel', 'col', 'track', 'pattern' }) do
+    items[#items + 1] = { label = V.TSCOPE[sc], v = 'scope:' .. sc, on = sc == scope, tip = 'transpose the ' .. V.TSCOPE[sc] .. ' (F1 F2: Opt sel, Shift+Ctrl column, Shift track, Ctrl pattern)' }
+  end
+  local sel = 25
+  ctx.smart_open({ title = 'transpose - ' .. V.TSCOPE[scope] .. ' (h j k l, Enter)', items = items, cols = 12, sel = sel,
+    on_pick = function(it)
+      if type(it.v) == 'string' and it.v:match('^scope:') then V.transpose_smart(it.v:sub(7)); return nil end
+      if type(it.v) == 'number' and it.v ~= 0 then V.transpose_scope(scope, it.v) end
+    end })
+end
 function V.visual_range()
   local a, b = V.anchor or V.cur, V.cur
   local f0, f1 = math.min(a.fi, b.fi), math.max(a.fi, b.fi)

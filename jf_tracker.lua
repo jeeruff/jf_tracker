@@ -14654,7 +14654,18 @@ local function frame()
     end
   end
   local quit = false
-  if c == keys.f1 then if ctx.mods().shift then state.khelp_big = false; ctx.tutorial() else ctx.help_big() end; c = 0 end
+  -- 10 окт: транспозиция как в Renoise — F1 / F2 полутон, F11 / F12 октава; Opt — выделение,
+  -- Shift+Ctrl — колонка, Shift — трек, Ctrl — паттерн (без модификатора F1 / F2 / F11 / F12 — как было)
+  do
+    local TK = { [26161] = -1, [26162] = 1, [6697265] = -12, [6697266] = 12 }
+    local m = ctx.mods()
+    if TK[c] and not m.cmd and (m.alt or m.shift or m.ctrl) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      local scope = m.alt and 'sel' or ((m.shift and m.ctrl) and 'col' or (m.shift and 'track' or 'pattern'))
+      if vim.transpose_scope(scope, TK[c]) then model.invalidate() end
+      c = 0
+    end
+  end
+  if c == keys.f1 then ctx.help_big(); c = 0 end   -- 10 окт: Shift+F1 — транспоз трека (туториал — в меню и :tutorial)
   if c == keys.f11 then toggle_dock(); c = 0 end
   -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;

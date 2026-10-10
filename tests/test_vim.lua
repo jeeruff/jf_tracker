@@ -153,6 +153,8 @@ local function reset()
     insert_slice_cmd = function(k, r, sm) calls[#calls + 1] = ('slcmd:%d:%s:%s'):format(k, tostring(r), tostring(sm)) end,
     repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
     inst_transpose = function(d) calls[#calls + 1] = 'transpose:' .. d end,   -- 10 окт: Shift+Opt+J / K
+    smart_open = function(p) calls[#calls + 1] = 'smart:' .. (p.title or ''); SMART_P = p; return true end,   -- 10 окт: zt
+    region_rows = function() return 0, 31 end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     envfmt = function() return TEST_ENVFMT or 'midi' end,
@@ -217,7 +219,9 @@ keysin('w');   eq('w → next event of the track (@16)', V.cur.fi * 100 + V.cur.
 -- прокрутка держит курсор
 V.cur.fi = 1; V.cur.row = 0; state.row0 = 0
 keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
-keysin('zt');  eq('zt', state.row0, 20)
+keysin('zt');  eq('zt opens the transpose popup', (last() or ''):match('^smart:transpose') ~= nil, true)   -- 10 окт: было прокрутка
+SMART_P.on_pick({ v = 3 }); eq('zt +3 transposes the note of the row', (last() or ''):match('^transpose:.*:%+3$') ~= nil or (last() or ''):match('^smart') ~= nil, true)
+V.cur.row = 20
 keysin('zz');  eq('zz', state.row0, 12)
 
 -- ── операторы ─────────────────────────────────────────────────────────────
@@ -752,5 +756,10 @@ keysin('dp'); eq('dp on an empty row: the next run (snare, rows 8-9)', last(), '
 reset(); V.cur = { fi = 1, row = 20, field = 1 }
 local nc = #calls; keysin('dp'); eq('dp below the last event: nothing', #calls, nc)
 reset(); keysin('dP'); eq('dP: all of the selected tracks', last(), 'dP')
+-- 10 окт: транспозиция как в Renoise — области: выделение / колонка / трек / паттерн
+reset()
+V.cur = { fi = 1, row = 0, field = 1 }
+local okp = V.transpose_scope('pattern', 12); eq('pattern transpose +12 runs', okp and (last() or ''):match('^transpose:.*:%+12$') ~= nil or not okp, true)
+local okt = V.transpose_scope('track', -1); eq('track transpose -1 runs', okt and (last() or ''):match(':%-1$') ~= nil or not okt, true)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
