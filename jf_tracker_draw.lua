@@ -4100,19 +4100,11 @@ function D.frame(L, snap, rows, state, info)
           if D.csel_on(col.guid, what) then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
           hint('trs', kx, ky, 2 * r + 1, 2 * r + 1, { col = col, what = what })
         end
-        if not bigf and state.panknob ~= false then
-          local d2 = 2 * L.rh - 2
-          if col.panmode == 5 or col.panmode == 6 then
-            local d = math.min(d2, math.floor((fx_w - 2) / 2))
-            local a1, a2 = (col.panmode == 5) and 'pan' or 'panl', (col.panmode == 5) and 'width' or 'panr'
-            local v1 = (col.panmode == 5) and lv('pan', col.pan or 0) or lv('panl', col.panL or -1)
-            local v2 = (col.panmode == 5) and lv('width', col.width or 1) or lv('panr', col.panR or 1)
-            knob(sx, pyy, d, (v1 + 1) / 2, a1)
-            knob(sx + fx_w - d, pyy, d, (v2 + 1) / 2, a2)
-          else
-            local d = math.min(d2, fx_w)
-            knob(sx, pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
-          end
+        -- 10 окт: одна панорама — кноб ровно над метром по центру; две (stereo pan / dual pan) —
+        -- двумя слайдерами, как в микшере REAPER
+        if not bigf and state.panknob ~= false and col.panmode ~= 5 and col.panmode ~= 6 then
+          local d = math.min(2 * L.rh - 2, fx_w)
+          knob(sx + math.floor((fx_w - d) / 2), pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
         elseif col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
@@ -5829,9 +5821,21 @@ function D.frame(L, snap, rows, state, info)
             local x1, x2, x3, x4 = X(tA), X(tA + tD), X(tA + tD + 0.3), X(tot)
             gfx.line(ax0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), x4, Y(0))
             text(ax0 + 2, ay0, fit(('A %s  D %s  S %s  R %s'):format(at.s, de.s, su.s, re.s), aw0 - 4), U.GREY)
+            -- 10 окт: ADSR мышью — три ручки: A (вбок), D+S (вбок / вверх-вниз), R (вбок); тянется ближайшая
+            local hs = { { 'a', x1, Y(1) }, { 'ds', x2, Y(sl) }, { 'r', x4, Y(0) } }
+            local inbox = not drag and mx >= ax0 and mx < ax0 + aw0 and my >= ay0 and my < ay0 + ah0
+            local near, nd
+            if inbox then for _, hp in ipairs(hs) do local dd = math.abs(mx - hp[2]) + 0.3 * math.abs(my - hp[3]); if not nd or dd < nd then near, nd = hp[1], dd end end end
+            local ad = info.adsr_drag and info.adsr_drag()
+            local rr = math.max(2, math.floor(L.rh / 4))
+            for _, hp in ipairs(hs) do
+              local on = (near == hp[1]) or (ad and ad.f == f and ad.part == hp[1])
+              set(on and U.AMBER or U.GREEN); gfx.rect(hp[2] - rr, hp[3] - rr, 2 * rr + 1, 2 * rr + 1, on and 1 or 0)
+            end
+            if inbox then hover.dspadsr = { fx = k, f = f, part = near, w = aw0, h = ah0 } end
           end
         end
-        if not drag and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
+        if not drag and not hover.dspadsr and mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then
           local fr = math.max(0, math.min(1, (mx - wx) / math.max(1, ww - 1)))
           hover.dspwave = { fx = k, f = f, frac = fr, x = wx, w = ww, edge = math.abs(fr - na) <= math.abs(fr - nb) and 'a' or 'b' }
         end

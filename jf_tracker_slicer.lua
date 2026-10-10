@@ -818,7 +818,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
   -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
-  local zoomed0 = S.zoom_e == (e.item or e.path) and S.vb ~= nil and (S.vb - (S.va or 0)) < (e.len or 1) - 1e-6
+  if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
+  local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
   local SBH = zoomed0 and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0
   if SBH > 0 then wh = wh - SBH - 2 end
@@ -837,7 +838,6 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
   -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком
   local len = e.len > 0 and e.len or 1
-  if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
   local va = math.max(0, math.min(len, S.va or 0))
   local vb = math.max(va + 1e-3, math.min(len, S.vb or len))
   local span = vb - va

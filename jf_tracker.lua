@@ -3848,6 +3848,61 @@ ctx = {
     vim.open_hydra({ title = 'insert - ' .. (m == 'fixed' and ('inst ' .. (vim.inst or 0)) or m) .. ((state.human or 0) > 0 and ('  human ' .. state.human .. '%') or ''), items = items })
     state.popup_at = { kind = 'strip', id = 'inst' }
   end,
+  -- 10 окт: ПКМ по пану — свойства панорамы, как окно REAPER «Pan properties», меню трекера
+  pan_menu = function(col)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local g = function(k) return reaper.GetMediaTrackInfo_Value(tr, k) end
+    local mode, law = math.floor(g('I_PANMODE')), g('D_PANLAW')
+    local function on(b) return b and '  (on)' or '' end
+    local function setm(v, nm) return function() edit.track_value(tr, 'I_PANMODE', v); model.invalidate(); vim.msg = col.name .. ' pan mode: ' .. nm end end
+    local function setl(v, nm) return function() edit.track_value(tr, 'D_PANLAW', v); model.invalidate(); vim.msg = col.name .. ' pan law: ' .. nm end end
+    local items = {
+      { key = 'c', label = 'center (pan 0' .. ((mode == 5) and ', width 100' or (mode == 6) and ', L -100 R +100' or '') .. ')', fn = function()
+          edit.track_value(tr, 'D_PAN', 0)
+          if mode == 5 then edit.track_value(tr, 'D_WIDTH', 1) end
+          if mode == 6 then edit.track_value(tr, 'D_DUALPANL', -1); edit.track_value(tr, 'D_DUALPANR', 1) end
+          model.invalidate(); vim.msg = col.name .. ': pan centered' end },
+      { key = 'p', label = 'project default mode' .. on(mode == -1), fn = setm(-1, 'project default') },
+      { key = 'b', label = 'stereo balance' .. on(mode == 3), fn = setm(3, 'stereo balance') },
+      { key = 'm', label = 'stereo balance / mono pan (3.x)' .. on(mode == 0), fn = setm(0, 'balance / mono pan') },
+      { key = 's', label = 'stereo pan (pan + width)' .. on(mode == 5), fn = setm(5, 'stereo pan') },
+      { key = 'd', label = 'dual pan (L + R)' .. on(mode == 6), fn = setm(6, 'dual pan') },
+      { key = '0', label = 'pan law: default' .. on(law < 0), fn = setl(-1, 'default') },
+      { key = '1', label = 'pan law: 0 dB' .. on(math.abs(law - 1) < 1e-3), fn = setl(1, '0 dB') },
+      { key = '3', label = 'pan law: -3 dB' .. on(math.abs(law - 0.70795) < 2e-3), fn = setl(0.70795, '-3 dB') },
+      { key = '4', label = 'pan law: -4.5 dB' .. on(math.abs(law - 0.59566) < 2e-3), fn = setl(0.59566, '-4.5 dB') },
+      { key = '6', label = 'pan law: -6 dB' .. on(math.abs(law - 0.50119) < 2e-3), fn = setl(0.50119, '-6 dB') },
+    }
+    vim.open_hydra({ title = 'pan - ' .. (col.name or ''), items = items })
+  end,
+  -- 10 окт: ПКМ по метру / фейдеру — свойства: что пишется (rec mode), мониторинг, что показывает метр (VU mode)
+  meter_menu = function(col)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local g = function(k) return math.floor(reaper.GetMediaTrackInfo_Value(tr, k)) end
+    local rm, mon, vu = g('I_RECMODE'), g('I_RECMON'), g('I_VUMODE')
+    local function on(b) return b and '  (on)' or '' end
+    local function set(k, v, nm) return function() reaper.SetMediaTrackInfo_Value(tr, k, v); model.invalidate(); vim.msg = col.name .. ': ' .. nm end end
+    local items = {}
+    local function add(key, label, fn) items[#items + 1] = { key = key, label = label, fn = fn } end
+    for _, r in ipairs({ { 'i', 0, 'input (audio or MIDI)' }, { 'n', 2, 'none (monitor only)' }, { 'o', 1, 'output stereo' }, { 'O', 3, 'output stereo, latency compensated' },
+        { 'm', 5, 'output mono' }, { 'M', 4, 'output MIDI' }, { 'v', 7, 'MIDI overdub' }, { 'r', 8, 'MIDI replace' }, { 't', 9, 'MIDI touch-replace' }, { 'l', 16, 'MIDI latch-replace' } }) do
+      add(r[1], 'record: ' .. r[3] .. on(rm == r[2]), set('I_RECMODE', r[2], 'record ' .. r[3]))
+    end
+    add('I', 'record input...', function() ctx.input_picker(col, { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }) end)
+    for _, r in ipairs({ { 'q', 0, 'off' }, { 'w', 1, 'on' }, { 'e', 2, 'auto (tape)' } }) do
+      add(r[1], 'monitor: ' .. r[3] .. on(mon == r[2]), set('I_RECMON', r[2], 'monitor ' .. r[3]))
+    end
+    local vm = vu & 30
+    for _, r in ipairs({ { 'p', 0, 'stereo peaks' }, { 'P', 2, 'multichannel peaks' }, { 's', 4, 'stereo RMS' }, { 'c', 8, 'combined RMS' },
+        { 'u', 12, 'LUFS-M' }, { 'U', 16, 'LUFS-S (readout max)' }, { 'S', 20, 'LUFS-S (readout current)' } }) do
+      add(r[1], 'meter shows: ' .. r[3] .. on(vu & 1 == 0 and vm == r[2]), set('I_VUMODE', (vu & ~31) | r[2], 'meter ' .. r[3]))
+    end
+    add('k', 'meter off' .. on(vu & 1 == 1), set('I_VUMODE', vu ~ 1, (vu & 1 == 1) and 'meter on' or 'meter off'))
+    add('x', 'reset peak hold', function() for ch = 0, 1 do reaper.Track_GetPeakHoldDB(tr, ch, true) end; vim.msg = col.name .. ': peaks reset' end)
+    vim.open_hydra({ title = 'meter / record - ' .. (col.name or ''), items = items })
+  end,
   -- ── вкладка macros (9 окт) ─────────────────────────────────────────────
   mac_file = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_macros.txt' end,
   mac_saved = function()
@@ -11570,6 +11625,7 @@ local function frame()
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
+    adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
@@ -12376,6 +12432,7 @@ local function frame()
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
+  elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
@@ -13628,6 +13685,20 @@ local function frame()
       ctx.ab_drag = hover.dspab
       ctx.ab_morph(hover.dspab.f, (gfx.mouse_x - hover.dspab.x) / math.max(1, hover.dspab.w))
       click = { t = now2, zone = 'dspab' }
+    elseif hover.dspadsr then
+      -- 10 окт: ADSR сэмплера мышью — от значений в момент щелчка, сдвиг мыши в долях окна ADSR
+      local h = hover.dspadsr
+      ctx.set_focus('dsp'); dsp_sel.fx = h.fx
+      local col = dsp_target()
+      local A = col and model.fxapi(col.track)
+      if A then
+        local d = { f = h.f, part = h.part, x0 = gfx.mouse_x, y0 = gfx.mouse_y, w = h.w, h = h.h, idx = {}, n0 = {} }
+        for _, nm in ipairs({ 'attack', 'decay', 'sustain', 'release' }) do
+          for _, p2 in ipairs(h.f.params) do if p2.name == nm then d.idx[nm] = p2.i; d.n0[nm] = A.GetParamNormalized(col.track, h.f.i, p2.i) end end
+        end
+        ctx.adsr_d = d
+      end
+      click = { t = now2, zone = 'dspadsr' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
@@ -14190,6 +14261,20 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then ctx.ab_morph(ctx.ab_drag.f, (gfx.mouse_x - ctx.ab_drag.x) / math.max(1, ctx.ab_drag.w))
     else ctx.ab_drag = nil end
   end
+  if ctx.adsr_d then
+    local d = ctx.adsr_d
+    local col = dsp_target()
+    if gfx.mouse_cap & 1 == 1 and col then
+      local fine = (gfx.mouse_cap & 8) == 8 and 0.2 or 1      -- Shift — мелко
+      local dx = (gfx.mouse_x - d.x0) / math.max(1, d.w) * fine
+      local dy = (d.y0 - gfx.mouse_y) / math.max(1, d.h) * fine
+      local function put(nm, v) if d.idx[nm] then edit.fx_param(col.track, d.f.i, d.idx[nm], math.max(0, math.min(1, d.n0[nm] + v))) end end
+      if d.part == 'a' then put('attack', dx)
+      elseif d.part == 'ds' then put('decay', dx); put('sustain', dy)
+      elseif d.part == 'r' then put('release', dx) end
+      state.status = d.f.name .. ': ' .. ({ a = 'attack', ds = 'decay / sustain', r = 'release' })[d.part or 'a'] .. ' - drag, Shift: fine'
+    else ctx.adsr_d = nil end
+  end
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspwave_drag
@@ -14247,6 +14332,10 @@ local function frame()
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
+  elseif U.rclick and hover.trs and hover.trs.col and (hover.trs.what == 'pan' or hover.trs.what == 'width' or hover.trs.what == 'panl' or hover.trs.what == 'panr') then
+    ctx.pan_menu(hover.trs.col)
+  elseif U.rclick and hover.trs and hover.trs.col and hover.trs.what == 'vol' then
+    ctx.meter_menu(hover.trs.col)
   elseif U.rclick and hover.dspcomp then
     ctx.gain_comp(hover.dspcomp, 'remove')
   elseif U.rclick and hover.btn and hover.btn.what == 'auto' then
