@@ -45,6 +45,7 @@ KH.PAGES = {
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   pane = { title = 'panes (tmux / zellij)', e = {
+    { k = 'zz', d = 'in any module (lib, browser, fx list, item, macros ...): the module on the whole window, again - back; the tracker keeps Vim zz (centre), matrix zz - session, dsp zz - dsp big', t = { 'z' } },
     { k = '⌘h ⌘j ⌘k ⌘l', d = 'focus the pane on the left / below / above / on the right (like dwm), from any pane' },
     { k = '⌘⇧h ⌘⇧j ⌘⇧k ⌘⇧l', d = 'move the pane there (out of its stack if it is a tab)' },
     { k = '⌥Tab', d = 'next pane in the tree order (Shift - back)' },
@@ -351,7 +352,8 @@ KH.PAGES = {
     { k = '+ -', d = 'transient sensitivity' },
     { k = 'x', d = 'clear slices' },
     { k = 'Q', d = 'smart quantize: strong hits to strong beats' },
-    { k = 'z', d = 'autotrim: cut the silence at the start and the end (button autotrim)' },
+    { k = 'T', d = 'autotrim: cut the silence at the start and the end (button autotrim)' },
+    { k = 'zz', d = 'item on the whole window (zoom), again - back', t = { 'z' } },
     { k = '< >', d = 'volume -1 / +1 dB' },
     { k = 'n', d = 'normalize' },
     { k = '[ ]', d = 'widen selection left / right' },

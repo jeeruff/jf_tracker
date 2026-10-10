@@ -1726,7 +1726,9 @@ function V.key_impl(c)
       V.count = nil; finish_move(); return
     elseif p == 'z' then
       local L = ctx.layout()
-      if c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
+      -- 10 окт: фокус не в трекере (lib, browser, fx list, macros …) — zz = модуль на всё окно (zoom)
+      if c == ('z'):byte() and ctx.state.focus ~= 'tracker' and ctx.zz_zoom and ctx.zz_zoom() then
+      elseif c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)

@@ -410,7 +410,11 @@ function S.key(c)
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
-  elseif ch == 'z' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
+  -- 10 окт: zz — item на всё окно (как zz в других модулях); autotrim — T
+  elseif ch == 'z' then
+    if S.pend_z and R.time_precise() - S.pend_z < 0.8 then S.pend_z = nil; if ctx.sample_big then ctx.sample_big() end
+    else S.pend_z = R.time_precise(); S.msg = 'z: z - item on the whole window' end
+  elseif ch == 'T' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)
   elseif ch == 'n' and S.entry and S.entry.item then ctx.edit.normalize(S.entry.item); S.msg = 'normalized (peak 0 dB)'
