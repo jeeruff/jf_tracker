@@ -14514,8 +14514,14 @@ local function frame()
   -- дополнение) и открытые fzf-пикер / hydra
   -- Ctrl + / Ctrl - : масштаб битмапа шагом 0.25 (просьба 1 окт); в TTF-режиме — кегль
   -- (на Mac Ctrl+минус может прийти кодом 31 = ^_ ; плюс — 61 '=' или 43 '+')
-  -- масштаб шрифта: Ctrl или Cmd + = / - (5 окт: Cmd — как привычно на маке)
-  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and (ctx.mods().ctrl or ctx.mods().cmd) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+  -- масштаб шрифта: Cmd + = / - (5 окт: как привычно на маке); 10 окт: Ctrl + = / -
+  -- — LPB в любом режиме (в пару к Ctrl+цифре = шаг)
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    set_lpb(nil, (c == 45 or c == 95 or c == 31) and -1 or 1)
+    vim.msg = 'LPB ' .. state.lpb .. '  (Ctrl - / +; Cmd - / + - font size)'
+    c = 0
+  end
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
     if (state.font or 0) == 0 then
       -- шаги x1 → x1.5 → x2 → x3 (5 окт)
