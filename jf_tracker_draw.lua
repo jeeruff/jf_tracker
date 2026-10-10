@@ -1276,14 +1276,14 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.GREEN))
-    else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+    elseif inv ~= 'inst' then text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end   -- 10 окт: под курсором — без точек
   end
   if not cell then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
     draw_inst()
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
-      text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
+      if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
     end
     return
   end
@@ -1343,7 +1343,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
         local skip = fld == 2 and cell.vol ~= nil
         if not skip then
           local fx = D.field_rect(L, fld)
-          text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
+          if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
         end
       end
       -- точка огибающей громкости take на этой строке (5 окт)
@@ -1360,7 +1360,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT))
       for fld = 2, nf do
         local fx = D.field_rect(L, fld)
-        text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
+        if inv ~= fld then text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY)) end   -- 10 окт: пустое поле под курсором — чистый блок, без точек
       end
     end
   end
@@ -3514,7 +3514,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
         local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
         set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
-        local stack = #c.tabs > 1                         -- 10 окт: стек — вкладки |rec|item|clips|, одна панель — подпись на линии
+        local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
         for _, t in ipairs(c.tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
           if lbl ~= '' then
