@@ -15637,6 +15637,7 @@ local function frame()
         -- 10 окт: модуль props — J K строка, H L значение, R сброс (как во вкладке item); остальное — vim
         local se = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
         if c == 27 then ctx.set_focus('tracker')
+        elseif c == 118 then ctx.sprops_fit()            -- v — лист растёт, пока все свойства не влезут
         elseif not SPROP.key(c, se) then vim.key(c) end
       elseif state.focus == 'slices' and state.slices_on then
         -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер
