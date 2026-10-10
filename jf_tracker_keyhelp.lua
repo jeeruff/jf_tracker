@@ -505,6 +505,7 @@ KH.BARS = {
              { 'b', 'bypass' }, { 'd', 'delete' }, { 'za', 'fold' }, { 'o', 'window' }, { 'zz Esc', 'back' } },
   notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
+  sprops = { { 'J K', 'row' }, { 'H L', 'value' }, { 'Shift', 'fine' }, { 'R', 'reset' }, { 'v', 'fit all rows' }, { 'Esc', 'tracker' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' }, { '?', 'help' } },
   modulation = { { 'L', 'curves' }, { 'P', 'params' }, { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
