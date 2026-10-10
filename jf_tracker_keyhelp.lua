@@ -340,6 +340,22 @@ KH.PAGES = {
     { k = 'drag title', d = 'move fx: the amber line shows where it lands' },
     { k = 'Esc', d = 'back to tracker' },
   } },
+  -- 10 окт: модуль слайсов — своя страница (клавиши и меню ПКМ — одни действия)
+  slices = { title = 'slices list of the selected sample', e = {
+    { k = 'j k', d = 'next / previous slice (it plays)' },
+    { k = 'J K', d = 'by 8' },
+    { k = 'g G', d = 'the whole sample / the last slice' },
+    { k = 'Enter i', d = 'insert the slice (S00 - the whole sample) at the tracker cursor' },
+    { k = 'Space', d = 'listen to the slice / stop' },
+    { k = 'x d', d = 'delete the slice (its line goes)' },
+    { k = 'a', d = 'insert all slices in a row' },
+    { k = 's', d = 'slice menu: smart, transients, 2 4 8 16 32 64 equal' },
+    { k = 'e', d = 'edit in the item tab (slicer)' },
+    { k = 'X', d = 'delete all slices (asks)' },
+    { k = 'r', d = 'slice pick mode: key / random ...' },
+    { k = 'zz', d = 'the slices list on the whole window, again - back', t = { 'z' } },
+    { k = 'Esc', d = 'back to the tracker' },
+  } },
   sample = { title = 'item tab (slicer + properties of the item)', e = {
     { k = 'dblclick', d = 'on the wave: a slice there (option slice by click: one click); on a slice line: remove it', t = {} },
     { k = 'slice labels', d = 'three rows at each slice line: its number (as in the slices list), the key that plays it, the MIDI note', t = {} },
@@ -496,7 +512,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

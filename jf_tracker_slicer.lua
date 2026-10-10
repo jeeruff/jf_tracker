@@ -627,7 +627,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- убрана 1 окт
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
-  local SBH = math.max(6, math.floor(rh * 0.45))
+  local SBH = math.max(30, math.floor(rh * 2.2))   -- 10 окт: в 5 раз выше (было 0.45 строки — микроскопически)
   wh = wh - SBH - 2
   if wh < 6 then return end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,

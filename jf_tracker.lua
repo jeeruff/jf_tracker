@@ -1617,8 +1617,17 @@ ctx = {
     elseif e.take and reaper.ValidatePtr(e.take, 'MediaItem_Take*') then
       key = 't:' .. tostring(e.guid or e.item) .. ':' .. ('%.4f'):format(e.len or 0)
       if SL.sg.jobs[key] then return SL.sg.jobs[key] end
-      reader, sr, len = SL.sg.take_reader(e.take)
-      len = e.len or len
+      -- 10 окт: сперва WAV-файл напрямую (смещение и скорость item): аудио-аксессор
+      -- take у заглушённого item (lib — заглушённый трек) отдаёт тишину — спектрограмма была тёмной
+      local fr, fsr = nil, nil
+      if e.fpath and e.fpath ~= '' and e.fpath:lower():match('%.wav$') then fr, fsr = SL.sg.wav_reader(e.fpath) end
+      if fr then
+        local offs, rate = e.offs or 0, (e.rate and e.rate ~= 0) and e.rate or 1
+        reader, sr, len = function(t, n) return fr(offs + t * rate, n) end, fsr, e.len
+      else
+        reader, sr, len = SL.sg.take_reader(e.take)
+        len = e.len or len
+      end
     end
     if not reader then return nil end
     return SL.sg.get(key, reader, len or 1, sr, 1024, 128)
@@ -1632,6 +1641,29 @@ ctx = {
   end,
   slice_child = function(col, root, k)
     for _, c in ipairs(col and col.pool or {}) do if c.parent == root and c.slice_k == k then return c end end
+  end,
+  -- 10 окт: действия модуля слайсов — общие для клавиш и меню (ПКМ)
+  slice_list_do = function(what, k)
+    local root, col = ctx.slice_root()
+    if not root then vim.msg = 'slices: pick a sample in the lib'; return end
+    k = k or ((ctx.ssel.item == root.item) and ctx.ssel.k or 0)
+    local function sl_open() if SL.entry ~= root and root.item then SL.open(root, col and col.track) end; return SL.entry == root end
+    if what == 'insert' then if k > 0 then ctx.insert_slice_cmd(k) else ctx.insert_whole() end
+    elseif what == 'play' then ctx.slice_step(0)
+    elseif what == 'all' then ctx.insert_all_slices()
+    elseif what == 'menu' then ctx.slice_hydra()
+    elseif what == 'edit' then
+      ctx.open_slicer()
+      if state.panes_ui and ctx.pane_focus then ctx.pane_focus('sample') else state.top = true; state.toptab = 'sample'; ctx.set_focus('top') end
+    elseif what == 'delete' then
+      if k == 0 then vim.msg = 'the whole sample is not a slice'; return end
+      if sl_open() then SL.remove(k); ctx.ssel.k = math.min(k, #(SL.slices or {})); vim.msg = SL.msg end
+    elseif what == 'clear' then
+      OPT.ask.open('delete all slices?', root.name .. ' - the slice lines go, notes that use them keep playing their spot', {
+        { key = 'k', label = 'keep', fn = function() vim.msg = 'slices kept' end },
+        { key = 'd', label = 'delete all', fn = function() if sl_open() then SL.clear(); vim.msg = 'slices deleted' end end },
+      })
+    end
   end,
   slice_step = function(d)
     local root, col = ctx.slice_root()
@@ -8965,7 +8997,7 @@ function ctx.tok_codes(t)
   if #t == 2 and t:match('^%a%a$') then return { t:byte(1), t:byte(2) } end
 end
 ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
-                    sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
+                    slices = 'slices', sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
   if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
@@ -8973,7 +9005,7 @@ function ctx.ctx_page(hover)
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus
   if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
-  if f == 'slices' then return 'sample' end
+  if f == 'slices' then return 'slices' end   -- 10 окт: своя страница (было — справка item)
   if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
   if f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm' end
   return ctx.CTX_FOCUS[f] and f or nil
@@ -9124,6 +9156,20 @@ function ctx.context_items(hover)
     radio('full', 'full - to the end of the item (Esc stops)')
     radio('hold', 'hold - while the mouse button is held on the row')
     radio('sec', 'first second')
+  elseif type(hover.slices) == 'number' and not state.midi_inst and not state.auto_inst then
+    -- 10 окт: своё меню списка слайсов (те же действия, что клавиши модуля)
+    local root = ctx.slice_root()
+    local k = hover.slices
+    if root then ctx.ssel.item = root.item; ctx.ssel.k = k end
+    local nm = k > 0 and ('S%02X'):format(k) or 'whole sample'
+    add('Insert ' .. nm .. ' at the cursor (Enter)', function() ctx.slice_list_do('insert', k) end, 'i')
+    add('Listen (Space)', function() ctx.slice_list_do('play', k) end, 'l')
+    add('Insert all slices in a row (a)', function() ctx.slice_list_do('all', k) end, 'a')
+    if k > 0 then add('Delete slice ' .. nm .. ' (x)', function() ctx.slice_list_do('delete', k) end, 'x') end
+    add('Slice … (s)', function() ctx.slice_list_do('menu', k) end, 's')
+    add('Edit in the item tab (e)', function() ctx.slice_list_do('edit', k) end, 'e')
+    add('Delete all slices (X)', function() ctx.slice_list_do('clear', k) end, 'X')
+    add((state.slicepick ~= 'key' and '!' or '') .. 'Slice pick mode: ' .. tostring(state.slicepick or 'key') .. ' (r)', function() ctx.slicepick_cycle() end, 'r')
   elseif hover.pool and hover.pool.auto then
     add('Select automation', function() ctx.auto_select() end)
   elseif hover.pool and hover.pool.midi then
@@ -14968,6 +15014,15 @@ local function frame()
         elseif ch == 'g' then ctx.slice_step(-cur)
         elseif ch == 'G' then ctx.slice_step(n - cur)
         elseif ch == 'r' then ctx.slicepick_cycle()
+        -- 10 окт: клавиши списка слайсов (как меню ПКМ): Enter / i вставить, Space слушать,
+        -- x / d удалить, a все подряд, s нарезать (меню), e открыть в item, X удалить все
+        elseif c == 13 or ch == 'i' then ctx.slice_list_do('insert')
+        elseif ch == ' ' then if PV.playing() then PV.stop() else ctx.slice_list_do('play') end
+        elseif ch == 'x' or ch == 'd' then ctx.slice_list_do('delete')
+        elseif ch == 'a' then ctx.slice_list_do('all')
+        elseif ch == 's' then ctx.slice_list_do('menu')
+        elseif ch == 'e' then ctx.slice_list_do('edit')
+        elseif ch == 'X' then ctx.slice_list_do('clear')
         else return vim.key(c) end
       elseif state.focus == 'inst' and (state.top or state.side) then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
