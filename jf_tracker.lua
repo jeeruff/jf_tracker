@@ -14253,7 +14253,10 @@ local function frame()
       inject_last = inj
       local code, cap = inj:match('^(%-?%d+),?(%d*)')
       code = tonumber(code)
-      if code then c = code; inject_cap = tonumber(cap) end
+      -- 10 окт: только в песочнице (проект без имени, треки sandbox_setup) — иначе отказ;
+      -- после обработки — jf_tracker/inject_ack «токен ok …» (драйвер tests/live.py ждёт его)
+      if code and not ctx.is_sandbox() then reaper.SetExtState(EXT, 'inject_ack', inj .. ' REFUSED: not a sandbox', false)
+      elseif code then c = code; inject_cap = tonumber(cap); ctx.inject_pending = inj end
     end
   end
   -- Ctrl+J (9 окт): на macOS код 10 до gfx.getchar не доходит (Ctrl+H K L
@@ -14928,6 +14931,11 @@ local function frame()
   if c_raw > 0 and ctx.keylog and #ctx.keylog > 0 then
     ctx.keylog[#ctx.keylog] = ctx.keylog[#ctx.keylog] .. ' -> ' .. tostring(vim.msg or ''):sub(1, 50) .. (ctx.last_trace and state.debug and (' @' .. ctx.last_trace) or '')
     reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
+  end
+  if ctx.inject_pending then
+    reaper.SetExtState(EXT, 'inject_ack', ('%s ok %s %s%s row%d fi%d fld%s msg=%s'):format(ctx.inject_pending, vim.mode, state.focus,
+      state.focus == 'top' and (':' .. tostring(state.toptab)) or '', vim.cur.row, vim.cur.fi, tostring(vim.cur.field), tostring(vim.msg or ''):sub(1, 80)), false)
+    ctx.inject_pending = nil
   end
   inject_cap = nil
   draw.pmark(nil)                                  -- jftop: конец кадра, ожидание defer не считается
