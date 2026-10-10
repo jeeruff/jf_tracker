@@ -9,11 +9,11 @@
 -- данные и действия — через ctx (TT.init): themes() → { {name, pal}, … },
 -- theme(), apply_theme(name), fonts() → { {key, face, size, tip}, … },
 -- font(), set_font(key), own_font(), install_fonts(), reload_themes().
--- Превью шрифтов рисуются один раз в картинку 90 (смена шрифта на кадр дорога).
+-- Превью шрифтов рисуются один раз в картинку 799 (смена шрифта на кадр дорога).
 
 local TT = { sec = 1, i = { 1, 1 }, scroll = 0, rects = {}, hot = nil, btn_hot = nil, fkey = nil }
 local U, ctx
-local IMG = 90
+local IMG = 799                   -- 10 окт: было 90 — это картинки спектрограмм (90..97), они затирали друг друга
 
 function TT.init(u, c) U, ctx = u, c end
 

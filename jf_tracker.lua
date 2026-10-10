@@ -12920,7 +12920,12 @@ local function frame()
       ctx.set_focus('top'); if hover.sample.e.item then edit.item_vol(hover.sample.e.item, 0); hover.sample.e.vol = 1; vim.msg = 'vol 0 dB' end
     elseif hover.sample and hover.sample.view then
       ctx.set_focus('top')
-      if hover.sample.view == 'big' then ctx.sample_big() else SL.view = hover.sample.view end
+      if hover.sample.view == 'big' then ctx.sample_big()
+      elseif hover.sample.view == 'sgram' and SL.view == 'sgram' and hover.sample.e then
+        -- 10 окт: повторное нажатие sgram — пересчитать спектрограмму заново
+        for k in pairs(SL.sg.jobs) do SL.sg.jobs[k] = nil end
+        vim.msg = 'spectrogram: recalculating'
+      else SL.view = hover.sample.view end
       click = { t = now2, zone = 'sampleview' }
     elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then
       -- клип сессии (6 окт): начало / конец / перенос / метки лупа L / xf

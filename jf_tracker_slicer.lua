@@ -622,6 +622,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- функцией, что колонка волны трека (ctx.spec_colour); спектрограмма
   -- убрана 1 окт
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
+  -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
+  local SBH = math.max(6, math.floor(rh * 0.45))
+  wh = wh - SBH - 2
   if wh < 6 then return end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
   -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком
@@ -862,7 +865,42 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     or (#slices > 0 and ('%d slices; keys: q = the whole sample, 2 w 3 e ... = slices 1 2 3 4 (Sxx), Option + key - the pitch of the last slice'):format(#slices) or '')
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag: to a track / the lib as a slice   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
-  U.text(x, wy + wh + 2, ctx.fit(foot, w), U.TEXT)
+  -- полоска-обзор (10 окт): весь item, рамка — что видно сейчас; тянуть / щёлкнуть — прокрутка
+  do
+    local sy = wy + wh + 1
+    local mx2, my2 = gfx.mouse_x, gfx.mouse_y
+    local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
+    U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)
+    local pk = ctx.peaks and ctx.peaks(e, math.max(16, w))
+    U.set(U.mix(base, U.BG, 0.35))
+    if pk and pk.n > 0 then
+      local c2, h2 = sy + SBH / 2, SBH / 2
+      for px = 0, w - 1, 2 do
+        local idx = math.floor(px / w * pk.n) + 1
+        local a, b = pk.min[idx] or 0, pk.max[idx] or 0
+        gfx.rect(x + px, math.floor(c2 - b * h2), 1, math.max(1, math.floor((b - a) * h2)), 1)
+      end
+    end
+    local zoomed = span < len - 1e-6
+    local p0, p1 = x + math.floor(va / len * w), x + math.max(2, math.floor(vb / len * w))
+    if zoomed then
+      U.set(U.AMBER); gfx.a = (inside or S.sbdrag) and 0.30 or 0.18; gfx.rect(p0, sy, math.max(2, p1 - p0), SBH, 1); gfx.a = 1
+      gfx.rect(p0, sy, math.max(2, p1 - p0), SBH, 0)
+    else U.set(U.LINE); gfx.rect(x, sy, w, SBH, 0) end
+    local down = (gfx.mouse_cap & 1) == 1
+    if down and inside and not S.sb_prev and zoomed then
+      local t = (mx2 - x) / w * len
+      S.sbdrag = { off = (t >= va and t <= vb) and (t - va) or span / 2 }   -- щелчок мимо рамки — рамка центром туда
+    end
+    if not down then S.sbdrag = nil end
+    S.sb_prev = down
+    if S.sbdrag then
+      local t = (mx2 - x) / w * len
+      local nva = math.max(0, math.min(len - span, t - S.sbdrag.off))
+      S.va, S.vb = nva, nva + span
+    end
+  end
+  U.text(x, wy + wh + SBH + 4, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end
