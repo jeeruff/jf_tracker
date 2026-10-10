@@ -234,6 +234,7 @@ local state = {
   jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
+  slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
   insmode = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'insmode')] or 'fixed',   -- 9 окт: инструмент при вставке
@@ -552,7 +553,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3497,6 +3498,23 @@ ctx = {
     vim.inst = ni
     return ni
   end,
+  -- режим слайса (10 окт): key — слайс клавиши; random — любая слайс-клавиша
+  -- ставит случайный слайс выбранного сэмпла (не тот же подряд); seq — следующий
+  -- по кругу. Меню вставки (l) и r в модуле слайсов
+  slice_pick = function(n, k)
+    local m = state.slicepick or 'key'
+    if m == 'key' or n < 1 then return k end
+    local last = vim.last_slice or 0
+    if m == 'seq' then return last % n + 1 end
+    if n == 1 then return 1 end
+    local r = math.random(n - 1)
+    if r >= last and last >= 1 then r = r + 1 end
+    return r
+  end,
+  slicepick_cycle = function()
+    state.slicepick = ({ key = 'random', random = 'seq', seq = 'key' })[state.slicepick or 'key']
+    vim.msg = 'slices: ' .. ({ key = 'by key (q 2 w ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
+  end,
   ins_vel = function(v)
     if not state.velrand then return v end
     return math.max(1, math.min(127, math.floor((v or 100) + (math.random() * 2 - 1) * 8 + 0.5)))
@@ -3513,6 +3531,7 @@ ctx = {
       { key = '2', label = 'human 50 %' .. mark(state.human == 50), fn = function() state.human = 50; edit.human = 50; vim.msg = 'human 50 %' end },
       { key = '4', label = 'human 100 %' .. mark(state.human == 100), fn = function() state.human = 100; edit.human = 100; vim.msg = 'human 100 %' end },
       { key = 'v', label = 'velocity: random +-8 every note' .. mark(state.velrand), fn = function() state.velrand = not state.velrand; vim.msg = 'velocity random ' .. (state.velrand and 'on' or 'off') end },
+      { key = 'l', label = 'slices: ' .. ({ key = 'by key', random = 'random', seq = 'sequence' })[state.slicepick or 'key'] .. ' - switch (by key / random / sequence)', fn = function() ctx.slicepick_cycle() end },
       { key = 'm', label = (state.slicemono and 'mono (a new note cuts the track) - switch to poly' or 'poly - switch to mono'), fn = function() ctx.mono_toggle() end },
       { key = 'a', label = 'step auto (the step follows the note length)' .. mark(vim.step_auto), fn = function() vim.step_auto = not vim.step_auto; vim.msg = 'step: ' .. (vim.step_auto and 'auto' or tostring(vim.step)) end },
     }
@@ -14431,6 +14450,7 @@ local function frame()
         elseif ch == 'K' then ctx.slice_step(-8)
         elseif ch == 'g' then ctx.slice_step(-cur)
         elseif ch == 'G' then ctx.slice_step(n - cur)
+        elseif ch == 'r' then ctx.slicepick_cycle()
         else return vim.key(c) end
       elseif state.focus == 'inst' and (state.top or state.side) then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end

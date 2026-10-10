@@ -102,6 +102,7 @@ local function reset()
   V.init({
     edit = E, state = state, piano = keys.piano,
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
+    slice_pick = function(n, k) if PICK then return PICK(n, k) end; return k end,  -- 10 окт: режим слайса
     track_dup = function() calls[#calls + 1] = 'tdup'; return true end,                -- 9 окт: t-операции
     track_move = function(d, n) calls[#calls + 1] = 'tmove:' .. d .. ':' .. (n or 1); return true end,
     track_colour = function() calls[#calls + 1] = 'tcol' end, rec_arm = function() calls[#calls + 1] = 'tarm' end,
@@ -645,6 +646,12 @@ do
   keysin('2'); eq('2 = slice 1 (black key)', last(), 'slice:trA@30:1')
   keysin('w'); eq('w = slice 2', last(), 'slice:trA@30:2')
   keysin('p'); eq('p = slice 16', last(), 'slice:trA@30:16')
+  -- режим слайса (10 окт): random / sequence выбирает слайс сам, клавиша только бьёт
+  PICK = function(n, k) return 7 end
+  keysin('w'); eq('slice mode picks the slice (w -> 7)', last(), 'slice:trA@30:7')
+  PICK = function(n, k) return 9 end
+  keysin('x'); keysin('p'); keysin('z'); eq('slice mode: a key past the slices (28 of 20) still inserts', last(), 'slice:trA@30:9')
+  PICK = nil
   local n0 = #calls
   keysin('x'); keysin('2'); eq('x then 2 = slice 13', last(), 'slice:trA@30:13')
   keysin('p'); eq('past the last slice (28 of 20): nothing', last(), 'slice:trA@30:13')

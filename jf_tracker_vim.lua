@@ -1508,6 +1508,8 @@ function V.key_impl(c)
     if sliced and kp - SB + 1 == 0 then sliced = false end          -- q: весь сэмпл — обычный путь ноты
     if sliced then
       local k = kp - SB + 1
+      -- режим слайса (10 окт): random / sequence — слайс выбирает режим, клавиша лишь бьёт
+      if ctx.slice_pick and (how == 'insert' or how == 'beside') and not V.arp_live then k = ctx.slice_pick(#inst0.slices, k) end
       if k < 1 or k > #inst0.slices then V.msg = ('no slice %d (the sample has %d) - z / x shift by an octave'):format(k, #inst0.slices); return end
       V.last_slice = k
       if ctx.select_slice then ctx.select_slice(inst0, k) end
