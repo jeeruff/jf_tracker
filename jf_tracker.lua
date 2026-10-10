@@ -3642,6 +3642,89 @@ ctx = {
     end
     return ('fonts: %d installed, %d were there already  (authors, licences - fonts/README.md; not in the list yet - restart REAPER)'):format(n, have)
   end,
+  -- 10 окт: выпадашки options → font / theme (смарт-панель): шрифт — своим
+  -- шрифтом, тема — мини-превью её цветами. Превью шрифтов рисуются один раз
+  -- в картинку 90 (смена шрифта каждый кадр дорогая), потом только blit
+  font_pick = function()
+    local list = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do list[#list + 1] = k end
+    if (state.ttfcustom or '') ~= '' then list[#list + 1] = 'custom' end
+    local fs = tonumber(state.fontscale) or 2
+    if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
+    local function face(k)
+      local f = draw.TTF_FACES[k]
+      if f then return f.face, math.floor(f.px * fs + 0.5) end
+      if k == 'custom' then return state.ttfcustom, math.floor((tonumber(state.ttfpx) or 14) * fs + 0.5) end
+    end
+    local ph = L.rh
+    for _, k in ipairs(list) do local _, sz = face(k); if sz then ph = math.max(ph, sz + 4) end end
+    local pw = L.cw * 34
+    local key = table.concat(list, ',') .. ph .. ':' .. pw .. ':' .. tostring(U.TEXT[1]) .. tostring(state.ttf)
+    if ctx.fontprev_key ~= key then
+      local d0 = gfx.dest
+      gfx.setimgdim(90, -1, -1); gfx.setimgdim(90, pw, ph * #list)
+      gfx.dest = 90
+      for i, k in ipairs(list) do
+        local y = (i - 1) * ph
+        local fc, sz = face(k)
+        if fc then
+          gfx.setfont(5, fc, sz); gfx.set(U.TEXT[1], U.TEXT[2], U.TEXT[3], 1)
+          gfx.x, gfx.y = 4, y + math.floor((ph - gfx.texth) / 2)
+          gfx.drawstr(k .. '   C-4 01 7F  ' .. (k == 'custom' and fc or 'Abc 0123'))
+        else
+          gfx.setfont(draw.font_id or 0)
+          draw.text(4, y + math.floor((ph - L.rh) / 2) + 1, 'off   C-4 01 7F  REAPER bitmap', U.TEXT)
+        end
+      end
+      gfx.setfont(draw.font_id or 0); gfx.dest = d0
+      ctx.fontprev_key = key
+    end
+    local items, sel = {}, 1
+    for i, k in ipairs(list) do
+      local f = draw.TTF_FACES[k]
+      if k == (state.ttf or 'off') then sel = i end
+      items[#items + 1] = { label = k, v = k, on = k == (state.ttf or 'off'),
+        tip = f and (k .. ' - ' .. f.d) or (k == 'custom' and ('your font: ' .. tostring(state.ttfcustom)) or 'off - the REAPER bitmap font'),
+        draw = function(x, y, w, h) gfx.blit(90, 1, 0, 0, (i - 1) * ph, math.min(pw, w), ph, x, y + math.floor((h - ph) / 2), math.min(pw, w), ph) end }
+    end
+    OPT.close()
+    ctx.smart_at = { x = math.floor(gfx.w * 0.2), y = math.floor(gfx.h * 0.08) }
+    ctx.smart_open({ title = 'font - h j k l, Enter (each in its own face)', items = items, cols = 2, sel = sel,
+      cell_w = pw + 4, cell_rows = ph / L.rh,
+      on_pick = function(it) state.ttf = it.v; draw.set_font(state); relayout(); ctx.fontprev_key = nil; ctx.options() end })
+  end,
+  theme_pick = function()
+    local okb, base = pcall(dofile, DIR .. '/jf_tracker_ui.lua')     -- палитра REAPER (как apply_theme)
+    if not okb or type(base) ~= 'table' then base = U end
+    local items, sel = {}, 1
+    for i, name in ipairs(draw.themes.LIST) do
+      local t = {}
+      for k, v in pairs(base) do if type(v) == 'table' and type(v[1]) == 'number' then t[k] = v end end
+      draw.themes.apply(t, name)
+      if name == (state.theme or 'reaper') then sel = i end
+      items[#items + 1] = { label = name, v = name, on = name == (state.theme or 'reaper'), tip = 'theme ' .. name,
+        draw = function(x, y, w, h)
+          local function c(col) gfx.set(col[1], col[2], col[3], 1) end
+          c(t.BG); gfx.rect(x, y, w, h, 1)
+          c(t.PANEL); gfx.rect(x, y, w, L.rh, 1)
+          draw.text(x + L.pad, y + 1, name, t.TEXT)
+          local ry = y + L.rh + 1
+          draw.text(x + L.pad, ry, 'C-4 01', t.TEXT)
+          local bx = x + L.pad + draw.measure('C-4 01') + L.pad
+          c(t.AMBER); gfx.rect(bx, ry, draw.measure('7F'), L.rh - 2, 1)
+          draw.text(bx, ry, '7F', t.BG)
+          local sx = bx + draw.measure('7F') + L.pad
+          for _, col in ipairs({ t.CYAN, t.GREEN, t.RED, t.GREY }) do
+            if sx + L.cw <= x + w - 2 then c(col); gfx.rect(sx, ry + 2, L.cw, L.rh - 6, 1); sx = sx + L.cw + 3 end
+          end
+          c(t.LINE); gfx.rect(x, y, w, h, 0)
+        end }
+    end
+    OPT.close()
+    ctx.smart_at = { x = math.floor(gfx.w * 0.2), y = math.floor(gfx.h * 0.08) }
+    ctx.smart_open({ title = 'theme - h j k l, Enter', items = items, cols = 4, sel = sel,
+      cell_w = L.cw * 22, cell_rows = 2.3,
+      on_pick = function(it) ctx.apply_theme(it.v); ctx.options() end })
+  end,
   -- :font (10 окт): шрифт трекера по имени / next / prev / off
   font_set = function(arg)
     arg = (arg or ''):match('^%s*(.-)%s*$')
@@ -6946,7 +7029,7 @@ ctx = {
       -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { sep = true, title = 'theme' },
-      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor; my themes - from Data/jf_tracker_themes', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end },
+      { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor; my themes - from Data/jf_tracker_themes', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end, pick = function() ctx.theme_pick() end },
       { label = 'make a theme from the current colours', kind = 'action', value = 'template', desc = 'writes Data/jf_tracker_themes/my-theme.txt: twelve colours as key = #rrggbb - edit them in any text editor', fn = function() ctx.theme_template() end },
       { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
       { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
@@ -6955,7 +7038,7 @@ ctx = {
       { label = 'install bundled fonts', kind = 'action', value = 'fonts/', desc = 'copies the pixel fonts that come with the tracker (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270) into your user fonts folder; authors and licences - fonts/README.md. A font not shown yet - restart REAPER', fn = function() vim.msg = ctx.fonts_install() end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
-      { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
+      { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() ctx.font_pick() end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },

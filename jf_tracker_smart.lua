@@ -7,6 +7,8 @@
 -- Что показать и что делать при выборе, решает вызывающий (vim: V.smart):
 -- SM.open{ title, items = { {label, v, tip, on}, … }, cols, sel, on_pick(it) }
 -- on_pick может вернуть следующую сетку (буква команды → её значения).
+-- 10 окт: p.cell_w (px) и p.cell_rows (высота ячейки в строках) — для превью;
+-- it.draw(x, y, w, h, sel) рисует ячейку сам (шрифт своим шрифтом, тема цветами)
 -- Без reaper.* — тест tests/test_smart.lua.
 
 local SM = { p = nil, rect = nil, hot = nil }
@@ -58,18 +60,19 @@ function SM.layout(L, ms, W, H)
   local p = SM.p
   local cw = 0
   for _, it in ipairs(p.items) do cw = math.max(cw, ms(it.label)) end
-  cw = cw + 2 * L.pad
+  cw = p.cell_w or (cw + 2 * L.pad)
+  local crh = (p.cell_rows or 1) * L.rh
   local rows = math.ceil(#p.items / p.cols)
   local w = p.cols * cw + 2 * L.pad
   local tw = ms(p.title or '') + 2 * L.pad
   if w < tw then cw = cw + math.ceil((tw - w) / p.cols); w = p.cols * cw + 2 * L.pad end
-  local h = (rows + 2) * L.rh + 2 * L.pad          -- заголовок, сетка, строка подсказки
+  local h = rows * crh + 2 * L.rh + 2 * L.pad     -- заголовок, сетка, строка подсказки
   local a = p.anchor or { x = L.pad, y = L.pad }
   local x = math.max(2, math.min(W - w - 2, a.x))
   local y = a.y
   if y + h > H - 2 then y = (a.top or a.y) - h - 2 end
   y = math.max(2, math.min(y, H - h - 2))
-  return x, y, w, h, cw, rows
+  return x, y, w, h, cw, rows, crh
 end
 
 -- рисование; d = { L, set, rect, text, ms, fit, C = цвета }
@@ -77,7 +80,7 @@ function SM.draw(d)
   local p = SM.p
   if not p then return end
   local L, set, text, ms, C = d.L, d.set, d.text, d.ms, d.C
-  local x, y, w, h, cw, rows = SM.layout(L, ms, gfx.w, gfx.h)
+  local x, y, w, h, cw, rows, crh = SM.layout(L, ms, gfx.w, gfx.h)
   SM.rect = { x, y, w, h }
   set(C.PANEL); gfx.rect(x, y, w, h, 1)
   set(C.FRAME); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
@@ -87,20 +90,25 @@ function SM.draw(d)
   SM.hot = nil
   for i, it in ipairs(p.items) do
     local r, c = (i - 1) // p.cols, (i - 1) % p.cols
-    local cx, cy = gx + c * cw, gy + r * L.rh
-    local hot = mx >= cx and mx < cx + cw and my >= cy and my < cy + L.rh
+    local cx, cy = gx + c * cw, gy + r * crh
+    local hot = mx >= cx and mx < cx + cw and my >= cy and my < cy + crh
     if hot then SM.hot = i end
     -- 9 окт: выбор клавишами — заметная янтарная заливка; текущее значение — янтарный текст
     local sel = i == p.sel
-    if sel then set(C.SELF); gfx.rect(cx, cy, cw - 1, L.rh, 1); set(C.AMBER); gfx.rect(cx, cy, cw - 1, L.rh, 0) end
-    if hot and not sel then set(C.TEXT); gfx.rect(cx, cy, cw - 1, L.rh, 0) end
-    local col = sel and C.TEXT or (it.on and C.AMBER or (it.dim and C.GREY or C.TEXT))
-    text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
+    if sel then set(C.SELF); gfx.rect(cx, cy, cw - 1, crh, 1) end
+    if it.draw then it.draw(cx + 1, cy + 1, cw - 3, crh - 2, sel)
+    else
+      local col = sel and C.TEXT or (it.on and C.AMBER or (it.dim and C.GREY or C.TEXT))
+      text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
+    end
+    if sel then set(C.AMBER); gfx.rect(cx, cy, cw - 1, crh, 0)
+    elseif hot then set(C.TEXT); gfx.rect(cx, cy, cw - 1, crh, 0)
+    elseif it.on then set(C.AMBER); gfx.rect(cx, cy, cw - 1, crh, 0) end
   end
   -- подсказка: под мышью, иначе выбранное
   local ti = p.items[SM.hot or p.sel]
   local tip = ti and (ti.tip or ti.label) or ''
-  text(x + L.pad, gy + rows * L.rh, d.fit(tip, w - 2 * L.pad), C.GREY)
+  text(x + L.pad, gy + rows * crh, d.fit(tip, w - 2 * L.pad), C.GREY)
 end
 
 -- мышь: щелчок по ячейке — выбор, мимо (или ПКМ) — закрыть. true — съели

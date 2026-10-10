@@ -114,6 +114,7 @@ end
 function O.adjust(it, d)
   if not it then return end
   if it.kind == 'action' or it.kind == 'text' then if it.fn then it.fn() end; return end   -- действие / текст (промпт) (5 окт)
+  if it.pick and d == 0 then return it.pick() end   -- 10 окт: Enter на font / theme — выпадашка с превью
   if it.kind == 'toggle' then it.set(not it.get())
   elseif it.kind == 'cycle' then
     local v = it.get(); local k = 1
@@ -237,6 +238,7 @@ function O.click(mx, my)
     -- cycle (3 окт): значения кнопками в ряд — клик по кнопке ставит его;
     -- кнопки не влезли — клик по строке шагает по кругу, как раньше
     if it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
+    elseif it.kind == 'cycle' and it.pick then it.pick()   -- 10 окт: щелчок по строке font / theme — выпадашка
     elseif it.kind == 'cycle' then O.adjust(it, 1)
     elseif it.kind == 'num' and it.min and it.max and r then
       if mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
