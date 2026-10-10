@@ -269,6 +269,7 @@ KH.PAGES = {
     { k = ':z words  :zi', d = 'zoxide: jump to the most used / recent folder matching the words (last word - in the folder name); :zi - pick from the visited folders' },
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },
+    { k = 'm M', d = 'mark the row (and step down) / clear all marks; marks stay across folders - Enter puts every marked file into the lib in marking order' },
     { k = 'h - BS', d = 'folder up' },
     { k = 'Cmd+Enter', d = 'replace sample of the selected instrument everywhere' },
     { k = 'Enter .rx2 .xrni', d = 'import REX / Renoise-Redux instrument with its slices' },

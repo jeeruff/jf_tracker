@@ -772,6 +772,47 @@ function B.full(e)
   return B.path .. '/' .. e.name
 end
 
+-- отметка строк (10 окт, как Insert в Midnight Commander / пробел в ranger):
+-- m — отметить / снять строку и шаг вниз, M — снять все. Ключ — полный путь,
+-- поэтому отметки живут при переходах по папкам: собрать файлы из разных
+-- папок и Enter — все в lib по порядку отметки
+B.sel, B.sel_order = {}, {}
+local function markable(e) return e and not (e.dir or e.db or e.pmdir or e.pmfolder or e.empty or e.mark) end
+function B.mkey(e) return e and (e.pm and ('pm:' .. (e.path or e.name)) or B.full(e)) end
+function B.nmarked() return #B.sel_order end
+function B.is_marked(e) return e and B.sel[B.mkey(e)] ~= nil end
+function B.toggle_mark()
+  local e = B.entries[B.cur]
+  if markable(e) then
+    local k = B.mkey(e)
+    if B.sel[k] then
+      B.sel[k] = nil
+      for i, o in ipairs(B.sel_order) do if o.key == k then table.remove(B.sel_order, i); break end end
+    else
+      B.sel[k] = true
+      B.sel_order[#B.sel_order + 1] = { key = k, e = e, full = B.full(e) }
+    end
+    if ctx.msg then ctx.msg(('%d marked - Enter: all into the lib, M: clear'):format(#B.sel_order)) end
+  end
+  B.cur = math.min(#B.entries, B.cur + 1)
+end
+function B.clear_marks()
+  B.sel, B.sel_order = {}, {}
+  if ctx.msg then ctx.msg('marks cleared') end
+end
+-- Enter при отметках: отмеченные файлы — в lib по порядку отметки (проекты pm,
+-- дорожки, регионы — пока только файлы); отметки снимаются
+function B.enter_marked()
+  local n = 0
+  for _, o in ipairs(B.sel_order) do
+    local e = o.e
+    if not (e.pm or e.trk or e.rgn or e.kit or e.other) and ctx.add_to_depot then ctx.add_to_depot(o.full); n = n + 1 end
+  end
+  B.sel, B.sel_order = {}, {}
+  if ctx.msg then ctx.msg(('%d file(s) into the lib'):format(n)) end
+  return n
+end
+
 function B.enter()
   local e = B.entries[B.cur]
   if not e then return end
@@ -893,6 +934,9 @@ function B.key(c)
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
     local e = B.entries[B.cur]
     if e and not (e.dir or e.db or e.pm or e.pmdir or e.kit or e.trk or e.rgn or e.mark or e.other or e.empty) and ctx.lib_append_slice then ctx.lib_append_slice(B.full(e)) end
+  elseif ch == 'm' then B.toggle_mark()                                -- 10 окт: отметка строк
+  elseif ch == 'M' then B.clear_marks()
+  elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
   elseif ch == ' ' then B.preview()
@@ -1113,6 +1157,13 @@ function B.draw(U, L, x, y, w, h)
       U.set(B.focus and U.TEXT or U.LINE); gfx.rect(x + 1, ry, w - 2, L.rh, 1)
     end
     local col = (idx == B.cur and B.focus) and U.BG or ((e.dir or e.db) and U.CYAN or ((e.pm or e.trk or e.rgn) and U.AMBER or U.TEXT))
+    -- отмеченная (10 окт): янтарная подложка и полоска слева, имя янтарём
+    local marked = B.sel[B.mkey(e)] ~= nil
+    if marked then
+      if idx ~= B.cur then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(x + 1, ry, w - 2, L.rh, 1) end
+      U.set(U.AMBER); gfx.rect(x + 1, ry, 2, L.rh, 1)
+      if idx ~= B.cur or not B.focus then col = U.AMBER end
+    end
     local glyph = e.db and '#' or (e.pm and '@' or (e.kit and '*' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or (e.dir and '/' or ' '))))))
     local is_file = not (e.dir or e.db or e.pm or e.trk or e.rgn or e.mark)
     local tw = w - 2 * L.pad

@@ -100,4 +100,26 @@ do
   local all = B.zquery(db, {}, now)
   eq('z: list all, best first', all[1].path, '/s/Drums/Kicks')
 end
+-- отметка строк (10 окт): m — отметить и вниз, отметки живут по папкам, Enter — все в lib
+do
+  local added = {}
+  B.init({ add_to_depot = function(p) added[#added + 1] = p end, msg = function() end }, '/r')
+  B.filter = ''; B.filtering = false; B.mode = 'files'; B.clear_marks()
+  B.path = '/r/Drums'; B.refresh()
+  local function at(name) for i, e in ipairs(B.entries) do if e.name == name then return i end end end
+  B.cur = at('Kicks'); B.key(('m'):byte())
+  eq('a folder is not marked (only steps down)', B.nmarked(), 0)
+  B.cur = at('hat_open.wav'); B.key(('m'):byte())
+  eq('m marks a file', B.nmarked(), 1)
+  eq('m steps down', B.cur, at('hat_open.wav') + 1)
+  B.path = '/r/Bass'; B.refresh(); B.cur = 1; B.key(('m'):byte())
+  eq('marks survive a folder change', B.nmarked(), 2)
+  B.cur = 1; B.key(('m'):byte()); eq('m again unmarks', B.nmarked(), 1)
+  B.key(('m'):byte()); B.cur = 1
+  B.key(13)
+  eq('Enter puts all marked into the lib', #added, 2)
+  eq('in marking order', added[1], '/r/Drums/hat_open.wav')
+  eq('marks cleared after Enter', B.nmarked(), 0)
+  B.key(('m'):byte()); B.key(('M'):byte()); eq('M clears', B.nmarked(), 0)
+end
 print(('%d checks, %d failed'):format(n, bad))
