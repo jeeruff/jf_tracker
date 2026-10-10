@@ -5963,8 +5963,12 @@ function D.frame(L, snap, rows, state, info)
     -- слева режим/сообщение (не шире трети), дальше — описание того, на что
     -- наведена мышь, во всю оставшуюся ширину
     local left = fit(info.status_left or '', sw / 3)
-    -- mono: INSERT в статусе — красным, как рамка (3 окт)
-    text(sx + L.pad, sy + 2, left, (D.mono and info.vmode == 'insert') and D.FOCUS_INS or U.AMBER)
+    -- 10 окт: «-- INSERT --» в статусе — красным во всех темах (цвет рамки INSERT), остальное — янтарь
+    local ins = info.vmode == 'insert' and left:sub(1, 12) == '-- INSERT --'
+    if ins then
+      text(sx + L.pad, sy + 2, '-- INSERT --', D.FOCUS_INS or U.RED)
+      text(sx + L.pad + ms('-- INSERT --'), sy + 2, left:sub(13), U.AMBER)
+    else text(sx + L.pad, sy + 2, left, U.AMBER) end
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
