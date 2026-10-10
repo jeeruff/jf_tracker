@@ -1081,8 +1081,29 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- линию слайса (отпустил — сохранено), колесо — шире / уже
   S.zoom_hot = nil
   -- 10 окт: плейхед — белая линия в волне (и в зуме, и на полоске-обзоре ниже)
-  local pht = ctx.item_playpos and e.item and ctx.item_playpos(e.item)
+  local pht, pt0
+  if ctx.item_playpos and e.item then pht, pt0 = ctx.item_playpos(e.item) end
   if pht and (pht < 0 or pht > len) then pht = nil end
+  -- 10 окт: след — сыгранный кусок подсвечен и гаснет 1.5 с после конца: короткий слайс
+  -- пролетает за пару кадров, а след остаётся видно, где именно прошёл звук
+  local now = reaper.time_precise()
+  if pht and pt0 then
+    local tr = S.trail
+    if not (tr and tr.item == e.item and tr.a == pt0 and pht >= tr.b - 0.05) then tr = { item = e.item, a = pt0, b = pt0 }; S.trail = tr end
+    tr.b, tr.at = math.max(tr.b, pht), now
+  end
+  local trl = S.trail and S.trail.item == e.item and S.trail
+  local tra = trl and (pht and 0.22 or 0.22 * (1 - (now - trl.at) / 1.5)) or 0
+  if trl and tra <= 0 then S.trail, trl = nil, nil end
+  local function trail_rect(t0z, t1z, x0, w0, y0, h0)       -- след в окне t0z..t1z шириной w0
+    if not trl then return end
+    local a2, b2 = math.max(trl.a, t0z), math.min(trl.b, t1z)
+    if b2 <= a2 then return end
+    local px0 = x0 + math.floor((a2 - t0z) / (t1z - t0z) * w0)
+    local px1 = x0 + math.floor((b2 - t0z) / (t1z - t0z) * w0)
+    U.set(U.TEXT); gfx.a = tra; gfx.rect(px0, y0, math.max(1, px1 - px0), h0, 1); gfx.a = 1
+  end
+  trail_rect(va, vb, x, w, wy, wh)
   if pht and pht >= va and pht <= vb then U.set(U.TEXT); gfx.rect(tx(pht), wy, 1, wh, 1) end
   if ZH > 0 then
     local zy = wy + wh + 2
@@ -1134,6 +1155,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
+    trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)
     if pht and pht > t0 and pht < t0 + 2 * W2 then U.set(U.TEXT); gfx.rect(x + math.floor((pht - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
     U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)

@@ -8363,12 +8363,12 @@ ctx = {
   -- 10 окт: плейхед в слайсере: превью этого item (нота, Shift+нота, MIDI) или транспорт поверх самого item
   item_playpos = function(item)
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return nil end
-    local t = PV.item_pos(item)
-    if t then return t end
+    local t, t0 = PV.item_pos(item)
+    if t then return t, t0 end
     if reaper.GetPlayState() & 1 == 1 and reaper.GetMediaItemInfo_Value(item, 'B_MUTE') == 0 then
       local p0 = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
       local d = reaper.GetPlayPosition() - p0
-      if d >= 0 and d <= reaper.GetMediaItemInfo_Value(item, 'D_LENGTH') then return d end
+      if d >= 0 and d <= reaper.GetMediaItemInfo_Value(item, 'D_LENGTH') then return d, nil end
     end
   end,
   preview_vol = function() return PV.vol end,

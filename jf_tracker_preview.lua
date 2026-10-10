@@ -43,7 +43,7 @@ function P.item_pos(item)
   if not (cur and P.cur_item and P.cur_item == item) then return nil end
   local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
   if not ok then return nil end
-  return (pos - (P.cur_offs or 0)) / math.max(1e-6, P.cur_rate or 1)
+  return (pos - (P.cur_offs or 0)) / math.max(1e-6, P.cur_rate or 1), P.cur_t0 or 0
 end
 
 local audio_stop_at
@@ -80,6 +80,7 @@ function P.audio(track, depot_item, semis, max_sec)
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
+  P.cur_t0 = 0
   P.cur_semis_add = semis or 0                                   -- нота поверх питча take
   return true
 end
@@ -114,6 +115,7 @@ function P.inst(track, item, max_sec)
   R.CF_Preview_Play(pv)
   cur = pv
   P.cur_item, P.cur_offs, P.cur_rate = item, offs, rate
+  P.cur_t0 = 0
   P.cur_semis_add = 0
   return true
 end
@@ -184,6 +186,7 @@ function P.slice(track, entry, t0, t1, semis)
   cur = pv
   -- плейхед слайса на волне инструмента (3 окт: Shift+нота / MIDI-клавиатура)
   P.cur_item, P.cur_offs, P.cur_rate = entry.item, entry.offs or 0, rate ~= 0 and rate or 1
+  P.cur_t0 = t0                                                 -- 10 окт: откуда играет — след на волне
   return true
 end
 
