@@ -123,6 +123,7 @@ local function reset()
     set_pitchmode = function(col, m) calls[#calls + 1] = 'pitchmode:' .. col.name .. ':' .. m end,
     sync_here = function() calls[#calls + 1] = 'sync'; return 1 end,
     pool_select = function(n) calls[#calls + 1] = 'pool:' .. n; V.inst = n end,
+    clear_tracks_all = function() calls[#calls + 1] = 'dP'; return true end,   -- 10 окт
     slicer_active = function() return SLICER end, slicer_key = function(c) calls[#calls + 1] = 'slkey:' .. c end,   -- 10 окт
     set_font = function(n) calls[#calls + 1] = 'font:' .. n end,
     browse = function(p) calls[#calls + 1] = 'browse:' .. tostring(p) end,
@@ -734,5 +735,13 @@ cmd_down = true; V.key(('4'):byte()); cmd_down = false
 eq('slicer open: Cmd+4 picks instrument 4', last(), 'pool:4')
 V.key(('x'):byte()); eq('slicer open: other keys go to the slicer', last(), 'slkey:120')
 SLICER = nil
+-- 10 окт: dp — до паузы (серия лейна без пустой строки), dP — всё выбранных треков
+reset(); V.cur = { fi = 1, row = 0, field = 1 }
+keysin('dp'); eq('dp from row 0: kick + its overlapping ov (rows 0-3)', last(), 'delete:kick,ov')
+reset(); V.cur = { fi = 1, row = 5, field = 1 }
+keysin('dp'); eq('dp on an empty row: the next run (snare, rows 8-9)', last(), 'delete:snare')
+reset(); V.cur = { fi = 1, row = 20, field = 1 }
+local nc = #calls; keysin('dp'); eq('dp below the last event: nothing', #calls, nc)
+reset(); keysin('dP'); eq('dP: all of the selected tracks', last(), 'dP')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -78,6 +78,8 @@ KH.PAGES = {
     { k = 'd', d = 'd + motion deletes events: dw d3j dG d}; dd (NORMAL) deletes the track, in INSERT the event of the row', t = { 'd' } },
     { k = 'dd dt', d = 'delete the track / remove the time selection from the project (later items move)', t = { 'dd', 'dt' } },
     { k = 'dW', d = 'delete the whole item under the cursor' },
+    { k = 'dp', d = 'delete up to the pause: the run of events of the cursor lane from the cursor down to the first empty row (like d} in Vim); on an empty row - the next run' },
+    { k = 'dP', d = 'delete every item and all automation (envelope points, automation items) of the selected tracks in the whole project (no selection - the cursor track); one undo' },
     { k = 'C-A-j S-A-j', d = 'repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track, Shift+Opt+J - all tracks (Paketti)', t = {} },
     { k = 'dr daw', d = 'clear the track in the cursor region / all items of the track (the lib after =LIB stays)', t = { 'dr', 'daw' } },
     { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },

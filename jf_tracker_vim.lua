@@ -1843,6 +1843,36 @@ function V.key_impl(c)
         V.count = nil; return
       end
       if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
+      -- 10 окт: dP — все items и автоматизация выбранных треков во всём проекте
+      if p == 'd' and c == ('P'):byte() then
+        if ctx.clear_tracks_all and ctx.clear_tracks_all() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
+      -- 10 окт: dp — до паузы (как d} в Vim: абзац = серия событий лейна без
+      -- пустой строки). С курсора вниз; курсор на пустой строке — ближайшая серия
+      if p == 'd' and c == ('p'):byte() then
+        local f = flat()[V.cur.fi]
+        if not f or f.env then finish_move(); V.count = nil; return end
+        local fa, fb = V.cur.fi, V.cur.fi
+        while flat()[fa - 1] and flat()[fa - 1].col == f.col and flat()[fa - 1].lane == f.lane and not flat()[fa - 1].env do fa = fa - 1 end
+        while flat()[fb + 1] and flat()[fb + 1].col == f.col and flat()[fb + 1].lane == f.lane and not flat()[fb + 1].env do fb = fb + 1 end
+        local maxr = -1
+        for fi = fa, fb do for _, sub in ipairs(subs_of(flat()[fi])) do for r in pairs(sub) do if type(r) == 'number' and r > maxr then maxr = r end end end end
+        local function busy(r)
+          for fi = fa, fb do for _, sub in ipairs(subs_of(flat()[fi])) do if sub[r] then return true end end end
+          return false
+        end
+        local r0 = V.cur.row
+        while r0 <= maxr and not busy(r0) do r0 = r0 + 1 end
+        if r0 > maxr then V.msg = 'dp: nothing below - no events until the end'; finish_move(); V.count = nil; return end
+        local r1 = r0
+        while r1 + 1 <= maxr and busy(r1 + 1) do r1 = r1 + 1 end
+        if apply('d', fa, fb, r0, r1) then
+          V.msg = ('dp: rows %04d-%04d deleted (up to the pause)'):format(r0, r1)
+          finish_edit()
+        else finish_move() end
+        V.count = nil; return
+      end
       local t = motion(c, n, p)
       -- 9 окт: dl / dh (yl, cl …) — только своя подколонка: шаг по полю через
       -- край задевал соседнюю колонку; dl = x (событие строки курсора)

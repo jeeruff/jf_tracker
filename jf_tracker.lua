@@ -1711,6 +1711,39 @@ ctx = {
     vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'daw' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
   end,
+  -- dP (10 окт): выбранные в REAPER треки (нет выбора — трек курсора): все
+  -- items и вся автоматизация во всём проекте — точки огибающих и automation
+  -- items (огибающие остаются пустыми); трек LIB не трогается. Один undo
+  clear_tracks_all = function()
+    local tracks = {}
+    for i = 0, reaper.CountSelectedTracks(0) - 1 do tracks[#tracks + 1] = reaper.GetSelectedTrack(0, i) end
+    if #tracks == 0 then local c = cur_col(); if c and c.track then tracks[1] = c.track end end
+    local ni, ne, names = 0, 0, {}
+    edit.run('delete all items and automation of tracks', function()
+      for _, tr in ipairs(tracks) do
+        local _, nm = reaper.GetTrackName(tr)
+        if not model.is_lib_name(nm) then
+          names[#names + 1] = nm
+          for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do reaper.DeleteTrackMediaItem(tr, reaper.GetTrackMediaItem(tr, i)); ni = ni + 1 end
+          for k = 0, reaper.CountTrackEnvelopes(tr) - 1 do
+            local env = reaper.GetTrackEnvelope(tr, k)
+            local ok, ch = reaper.GetEnvelopeStateChunk(env, '', false)
+            if ok then
+              -- точки (PT) и automation items (POOLEDENVINST) из чанка долой
+              local out, cut = {}, 0
+              for line in (ch .. '\n'):gmatch('([^\n]*)\n') do
+                if line:match('^%s*PT ') or line:match('^%s*POOLEDENVINST ') then cut = cut + 1 else out[#out + 1] = line end
+              end
+              if cut > 0 then reaper.SetEnvelopeStateChunk(env, table.concat(out, '\n'), false); ne = ne + 1 end
+            end
+          end
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('dP: %s - %d item(s), automation cleared on %d envelope(s) (u - undo)'):format(table.concat(names, ', '), ni, ne)
+    return ni > 0 or ne > 0
+  end,
   -- dt (4 окт) — вырезать выделенное время во всём проекте: нативное «Remove
   -- contents of time selection (moving later items)», всё после — сдвигается
   delete_time = function()
