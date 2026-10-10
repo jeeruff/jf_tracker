@@ -1080,6 +1080,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать
   -- линию слайса (отпустил — сохранено), колесо — шире / уже
   S.zoom_hot = nil
+  -- 10 окт: плейхед — белая линия в волне (и в зуме, и на полоске-обзоре ниже)
+  local pht = ctx.item_playpos and e.item and ctx.item_playpos(e.item)
+  if pht and (pht < 0 or pht > len) then pht = nil end
+  if pht and pht >= va and pht <= vb then U.set(U.TEXT); gfx.rect(tx(pht), wy, 1, wh, 1) end
   if ZH > 0 then
     local zy = wy + wh + 2
     local W2 = S.zwin or 0.04
@@ -1130,6 +1134,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
+    if pht and pht > t0 and pht < t0 + 2 * W2 then U.set(U.TEXT); gfx.rect(x + math.floor((pht - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
     U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
     if ctx.hints_on and ctx.hints_on() and ZH > 3 * rh then
@@ -1187,6 +1192,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         gfx.rect(x + px, math.floor(c2 - b * h2), 1, math.max(1, math.floor((b - a) * h2)), 1)
       end
     end
+    if pht then U.set(U.TEXT); gfx.rect(x + math.floor(pht / len * w), sy, 1, SBH, 1) end
     local zoomed = span < len - 1e-6
     local p0, p1 = x + math.floor(va / len * w), x + math.max(2, math.floor(vb / len * w))
     if zoomed then

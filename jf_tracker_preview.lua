@@ -38,6 +38,14 @@ function P.position()
   return pos, P.cur_len, P.cur_path
 end
 
+-- 10 окт: плейхед слайсера — где сейчас превью этого item, в секундах от начала item (nil — не играет)
+function P.item_pos(item)
+  if not (cur and P.cur_item and P.cur_item == item) then return nil end
+  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ok then return nil end
+  return (pos - (P.cur_offs or 0)) / math.max(1e-6, P.cur_rate or 1)
+end
+
 local audio_stop_at
 
 -- трек для превью (4 окт): превью входит в трек как вход — армированный трек
