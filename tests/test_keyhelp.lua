@@ -45,7 +45,15 @@ eq(keys('O'), 'slot_new:empty:true', 'O')
 eq(keys('p'), 'slot_new:put:false', 'p')
 eq(keys('P'), 'slot_new:put:true', 'P')
 eq(keys('yp'), 'slot_new:clone', 'yp duplicates')
-eq(keys('D'), '', 'D is gone')
+MX.cur = { ri = 1, ci = 1 }; eq(keys('D'), 'mx_block:cut', '10 окт: D on a cell cuts it')
+MX.cur = { ri = 1, ci = -1 }; eq(keys('D'), 'slot_delete', 'D on the slot number deletes the slot')
+calls = {}; MX.key(8, regs, snap); eq(table.concat(calls, ' '), 'slot_delete', 'Backspace on the slot number deletes the slot (not the tracker)')
+MX.cur = { ri = 1, ci = 1 }
+do local gr = { regs[1], { gap = true, pos = 2, rgnend = 3 }, { gap = true, pos = 3, rgnend = 4 }, regs[2] }
+  MX.key(('w'):byte(), gr, snap); eq(MX.cur.ri, 4, 'w skips the free bars to the next slot')
+  MX.key(('b'):byte(), gr, snap); eq(MX.cur.ri, 1, 'b back to the previous slot')
+  MX.key(('e'):byte(), gr, snap); eq(MX.cur.ri, 3, 'e - the last bar before the next slot') end
+MX.cur = { ri = 1, ci = 1 }
 eq(keys('n'), 'mx_name_prompt', 'n renames')
 eq(keys('n'), 'mx_name_prompt', 'n')
 eq(keys(']'), 'slot_len_step:bar:1', ']')

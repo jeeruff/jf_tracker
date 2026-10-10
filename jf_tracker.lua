@@ -2776,6 +2776,24 @@ ctx = {
     edit.env_nudge(e, t, d, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
   end,
   -- слот последовательности → следующий/предыдущий паттерн по номеру
+  -- 10 окт: номер паттерна в слот — Enter на номере (ci −1) → :pat N
+  slot_pat_prompt = function()
+    vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'pat '
+  end,
+  slot_set_pattern = function(n)
+    local seq = ctx.sequence()
+    local slot = seq[MX.cur.ri]
+    if not (slot and n) then vim.msg = 'pat: a pattern number, like :pat 3'; return end
+    if slot.gap then vim.msg = 'free bar: name it first (n)'; return end
+    local list = model.patterns(regions)
+    local p
+    for _, q in ipairs(list) do if q.num == n then p = q end end
+    if not p then vim.msg = ('no pattern %02d (there are %d)'):format(n, #list); return end
+    if alias.set_slot(regions, slot, p) then
+      vim.msg = ('slot %d → %02d %s'):format(MX.cur.ri, p.num, p.name)
+      model.invalidate(); regions = model.regions(state.lpb)
+    end
+  end,
   slot_cycle = function(ri, dir)
     local seq = ctx.sequence()
     local slot = seq[ri]

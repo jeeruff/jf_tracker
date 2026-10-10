@@ -847,6 +847,7 @@ local function run_cmd(line)
   elseif cmd == 'optload' then ctx.opt_load(arg)
   elseif cmd == 'optdel' then ctx.opt_del(arg)
   elseif cmd == 'len' then ctx.mx_len(arg)
+  elseif cmd == 'pat' then if ctx.slot_set_pattern then ctx.slot_set_pattern(tonumber(arg)) end   -- 10 окт: :pat N — паттерн N в слот курсора матрицы
   elseif cmd == 'sig' then ctx.sig_cmd(arg)
   elseif cmd == 'add' then local b, nm = arg:match('^(%d*)%s*(.*)$'); ctx.mx_add(tonumber(b) or 1, nm)
   elseif cmd == 'beatsync' or cmd == 'bs' then

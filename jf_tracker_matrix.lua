@@ -756,10 +756,32 @@ function MX.key(c, regions, snap)
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
+  -- 10 окт: D / Backspace / Del — на номере или имени слота удалить слот, на
+  -- ячейке вырезать её (раньше Backspace уходил в трекер и удалял там строку)
+  if ch == 'D' or ((c == 8 or c == 6579564) and not mods.ctrl) then
+    if MX.cur.ci < 1 then ctx.slot_delete() else ctx.mx_block('cut') end
+    return true
+  end
+  -- 10 окт: w / b — следующий / предыдущий слот с паттерном (пустые такты ..
+  -- мимо), e — последний такт этого слота; 0 ^ $ — первая / последняя колонка
+  if (ch == 'w' or ch == 'b' or ch == 'e') and not MX.count then
+    local d = ch == 'b' and -1 or 1
+    local ri = MX.cur.ri
+    if ch == 'e' then
+      while regions[ri + 1] and regions[ri + 1].gap do ri = ri + 1 end
+    else
+      ri = ri + d
+      while regions[ri] and regions[ri].gap do ri = ri + d end
+    end
+    if regions[ri] then MX.goto_cell(regions, snap, ri, MX.cur.ci) else ctx.msg(ch == 'b' and 'no slot above' or 'no slot below') end
+    return true
+  end
+  if (ch == '0' and not MX.count) or ch == '^' then MX.goto_cell(regions, snap, MX.cur.ri, MX.fold and -1 or 0); return true end
+  if ch == '$' then MX.goto_cell(regions, snap, MX.cur.ri, #snap.cols); return true end
   -- 9 окт: курсор на имени (ci 0) — Enter / i / r переименовать; на номере
-  -- (ci −1) — Enter следующий паттерн слота
+  -- (ci −1) — Enter: номер паттерна цифрами (10 окт; < > — листать)
   if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
-  if MX.cur.ci == -1 and c == 13 then ctx.slot_cycle(MX.cur.ri, 1); return true end
+  if MX.cur.ci == -1 and c == 13 then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() else ctx.slot_cycle(MX.cur.ri, 1) end; return true end
   if MX.cur.ci < 1 and (ch == 'm' or ch == 'M' or ch == 'x' or c == 22 or c == 3 or c == 24) then ctx.msg('on the region name / number - move to a track cell (l)'); return true end
   -- слой лупов: цифры+Enter, > < + - = — лупы ячейки (вместо паттерна / длины)
   if MX.loops and ctx.mx_loop_key and ctx.mx_loop_key(c) then return true end

@@ -183,6 +183,10 @@ KH.PAGES = {
   matrix = { title = 'matrix of regions (slots)', e = {
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
     { k = 'gg G', d = 'first slot / last slot' },
+    { k = 'w b e', d = 'next / previous slot with a pattern (free bars .. skipped) / the last bar before the next slot' },
+    { k = '0 ^ $', d = 'name column / last track' },
+    { k = 'D BS Del', d = 'on the slot number or name - delete the slot (like dd); on a cell - cut it (like x)' },
+    { k = 'Enter', d = 'on the slot number: type the pattern number (:pat N); on the name - rename; < > - previous / next pattern' },
     { k = 'o O', d = 'new empty 1-bar slot after / before' },
     { k = 'dd', d = 'delete slot: region + its time (goes to register)', t = { 'dd', 'd' } },
     { k = 'yy', d = 'yank slot into register', t = { 'yy', 'y' } },
