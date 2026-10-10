@@ -234,6 +234,7 @@ local state = {
   jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
+  libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -553,7 +554,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3518,6 +3519,36 @@ ctx = {
     state.slicepick = ({ key = 'random', random = 'seq', seq = 'key' })[state.slicepick or 'key']
     vim.msg = 'slices: ' .. ({ key = 'by key (q 2 w ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
   end,
+  -- ── разделители lib (10 окт): хранит проект (ProjExtState jf_tracker/libseps,
+  -- строки «gkey<TAB>узор»); строка узора — после инструмента с этим ключом
+  lib_seps_get = function()
+    local proj = reaper.EnumProjects(-1)
+    local c = ctx.libseps_c
+    if c and c.proj == proj then return c.map end
+    local _, s = reaper.GetProjExtState(0, 'jf_tracker', 'libseps')
+    local map = {}
+    for k, a in (s or ''):gmatch('([^\t\n]+)\t([^\n]*)') do map[k] = a end
+    ctx.libseps_c = { proj = proj, map = map }
+    return map
+  end,
+  lib_seps_put = function(gkey, art)
+    local map = ctx.lib_seps_get()
+    map[gkey] = art
+    local out = {}
+    for k, a in pairs(map) do out[#out + 1] = k .. '\t' .. a end
+    table.sort(out)
+    reaper.SetProjExtState(0, 'jf_tracker', 'libseps', table.concat(out, '\n'))
+  end,
+  -- выбор узора — смарт-панелью (сетка образцов), ставит / меняет разделитель
+  lib_sep_pick = function(gkey)
+    if not gkey then vim.msg = 'separator: pick an instrument first'; return end
+    local items = {}
+    local cur = ctx.lib_seps_get()[gkey]
+    for _, a in ipairs(draw.SEP_ARTS) do items[#items + 1] = { label = draw.sep_line(a, 12), v = a, on = a == cur, tip = ('separator "%s" repeated over the row'):format(a) } end
+    ctx.smart_open({ title = 'separator under the instrument - h j k l, Enter', items = items, cols = 4, sel = 1,
+      on_pick = function(it) ctx.lib_seps_put(gkey, it.v); vim.msg = 'separator: ' .. it.v .. '  (right click on it - change / remove)' end })
+  end,
+  lib_sep_remove = function(gkey) ctx.lib_seps_put(gkey, nil); vim.msg = 'separator removed' end,
   -- :font (10 окт): шрифт трекера по имени / next / prev / off
   font_set = function(arg)
     arg = (arg or ''):match('^%s*(.-)%s*$')
@@ -6757,6 +6788,8 @@ ctx = {
       { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
       { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
       { sep = true, title = 'look' },
+      { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
+      flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
@@ -8834,13 +8867,35 @@ function ctx.context_items(hover)
   elseif hover.pool and hover.pool.midi then
     add('Select MIDI clips', function() ctx.midi_select() end)
     add('MIDI clips: track / project', function() ctx.midi_select(); ctx.mc_scope_set() end)
+  elseif hover.pool and hover.pool.sep then
+    local key = hover.pool.sep
+    add('Change separator … (pattern)', function() ctx.lib_sep_pick(key) end, 'c')
+    add('Remove separator', function() ctx.lib_sep_remove(key) end, 'd')
   elseif hover.pool then
+    -- 10 окт: меню инструментов — и на пустом слоте (вставить, папки, разделитель)
     local col = cur_col()
-    add('Select instrument', function() pool_select(hover.pool.i) end)
-    add('Preview', function() local e = col and col.pool[hover.pool.i]; if e then ctx.inst_preview(e, col.track) end end)
-    add('Slice … (virtual)', function() ctx.open_slicer(hover.pool.i) end)
-    add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end)
-    add('Hide top bar (:top)', function() state.top = false end)
+    local i = hover.pool.i
+    local e = col and i and col.pool[i]
+    if e then
+      add('Select instrument', function() pool_select(i) end, 's')
+      add('Preview', function() ctx.inst_preview(e, col.track) end, 'v')
+      add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
+      add('Rename … (:iname)', function() pool_select(i); ctx.rename_inst_prompt() end, 'n')
+      add('Copy (yy)', function() ctx.inst_yank(i, i) end, 'y')
+      add('Duplicate (yp)', function() ctx.inst_yank(i, i, true); pool_select(i); ctx.inst_put(false) end, 'u')
+      add('Delete (dd) - its notes too', function() ctx.inst_cut(i, i) end, 'd')
+    elseif i then
+      add('Select empty slot', function() pool_select(i) end, 's')
+    end
+    if state.inst_reg and #state.inst_reg > 0 then
+      add('Paste after (p)', function() if i then pool_select(i) end; ctx.inst_put(false) end, 'p')
+      add('Paste before (P)', function() if i then pool_select(i) end; ctx.inst_put(true) end, 'P')
+    end
+    local skey = e and e.gkey
+    if not skey and col then for k = #(col.pool or {}), 1, -1 do local q = col.pool[k]; if q and not q.parent then skey = q.gkey; break end end end
+    if skey then add('Insert separator below … (pattern)', function() ctx.lib_sep_pick(skey) end, '-') end
+    add((state.libfolders and '!' or '') .. 'Folders: kicks, snares, hats … (3+ alike)', function() state.libfolders = not state.libfolders; vim.msg = 'lib folders ' .. (state.libfolders and 'on' or 'off') end, 'f')
+    add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end, 'r')
   elseif hover.header_env then
     local e = hover.header_env.e
     add('Delete envelope ' .. (e.name or '') .. ' (whole curve)', function() edit.env_remove(e.env); vim.msg = 'envelope removed: ' .. (e.name or '') end, 'd')
@@ -11043,6 +11098,7 @@ local function frame()
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
     tabs = ctx.top_tabs(),
+    lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос

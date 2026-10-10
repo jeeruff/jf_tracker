@@ -2613,6 +2613,80 @@ function D.pool_rows(pool, sort, col, cols)
   return add_empty(rows, pool)
 end
 
+-- ── папки и разделители lib (10 окт) ──────────────────────────────────────
+-- Только отображение (номера и items не трогаются). Папки (опция folders):
+-- внутри группы трека сэмплы одной категории — kick, snare, hat … или общая
+-- основа имени без цифр — от 3 штук под заголовком «/kicks 5». Разделители:
+-- D.lib_seps[gkey] = узор — строка после инструмента (хранит проект, main).
+D.LIB_CATS = { { 'kick', 'kicks' }, { 'bd', 'kicks' }, { 'snare', 'snares' }, { 'sd', 'snares' }, { 'rim', 'snares' },
+  { 'hihat', 'hats' }, { 'hat', 'hats' }, { 'hh', 'hats' }, { 'clap', 'claps' }, { 'cp', 'claps' }, { 'perc', 'percs' },
+  { 'tom', 'toms' }, { 'crash', 'cymbals' }, { 'ride', 'cymbals' }, { 'cym', 'cymbals' }, { 'shaker', 'percs' }, { 'conga', 'percs' },
+  { 'bass', 'bass' }, { 'sub', 'bass' }, { '808', 'bass' }, { 'vox', 'vox' }, { 'vocal', 'vox' }, { 'chop', 'chops' },
+  { 'loop', 'loops' }, { 'break', 'loops' }, { 'fx', 'fx' }, { 'sfx', 'fx' }, { 'riser', 'fx' }, { 'pad', 'pads' },
+  { 'chord', 'keys' }, { 'piano', 'keys' }, { 'keys', 'keys' }, { 'synth', 'synths' }, { 'lead', 'synths' } }
+function D.lib_cat(name)
+  local n = (name or ''):lower()
+  for _, c in ipairs(D.LIB_CATS) do
+    local k = c[1]
+    -- слово целиком или на границе (bop_kick11, kick hard, 808_sub)
+    if n:find('%f[%w]' .. k) or n:find('_' .. k) or n:find(k .. '%d') or n:find(k .. '[%s_%-]') or n == k then return c[2] end
+  end
+  -- общая основа: без цифр, хвостовых разделителей и метки-префикса
+  local stem = n:gsub('%.%w+$', ''):gsub('%d+', ''):gsub('[%s_%-%.]+$', ''):gsub('^[%s_%-%.]+', '')
+  return stem ~= '' and stem or nil
+end
+local function lib_folders(rows, pool)
+  local out, seg = {}, {}
+  local function flush()
+    local cnt, first = {}, {}
+    for k, r in ipairs(seg) do
+      local e = r.i and pool[r.i]
+      r.cat = e and D.lib_cat(e.name) or nil
+      if r.cat then cnt[r.cat] = (cnt[r.cat] or 0) + 1; first[r.cat] = first[r.cat] or k end
+    end
+    local done = {}
+    for k, r in ipairs(seg) do
+      local c = r.cat
+      if c and cnt[c] >= 3 then
+        if not done[c] then
+          done[c] = true
+          out[#out + 1] = { hdr = ('/%s  %d'):format(c, cnt[c]), folder = c }
+          for _, r2 in ipairs(seg) do if r2.cat == c then out[#out + 1] = r2 end end
+        end
+      else out[#out + 1] = r end
+    end
+    seg = {}
+  end
+  for _, r in ipairs(rows) do
+    if r.i then seg[#seg + 1] = r else flush(); out[#out + 1] = r end
+  end
+  flush()
+  return out
+end
+local pool_rows0 = D.pool_rows
+function D.pool_rows(pool, sort, col, cols)
+  local rows = pool_rows0(pool, sort, col, cols)
+  if D.lib_folders_on then rows = lib_folders(rows, pool) end
+  local seps = D.lib_seps
+  if seps and next(seps) then
+    local out = {}
+    for _, r in ipairs(rows) do
+      out[#out + 1] = r
+      local e = r.i and pool[r.i]
+      if e and seps[e.gkey] then out[#out + 1] = { sep = seps[e.gkey], key = e.gkey } end
+    end
+    rows = out
+  end
+  return rows
+end
+-- узоры разделителей (ASCII — битмап REAPER знает только его): единица узора
+-- повторяется на ширину строки
+D.SEP_ARTS = { '-', '=', '~', '.', '_.', '-=', '=-', '~=', '. ', '- ', '-- ', '.:', ':.', '*.', '+-', '/\\', '\\/', '<>', '><', '_.-*-.', '.-~-.', '-~', '~-~', '|.', '=+', ':: ', '# ', 'o.', '.o', '*', ' / ', ' \\ ' }
+function D.sep_line(art, n)
+  if not art or art == '' then art = '-' end
+  return string.rep(art, math.ceil(n / #art)):sub(1, math.max(0, n))
+end
+
 -- пианинка (4 окт, слой пианино m): полторы октавы верхнего ряда клавиатуры —
 -- белые q w e r t y u i o p (C..E), чёрные 2 3 5 6 7 9 0; на клавишах буквы,
 -- держимые — янтарём, последняя сыгранная — тускло; слева октава.
@@ -3159,6 +3233,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(('%02d ~~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
+    elseif row.sep then
+      -- разделитель (10 окт): узор на ширину строки, тускло; ПКМ — сменить / убрать
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      local nch = math.max(1, math.floor((w - 12) / math.max(1, ms('-'))))
+      text(ix + 6, y + 1, fit(D.sep_line(row.sep, nch), w - 12), hot and U.GREY or U.DIM)
+      if hot then hover.pool = { ci = info.pool_ci, sep = row.key } end
     elseif row.midi then
       local sel = info.midi_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
