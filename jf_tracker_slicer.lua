@@ -182,7 +182,9 @@ function S.mouse_up()
       S.msg = ('slice S%02X selected'):format(d.k)
       return d
     end
-    commit(); S.msg = ('slice %d moved'):format(d.k); return d
+    commit(); S.msg = ('slice %d moved'):format(d.k)
+    if ctx.state and ctx.state.sliceaudition then S.preview(d.k) end   -- 10 окт: auto play
+    return d
   end
   if S.sel and S.sel.b < S.sel.a then S.sel.a, S.sel.b = S.sel.b, S.sel.a end
   if S.sel and S.sel.b - S.sel.a < 0.001 then
@@ -1042,7 +1044,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
   local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
-    or (#slices > 0 and ('%d slices; keys: q = the whole sample, 2 w 3 e ... = slices 1 2 3 4 (Sxx), Option + key - the pitch of the last slice'):format(#slices) or '')
+    or (#slices > 0 and 'q whole  2 w 3 e ... slices  Opt+key pitch' or '')   -- 10 окт: коротко — число слайсов и так видно
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag: to a track / the lib as a slice   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
   -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать
@@ -1098,11 +1100,24 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
-    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), w - 8), U.GREY)
+    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
-    local inz = mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
-    if inz then S.zoom_hot = true end
     local down = (gfx.mouse_cap & 1) == 1
+    -- 10 окт: кнопка auto play справа — сдвинул линию и отпустил: слайс играет сам
+    local ap_on = ctx.state and ctx.state.sliceaudition
+    local apl = 'auto play'
+    local apw = U.measure(apl) + 2 * L.pad
+    local apx, apy = x + w - apw - 2, zy + 1
+    local aphot = mx2 >= apx and mx2 < apx + apw and my2 >= apy and my2 < apy + rh
+    U.set(ap_on and U.tint(U.CYAN, 0.3) or (aphot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(apx, apy, apw, rh - 1, 1)
+    U.set(ap_on and U.CYAN or (aphot and U.AMBER or U.LINE)); gfx.rect(apx, apy, apw, rh - 1, 0)
+    U.text(apx + L.pad, apy, apl, ap_on and U.CYAN or (aphot and U.AMBER or U.TEXT))
+    if aphot and down and not S.zd_prev and ctx.state then
+      ctx.state.sliceaudition = not ctx.state.sliceaudition
+      S.msg = 'auto play ' .. (ctx.state.sliceaudition and 'on: a moved slice line plays its slice' or 'off')
+    end
+    local inz = not aphot and mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
+    if inz then S.zoom_hot = true end
     if down and inz and not S.zd_prev and zk and S.active and S.entry and S.entry.item == e.item and S.slices[zk] then
       S.zdrag = { k = zk, mx0 = mx2, t0 = S.slices[zk], span = 2 * W2 }
     end
@@ -1113,7 +1128,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if not down then
         local moved = math.abs(S.slices[k3] - S.zdrag.t0) > 1e-6
         S.zdrag = nil
-        if moved then commit(); S.msg = ('slice %02X moved (fine)'):format(k3) end
+        if moved then commit(); S.msg = ('slice %02X moved (fine)'):format(k3); if ctx.state and ctx.state.sliceaudition then S.preview(k3) end end
       end
     end
     S.zd_prev = down
