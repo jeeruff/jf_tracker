@@ -156,7 +156,8 @@ local state = {
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
-  ttf = draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] and reaper.GetExtState(EXT, 'ttf') or 'off',   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
+  ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
+  ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
   opt_tab = reaper.GetExtState(EXT, 'opttab') ~= '' and reaper.GetExtState(EXT, 'opttab') or nil,   -- последняя вкладка опций (5 окт)
   -- время и BPM мелко (5 окт, просьба): новый ключ — прежнее «вкл» не тянется
   bigbpm = flag('bigbpm2', false),
@@ -571,7 +572,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -3621,15 +3622,21 @@ ctx = {
   font_set = function(arg)
     arg = (arg or ''):match('^%s*(.-)%s*$')
     local list = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do list[#list + 1] = k end
+    if (state.ttfcustom or '') ~= '' then list[#list + 1] = 'custom' end
     local i = 1; for k, v in ipairs(list) do if v == (state.ttf or 'off') then i = k end end
     local to
-    if arg == 'next' then to = list[i % #list + 1]
+    if arg == '' then vim.msg = 'fonts: ' .. table.concat(list, ' ') .. '   or :font <installed family name> [px]'; return
+    elseif arg == 'next' then to = list[i % #list + 1]
     elseif arg == 'prev' then to = list[(i - 2) % #list + 1]
-    elseif arg == 'off' or draw.TTF_FACES[arg] then to = arg end
-    if not to then vim.msg = 'fonts: ' .. table.concat(list, ' '); return end
+    elseif arg == 'off' or draw.TTF_FACES[arg] or (arg == 'custom' and (state.ttfcustom or '') ~= '') then to = arg
+    else
+      -- любое другое — имя семейства, как в Font Book; число в конце — размер в px
+      local name, px = arg:match('^(.-)%s+(%d+)$')
+      state.ttfcustom = name or arg; state.ttfpx = math.max(6, math.min(40, tonumber(px) or state.ttfpx or 14)); to = 'custom'
+    end
     state.ttf = to; draw.set_font(state); relayout()
     local f = draw.TTF_FACES[to]
-    vim.msg = 'font: ' .. (f and (to .. ' - ' .. f.d) or 'off (REAPER bitmap)') .. '   :font next / prev'
+    vim.msg = 'font: ' .. (f and (to .. ' - ' .. f.d) or to == 'custom' and (state.ttfcustom .. ' ' .. state.ttfpx .. 'px  (not installed - macOS shows a fallback)') or 'off (REAPER bitmap)') .. '   :font next / prev'
   end,
   -- ── аудиоустройство (10 окт): jf_tracker_audio.lua ──────────────────────
   audio = function() ctx.AU = ctx.AU or dofile(DIR .. '/jf_tracker_audio.lua'); return ctx.AU end,
@@ -6868,9 +6875,10 @@ ctx = {
       { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
       { label = 'open the themes folder', kind = 'action', value = 'folder', desc = 'the folder with your theme files', fn = function() local d = ctx.theme_dir(); reaper.RecursiveCreateDirectory(d, 0); if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d) else os.execute('open "' .. d .. '"') end end },
       { sep = true, title = 'look' },
+      { label = 'own font', kind = 'action', value = (state.ttfcustom or '') ~= '' and (state.ttfcustom .. ' ' .. (state.ttfpx or 14)) or 'none', desc = 'any installed font by its family name (as in Font Book), optional size in px at the end: Enter opens :font - type e.g. Menlo 13; it becomes "custom" in the font list', fn = function() OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'font ' .. (state.ttfcustom or '') end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
-      { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
+      { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },

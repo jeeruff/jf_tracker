@@ -166,6 +166,8 @@ D.TTF_LIST = { 'bigblue', 'bb437', 'departure', 'gohu11', 'gohu14', 'terminess',
   'iosevka', 'iosevkaslab', 'jetbrains', 'hack', 'fira', 'inconsolata', 'commit', 'plex', 'cascadia', 'geist', 'victor', 'space', 'ubuntu', 'mononoki', 'proto', 'monaspace' }
 function D.set_font(state)
   local tf = D.TTF_FACES[state.ttf or 'off']
+  -- 10 окт: свой шрифт — любое установленное семейство по имени (:font Имя [px])
+  if state.ttf == 'custom' and (state.ttfcustom or '') ~= '' then tf = { face = state.ttfcustom, px = tonumber(state.ttfpx) or 14 } end
   D.ttf = tf and true or false
   if tf then
     local fs = tonumber(state.fontscale) or 2
