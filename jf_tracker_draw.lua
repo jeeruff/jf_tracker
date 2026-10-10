@@ -4027,7 +4027,24 @@ function D.frame(L, snap, rows, state, info)
         -- 9 окт: макс. пик — строкой сразу над коробкой, приглушённо; нет
         -- сигнала — пусто (без -inf)
         local pty = ty0 - 6 - L.rh
-        if hold.max > -60 then
+        local pk2
+        if lufs_w > 0 and col.track then
+          -- 10 окт: мастер — удержание каждого канала (L R), как у REAPER; над
+          -- коробкой вместе со столбиками RMS, не влезают — один максимум
+          local hl, hr = reaper.Track_GetPeakHoldDB(col.track, 0, false) * 100, reaper.Track_GetPeakHoldDB(col.track, 1, false) * 100
+          local x0, x1 = bx0 - 2 - lufs_w, bx0 + bw0 + 2 + lufs_w
+          local a1, a2
+          for _, fmt in ipairs({ '%.1f', '%.0f' }) do
+            a1 = hl > -60 and fmt:format(hl) or '-inf'; a2 = hr > -60 and fmt:format(hr) or '-inf'
+            if ms(a1) + L.pad + ms(a2) <= x1 - x0 then break end
+          end
+          if hold.max > -60 and ms(a1) + L.pad + ms(a2) <= x1 - x0 then
+            pk2 = true
+            text(x0, pty, a1, hl > 0 and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3))
+            text(x1 - ms(a2), pty, a2, hr > 0 and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3))
+          end
+        end
+        if hold.max > -60 and not pk2 then
           local ptxt = ('%+.1f'):format(hold.max)
           if ms(ptxt) > bw0 then ptxt = ('%+.0f'):format(hold.max) end                 -- 9 окт: не вылезать за коробку
           if ms(ptxt) <= bw0 then text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3)) end
@@ -4057,9 +4074,10 @@ function D.frame(L, snap, rows, state, info)
         -- 10 окт: громкость мастера — нативная (Track_GetPeakInfo 1024 / 1025,
         -- как VU мастера REAPER в режиме loudness): тонкие столбики по бокам
         -- коробки в той же шкале, риска — удержание REAPER (сброс — щелчок по
-        -- числу пика). Среднее — строкой над routing: энергия momentary за
-        -- время воспроизведения (гейт -70), с нового старта — заново
+        -- числу пика). Каналы 1024 / 1025 — то, что показывает VU мастера
+        -- (у пользователя RMS): левый столбик L, правый R
         if lufs_w > 0 and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+          local hmax
           for k2, ch in ipairs({ 1024, 1025 }) do
             local v = reaper.Track_GetPeakInfo(col.track, ch)
             local ldb = v > 1e-6 and 20 * math.log(v, 10) or -150
@@ -4068,22 +4086,18 @@ function D.frame(L, snap, rows, state, info)
             set(dark); gfx.rect(lx0, ty0 - 6, lufs_w, th + 9, 1)
             if ldb > -60 then local ya = ypos(math.min(ldb, 12)); set(U.CYAN); gfx.rect(lx0, ya, lufs_w, ty0 + th - ya, 1) end
             if hdb > -60 then set(U.TEXT); gfx.rect(lx0, ypos(math.min(hdb, 12)), lufs_w, 1, 1) end
-            if k2 == 1 then
-              local li = D.lufs_int or { e = 0, n = 0 }
-              D.lufs_int = li
-              local playing = reaper.GetPlayState() & 1 == 1
-              if playing and not li.was then li.e, li.n = 0, 0 end
-              li.was = playing
-              if playing and ldb > -70 then li.e = li.e + 10 ^ (ldb / 10); li.n = li.n + 1 end
-            end
+            hmax = math.max(hmax or -150, hdb)
           end
-          local li = D.lufs_int
-          if D.lufs_row_y and li and li.n > 0 then
-            local lt = ('%.1f LUFS'):format(10 * math.log(li.e / li.n, 10))
-            if ms(lt) > c.w - 2 * L.pad then lt = ('%.1f'):format(10 * math.log(li.e / li.n, 10)) end
-            if ms(lt) <= c.w - 2 * L.pad then text(c.x + L.pad, D.lufs_row_y, lt, U.CYAN) end
-          elseif D.lufs_row_y and ms('-- LUFS') <= c.w - 2 * L.pad then
-            text(c.x + L.pad, D.lufs_row_y, '-- LUFS', U.GREY)        -- среднее появится при воспроизведении
+          -- строка над routing — как у REAPER: «RMS -16.9», его удержание (то,
+          -- что показывает VU мастера: RMS / LUFS — по режиму его метра)
+          if D.lufs_row_y then
+            local lbl = 'RMS'
+            local val = (hmax or -150) > -60 and ('%.1f'):format(hmax) or '-inf'
+            if ms(lbl .. ' ' .. val) <= c.w - 2 * L.pad then
+              text(c.x + L.pad, D.lufs_row_y, lbl, U.readable(U.GREEN, rbg, 3))
+              text(c.x + L.pad + ms(lbl .. ' '), D.lufs_row_y, val, U.TEXT)
+            end
+            if mx >= c.x and mx < c.x + c.w and my >= D.lufs_row_y and my < D.lufs_row_y + L.rh then hover.mixpk = col.track end   -- щелчок — сброс
           end
         end
         -- ручка [-]: колпачок в рамке поверх метра, риска посередине — уровень
