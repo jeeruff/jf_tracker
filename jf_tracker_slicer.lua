@@ -925,14 +925,27 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
     local smp, n = zoom_samples(e, t0, 2 * W2)
     local zc, zh2 = zy + ZH / 2, ZH / 2 - 2
+    -- 10 окт: зум повторяет вид волны — sgram: кусок спектрограммы фоном; spec: окраска по частоте
+    local sgz = S.view == 'sgram' and ctx.sgram and ctx.sgram(e)
+    if sgz then
+      local c0 = math.max(0, t0 / len * sgz.cols)
+      local cw2 = math.max(1, 2 * W2 / len * sgz.cols)
+      gfx.a = 0.85; gfx.blit(sgz.img, 1, 0, c0, 0, cw2, sgz.rows, x, zy, w, ZH); gfx.a = 1
+    end
+    local spk = S.view == 'spec' and ctx.peaks and ctx.peaks(e, math.max(w, math.min(16384, math.floor(w * len / span))), true)
     if smp and n then
       local pk = 0.02
       for i = 1, n do local v = math.abs(smp[i] or 0); if v > pk then pk = v end end
-      U.set(base)
+      U.set(sgz and U.TEXT or base)
       for px = 0, w - 1 do
         local i0, i1 = math.floor(px / w * n) + 1, math.max(math.floor(px / w * n) + 1, math.floor((px + 1) / w * n))
         local mn, mx3 = 1e9, -1e9
         for i = i0, math.min(n, i1) do local v = smp[i] or 0; if v < mn then mn = v end; if v > mx3 then mx3 = v end end
+        if spk and spk.spec and spk.n > 0 and ctx.spec_colour then
+          local tt = t0 + (px + 0.5) / w * 2 * W2
+          local cc = ctx.spec_colour(spk.spec[math.max(1, math.min(spk.n, math.floor(tt / len * spk.n) + 1))])
+          gfx.set(cc[1], cc[2], cc[3], 1)
+        end
         if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
       end
     else U.text(x + 4, zy + 2, 'zoom: no audio to read', U.GREY) end

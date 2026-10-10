@@ -3718,10 +3718,18 @@ ctx = {
     vim.msg = msg
     return ok
   end,
+  -- 10 окт: переоткрыть то же устройство (как выбрать его заново) — Audio_Quit + Audio_Init; F12
+  audio_reload = function()
+    if not (reaper.Audio_Quit and reaper.Audio_Init) then vim.msg = 'audio: this REAPER cannot restart the audio'; return end
+    reaper.Audio_Quit(); reaper.Audio_Init()
+    local l = ctx.audio().live()
+    vim.msg = ('audio reloaded: %s  %s Hz  %s smp%s'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'), l.running and '' or '  (NOT running - check the device)')
+  end,
   audio_items = function()
     local A = ctx.audio()
     local cur = A.read()
     local items = { { sep = true, title = 'audio', group = 'audio' } }
+    items[#items + 1] = { label = 'reload the device (F12)', kind = 'action', value = 'F12', desc = 'reopen the same audio device, as choosing it again: the audio stops and starts (fixes a device that went silent or changed its rate)', fn = function() ctx.audio_reload() end }
     if not cur then
       items[#items + 1] = { label = 'audio device', kind = 'action', value = '-', desc = 'only CoreAudio (macOS) settings can be changed from the tracker', fn = function() end }
       return items
@@ -14615,7 +14623,8 @@ local function frame()
     if c > 0 and not vim.picker and not OPT.ask.active and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local rec = reaper.GetPlayState() & 4 == 4
       if rec and state.rec_sess and (c == 27 or c == 32 or c == 13) then ctx.rec_stop(c); c = 0
-      elseif c == 6697266 or (c == 18 and m.ctrl and not m.cmd) then
+      elseif c == 6697266 then ctx.audio_reload(); c = 0       -- 10 окт: F12 — переоткрыть аудиоустройство (вкладка rec — Ctrl+R)
+      elseif c == 18 and m.ctrl and not m.cmd then
         state.top = true; state.toptab = 'retro'; ctx.set_focus('top'); vim.msg = 'tab: rec'; c = 0
       elseif c == 1962934446 or ((c == 114 or c == 18) and m.alt and not m.cmd) then ctx.rec_start('tracker'); c = 0
       elseif (c == 18 or c == 114) and m.cmd and not m.ctrl then ctx.rec_start('inst'); c = 0 end
