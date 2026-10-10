@@ -12243,7 +12243,9 @@ local function frame()
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
   elseif SPROP.hover and not SPROP.hover.title and state.top and state.toptab == 'sample' then
-    state.status = ('sample %s - H L / drag: change, wheel: scroll, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label)
+    local rk = SPROP.ROWS[SPROP.hover.row].k
+    local extra = ({ bsync = '  |  beatsync: L - on (beats from the length), H L / wheel - beats, R - off', norm = '  |  normalize: L or click - to peak 0 dB' })[rk] or ''
+    state.status = ('sample %s - H L / drag: change, wheel: scroll, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label) .. extra
   elseif hover.hsb then
     state.status = 'tracks: drag the bar, click beside it - a page; trackpad sideways / Shift+wheel scroll, Cmd+sideways - width zoom, Cmd+wheel - LPB zoom'
   elseif hover.trsbtn then

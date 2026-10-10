@@ -39,14 +39,14 @@ function SP.value(e, k)
   if k == 'st' then return ('%+d st'):format(st) end
   if k == 'cent' then return ('%+d ct'):format(math.floor((p - st) * 100 + 0.5)) end
   if k == 'rate' then return ('%.3f'):format(e.rate or 1) .. (e.bsync and ' (bsync)' or '') end
-  if k == 'bsync' then return e.bsync and ('%d beats (wheel, R: off)'):format(e.bsync) or 'off (L: on)' end
+  if k == 'bsync' then return e.bsync and ('%d beats'):format(e.bsync) or 'off' end   -- 10 окт: без «(L: on)» в значении — клавиши в статусе
   if k == 'ppitch' then return e.ppitch and 'on' or 'off' end
   if k == 'mode' then return ctx.pitch_mode_name(e.pmode or -1) end
   if k == 'loop' then return e.loop and 'on' or 'off' end
   if k == 'fin' then return ('%d ms'):format(math.floor((e.fin or 0) * 1000 + 0.5)) end
   if k == 'fout' then return ('%d ms'):format(math.floor((e.fout or 0) * 1000 + 0.5)) end
   if k == 'fx' then return (e.nfx or 0) > 0 and (('%d: %s'):format(e.nfx, (e.fxnames or {})[1] or '')) or 'none (click: add, dbl: window)' end
-  if k == 'norm' then return 'L: peak 0 dB' end
+  if k == 'norm' then return 'to peak 0 dB' end
   if ctx.sp_raw then return (ctx.sp_raw(e, k)) or '' end
   return ''
 end
