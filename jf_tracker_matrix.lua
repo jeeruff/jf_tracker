@@ -303,7 +303,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and ctx.state and ctx.state.mxse) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fill' and MX.fill) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fill' and MX.fill) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -420,7 +420,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   local mk_start = marks.start or { name = '=START', bar = '--', missing = true }
   local mk_stop = marks.stop or { name = '=END', bar = '--', missing = true }
-  mark_row(mk_start, top, 'start'); top = top + L.rh
+  local show_mk = not (ctx and ctx.state and ctx.state.mxmarks == false)   -- 10 окт: s/e выключена — без строк маркеров
+  if show_mk then mark_row(mk_start, top, 'start'); top = top + L.rh end
   -- колонки по горизонтали (5 окт): сколько влезает, прокрутка MX.hs за
   -- курсором; полоса снизу, если не все
   local ncv = math.max(1, math.floor((W - 4 - L.mx_label_w) / L.mx_cell_w))
@@ -654,7 +655,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   do
     local last = math.min(#regions, MX.scroll + nvis)
     local ye = top + (last - MX.scroll) * rh
-    if last == #regions and ye + L.rh <= ybot then mark_row(mk_stop, ye, 'end') end
+    if show_mk and last == #regions and ye + L.rh <= ybot then mark_row(mk_stop, ye, 'end') end
   end
   if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
   return hover
