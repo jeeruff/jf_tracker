@@ -1491,6 +1491,10 @@ function V.key_impl(c)
       if ctx.ai_insert(kp, V.cur.row) then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       return
     end
+    if kp and ctx.midi_on and ctx.midi_on() and how ~= 'audition' then   -- MIDI-клип трека / проекта (10 окт)
+      if ctx.mc_insert(kp, V.cur.row) then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
+      return
+    end
     local SB = V.slice_base()
     local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
     local semis = 0

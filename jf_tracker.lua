@@ -673,6 +673,7 @@ end
 local ctx                                        -- 9 окт: раньше pool_select (ему нужны плагины трека)
 local function pool_select(n)
   state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
+  state.midi_inst = false
   local col = cur_col()
   if col and state.instfx then state.instfx[col.guid] = nil end   -- 9 окт: сэмпл вместо плагина-инструмента
   local pool = col and col.pool or {}
@@ -2994,7 +2995,7 @@ ctx = {
   -- скорость — от высоты: C-4 = ×1, октава вверх = ×2
   auto_on = function() return state.auto_inst and true or false end,
   auto_select = function()
-    state.auto_inst = true
+    state.auto_inst = true; state.midi_inst = false
     local c = cur_col()                                 -- 9 окт: номер automation — последний в lib
     if c then
       if state.instfx then state.instfx[c.guid] = nil end
@@ -3004,6 +3005,85 @@ ctx = {
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
   end,
   ai_sel = 1,
+  -- ── MIDI-клипы как инструмент (10 окт) ───────────────────────────────
+  -- строка midi в lib после automation; модуль слайсов — MIDI-items трека
+  -- курсора или всего проекта (a / щелчок по track | project); нотная
+  -- клавиша вставляет копию выбранного на курсор (тот же путь, что MIDI-клип
+  -- из lib: C-4 — как есть, выше / ниже — транспонирование, пул снят);
+  -- Enter / двойной щелчок — прыжок к клипу (Ctrl+O — назад)
+  midi_on = function() return state.midi_inst and true or false end,
+  mc_sel = 1,
+  mc_scope = 'track',
+  midi_select = function()
+    state.midi_inst = true; state.auto_inst = false
+    local c = cur_col()
+    if c then
+      if state.instfx then state.instfx[c.guid] = nil end
+      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + #ctx.track_insts(c) + 2
+    end
+    local n = #ctx.mc_list()
+    vim.msg = n > 0 and ('midi: %d clip(s) (%s) - pick one in the slices list, a note key inserts it (C-4 = as is), a - track / project'):format(n, ctx.mc_scope)
+      or ('midi: no MIDI clips (%s)%s'):format(ctx.mc_scope, ctx.mc_scope == 'track' and ' - a in the slices list: the whole project' or '')
+  end,
+  mc_scope_set = function(s)
+    ctx.mc_scope = s or (ctx.mc_scope == 'track' and 'project' or 'track')
+    ctx.mc_sel = 1
+    vim.msg = ('midi clips: %s (%d)'):format(ctx.mc_scope, #ctx.mc_list())
+  end,
+  mc_list = function()
+    local col = cur_col()
+    local scope = ctx.mc_scope
+    local c = ctx.mc_cache
+    if c and c.snap == snap and c.scope == scope and (scope == 'project' or c.col == col) then return c.list end
+    local list, tracks = {}, {}
+    if scope == 'project' then
+      for i = 0, reaper.CountTracks(0) - 1 do tracks[#tracks + 1] = reaper.GetTrack(0, i) end
+    elseif col and col.track then tracks[1] = col.track end
+    local lpb = state.lpb or 4
+    for _, tr in ipairs(tracks) do
+      local _, tname = reaper.GetTrackName(tr)
+      for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local tk = reaper.GetActiveTake(it)
+        if tk and reaper.TakeIsMIDI(tk) and #list < 1000 then
+          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local len = math.max(1e-6, reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'))
+          local _, nn = reaper.MIDI_CountEvts(tk)
+          local notes, lo, hi = {}, 127, 0
+          for n = 0, math.min(nn, 256) - 1 do
+            local _, _, _, sp, ep, _, p = reaper.MIDI_GetNote(tk, n)
+            notes[#notes + 1] = { (reaper.MIDI_GetProjTimeFromPPQPos(tk, sp) - pos) / len, (reaper.MIDI_GetProjTimeFromPPQPos(tk, ep) - pos) / len, p }
+            lo = math.min(lo, p); hi = math.max(hi, p)
+          end
+          list[#list + 1] = { item = it, track = tr, tname = tname or '', label = reaper.GetTakeName(tk) or '', pos = pos, len = len, nn = nn,
+            row = math.floor(reaper.TimeMap2_timeToQN(0, pos) * lpb + 1e-6), notes = notes, lo = lo, hi = hi }
+        end
+      end
+    end
+    ctx.mc_cache = { snap = snap, col = col, scope = scope, list = list }
+    if ctx.mc_sel > #list then ctx.mc_sel = math.max(1, #list) end
+    return list
+  end,
+  mc_insert = function(pitch, row)
+    local a = ctx.mc_list()[ctx.mc_sel]
+    if not (a and reaper.ValidatePtr(a.item, 'MediaItem*')) then vim.msg = 'midi: no MIDI clip picked (the slices list)'; return false end
+    local f = L and L.flat[vim.cur.fi]
+    if not (f and f.col and f.col.track and not f.env) then return false end
+    local lane_idx = f.col.fixed and f.lane and f.lane.idx or nil
+    edit.insert_note(f.col.track, lane_idx, state.lpb, row, pitch, vim.vel or 100, 1, a.item)
+    model.invalidate()
+    vim.msg = ('midi clip %s %+d'):format(a.label ~= '' and a.label or 'midi', pitch - model.BASE_NOTE)
+    return true
+  end,
+  mc_jump = function(a)
+    if not (a and reaper.ValidatePtr(a.item, 'MediaItem*') and L) then return end
+    ctx.jump_mark()
+    for i, f in ipairs(L.flat) do if f.col and f.col.track == a.track and not f.env then vim.cur.fi = i; break end end
+    vim.cur.row = a.row
+    vim.ensure_visible()
+    ctx.set_focus('tracker')
+    vim.msg = ('midi clip %s: row %04d (Ctrl+O - back)'):format(a.label ~= '' and a.label or 'midi', a.row)
+  end,
   -- кривые automation (6 окт): Data/jf_tracker_curves/*.jfcurve
   curve_dir = function()
     local d = reaper.GetResourcePath() .. '/Data/jf_tracker_curves'
@@ -3573,6 +3653,7 @@ ctx = {
     state.instfx = state.instfx or {}
     state.instfx[col.guid] = fx
     state.auto_inst = false
+    state.midi_inst = false
     -- номер в сквозной нумерации lib (vim.inst) — чтобы , . / Cmd+J K шли дальше от него
     do
       local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
@@ -8619,6 +8700,9 @@ function ctx.context_items(hover)
     radio('sec', 'first second')
   elseif hover.pool and hover.pool.auto then
     add('Select automation', function() ctx.auto_select() end)
+  elseif hover.pool and hover.pool.midi then
+    add('Select MIDI clips', function() ctx.midi_select() end)
+    add('MIDI clips: track / project', function() ctx.midi_select(); ctx.mc_scope_set() end)
   elseif hover.pool then
     local col = cur_col()
     add('Select instrument', function() pool_select(hover.pool.i) end)
@@ -9152,6 +9236,8 @@ local function poll_midi_in()
       if kind == 0x90 and d2 > 0 and state.auto_inst then
         -- automation как инструмент (5 окт): нота MIDI — пул со скоростью по высоте
         if ctx.ai_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
+      elseif kind == 0x90 and d2 > 0 and state.midi_inst then
+        if ctx.mc_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
       elseif kind == 0x90 and d2 > 0 then
         if midiin.nheld == 0 then
           -- новый аккорд: строка курсора; без Shift — перезапись того, что там стоит
@@ -10327,7 +10413,7 @@ local function frame()
   -- модуль слайсов (4 окт): колонка, пока у выбранного инструмента есть слайсы
   -- 8 окт: под инструментами (slices = split) — всегда, и на пустом слоте (заголовок + подсказка)
   local tq0 = reaper.time_precise()
-  do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split') and true or false end
+  do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split' or state.midi_inst) and true or false end
   local tq1 = reaper.time_precise()
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
   local tq2 = reaper.time_precise()
@@ -10819,7 +10905,7 @@ local function frame()
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
     tabs = ctx.top_tabs(),
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -11107,6 +11193,13 @@ local function frame()
       if state.auto_inst then
         local list = ctx.ai_list()
         local hv = SPROP.draw_ai(Lx, x, y, w - 5, h, list, ctx.ai_sel)
+        local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+        draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #list)
+        return hv
+      end
+      if state.midi_inst then                       -- MIDI-клипы трека / проекта (10 окт)
+        local list = ctx.mc_list()
+        local hv = SPROP.draw_mc(Lx, x, y, w - 5, h, list, ctx.mc_sel, ctx.mc_scope)
         local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
         draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #list)
         return hv
@@ -11624,6 +11717,8 @@ local function frame()
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
     state.status = 'instrument plugin: click - note keys write MIDI to it, DSP shows it; dblclick - its window'
+  elseif hover.pool and hover.pool.midi then
+    state.status = 'midi clips: MIDI items of the track (or the project - a in the slices list) as one instrument; a note key inserts a copy of the selected one, transposed from C-4'
   elseif hover.pool and hover.pool.auto then
     state.status = 'automation: automation items of the track as one instrument - the slices list shows them; a note key inserts the selected one, its rate by the key (C-4 = x1, an octave up = x2)'
   elseif hover.pool then
@@ -12427,7 +12522,14 @@ local function frame()
       -- модуль слайсов (4 окт): клик — выбрать и прослушать
       ctx.set_focus('slices')
       local root = ctx.slice_root()
-      if state.auto_inst then
+      if state.midi_inst then
+        if type(hover.slices) == 'string' then ctx.mc_scope_set(hover.slices); click = { t = now2, zone = 'mcscope' }; goto ai_click_done end
+        local same = click.zone == 'slicelist' and click.row == hover.slices
+        ctx.mc_sel = hover.slices; local a = ctx.mc_list()[hover.slices]
+        vim.msg = a and ('midi clip %s (row %04d): a note key inserts a copy, double click / Enter - go there'):format(a.label ~= '' and a.label or 'midi', a.row) or ''
+        if dbl and same and a then ctx.mc_jump(a) end
+        click = { t = now2, zone = 'slicelist', row = hover.slices }; goto ai_click_done
+      elseif state.auto_inst then
         local same = click.zone == 'slicelist' and click.row == hover.slices
         ctx.ai_sel = hover.slices; local a = ctx.ai_list()[hover.slices]
         vim.msg = a and ('automation %s: a note key inserts it, double click edits it'):format(a.label) or ''
@@ -12745,6 +12847,9 @@ local function frame()
     elseif hover.pool and hover.pool.auto then
       ctx.set_focus('inst'); ctx.auto_select()
       click = { t = now2, zone = 'poolauto' }
+    elseif hover.pool and hover.pool.midi then
+      ctx.set_focus('inst'); ctx.midi_select()
+      click = { t = now2, zone = 'poolmidi' }
     elseif hover.pool and hover.pool.instfx then
       -- 9 окт: плагин-инструмент: щелчок — выбрать (ноты — MIDI в него) и DSP на нём, двойной — его окно
       ctx.inst_fx_pick(cur_col(), hover.pool.instfx, dbl and click.zone == 'poolinst' and click.row == hover.pool.instfx)
@@ -14293,6 +14398,22 @@ local function frame()
         local root = ctx.slice_root()
         local cur = (root and ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
         local n = root and root.slices and #root.slices or 0
+        if state.midi_inst then
+          -- MIDI-клипы (10 окт): j k J K g G — выбор, a — трек / проект, Enter — туда
+          local nl = #ctx.mc_list()
+          local function mv(i) ctx.mc_sel = math.max(1, math.min(math.max(1, nl), i)); local a = ctx.mc_list()[ctx.mc_sel]; if a then vim.msg = ('midi clip %s (row %04d)'):format(a.label ~= '' and a.label or 'midi', a.row) end end
+          if c == 27 then ctx.set_focus('tracker')
+          elseif ch == 'j' or c == keys.down then mv(ctx.mc_sel + 1)
+          elseif ch == 'k' or c == keys.up then mv(ctx.mc_sel - 1)
+          elseif ch == 'J' then mv(ctx.mc_sel + 8)
+          elseif ch == 'K' then mv(ctx.mc_sel - 8)
+          elseif ch == 'g' then mv(1)
+          elseif ch == 'G' then mv(nl)
+          elseif ch == 'a' then ctx.mc_scope_set()
+          elseif c == 13 then ctx.mc_jump(ctx.mc_list()[ctx.mc_sel])
+          else return vim.key(c) end
+          return
+        end
         if c == 27 then ctx.set_focus('tracker')
         elseif ch == 'j' or c == keys.down then ctx.slice_step(1)
         elseif ch == 'k' or c == keys.up then ctx.slice_step(-1)

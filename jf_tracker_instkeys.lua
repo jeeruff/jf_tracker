@@ -67,9 +67,13 @@ function IK.key(c, cur, n, nslots)
     return 'leave'
   end
   -- automation — строка после всех слотов (5 окт): j с последнего слота — туда, k — обратно
+  if ctx.midi_on and ctx.midi_on() then                -- midi — под automation (10 окт)
+    if (ch == 'k' or c == UP) and ctx.auto_select then ctx.auto_select(); return true end
+    if ch == 'j' or c == DOWN or ch == 'G' then return true end
+  end
   if ctx.auto_on and ctx.auto_on() then
     if ch == 'k' or c == UP then ctx.inst_select(math.max(1, nslots)); return true end
-    if ch == 'j' or c == DOWN then return true end
+    if ch == 'j' or c == DOWN then if ctx.midi_select then ctx.midi_select() end; return true end
   end
   if ch == 'd' or ch == 'y' then IK.pending = ch; ctx.msg(ch .. '...'); return true end
   if (ch == 'j' or c == DOWN) and cur >= nslots and ctx.auto_select then ctx.auto_select()
@@ -77,7 +81,7 @@ function IK.key(c, cur, n, nslots)
   elseif ch == 'k' or c == UP then ctx.inst_select(math.max(1, cur - 1))
   elseif ch == 'J' or ch == 'K' then ctx.lib_step(ch == 'J' and 1 or -1)   -- исходник ниже / выше (3 окт)
   elseif ch == 'g' then ctx.inst_select(1)
-  elseif ch == 'G' then if ctx.auto_select then ctx.auto_select() else ctx.inst_select(math.max(1, n)) end   -- G — в самый низ: automation (5 окт)
+  elseif ch == 'G' then if ctx.midi_select then ctx.midi_select() elseif ctx.auto_select then ctx.auto_select() else ctx.inst_select(math.max(1, n)) end   -- G — в самый низ: midi (10 окт)
   elseif ch == 'v' then IK.anchor = IK.anchor and nil or cur
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)

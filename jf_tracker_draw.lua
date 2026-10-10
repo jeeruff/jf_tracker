@@ -3050,11 +3050,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if #tins > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
   for k, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end
   rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент — последней строкой (5 окт)
+  rows[#rows + 1] = { midi = true, num = nsamp + #tins + 2 }   -- MIDI-клипы трека / проекта (10 окт)
   L.pool_rows = rows
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
-  for r, row in ipairs(rows) do if (not info.auto_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) then sel_r = r end end
+  for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом можно листать
@@ -3129,6 +3130,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(('%02d ~~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
+    elseif row.midi then
+      local sel = info.midi_inst
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      text(ix + 6, y + 1, fit(('%02d ## midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
+      if hot then hover.pool = { ci = info.pool_ci, midi = true } end
+      hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
     elseif row.instfx then
       local sel = info.inst_fx and info.inst_fx(col) == row.instfx
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh

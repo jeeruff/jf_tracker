@@ -21,7 +21,9 @@ IK.init({
   inst_find = function() log[#log + 1] = 'find' end,
   inst_track = function(d) log[#log + 1] = 'track:' .. d end,
   auto_on = function() return AUTO end,
-  auto_select = function() AUTO = true; log[#log + 1] = 'auto' end,
+  auto_select = function() AUTO = true; MIDI = false; log[#log + 1] = 'auto' end,
+  midi_on = function() return MIDI end,
+  midi_select = function() MIDI = true; AUTO = false; log[#log + 1] = 'midi' end,
 })
 local function k(s) local r; for ch in s:gmatch('.') do r = IK.key(ch:byte(), cur, 3, 8) end; return r end
 
@@ -46,7 +48,7 @@ cur = 5; local before = #log; k('x'); eq('x on empty slot does nothing', #log, b
 -- навигация и прочее
 cur = 8; k('j'); eq('j stops at last slot', cur, 8)
 k('g'); eq('g first', cur, 1)
-AUTO = false; k('G'); eq('G -> the automation row', log[#log], 'auto'); AUTO = false
+AUTO = false; k('G'); eq('G -> the midi row (the bottom)', log[#log], 'midi'); MIDI = false
 IK.key(13, cur, 3, 8); eq('Enter slicer', last(), 'slicer')
 k(' '); eq('Space listens', last(), 'listen')
 k('a'); eq('a toggles listen on select', last(), 'listen_toggle')
@@ -58,6 +60,11 @@ eq('u is not ours (vim undo)', IK.key(('u'):byte(), cur, 3, 8), false)
 -- automation (5 окт): j с последнего слота — строка automation, k — обратно
 AUTO = false; cur = 8; IK.key(('j'):byte(), cur, 3, 8); eq('j past the last slot -> automation', log[#log], 'auto')
 IK.key(('k'):byte(), cur, 3, 8); eq('k from automation -> last slot', log[#log], 'sel:8')
-AUTO = false
+-- midi (10 окт): под automation; j с automation — midi, k — обратно, j / G на midi стоят
+AUTO = true; IK.key(('j'):byte(), cur, 3, 8); eq('j from automation -> midi', log[#log], 'midi')
+local nm = #log; IK.key(('j'):byte(), cur, 3, 8); eq('j on midi stays', #log, nm)
+IK.key(('G'):byte(), cur, 3, 8); eq('G on midi stays', #log, nm)
+IK.key(('k'):byte(), cur, 3, 8); eq('k from midi -> automation', log[#log], 'auto')
+AUTO = false; MIDI = false
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

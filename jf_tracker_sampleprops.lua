@@ -310,6 +310,75 @@ function SP.draw_ai(L, x, y, w, h, list, sel)
   return SP.slice_hover
 end
 
+-- MIDI-клипы как инструмент (10 окт): MIDI-items трека курсора или всего
+-- проекта — подпись (в проекте — с треком), строка начала, мини-пиано-ролл.
+-- Заголовок: track | project — щелчок переключает. Возвращает номер под
+-- мышью или 'track' / 'project' (переключатель)
+function SP.draw_mc(L, x, y, w, h, list, sel, scope)
+  SP.slice_hover = nil
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  local zw = zoom_button(L, x, y, w)
+  local head = ('midi %d  '):format(#list)
+  U.text(x + L.pad, y, head, U.GREY)
+  local sx = x + L.pad + U.measure(head)
+  for _, s in ipairs({ 'track', 'project' }) do
+    local sw = U.measure(s)
+    if sx + sw > x + w - zw - L.pad then break end
+    local hot = mx >= sx and mx < sx + sw and my >= y and my < y + L.rh
+    U.text(sx, y, s, scope == s and U.AMBER or (hot and U.TEXT or U.DIM))
+    if hot then SP.slice_hover = s end
+    sx = sx + sw + L.pad
+  end
+  if #list == 0 then
+    U.text(x + L.pad, y + L.rh, ctx.fit(scope == 'project' and 'no MIDI clips in the project' or 'no MIDI clips on this track - a: the whole project', w - 2 * L.pad), U.DIM)
+    return SP.slice_hover
+  end
+  local RH = L.rh * SP.szoom
+  local nvis = math.max(1, math.floor((h - L.rh) / RH))
+  SP.slice_nvis = nvis
+  -- выбранный — в окне (выбор клавишами j k)
+  local sc = SP.slice_scroll or 0                       -- колесо листает; смена выбора — к нему
+  if SP.mc_last ~= sel then
+    SP.mc_last = sel
+    if sel > sc + nvis then sc = sel - nvis end
+    if sel <= sc then sc = sel - 1 end
+  end
+  sc = math.max(0, math.min(sc, math.max(0, #list - nvis)))
+  SP.slice_scroll = sc
+  for r = sc + 1, math.min(#list, sc + nvis) do
+    local a = list[r]
+    local ry = y + L.rh + (r - sc - 1) * RH
+    local on = r == sel
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + RH
+    if on or hot then U.set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, RH, 1) end
+    local rt = ('%04d'):format(a.row or 0)
+    local zoomed = SP.szoom > 1
+    local lw = zoomed and (w - U.measure(rt) - 2 * L.pad) or math.floor(w * 0.45)
+    local lbl = (scope == 'project' and a.tname ~= '' and (a.tname .. ': ') or '') .. (a.label ~= '' and a.label or 'midi')
+    U.text(x + L.pad, ry, ctx.fit(lbl, lw - L.pad), on and U.AMBER or U.TEXT)
+    U.text(x + w - L.pad - U.measure(rt), ry, rt, U.GREY)
+    local px0, pw, py0, ph
+    if zoomed then px0, pw, py0, ph = x + L.pad, w - 2 * L.pad, ry + L.rh, RH - L.rh - 2
+    else px0, pw, py0, ph = x + lw, w - lw - U.measure(rt) - 3 * L.pad, ry + 2, L.rh - 4 end
+    if pw > 8 and ph > 2 then
+      U.set(U.mix(U.BG, U.TEXT, 0.08)); gfx.rect(px0, py0, pw, ph, 1)
+      U.set(on and U.AMBER or U.CYAN)
+      local lo, hi = a.lo or 60, a.hi or 60
+      local span = math.max(1, hi - lo)
+      for _, n in ipairs(a.notes or {}) do
+        local nx0 = px0 + math.floor(math.max(0, n[1]) * pw)
+        local nx1 = px0 + math.floor(math.min(1, n[2]) * pw)
+        local ny = py0 + ph - 1 - math.floor((n[3] - lo) / span * (ph - 1) + 0.5)
+        gfx.rect(nx0, ny, math.max(1, nx1 - nx0), 1, 1)
+      end
+    end
+    if hot then SP.slice_hover = r end
+    if ctx.hint then ctx.hint('slice', x, ry, w, RH, r) end
+  end
+  return SP.slice_hover
+end
+
 -- информация о файле браузера (2 окт): вместо свойств, когда в модуле файл
 -- info = { name, dir, rows = { {label, value} … } } — собирает main (ctx.file_info)
 function SP.draw_info(L, x, y, w, h, info, playing)
