@@ -3185,10 +3185,33 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент (5 окт)
   rows[#rows + 1] = { hdr = 'midi', name = '' }
   rows[#rows + 1] = { midi = true, num = nsamp + #tins + 2 }   -- MIDI-клипы трека / проекта (10 окт)
+  -- 10 окт: секции audio / instruments / automation / midi; опция lib tabs — вкладками (F4),
+  -- иначе разделителями с пустой строкой перед каждой
+  local SECS = { instruments = true, automation = true, midi = true }
+  do
+    local sec, out = 'audio', {}
+    for _, row in ipairs(rows) do
+      if row.hdr and SECS[row.hdr] then sec = row.hdr end
+      row.sec = sec
+    end
+    if info.libtabs then
+      local want = info.libtab or 'audio'
+      for _, row in ipairs(rows) do
+        if row.sec == want and not (row.hdr and (SECS[row.hdr] or row.hdr == 'audio')) then out[#out + 1] = row end
+      end
+    else
+      for i, row in ipairs(rows) do
+        if row.hdr and SECS[row.hdr] and i > 1 then out[#out + 1] = { gap = true, sec = row.sec } end
+        out[#out + 1] = row
+      end
+    end
+    rows = out
+  end
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
-  local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG) / L.rh))
+  local TBH = info.libtabs and (L.rh + 2) or 0             -- строка вкладок lib
+  local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG - TBH) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
   for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) then sel_r = r end end
@@ -3240,6 +3263,23 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     set(U.DIM); gfx.rect(ix + 2, hy2 + L.rh - 1, w - 4, 1, 1)
   end
+  if TBH > 0 then
+    -- вкладки lib (10 окт): как вкладки панелей — рамками встык, активная янтарём
+    local ty = iy + 2 + 2 * L.rh + LEG
+    local tx = ix + 2
+    for _, nm in ipairs({ 'audio', 'instruments', 'automation', 'midi' }) do
+      local tw2 = ms(nm) + 2 * L.pad
+      if tx + tw2 > ix + w - 2 then break end
+      local on = (info.libtab or 'audio') == nm
+      local hot = mx >= tx and mx < tx + tw2 and my >= ty and my < ty + L.rh
+      set(on and U.tint(U.AMBER, 0.25) or (hot and D.CURROW or U.BG)); gfx.rect(tx, ty, tw2, L.rh, 1)
+      set(on and U.AMBER or U.LINE); gfx.rect(tx, ty, tw2, L.rh, 0)
+      text(tx + L.pad, ty, nm, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      if hot then hover.libtab = nm end
+      hint('libtab', tx, ty, tw2, L.rh, nm)
+      tx = tx + tw2 - 1
+    end
+  end
   -- цвет трека по имени — запасной цвет волны, когда у item нет своего
   local trgb = {}
   for _, c in ipairs(info.cols or {}) do if c.rgb and not trgb[c.name] then trgb[c.name] = c.rgb end end
@@ -3251,8 +3291,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local drop_y
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
-    local y = iy + 2 + 2 * L.rh + LEG + (r - D.pool_scroll - 1) * L.rh
-    if row.hdr then
+    local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
+    if row.gap then
+      -- пустая строка перед секцией
+    elseif row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
       local tw = ms(row.hdr)
@@ -3420,7 +3462,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
   end
   if drop_y then set(U.AMBER); gfx.rect(ix + 2, drop_y - 1, w - 4, 2, 1) end
-  D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
+  D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
     text(ix + 6, iy + 2 + 2 * L.rh, fit('& files kit  /N slices  ~~ automation  ## midi clips  (muted)', w - 12), U.GREY)
