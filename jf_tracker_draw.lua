@@ -316,16 +316,16 @@ function D.panes_layout(state, L, nregions, ncols)
   local m = state.panes
   local H = gfx.h - L.status_h
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.ab == (state.tababc and 1 or 0) and s.hi == (state.hints and 1 or 0) then
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
   s.ab = state.tababc and 1 or 0
-  s.hi = state.hints and 1 or 0
+  s.hi = (state.hints and state.hintpos ~= 'status') and 1 or 0
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
   M.tab_h = L.rh + 2                                    -- подпись листа — в верхней линии рамки (zellij)
-  M.hint_h = state.hints and (L.rh + 1) or 0           -- 10 окт: хинты включены — своя строка клавиш под каждой панелью
+  M.hint_h = (state.hints and state.hintpos ~= 'status') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
   M.minh = function(id) if id == 'sample' and D.sprops_rows then return (math.ceil(D.sprops_rows / 2) + 1) * L.rh + 2 * L.rh + 10 end end
@@ -601,7 +601,7 @@ function D.layout(snap, state, nregions)
   L.pn = nil
   if state.panes_ui and D.panes and state.panes then
     -- zellij: подсказки клавиш панели в фокусе — одной строкой внизу окна, над статусом
-    L.pn_keys = state.hints and (L.rh + 1) or 0
+    L.pn_keys = (state.hints and state.hintpos ~= 'panes') and (L.rh + 1) or 0
     L.status_h = (L.statpos == 'bottom' and (L.rh + 4) or 0) + L.pn_keys
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
