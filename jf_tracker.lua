@@ -234,7 +234,8 @@ local state = {
   jumps = flag('jumps', false),                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
-  libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',   -- 10 окт: папки lib (kicks, snares …)
+  libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
+  hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -554,7 +555,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -6911,6 +6912,7 @@ ctx = {
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
+      { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on (default): after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, aliases copy exactly what is seen; off - a note started in a pattern rings on into the next one (as in Renoise); the matrix trim button still cuts by hand', get = function() return state.hardedges ~= false end, set = function(v) state.hardedges = v end },
       flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
@@ -6934,7 +6936,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'curline', 'curlead', 'bigcur', 'phtail', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -8352,14 +8354,19 @@ edit.after = function(desc)
       end
     end
   end
-  if not state.autosync or not regions or #regions == 0 then return end
+  -- 10 окт: жёсткие границы — своя опция hard pattern edges (по умолчанию вкл,
+  -- решение 1 окт), не зависит от auto sync; выкл — нота звучит в следующий паттерн
+  local hard = state.hardedges ~= false
+  if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
-  if desc == 'add region' then model.invalidate(); alias.trim(model.regions(state.lpb)); return end
+  if desc == 'add region' then if hard then model.invalidate(); alias.trim(model.regions(state.lpb)) end; return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
-  local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
-  if rg then alias.sync(regions, rg) end
+  if state.autosync then
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if rg then alias.sync(regions, rg) end
+  end
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
-  alias.trim(regions)
+  if hard then alias.trim(regions) end
 end
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
