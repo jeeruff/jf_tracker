@@ -3311,8 +3311,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local pk = e.parent and e.parent.kit                -- 10 окт: часть набора & — своим именем файла
         local kname = pk and e.slice_k and #pk == #(e.parent.slices or {}) and pk[e.slice_k] or nil
         body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (kname or (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut'))
-      else body = (e.kit and '& ' or '') .. e.name .. (e.slices and (' /' .. #e.slices) or '') end   -- 10 окт: & — набор из нескольких файлов
-      local lbl = ('%02d %s%s'):format(e.num or i, body, e.muted and ' (muted)' or '')
+      end
+      -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
+      local pre = ('%02d '):format(e.num or i)
+      local suf = ((not child and e.slices) and (' /' .. #e.slices) or '') .. ((e.muted and not e.depot) and ' (muted)' or '')
+      if not child then body = (e.kit and '& ' or '') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ((e.kit and ms('& ')) or 0))) end
+      local lbl = pre .. body .. suf
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
       local dw = ms('88.88s') + L.pad
