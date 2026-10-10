@@ -167,7 +167,18 @@ function S.mouse_move(frac)
     local k = S.drag.k
     local lo = (S.slices[k - 1] or 0) + 0.002
     local hi = (S.slices[k + 1] or S.entry.len) - 0.002
-    S.slices[k] = math.max(lo, math.min(hi, S.snap_t(frac * S.entry.len, k)))
+    -- 10 окт: Shift — fine, как в зуме: мышь двигает линию в 10 раз медленнее от места, где нажат Shift;
+    -- отпустил Shift — линия не прыгает к мыши, смещение остаётся
+    local d, len = S.drag, S.entry.len
+    local t
+    if (gfx.mouse_cap & 8) == 8 then
+      if not d.fa then d.fa, d.ft = frac, S.slices[k] end
+      t = d.ft + (frac - d.fa) * len * 0.1
+    else
+      if d.fa then d.off = S.slices[k] - frac * len; d.fa = nil end
+      t = S.snap_t(frac * len + (d.off or 0), k)
+    end
+    S.slices[k] = math.max(lo, math.min(hi, t))
     if math.abs(S.slices[k] - (S.drag.t0 or 0)) > 1e-6 then S.roll(S.slices[k], S.line_is_end(S.drag.t0)) end   -- 10 окт: roll
   end
   if S.drag and S.drag.kind == 'sel' and S.entry and frac then S.sel.b = math.max(0, math.min(S.entry.len, S.snap_t(frac * S.entry.len))) end
