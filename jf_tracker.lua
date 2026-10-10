@@ -214,6 +214,7 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
+  mxse = flag('mxse', false),                   -- 10 окт: кнопка s/e — матрица только между =START и =END
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom' or v == 'clips') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
@@ -579,7 +580,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'mxse', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2924,15 +2925,23 @@ ctx = {
     local s1 = regions.end_pos
     -- 8 окт: без =END матрица длинная — 512 тактов свободных строк от =START
     -- (маркер не ставится; :end переносит конец)
+    -- 10 окт: s/e — строго между маркерами: регионы целиком внутри, без =END — до конца последнего, без хвоста пустых тактов
+    local strict = state.mxse
     if not s1 then
-      local _, m0 = reaper.TimeMap2_timeToBeats(0, s0)
-      s1 = reaper.TimeMap2_beatsToTime(0, 0, (m0 or 0) + ctx.MX_BARS)
+      if strict then
+        for _, rg in ipairs(regions) do if not rg.lib and not rg.session and rg.pos >= s0 - 1e-6 then s1 = math.max(s1 or 0, rg.rgnend) end end
+      end
+      if not s1 then
+        local _, m0 = reaper.TimeMap2_timeToBeats(0, s0)
+        s1 = reaper.TimeMap2_beatsToTime(0, 0, (m0 or 0) + ctx.MX_BARS)
+      end
     end
-    local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1)
+    local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1) .. (strict and '|s' or '')
     if seq_cache.key == key then return seq_cache.seq end
     local out, real = {}, {}
     for _, rg in ipairs(regions) do
-      if not rg.lib and not rg.session and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6) then real[#real + 1] = rg end
+      if not rg.lib and not rg.session and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6)
+         and (not strict or (rg.pos >= s0 - 1e-6 and rg.rgnend <= s1 + 1e-6)) then real[#real + 1] = rg end
     end
     local function bars(t0, t1)
       local t, n = t0, 0
@@ -12601,6 +12610,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
+  elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e: on - the matrix holds only the slots between =START and =END (without =END - up to the last region, no free bars); off - from =START with free bars to the end'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
   elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
@@ -13671,6 +13681,10 @@ local function frame()
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
+      elseif hover.matrix.btn == 'se' then
+        state.mxse = not state.mxse; seq = ctx.sequence()
+        if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
+        vim.msg = 'matrix s/e ' .. (state.mxse and 'on: only slots between =START and =END' or 'off: =START onwards, free bars to the end')
       elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
       elseif hover.matrix.btn == 'clips' then ctx.mx_clips_toggle()
       elseif hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend' then
