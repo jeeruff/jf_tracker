@@ -84,7 +84,7 @@ function O.open_panel(items, title, anchor)
   O.compact = { title = title or '', x = anchor and anchor.x, y = anchor and anchor.y }
   O.page, O.active, O.sel, O.scroll, O.numbuf = 'list', true, 1, 0, nil
 end
-function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end end
+function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end; if t == 'theme' and ctx.theme_tab then ctx.theme_tab.sync() end end
 function O.step_tab(d)
   if #O.tabs == 0 then return end
   local i = 1
@@ -175,6 +175,8 @@ function O.key(c)
   if c == 9 or ch == ']' then O.step_tab(shift and -1 or 1); return true end
   if c == 25 or ch == '[' then O.step_tab(-1); return true end
   if c == 27 and O.query ~= '' then O.query = ''; O.rebuild(); return true end
+  -- 10 окт: вкладка theme — своя сетка (темы карточками, шрифты своим шрифтом)
+  if O.tab == 'theme' and O.query == '' and ctx.theme_tab and ctx.theme_tab.key(c) then return true end
   local n = #O.items
   local it = O.items[O.sel]
   if it and it.masked and it.masked() and (c == 13 or ch == ' ' or ch == 'l' or ch == 'h' or ch == '+' or ch == '-') then it.unmask(); return true end
@@ -194,6 +196,7 @@ end
 
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
+  if O.tab == 'theme' and O.query == '' and ctx.theme_tab then ctx.theme_tab.wheel(d); return end
   local it = O.items[O.hover or O.sel]
   -- список (хоткеи, действия, полоса прокрутки): колесо листает (5 окт)
   if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' then
@@ -228,6 +231,7 @@ function O.click(mx, my)
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.tab_hot then O.set_tab(O.tab_hot); return end
+  if O.tab == 'theme' and O.query == '' and ctx.theme_tab and ctx.theme_tab.click() then return end
   if O.find_hot then O.typing = true; return end
   if O.sb_hot then O.sb_drag = true; return end
   if O.hover then
@@ -474,6 +478,7 @@ function O.draw(L, W, H)
   local tk = tostring(O.tab or '')
   if O.query == '' then O.nfull[tk] = math.max(O.nfull[tk] or 0, n) end
   local rows = math.max(12, math.ceil((O.nfull[tk] or n) / ncw), math.ceil(n / ncol))
+  if O.tab == 'theme' and O.query == '' then rows = math.max(rows, 60); bw = math.max(bw, math.min(W - 2 * L.pad - 20, L.cw * 150)) end   -- вкладка theme — во всю высоту
   local nvis = math.max(3, math.min(rows, math.floor((H - 6 * rh) / rh)))
   local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
@@ -537,6 +542,10 @@ function O.draw(L, W, H)
   local by0 = by
   if not O.compact then by = by + rh * ((#O.tabs > 0) and 2 or 1) end   -- список — под вкладками и поиском
   O.nvis = cap
+  if O.tab == 'theme' and O.query == '' and ctx.theme_tab then
+    ctx.theme_tab.draw(bx + L.pad, by + rh + 4, bw - 2 * L.pad, by0 + bh - (by + rh + 4) - 4)
+    return
+  end
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
   local sbw = 0
