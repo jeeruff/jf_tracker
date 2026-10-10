@@ -297,10 +297,12 @@ keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
 keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
-ctrl_down = true; V.key(51); eq('INSERT: Ctrl+3 = black key held (hold note D#5)', last(), 'hold:75'); V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); ctrl_down = false
+ctrl_down = true; V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); V.key(51); eq('10 окт: Ctrl+3 = step 3', V.step, 3); ctrl_down = false
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
-cmd_down = true; V.key(51); eq('NORMAL: ⌘3 → pool slot 3', last(), 'pool:3'); V.key(48); eq('⌘0 → slot 10', last(), 'pool:10'); cmd_down = false
+do local fi0 = V.cur.fi; V.cur.fi = 1; cmd_down = true; V.key(50); cmd_down = false
+eq('NORMAL: ⌘2 -> channel 2', V.cur.fi > 1, true); V.cur.fi = fi0 end
+alt_down = true; V.key(8482); alt_down = false; eq('Option+2 -> instrument 2', last(), 'pool:2')
 -- 5 окт: слоя пианино в NORMAL нет — m не включает клавиатуру, q — Vim
 keysin('m'); eq('NORMAL m: no keyboard layer', V.piano, false); eq('NORMAL: stays normal', V.mode, 'normal')
 keysin('iq');      eq('len = step', last(), 'ins:trA@5:72:2'); eq('advance by step', V.cur.row, 7)
@@ -399,7 +401,7 @@ V.key(10); eq('^J → matrix down', last(), 'mx:0,1')
 V.key(11); eq('^K → matrix up', last(), 'mx:0,-1')
 V.key(12); eq('^L → matrix right', last(), 'mx:1,0')
 V.key(8);  eq('^H → matrix left', last(), 'mx:-1,0')
-keysin('3'); V.key(10); eq('3^J', last(), 'mx:0,3')
+ctrl_down = false; keysin('3'); ctrl_down = true; V.key(10); eq('3^J', last(), 'mx:0,3')   -- 10 окт: Ctrl+цифра — шаг, счётчик — без Ctrl
 ctrl_down = false
 keysin('i'); V.key(8); eq('plain backspace in INSERT deletes', last(), 'delete:kick'); V.key(27)
 reset()
@@ -731,8 +733,8 @@ eq('Ctrl+Right = Ctrl+l: matrix move', last(), 'mx:1,0')
 reset(); SLICER = true; V.inst = 2
 alt_down = true; V.key(8710); alt_down = false
 eq('slicer open: Option+J still picks the next instrument', last(), 'pool:3')
-cmd_down = true; V.key(('4'):byte()); cmd_down = false
-eq('slicer open: Cmd+4 picks instrument 4', last(), 'pool:4')
+alt_down = true; V.key(162); alt_down = false
+eq('slicer open: Option+4 picks instrument 4', last(), 'pool:4')
 V.key(('x'):byte()); eq('slicer open: other keys go to the slicer', last(), 'slkey:120')
 SLICER = nil
 -- 10 окт: dp — до паузы (серия лейна без пустой строки), dP — всё выбранных треков

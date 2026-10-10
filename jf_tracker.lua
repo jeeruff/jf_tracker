@@ -14345,11 +14345,12 @@ local function frame()
       end
     end
   end
-  -- Option+1..9 (8 окт): выделить / снять трек N трекера в REAPER (нативное
-  -- выделение) — цели прыжка фейдера f; символ от раскладки — физическая клавиша
-  if c > 0 and reaper.JS_VKeys_GetState and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
+  -- Cmd+Shift+1..9 (10 окт, было Option — теперь это инструмент): выделить /
+  -- снять трек N трекера в REAPER (нативное выделение) — цели прыжка фейдера f;
+  -- символ от раскладки — физическая клавиша. macOS: Cmd+Shift+3 4 5 — снимки экрана
+  if c > 0 and reaper.JS_VKeys_GetState and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then
     local m = ctx.mods()
-    if m.alt and not m.cmd and not m.ctrl and not m.shift then
+    if m.cmd and m.shift and not m.alt and not m.ctrl then
       local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
       for n = 1, 9 do
         if ks and ks:byte(48 + n) ~= 0 then

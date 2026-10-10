@@ -1232,11 +1232,26 @@ function V.key_impl(c)
       V.count = nil; return
     end
   end
-  -- ⌘+цифра — слот пула (1..9, 0 = 10) в любом режиме
-  if mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
+  -- 10 окт: Ctrl+цифра — длина шага (step 0..9; 0 — курсор стоит), step auto выкл
+  if mods.ctrl and not mods.alt and not mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    V.step = c - ('0'):byte(); V.step_auto = false
+    V.msg = 'step ' .. V.step .. (V.step == 0 and ' - the cursor stays' or ' row(s)')
+    V.count = nil; return
+  end
+  -- 10 окт: ⌘+цифра — прыжок на канал N (1..9, 0 = 10) в любом режиме (было —
+  -- инструмент, теперь он только на Option+цифре); Ctrl+O — назад
+  if mods.cmd and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
      and not ((V.mode == 'insert' or V.piano) and ctx.piano[c]) then      -- в INSERT / слое пианино ⌘+цифра — нота с удержанием
     local k = c - ('0'):byte(); if k == 0 then k = 10 end
-    if ctx.pool_select then ctx.pool_select(k) end
+    local to
+    for i, f in ipairs(flat()) do if f.ci == k and not f.env then to = i; break end end
+    if to then
+      if to ~= V.cur.fi and ctx.jump_mark then ctx.jump_mark() end
+      V.cur.fi = to; V.cur.field = 1; V.cur.sub = nil
+      ensure_visible()
+      local f = flat()[to]
+      V.msg = ('channel %d: %s'):format(k, f.col and f.col.name or '')
+    else V.msg = ('no channel %d'):format(k) end
     V.count = nil; return
   end
   local hk = HJKL[c]
