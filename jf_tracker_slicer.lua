@@ -948,14 +948,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         end
         if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
       end
-    else U.text(x + 4, zy + 2, 'zoom: no audio to read', U.GREY) end
+    else U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
     -- линии слайсов в окне и сам край по центру
     local zsl = (S.active and S.entry and S.entry.item == e.item) and S.slices or (e.slices or {})
     for k2, t2 in ipairs(zsl) do
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
-    U.text(x + 4, zy + 1, ('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), U.GREY)
+    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), w - 8), U.GREY)
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local inz = mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
     if inz then S.zoom_hot = true end

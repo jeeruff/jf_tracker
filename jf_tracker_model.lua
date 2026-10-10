@@ -882,10 +882,14 @@ function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone, guid, first)
   if depot_tr then
     -- 8 окт: семпл трека LIB — у трека-владельца (P_EXT:jf_home = GUID трека);
     -- без владельца — у первого трека
+    -- 10 окт: владелец удалён (или трека не было — файл из браузера в пустом проекте) —
+    -- тоже у первого трека: раньше такие инструменты не показывались нигде
+    local live = {}
+    for ti = 0, R.CountTracks(0) - 1 do live[M.track_guid(R.GetTrack(0, ti))] = true end
     for i = 0, R.CountTrackMediaItems(depot_tr) - 1 do
       local it = R.GetTrackMediaItem(depot_tr, i)
       local _, home = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_home', '', false)
-      if (home ~= '' and home == guid) or (home == '' and first) then pool_add(pool, seen, it, true) end
+      if (home ~= '' and home == guid) or ((home == '' or not live[home]) and first) then pool_add(pool, seen, it, true) end
     end
   end
   return pool
