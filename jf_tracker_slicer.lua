@@ -157,6 +157,7 @@ end
 function S.slice_down(k)
   if not S.entry or not S.slices[k] then return end
   S.drag = { kind = 'slice', k = k, t0 = S.slices[k], mx0 = gfx.mouse_x }
+  S.zedge_k, S.zedge_e = k, S.entry.item or S.entry.path   -- 10 окт: зум края показывает последнюю схваченную линию
   -- клик по линии слайса (5 окт) — этот слайс выбран в модуле слайсов
   if ctx and ctx.select_slice then ctx.select_slice(S.entry, k) end
   if ctx and ctx.set_last_slice then ctx.set_last_slice(k) end
@@ -517,6 +518,45 @@ function S.cycle_view()
   return S.view
 end
 
+-- 10 окт: зум края (как в Xfer Nerve) — что показывать снизу крупно:
+-- тянущаяся линия слайса → край тянущейся зоны → выбранный в списке слайс →
+-- последняя схваченная линия → начало зоны. Возвращает t (секунды e), подпись, k линии
+function S.edge_focus(e, zone, editing)
+  if not (ctx.state and ctx.state.edgezoom ~= false) then return nil end
+  local sl = editing and S.slices or (e.slices or {})
+  if editing and S.drag and S.drag.kind == 'slice' and sl[S.drag.k] then return sl[S.drag.k], ('S%02X line'):format(S.drag.k), S.drag.k end
+  if S.zdrag and S.zdrag.k and sl[S.zdrag.k] then return sl[S.zdrag.k], ('S%02X line'):format(S.zdrag.k), S.zdrag.k end
+  local zd = S.zone_drag
+  if zd and zone and (zd.edge == 'a' or zd.edge == 'b') then return zd.edge == 'a' and zone[1] or zone[2], zd.edge == 'a' and 'zone start' or 'zone end' end
+  local k = ctx.selected_slice and ctx.selected_slice(e)
+  if k and k > 0 and sl[k] then return sl[k], ('S%02X start'):format(k), k end
+  if S.zedge_k and sl[S.zedge_k] and S.zedge_e == (e.item or e.path) then return sl[S.zedge_k], ('S%02X line'):format(S.zedge_k), S.zedge_k end
+  if zone then return zone[1], 'zone start' end
+  -- ничего не выбрано — как в Nerve, окно всё равно есть: первая линия слайса, иначе начало сэмпла
+  if sl[1] then return sl[1], 'S01 line', 1 end
+  return 0, 'sample start'
+end
+-- сэмплы окна [t0, t0 + span] секунд e: WAV напрямую (смещение / скорость item), иначе аудио-аксессор take
+local function zoom_samples(e, t0, span)
+  local key = tostring(e.fpath) .. ':' .. tostring(e.offs) .. ':' .. tostring(e.rate) .. ':' .. ('%.5f:%.5f'):format(t0, span)
+  if S.zs and S.zs.key == key then return S.zs.s, S.zs.n end
+  local rk = tostring(e.fpath) .. tostring(e.take)
+  if not (S.zr and S.zr.key == rk) then
+    local fn, sr, file = nil, nil, false
+    if S.sg and e.fpath and e.fpath:lower():match('%.wav$') then fn, sr = S.sg.wav_reader(e.fpath); file = fn ~= nil end
+    if not fn and S.sg and e.take and R.ValidatePtr(e.take, 'MediaItem_Take*') then fn, sr = S.sg.take_reader(e.take) end
+    S.zr = { key = rk, fn = fn, sr = sr or 44100, file = file }
+  end
+  local zr = S.zr
+  if not zr.fn then return nil end
+  local rate = (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
+  local n = math.max(16, math.min(65536, math.floor(span * rate * zr.sr)))
+  local ft = zr.file and ((e.offs or 0) + math.max(0, t0) * rate) or math.max(0, t0)
+  local s = zr.fn(ft, n)
+  S.zs = { key = key, s = s, n = n }
+  return s, n
+end
+
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
 -- когда e — его исходник (слайс/кусок показывается на фоне целого сэмпла)
 function S.draw_in(U, L, x, y, w, h, e, track, zone)
@@ -627,8 +667,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- убрана 1 окт
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
-  local SBH = math.max(30, math.floor(rh * 2.2))   -- 10 окт: в 5 раз выше (было 0.45 строки — микроскопически)
-  wh = wh - SBH - 2
+  -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
+  local zoomed0 = S.zoom_e == (e.item or e.path) and S.vb ~= nil and (S.vb - (S.va or 0)) < (e.len or 1) - 1e-6
+  local wavebar = not (ctx.state and ctx.state.wavebar == false)
+  local SBH = zoomed0 and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0
+  if SBH > 0 then wh = wh - SBH - 2 end
+  local zt, zlab, zk = S.edge_focus(e, zone, S.active and S.entry and S.entry.item == e.item)
+  local ZH = 0
+  if zt and wh > 9 * rh then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end   -- волна пополам: сверху целиком, снизу край
   if wh < 6 then return end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
   -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком
@@ -869,14 +915,62 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     or (#slices > 0 and ('%d slices; keys: q = the whole sample, 2 w 3 e ... = slices 1 2 3 4 (Sxx), Option + key - the pitch of the last slice'):format(#slices) or '')
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag: to a track / the lib as a slice   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
+  -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать
+  -- линию слайса (отпустил — сохранено), колесо — шире / уже
+  S.zoom_hot = nil
+  if ZH > 0 then
+    local zy = wy + wh + 2
+    local W2 = S.zwin or 0.04
+    local t0 = zt - W2
+    U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
+    local smp, n = zoom_samples(e, t0, 2 * W2)
+    local zc, zh2 = zy + ZH / 2, ZH / 2 - 2
+    if smp and n then
+      local pk = 0.02
+      for i = 1, n do local v = math.abs(smp[i] or 0); if v > pk then pk = v end end
+      U.set(base)
+      for px = 0, w - 1 do
+        local i0, i1 = math.floor(px / w * n) + 1, math.max(math.floor(px / w * n) + 1, math.floor((px + 1) / w * n))
+        local mn, mx3 = 1e9, -1e9
+        for i = i0, math.min(n, i1) do local v = smp[i] or 0; if v < mn then mn = v end; if v > mx3 then mx3 = v end end
+        if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
+      end
+    else U.text(x + 4, zy + 2, 'zoom: no audio to read', U.GREY) end
+    -- линии слайсов в окне и сам край по центру
+    local zsl = (S.active and S.entry and S.entry.item == e.item) and S.slices or (e.slices or {})
+    for k2, t2 in ipairs(zsl) do
+      if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
+    end
+    U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
+    U.text(x + 4, zy + 1, ('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), U.GREY)
+    local mx2, my2 = gfx.mouse_x, gfx.mouse_y
+    local inz = mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
+    if inz then S.zoom_hot = true end
+    local down = (gfx.mouse_cap & 1) == 1
+    if down and inz and not S.zd_prev and zk and S.active and S.entry and S.entry.item == e.item and S.slices[zk] then
+      S.zdrag = { k = zk, mx0 = mx2, t0 = S.slices[zk], span = 2 * W2 }
+    end
+    if S.zdrag and S.slices[S.zdrag.k] then
+      local k3 = S.zdrag.k
+      local lo, hi = (S.slices[k3 - 1] or 0) + 0.002, (S.slices[k3 + 1] or len) - 0.002
+      S.slices[k3] = math.max(lo, math.min(hi, S.zdrag.t0 + (mx2 - S.zdrag.mx0) / w * S.zdrag.span))
+      if not down then
+        local moved = math.abs(S.slices[k3] - S.zdrag.t0) > 1e-6
+        S.zdrag = nil
+        if moved then commit(); S.msg = ('slice %02X moved (fine)'):format(k3) end
+      end
+    end
+    S.zd_prev = down
+  end
   -- полоска-обзор (10 окт): весь item, рамка — что видно сейчас; тянуть / щёлкнуть — прокрутка
-  do
-    local sy = wy + wh + 1
+  if SBH > 0 then
+    local sy = wy + wh + (ZH > 0 and (ZH + 3) or 1)
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
     U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)
-    local pk = ctx.peaks and ctx.peaks(e, math.max(16, w))
+    local pk = wavebar and ctx.peaks and ctx.peaks(e, math.max(16, w))
     U.set(U.mix(base, U.BG, 0.35))
+    if not wavebar then U.set(U.DIM); gfx.rect(x, sy + math.floor(SBH / 2), w, 1, 1) end   -- обычная полоса: дорожка
     if pk and pk.n > 0 then
       local c2, h2 = sy + SBH / 2, SBH / 2
       for px = 0, w - 1, 2 do
@@ -904,7 +998,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       S.va, S.vb = nva, nva + span
     end
   end
-  U.text(x, wy + wh + SBH + 4, ctx.fit(foot, w), U.TEXT)
+  U.text(x, wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2, ctx.fit(foot, w), U.TEXT)
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end

@@ -585,7 +585,8 @@ function O.draw(L, W, H)
     local bx, bw = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
     if it.sep then
       -- раздел (4 окт): заголовок темы, иначе — тонкая линия
-      if it.title then U.text(bx + L.pad, y + 1, it.title, U.CYAN); U.set(U.DIM); gfx.rect(bx + L.pad + U.measure(it.title) + L.pad, y + math.floor(rh / 2), bw - 3 * L.pad - U.measure(it.title), 1, 1)
+      if it.gap then                                  -- 10 окт: пустая строка перед разделом
+      elseif it.title then U.text(bx + L.pad, y + 1, it.title, U.CYAN); U.set(U.DIM); gfx.rect(bx + L.pad + U.measure(it.title) + L.pad, y + math.floor(rh / 2), bw - 3 * L.pad - U.measure(it.title), 1, 1)
       else U.set(U.DIM); gfx.rect(bx + L.pad, y + math.floor(rh / 2), bw - 2 * L.pad, 1, 1) end
     else
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + rh
