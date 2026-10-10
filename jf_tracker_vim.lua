@@ -1768,7 +1768,8 @@ function V.key_impl(c)
     elseif p == 'z' then
       local L = ctx.layout()
       -- 10 окт: фокус не в трекере (lib, browser, fx list, macros …) — zz = модуль на всё окно (zoom)
-      if c == ('z'):byte() and ctx.state.focus ~= 'tracker' and ctx.zz_zoom and ctx.zz_zoom() then
+      -- 10 окт: zz везде — модуль в фокусе на всё окно (и трекер; центровка строки Vim заменена)
+      if c == ('z'):byte() and ctx.zz_zoom and ctx.zz_zoom() then
       elseif c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)

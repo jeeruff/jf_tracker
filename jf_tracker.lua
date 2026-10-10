@@ -3422,7 +3422,7 @@ ctx = {
   zz_zoom = function()
     if not (state.panes_ui and L and L.pn) then vim.msg = 'zz: panes are off (options: panes)'; return end
     local id = ctx.pane_cur()
-    if not id or id == 'tracker' then return false end
+    if not id then return false end   -- 10 окт: трекер тоже — zz в трекере = трекер на всё окно
     if id == 'sample' then ctx.sample_big(); return true end
     ctx.pane_do(function() return draw.panes.zoom(state.panes, id) end, state.panes.zoom == id and (id .. ' back in its pane') or (id .. ' zoomed - zz back'))
     return true
