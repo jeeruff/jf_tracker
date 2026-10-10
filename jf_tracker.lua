@@ -241,7 +241,8 @@ local state = {
   hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',
   escstop = reaper.GetExtState(EXT, 'escstop') == '1',
   escmode = reaper.GetExtState(EXT, 'escmode') == 'vim' and 'vim' or 'renoise',
-  hidereaper = reaper.GetExtState(EXT, 'hidereaper') == '1',   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
+  hidereaper = reaper.GetExtState(EXT, 'hidereaper') == '1',
+  slicemk = reaper.GetExtState(EXT, 'slicemk') == 'click' and 'click' or 'double',   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
   pmpane = flag('pmpane', false),                  -- 9 окт: pm своей панелью (выкл — вкладка браузера)
@@ -576,7 +577,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1708,7 +1709,8 @@ ctx = {
     } })
     state.popup_at = { kind = 'sprops' }                -- поверх панели свойств сэмпла (5 окт)
   end,
-  octave = function() return vim.octave end,                            -- подписи слайсов в слайсере (4 окт)
+  octave = function() return vim.octave end,
+  slice_by_click = function() return state.slicemk or 'double' end,   -- 10 окт: опция slice by click                            -- подписи слайсов в слайсере (4 окт)
   slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 end,   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
@@ -6981,6 +6983,7 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'bottom', 'tracker', 'keyboard' }, desc = 'status line at the window bottom, inside the tracker module, or in the keyboard strip (m shows it)', get = function() return state.statpos or 'bottom' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      { key = 'slicemk', label = 'slice by click', kind = 'cycle', values = { 'double', 'click' }, desc = 'how the mouse makes a slice on the sample wave: double - a double click (a single click selects, as before); click - one click without dragging, as the Slice Marker Tool in Renoise (dragging still selects). A double click on a slice line removes it', get = function() return state.slicemk or 'double' end, set = function(v) state.slicemk = v end },
       flag('hidereaper', 'hide REAPER items in menus', 'right-click menus collect what opens REAPER windows (FX window, modulation window, track header, native FX browser) in a submenu "in REAPER"; on - that submenu is hidden, menus show only what works in the tracker'),
       flag('escstop', 'Esc stops playback', 'while the project plays, Esc stops it (instead of switching NORMAL / INSERT); not while recording - there Esc deletes the take; menus, the command line and VISUAL keep their Esc'),
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
@@ -7081,7 +7084,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -12969,12 +12972,18 @@ local function frame()
       ctx.set_focus('top')
       -- просмотр инструмента без правки: открыть его в модуле, чтобы выделять
       if not SL.active and hover.sample.e and hover.sample.e.item then SL.open(hover.sample.e, cur_col() and cur_col().track) end
+      local dbl_s = dbl and click.zone == 'sample'
       if hover.sample.slice then
-        -- слайс-маркер: тянуть мышью (правка открывается на этом инструменте)
+        -- слайс-маркер: тянуть мышью (правка открывается на этом инструменте); 10 окт: двойной щелчок — удалить
         if SL.entry ~= hover.sample.e and hover.sample.e.item then SL.open(hover.sample.e, cur_col() and cur_col().track) end
-        SL.slice_down(hover.sample.slice)
-      elseif hover.sample.frac then SL.mouse_down(hover.sample.frac) end
-      click = { t = now2, zone = 'sample' }
+        if dbl_s and click.slice == hover.sample.slice then SL.remove(hover.sample.slice); SL.drag = nil
+        else SL.slice_down(hover.sample.slice) end
+      elseif hover.sample.frac then
+        -- 10 окт: slice by click = double — двойной щелчок по волне ставит слайс
+        if dbl_s and not click.slice and (state.slicemk or 'double') == 'double' and SL.entry then SL.add_at(hover.sample.frac * SL.entry.len); SL.drag = nil
+        else SL.mouse_down(hover.sample.frac) end
+      end
+      click = { t = now2, zone = 'sample', slice = hover.sample.slice }
     elseif hover.mod then
       ctx.set_focus('top')
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end

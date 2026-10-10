@@ -184,7 +184,12 @@ function S.mouse_up()
     commit(); S.msg = ('slice %d moved'):format(d.k); return d
   end
   if S.sel and S.sel.b < S.sel.a then S.sel.a, S.sel.b = S.sel.b, S.sel.a end
-  if S.sel and S.sel.b - S.sel.a < 0.001 then S.sel = nil end
+  if S.sel and S.sel.b - S.sel.a < 0.001 then
+    local t = S.sel.a
+    S.sel = nil
+    -- 10 окт, опция slice by click = click (как Slice Marker Tool в Renoise): щелчок без протяжки — слайс
+    if d and d.kind == 'sel' and ctx.slice_by_click and ctx.slice_by_click() == 'click' then S.add_at(t) end
+  end
   return d
 end
 function S.span() if S.sel then return math.min(S.sel.a, S.sel.b), math.max(S.sel.a, S.sel.b) end end
@@ -200,6 +205,21 @@ function commit()
   end
 end
 S.commit = commit
+
+-- 10 окт: слайс мышью — поставить на t / удалить k (сразу в item, как остальная нарезка)
+function S.add_at(t)
+  if not (S.entry and S.entry.item) then S.msg = 'slices live on items: put the sample on a track or into the lib first'; return end
+  if t <= 0.002 or t >= S.entry.len - 0.002 then return end
+  for _, u in ipairs(S.slices) do if math.abs(u - t) < 0.002 then return end end
+  S.slices[#S.slices + 1] = t; table.sort(S.slices)
+  commit()
+  for k, u in ipairs(S.slices) do if u == t then S.msg = ('slice %02X added (double click on its line removes it)'):format(k) end end
+end
+function S.remove(k)
+  if not (S.entry and S.entry.item and S.slices[k]) then return end
+  table.remove(S.slices, k); commit()
+  S.msg = ('slice %02X removed (%d left)'):format(k, #S.slices)
+end
 
 function S.equal(n)
   S.slices = {}
@@ -803,12 +823,21 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if hot then hover_slice = k end
     local onkey = key_of[k] ~= nil
     U.set(hot and U.TEXT or (onkey and U.AMBER or U.CYAN)); gfx.rect(hot and (px - 1) or px, wy, hot and 3 or 1, wh, 1)
-    local lbl = key_of[k] or tostring(k)
-    if zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3 then lbl = '' end   -- там подпись ноты зоны
-    local lw = lbl ~= '' and U.measure(lbl) or 0
+    -- 10 окт: подпись в три строки — номер слайса (как в списке, 01 … 0E), клавиша,
+    -- нота MIDI, которую он играет; у выделенного тоже (раньше номер пропадал)
+    local base = (ctx and ctx.slice_base and ctx.slice_base()) or 61
+    local p = base + k - 1
+    local NM = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+    local rows3 = { ('%02X'):format(k), key_of[k] or '', (p >= 0 and p <= 127) and (NM[p % 12 + 1] .. (p // 12 - 1)) or '' }
+    local zy = (zone and S.zone_px0 and math.abs(px - S.zone_px0) < 3) and rh or 0   -- там подпись ноты зоны — ниже неё
+    local lw = 0
+    for _, s3 in ipairs(rows3) do if s3 ~= '' then lw = math.max(lw, U.measure(s3)) end end
     local nx = slices[k + 1] and math.min(x + w, tx(slices[k + 1])) or (x + w)
-    if lbl ~= '' and px + 3 + lw <= nx - 1 and px + 3 >= lab_end + 2 then
-      U.text(px + 3, wy + 1, lbl, hot and U.TEXT or (onkey and U.AMBER or U.CYAN))
+    if px + 3 + lw <= nx - 1 and px + 3 >= lab_end + 2 and wh >= 4 * rh then
+      local cc = hot and U.TEXT or (onkey and U.AMBER or U.CYAN)
+      for i3, s3 in ipairs(rows3) do
+        if s3 ~= '' then U.text(px + 3, wy + 1 + zy + (i3 - 1) * rh, s3, i3 == 3 and (hot and U.TEXT or U.GREY) or cc) end
+      end
       lab_end = px + 3 + lw
     end
     ::next_slice::

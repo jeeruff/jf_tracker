@@ -340,6 +340,8 @@ KH.PAGES = {
     { k = 'Esc', d = 'back to tracker' },
   } },
   sample = { title = 'item tab (slicer + properties of the item)', e = {
+    { k = 'dblclick', d = 'on the wave: a slice there (option slice by click: one click); on a slice line: remove it', t = {} },
+    { k = 'slice labels', d = 'three rows at each slice line: its number (as in the slices list), the key that plays it, the MIDI note', t = {} },
     { k = 'Enter', d = 'apply slicing / insert selection at cursor' },
     { k = 'a', d = 'select all' },
     { k = 'v', d = 'view: peaks / spectral' },
