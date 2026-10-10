@@ -722,7 +722,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if ctx.hint then ctx.hint('sampleview', vx, y, bw, rh, v) end
     vx = vx - 2
   end
-  if e.muted then title = title .. '  (muted)' end
+  if e.muted and not e.depot then title = title .. '  (muted)' end   -- 10 окт: в lib заглушено всё — не пишем
   U.text(x, y, ctx.fit(title, vx - x - L.pad), U.TEXT)
   local hint = editing
     and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  [ ]: edges'
@@ -820,7 +820,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   U.set(U.PANEL); gfx.rect(x, wy, w, wh, 1)
   local cy, hh = wy + wh / 2, wh / 2 - 1
   local base = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
-  if e.muted then base = U.mix(base, U.BG, 0.45) end      -- заглушённый — волна тусклее
+  if e.muted and not e.depot then base = U.mix(base, U.BG, 0.45) end   -- заглушённый — тусклее; 10 окт: кроме lib (там заглушено всё — волна была тусклой всегда)
   U.set(base)
   -- волна правки — теми же пиками item, что просмотр (3 окт): огибающая
   -- S.env читалась линейно и растягивала файл на всю ширину, а item в лупе
@@ -843,7 +843,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
         if b - a < 0.02 then a, b = -0.01, 0.01 end
         local cc = (pk.spec and ctx.spec_colour) and ctx.spec_colour(pk.spec[idx]) or base
-        if e.muted then cc = U.mix(cc, U.BG, 0.45) end
+        if e.muted and not e.depot then cc = U.mix(cc, U.BG, 0.45) end
         gfx.set(cc[1], cc[2], cc[3], 1)
         gfx.line(x + px, cy - b * hh, x + px, cy - a * hh)
       end
@@ -1154,7 +1154,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       S.va, S.vb = nva, nva + span
     end
   end
-  U.text(x, wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2, ctx.fit(foot, w), U.TEXT)
+  U.text(x, wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2, ctx.fit(foot, w), U.GREY)   -- 10 окт: подсказка — приглушённо
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end
