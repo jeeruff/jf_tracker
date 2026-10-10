@@ -45,6 +45,7 @@ KH.PAGES = {
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
   pane = { title = 'panes (tmux / zellij)', e = {
+    { k = '\\ (in a module)', d = 'quick menu of the module in focus (its main actions, letters); in it \\ - the main menu' },
     { k = 'zz', d = 'in any module (lib, browser, fx list, item, macros ...): the module on the whole window, again - back; in the tracker - the tracker alone; matrix zz - session, dsp zz - dsp big', t = { 'z' } },
     { k = '⌘h ⌘j ⌘k ⌘l', d = 'focus the pane on the left / below / above / on the right (like dwm), from any pane' },
     { k = '⌘⇧h ⌘⇧j ⌘⇧k ⌘⇧l', d = 'move the pane there (out of its stack if it is a tab)' },
@@ -359,6 +360,13 @@ KH.PAGES = {
     { k = 'X', d = 'delete all slices (asks)' },
     { k = 'r', d = 'slice pick mode: key / random ...' },
     { k = 'zz', d = 'the slices list on the whole window, again - back', t = { 'z' } },
+    { k = 'Esc', d = 'back to the tracker' },
+  } },
+  sprops = { title = 'properties of the item / slice', e = {
+    { k = 'J K', d = 'property row down / up' },
+    { k = 'H L', d = 'value less / more (Shift - fine)' },
+    { k = 'R', d = 'reset the property to its default' },
+    { k = 'v', d = 'fit: the pane grows until every row fits' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
   sample = { title = 'item tab (slicer + properties of the item)', e = {

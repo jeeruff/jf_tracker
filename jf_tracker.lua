@@ -5372,9 +5372,15 @@ ctx = {
     elseif state.focus == 'inst' then hv.pool = { i = vim.inst }
     elseif state.focus == 'fxb' then hv.fxb = { row = FB.cur }
     elseif state.focus == 'browser' then hv.browser = B.cur
+    elseif state.focus == 'slices' then hv.slices = ctx.ssel and ctx.ssel.k or 0   -- 10 окт: меню выбранного слайса
     end
-    local r = draw.module_rects and draw.module_rects[state.focus]
-    ctx.open_context(hv, r and { kind = 'xy', x = r[1] + 8, y = r[2] + 2 * L.rh } or nil)
+    -- 10 окт: якорь — лист панели в фокусе (вкладки — их стек), иначе прямоугольник модуля
+    local pid = state.focus == 'top' and state.toptab or state.focus
+    local cell = L.pn and L.pn.by_panel and L.pn.by_panel[pid]
+    local r = cell and { cell.content.x, cell.content.y } or (draw.module_rects and draw.module_rects[state.focus])
+    local anchor = r and { kind = 'xy', x = r[1] + 8, y = r[2] + 2 * L.rh } or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    anchor.quick = true
+    ctx.open_context(hv, anchor)
   end,
   main_menu = function()
     vim.open_hydra(ctx.hydra_root())
@@ -9489,7 +9495,7 @@ function ctx.tok_codes(t)
   if #t == 2 and t:match('^%a%a$') then return { t:byte(1), t:byte(2) } end
 end
 ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
-                    slices = 'slices', sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
+                    slices = 'slices', sprops = 'sprops', sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
   if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
@@ -9573,6 +9579,8 @@ local function context_menu(hover, anchor)
       end
     end
   end
+  -- 10 окт: быстрое меню модуля (\ в модуле) — последним пунктом \ главное меню
+  if anchor and anchor.quick and ctx.main_menu then hitems[#hitems + 1] = { key = '\\', label = 'main menu …', fn = function() ctx.main_menu() end } end
   if #hitems == 0 then return end
   -- 5 окт: двойные хоткеи — нет; пока только жёлтые буквы, без колонки клавиш
   for _, it in ipairs(hitems) do it.hk = nil end
@@ -15661,7 +15669,7 @@ local function frame()
       if not typing and c == 47 and m0.cmd then ctx.file_search(); return end                           -- Cmd+/ — файлы
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
       if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-        ctx.main_menu(); return                          -- \ — главное меню, в нём \ — контекст
+        ctx.context_here(); return                       -- 10 окт: \ в модуле — его быстрое меню, в нём \ — главное
       end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       -- док session в фокусе (7 окт): клип-мод — клавиатура запускает клипы;

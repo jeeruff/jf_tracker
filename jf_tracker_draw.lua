@@ -3704,7 +3704,12 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if c.hint and info.hint_bars then
         local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
         local hl = setmetatable({ hint_h = c.hint.h }, { __index = L })
-        D.hint_bar(hl, c.hint.x, c.hint.y, c.hint.w, info.hint_bars(page) or D.PANE_KEYS, fon)
+        -- 10 окт: первой — \ menu (быстрое меню модуля), дальше клавиши модуля
+        local bar = info.hint_bars(page) or D.PANE_KEYS
+        D.qm_bars = D.qm_bars or setmetatable({}, { __mode = 'k' })
+        local qb = D.qm_bars[bar]
+        if not qb then qb = { { '\\', 'menu' } }; for _, it in ipairs(bar) do qb[#qb + 1] = it end; D.qm_bars[bar] = qb end
+        D.hint_bar(hl, c.hint.x, c.hint.y, c.hint.w, qb, fon)
       end
     end
   end
