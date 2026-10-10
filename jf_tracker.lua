@@ -14317,6 +14317,7 @@ local function frame()
         else
           local t = SL.snap_t(raw)
           if zd.edge == 'a' then zd.a = math.min(t, zd.b - 0.005) else zd.b = math.max(t, zd.a + 0.005) end
+          if not zd.clip and SL.roll then SL.roll(zd.edge == 'a' and zd.a or zd.b, zd.edge == 'b') end   -- 10 окт: auto play — roll у края зоны
         end
         if zd.clip and (zd.edge == 'la' or zd.edge == 'lb') then state.status = ('clip loop: %.3f - %.3fs (%.3fs) - release to apply'):format(zd.la, zd.lb, zd.lb - zd.la)
         else state.status = ('%s: %.3f - %.3fs of %s (%.3fs) - release to apply'):format(zd.clip and 'clip' or 'slice', zd.a, zd.b, zd.p.name or 'sample', zd.b - zd.a) end

@@ -168,6 +168,7 @@ function S.mouse_move(frac)
     local lo = (S.slices[k - 1] or 0) + 0.002
     local hi = (S.slices[k + 1] or S.entry.len) - 0.002
     S.slices[k] = math.max(lo, math.min(hi, S.snap_t(frac * S.entry.len, k)))
+    if math.abs(S.slices[k] - (S.drag.t0 or 0)) > 1e-6 then S.roll(S.slices[k], S.line_is_end(S.drag.t0)) end   -- 10 окт: roll
   end
   if S.drag and S.drag.kind == 'sel' and S.entry and frac then S.sel.b = math.max(0, math.min(S.entry.len, S.snap_t(frac * S.entry.len))) end
   if S.drag and S.drag.kind == 'out' and not S.drag.active and (math.abs(gfx.mouse_x - S.drag.x0) > 6 or math.abs(gfx.mouse_y - S.drag.y0) > 6) then S.drag.active = true end
@@ -183,7 +184,7 @@ function S.mouse_up()
       return d
     end
     commit(); S.msg = ('slice %d moved'):format(d.k)
-    if ctx.state and ctx.state.sliceaudition then S.preview(d.k) end   -- 10 окт: auto play
+    S.roll(S.slices[d.k], S.line_is_end(d.t0), true)   -- 10 окт: auto play — кусок у края, не весь слайс
     return d
   end
   if S.sel and S.sel.b < S.sel.a then S.sel.a, S.sel.b = S.sel.b, S.sel.a end
@@ -210,6 +211,21 @@ end
 S.commit = commit
 
 -- 10 окт: слайс мышью — поставить на t / удалить k (сразу в item, как остальная нарезка)
+-- 10 окт: auto play как roll на SP-404 — пока тянешь край, короткий кусок у него
+-- перезапускается: начало — RW мс от линии, конец — RW мс перед ним
+S.RW = 0.12
+function S.roll(t, is_end, force)
+  if not (ctx.state and ctx.state.sliceaudition and S.entry and t) then return end
+  local now = R.time_precise()
+  if not force and now - (S.roll_t or 0) < S.RW then return end
+  S.roll_t = now
+  local a, b
+  if is_end then a, b = math.max(0, t - S.RW), t else a, b = t, math.min(S.entry.len, t + S.RW) end
+  if b > a then ctx.preview_slice(S.track, S.entry, a, b) end
+end
+-- тянется ли конец выбранного слайса (линия = конец зоны)
+function S.line_is_end(t0) return S.zone_cur and math.abs((S.zone_cur[2] or -1) - t0) < 1e-6 or false end
+
 function S.add_at(t)
   if not (S.entry and S.entry.item) then S.msg = 'slices live on items: put the sample on a track or into the lib first'; return end
   if t <= 0.002 or t >= S.entry.len - 0.002 then return end
@@ -923,6 +939,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if math.abs(zone[1] - S.drag.t0) < 1e-6 then zone[1] = nt end
     if math.abs(zone[2] - S.drag.t0) < 1e-6 then zone[2] = nt end
   end
+  S.zone_cur = zone and (S.entry and S.entry.item == e.item) and zone or nil
   if zone then
     local za, zb = math.max(0, math.min(len, zone[1])), math.max(0, math.min(len, zone[2]))
     local px0, px1 = math.max(x, math.min(x + w, tx(za))), math.max(x, math.min(x + w, tx(zb)))
@@ -1125,10 +1142,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local k3 = S.zdrag.k
       local lo, hi = (S.slices[k3 - 1] or 0) + 0.002, (S.slices[k3 + 1] or len) - 0.002
       S.slices[k3] = math.max(lo, math.min(hi, S.zdrag.t0 + (mx2 - S.zdrag.mx0) / w * S.zdrag.span))
+      if down and math.abs(S.slices[k3] - S.zdrag.t0) > 1e-6 then S.roll(S.slices[k3], S.line_is_end(S.zdrag.t0)) end   -- roll
       if not down then
         local moved = math.abs(S.slices[k3] - S.zdrag.t0) > 1e-6
+        local zt0 = S.zdrag.t0
         S.zdrag = nil
-        if moved then commit(); S.msg = ('slice %02X moved (fine)'):format(k3); if ctx.state and ctx.state.sliceaudition then S.preview(k3) end end
+        if moved then commit(); S.msg = ('slice %02X moved (fine)'):format(k3); S.roll(S.slices[k3], S.line_is_end(zt0), true) end
       end
     end
     S.zd_prev = down
