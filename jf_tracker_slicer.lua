@@ -233,14 +233,19 @@ end
 -- транзиенты: рост огибающей над локальным фоном, порог и отношение от
 -- чувствительности, минимальный зазор 40 мс. Тайм-коды — в секундах item
 -- (огибающая идёт по источнику с rate, пересчитываем).
+-- 10 окт: модуль детектора (Opt+D) — параметры как Transient detection / Dynamic split REAPER
+S.DT = { thr_db = nil, gap_ms = 40, pre_ms = 0 }   -- thr_db nil — порог от чувствительности
+S.dpanel = false
+S.dsel = 1
 function S.detect()
   S.trans = {}
   S.trans_amp = {}
   local env = S.env
   if not env then return end
   local thr = 0.04 + (1 - S.sens) * 0.30
+  if S.DT.thr_db then thr = 10 ^ (S.DT.thr_db / 20) end
   local ratio = 1.6 + (1 - S.sens) * 2.5
-  local gap = math.floor(env.rate * 0.04)
+  local gap = math.floor(env.rate * (S.DT.gap_ms or 40) / 1000)
   local win = 12
   local last = -gap
   for i = win + 1, env.n do
@@ -267,7 +272,9 @@ function S.use_transients()
   S.detect()
   S.slices = {}
   if #S.trans == 0 or S.trans[1] > 0.01 then S.slices[1] = 0 end
-  for _, t in ipairs(S.trans) do S.slices[#S.slices + 1] = t end
+  local pre = (S.DT.pre_ms or 0) / 1000
+  for _, t in ipairs(S.trans) do S.slices[#S.slices + 1] = math.max(0, t - pre) end
+  table.sort(S.slices)
   S.mode = ('transients %d (sens %.2f)'):format(#S.slices, S.sens)
   commit()
 end
@@ -398,6 +405,11 @@ end
 -- клавиши; true — съедена
 function S.key(c)
   local ch = c < 256 and string.char(c) or ''
+  -- 10 окт: Opt+D — модуль детектора транзиентов; пока открыт — его клавиши первыми
+  local mods = ctx.mods and ctx.mods() or {}
+  local cpd = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+  if (mods.alt and (ch == 'd' or ch == 'D')) or cpd == 8706 then S.dt_toggle(); return true end
+  if S.dpanel and S.dt_key(c, mods.shift) then return true end
   local a, b = S.span()
   local pk = S.entry and not S.entry.file and piano_slice(c)
   if pk then
@@ -543,6 +555,94 @@ end
 -- 10 окт: зум края (как в Xfer Nerve) — что показывать снизу крупно:
 -- тянущаяся линия слайса → край тянущейся зоны → выбранный в списке слайс →
 -- последняя схваченная линия → начало зоны. Возвращает t (секунды e), подпись, k линии
+-- строки панели детектора: { key, label, get, set(v), min, max, step, fine, fmt }
+S.DROWS = {
+  { 'sens', 'sensitivity', function() return S.sens end, function(v) S.sens = v end, 0, 1, 0.05, 0.01, '%.2f' },
+  { 'thr', 'threshold', function() return S.DT.thr_db or -60.5 end, function(v) S.DT.thr_db = v <= -60 and nil or v end, -60.5, 0, 1, 0.25, nil },
+  { 'gap', 'min gap', function() return S.DT.gap_ms end, function(v) S.DT.gap_ms = v end, 5, 500, 5, 1, '%d ms' },
+  { 'pre', 'pre-attack', function() return S.DT.pre_ms end, function(v) S.DT.pre_ms = v end, 0, 30, 1, 0.25, '%.1f ms' },
+}
+local function drow_txt(r)
+  local v = r[3]()
+  if r[1] == 'thr' then return S.DT.thr_db and ('%.1f dB'):format(S.DT.thr_db) or 'auto' end
+  return r[9]:format(v)
+end
+local function d_redetect() if S.env then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end end
+function S.dt_adjust(i, d)
+  local r = S.DROWS[i]; if not r then return end
+  r[4](math.max(r[5], math.min(r[6], r[3]() + d)))
+  d_redetect()
+end
+-- клавиши панели (пока открыта); true — съели
+function S.dt_key(c, shift)
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  local r = S.DROWS[S.dsel]
+  if c == 27 then S.dpanel = false; S.msg = 'transient detector closed'
+  elseif ch == 'j' or c == 1685026670 then S.dsel = math.min(#S.DROWS, S.dsel + 1)
+  elseif ch == 'k' or c == 30064 then S.dsel = math.max(1, S.dsel - 1)
+  elseif ch == 'l' or ch == 'L' or c == 1919379572 then S.dt_adjust(S.dsel, (shift or ch == 'L') and r[8] or r[7])
+  elseif ch == 'h' or ch == 'H' or c == 1818584692 then S.dt_adjust(S.dsel, -((shift or ch == 'H') and r[8] or r[7]))
+  elseif c == 13 then S.use_transients(); S.msg = ('sliced at %d transients'):format(#S.slices)
+  elseif ch == 's' then S.smart_slice()
+  elseif ch == 'x' then S.clear()
+  else return false end
+  return true
+end
+function S.dt_toggle()
+  S.dpanel = not S.dpanel
+  if S.dpanel then d_redetect(); S.msg = 'transient detector: j k parameter, h l value (Shift fine), Enter slice, s smart, x clear, Esc close' end
+end
+-- отрисовка панели (x, y, w, h); тянуть слайдер мышью — по горизонтали
+function S.dt_draw(U, L, x, y, w, h)
+  local rh, pad = L.rh, L.pad
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  U.set(U.LINE); gfx.rect(x + w - 1, y, 1, h, 1)
+  U.text(x + pad, y + 1, ctx.fit('transients', w - 2 * pad), U.AMBER)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local down = (gfx.mouse_cap & 1) == 1
+  local lw = math.floor(w * 0.45)
+  for i, r in ipairs(S.DROWS) do
+    local ry = y + i * rh + 2
+    local sel = i == S.dsel
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + rh
+    if sel or hot then U.set(U.tint(U.AMBER, sel and 0.25 or 0.12)); gfx.rect(x + 1, ry, w - 2, rh, 1) end
+    U.text(x + pad, ry, ctx.fit(r[2], lw - pad), (sel or hot) and U.AMBER or U.TEXT)
+    local bx, bw = x + lw, w - lw - pad
+    local f = (r[3]() - r[5]) / (r[6] - r[5])
+    U.set(U.DIM); gfx.rect(bx, ry + rh - 3, bw, 1, 1)
+    U.set((sel or hot) and U.AMBER or U.GREY); gfx.rect(bx, ry + rh - 4, math.max(1, math.floor(bw * f)), 3, 1)
+    U.text(bx, ry, ctx.fit(drow_txt(r), bw), (sel or hot) and U.TEXT or U.GREY)
+    if down and hot and not S.dt_prev then S.dsel = i; S.dt_drag = { i = i, bx = bx, bw = bw } end
+  end
+  if S.dt_drag and down then
+    local r = S.DROWS[S.dt_drag.i]
+    local f = math.max(0, math.min(1, (mx - S.dt_drag.bx) / math.max(1, S.dt_drag.bw)))
+    local v = r[5] + f * (r[6] - r[5])
+    v = math.floor(v / r[8] + 0.5) * r[8]
+    if math.abs(v - r[3]()) > 1e-9 then r[4](v); d_redetect() end
+  elseif not down then S.dt_drag = nil end
+  local cy = y + (#S.DROWS + 1) * rh + 6
+  U.text(x + pad, cy, ctx.fit(('%d transients'):format(#(S.trans or {})), w - 2 * pad), U.CYAN)
+  -- кнопки: apply / smart / clear
+  local bx = x + pad
+  local by = cy + rh + 2
+  S.dt_btn = nil
+  for _, b in ipairs({ { 'apply', 'Enter' }, { 'smart', 's' }, { 'clear', 'x' } }) do
+    local bw = U.measure(b[1]) + 2 * pad
+    if bx + bw > x + w - pad then bx = x + pad; by = by + rh + 2 end
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, by, bw, rh, 0)
+    U.text(bx + pad, by, b[1], hot and U.AMBER or U.TEXT)
+    if hot and down and not S.dt_prev then S.dt_btn = b[1] end
+    bx = bx + bw + pad
+  end
+  if S.dt_btn == 'apply' then S.dt_key(13) elseif S.dt_btn == 'smart' then S.smart_slice() elseif S.dt_btn == 'clear' then S.clear() end
+  U.text(x + pad, by + rh + 4, ctx.fit('Opt+D or Esc - close', w - 2 * pad), U.GREY)
+  S.dt_prev = down
+  return mx >= x and mx < x + w and my >= y and my < y + h
+end
+
 function S.edge_focus(e, zone, editing)
   if not (ctx.state and ctx.state.edgezoom ~= false) then return nil end
   local sl = editing and S.slices or (e.slices or {})
@@ -698,6 +798,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local ZH = 0
   if zt and wh > 9 * rh then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end   -- волна пополам: сверху целиком, снизу край
   if wh < 6 then return end
+  -- 10 окт: модуль детектора транзиентов (Opt+D) — слева от волны, волна сужается
+  S.dt_hot = nil
+  if S.dpanel and S.active and S.entry and S.entry.item == e.item then
+    local dpw = math.min(math.floor(w * 0.30), L.cw * 34)
+    local ph = wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0)
+    S.dt_hot = S.dt_draw(U, L, x, wy, dpw, ph)
+    x, w = x + dpw + 2, w - dpw - 2
+  end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
   -- вбок / Shift+колесо — прокрутка; новый инструмент — целиком
   local len = e.len > 0 and e.len or 1

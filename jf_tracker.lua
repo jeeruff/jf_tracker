@@ -1932,6 +1932,7 @@ ctx = {
   -- слайсер: оверлей нарезки инструмента (двойной клик по сэмплу / :slice / \is)
   slicer_active = function() return SL.active end,
   slicer_key = function(c) SL.key(c) end,
+  slicer_dt = function() if not SL.active then ctx.open_slicer() end; if SL.active then SL.dt_toggle() end end,   -- 10 окт: Opt+D
   open_slicer = function(n)
     local col = cur_col(); if not col then return end
     if n then pool_select(n) end

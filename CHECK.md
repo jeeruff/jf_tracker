@@ -442,3 +442,4 @@
 - smart slice на сэмпле из lib (заглушённый) — находит dark / bright (читает WAV напрямую; было «smart 1 (dark 0, bright 0)»)
 - options → jump ruler background (выкл): линейки прыжков без подложки, цифры приглушены, 0 у курсора; левая — целые числа
 - g12 Enter (или g12g) — строка 0012; 12gg — тоже 0012 (было 0011, как строки Vim с 1)
+- (10 окт) item: Opt+D (или :transients) — модуль детектора транзиентов слева от волны: sensitivity, threshold (auto / dB), min gap, pre-attack; транзиенты на волне сразу; j k / h l (Shift — мелко) или мышью по слайдеру; Enter / apply — нарезать, s / smart, x / clear; Esc или Opt+D — закрыть

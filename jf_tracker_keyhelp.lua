@@ -372,6 +372,7 @@ KH.PAGES = {
     { k = 'x', d = 'clear slices' },
     { k = 'Q', d = 'smart quantize: strong hits to strong beats' },
     { k = 'T', d = 'autotrim: cut the silence at the start and the end (button autotrim)' },
+    { k = 'Opt+D', d = 'transient detector module left of the wave: sensitivity, threshold, min gap, pre-attack - transients show live; Enter slices, s smart, x clear, Esc / Opt+D close' },
     { k = 'zz', d = 'item on the whole window (zoom), again - back', t = { 'z' } },
     { k = '< >', d = 'volume -1 / +1 dB' },
     { k = 'n', d = 'normalize' },
