@@ -27,7 +27,7 @@ local T = {
         { 'R', 'big router' } } },
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },
-        { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' }, { 'Tab', 'next tab of stack' },
+        { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
         { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' },
         { 'panels', 'm matrix  b browser  l lib  n main' }, { '', 's slices  o notes  f fx list  d dsp' },
         { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video' } } },

@@ -3541,7 +3541,7 @@ ctx = {
     elseif ch == 'B' then ctx.pane_do(function() return PN.unstack(m, id, 'd') end, 'pane ' .. id .. ' out of the stack')
     elseif ch == 'x' then if ctx.pn_prev then ctx.pane_do(function() return PN.swap(m, id, ctx.pn_prev) end, 'pane swap') end
     elseif c == 9 or c == 25 then
-      local nx = PN.cycle(m, id, c == 25 and -1 or 1); if nx then ctx.pane_focus(nx) end
+      vim.msg = '-- PANE -- Tab: off for now - a panel letter or 1..9'   -- 10 окт: перебор стека выключен
     elseif ch == '+' or ch == '-' then ctx.pane_do(function() return PN.resize(m, id, 'v', ch == '+' and 0.03 or -0.03) end)
     elseif ch == '>' or ch == '<' then ctx.pane_do(function() return PN.resize(m, id, 'h', ch == '>' and 0.03 or -0.03) end)
     elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
@@ -15390,17 +15390,14 @@ local function frame()
     local m = ctx.mods()
     local back = c == 25 or m.shift or (inject_cap or gfx.mouse_cap) & 8 == 8
     if m.ctrl then
-      local TABS = ctx.top_tabs()
-      local i = 1
-      for k, t in ipairs(TABS) do if t == state.toptab or (t == 'sample' and state.toptab == 'retro') then i = k end end
-      state.top = true
-      state.toptab = TABS[(i - 1 + (back and -1 or 1)) % #TABS + 1]
-      ctx.set_focus('top')
-      vim.msg = 'tab: ' .. state.toptab
+      -- 10 окт: Ctrl+Tab по вкладкам — пока выключен (возвращал спрятанные панели и сыпал ими);
+      -- вкладку — щелчком, F2-F6 или Ctrl+W + буква
+      vim.msg = 'Ctrl+Tab: off for now - click a tab, F2-F6 or Ctrl+W + panel letter'
     elseif m.alt then
       ctx.toggle_focus(back and -1 or 1)
       vim.msg = 'focus: ' .. state.focus:upper()
-    else ctx.col_step(back and -1 or 1) end           -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
+    elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
+    else vim.msg = 'Tab: only in the tracker (next track) for now' end   -- 10 окт: в панелях Tab пока ничего не делает
     c = 0
   end
   if c == 27 and MMX.CM.count() > 0 and not HN.active and not vim.picker and not vim.hydra and vim.mode == 'normal' then MMX.CM.clear(); vim.msg = 'ctrl-mouse: selection cleared'; c = 0 end
