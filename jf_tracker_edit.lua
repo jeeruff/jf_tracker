@@ -659,6 +659,10 @@ function E.slice_append(it, path)
     local tk0 = R.GetActiveTake(it)
     local name = ''
     if tk0 then local _, n = R.GetSetMediaItemTakeInfo_String(tk0, 'P_NAME', '', false); name = n or '' end
+    -- 10 окт: набор из нескольких файлов (& в lib) — имена частей по порядку в P_EXT:jf_kit
+    local _, kit0 = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_kit', '', false)
+    local kit = (kit0 and kit0 ~= '') and kit0 or (name ~= '' and name or 'part 1')
+    kit = kit .. '|' .. ((path:match('([^/]+)%.%w+$')) or path)
     local src = R.PCM_Source_CreateFromFile(path)
     if not src then return end
     local slen = R.GetMediaSourceLength(src)
@@ -683,6 +687,7 @@ function E.slice_append(it, path)
     local gtk = R.GetActiveTake(g)
     R.GetSetMediaItemInfo_String(g, 'P_EXT:jf_slice_base', ('%.6f;%.6f;%.6f'):format(gtk and R.GetMediaItemTakeInfo_Value(gtk, 'D_STARTOFFS') or 0, R.GetMediaItemInfo_Value(g, 'D_LENGTH'), 1), true)
     if gtk and name and name ~= '' then R.GetSetMediaItemTakeInfo_String(gtk, 'P_NAME', name, true) end
+    R.GetSetMediaItemInfo_String(g, 'P_EXT:jf_kit', kit, true)
     out = g
   end)
   if model then model.invalidate() end

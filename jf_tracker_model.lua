@@ -847,6 +847,9 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   -- tonumber всей строки давал nil, lib и свойства показывали off)
   pool[at].bsync = bs and tonumber(bs:match('^%s*([^;]+)')) or nil
   pool[at].iid = M.iid(it)
+  -- 10 окт: набор файлов (Option+двойной щелчок / Opt+Enter в браузере) — имена частей
+  do local _, kit = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_kit', '', false)
+    if kit and kit ~= '' then local t = {}; for nm in kit:gmatch('[^|]+') do t[#t + 1] = nm end; pool[at].kit = t end end
   do local _, pt = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_playthru', '', false); pool[at].playthru = pt == '1' end   -- 6 окт
 end
 

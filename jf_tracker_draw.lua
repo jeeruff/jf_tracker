@@ -3161,7 +3161,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент — последней строкой (5 окт)
   rows[#rows + 1] = { midi = true, num = nsamp + #tins + 2 }   -- MIDI-клипы трека / проекта (10 окт)
   L.pool_rows = rows
-  local nvis = math.max(1, math.floor((H - 3 * L.rh - 6) / L.rh))
+  -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
+  local LEG = (L.hint_h or 0) > 0 and L.rh or 0
+  local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
   for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) then sel_r = r end end
@@ -3224,7 +3226,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local drop_y
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
-    local y = iy + 2 + 2 * L.rh + (r - D.pool_scroll - 1) * L.rh
+    local y = iy + 2 + 2 * L.rh + LEG + (r - D.pool_scroll - 1) * L.rh
     if row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
@@ -3294,8 +3296,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local tree = (info.poolsort or 'track') == 'track'
         local nxt = pool[i + 1]
         local last = not (nxt and (nxt.depth or 0) > 0 and nxt.parent == e.parent)
-        body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut')
-      else body = e.name .. (e.slices and (' /' .. #e.slices) or '') end
+        local pk = e.parent and e.parent.kit                -- 10 окт: часть набора & — своим именем файла
+        local kname = pk and e.slice_k and #pk == #(e.parent.slices or {}) and pk[e.slice_k] or nil
+        body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (kname or (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut'))
+      else body = (e.kit and '& ' or '') .. e.name .. (e.slices and (' /' .. #e.slices) or '') end   -- 10 окт: & — набор из нескольких файлов
       local lbl = ('%02d %s%s'):format(e.num or i, body, e.muted and ' (muted)' or '')
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
@@ -3384,7 +3388,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
   end
   if drop_y then set(U.AMBER); gfx.rect(ix + 2, drop_y - 1, w - 4, 2, 1) end
-  D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
+  D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
+  if LEG > 0 then
+    set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
+    text(ix + 6, iy + 2 + 2 * L.rh, fit('& files kit  /N slices  ~~ automation  ## midi clips  (muted)', w - 12), U.GREY)
+  end
   D.pool_dbg = table.concat(dbg, ' | ')
 end
 

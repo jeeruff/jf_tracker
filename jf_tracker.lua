@@ -13289,7 +13289,12 @@ local function frame()
     elseif hover.browser then
       ctx.set_focus('browser')
       B.cur = hover.browser
-      if dbl and click.zone == 'browser' and click.row == hover.browser then B.enter() end
+      if dbl and click.zone == 'browser' and click.row == hover.browser then
+        -- 10 окт: двойной щелчок — в lib (как Enter); Option + двойной — слайсом выбранного инструмента (как Opt+Enter)
+        local fe = B.entries[hover.browser]
+        if ctx.mods().alt and fe and not (fe.dir or fe.db or fe.pm or fe.pmdir or fe.kit or fe.trk or fe.rgn or fe.mark or fe.other or fe.empty) then ctx.lib_append_slice(B.full(fe))
+        else B.enter() end
+      end
       click = { t = now2, zone = 'browser', row = hover.browser }
       local e = B.entries[hover.browser]
       if e and not e.dir and not e.db and not e.pmdir and not e.mark then B.drag = { e = e, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
@@ -13996,7 +14001,10 @@ local function frame()
       if not B.drag.active and (math.abs(gfx.mouse_x - B.drag.x0) > 6 or math.abs(gfx.mouse_y - B.drag.y0) > 6) then B.drag.active = true end
       if B.drag.active then
         if hover.fi and hover.row then state.status = ('drop %s → %s @ %04d'):format(B.drag.e.name, hover.col and hover.col.name or '', hover.row.row)
-        else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column' end
+        elseif type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac)) then state.status = 'drop ' .. B.drag.e.name .. ' → a new slice of the selected instrument (a files kit &)'
+        elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
+        elseif hover.sess or (hover.matrix and hover.matrix.ri) then state.status = 'drop ' .. B.drag.e.name .. ' → a clip in this slot'
+        else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column, the lib, the slices, the item wave or a clip' end
       end
     else
       local bd = B.drag; B.drag = nil       -- снять ДО действия (6 окт): ошибка не повторит бросок каждый кадр
@@ -14007,6 +14015,9 @@ local function frame()
         if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
+      elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
+             and (type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac))) then
+        ctx.lib_append_slice(bd.e.pm and bd.e.path or B.full(bd.e))   -- 10 окт: на слайсы / волну item — новым слайсом (набор &)
       elseif bd.active and hover.pool and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
         ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
       elseif bd.active and hover.matrix and hover.matrix.ri and hover.matrix.ci and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
