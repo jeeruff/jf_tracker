@@ -30,7 +30,7 @@ local T = {
         { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
         { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' },
         { 'panels', 'm matrix  b browser  l lib  n main' }, { '', 's slices  o notes  f fx list  d dsp' },
-        { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video' } } },
+        { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video  V visor' } } },
   ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'd', 'unpin this place' } } },
   t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 'd', 'delete tracks (5td), to the buffer' }, { 'x', 'cut tracks' }, { 'p', 'paste tracks' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },
         { 'n', 'rename' }, { 'c', 'colour' }, { 'y', 'duplicate' }, { 'a', 'rec arm' }, { 'i', 'input (list)' }, { 'I', 'input: the active one' },

@@ -609,3 +609,14 @@ scale x1 / x1.5 / x2 / x3 (и узком окне): где подписи нал
 добавить в tests/LIVE_PLAN.md (раздел 9, устойчивость): снимок окна → поиск
 пересечений прямоугольников текста (draw.text может копить прямоугольники в
 режиме проверки и сообщать пересечения в debug log).
+
+## visor — ReaVisor в трекере (10 окт, сделано: этап 1)
+
+Трекер сам пульт страницы ReaVisor (`reaper_www_root/isf` → репо reavisor/web):
+пишет те же ExtState `ISFVIZ/*`, что reavisor.lua (layers, fades, lgate, blend,
+lvalues1..8, fxchain, fxvalues, mvalues, render) — страница не меняется.
+Модуль `jf_tracker_visor.lua`, панель `visor` (буква V). Модель — в проекте
+(ProjExtState jf_tracker/visor), сцены — по слотам матрицы (вместо регионов `rv:`),
+импорт пресетов ReaVisor. Модуляция — один источник на параметр: LFO или пик трека.
+Дальше (по просьбе): огибающие / MIDI / ноты трекера как источники, морфинг сцен,
+слои @cam / @video, превью сцен, пульт remote.html.

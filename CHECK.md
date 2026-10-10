@@ -489,3 +489,5 @@
 - [ ] опция properties with item (вкл): панель properties видна только когда активна вкладка item; выкл — всегда
 - [ ] мост LLM / MCP: опция LLM / MCP bridge (sound and samples) = ask; claude mcp add jf-tracker -- uv run --with mcp python "…/tools/jf_tracker_mcp.py"; tracker_state / tracker_help читают, tracker_run просит y
 - [ ] \ в любом модуле (не трекер) — его быстрое меню у панели, последним пунктом \ главное меню; в строке хинтов модуля первым «\ menu»
+- [ ] visor (g V или Ctrl+W V): o — страница ReaVisor в браузере и отправка вкл; a — слой-шейдер (fzf), e — эффект, j k / J K / H L / h l — строка, параметр, значение, уровень; m — LFO / пик трека; картинка в браузере меняется сразу
+- [ ] visor: i — пресет ReaVisor (blobtv, glitches2 …) встаёт целиком; s — сцена слота курсора, при воспроизведении сцены идут за слотом (S — выкл); reavisor.lua в это время закрыт

@@ -9,7 +9,7 @@ local GROUP = {
   { 'клавиши и команды', { 'vim', 'keys', 'whichkey', 'keyhelp', 'hints', 'instkeys', 'dspkeys', 'ctrlmouse', 'names' } },
   { 'окно: раскладка и рисование', { 'draw', 'panes', 'ui', 'themes', 'smart', 'ask', 'png', 'logo' } },
   { 'панели и вкладки', { 'matrix', 'session', 'browser', 'fxbrowser', 'sampleprops', 'slicer', 'preview', 'params', 'modmatrix', 'fxclass',
-      'dspmods', 'dspbig', 'aiedit', 'lfogen', 'sgram', 'macros', 'macro', 'midimap', 'harm', 'video', 'garden', 'orca', 'notes', 'pm', 'perf', 'audio' } },
+      'dspmods', 'dspbig', 'aiedit', 'lfogen', 'sgram', 'macros', 'macro', 'midimap', 'harm', 'video', 'visor', 'garden', 'orca', 'notes', 'pm', 'perf', 'audio' } },
   { 'опции, справка, служебное', { 'options', 'screensets', 'doc', 'tour', 'version' } },
 }
 

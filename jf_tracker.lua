@@ -56,6 +56,8 @@ MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роути�
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
+MX.VZ = dofile(DIR .. '/jf_tracker_visor.lua')          -- 10 окт: панель visor — шейдеры ReaVisor (страница isf в браузере) из трекера
+MX.VZ.WEB = reaper.GetResourcePath() .. '/reaper_www_root/isf'
 MX.MR = dofile(DIR .. '/jf_tracker_macros.lua')         -- вкладка macros (9 окт)
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
@@ -2992,7 +2994,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video' }   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -4618,6 +4620,198 @@ ctx = {
   -- огибающую). Кэш — по счётчику изменений проекта
   -- вкладка video (9 окт): данные — видео-item проекта (кэш по счётчику
   -- изменений), Video processor трека курсора, состояние Video window
+  -- ── visor (10 окт, jf_tracker_visor.lua): трекер — пульт страницы ReaVisor ──
+  -- пик трека по GUID (сглаженный: атака 10 мс, спад 120 мс) — источник модуляции
+  visor_peak = function(g)
+    local P = ctx.vz_pk or { s = {} }; ctx.vz_pk = P
+    local cc = reaper.GetProjectStateChangeCount(0)
+    if P.cc ~= cc then
+      P.cc, P.map, P.names = cc, {}, {}
+      local mt = reaper.GetMasterTrack(0)
+      P.map[reaper.GetTrackGUID(mt)] = mt; P.names[reaper.GetTrackGUID(mt)] = 'master'
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, i)
+        local gd = reaper.GetTrackGUID(tr)
+        local _, nm = reaper.GetTrackName(tr)
+        P.map[gd], P.names[gd] = tr, nm
+      end
+    end
+    local tr = P.map[g]
+    if not tr then return 0 end
+    local raw = math.min(1, math.max(reaper.Track_GetPeakInfo(tr, 0), reaper.Track_GetPeakInfo(tr, 1)))
+    local now = reaper.time_precise()
+    local e = P.s[g]
+    if not e then e = { v = raw, t = now }; P.s[g] = e end
+    local dt = now - e.t
+    if dt > 0 then
+      e.v = e.v + (raw - e.v) * (1 - math.exp(-dt / (raw > e.v and 0.01 or 0.12))); e.t = now
+    end
+    return e.v
+  end,
+  visor_tname = function(g)
+    ctx.visor_peak(g)
+    return ctx.vz_pk and ctx.vz_pk.names[g] or 'track?'
+  end,
+  -- слот (регион последовательности) под строкой
+  visor_slot_at = function(row, pos)
+    for _, rg in ipairs(seq) do
+      if not rg.gap then
+        if pos and pos >= rg.pos and pos < rg.rgnend then return rg.name end
+        if row and row >= rg.r0 and row < rg.r1 then return rg.name end
+      end
+    end
+  end,
+  -- превью шейдера из ReaVisor (web/thumbs/<shaders|effects>/<имя>.png), картинка 1018
+  visor_thumb = function(kind, fn, x, y, w, h)
+    local T = ctx.vz_thumb or {}; ctx.vz_thumb = T
+    local path = MX.VZ.WEB .. '/thumbs/' .. kind .. '/' .. (fn:gsub('%.fs$', '')) .. '.png'
+    if T.path ~= path then
+      T.path, T.ok = path, false
+      if reaper.file_exists(path) and gfx.loadimg(1018, path) >= 0 then
+        T.w, T.h = gfx.getimgdim(1018); T.ok = T.w > 0 and T.h > 0
+      end
+    end
+    if not T.ok then return false end
+    local sc = math.min(w / T.w, h / T.h)
+    local dw, dh = math.floor(T.w * sc), math.floor(T.h * sc)
+    gfx.a = 1
+    gfx.blit(1018, 1, 0, 0, 0, T.w, T.h, x + w - dw, y, dw, dh)
+    return true
+  end,
+  visor_env = function()
+    local VZ = MX.VZ
+    local sl = ctx.visor_slot_at(vim.cur.row)
+    return { on = VZ.on, t = reaper.time_precise(), peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb,
+             scene = sl, scene_has = sl and VZ.st.scenes[sl] ~= nil }
+  end,
+  -- файлы шейдеров / эффектов (один раз за сессию)
+  visor_files = function(kind)
+    ctx.vz_files = ctx.vz_files or {}
+    local F = ctx.vz_files[kind]
+    if F then return F end
+    F = {}
+    local dir = MX.VZ.WEB .. '/' .. (kind == 'fx' and 'effects' or 'shaders')
+    local i = 0
+    while true do
+      local fn = reaper.EnumerateFiles(dir, i)
+      if not fn then break end
+      if fn:match('%.fs$') then F[#F + 1] = fn end
+      i = i + 1
+    end
+    table.sort(F, function(a, b) return a:lower() < b:lower() end)
+    ctx.vz_files[kind] = F
+    return F
+  end,
+  -- кадр: проект → модель, сцены за плейхедом, отправка странице, сохранение
+  visor_tick = function()
+    local VZ = MX.VZ
+    local proj = reaper.EnumProjects(-1)
+    if ctx.vz_proj ~= proj then
+      ctx.vz_proj, ctx.vz_rg = proj, nil
+      local _, s = reaper.GetProjExtState(0, EXT, 'visor')
+      VZ.decode(s); VZ.dirty = false
+      if VZ.on == nil then VZ.on = reaper.GetExtState(EXT, 'visor_on') == '1' end
+    end
+    if not VZ.on and not VZ.dirty then return end
+    local now = reaper.time_precise()
+    if VZ.st.follow and reaper.GetPlayState() & 1 == 1 then
+      local nm = ctx.visor_slot_at(nil, reaper.GetPlayPosition())
+      if nm ~= ctx.vz_rg then
+        ctx.vz_rg = nm
+        local sc = nm and VZ.st.scenes[nm]
+        if sc then local dirty = VZ.dirty; VZ.scene_apply(sc); VZ.dirty = dirty end   -- сцена из проекта: сохранять нечего
+      end
+    elseif ctx.vz_rg then ctx.vz_rg = nil end
+    if VZ.on and now - (ctx.vz_t or 0) >= 0.03 then
+      ctx.vz_t = now
+      VZ.frame({ t = now, peak = ctx.visor_peak, set = function(k, v) reaper.SetExtState(VZ.SECTION, k, v, false) end })
+    end
+    if VZ.dirty and now - (ctx.vz_save or 0) > 0.5 then
+      ctx.vz_save, VZ.dirty = now, false
+      reaper.SetProjExtState(0, EXT, 'visor', VZ.encode())
+    end
+  end,
+  visor_do = function(a)
+    local VZ = MX.VZ
+    if type(a) ~= 'table' then return end
+    local k = a.kind
+    local st = VZ.st
+    local function select_slot(slot)
+      for i, e in ipairs(VZ.list()) do if e.slot == slot then VZ.sel = i; VZ.psel = 1 end end
+    end
+    if k == 'leave' then ctx.set_focus('tracker')
+    elseif k == 'msg' then vim.msg = a.text
+    elseif k == 'power' then
+      VZ.on = not VZ.on; VZ.cache = {}
+      reaper.SetExtState(EXT, 'visor_on', VZ.on and '1' or '0', true)
+      vim.msg = VZ.on and 'visor on: the tracker drives the ReaVisor page (close reavisor.lua - two drivers fight)' or 'visor off: the page keeps the last picture'
+    elseif k == 'open' then
+      if not VZ.on then ctx.visor_do({ kind = 'power' }) end
+      local url = 'http://localhost:8080/isf/index.html'
+      if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url); vim.msg = 'visor: page opened - F fullscreen, H hides the HUD'
+      else vim.msg = 'visor: open ' .. url .. ' in a browser (needs SWS for the button)' end
+    elseif k == 'blend' then VZ.key(('b'):byte())
+    elseif k == 'follow' then ctx.visor_do(VZ.key(('S'):byte()))
+    elseif k == 'res' or k == 'fps' then
+      local list = k == 'res' and { 0.25, 0.3, 0.5, 0.75, 1 } or { 15, 24, 30, 60 }
+      local cur, nxt = st[k == 'res' and 'scale' or 'fps'], list[1]
+      for i, v in ipairs(list) do if math.abs(v - (cur or 0)) < 1e-6 then nxt = list[i % #list + 1] end end
+      st[k == 'res' and 'scale' or 'fps'] = nxt; VZ.dirty = true
+    elseif k == 'add' or k == 'replace' then
+      local kind = a.what == 'fx' and 'fx' or 'layer'
+      local files = ctx.visor_files(kind)
+      if #files == 0 then vim.msg = 'visor: no ' .. (kind == 'fx' and 'effects' or 'shaders') .. ' in ' .. VZ.WEB .. ' - ReaVisor web folder (reaper_www_root/isf)'; return end
+      if kind == 'layer' and k == 'add' and #st.layers >= VZ.MAXL then vim.msg = 'visor: ' .. VZ.MAXL .. ' layers at most (the page mixes 8)'; return end
+      local items = {}
+      for _, fn in ipairs(files) do items[#items + 1] = { label = VZ.short(fn), data = fn } end
+      local cur = k == 'replace' and (kind == 'fx' and st.fx[a.i] or st.layers[a.i]) or nil
+      vim.open_picker((k == 'replace' and 'replace ' or 'add ') .. (kind == 'fx' and 'effect' or 'shader') .. ' (ReaVisor library)', items, function(it)
+        local slot = { fn = it.data, on = true, fade = kind == 'layer' and 1 or nil, p = {} }
+        local t = kind == 'fx' and st.fx or st.layers
+        if cur then
+          -- замена: уровень, вкл и одноимённые параметры (с модуляцией) остаются
+          slot.on, slot.fade = cur.on, cur.fade
+          for _, row in ipairs(VZ.rows(kind, it.data)) do if cur.p and cur.p[row.key] then slot.p[row.key] = VZ.copy(cur.p[row.key]) end end
+          t[a.i] = slot
+        else t[#t + 1] = slot end
+        VZ.dirty = true; select_slot(slot)
+        vim.msg = 'visor: ' .. VZ.short(it.data) .. (VZ.on and '' or ' - p sends to the page, o opens it')
+      end)
+    elseif k == 'pick_track' then
+      local e = VZ.cur()
+      if not (e and e.slot) then return end
+      local items = { { label = 'master', data = reaper.GetTrackGUID(reaper.GetMasterTrack(0)) } }
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, i)
+        local _, nm = reaper.GetTrackName(tr)
+        items[#items + 1] = { label = ('%d %s'):format(i + 1, nm), data = reaper.GetTrackGUID(tr) }
+      end
+      local pkey = a.key
+      vim.open_picker('track peak drives ' .. pkey .. ' (Esc - no modulation)', items, function(it)
+        e.slot.p[pkey] = e.slot.p[pkey] or {}
+        e.slot.p[pkey].m = { k = 'trk', g = it.data, amt = 0.5 }
+        VZ.dirty = true
+        vim.msg = 'visor: ' .. pkey .. ' follows ' .. it.label .. ' - [ ] depth'
+      end)
+    elseif k == 'scene_save' then
+      local nm = ctx.visor_slot_at(vim.cur.row)
+      if not nm then vim.msg = 'visor: the cursor is not in a slot - scenes belong to slots of the matrix'; return end
+      st.scenes[nm] = VZ.scene_take(); VZ.dirty = true
+      vim.msg = 'visor: scene of slot ' .. nm .. (st.follow and ' - comes back when the playhead enters it' or ' - S: follow the playhead')
+    elseif k == 'import' then
+      local names = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset_names')) or {}
+      if #names == 0 then vim.msg = 'visor: no ReaVisor presets (ISFVIZ preset_names)'; return end
+      local items = {}
+      for _, nm in ipairs(names) do items[#items + 1] = { label = nm, data = nm } end
+      vim.open_picker('ReaVisor preset - layers, effects, values, LFOs, track routes', items, function(it)
+        local sc = VZ.from_reavisor(VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset:' .. it.data)))
+        if not sc then vim.msg = 'visor: preset ' .. it.data .. ' does not read'; return end
+        VZ.scene_apply(sc); VZ.sel, VZ.psel = 1, 1
+        vim.msg = ('visor: %s - %d layers, %d effects'):format(it.data, #sc.layers, #sc.fx)
+      end)
+    elseif k == 'drag' or k == 'drag_fade' then ctx.vz_drag = a
+    end
+  end,
   video_info = function()
     local col = cur_col()
     local tr = col and col.track
@@ -9233,6 +9427,7 @@ local function hint_go(t)
     if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
   elseif t.kind == 'video' then ctx.set_focus('top'); state.toptab = 'video'; ctx.video_do({ kind = d })
+  elseif t.kind == 'visor' then ctx.set_focus('top'); state.toptab = 'visor'; ctx.visor_do(MX.VZ.click({ kind = d }))
   elseif t.kind == 'harm' then ctx.set_focus('top'); state.toptab = 'harm'; ctx.harm_do(MMX.HM.click(d, ctx.harm_pitches(cur_col())))
   elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
     -- метка заглавной (Shift) — нырок: туда и обратно за N тактов (без счёта — за 1)
@@ -9502,7 +9697,7 @@ function ctx.ctx_page(hover)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus
-  if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master') and t or nil end
+  if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master' or t == 'visor') and t or nil end
   if f == 'slices' then return 'slices' end   -- 10 окт: своя страница (было — справка item)
   if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
   if f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm' end
@@ -12020,6 +12215,20 @@ local function frame()
       end
       return hv
     end,
+    visor_draw = function(Lx, x, y, w, h)
+      local VZ = MX.VZ
+      local d = ctx.vz_drag   -- протяжка ползунка / уровня слоя: держим кнопку — значение по x
+      if d then
+        if gfx.mouse_cap & 1 == 1 then VZ.drag(d, math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.w))))
+        else ctx.vz_drag = nil end
+      end
+      local hv = VZ.draw(Lx, U, x, y, w, h, state.focus == 'top' and state.toptab == 'visor', ctx.visor_env(), ctx.fit, ctx.hint)
+      if hv and gfx.mouse_wheel ~= 0 and (hv.kind == 'param' or hv.kind == 'row') then
+        VZ.wheel(hv, gfx.mouse_wheel > 0 and 1 or -1, gfx.mouse_cap & 8 == 8)
+        gfx.mouse_wheel = 0
+      end
+      return hv
+    end,
     macros_draw = function(Lx, x, y, w, h)
       local rows = ctx.mac_rows()
       ctx.mac_last = rows
@@ -12726,6 +12935,7 @@ local function frame()
     local ch = garden.f and garden.f.cells[hover.garden.oy][hover.garden.ox] or '.'
     state.status = ('orca (%d,%d) %s'):format(hover.garden.ox, hover.garden.oy, ORCA.DOC[ch] or ORCA.DOC[ch:upper()] or 'click to place the cursor, type to write')
   elseif hover.video then state.status = hover.video.tip or 'video'
+  elseif hover.visor then state.status = hover.visor.tip or 'visor'
   elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
   elseif hover.midimap then
     local t = MM.TARGETS[hover.midimap.row]
@@ -13492,6 +13702,10 @@ local function frame()
         GD.ocur = { x = hover.garden.ox, y = hover.garden.oy }
         click = { t = now2, zone = 'gardenorca' }
       end
+    elseif hover.visor then
+      ctx.set_focus('top')
+      ctx.visor_do(MX.VZ.click(hover.visor))
+      click = { t = now2, zone = 'visor' }
     elseif hover.video then
       ctx.set_focus('top')
       local a = MX.VD.click(hover.video, dbl and click.zone == 'video')
@@ -15193,7 +15407,8 @@ local function frame()
   end
   if SL.qpreview and not (OPT.active and OPT.compact and (OPT.compact.title or ''):match('^quantize')) then SL.qpreview = false end   -- панель закрыта — без превью
   local c_raw = c                                                  -- журнал клавиш (4 окт)
-  do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end   -- 10 окт: мост к модели / MCP
+  do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
+  do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')
@@ -15860,6 +16075,9 @@ local function frame()
           if type(r) == 'table' then ctx.mac_do(r) elseif not r then
             if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
+        elseif state.toptab == 'visor' then
+          local r = MX.VZ.key(c)
+          if type(r) == 'table' then ctx.visor_do(r) elseif not r then return vim.key(c) end
         elseif state.toptab == 'video' then
           local r = MX.VD.key(c, ctx.video_info())
           if type(r) == 'table' then ctx.video_do(r) elseif not r then return vim.key(c) end
