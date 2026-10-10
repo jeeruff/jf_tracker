@@ -192,7 +192,17 @@ function S.mouse_up()
     local t = S.sel.a
     S.sel = nil
     -- 10 окт, опция slice by click = click (как Slice Marker Tool в Renoise): щелчок без протяжки — слайс
-    if d and d.kind == 'sel' and ctx.slice_by_click and ctx.slice_by_click() == 'click' then S.add_at(t) end
+    if d and d.kind == 'sel' and ctx.slice_by_click and ctx.slice_by_click() == 'click' then S.add_at(t)
+    elseif d and d.kind == 'sel' and S.entry and #(S.slices or {}) > 0 and ctx.select_slice then
+      -- 10 окт: режим double — одиночный щелчок между линиями выбирает этот слайс
+      local k = 0
+      for i, u in ipairs(S.slices) do if u <= t + 1e-6 then k = i end end
+      if k > 0 then
+        ctx.select_slice(S.entry, k); S.zedge_k, S.zedge_e = k, S.entry.item or S.entry.path
+        if ctx.set_last_slice then ctx.set_last_slice(k) end
+        S.msg = ('slice S%02X selected'):format(k)
+      end
+    end
   end
   return d
 end
@@ -975,8 +985,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     S.zone_px0 = px0
     -- полоса переноса всей зоны
     local mhot = S.zone_hot == 'move' or dragging == 'move'
-    U.set(mhot and U.AMBER or U.mix(U.AMBER, U.BG, 0.45))
-    gfx.rect(px0, BY, math.max(2, px1 - px0), 5, 1)
+    -- 10 окт: цветом линий слайса и у самого низа — с краями зоны под прямым углом
+    U.set(U.AMBER); gfx.a = mhot and 1 or 0.85
+    gfx.rect(px0, wy + wh - 4, math.max(2, px1 - px0 + 1), 4, 1)
+    gfx.a = 1
   end
   -- клип сессии (6 окт): метки лупа L (тянутся: S.zone_hot 'la' / 'lb'),
   -- кнопка xf — кроссфейд шва лупа (клик — 0 / 10 / 30 / 60 / 120 мс)
@@ -1117,7 +1129,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
-    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms%s'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5), zk and '  drag: fine move, wheel: wider / closer' or '  wheel: wider / closer'), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
+    -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
+    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
+    if ctx.hints_on and ctx.hints_on() and ZH > 3 * rh then
+      U.text(x + 4, zy + ZH - rh - 1, ctx.fit(zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8), U.DIM)
+    end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
     -- 10 окт: кнопка auto play справа — сдвинул линию и отпустил: слайс играет сам
