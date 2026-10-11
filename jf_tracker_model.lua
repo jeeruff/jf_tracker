@@ -608,9 +608,7 @@ function M.build(lpb)
     if a.dp and a.dp ~= b.dp then return a.dp < b.dp end
     return a.i < b.i
   end)
-  for _, col in ipairs(snap.cols) do
-    for _, r in ipairs(roots) do if r.e.home == col.name then put(r.e, 0) end end
-  end
+  -- 11 окт: без группировки по трекам (по трекам — кнопка track в lib, только вид)
   for _, r in ipairs(roots) do put(r.e, 0) end
   for _, e in ipairs(all) do put(e, e.parent and 1 or 0) end
   -- свой порядок исходников (3 окт): перетаскивание в lib пишет P_EXT:jf_ord

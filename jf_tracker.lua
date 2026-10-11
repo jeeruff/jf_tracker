@@ -117,6 +117,7 @@ local state = {
   font = tonumber(ext('font', 0)) or 0,         -- 0 = битмап REAPER (масштаб fontscale), N = TTF
   fontscale = tonumber(ext('fontscale', 2)) or 2,
   poolsort = tostring(ext('poolsort', 'track')),
+  libtrack = reaper.GetExtState(EXT, 'libtrack') == '1',   -- 11 окт: lib по трекам (кнопка track)
   fontspace = tonumber(ext('fontspace', 2)) or 2,
   toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'modulation' elseif t == 'scope' then t = 'master' elseif t == 'clips' then t = 'sample' end; return t end)(),   -- clips вкладкой убраны (7 окт)
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
@@ -7180,10 +7181,27 @@ ctx = {
     vim.open_hydra({ title = 'lib presets: the whole lib of the track (Cmd+Z - back)', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
+  -- 11 окт: load в шапке lib — киты; кит добавляется к lib трека (не заменяет)
+  kit_add_menu = function()
+    local list = edit.lib_presets()
+    local items, keys = {}, 'abcdefghijklmnopqrstuvwxyz'
+    for k, e in ipairs(list) do
+      local key = k <= 9 and tostring(k) or keys:sub(k - 9, k - 9)
+      if key ~= '' then items[#items + 1] = { key = key, label = e.name, fn = function()
+        local col = cur_col(); if not col then vim.msg = 'load: no track under the cursor'; return end
+        local n = edit.kit_load(e.path, col.track, false, nil)
+        model.invalidate()
+        vim.msg = ('kit %s: +%d sample(s) into the lib of %s (Cmd+Z - back)'):format(e.name, n, col.name or '')
+      end } end
+    end
+    if #items == 0 then items[1] = { key = 'x', label = '(no kits yet - the preset name: save)', fn = function() end } end
+    vim.open_hydra({ title = 'load a kit into the lib (adds)', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   sort_menu = function()
     local cur = state.poolsort or 'track'
     local items = {}
-    for _, o in ipairs({ { 't', 'track', 'by track (tree: track, its samples, their slices)' }, { 'n', 'name', 'by name' }, { 'l', 'len', 'by length' },
+    for _, o in ipairs({ { 't', 'track', 'by number (as the lib numbers them)' }, { 'n', 'name', 'by name' }, { 'l', 'len', 'by length' },
                          { 'm', 'mark', 'by marks @ $ *' }, { 'y', 'type', 'by type: audio / midi / video' } }) do
       items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.poolsort = o[2]; vim.msg = 'lib order: ' .. o[3] end }
     end
@@ -13726,7 +13744,7 @@ local function frame()
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
-    inspreview = state.preview,
+    inspreview = state.preview, lib_bytrack = state.libtrack,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
     trsel = (function()
@@ -14630,6 +14648,8 @@ local function frame()
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
+  elseif hover.pooltrack then state.status = 'track: group the lib by the tracks the instruments already lie on (off - one list)'
+  elseif hover.poolload then state.status = 'load: kits - the samples of a kit are ADDED to the lib (the preset < > replaces the whole lib)'
   elseif hover.poolsort then state.status = 'lib order: ' .. (state.poolsort or 'track') .. ' - click: the list (track / name / len / marks / type), or click a column head; numbers stay'
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
@@ -15378,6 +15398,12 @@ local function frame()
       ctx.set_focus('inst')
       ctx.sort_menu()
       click = { t = now2, zone = 'poolsort' }
+    elseif hover.pooltrack then
+      state.libtrack = not state.libtrack; reaper.SetExtState(EXT, 'libtrack', state.libtrack and '1' or '0', true)
+      vim.msg = state.libtrack and 'lib by track: where the instruments already lie (one on two tracks - in both)' or 'lib: one list by number'
+      click = { t = now2, zone = 'pooltrack' }
+    elseif hover.poolload then
+      ctx.set_focus('inst'); ctx.kit_add_menu(); click = { t = now2, zone = 'poolload' }
     elseif hover.garden then
       ctx.set_focus('top')
       if hover.garden.ri then
