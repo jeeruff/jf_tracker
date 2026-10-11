@@ -2584,13 +2584,13 @@ function V.slc_field_ok()
   if not V.inst_field_ok() then return false end
   local f = flat()[V.cur.fi]
   local G = f.G or ctx.layout()
-  return G.x_slc ~= nil and not G.notes_only
+  return G.x_slc and not G.notes_only and true or false
 end
 function V.inst_field_ok()
   local f = flat()[V.cur.fi]
   if not f or f.env or f.compact or f.folded then return false end
   local G = f.G or ctx.layout()
-  return G.x_inst ~= nil
+  return G.x_inst and true or false   -- 11 окт: false у узких подколонок — поля нет
 end
 
 V.ensure_visible = ensure_visible   -- курсор в окне (9 окт: вкладка video)

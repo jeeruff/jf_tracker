@@ -397,14 +397,14 @@ function D.layout(snap, state, nregions)
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
   L.sub_w_narrow = L.pad + L.w_note + L.pad + L.w_vol + L.pad
-  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false,
+  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false,
     x_vol = L.pad + L.w_note + L.pad, x_fx = {}, x_del = L.pad + L.w_note + L.pad, sub_w = L.sub_w_narrow }, { __index = L })
   -- свёрнутый трек (fold, 2 окт): только волна и нота; ноты аккорда — только нота;
   -- огибающие — узкая схема: линия в символ шириной + hex значения точек
   L.sub_w_compact = L.x_note + L.w_note + L.pad
-  L.GC = setmetatable({ notes_only = true, nfx = 0, x_inst = false, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
+  L.GC = setmetatable({ notes_only = true, nfx = 0, x_inst = false, x_slc = false, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
-  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_fx = {},
+  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
   L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
@@ -707,7 +707,7 @@ function D.layout(snap, state, nregions)
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
-            L.GW[ww] = L.GW[ww] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, w_wave = ww, x_wave = L.pad,
+            L.GW[ww] = L.GW[ww] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
               wave = state.wavemode == 'column' and 'spec' or 'peaks', x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
             G = L.GW[ww]
           end
@@ -4737,7 +4737,7 @@ function D.frame(L, snap, rows, state, info)
       local pos = {}
       for fi, f in ipairs(L.flat) do
         local G = f.G or L
-        local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst ~= nil
+        local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst and true or false   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
         for _, fld in ipairs(vo(fi)) do
           idx = idx + 1
           if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' then cur_i = idx end
