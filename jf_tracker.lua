@@ -2740,8 +2740,74 @@ ctx = {
       if env then items[#items + 1] = it else rest[#rest + 1] = it end
     end
     for _, it in ipairs(rest) do items[#items + 1] = it end
+    -- 11 окт: и огибающие take — ноты (item) в строке курсора на этом треке:
+    -- Volume / Pan / Mute / Pitch и параметры take FX; выбор создаёт огибающую
+    -- (точка в начале, если пусто) и открывает её точки во вкладке automation
+    local titem
+    for fi, f in ipairs(L.flat or {}) do
+      if f.col == col and not f.env and not f.ml then
+        local h = vim.heads_in(fi, fi, vim.cur.row, vim.cur.row)[1] or vim.covering(fi, vim.cur.row)[1]
+        if h and h.item and reaper.ValidatePtr(h.item, 'MediaItem*') then titem = h.item; break end
+      end
+    end
+    local ttk = titem and reaper.GetActiveTake(titem)
+    if ttk then
+      local _, tname = reaper.GetSetMediaItemTakeInfo_String(ttk, 'P_NAME', '', false)
+      local function tlab(env, label) return { label = (env and reaper.CountEnvelopePoints(env) > 0 and '● ' or '  ') .. 'take / ' .. label .. ' - ' .. (tname or ''), data = { take_label = label } } end
+      for _, nm in ipairs({ 'Volume', 'Pan', 'Mute', 'Pitch' }) do
+        local it = tlab(reaper.GetTakeEnvelopeByName(ttk, nm), nm); it.data.tenv = nm; items[#items + 1] = it
+      end
+      for fx = 0, reaper.TakeFX_GetCount(ttk) - 1 do
+        local _, fxn = reaper.TakeFX_GetFXName(ttk, fx, '')
+        fxn = (fxn or ''):gsub('^[^:]*: ', '')
+        for p = 0, math.min(reaper.TakeFX_GetNumParams(ttk, fx), 64) - 1 do
+          local _, pn = reaper.TakeFX_GetParamName(ttk, fx, p, '')
+          local it = tlab(reaper.TakeFX_GetEnvelope(ttk, fx, p, false), fxn .. ' / ' .. (pn or p)); it.data.tfx = { fx, p }; items[#items + 1] = it
+        end
+      end
+    end
     if #items == 0 then vim.msg = 'nothing to automate'; return end
-    vim.open_picker('automation ' .. col.name .. ' - ● shown, Enter: show / hide (as in REAPER)', items, function(it)
+    vim.open_picker('automation ' .. col.name .. ' - ● shown, Enter: show / hide (as in REAPER); take / - the note under the cursor', items, function(it)
+      if it.data.take_label then
+        local d, env = it.data, nil
+        -- id действия «Take: Toggle take <name> envelope» — по имени (как в cmds)
+        local function act_id(what)
+          for _, rg in ipairs({ { 40600, 40800 }, { 41600, 41700 }, { 40000, 42500 } }) do
+            for id = rg[1], rg[2] do
+              if (reaper.kbd_getTextFromCmd(id, 0) or ''):match('^Take: Toggle take ' .. what .. ' envelope') then return id end
+            end
+          end
+        end
+        edit.run('take envelope', function()
+          if d.tfx then env = reaper.TakeFX_GetEnvelope(ttk, d.tfx[1], d.tfx[2], true)
+          else
+            env = reaper.GetTakeEnvelopeByName(ttk, d.tenv)
+            if not env then
+              -- действие REAPER «Take: Toggle take … envelope» работает по выделенным items — выделение возвращается
+              local sel = {}
+              for i = 0, reaper.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = reaper.GetSelectedMediaItem(0, i) end
+              reaper.SelectAllMediaItems(0, false); reaper.SetMediaItemSelected(titem, true)
+              local aid = act_id(d.tenv:lower())
+              if aid then reaper.Main_OnCommand(aid, 0) end
+              reaper.SetMediaItemSelected(titem, false)
+              for _, x in ipairs(sel) do if reaper.ValidatePtr(x, 'MediaItem*') then reaper.SetMediaItemSelected(x, true) end end
+              env = reaper.GetTakeEnvelopeByName(ttk, d.tenv)
+            end
+          end
+          if env and reaper.CountEnvelopePoints(env) == 0 then
+            local _, v = reaper.Envelope_Evaluate(env, 0, 0, 0)
+            reaper.InsertEnvelopePoint(env, 0, v, 0, 0, false, true); reaper.Envelope_SortPoints(env)
+          end
+        end)
+        if not env then vim.msg = 'take envelope: REAPER did not create ' .. d.take_label; return end
+        model.invalidate()
+        ctx.tenv_cc = nil
+        for _, a in ipairs(ctx.take_envs(titem)) do
+          if a.env == env then ctx.ai_edit_open(a); vim.msg = 'take envelope ' .. d.take_label .. ': edit its points (automation tab)'; return end
+        end
+        vim.msg = 'take envelope ' .. d.take_label .. ' added'
+        return
+      end
       local r = it.data
       local env = PP.env_of(tr, r, false)
       local vis = env and select(2, reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)) == '1'
