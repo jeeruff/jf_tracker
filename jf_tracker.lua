@@ -3936,7 +3936,7 @@ ctx = {
     vim.msg = ('dsp: %s - %s'):format(d.col and d.col.name or '', f and f.name or '')
   end,
   slices_render_menu = function()
-    vim.open_hydra({ title = 'render slices', items = {
+    vim.open_hydra({ title = 'convert slices', items = {
       { key = 'l', label = 'to the lib - every slice its own instrument', fn = function() ctx.slices_render('lib') end },
       { key = 's', label = 'to the sampler - an RS5K per slice on the cursor track (slice note)', fn = function() ctx.slices_render('rs5k') end },
     } })
@@ -3945,16 +3945,16 @@ ctx = {
   slices_render = function(how)
     local root, col = ctx.slice_root()
     local sl = root and root.slices or {}
-    if not (root and col and root.item and #sl > 0) then vim.msg = 'render: no slices on the selected instrument'; return end
+    if not (root and col and root.item and #sl > 0) then vim.msg = 'convert: no slices on the selected instrument'; return end
     local spans = {}
     for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end
     if how == 'lib' then
       local n = 0
-      edit.run('render slices to the lib', function()
+      edit.run('convert slices to the lib', function()
         for _, sp in ipairs(spans) do if sp[2] - sp[1] > 0.002 and edit.depot_span(col.track, root, sp[1], sp[2]) then n = n + 1 end end
       end)
       model.invalidate()
-      vim.msg = ('render: %d slice(s) -> the lib of %s'):format(n, col.name or 'track')
+      vim.msg = ('convert: %d slice(s) -> the lib of %s'):format(n, col.name or 'track')
       return
     end
     local tk = reaper.GetActiveTake(root.item)
@@ -3974,7 +3974,7 @@ ctx = {
       end
     end
     local n = 0
-    edit.run('render slices to RS5K', function()
+    edit.run('convert slices to RS5K', function()
       for k, sp in ipairs(spans) do
         local fx = reaper.TrackFX_AddByName(tr, 'ReaSamplOmatic5000 (Cockos)', false, -1)
         if fx and fx >= 0 then
@@ -3996,7 +3996,7 @@ ctx = {
       end
     end)
     model.invalidate()
-    vim.msg = ('render: %d RS5K on %s, slice S01 = note %d (a key each)'):format(n, col.name or 'track', base)
+    vim.msg = ('convert: %d RS5K on %s, slice S01 = note %d (a key each)'):format(n, col.name or 'track', base)
   end,
   slq_menu = function()
     local items = {}
@@ -10961,6 +10961,22 @@ end
 -- становится владельцем и публикует данные. Запрос — только при смене
 -- экземпляра (или если владельца перехватили), не чаще 2 раз в секунду.
 ctx.slx = { guid = nil, serial = 0, t = 0, pkv = -1, peaks = {}, tick = -1, tick_t = 0 }
+-- 11 окт: файл в slixer из трекера (бросок на его волну в DSP): показываемый экземпляр —
+-- владелец вида (slixer_view), он берёт заказ пути из gmem TRKV+5000.. как свой бросок
+function ctx.slixer_load(f, path)
+  local t = dsp_target()
+  if not (t and t.col and f and path and path ~= '') then return end
+  local v = ctx.slixer_view(t.col.track, f.i)
+  if not v or v.old then vim.msg = 'slixer: old plugin version - drop the file on its window'; return end
+  local B = 200000
+  with_ns('jf_slixer', function()
+    local n = math.min(#path, 255)
+    reaper.gmem_write(B + 5001, n)
+    for i = 1, n do reaper.gmem_write(B + 5001 + i, path:byte(i)) end
+    reaper.gmem_write(B + 5000, (math.floor(reaper.gmem_read(B + 5000)) % 16000000) + 1)
+  end)
+  vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. (v.wait and ' (when the view is ready)' or '')
+end
 function ctx.slixer_view(track, fxi)
   local S = ctx.slx
   if not (track and fxi and reaper.ValidatePtr(track, 'MediaTrack*')) then return nil end
@@ -13654,7 +13670,8 @@ local function frame()
       for _, t in ipairs(HN.targets) do if not (t.y and t.y >= y0 and t.y < y0 + h0 and t.x and t.x >= x0 and t.x < x0 + w0) then keep[#keep + 1] = t end end
       HN.targets = keep
     end
-    local hv = draw.route_diagram(L, snap.cols, snap.master, x0, y0, w0, h0)
+    local hv = draw.route_diagram(L, snap.cols, snap.master, x0, y0, w0, h0,
+      { params = state.routeparams and state.panes and state.panes.zoom == 'tracker' })   -- 11 окт: параметры — в зуме и с опцией p
     local mx, my = gfx.mouse_x, gfx.mouse_y
     if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end
   end
@@ -14017,6 +14034,8 @@ local function frame()
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
   elseif ctx.aied_hover and ctx.aied_hover.status and mod_pane == 'ai' and state.toptab == 'modulation' then
     state.status = ctx.aied_hover.status
+  elseif hover.slices == 'convert' then
+    state.status = 'convert slices: l - every slice its own lib instrument, s - an RS5K per slice on the cursor track (slice note)'
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.scope then state.status = 'what the properties change: sample (all its notes) / slice (the selected slice and its notes) / note (only the note under the cursor) - click: the list'
@@ -14939,6 +14958,7 @@ local function frame()
       -- модуль слайсов (4 окт): клик — выбрать и прослушать
       ctx.set_focus('slices')
       local root = ctx.slice_root()
+      if hover.slices == 'convert' then ctx.slices_render_menu(); click = { t = now2, zone = 'convert' }; goto ai_click_done end   -- 11 окт: кнопка convert
       if state.midi_inst then
         if type(hover.slices) == 'string' then ctx.mc_scope_set(hover.slices); click = { t = now2, zone = 'mcscope' }; goto ai_click_done end
         local same = click.zone == 'slicelist' and click.row == hover.slices
@@ -15923,6 +15943,8 @@ local function frame()
         local c = cur_col()
         local it = c and edit.depot_add(bd.e.pm and bd.e.path or B.full(bd.e), c.track)
         if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
+      elseif bd.active and hover.slxwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
+        ctx.slixer_load(hover.slxwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- 11 окт: файл на волну slixer — его сэмпл
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
@@ -16916,6 +16938,12 @@ local function frame()
     end
   end
   if c == 27 and state.routeview and not vim.picker and not vim.hydra then state.routeview = nil; vim.msg = 'routing: back'; c = 0 end   -- 9 окт: Esc закрывает диаграмму
+  -- 11 окт: p в routing — параметры устройств (видны в зуме трекера: zz / Cmd+z)
+  if c == 112 and state.routeview and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    state.routeparams = not state.routeparams
+    vim.msg = 'routing: parameters ' .. (state.routeparams and ('on' .. ((state.panes and state.panes.zoom == 'tracker') and '' or ' - they show in the zoomed view (zz)')) or 'off')
+    c = 0
+  end
   if c == 27 and state.measure then state.measure = false; ctx.meas = nil; vim.msg = 'measure off'; c = 0 end   -- линейка: Esc — выкл (7 окт)
   if state.measure and c == ('s'):byte() then ctx.shot_req = 'file'; c = 0 end   -- 8 окт: снимок линейки (одна клавиша)
   local ctrl_note = vim.mode == 'insert' and state.focus == 'tracker' and ctx.mods().ctrl   -- Ctrl+i / Ctrl+y = нота, не Tab

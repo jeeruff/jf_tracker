@@ -1062,7 +1062,7 @@ end
 -- вверх, по полосе к колонке получателя, вниз в его полосу микшера
 -- (стрелка). Мастер — колонка под номерами строк; аппаратные выходы — к
 -- правому краю с подписью. Щелчок над колонкой — попап маршрутизации трека
-function D.route_diagram(L, cols, master, x, y, w, h)
+function D.route_diagram(L, cols, master, x, y, w, h, opts)
   local hover = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.BG); gfx.rect(x, y, w, h, 1)
@@ -1103,7 +1103,11 @@ function D.route_diagram(L, cols, master, x, y, w, h)
     if #fxs > 0 and dbot - dtop >= L.rh + 4 and bw0 >= 3 * L.cw then
       local bx0 = c.x + 2
       local avail = dbot - dtop
-      local bh0 = math.max(L.rh + 4, math.min(6 * L.rh + 4, math.floor(avail / #fxs) - 2))
+      -- 11 окт: схема (как вкладка fx routing): рамка с именем, между блоками — провод;
+      -- параметры — только в большом виде (зум) с опцией p
+      local withp = opts and opts.params
+      local gap = withp and 2 or 8
+      local bh0 = withp and math.max(L.rh + 4, math.min(6 * L.rh + 4, math.floor(avail / #fxs) - gap)) or (L.rh + 4)
       local yb = dbot
       for k, f in ipairs(fxs) do
         local by0 = yb - bh0
@@ -1111,10 +1115,11 @@ function D.route_diagram(L, cols, master, x, y, w, h)
           text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY); break
         end
         local hot = mx >= bx0 and mx < bx0 + bw0 and my >= by0 and my < yb
-        set(hot and D.CURROW or U.PANEL); gfx.rect(bx0, by0, bw0, bh0, 1)
+        if k > 1 then set(U.LINE); gfx.rect(c.x + math.floor(c.w / 2), yb, 1, gap, 1) end     -- провод к прошлому блоку
+        set(hot and D.CURROW or U.BG); gfx.rect(bx0, by0, bw0, bh0, 1)
         set(hot and U.AMBER or (f.enabled and U.LINE or U.DIM)); gfx.rect(bx0, by0, bw0, bh0, 0)
         text(bx0 + 2, by0 + 2, fit(f.name or '?', bw0 - 4), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
-        local prow = math.floor((bh0 - L.rh - 4) / L.rh)
+        local prow = withp and math.floor((bh0 - L.rh - 4) / L.rh) or 0
         local pw = bw0 - 6
         for pi = 1, math.min(prow, #(f.params or {})) do
           local pp = f.params[pi]
@@ -1130,7 +1135,7 @@ function D.route_diagram(L, cols, master, x, y, w, h)
           end
         end
         if hot then hover.rdev = { col = c.col, k = k, master = c.master } end
-        yb = by0 - 2
+        yb = by0 - gap
       end
     end
   end
@@ -6076,6 +6081,8 @@ function D.frame(L, snap, rows, state, info)
         local wx, wy, ww, wh = bx + L.pad, by + L.rh + 1, pw, bh - 2 * L.rh - 4
         if wtop > 0 then ww, wh = bw - 2 * L.pad, wtop_wh else pcol0 = 1 end
         local v = info.dsp_view and info.dsp_view('slixer', f.i)
+        -- 11 окт: бросок файла (браузер / lib) на волну — сэмпл в этот slixer
+        if mx >= wx and mx < wx + ww and my >= wy and my < wy + math.max(4, wh) then hover.slxwave = { fx = k, f = f } end
         set(U.PANEL); gfx.rect(wx, wy, ww, math.max(4, wh), 1)
         set(U.LINE); gfx.rect(wx, wy, ww, math.max(4, wh), 0)
         local st, stc = '', U.DIM
