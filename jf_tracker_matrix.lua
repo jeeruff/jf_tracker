@@ -255,7 +255,9 @@ function MX.width(L, nregions, ncols)
   L.mx_head_h = L.rh + 2 + MX.name_h + 4
   -- справа — колонка кнопок < > = у линии раздела: ячейки под неё не уходят
   local knob_w = U.measure('>') + 2 * L.pad + 6
-  local w = math.max(L.mx_label_w + ncols * L.mx_cell_w + L.pad + knob_w, MX.btns_w + L.pad + knob_w)   -- ряд кнопок не под ручками
+  -- 11 окт: колонка visor — превью сцены слота, справа от треков (когда visor включён / есть сцены)
+  MX.vis_w = (ctx and ctx.visor_col_on and ctx.visor_col_on()) and math.floor(L.mx_cell_w * 1.6) or 0
+  local w = math.max(L.mx_label_w + ncols * L.mx_cell_w + (MX.vis_w > 0 and (MX.vis_w + 2) or 0) + L.pad + knob_w, MX.btns_w + L.pad + knob_w)   -- ряд кнопок не под ручками
   if MX.clips then w = math.max(w, L.cw * 8 + math.min(ncols, 6) * L.cw * 8 + 3 * L.pad + knob_w) end   -- clips: клетки не уже 8 знаков (до 6 треков без прокрутки)
   return w
 end
@@ -362,6 +364,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       is_cur and U.AMBER or U.TEXT, U.PANEL)
     if col.rgb then U.set(col.rgb); gfx.rect(x + 1, ny + MX.name_h, L.mx_cell_w - 2, 2, 1) end
     end
+  end
+  -- 11 окт: заголовок колонки visor
+  if (MX.vis_w or 0) > 0 then
+    local vx = L.mx_label_w + (#snap.cols - MX.hs) * L.mx_cell_w + 2
+    if vx + MX.vis_w <= W - 4 then ctx.vtext(vx + (MX.vis_w - L.th) / 2, ny, MX.name_h - 2, 'visor', U.CYAN, U.PANEL) end
   end
   -- аранжировка (9 окт): пустой угол над слотами, левее имён треков —
   -- имя и управление: < имя >, new dup del; строки — сколько влезает
@@ -685,6 +692,20 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         elseif y + rh - 1 - my <= 2 then hover.cellrep = { ri = ri, ci = ci, edge = 'bottom', x = x } end
       end
       if ctx.hint then ctx.hint('mx', x, y, L.mx_cell_w, rh, { ri = ri, ci = ci }) end
+      end
+    end
+    -- 11 окт: клетка visor — превью сцены слота (сцена на имени слота или событие v: в нём)
+    if (MX.vis_w or 0) > 0 and not rg.gap then
+      local vx = L.mx_label_w + (#snap.cols - MX.hs) * L.mx_cell_w + 2
+      if vx + MX.vis_w <= W - 4 then
+        local nm = ctx.visor_slot_name and ctx.visor_slot_name(rg)
+        U.set(U.DIM); gfx.rect(vx, y, MX.vis_w, rh, 0)
+        if nm then
+          local ok = ctx.visor_namethumb and rh >= 6 and ctx.visor_namethumb(nm, vx + 1, y + 1, MX.vis_w - 2, rh - 2)
+          if not ok or rh < 2 * L.rh then U.text(vx + 2, y + 1, ctx.fit(nm, MX.vis_w - 4), U.CYAN, ok and U.BG or nil) end
+        end
+        if hover.ri == ri and mx >= vx and mx < vx + MX.vis_w then hover.btn = nil; hover.vis = { ri = ri, name = nm } end
+        if ctx.hint then ctx.hint('mxvis', vx, y, MX.vis_w, rh, { ri = ri }) end
       end
     end
   end

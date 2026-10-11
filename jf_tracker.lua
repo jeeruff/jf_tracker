@@ -5589,6 +5589,25 @@ ctx = {
     return F
   end,
   -- кадр: проект → модель, сцены за плейхедом, отправка странице, сохранение
+  -- 11 окт: колонка visor в матрице — когда visor включён, есть сцены слотов или события v:
+  visor_col_on = function()
+    local VZ = MX.VZ
+    if VZ.on then return true end
+    if next(VZ.st.scenes or {}) then return true end
+    return snap and snap.master and snap.master.vis and #snap.master.vis.rows > 0 or false
+  end,
+  -- сцена слота: на имени слота (follow) или первое событие v: внутри слота
+  visor_slot_name = function(rg)
+    local VZ = MX.VZ
+    if rg.name ~= '' and VZ.st.scenes[rg.name] then return rg.name end
+    local vis = snap and snap.master and snap.master.vis
+    if not vis then return nil end
+    for _, r in ipairs(vis.rows) do
+      local e = vis.ev[r]
+      if e.pos >= rg.pos - 1e-6 and e.pos < rg.rgnend - 1e-6 then return e.text end
+    end
+    return nil
+  end,
   -- 11 окт: сцена visor по имени: своя сцена (сохранённая на слот / имя) или пресет ReaVisor
   visor_apply_name = function(name, quiet)
     local VZ = MX.VZ
@@ -14739,6 +14758,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e on: the matrix goes from =START to =END; off: the whole project as the REAPER timeline (library regions after =END too, 16 free bars at the end) - only the view, the markers stay'
+  elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
   elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
@@ -15938,6 +15958,11 @@ local function frame()
       end
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
       click = { t = now2, zone = 'mxrep' }
+    elseif hover.matrix and hover.matrix.vis then
+      -- 11 окт: клетка visor матрицы — сцена / пресет в начало слота (событие v:)
+      local rg = seq[hover.matrix.vis.ri]
+      if rg then ctx.visor_pick(math.floor(rg.r0 + 0.5)) end
+      click = { t = now2, zone = 'mxvis' }
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       ctx.mx_btn_do(hover.matrix.btn)
