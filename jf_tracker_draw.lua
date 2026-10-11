@@ -4689,9 +4689,11 @@ function D.frame(L, snap, rows, state, info)
       local cy3 = hy + (L.lane_row + 1) * L.rh + 2
       local function cap(x, w, txt, kind)
         -- 11 окт: подписи полными словами мелким шрифтом (note / vol / fx1 / delay); не влезло — короче
+        -- 11 окт: подпись может занять половину отступа с каждой стороны поля (vol влезает целиком), соседние не слипаются
+        local hp = math.floor(L.pad / 2)
         local t = txt
-        while #t > 1 and D.small_measure(t) > w do t = t:sub(1, -2) end   -- строго по полю: соседние не слипаются
-        D.small_text(x, cy3 + math.floor(L.rh / 4), t, U.GREY)
+        while #t > 1 and D.small_measure(t) > w + 2 * hp - 1 do t = t:sub(1, -2) end
+        D.small_text(x - hp, cy3 + math.floor(L.rh / 4), t, U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
       end
       for _, ln in ipairs(c.lanes) do
