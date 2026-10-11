@@ -3725,6 +3725,7 @@ ctx = {
   pane_do = function(fn, msg)
     local before = draw.panes.encode(state.panes)
     if fn() then
+      draw.panes.pin_mixer(state.panes)   -- 11 окт: mixer — всегда под трекером
       ctx.pn_undo = ctx.pn_undo or {}
       table.insert(ctx.pn_undo, before)
       if #ctx.pn_undo > 20 then table.remove(ctx.pn_undo, 1) end

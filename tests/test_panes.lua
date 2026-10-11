@@ -232,5 +232,20 @@ ok('main top-left over matrix', lay.by_panel.ctrl.x == 0 and lay.by_panel.ctrl.y
 d = PN.migrate({ ctrlpos = 'top', toppos = 'mid', browserleft = true }, 1600, 900)
 lay = PN.layout(d, 1600, 900, M)
 ok('main, matrix, browser in the left column', lay.by_panel.ctrl.x == 0 and lay.by_panel.matrix.x == 0 and lay.by_panel.browser.x == 0 and lay.by_panel.ctrl.y < lay.by_panel.matrix.y and lay.by_panel.matrix.y < lay.by_panel.browser.y)
+-- 11 окт: mixer ушёл в стек к dsp (случай пользователя) — pin_mixer возвращает его под трекер
+do
+  local u = PN.decode('h[0.132:v[0.184:ctrl*|0.816:matrix*,visor,clips]|0.509:v[0.393:h[0.395:retro,modulation,grid,macros,sample*|0.511:sprops*|0.094:slices*]|0.607:dsp,mixer*]|0.25:tracker*|0.109:v[0.513:inst*|0.487:browser*,fxb]] H:notes Z:')
+  ok('user layout: mixer in the dsp stack', #(PN.find(u, 'mixer').panes) == 2)
+  ok('pin: changed', PN.pin_mixer(u))
+  local lf, par, ix = PN.find(u, 'mixer')
+  ok('pin: mixer alone in its leaf', #lf.panes == 1)
+  ok('pin: right under the tracker', par.ax == 'v' and par.kids[ix - 1] == PN.find(u, 'tracker'))
+  ok('pin: dsp still visible', PN.visible(u, 'dsp'))
+  ok('pin: idempotent', not PN.pin_mixer(u))
+  local d = PN.DEFAULT()
+  ok('pin: default untouched', not PN.pin_mixer(d))
+  PN.hide(d, 'mixer'); ok('pin: hidden mixer stays hidden', not PN.pin_mixer(d) and not PN.visible(d, 'mixer'))
+  tiling('pinned user layout', u, 1600, 900)
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

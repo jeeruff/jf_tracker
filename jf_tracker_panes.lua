@@ -514,6 +514,17 @@ function PN.hide(model, id)
   if model.zoom == id then model.zoom = nil end
   return bump(model)
 end
+-- 11 окт: полоски микшера стоят под колонками трекера — модуль mixer живёт только
+-- прямо под трекером, отдельным листом; ушёл в стек / вбок — возвращается (true — вернули)
+function PN.pin_mixer(model)
+  local lf, par, ix = PN.find(model, 'mixer')
+  if not lf then return false end
+  local tl = PN.find(model, 'tracker')
+  if #lf.panes == 1 and par and par.ax == 'v' and ix and ix > 1 and par.kids[ix - 1] == tl and #tl.panes == 1 then return false end
+  detach(model, 'mixer')
+  insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
+  return bump(model)
+end
 local SIDE_DIR = { left = 'l', right = 'r', top = 'u', bottom = 'd' }
 -- показать: at — панель, рядом с которой (по умолчанию трекер со стороны
 -- PANELS[id].side); share — доля новичка
