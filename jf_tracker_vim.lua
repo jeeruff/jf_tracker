@@ -1314,6 +1314,11 @@ function V.key_impl(c)
     if ctx.inst_transpose then ctx.inst_transpose(((hk == 'k' or c == UP) and 1 or -1) * n) end
     V.count = nil; return
   end
+  -- 11 окт: Shift+Opt+H / L — playrate выбранного инструмента (не переход по трекам)
+  if mods.alt and mods.shift and not mods.ctrl and not mods.cmd and (hk == 'h' or hk == 'l' or c == LEFT or c == RIGHT) and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if ctx.inst_rate then ctx.inst_rate(((hk == 'l' or c == RIGHT) and 1 or -1) * n) end
+    V.count = nil; return
+  end
   -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора;
   -- все треки — :repeat all (Shift+Opt+J с 10 окт — транспоз)
   if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then

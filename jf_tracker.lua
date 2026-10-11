@@ -7660,6 +7660,28 @@ ctx = {
     local p = reaper.ValidatePtr(e.take, 'MediaItem_Take*') and reaper.GetMediaItemTakeInfo_Value(e.take, 'D_PITCH') or 0
     vim.msg = ('%s: transpose %+d st  (Shift+Opt+J / K)'):format(e.name or 'instrument', math.floor(p + 0.5))
   end,
+  -- 11 окт: Shift+Opt+H / L — playrate выбранного инструмента −/+ 0.01 (счётчик — на N)
+  inst_rate = function(d)
+    local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+    if e and e.parent then e = e.parent end
+    if not (e and e.item) then vim.msg = 'playrate: pick a sample in the lib'; return end
+    ctx.sp_adjust(e, 'rate', d)
+    local r = reaper.ValidatePtr(e.take, 'MediaItem_Take*') and reaper.GetMediaItemTakeInfo_Value(e.take, 'D_PLAYRATE') or 1
+    vim.msg = ('%s: playrate x%.2f  (Shift+Opt+H / L)'):format(e.name or 'instrument', r)
+  end,
+  -- 11 окт: ПКМ по bsync — меню: выкл, угадать, N долей
+  bsync_menu = function()
+    local col = cur_col(); local e = col and col.pool[vim.inst]
+    if not e then vim.msg = 'no item selected'; return end
+    local items = {}
+    items[#items + 1] = { key = 'x', label = 'off' .. (e.bsync and '' or '  (on)'), fn = function() if e.bsync then ctx.bsync_set(e, nil) end end }
+    items[#items + 1] = { key = 'g', label = 'guess the beats from the length', fn = function() ctx.bsync_set(e, edit.bsync_guess(e.len * (e.rate or 1), reaper.GetCursorPosition())) end }
+    for _, o in ipairs({ { '1', 1 }, { '2', 2 }, { '3', 3 }, { '4', 4 }, { '6', 6 }, { '8', 8 }, { 'a', 12 }, { 'b', 16 }, { 'c', 32 }, { 'd', 64 } }) do
+      items[#items + 1] = { key = o[1], label = ('%d beats'):format(o[2]) .. (e.bsync == o[2] and '  (on)' or ''), fn = function() ctx.bsync_set(e, o[2]) end }
+    end
+    vim.open_hydra({ title = 'beatsync: ' .. (e.name or 'instrument') .. ' - its length = N beats at the tempo', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   sp_adjust = function(e, k, d)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
@@ -13721,7 +13743,7 @@ local function frame()
   elseif hover.mixmode then state.status = 'meter of the master (REAPER VU): RMS / LUFS-M / LUFS-S / peak - click: the list (native, no plugin)'
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
-  elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
+  elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N, right click: menu'
   elseif hover.dbplus or hover.dbpar then state.status = (hover.dbtip or '') .. ' - click: fzf of the effects'
   elseif hover.poolkit then state.status = 'lib preset: the whole lib of the track - click: the presets and save, < > the previous / next one (replaces the lib, Cmd+Z back)'
   elseif hover.poolpprev or hover.poolpnext then state.status = (hover.poolpprev and 'previous' or 'next') .. ' lib preset - replaces the lib of the track (Cmd+Z back)'
@@ -15616,6 +15638,7 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
   elseif U.rclick and hover.ctrl == 'dub' then ctx.dub_menu()

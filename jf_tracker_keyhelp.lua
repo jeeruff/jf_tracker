@@ -86,6 +86,7 @@ KH.PAGES = {
     { k = 'dP', d = 'delete every item and all automation (envelope points, automation items) of the selected tracks in the whole project (no selection - the cursor track); one undo' },
     { k = 'C-A-j', d = 'repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track; :repeat all - all tracks (Paketti)' },
     { k = 'S-A-j S-A-k', d = 'transpose the instrument selected in the lib -1 / +1 semitone (a count - by N)' },
+    { k = 'S-A-h S-A-l', d = 'playrate of the instrument selected in the lib -0.01 / +0.01 (a count - by N)' },
     { k = 'dr daw', d = 'clear the track in the cursor region / all items of the track (the lib after =LIB stays)', t = { 'dr', 'daw' } },
     { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s', d = 'replace / split the event (mute events: select with v, then M)', t = { 'c', 's' } },
