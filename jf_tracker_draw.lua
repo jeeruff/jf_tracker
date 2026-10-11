@@ -654,6 +654,12 @@ function D.layout(snap, state, nregions)
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
   L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.label_w >= 6 * L.cw or false
   L.master_w = L.master_right and L.label_w or 0
+  -- 11 окт: колонка мастера (как show master track в REAPER, по умолчанию вкл) — его огибающие; нет огибающих — пустая дорожка
+  L.mtrack = state.showmaster ~= false and snap.master and snap.master.track and not state.ptmode or false
+  if L.mtrack then
+    local ne = math.max(1, #(snap.master.envs or {}))
+    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1)
+  end
   L.cols_r = L.win_w - L.master_w
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
@@ -760,6 +766,22 @@ function D.layout(snap, state, nregions)
     -- скрытые дети свёрнутой папки: записи L.flat остаются (курсор не ломается), x = nil
     if hidden then for _, f in ipairs(L.flat) do if f.ci == ci then f.x = nil end end end
   end
+  -- 11 окт: колонка мастера — справа, в своём углу; огибающие — элементы L.flat (курсор, точки), как у трека
+  if L.mtrack then
+    local mc = snap.master
+    local ci = #snap.cols + 1
+    local c = { col = mc, ci = ci, x = L.cols_r + 1, lanes = {}, envs = {}, mls = {}, master = true, mtrack = true }
+    local lx = c.x
+    for _, e in ipairs(mc.envs or {}) do
+      L.flat[#L.flat + 1] = { ci = ci, col = mc, env = e, sub = {}, x = lx, w = L.env_w }
+      c.envs[#c.envs + 1] = { e = e, x = lx, w = L.env_w, fi = #L.flat }
+      lx = lx + L.env_w + 1
+    end
+    c.w = L.master_w - 1
+    c.empty = #c.envs == 0
+    L.mcol = c
+    L.cols[#L.cols + 1] = c
+  else L.mcol = nil end
   L.total_w = cx
   return L
 end
@@ -861,6 +883,22 @@ function D.big_text(x, y, s, col, k)
     return
   end
   local s0 = D.SCALE; D.SCALE = s0 * k; text(x, y, s, col); D.SCALE = s0
+end
+-- 11 окт: мелкий шрифт (половина) — подписи колонок, деления dB; TTF — не мельче 7 px
+D.SMALL = 0.5
+function D.small_measure(s)
+  if D.ttf then gfx.setfont(3, D.ttf_face, math.max(7, D.ttf_size * D.SMALL)); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
+  return math.ceil(ms(s) * D.SMALL)
+end
+function D.small_text(x, y, s, col)
+  if s == nil or s == '' then return end
+  if D.ttf then
+    gfx.setfont(3, D.ttf_face, math.max(7, D.ttf_size * D.SMALL))
+    set(col); gfx.x, gfx.y = math.floor(x), math.floor(y + D.SPACE); gfx.drawstr(s)
+    gfx.setfont(D.font_id)
+    return
+  end
+  D.big_text(x, y, s, col, D.SMALL)
 end
 local function fit(s, w)
   if ms(s) <= w then return s end
@@ -1526,7 +1564,11 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
   if ev.pt then
     -- точки кружочками, как в REAPER (6 окт); опция envelope points
     if D.envpoints ~= false then gfx.circle(ex, cy, L.env_compact and 1 or 2, 0, 1) end
-    text(tx, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)), U.TEXT)
+    -- 11 окт: темп (колонка мастера) — сам BPM, не 0..127
+    local tempo = e and e.name and e.name:lower():find('tempo', 1, true) and e.max and e.min
+    local vt = tempo and ('%d'):format(math.floor(e.min + ev.v * (e.max - e.min) + 0.5))
+      or (D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)))
+    text(tx, ty, vt, U.TEXT)
   elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
     -- форма сегмента точки строкой выше — под её значением, только если не lin
     text(tx, ty, D.ENV_SHAPES[prev.shape] or '?', U.CYAN)
@@ -3914,7 +3956,7 @@ function D.frame(L, snap, rows, state, info)
   -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
   -- (там было пусто); та же отрисовка, что у трека, без шапки
   local hcols = L.cols
-  if L.mix_bottom and snap and snap.master and snap.master.vol and L.label_w >= 6 * L.cw then
+  if L.mix_bottom and snap and snap.master and snap.master.vol and L.label_w >= 6 * L.cw and not L.mcol then   -- 11 окт: колонка мастера есть — полоса микшера у неё
     hcols = { table.unpack(L.cols) }
     hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
@@ -4404,18 +4446,21 @@ function D.frame(L, snap, rows, state, info)
           local yy = ypos(m)
           set(m == 0 and U.mix(U.TEXT, dark, 0.35) or tick); gfx.rect(bx0 + 1, yy, 2, 1, 1); gfx.rect(bx0 + bw0 - 3, yy, 2, 1, 1)
           -- подпись — только если не налезает на предыдущую (без наложений)
-          local ly = yy - D.SPACE - math.floor((L.th or L.rh) / 2) - 2   -- 9 окт: цифры глифа выше середины ячейки — центр цифры на риске
-          if (not last_ly or ly >= last_ly + L.rh) and ly + L.rh <= ty0 + th + math.floor(L.rh / 2) then
+          -- 11 окт: деления мелким шрифтом — центр цифры на риске, помещается больше
+          local sh = math.max(4, math.floor((L.th or L.rh) * D.SMALL))
+          local ly = yy - D.SPACE - math.floor(sh / 2) - 1
+          if (not last_ly or ly >= last_ly + sh + 1) and ly + sh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
+            local mw = D.small_measure(ml)
             if lblw > 0 then
-              text(bx0 - 2 - ms(ml), ly, ml, m == 0 and U.TEXT or U.GREY)
-              hint('trsmark', bx0 - 2 - ms(ml), ly, ms(ml), L.rh, { col = col, db = m })   -- f: громкость на метку
+              D.small_text(bx0 - 2 - mw, ly, ml, m == 0 and U.TEXT or U.GREY)
+              hint('trsmark', bx0 - 2 - mw, ly, mw, sh, { col = col, db = m })   -- f: громкость на метку
               last_ly = ly
-            elseif ms(ml) <= bw0 - 2 then
+            elseif mw <= bw0 - 2 then
               -- 9 окт: узкий фейдер — метки внутри коробки, серым (f прыгает на них)
-              local lx = bx0 + math.floor((bw0 - ms(ml)) / 2)
-              text(lx, ly, ml, U.mix(U.GREY, dark, 0.45))   -- 9 окт: метки внутри коробки — темнее
-              hint('trsmark', lx, ly, ms(ml), L.rh, { col = col, db = m })
+              local lx = bx0 + math.floor((bw0 - mw) / 2)
+              D.small_text(lx, ly, ml, U.mix(U.GREY, dark, 0.45))   -- 9 окт: метки внутри коробки — темнее
+              hint('trsmark', lx, ly, mw, sh, { col = col, db = m })
               last_ly = ly
             end
           end
@@ -4643,19 +4688,24 @@ function D.frame(L, snap, rows, state, info)
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
       local cy3 = hy + (L.lane_row + 1) * L.rh + 2
       local function cap(x, w, txt, kind)
-        text(x, cy3, fit(txt, w), U.GREY)
+        -- 11 окт: подписи полными словами мелким шрифтом (note / vol / fx1 / delay); не влезло — короче
+        local t = txt
+        while #t > 1 and D.small_measure(t) > w + L.pad do t = t:sub(1, -2) end
+        D.small_text(x, cy3 + math.floor(L.rh / 4), t, U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
       end
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
           local sx = ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w)
           local G = (L.flat[ln.f0 + si - 1] or {}).G or L
-          if G.w_wave > 0 then cap(sx + G.x_wave, G.w_wave, L.wave == 'spec' and 'wav' or 'wv', 'wave') end
-          cap(sx + G.x_note, L.w_note, 'nt', 'note')
-          if not G.notes_only then cap(sx + G.x_vol, L.w_vol, 'vl', 'vol') end
+          if G.w_wave > 0 then cap(sx + G.x_wave, G.w_wave, 'wave', 'wave') end
+          cap(sx + G.x_note, L.w_note, 'note', 'note')
+          if not G.notes_only then cap(sx + G.x_vol, L.w_vol, 'vol', 'vol') end
           if not (G.narrow or G.notes_only) then
-            for k = 1, L.nfx do cap(sx + L.x_fx[k], L.w_fx, 'fx' .. k, 'fx') end
-            cap(sx + L.x_del, L.w_del, 'dl', 'delay')
+            -- 11 окт: поля — по раскладке самой подколонки (уровень зума), не по полной: за краем — нет подписей
+            local sw = (L.flat[ln.f0 + si - 1] or {}).w or L.sub_w
+            for k = 1, (G.nfx or L.nfx) do local fx = (G.x_fx or L.x_fx)[k]; if fx and fx < sw then cap(sx + fx, L.w_fx, 'fx' .. k, 'fx') end end
+            if (G.x_del or L.x_del) < sw then cap(sx + (G.x_del or L.x_del), L.w_del, 'delay', 'delay') end
           end
         end
       end

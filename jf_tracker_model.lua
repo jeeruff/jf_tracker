@@ -414,6 +414,7 @@ function M.build(lpb)
     ms.muted = R.GetMediaTrackInfo_Value(mt, 'B_MUTE') == 1
     local sfx = R.TrackFX_GetByName and R.TrackFX_GetByName(mt, 'jf_tracker_scope', false)
     if sfx and sfx >= 0 then ms.scope_slot = math.floor(R.TrackFX_GetParam(mt, sfx, 0)) end
+    ms.envs = M.track_envs(mt, lpb)   -- 11 окт: колонка мастера в трекере — его огибающие (темп, громкость …)
     snap.master = ms
   end
   for ti = 0, R.CountTracks(0) - 1 do
