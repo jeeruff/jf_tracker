@@ -331,6 +331,10 @@ if state.panes and reaper.GetExtState(EXT, 'sprops_init') ~= '1' then
   end
   reaper.SetExtState(EXT, 'sprops_init', '1', true)
 end
+-- 11 окт: по умолчанию в стопке рядом с properties — нарезчик (вкладка item)
+if state.panes and draw.panes.visible(state.panes, 'sample') and draw.panes.visible(state.panes, 'sprops') then
+  draw.panes.set_active(state.panes, 'sample'); state.toptab = 'sample'
+end
 -- 11 окт: микшер — свой модуль; один раз поставить его под трекер (дальше — как пользователь разложит)
 if state.panes and reaper.GetExtState(EXT, 'mixer_init') ~= '1' then
   local PNm = draw.panes
@@ -2100,7 +2104,13 @@ ctx = {
   -- слайсер: оверлей нарезки инструмента (двойной клик по сэмплу / :slice / \is)
   slicer_active = function() return SL.active end,
   slicer_key = function(c) SL.key(c) end,
-  slicer_dt = function() if not SL.active then ctx.open_slicer() end; if SL.active then SL.dt_toggle() end end,   -- 10 окт: Opt+D
+  slicer_dt = function()   -- 10 окт: Opt+D; 11 окт — и из properties / slices: вкладка item (нарезчик) открывается
+    if state.panes and draw.panes.visible(state.panes, 'sample') and draw.panes.active_of(state.panes, 'sample') ~= 'sample' then
+      draw.panes.set_active(state.panes, 'sample'); state.toptab = 'sample'
+    end
+    if not SL.active then ctx.open_slicer() end
+    if SL.active then SL.dt_toggle() end
+  end,
   open_slicer = function(n)
     local col = cur_col(); if not col then return end
     if n then pool_select(n) end
