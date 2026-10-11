@@ -190,6 +190,9 @@ function D.set_font(state)
     D.SCALE = math.max(1, math.min(state.ptmode and 4 or D.SCALE_MAX, fs))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
+  -- 11 окт: мелкий шрифт (метры, подписи колонок) — всегда x1: битмап без масштаба,
+  -- TTF — родной кегль; при x1 он равен обычному
+  D.SMALL = D.ttf and math.min(1, D.ttf_px / math.max(1, D.ttf_size)) or 1 / D.SCALE
   tcache, next_img = {}, IMG_FIRST
   if D.reset_vcache then D.reset_vcache() end      -- вертикальные имена — тоже из старого шрифта
   if D.reset_glyph then D.reset_glyph(); D.reset_measure() end
@@ -907,21 +910,21 @@ function D.big_text(x, y, s, col, k)
   end
   local s0 = D.SCALE; D.SCALE = s0 * k; text(x, y, s, col); D.SCALE = s0
 end
--- 11 окт: мелкий шрифт (×0.75) — подписи колонок, деления dB; TTF — не мельче 7 px
-D.SMALL = 0.75   -- 11 окт: 0.5 мелковат
+-- 11 окт: мелкий шрифт — подписи колонок, деления dB; всегда x1 (D.SMALL считает set_font)
+D.SMALL = D.SMALL or 1
 function D.small_measure(s)
-  if D.ttf then gfx.setfont(3, D.ttf_face, math.max(7, D.ttf_size * D.SMALL)); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
-  return math.ceil(ms(s) * D.SMALL)
+  if D.ttf then gfx.setfont(3, D.ttf_face, D.ttf_px); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
+  local s0 = D.SCALE; D.SCALE = 1; local w = ms(s); D.SCALE = s0; return w
 end
 function D.small_text(x, y, s, col)
   if s == nil or s == '' then return end
   if D.ttf then
-    gfx.setfont(3, D.ttf_face, math.max(7, D.ttf_size * D.SMALL))
+    gfx.setfont(3, D.ttf_face, D.ttf_px)
     set(col); gfx.x, gfx.y = math.floor(x), math.floor(y + D.SPACE); gfx.drawstr(s)
     gfx.setfont(D.font_id)
     return
   end
-  D.big_text(x, y, s, col, D.SMALL)
+  local s0 = D.SCALE; D.SCALE = 1; text(x, y, s, col); D.SCALE = s0   -- ровно x1 (x1.5 · 2/3 давал 0.999…)
 end
 local function fit(s, w)
   if ms(s) <= w then return s end
@@ -4720,7 +4723,7 @@ function D.frame(L, snap, rows, state, info)
         local hp = math.floor(L.pad / 2)
         local t = txt
         while #t > 1 and D.small_measure(t) > w + 2 * hp - 1 do t = t:sub(1, -2) end
-        D.small_text(x - hp, cy3 + math.floor(L.rh / 4), t, U.GREY)
+        D.small_text(x - hp, cy3 + math.max(0, math.floor((L.rh - math.floor((L.th or L.rh) * D.SMALL)) / 2) - D.SPACE), t, U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
       end
       for _, ln in ipairs(c.lanes) do
