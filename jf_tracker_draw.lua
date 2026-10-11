@@ -115,7 +115,7 @@ local tcache, next_img = {}, 100
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
 -- 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
-local IMG_FIRST, IMG_LAST = 100, 798   -- 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы)
+local IMG_FIRST, IMG_LAST = 100, 797   -- 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
 -- сбрасывало весь кэш, и экран из сотен строк (pm cards) перезапекался
@@ -528,8 +528,9 @@ function D.layout(snap, state, nregions)
   L.route_h = (L.mix_bottom and state.mixroute ~= false) and (D.rt_need or (3 * ms('W') + 16)) or 0
   L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4 + L.route_h) or 0
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
-  L.lane_row = 2 + L.hr_vp + L.hr_in + L.hr_info
-  -- 11 окт: +1 строка уголка — кнопка markers под регионом
+  -- 11 окт: +1 строка уголка — кнопка markers под регионом; кнопки лейнов
+  -- (- + a+) — по-прежнему последняя строка шапки, прямо над номерами колонок
+  L.lane_row = 3 + L.hr_vp + L.hr_in + L.hr_info
   L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
@@ -1172,39 +1173,97 @@ end
 -- в каждой колонке — дорожки выходов (сенды, аппаратные) с вертикальными
 -- именами, под ними провода к колонке получателя (цвет получателя). Щелчок
 -- по дорожке — меню маршрутизации трека. Высота — по длинному имени (D.rt_need)
--- 11 окт: track list (ниша микшера): все треки — отступ по вложенности, цвет, папка
--- > / -, имя; курсорный — янтарём, скрытые в трекере — тускло (h). Щелчок — к треку,
--- по > / - — свернуть папку, ПКМ — скрыть / показать в трекере, колесо — листать
+-- 11 окт: модуль tracks — как Track Manager в REAPER: все треки строками (отступ по
+-- вложенности, цвет, папка > / -), справа матрица флажков: T — виден в трекере,
+-- tcp / mcp — в REAPER (арранжировка / микшер), M S R — mute / solo / arm.
+-- Щелчок по клетке — переключить, протяжка вниз по столбцу — то же значение на
+-- все строки (как в REAPER), щелчок по заголовку столбца — весь столбец, по имени —
+-- к треку, ПКМ по имени — скрыть / показать в трекере, колесо — листать.
+-- Клавиатура (фокус tracks): j k строки, h l столбцы, Space — клетка, Enter — к треку,
+-- a — весь столбец, z — папка, / — фильтр по имени
+D.TL = { cur = 1, col = 1, scroll = 0, filter = '', typing = false }
 D.tl_scroll = 0
-function D.track_list(L, state, snap, info, hover, x, y, w, h)
+D.TL_COLS = {
+  { k = 'T',   h = 'T',   d = 'shown in the tracker (and its mixer strip)' },
+  { k = 'tcp', h = 'tcp', d = 'REAPER: shown in the arrange view (TCP)' },
+  { k = 'mcp', h = 'mcp', d = 'REAPER: shown in the mixer (MCP)' },
+  { k = 'M',   h = 'M',   d = 'mute' },
+  { k = 'S',   h = 'S',   d = 'solo' },
+  { k = 'R',   h = 'R',   d = 'record arm' },
+}
+-- строки списка: индексы snap.cols; свёрнутые папки прячут детей, фильтр — по имени
+-- (с фильтром видны и треки из свёрнутых папок)
+function D.tl_rows(state, snap)
+  local cols, list, hide_below = snap and snap.cols or {}, {}, nil
+  local f = (D.TL.filter or ''):lower()
+  for ci, col in ipairs(cols) do
+    local d = col.depth or 0
+    if f ~= '' then
+      if (col.name or ''):lower():find(f, 1, true) then list[#list + 1] = ci end
+    else
+      if hide_below and d <= hide_below then hide_below = nil end
+      if not hide_below then list[#list + 1] = ci end
+      if not hide_below and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = d end
+    end
+  end
+  return list
+end
+function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
+  local TL = D.TL
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.BG); gfx.rect(x, y, w, h, 1)
   local cols = snap and snap.cols or {}
-  text(x + L.pad, y, fit(('tracks %d'):format(#cols), w - 2 * L.pad), U.GREY)
-  local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
-  -- свёрнутые папки прячут детей и здесь
-  local list, hide_below = {}, nil
-  for ci, col in ipairs(cols) do
-    local d = col.depth or 0
-    if hide_below and d <= hide_below then hide_below = nil end
-    if not hide_below then list[#list + 1] = ci end
-    if not hide_below and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = d end
-  end
-  D.tl_scroll = math.max(0, math.min(D.tl_scroll, math.max(0, #list - nvis)))
+  local list = D.tl_rows(state, snap)
+  TL.n = #list
+  TL.cur = math.max(1, math.min(TL.cur, math.max(1, #list)))
+  TL.col = math.max(1, math.min(TL.col, #D.TL_COLS))
+  -- ширина столбцов матрицы; не влезает с именем (меньше 6 знаков) — столбцы справа отпадают
+  local cw = {}
+  for i, c in ipairs(D.TL_COLS) do cw[i] = math.max(ms(c.h), ms('W')) + L.pad end
+  local ncol = #D.TL_COLS
+  local function mw(n) local s = 0; for i = 1, n do s = s + cw[i] end; return s end
+  while ncol > 1 and w - 2 * L.pad - mw(ncol) < 6 * L.cw do ncol = ncol - 1 end
+  local gx = x + w - L.pad - 3 - mw(ncol)            -- левый край матрицы (3 px — полоса прокрутки)
   local inside = mx >= x and mx < x + w and my >= y and my < y + h
+  -- строка 0: «tracks N» или фильтр, заголовки столбцов
+  local ttl = (TL.typing or TL.filter ~= '') and ('/' .. TL.filter .. (TL.typing and '_' or '')) or ('tracks %d'):format(#cols)
+  text(x + L.pad, y, fit(ttl, gx - x - 2 * L.pad), (TL.typing or TL.filter ~= '') and U.CYAN or U.GREY)
+  local cx = gx
+  for i = 1, ncol do
+    local c = D.TL_COLS[i]
+    local hot = inside and my >= y and my < y + L.rh and mx >= cx and mx < cx + cw[i]
+    local sel = foc and i == TL.col
+    text(cx + math.floor((cw[i] - ms(c.h)) / 2), y, c.h, hot and U.AMBER or (sel and U.CYAN or U.GREY))
+    if hot then hover.tlist_hdr = c.k end
+    hint('tlhdr', cx, y, cw[i], L.rh, c.k)
+    cx = cx + cw[i]
+  end
+  local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
+  TL.nvis = nvis
+  -- клавиатурный курсор — в видимых строках
+  if foc then
+    if TL.cur <= TL.scroll then TL.scroll = TL.cur - 1 end
+    if TL.cur > TL.scroll + nvis then TL.scroll = TL.cur - nvis end
+  end
+  TL.scroll = math.max(0, math.min(TL.scroll, math.max(0, #list - nvis)))
+  D.tl_scroll = TL.scroll
   if inside then hover.tlist_area = { n = #list, nvis = nvis } end
   local cf = info.vcur and L.flat and L.flat[info.vcur.fi]
   local cg = cf and cf.col and cf.col.guid
+  local get = info.tl_get
   for i = 1, nvis do
-    local ci = list[D.tl_scroll + i]
+    local li = TL.scroll + i
+    local ci = list[li]
     if not ci then break end
     local col = cols[ci]
     local ry = y + i * L.rh
     local hid = state.thide and state.thide[col.guid]
     local on = cg and col.guid == cg
+    local kc = foc and li == TL.cur
     local hot = inside and my >= ry and my < ry + L.rh
-    if on or hot then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
-    local ix = x + L.pad + (col.depth or 0) * math.floor(L.cw / 2)
+    if on or hot or kc then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end
+    local ix = x + L.pad + (TL.filter ~= '' and 0 or (col.depth or 0) * math.floor(L.cw / 2))
     if col.rgb then rawset_col(col.rgb); gfx.rect(ix, ry + 2, 3, L.rh - 4, 1) end
     ix = ix + 5
     local fw = 0
@@ -1215,12 +1274,34 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h)
       text(ix, ry, fl, fh and U.AMBER or U.CYAN)
       if fh then hover.tlist = { ci = ci, what = 'fold' } end
     end
-    text(ix + fw, ry, fit((hid and 'h ' or '') .. (col.name ~= '' and col.name or ('Track ' .. ci)), x + w - ix - fw - L.pad), on and U.AMBER or (hid and U.DIM or U.TEXT))
-    if hot and not hover.tlist then hover.tlist = { ci = ci, what = 'go' } end
-    hint('tlist', x, ry, w, L.rh, { ci = ci, what = 'go' })
+    text(ix + fw, ry, fit(col.name ~= '' and col.name or ('Track ' .. ci), gx - ix - fw - L.pad), on and U.AMBER or (hid and U.DIM or U.TEXT))
+    if hot and not hover.tlist and mx < gx then hover.tlist = { ci = ci, what = 'go', li = li } end
+    hint('tlist', x, ry, gx - x, L.rh, { ci = ci, what = 'go' })
+    -- матрица флажков: включено — буква столбца на подложке, выключено — точка
+    cx = gx
+    for k = 1, ncol do
+      local c = D.TL_COLS[k]
+      local v = get and get(col, c.k)
+      local ch = hot and mx >= cx and mx < cx + cw[k]
+      local ksel = kc and k == TL.col
+      if v then set(U.tint(c.k == 'R' and (D.ARM or U.RED) or ((c.k == 'M' or c.k == 'S') and U.AMBER or U.CYAN), ch and 0.45 or 0.28)); gfx.rect(cx + 1, ry + 1, cw[k] - 2, L.rh - 2, 1) end
+      if ch or ksel then set(ch and U.AMBER or (D.FOCUS or U.CYAN)); gfx.rect(cx + 1, ry + 1, cw[k] - 2, L.rh - 2, 0) end
+      local lbl = v and c.h or '.'
+      text(cx + math.floor((cw[k] - ms(lbl)) / 2), ry, lbl, v and U.TEXT or U.DIM)
+      if ch then hover.tlist = { ci = ci, what = 'cell', key = c.k, li = li } end
+      cx = cx + cw[k]
+    end
   end
-  if #list > nvis and D.vbar then D.vbar('tlist', x + w - 3, y + L.rh, 3, nvis * L.rh, D.tl_scroll, nvis, #list) end
+  if #list > nvis and D.vbar then D.vbar('tlist', x + w - 3, y + L.rh, 3, nvis * L.rh, TL.scroll, nvis, #list) end
+  if inside and hover.tlist_hdr then
+    for _, c in ipairs(D.TL_COLS) do if c.k == hover.tlist_hdr then hover.tlist_tip = c.d end end
+  elseif inside and hover.tlist and hover.tlist.what == 'cell' then
+    for _, c in ipairs(D.TL_COLS) do if c.k == hover.tlist.key then hover.tlist_tip = c.d end end
+  end
 end
+
+-- 11 окт: шаблоны треков — «< имя >» в шапке DSP; D.PR.cur — текущий (стрелки, выпадашка)
+D.PR = { cur = 1 }
 
 function D.route_strip(L, info, hover, x0, x1)
   local y0, h = L.route_y, L.route_h
@@ -1487,6 +1568,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local function draw_inst()
     if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
+    if not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
     else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     if L.x_slc then
@@ -2105,23 +2187,22 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local ptxt = math.abs(pan) < 0.005 and 'C' or ((pan < 0 and 'L' or 'R') .. math.floor(math.abs(pan) * 100 + 0.5))
   if yy + L.rh <= y + h then slider(yy, (pan + 1) / 2, true, 'pan', ptxt, 'pan'); yy = yy + L.rh end
   -- строки-кнопки: вход, выход, отправки
-  local function row(label, val, what, on)
+  local function row(label, val, what, on, reserve)
     if yy + L.rh > y + h then return end
     local hot = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
     if hot then set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, yy, w - 2, L.rh, 1); hover.trkio = { col = col, what = what } end
     text(x + L.pad, yy, label, U.GREY)
     local lx = x + L.pad + ms('send ') + L.pad
-    text(lx, yy, fit(val, x + w - L.pad - lx), on == false and U.GREY or U.TEXT)
+    text(lx, yy, fit(val, x + w - L.pad - lx - (reserve or 0)), on == false and U.GREY or U.TEXT)   -- 11 окт: место под кнопку справа
     yy = yy + L.rh
   end
   -- smart (4 окт: из шапки трека сюда) — кнопкой справа в строке in
   local sy0 = yy
   local sbw = ms('smart') + 2 * L.pad
   local show_smart = info.smart_ok and w > ms('in ') + 6 * L.cw + sbw + 3 * L.pad
-  row('in', (io.input:gsub(' / in ', '/'):gsub(' / ', '/')) .. ' v', 'input')
+  row('in', (io.input:gsub(' / in ', '/'):gsub(' / ', '/')) .. ' v', 'input', nil, show_smart and (sbw + L.pad) or 0)
   if show_smart and yy > sy0 then
     local sx = x + w - L.pad - sbw
-    set(U.PANEL); gfx.rect(sx - L.pad, sy0, sbw + L.pad, L.rh, 1)        -- текст входа не залезает под кнопку
     local hot = mx >= sx and mx < sx + sbw and my >= sy0 and my < sy0 + L.rh
     set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(sx, sy0 + 1, sbw, L.rh - 2, 1)
     set(hot and U.AMBER or U.DIM); gfx.rect(sx, sy0 + 1, sbw, L.rh - 2, 0)
@@ -2224,6 +2305,20 @@ function D.draw_sendpop(L, info, col, io, ax, ay, hover)
 end
 
 -- «призрак» перетаскивания (DSP-блок и т.п.): янтарная бирка у курсора
+-- режим PANE: номер листа (1..9 — фокус цифрой) у правого края его верхней строки
+function D.pane_badge(L, c, h)
+  local ns = tostring(c.num)
+  local nx = c.x + c.w - ms(ns) - L.pad - 2
+  set(U.AMBER); gfx.rect(nx - 2, c.y, ms(ns) + 4, h, 1)
+  text(nx, c.y + 1, ns, U.BG)
+end
+-- 11 окт: у трекера нет строки вкладок, и его тело рисуется после рамок —
+-- номер ставится в проходе post (поверх шапки), иначе его не видно
+function D.pane_badge_tracker(L, on)
+  local c = D.pn_tracker_cell
+  if on and L and c and c.num and c.num <= 9 then D.pane_badge(L, c, L.rh) end
+end
+
 function D.ghost(label)
   if not label then return end
   local bw = ms(label) + 2 * 6
@@ -3668,7 +3763,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local pre = ('%02d '):format(e.num or i)
-      local suf = ((not child and e.slices) and (' /' .. #e.slices) or '') .. ((e.muted and not e.depot) and ' (muted)' or '')
+      local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or '') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ((e.kit and ms('& ')) or 0))) end
       local lbl = pre .. body .. suf
       text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
@@ -3910,15 +4005,16 @@ end
 -- через закадровый буфер 1021 со сдвигом мыши.
 local function pn_buffered(x, y, w, h, fn)
   if x == 0 then return fn() end
-  if D.pnb_w ~= w or D.pnb_h ~= gfx.h then gfx.setimgdim(1021, w, gfx.h); D.pnb_w, D.pnb_h = w, gfx.h end
+  -- 11 окт: свой буфер 798 — 1021 занят буфером кадра (опция fps / big fixed cursor), переразмер ломал кадр
+  if D.pnb_w ~= w or D.pnb_h ~= gfx.h then gfx.setimgdim(798, w, gfx.h); D.pnb_w, D.pnb_h = w, gfx.h end
   local dest0, mx0 = gfx.dest, gfx.mouse_x
-  gfx.dest = 1021
+  gfx.dest = 798
   set(U.PANEL); gfx.rect(0, y, w, h, 1)
   gfx.mouse_x = mx0 - x
   local ok, res = pcall(fn)
   gfx.mouse_x, gfx.dest = mx0, dest0
   if not ok then error(res, 0) end
-  gfx.blit(1021, 1, 0, 0, y, w, h, x, y, w, h)
+  gfx.blit(798, 1, 0, 0, y, w, h, x, y, w, h)
   return res
 end
 
@@ -3933,6 +4029,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
     local id = c.active_id
     if id == 'tracker' then
       rects.tracker = { c.x, c.y, c.w, c.h }
+      D.pn_tracker_cell = c                        -- 11 окт: его номер в PANE рисуется поверх (D.pane_badge_tracker)
       if c.hint and info.hint_bars then           -- 10 окт: и у трекера своя строка клавиш (hints where = panes)
         D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
           info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
@@ -3971,12 +4068,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         end
       end
       -- режим PANE: номер листа (1..9 — фокус цифрой) у правого края рамки
-      if state.pane_mode and c.num and c.num <= 9 and c.tab then
-        local ns = tostring(c.num)
-        local nx = c.x + c.w - ms(ns) - L.pad - 2
-        set(U.AMBER); gfx.rect(nx - 2, c.y, ms(ns) + 4, c.tab.h, 1)
-        text(nx, c.y + 1, ns, U.BG)
-      end
+      if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
       if id == 'matrix' then
@@ -3988,6 +4080,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
         end
+      elseif id == 'tracks' then
+        D.track_list(L, state, snap, info, hover, ct.x + 1, ct.y + 2, ct.w - 2, ct.h - 4, foc == 'tracks')   -- 11 окт: Track Manager
       elseif id == 'pm' and info.pm_draw then
         hover.browser = info.pm_draw(L, ct.x, ct.y, ct.w, ct.h)          -- 9 окт: проекты — своя панель
       elseif id == 'browser' and info.browser_draw then
@@ -4673,14 +4767,10 @@ function D.frame(L, snap, rows, state, info)
             if not hover.mixmode and mx >= c.x and mx < c.x + c.w and my >= D.lufs_row_y and my < D.lufs_row_y + L.rh then hover.mixpk = col.track end   -- щелчок — сброс
           end
         end
-        -- ручка [-]: колпачок в рамке поверх метра, риска посередине — уровень
+        -- ручка: 11 окт — просто риска «__» во всю коробку (была колпачком в рамке)
         local hy2 = ypos(db)
-        local chh = math.max(5, math.floor(L.rh * 0.6)) | 1
-        local cy0 = hy2 - (chh >> 1)
         local hc = U.readable((hot or kon) and U.AMBER or U.TEXT, dark, 4)
-        set(dark); gfx.rect(bx0 + 1, cy0, bw0 - 2, chh, 1)
-        set(hc); gfx.rect(bx0 + 1, cy0, bw0 - 2, chh, 0)
-        gfx.rect(bx0 + 3, hy2, bw0 - 6, 1, 1)
+        set(hc); gfx.rect(bx0 + 1, hy2, bw0 - 2, 2, 1)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
@@ -4944,14 +5034,6 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
-  -- 11 окт: track list — ниша микшера слева от полос (под номерами строк)
-  if L.mix_bottom and L.mix_h > 0 then
-    local x0 = L.matrix_w or 0
-    local x1 = x0 + L.label_w
-    for _, c in ipairs(L.cols or {}) do if c.x and not c.master then x1 = c.x; break end end
-    local ty = L.mix_y + (L.route_h or 0) + 2
-    if x1 - x0 >= 8 * L.cw and L.mix_y + L.mix_h - ty >= 3 * L.rh then D.track_list(L, state, snap, info, hover, x0 + 2, ty, x1 - x0 - 4, L.mix_y + L.mix_h - ty - 2) end
-  end   -- от левого края модуля: и над мастером
   -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),
   -- источники (R зелёный), сам трек (белый), трек под строкой — янтарь, 2 px
   local rhl = info.route_hl and info.route_hl()
@@ -5003,7 +5085,9 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router);
     -- 9 окт: высокая шапка (микшер) — имя и кнопки внизу, прямо над длиной
     -- «< N >» (регион одним блоком), не под session
-    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 4) * L.rh + 1)
+    -- 11 окт: длина «< N >» — на последней строке рядом с markers, поэтому имя
+    -- встаёт над ней (на 4-строчной шапке имя и число раньше ложились в одну строку)
+    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
     if rg then
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
@@ -5018,7 +5102,7 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 2: /2 x2 dup
     if rg then
       local by2 = ny + L.rh
-      if by2 + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+      if by2 + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
         -- 7 окт: /2 x2 слева, als cln — парой справа (копии паттерна рядом)
         local x = bx
         for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
@@ -5029,36 +5113,41 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
-  -- 11 окт: последняя строка уголка — markers (выпадашка: показ маркеров и регионов)
+  -- последняя строка уголка (11 окт): «< N >» — длина региона курсора в шагах
+  -- (стрелки и колесо ±1 шаг, клик по числу — выпадашка длин), справа markers
+  -- (выпадашка: показ маркеров и регионов)
   do
     local bx, y4 = tx0 + 3, hy + (L.header_rows - 1) * L.rh + 2
-    local lbl = (ms('markers') + 2 <= L.label_w - 4) and 'markers' or 'mk'
-    local w1 = ms(lbl) + 2
-    local hot = mx >= bx and mx < bx + w1 and my >= y4 and my < y4 + L.rh
-    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y4, w1, L.rh, 1)
-    set(hot and U.AMBER or U.LINE); gfx.rect(bx, y4, w1, L.rh, 0)
-    text(bx + 1, y4, lbl, hot and U.AMBER or U.TEXT)
-    if hot then hover.viewbtn = 'markers' end
-    hint('viewbtn', bx, y4, w1, L.rh, 'markers')
-  end
-  -- длина региона курсора в шагах — предпоследняя строка шапки: «<  24  >»
-  -- одной строкой (7 окт: стрелки рядом с числом, которым управляют;
-  -- клик / колесо = ±1 шаг, ripple как :len)
-  if info.cur_region then
-    local rg = info.cur_region
-    local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
-    local bx, bw = tx0 + 1, L.label_w - 2
-    local y3 = hy + (L.header_rows - 2) * L.rh + 2
-    set(U.LINE); gfx.rect(bx, y3 - 1, bw, L.rh + 1, 0)
+    local bw = L.label_w - 4
     local aw = ms('<') + 2
-    text(bx + math.max(aw, math.floor((bw - ms(s)) / 2)), y3, fit(s, bw - 2 * aw), U.TEXT)
-    local hl = mx >= bx and mx < bx + bw / 3 and my >= y3 and my < y3 + L.rh
-    local hr = mx >= bx + bw * 2 / 3 and mx < bx + bw and my >= y3 and my < y3 + L.rh
-    text(bx + 1, y3, '<', hl and U.AMBER or U.GREY)
-    text(bx + bw - ms('>') - 1, y3, '>', hr and U.AMBER or U.GREY)
-    if hl then hover.rglen = -1 elseif hr then hover.rglen = 1
-    elseif mx >= bx and mx < bx + bw and my >= y3 and my < y3 + L.rh then hover.rglen = 0 end
-    hint('rglen', bx, y3, math.floor(bw / 2), L.rh, -1); hint('rglen', bx + math.floor(bw / 2), y3, math.floor(bw / 2), L.rh, 1)
+    local nmin = 2 * aw + ms('000') + 4                 -- поле длины не уже «< 000 >»
+    local lbl = (ms('markers') + 2 + nmin + 2 <= bw) and 'markers' or 'mk'
+    local w1 = ms(lbl) + 2
+    local mx0 = info.cur_region and (bx + bw - w1) or bx
+    local hot = mx >= mx0 and mx < mx0 + w1 and my >= y4 and my < y4 + L.rh
+    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(mx0, y4, w1, L.rh, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(mx0, y4, w1, L.rh, 0)
+    text(mx0 + 1, y4, lbl, hot and U.AMBER or U.TEXT)
+    if hot then hover.viewbtn = 'markers' end
+    hint('viewbtn', mx0, y4, w1, L.rh, 'markers')
+    D.rglen_at = nil
+    if info.cur_region then
+      local rg = info.cur_region
+      local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
+      local lw = mx0 - 2 - bx
+      local inb = my >= y4 and my < y4 + L.rh
+      local hl = inb and mx >= bx and mx < bx + aw
+      local hr = inb and mx >= bx + lw - aw and mx < bx + lw
+      local hn = inb and not hl and not hr and mx >= bx and mx < bx + lw
+      set(hn and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y4, lw, L.rh, 1)
+      set(hn and U.AMBER or U.LINE); gfx.rect(bx, y4, lw, L.rh, 0)
+      text(bx + math.max(aw, math.floor((lw - ms(s)) / 2)), y4, fit(s, lw - 2 * aw), hn and U.AMBER or U.TEXT)
+      text(bx + 1, y4, '<', hl and U.AMBER or U.GREY)
+      text(bx + lw - ms('>') - 1, y4, '>', hr and U.AMBER or U.GREY)
+      if hl then hover.rglen = -1 elseif hr then hover.rglen = 1 elseif hn then hover.rglen = 0 end
+      hint('rglen', bx, y4, aw, L.rh, -1); hint('rglen', bx + aw, y4, lw - 2 * aw, L.rh, 0); hint('rglen', bx + lw - aw, y4, aw, L.rh, 1)
+      D.rglen_at = { bx, y4 + L.rh + 1 }
+    end
   end
 
   -- тело
@@ -5794,39 +5883,78 @@ function D.frame(L, snap, rows, state, info)
         local nb = (tcol.rgb and (info.hdrfill or 'line') ~= 'off') and U.mix(D.HDR, tcol.rgb, 0.30) or D.HDR
         if tcol.rgb and (info.hdrfill or 'line') ~= 'off' then rawset_col(nb) else set(nb) end
         gfx.rect(hx, dy + 2, nw, L.rh, 1)
-        text(hx + L.pad, dy + 3, nm, U.readable(U.TEXT, nb, 4.5))
+        -- 11 окт: щелчок по имени — блок трека (R I M S, vol, pan, in, out) открыть / закрыть
+        local hot = mx >= hx and mx < hx + nw and my >= dy + 2 and my < dy + 2 + L.rh
+        if hot or info.dsptrack then set(hot and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, nw, L.rh, 0) end
+        text(hx + L.pad, dy + 3, nm, hot and U.AMBER or U.readable(U.TEXT, nb, 4.5))
+        if hot then hover.dsptrkname = true end
+        hint('dsptrkname', hx, dy + 2, nw, L.rh, true)
         hx = hx + nw + L.pad
       end
-      for _, b in ipairs({ { 'track', false, 'track fx' }, { 'take', true, 'take fx' } }) do
-        local on = (info.dsp_is_take or false) == b[2]
-        local bw = ms(b[3]) + 2 * L.pad
-        local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
-        -- track fx включена — зелёная, как FX на канале REAPER (3 окт)
-        local g = on and not b[2]
-        set(g and D.FXG_T or (hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG))); gfx.rect(hx, dy + 2, bw, L.rh, 1)
-        set(g and D.FXG or (on and U.AMBER or U.LINE)); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, b[3], g and D.FXTXT or (on and U.AMBER or (hot and U.TEXT or U.GREY)))
-        if hot then hover.dsptarget = b[1] end
-        hint('dsptarget', hx, dy + 2, bw, L.rh, b[1])
-        hx = hx + bw + L.pad
-      end
-      -- router (7 окт): цепочка с роутингом на всё окно (DSP big, zz)
-      do
-        local bw = ms('fx routing') + 2 * L.pad
-        local hot = mx >= hx and mx < hx + bw and my >= dy + 2 and my < dy + 2 + L.rh
-        set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(hx, dy + 2, bw, L.rh, 1)
-        set(hot and U.AMBER or U.LINE); gfx.rect(hx, dy + 2, bw, L.rh, 0)
-        text(hx + L.pad, dy + 3, 'fx routing', hot and U.AMBER or U.GREY)
-        if hot then hover.dsprouter = true end
-        hx = hx + bw + L.pad
+      -- 11 окт: справа в шапке — шаблоны треков «< имя >»: стрелки листают, щелчок по
+      -- имени — выпадашка (fzf), выбор вставляет трек(и) после трека курсора
+      local tr_right = DR - L.pad
+      local items = info.presets and info.presets() or {}
+      if #items > 0 then
+        local PR = D.PR
+        PR.cur = math.max(1, math.min(PR.cur or 1, #items))
+        local aw = ms('<') + 2 * L.pad
+        local nm = items[PR.cur].name
+        local nw = math.min(L.cw * 22, math.max(L.cw * 10, ms(nm) + 2 * L.pad))
+        local tw = 2 * aw + nw
+        local tx = DR - L.pad - tw
+        if tx > hx + L.cw * 12 then
+          local yb = dy + 2
+          for i, part in ipairs({ { '<', -1, tx, aw }, { nm, 0, tx + aw, nw }, { '>', 1, tx + aw + nw, aw } }) do
+            local px, pw2 = part[3], part[4]
+            local hot = mx >= px and mx < px + pw2 and my >= yb and my < yb + L.rh
+            set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(px, yb, pw2, L.rh, 1)
+            set(hot and U.AMBER or U.LINE); gfx.rect(px, yb, pw2, L.rh, 0)
+            local lbl = i == 2 and fit(part[1], pw2 - 2 * L.pad) or part[1]
+            text(px + (i == 2 and L.pad or math.floor((pw2 - ms(lbl)) / 2)), dy + 3, lbl, hot and U.AMBER or (i == 2 and U.TEXT or U.GREY))
+            if hot then hover.tmpl = part[2] end
+            hint('tmpl', px, yb, pw2, L.rh, part[2])
+          end
+          tr_right = tx - L.pad
+        end
       end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
-      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), DR - hx - L.pad), info.dsp_is_take and U.AMBER or U.GREY)
+      text(hx, dy + 3, fit((info.dsp_is_take and (info.dsp_title or '') or '') .. (#fxs == 0 and '  (no fx: pick one in the fx list, or / )' or ''), tr_right - hx), info.dsp_is_take and U.AMBER or U.GREY)
     end
     local bx = fbw + L.pad
     local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
     local mw = math.max(ms('o') + 4, 12)                -- тонкие метры (5 окт)
     local mby, mbh = dy + L.rh + 4, DH - L.rh - 6 - (L.hint_h or 0)
+    -- 11 окт: track fx / take fx / fx routing — колонкой в начале модуля, подписи
+    -- вертикально (как имена треков в матрице); шапка остаётся под имя трека
+    do
+      local vw = L.rh + 2
+      local gap = 2
+      local bh3 = math.floor((mbh - 2 * gap) / 3)
+      if bh3 >= 2 * L.cw then
+        local BT = { { 'track', false, 'track fx' }, { 'take', true, 'take fx' }, { 'route', nil, 'fx routing' } }
+        for i, b in ipairs(BT) do
+          local by = mby + (i - 1) * (bh3 + gap)
+          local hot = mx >= bx and mx < bx + vw and my >= by and my < by + bh3
+          local on = b[2] ~= nil and (info.dsp_is_take or false) == b[2]
+          local g = on and not b[2]                      -- track fx включена — зелёная, как FX на канале REAPER
+          local bg = g and D.FXG_T or (hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG))
+          local fg = g and D.FXTXT or (on and U.AMBER or (hot and U.AMBER or U.GREY))
+          set(bg); gfx.rect(bx, by, vw, bh3, 1)
+          set(g and D.FXG or ((on or hot) and U.AMBER or U.LINE)); gfx.rect(bx, by, vw, bh3, 0)
+          local tl = math.min(ms(b[3]), bh3 - 4)
+          D.vtext(bx + math.floor((vw - TH()) / 2), by + math.floor((bh3 - tl) / 2), tl, b[3], mono(fg), mono(bg))
+          if b[2] == nil then
+            if hot then hover.dsprouter = true end
+            hint('dsprouting', bx, by, vw, bh3, 'route')
+          else
+            if hot then hover.dsptarget = b[1] end
+            hint('dsptarget', bx, by, vw, bh3, b[1])
+          end
+        end
+        bx = bx + vw + L.pad
+      end
+    end
     if lvl then
       D.dsp_meter(L, bx, mby, mw, mbh, lvl.src == 'in' and 'i' or 'p', lvl.inp, 'in', hover)
       bx = bx + mw + L.pad
@@ -5848,7 +5976,9 @@ function D.frame(L, snap, rows, state, info)
     -- сколько блоков за краем (клик — выбрать ближний скрытый)
     local right = DR - (lvl and (mw + L.pad) or 0)
     local stubw = ms('99>') + 2 * L.pad
-    local bh0 = DH - L.rh - 6 - (L.hint_h or 0)
+    -- 11 окт: под блоками — полоса прокрутки цепочки (вместо кнопок «<N» / «N>»)
+    local sbh = (D.SBW or 3) + 4
+    local bh0 = DH - L.rh - 6 - (L.hint_h or 0) - sbh
     local function ncol_of(f)
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
@@ -5857,12 +5987,22 @@ function D.frame(L, snap, rows, state, info)
       end
       return f.cols or 1
     end
-    local first = 1
-    if sel.fx and sel.fx > 1 and sel.fx <= #fxs then
-      local sum = 0
-      for k = 1, sel.fx do sum = sum + L.cw * 14 + L.pad end      -- по самой узкой колонке
-      while first < sel.fx and bx + stubw + sum > right - stubw do sum = sum - L.cw * 14 - L.pad; first = first + 1 end
+    -- первый видимый блок — D.dsp_first (полоса прокрутки); выбор другого эффекта
+    -- подтягивает его в поле зрения, прокрутка мимо выбора его не трогает
+    local first = D.dsp_first or 1
+    if sel.fx ~= D.dsp_sel_last then
+      D.dsp_sel_last = sel.fx
+      if sel.fx and sel.fx >= 1 and sel.fx <= #fxs then
+        local est = 1
+        local sum = 0
+        for k = 1, sel.fx do sum = sum + L.cw * 14 + L.pad end      -- по самой узкой колонке
+        while est < sel.fx and bx + sum > right do sum = sum - L.cw * 14 - L.pad; est = est + 1 end
+        if sel.fx < first then first = sel.fx elseif est > first then first = est end
+      end
     end
+    first = math.max(1, math.min(first, math.max(1, #fxs)))
+    D.dsp_first = first
+    local sb_x0, nshown = bx, 0
     local function stub(x, label, k, at_right)
       local sy = dy + 3 + L.rh
       local hot = not drag and mx >= x and mx < x + stubw and my >= sy and my < sy + bh0
@@ -5872,7 +6012,6 @@ function D.frame(L, snap, rows, state, info)
       if hot then hover.dsp = { fx = k, f = fxs[k] } end
       hint('dsp', x, sy, stubw, L.rh, { fx = k })
     end
-    if first > 1 then stub(bx, '<' .. (first - 1), first - 1); bx = bx + stubw + L.pad end
     -- роутер (7 окт): в панели DSP FX вместо блоков — схема цепочки (имена и
     -- кабели), прокрутка по горизонтали; метры in / out остаются по краям
     if info.dsp_router and info.draw_router then
@@ -5893,13 +6032,11 @@ function D.frame(L, snap, rows, state, info)
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
-      local room = right - ((k < #fxs) and (stubw + L.pad) or 0)
+      local room = right
       if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = 1 end
       local bw = bw1 * ncol
-      if bx + bw > room then
-        if bx + stubw <= right then stub(bx, (#fxs - k + 1) .. '>', k, true); bx = bx + stubw + L.pad end
-        break
-      end
+      if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
+      nshown = nshown + 1
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
@@ -6019,16 +6156,12 @@ function D.frame(L, snap, rows, state, info)
       end
       local grp = f.groups and f.rows and nfit - 1 >= f.rows
       if grp then nfit = f.rows; aw_off = wtop + L.rh end
-      if awi and nfit > 2 then
-        nfit = nfit - 1; aw_off = L.rh
-        local ay = by + L.rh + 1
-        local tag = awi.cat ~= '' and ('[' .. awi.cat .. '] ') or ''
-        local ccol = D.aw_colour(awi.cat)
-        text(bx + L.pad, ay, fit(tag, bw - 2 * L.pad), ccol)
-        -- описание — в статус (5 окт): под мышью или выбранный блок
+      if awi then
+        -- 11 окт: строки «[категория]» в блоке нет — категория и описание только в
+        -- статусе внизу (под мышью или выбранный блок), блок — под параметры
         local over = mx >= bx and mx < bx + bw and my >= by and my < by + bh
         if (over or (is_sel and not D.aw_status)) and (awi.desc or '') ~= '' then
-          D.aw_status = (f.airwin or '') .. ' ' .. tag .. awi.desc
+          D.aw_status = (f.airwin or '') .. (awi.cat ~= '' and (' - ' .. awi.cat) or '') .. ': ' .. awi.desc
         end
       end
       local pcol0 = 0
@@ -6052,7 +6185,75 @@ function D.frame(L, snap, rows, state, info)
           local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
           return fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), w0)
         end
-        if #f.kids > 0 and ncol >= (f.cols or 1) then
+        if f.kit and ncol >= 2 then
+          -- 11 окт: кит RS5K — слева «all» и слайсы строками (имя, нота, громкость), щелчок —
+          -- выбрать; справа свойства выбранного слайса тем же модулем RS5K. all — общий
+          -- контроль: показаны параметры первого слайса, запись идёт на все (ctx.fx_write)
+          D.kit_sel = D.kit_sel or {}
+          local kkey = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.i)
+          local ks = math.max(0, math.min(#f.kids, D.kit_sel[kkey] or 0))
+          f.kit_all = ks == 0
+          set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
+          local hy = by + L.rh + 1
+          local function kv(ki, want)
+            for pi, p in ipairs(f.params) do
+              if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return vals[pi] and vals[pi].s or '' end
+            end
+            return ''
+          end
+          text(bx + L.pad, hy, fit(('%d$'):format(#f.kids), bw1 - 2 * L.pad), U.GREY)
+          local nrow = math.max(1, math.floor((bh - 2 * L.rh - 4) / L.rh))
+          D.kit_scroll = D.kit_scroll or {}
+          local sc = D.kit_scroll[kkey] or 0
+          local total = #f.kids + 1                           -- строка all + слайсы
+          if ks + 1 <= sc then sc = ks elseif ks + 1 > sc + nrow then sc = ks + 1 - nrow end
+          sc = math.max(0, math.min(sc, math.max(0, total - nrow)))
+          D.kit_scroll[kkey] = sc
+          for r = 1, nrow do
+            local ki = sc + r - 1                             -- 0 = all
+            if ki > #f.kids then break end
+            local kid = ki > 0 and f.kids[ki] or nil
+            local ry = hy + r * L.rh
+            local hot = not drag and mx >= bx and mx < bx + bw1 and my >= ry and my < ry + L.rh
+            local on = ki == ks
+            if on or hot then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(bx + 2, ry, bw1 - 3, L.rh, 1) end
+            if kid then
+              local nm = (kid.name or ''):match('^(%S+)') or ('S%02d'):format(ki)
+              local note = kv(ki, 'note range start'); if note == '' then note = kv(ki, 'note lo') end
+              local line = ('%-4s %-4s %s'):format(nm, note, kv(ki, 'volume'))
+              text(bx + L.pad, ry, fit((kid.enabled and '' or '(off) ') .. line, bw1 - 2 * L.pad), kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM)
+              if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+            else
+              text(bx + L.pad, ry, fit('all  - every slice at once', bw1 - 2 * L.pad), on and U.AMBER or (hot and U.TEXT or U.CYAN))
+              if hot then hover.dspkit = { k = k, key = kkey, ki = 0 } end
+            end
+            hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
+          end
+          set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1)
+          -- шапка второй колонки: выбранный слайс с B / x, или all
+          local cx = bx + bw1
+          local kid = ks > 0 and f.kids[ks] or nil
+          if kid then
+            local kb2 = ms('x') + 2 * L.pad
+            for _, b in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
+              local hb = not drag and mx >= b[3] and mx < b[3] + kb2 and my >= hy and my < hy + L.rh
+              local lit = b[2] == 'kbypass' and not kid.enabled
+              set(hb and U.tint(b[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b[3], hy, kb2, L.rh - 1, 1)
+              set(hb and (b[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b[3], hy, kb2, L.rh - 1, 0)
+              text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+              if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
+            end
+            text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4), kid.enabled and U.CYAN or U.GREY)
+          else
+            text(cx + L.pad, hy, fit(('all %d slices - a change goes to every RS5K'):format(#f.kids), bw1 - 2 * L.pad), U.AMBER)
+          end
+          cl = {}
+          local show = ks > 0 and ks or 1
+          local cnt = 0
+          for pi, p in ipairs(f.params) do
+            if p.kid == show and not p.macro then cl[pi] = { 1, cnt }; cnt = cnt + 1 else cl[pi] = { 99, 0 } end
+          end
+        elseif #f.kids > 0 and ncol >= (f.cols or 1) then
           -- развёрнут (6 окт): контейнер — рамка, внутри колонка на каждый
           -- плагин: имя (| за предыдущим, = параллельно, + с суммой) и его
           -- параметры тем же модулем, что на верхнем уровне; макросы — первой
@@ -6492,6 +6693,25 @@ function D.frame(L, snap, rows, state, info)
       end
       ::next_block::
     end
+    -- полоса прокрутки цепочки (11 окт): ползунок = видимые блоки из всех; тянуть,
+    -- клик мимо — страница, колесо над полосой — на блок
+    hover.dsphsb = nil
+    if not (info.dsp_router and info.draw_router) and #fxs > 0 and (first > 1 or first + nshown - 1 < #fxs) then
+      local x0, w = sb_x0, right - sb_x0 - L.pad
+      local sy = dy + 3 + L.rh + bh0 + 2
+      local h = D.SBW or 3
+      if w > 20 then
+        local n = #fxs
+        local tw = math.max(12, math.floor(w * math.max(1, nshown) / n))
+        local tx = x0 + math.floor((w - tw) * ((first - 1) / math.max(1, n - math.max(1, nshown))))
+        tx = math.max(x0, math.min(tx, x0 + w - tw))
+        local inbar = mx >= x0 and mx < x0 + w and my >= sy - 2 and my < sy + h + 2
+        local onthumb = inbar and mx >= tx and mx < tx + tw
+        set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x0, sy + math.floor(h / 2), w, 1, 1)
+        set((onthumb or D.dsphsb_drag) and U.AMBER or U.GREY); gfx.rect(tx, sy, tw, h, 1)
+        if inbar then hover.dsphsb = { thumb = onthumb, w = w, n = n, page = math.max(1, nshown), dir = mx < tx and -1 or 1 } end
+      end
+    end
     ::dsp_router_done::
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
     if lvl then
@@ -6731,9 +6951,13 @@ function D.frame(L, snap, rows, state, info)
   -- keycaster (4 окт): последние нажатия в пустой правой части тела трекера —
   -- новое снизу, старое поднимается и гаснет (info.keycast: { label, t, n })
   if info.keycast and #info.keycast > 0 and L.cols and #L.cols > 0 then
+    -- 11 окт: последняя колонка L.cols — мастер у правого края (mtrack); keycast —
+    -- после последнего обычного трека, иначе его зона начиналась за окном
     local lc = L.cols[#L.cols]
+    for k = #L.cols, 1, -1 do if not L.cols[k].master then lc = L.cols[k]; break end end
     local kx0 = (lc.x or 0) + (lc.w or 0) + 2 * L.pad
-    local kx1 = W - L.pad
+    -- 11 окт: мастер справа (колонка Tempo у края) — keycast до него, а не до края окна
+    local kx1 = (L.master_right and L.cols_r or W) - L.pad
     local now = info.now or 0
     -- свой масштаб (4 окт: keys - / keys + в главном модуле)
     local s0, kcs = D.SCALE, (info.keycast_scale or 0) > 0 and info.keycast_scale or nil
