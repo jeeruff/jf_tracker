@@ -5873,6 +5873,23 @@ ctx = {
     local ks = state.kslider
     local ch = c > 0 and c < 256 and string.char(c) or ''
     if c == 1818584692 then ch = 'h' elseif c == 1919379572 then ch = 'l' elseif c == 1685026670 then ch = 'j' elseif c == 30064 then ch = 'k' end   -- стрелки
+    -- 11 окт: слайдер транспорта (скорость / свинг): h l шаг, H L мелко, 0 сброс, Esc / Enter — выход
+    if ks.ctrl then
+      if c == 27 or c == 13 then state.kslider = nil; vim.msg = ''; return true end
+      if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' then
+        local d = (ch == 'h' or ch == 'H') and -1 or 1
+        if ks.ctrl == 'ratebar' then
+          local r = math.max(0.25, math.min(4, reaper.Master_GetPlayRate(0) + d * ((ch == 'H' or ch == 'L') and 0.01 or 0.05)))
+          reaper.CSurf_OnPlayRateChange(r); vim.msg = ('playrate x%.2f'):format(r)
+        else ctrl_action('swingbar', d * ((ch == 'H' or ch == 'L') and 1 or 5)) end
+        return true
+      end
+      if ch == '0' then
+        if ks.ctrl == 'ratebar' then reaper.CSurf_OnPlayRateChange(1); vim.msg = 'playrate x1.00' else edit.swing_set(false, 0); vim.msg = 'swing off' end
+        return true
+      end
+      return false
+    end
     -- 8 окт: фейдер микшера (f на фейдере) — k j громкость, h l панорама
     -- (у dual pan — левая), Shift — мелкий шаг; 0 — сброс громкости
     if state.mixer and ks.what == 'vol' then
@@ -5917,7 +5934,7 @@ ctx = {
       list[#list + 1] = { key = s[1], label = ('%d/%d'):format(s[2], s[3]) .. ((s[2] == n0 and s[3] == d0) and '  *' or ''), fn = function() ctx.sig_cmd(('%d/%d'):format(s[2], s[3])) end }
     end
     list[#list + 1] = { key = 'c', label = 'other ... (:sig N/D)', fn = function() ctx.sig_prompt() end }
-    vim.open_hydra({ title = 'time signature', items = list })
+    vim.open_hydra({ title = 'time signature', items = list, how = 'f + the label of sig, then 3 / 4 / 7 … - or :sig 7/8 (:sig 7/8 here - only this pattern); wheel on sig steps the numerator' })
     state.popup_at = { kind = 'strip', id = 'sig' }
   end,
   -- колесо по размеру: числитель ±1 сразу на весь проект, ноты как есть (сетка пересчитывается)
@@ -6222,6 +6239,41 @@ ctx = {
     end
     vim.msg = on and 'rec follows selection: the selected tracks are armed (REAPER auto record-arm on every track)' or 'rec follows selection off'
     return n
+  end,
+  -- 11 окт: метроном как в REAPER: вкл, скорость, паттерн долей (TimeMap_GetMetronomePattern), отсчёт, окно настроек
+  metro_menu = function()
+    local items = {}
+    local function act(name, key, label)
+      local id = ctx.cmd_exact(name); if not id then return end
+      local on = reaper.GetToggleCommandState(id) == 1
+      items[#items + 1] = { key = key, label = label .. (on and '  (on)' or ''), fn = function() reaper.Main_OnCommand(id, 0) end }
+    end
+    act('Options: Toggle metronome', 'm', 'metronome')
+    act('Options: Set metronome speed to 0.5x', '5', 'speed x0.5 (half notes)')
+    act('Options: Set metronome speed to 1x', '1', 'speed x1')
+    act('Options: Set metronome speed to 2x', '2', 'speed x2 (eighths)')
+    act('Options: Set metronome speed to 4x', '4', 'speed x4 (sixteenths)')
+    -- паттерн: группы долей у текущего числителя (буквы A B C … — доля в группе, A — сильная)
+    local pos = reaper.GetCursorPosition()
+    local cur = select(2, reaper.TimeMap_GetMetronomePattern(0, pos, 'EXTENDED')) or ''
+    local num = beat_info and beat_info.num or 4
+    local function pat(groups) local t = {}; for _, g in ipairs(groups) do for k = 1, g do t[#t + 1] = string.char(64 + k) end end; return table.concat(t) end
+    local opts = { { 'a', 'accent on 1', { num } }, { 'e', 'every beat accented', (function() local t = {}; for _ = 1, num do t[#t + 1] = 1 end; return t end)() } }
+    if num % 2 == 0 and num > 2 then local t = {}; for _ = 1, num // 2 do t[#t + 1] = 2 end; opts[#opts + 1] = { 'w', 'in twos (2+2…)', t } end
+    if num % 3 == 0 and num > 3 then local t = {}; for _ = 1, num // 3 do t[#t + 1] = 3 end; opts[#opts + 1] = { 't', 'in threes (3+3…)', t } end
+    if num == 5 then opts[#opts + 1] = { 'f', '3+2', { 3, 2 } }; opts[#opts + 1] = { 'g', '2+3', { 2, 3 } } end
+    if num == 7 then opts[#opts + 1] = { 's', '3+4', { 3, 4 } }; opts[#opts + 1] = { 'v', '4+3', { 4, 3 } }; opts[#opts + 1] = { 'x', '2+2+3', { 2, 2, 3 } } end
+    if num == 8 then opts[#opts + 1] = { 'b', '3+3+2', { 3, 3, 2 } } end
+    for _, o in ipairs(opts) do
+      local sp = pat(o[3])
+      items[#items + 1] = { key = o[1], label = 'pattern ' .. o[2] .. '  ' .. sp .. (cur:upper():gsub('[^A-Z]', '') == sp and '  (on)' or ''), fn = function()
+        reaper.TimeMap_GetMetronomePattern(0, pos, 'SET:' .. sp); vim.msg = 'metronome pattern ' .. sp end }
+    end
+    act('Pre-roll: toggle pre-roll on record', 'r', 'pre-roll before recording')
+    act('Pre-roll: toggle pre-roll on play', 'p', 'pre-roll before playback')
+    act('Options: Show metronome/pre-roll settings', 'o', 'all settings (count-in, sounds, volume) …')
+    vim.open_hydra({ title = 'metronome', items = items, how = 'click metro in the transport, or f + its label, then the letter' })
+    state.popup_at = { kind = 'strip', id = 'metro' }
   end,
   -- 11 окт: подписи кнопок
   frz_label = function(len)
@@ -9983,6 +10035,9 @@ local function hint_go(t)
     elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'loop' then retro_loop() elseif d == 'add' then ctx.retro_add() end
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'recbtn' then ctx.set_focus('top'); state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
+  elseif t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar') then   -- 11 окт: фейдер транспорта по f — с клавиатуры
+    state.kslider = { ctrl = d }
+    vim.msg = (d == 'ratebar' and 'playrate' or 'swing') .. ': h l change (H L fine), 0 reset, Esc done'
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
@@ -11513,7 +11568,16 @@ function ctrl_action(name, delta)
   elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
-  elseif name == 'play' then if delta == 0 then edit.play_stop() end
+  elseif name == 'play' then
+    if delta == 0 then edit.play_stop()
+    else
+      -- 11 окт: колесо по времени — джог: на долю (Shift — на строку); при воспроизведении — туда же и звук
+      local pos = reaper.GetPlayState() & 1 == 1 and reaper.GetPlayPosition() or reaper.GetCursorPosition()
+      local qn = reaper.TimeMap2_timeToQN(0, pos)
+      local step = (gfx.mouse_cap & 8 == 8) and (1 / math.max(1, state.lpb)) or 1
+      local nq = math.max(0, (delta > 0 and math.floor(qn / step + 1e-6) + 1 or math.ceil(qn / step - 1e-6) - 1) * step)
+      reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, nq), true, true)
+    end
   -- 11 окт: скорость проекта (playrate) — щелчок: выпадашка, колесо ±0.05
   elseif name == 'rate' then
     if delta ~= 0 then
@@ -11572,7 +11636,7 @@ function ctrl_action(name, delta)
     local order = { off = 'line', line = 'header', header = 'full', full = 'off' }
     local back = { off = 'full', line = 'off', header = 'line', full = 'header' }
     state.hdrfill = (delta < 0 and back or order)[state.hdrfill or 'line']; vim.msg = 'track header colour: ' .. state.hdrfill
-  elseif name == 'metro' then if delta == 0 then reaper.Main_OnCommand(40364, 0) end      -- Options: Toggle metronome
+  elseif name == 'metro' then if delta == 0 then ctx.metro_menu() end      -- 11 окт: метроном — полная выпадашка (вкл — первым пунктом)
   elseif name == 'debug' then
     state.debug = not state.debug
     vim.msg = state.debug and ('debug on: log -> ' .. ctx.dlog_path) or 'debug off'

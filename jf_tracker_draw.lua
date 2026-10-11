@@ -2964,9 +2964,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     return gw
   end
-  local function draw_group(g, gx, gw)
+  local function draw_group(g, gx, gw, y0)
     for ri, row in ipairs(g) do
-      local cx, cy = gx, ly + (ri - 1) * L.rh
+      local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh
       for _, it in ipairs(row) do
         local iw = cw_of(it)
         local hot = cell_hot(cx, cy, iw, L.rh)
@@ -3108,6 +3108,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local bigw = 0
   if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
   local function draw_big(bx)
+    local bx0 = bx
     for _, b in ipairs(big) do
       local hot = cell_hot(bx, ly, b.w, 2 * L.rh)
       D.big_text(bx, ly, b[2], hot and U.AMBER or b[3], 2)
@@ -3115,6 +3116,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
       bx = bx + b.w + 3 * L.pad
     end
+    -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
+    if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2) end
   end
   -- порядок блоков
   local by_id = {}
@@ -3123,9 +3126,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   addg('step')
   order[#order + 1] = { w = btot, draw = draw_buttons }
-  if big then order[#order + 1] = { w = bigw, draw = draw_big } else addg('play') end
+  -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
+  if big and c.tpfull and by_id.sig then
+    local g = by_id.sig
+    D.sig_line = { { g[1][1], g[1][2], g[2][1] } }
+  else D.sig_line = nil end
+  local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
+  if big then order[#order + 1] = { w = bigw2, draw = draw_big } else addg('play') end
   addg('rate')                                   -- 11 окт: скорость проекта
-  addg('sig'); addg('punch')       -- 9 окт: LPB — в блоке step; блок размера такта начинается с sig
+  if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
+  addg('punch')       -- 9 окт: LPB — в блоке step; блок размера такта начинается с sig
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
   local last = by_id.swing and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   local right = x + w - L.pad

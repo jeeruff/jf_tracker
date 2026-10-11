@@ -2285,6 +2285,8 @@ function V.popup()
     for _, it in ipairs(V.hydra.items or {}) do
       lines[#lines + 1] = { key = it.key, text = it.label .. ((it.sub and not it.label:find('…', 1, true)) and ' …' or ''), hk = it.hk }   -- 9 окт: без двойного …
     end
+    -- 11 окт: хинты включены — внизу меню «как сюда быстро» (h.how): для мышечной памяти
+    if V.hydra.how and ctx.state and ctx.state.hints then lines[#lines + 1] = { key = ' ', text = 'fast: ' .. V.hydra.how, col = { 0.55, 0.55, 0.55 } } end
     return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
   elseif V.mode == 'cmd' then
     local matches, word = V.cmd_matches(V.cmdline)
