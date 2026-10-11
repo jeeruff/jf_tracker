@@ -5602,6 +5602,20 @@ ctx = {
     return F
   end,
   -- кадр: проект → модель, сцены за плейхедом, отправка странице, сохранение
+  -- 11 окт: jf_visor_macros на мастере — 16 источников матрицы visor (0 — нет плагина)
+  visor_macros = function()
+    local cc = reaper.GetProjectStateChangeCount(0)
+    if ctx.vzm_cc ~= cc then
+      ctx.vzm_cc = cc
+      local mt = reaper.GetMasterTrack(0)
+      ctx.vzm_fx = mt and reaper.TrackFX_GetByName(mt, 'jf_visor_macros', false) or -1
+    end
+    return (ctx.vzm_fx or -1) >= 0 and 16 or 0
+  end,
+  visor_macro = function(k)
+    if (ctx.vzm_fx or -1) < 0 then return 0 end
+    return reaper.TrackFX_GetParamNormalized(reaper.GetMasterTrack(0), ctx.vzm_fx, k - 1) or 0
+  end,
   -- 11 окт: колонка visor в матрице — когда visor включён, есть сцены слотов или события v:
   visor_col_on = function()
     local VZ = MX.VZ
@@ -5731,6 +5745,7 @@ ctx = {
     elseif ctx.vz_rg then ctx.vz_rg = nil end
     if VZ.on and now - (ctx.vz_t or 0) >= 0.03 then
       ctx.vz_t = now
+      VZ.env_macro = ctx.visor_macro                   -- 11 окт: M1..M16 — ручки jf_visor_macros на мастере
       VZ.frame({ t = now, peak = ctx.visor_peak, set = function(k, v) reaper.SetExtState(VZ.SECTION, k, v, false) end })
     end
     if VZ.dirty and now - (ctx.vz_save or 0) > 0.5 then
@@ -5757,6 +5772,16 @@ ctx = {
       local url = 'http://localhost:8080/isf/index.html'
       if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url); vim.msg = 'visor: page opened - F fullscreen, H hides the HUD'
       else vim.msg = 'visor: open ' .. url .. ' in a browser (needs SWS for the button)' end
+    elseif k == 'macros' then
+      -- 11 окт: макросы — 16 ручек на мастере; их огибающие — колонки мастера в трекере
+      local mt = reaper.GetMasterTrack(0)
+      if ctx.visor_macros() == 0 then
+        edit.run('visor macros', function() reaper.TrackFX_AddByName(mt, 'JS:jf_visor_macros', false, -1) end)
+        ctx.vzm_cc = nil; model.invalidate()
+        vim.msg = ctx.visor_macros() > 0 and 'visor macros on the master: M1..M16 in the matrix (M); a+ on the master - their automation columns'
+          or 'visor macros: the JSFX did not load (Effects/jf_visor_macros.jsfx)'
+      elseif L.mcol then ctx.automation_picker(L.mcol.col)
+      else vim.msg = 'visor macros: show the master column (option show master) for their automation' end
     elseif k == 'blend' then VZ.key(('b'):byte())
     elseif k == 'follow' then ctx.visor_do(VZ.key(('S'):byte()))
     elseif k == 'res' or k == 'fps' then

@@ -909,6 +909,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   b('scene', env.scene_has, 'scene_save', 'save everything as the scene of the cursor slot ' .. (env.scene or '') .. ' (s); with follow it comes back when the playhead enters the slot')
   b('follow', st.follow, 'follow', 'scenes follow the slot under the playhead (S)')
   b('matrix', VZ.mxv, 'mxtoggle', 'modulation matrix (M): sources - LFO 1-4, track peaks, macros - into the parameters of the selected layer')
+  b('macros', (env.macros or 0) > 0, 'macros', (env.macros or 0) > 0 and 'macros M1..M16 (jf_visor_macros on the master): click - pick one to show as an automation column of the master' or 'macros: click - put 16 knobs (jf_visor_macros) on the master; their automation in the tracker drives the matrix rows M1..M16')
   b(('res %d%%'):format(math.floor((st.scale or 0.3) * 100 + 0.5)), false, 'res', 'render resolution of the page: click - next (lower is lighter for the GPU)')
   b(('fps %d'):format(st.fps or 60), false, 'fps', 'frame rate cap of the page: click - next')
   local top = by + rh + 4
