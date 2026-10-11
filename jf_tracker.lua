@@ -7251,6 +7251,13 @@ ctx = {
     local cell = grid and grid[ri] and grid[ri][ci]
     local head
     for _, e in ipairs(cell and cell.ev or {}) do if e.head then head = e.head; break end end
+    -- 11 окт: клип виден и в трекере — курсор на первую строку слота, колонка трека клипа
+    local rg, vc = seq[ri], ctx.ss_V().cols[ci]
+    if rg and vc and snap then
+      local mci
+      for k, c in ipairs(snap.cols) do if c == vc or c == vc.col or c.track == vc.track then mci = k; break end end
+      if mci then MX.cur.ri, MX.cur.ci = ri, mci; ctx.scroll_to(rg.r0, mci); ctx.region_cursor(rg) end
+    end
     local prev = state.ss_clip and state.ss_clip.prev or vim.inst
     state.ss_clip = head and { item = head.item, prev = prev } or nil
     if not head then return end

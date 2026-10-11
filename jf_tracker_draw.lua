@@ -2838,7 +2838,7 @@ function D.transport_sub(c)
   local frz = c.frz and ('frz %s'):format(c.frz) or 'freeze'
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
-           { 'slowplay', 'slow', c.halfplay and U.TEXT or nil, U.TEXT },
+           { 'slowplay', 'slow', (c.halfplay and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },   -- включена — мигает, шрифт обычный
            { 'smartrec', 'smart', c.smartrec and U.RED or nil },
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
 end
