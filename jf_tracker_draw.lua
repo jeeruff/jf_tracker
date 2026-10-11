@@ -694,6 +694,7 @@ function D.layout(snap, state, nregions)
     local depth = col.depth or 0
     if hide_below and depth <= hide_below then hide_below = nil end
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
+      or (state.thide ~= nil and state.thide[col.guid] == true)                 -- 11 окт: скрыт в track list
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.cols_r
     -- PT-mode (3 окт): ровно 4 канала от прокрутки
@@ -1171,6 +1172,56 @@ end
 -- в каждой колонке — дорожки выходов (сенды, аппаратные) с вертикальными
 -- именами, под ними провода к колонке получателя (цвет получателя). Щелчок
 -- по дорожке — меню маршрутизации трека. Высота — по длинному имени (D.rt_need)
+-- 11 окт: track list (ниша микшера): все треки — отступ по вложенности, цвет, папка
+-- > / -, имя; курсорный — янтарём, скрытые в трекере — тускло (h). Щелчок — к треку,
+-- по > / - — свернуть папку, ПКМ — скрыть / показать в трекере, колесо — листать
+D.tl_scroll = 0
+function D.track_list(L, state, snap, info, hover, x, y, w, h)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  set(U.BG); gfx.rect(x, y, w, h, 1)
+  local cols = snap and snap.cols or {}
+  text(x + L.pad, y, fit(('tracks %d'):format(#cols), w - 2 * L.pad), U.GREY)
+  local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
+  -- свёрнутые папки прячут детей и здесь
+  local list, hide_below = {}, nil
+  for ci, col in ipairs(cols) do
+    local d = col.depth or 0
+    if hide_below and d <= hide_below then hide_below = nil end
+    if not hide_below then list[#list + 1] = ci end
+    if not hide_below and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = d end
+  end
+  D.tl_scroll = math.max(0, math.min(D.tl_scroll, math.max(0, #list - nvis)))
+  local inside = mx >= x and mx < x + w and my >= y and my < y + h
+  if inside then hover.tlist_area = { n = #list, nvis = nvis } end
+  local cf = info.vcur and L.flat and L.flat[info.vcur.fi]
+  local cg = cf and cf.col and cf.col.guid
+  for i = 1, nvis do
+    local ci = list[D.tl_scroll + i]
+    if not ci then break end
+    local col = cols[ci]
+    local ry = y + i * L.rh
+    local hid = state.thide and state.thide[col.guid]
+    local on = cg and col.guid == cg
+    local hot = inside and my >= ry and my < ry + L.rh
+    if on or hot then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+    local ix = x + L.pad + (col.depth or 0) * math.floor(L.cw / 2)
+    if col.rgb then rawset_col(col.rgb); gfx.rect(ix, ry + 2, 3, L.rh - 4, 1) end
+    ix = ix + 5
+    local fw = 0
+    if col.folder then
+      local fl = (state.fcollapse and state.fcollapse[col.guid]) and '>' or '-'
+      fw = ms(fl) + L.pad
+      local fh = hot and mx >= ix and mx < ix + fw
+      text(ix, ry, fl, fh and U.AMBER or U.CYAN)
+      if fh then hover.tlist = { ci = ci, what = 'fold' } end
+    end
+    text(ix + fw, ry, fit((hid and 'h ' or '') .. (col.name ~= '' and col.name or ('Track ' .. ci)), x + w - ix - fw - L.pad), on and U.AMBER or (hid and U.DIM or U.TEXT))
+    if hot and not hover.tlist then hover.tlist = { ci = ci, what = 'go' } end
+    hint('tlist', x, ry, w, L.rh, { ci = ci, what = 'go' })
+  end
+  if #list > nvis and D.vbar then D.vbar('tlist', x + w - 3, y + L.rh, 3, nvis * L.rh, D.tl_scroll, nvis, #list) end
+end
+
 function D.route_strip(L, info, hover, x0, x1)
   local y0, h = L.route_y, L.route_h
   if not y0 or h <= 0 then return end
@@ -4892,7 +4943,15 @@ function D.frame(L, snap, rows, state, info)
       if c.x and c.ci and not c.master then set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1) end
     end
   end
-  if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end   -- от левого края модуля: и над мастером
+  if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
+  -- 11 окт: track list — ниша микшера слева от полос (под номерами строк)
+  if L.mix_bottom and L.mix_h > 0 then
+    local x0 = L.matrix_w or 0
+    local x1 = x0 + L.label_w
+    for _, c in ipairs(L.cols or {}) do if c.x and not c.master then x1 = c.x; break end end
+    local ty = L.mix_y + (L.route_h or 0) + 2
+    if x1 - x0 >= 8 * L.cw and L.mix_y + L.mix_h - ty >= 3 * L.rh then D.track_list(L, state, snap, info, hover, x0 + 2, ty, x1 - x0 - 4, L.mix_y + L.mix_h - ty - 2) end
+  end   -- от левого края модуля: и над мастером
   -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),
   -- источники (R зелёный), сам трек (белый), трек под строкой — янтарь, 2 px
   local rhl = info.route_hl and info.route_hl()

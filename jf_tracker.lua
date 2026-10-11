@@ -296,6 +296,7 @@ local state = {
   notes_open = flag('notes', false),            -- редактор заметок в главном модуле (3 окт; раньше — на месте списка эффектов)
   view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
+  thide = {},                                   -- 11 окт: guid → скрыт в трекере (track list, ПКМ)
 }
 -- быстрая опция dB marks (9 окт): один раз — рядом с mixer в сохранённых быстрых опциях
 -- 9 окт: быстрая опция jumps (линейка прыжков) — в первую колонку быстрых
@@ -431,6 +432,7 @@ for g in tostring(ext('folds', '')):gmatch('[^,]+') do
   if id then state.folds[id] = (m == 'm') and 'mini' or true end
 end
 for g in tostring(ext('fcollapse', '')):gmatch('[^,]+') do state.fcollapse[g] = true end
+for g in tostring(ext('thide', '')):gmatch('[^,]+') do state.thide[g] = true end
 for g, m in tostring(ext('pitchmodes', '')):gmatch('([^,=]+)=([^,]+)') do state.pitchmodes[g] = m end
 
 local MY_ID = ('%d-%06d'):format(os.time(), math.floor((reaper.time_precise() % 1) * 1e6))
@@ -631,6 +633,7 @@ local function save_win()
   local fc = {}
   for g, v in pairs(state.fcollapse) do if v then fc[#fc + 1] = g end end
   S('fcollapse', table.concat(fc, ','))
+  do local th = {}; for g, v in pairs(state.thide or {}) do if v then th[#th + 1] = g end end; S('thide', table.concat(th, ',')) end
   S('browse', B.root or '')
 end
 
@@ -3937,6 +3940,25 @@ ctx = {
     vim.msg = ('dsp: %s - %s'):format(d.col and d.col.name or '', f and f.name or '')
   end,
   -- 11 окт: кнопка markers в уголке — показ маркеров и регионов (вкл / выкл, отметка on)
+  -- 11 окт: track list — go: курсор на трек (скрытый — показать; за прокруткой — прокрутить),
+  -- fold: свернуть / развернуть папку, hide: скрыть / показать в трекере
+  tlist_do = function(ci, what)
+    local col = snap and snap.cols[ci]
+    if not col then return end
+    if what == 'fold' then ctx.fold_folder(col); relayout(); return end
+    if what == 'hide' then
+      state.thide = state.thide or {}
+      state.thide[col.guid] = (not state.thide[col.guid]) or nil
+      relayout(); vim.msg = (state.thide[col.guid] and 'hidden in the tracker: ' or 'shown: ') .. (col.name or '')
+      return
+    end
+    if state.thide and state.thide[col.guid] then state.thide[col.guid] = nil; relayout() end
+    local hit
+    for i, f in ipairs(L.flat or {}) do if f.ci == ci then vim.cur.fi = i; hit = true; break end end
+    if not hit then state.hscroll = ci; relayout(); for i, f in ipairs(L.flat or {}) do if f.ci == ci then vim.cur.fi = i; break end end end
+    ctx.set_focus('tracker')
+    vim.msg = 'track: ' .. (col.name or '')
+  end,
   markers_menu = function()
     local items = {}
     local function tog(key, k, label)
@@ -10291,6 +10313,7 @@ local function hint_go(t)
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
   elseif t.kind == 'viewbtn' and d == 'markers' then ctx.markers_menu()
+  elseif t.kind == 'tlist' then ctx.tlist_do(d.ci, d.what)   -- 11 окт: track list по f
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
@@ -14948,6 +14971,7 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
+    elseif hover.tlist then ctx.tlist_do(hover.tlist.ci, hover.tlist.what); click = { t = now2, zone = 'tlist' }   -- 11 окт: track list
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
     elseif hover.viewbtn == 'fxparams' then
       state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true)
@@ -15929,6 +15953,7 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and hover.tlist then ctx.tlist_do(hover.tlist.ci, 'hide')   -- 11 окт: track list — скрыть / показать в трекере
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
@@ -16303,6 +16328,9 @@ local function frame()
     end
   end
 
+  if gfx.mouse_wheel ~= 0 and hover and hover.tlist_area then   -- 11 окт: track list листается колесом
+    draw.tl_scroll = (draw.tl_scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1) * 3; gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and hover and hover.dspeq then   -- ReaEQ: колесо на виде — ширина ближайшей полосы
     local d = hover.dspeq
     local LQ = { '1 lo q', '2 q', '3 q', '4 hi q' }
