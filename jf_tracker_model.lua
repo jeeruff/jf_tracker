@@ -1313,7 +1313,8 @@ function build_one(tr, fx, out)
       local cols = math.max(1, math.min(3, math.ceil(#params / 8)))
       -- Airwindows (4 окт): имя без «(airwindows)» — по нему категория и описание (Airwindopedia)
       local aw = short:match('^(.-)%s*%([Aa]irwindows%)')
-      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw }
+      out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw,
+                        vproc = short:lower():find('video processor', 1, true) ~= nil }   -- 11 окт: Video processor — строка code / редактор кода
     end
   end
 end

@@ -5866,6 +5866,35 @@ function D.frame(L, snap, rows, state, info)
           aw_off = wtop
         end
       end
+      -- 11 окт: Video processor — строка кнопок code / apply / revert под именем; код открыт —
+      -- редактор на весь блок (параметры — после закрытия); пресеты — строка < имя > в шапке
+      if f.vproc and not f.container and nfit >= 2 then
+        local ed = info.vp_editor and info.vp_editor(f)
+        local rx, ry = bx + L.pad, by + L.rh + 1
+        local function vbtn(lbl, what, on)
+          local w2 = ms(lbl) + 2 * L.pad
+          if rx + w2 > bx + bw - L.pad then return end
+          local hot = not drag and mx >= rx and mx < rx + w2 and my >= ry and my < ry + L.rh
+          set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(rx, ry, w2, L.rh - 1, 1)
+          set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(rx, ry, w2, L.rh - 1, 0)
+          text(rx + L.pad, ry, lbl, on and U.CYAN or (hot and U.AMBER or U.TEXT))
+          if hot then hover.rs5k = { fx = k, f = f, what = what } end
+          rx = rx + w2 + 2
+        end
+        vbtn('code', 'vp_code', ed ~= nil)
+        if ed then
+          vbtn('apply', 'vp_apply'); vbtn('revert', 'vp_revert')
+          local tip = 'Cmd+S apply, Esc close'
+          if rx + L.pad + ms(tip) <= bx + bw - L.pad then text(rx + L.pad, ry, tip, U.GREY) end
+          local ey = ry + L.rh + 1
+          if by + bh - ey > 2 * L.rh then
+            ed.draw(U, L, bx + 1, ey, bw - 2, by + bh - ey - 1, info.focus == 'dsp', fit, (ed.dirty and 'edited - not applied' or 'code'))
+          end
+          nfit = 0
+        else
+          nfit = nfit - 1; aw_off = aw_off + L.rh
+        end
+      end
       local grp = f.groups and f.rows and nfit - 1 >= f.rows
       if grp then nfit = f.rows; aw_off = wtop + L.rh end
       if awi and nfit > 2 then

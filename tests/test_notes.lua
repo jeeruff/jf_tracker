@@ -27,5 +27,13 @@ eq(NT.toggle(4), false, 'toggle on a plain line: no')
 local st = NT.style('# Check'); eq(st[3], 'HEAD1', 'heading colour')
 st = NT.style('- [x] done thing'); eq(st[1], 'MARK', 'todo mark'); eq(st[8], 'DONE', 'done text dimmed')
 st = NT.style('`code` and **b**'); eq(st[2], 'CODE', 'inline code'); eq(st[13], 'BOLD', 'bold')
+-- 11 окт: режим кода (Video processor): Tab — отступ, не выход; Esc — выход; текст как есть
+NT.code = true
+NT.set('input_info(0, w, h);\n// comment')
+eq(NT.key(9), true, 'code: Tab is eaten'); eq(NT.lines[1]:sub(1, 2), '  ', 'code: Tab inserts two spaces')
+eq(NT.key(27), 'leave', 'code: Esc leaves')
+eq(NT.text(), '  input_info(0, w, h);\n// comment', 'code: text round trip')
+NT.code = false
+eq(NT.key(9), 'leave', 'notes: Tab still leaves')
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

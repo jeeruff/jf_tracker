@@ -21,6 +21,7 @@ NT.l, NT.c = 1, 0          -- курсор: строка, символ (0 — п
 NT.scroll = 0
 NT.dirty = false
 NT.target = 'project'      -- 'project' | 'context' | 'dev' (CHECK.md, с debug)
+NT.code = false            -- 11 окт: редактор кода (Video processor в DSP): без целей и Markdown, Tab — отступ, // — серым
 
 local LEFT, RIGHT, UP, DOWN, HOME, END, DEL = 1818584692, 1919379572, 30064, 1685026670, 1752132965, 6647396, 6579564
 
@@ -80,7 +81,8 @@ end
 -- 'leave' — выйти из редактора; true — съедено; false — не наше
 function NT.key(c)
   local s = NT.lines[NT.l]
-  if c == 27 or c == 9 then return 'leave'
+  if c == 27 or (c == 9 and not NT.code) then return 'leave'
+  elseif c == 9 then NT.lines[NT.l] = s:sub(1, NT.c) .. '  ' .. s:sub(NT.c + 1); NT.c = NT.c + 2; NT.dirty = true
   elseif c == 13 then
     table.insert(NT.lines, NT.l + 1, s:sub(NT.c + 1)); NT.lines[NT.l] = s:sub(1, NT.c)
     NT.l, NT.c = NT.l + 1, 0; NT.dirty = true
@@ -120,7 +122,7 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
   U.set(U.LINE); gfx.rect(x + w - 1, y, 1, h, 1)
   -- шапка: [project] [context] и чьи заметки
   local bx = x + L.pad
-  for _, t in ipairs(NT.show_dev and { 'project', 'context', 'dev' } or { 'project', 'context' }) do   -- dev — только в режиме debug (8 окт)
+  for _, t in ipairs(NT.code and {} or NT.show_dev and { 'project', 'context', 'dev' } or { 'project', 'context' }) do   -- dev — только в режиме debug (8 окт)
     local bw = U.measure(t) + 2 * L.pad
     local on = NT.target == t
     local hot = mx >= bx and mx < bx + bw and my >= y + 2 and my < y + 2 + L.rh
@@ -133,7 +135,7 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
   -- − + (4 окт): размер текста заметок — справа в шапке
   local zw = U.measure('+') + 2 * L.pad
   local zx = x + w - L.pad - 2 * zw - 2
-  for i, z in ipairs({ { '-', 'zoom-' }, { '+', 'zoom+' } }) do
+  for i, z in ipairs(NT.code and {} or { { '-', 'zoom-' }, { '+', 'zoom+' } }) do
     local kx = zx + (i - 1) * (zw + 2)
     local hot = mx >= kx and mx < kx + zw and my >= y + 2 and my < y + 2 + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(kx, y + 2, zw, L.rh, 1)
@@ -166,7 +168,10 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
     local line = NT.lines[v.l]
     local s = line:sub(v.c0 + 1, v.c0 + cols)
     -- раскраска Markdown: куски одного цвета подряд
-    local st = NT.style(line)
+    local st
+    if NT.code then   -- код: комментарий // — серым, остальное текстом
+      st = {}; local cm = line:find('//', 1, true); if cm then for q = cm, #line do st[q] = 'MARK' end end
+    else st = NT.style(line) end
     local COL = { TEXT = U.TEXT, HEAD1 = U.AMBER, HEAD2 = U.CYAN, DONE = U.DIM, MARK = U.GREY,
                   CODE = U.CYAN, BOLD = U.AMBER, QUOTE = U.GREY }
     local i0, px = 1, x + L.pad
@@ -181,7 +186,8 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
     end
     -- коробка задачи — буквами «[ ]» / «[x]» (никаких значков): отмеченная
     -- зелёная, под мышью — янтарная подложка; клик — переключить
-    local at, done = NT.todo(line)
+    local at, done
+    if not NT.code then at, done = NT.todo(line) end
     if at and at > v.c0 and at + 2 <= v.c0 + cols then
       local bx0 = x + L.pad + U.measure(s:sub(1, at - v.c0 - 1))
       local box = line:sub(at, at + 2)
@@ -196,7 +202,7 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
       U.set(U.AMBER); gfx.rect(cx, ry + 1, 2, L.rh - 2, 1)
     end
   end
-  if NT.lines[1] == '' and #NT.lines == 1 and not focused then U.text(x + L.pad, top + 1, 'click to write notes', U.DIM) end
+  if not NT.code and NT.lines[1] == '' and #NT.lines == 1 and not focused then U.text(x + L.pad, top + 1, 'click to write notes', U.DIM) end
   if not hover and mx >= x and mx < x + w and my >= top and my < y + h then hover = 'text' end
   return hover
 end

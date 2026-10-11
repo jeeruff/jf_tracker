@@ -9141,7 +9141,53 @@ ctx = {
     vim.msg = ('sampler: %s -> RS5K on %s (%.3f-%.3f of the file)'):format(label or 'item', col.name or 'track', a, b)
   end,
   -- 10 окт: кнопки RS5K над волной — режим, browse, item, list, detect pitch
+  -- 11 окт: Video processor в DSP — код эффекта (named config VIDEO_CODE) в редакторе
+  -- блока: code — открыть / закрыть, apply (Cmd+S) — записать (undo), revert — как в эффекте
+  vp_editor = function(f)
+    local e = ctx.vp
+    if not (e and f and f.vproc) then return nil end
+    local col = dsp_target()
+    if not (col and col.track == e.tr and reaper.TrackFX_GetFXGUID(e.tr, f.i) == e.guid) then return nil end
+    return e.nt
+  end,
+  vp_do = function(f, what)
+    local col = dsp_target(); if not (col and f) then return end
+    local tr, fx = col.track, f.i
+    if what == 'vp_code' and ctx.vp_editor(f) then
+      if ctx.vp.nt.dirty then ctx.vp_do(f, 'vp_apply') end
+      ctx.vp = nil; vim.msg = 'video code closed'; return
+    end
+    if what == 'vp_code' or what == 'vp_revert' then
+      local ok, code = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'VIDEO_CODE')
+      if not ok then vim.msg = 'video code: this REAPER does not give the code (VIDEO_CODE)'; return end
+      local nt = (ctx.vp and ctx.vp.nt) or dofile(DIR .. '/jf_tracker_notes.lua')
+      nt.code = true
+      nt.set(code)
+      ctx.vp = { tr = tr, guid = reaper.TrackFX_GetFXGUID(tr, fx), nt = nt }
+      ctx.set_focus('dsp')
+      vim.msg = what == 'vp_revert' and 'video code: back to the code of the effect' or 'video code: type, Cmd+S apply (one undo), Esc close (applies)'
+    elseif what == 'vp_apply' and ctx.vp_editor(f) then
+      local code = ctx.vp.nt.text()
+      edit.run('video processor code', function() reaper.TrackFX_SetNamedConfigParm(tr, fx, 'VIDEO_CODE', code) end)
+      ctx.vp.nt.dirty = false; model.invalidate()
+      vim.msg = 'video code applied (u undoes)'
+    end
+  end,
+  -- клавиши редактора кода (фокус DSP, код открыт); true — съели
+  vp_key = function(c)
+    local col = dsp_target()
+    local f
+    for _, x in ipairs(col and col.fx or {}) do if ctx.vp_editor(x) then f = x; break end end
+    if not f then return false end
+    local m = ctx.mods()
+    if (c == 19 or (c == 115 and m.cmd)) then ctx.vp_do(f, 'vp_apply'); return true end   -- Cmd+S
+    if c == 27 then ctx.vp_do(f, 'vp_code'); return true end
+    if m.cmd and not m.shift then return false end                                    -- Cmd+… — окна, панели
+    ctx.vp.nt.key(c)
+    return true
+  end,
   rs5k_do = function(f, what)
+    if what:match('^vp_') then return ctx.vp_do(f, what) end
     local col = dsp_target(); if not (col and f) then return end
     local tr, fx = col.track, f.i
     if model.is_take(tr) then vim.msg = 'RS5K: take FX - use the plugin window'; return end
@@ -12986,6 +13032,7 @@ local function frame()
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
+    vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -17019,6 +17066,7 @@ local function frame()
         -- DSP — своя грамматика по эффектам (jf_tracker_dspkeys.lua, 2 окт);
         -- в vim уходят только командная строка и поиск (: /)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
