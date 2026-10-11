@@ -3,6 +3,22 @@ local DIR = debug.getinfo(1, 'S').source:match('^@(.*)/tests/') or '.'
 local IM = dofile(DIR .. '/jf_tracker_import.lua')
 local n, bad = 0, 0
 local function eq(a, b, what) n = n + 1; if a ~= b then bad = bad + 1; print(('FAIL %s: %s ~= %s'):format(what, tostring(a), tostring(b))) end end
+-- 11 окт: SFZ — наследование group, пробелы в пути, \\ и .., имена нот, комментарии
+eq(IM.kind('x.SFZ'), 'sfz', 'kind sfz'); eq(IM.sfz_key('c4'), 60, 'c4 = 60'); eq(IM.sfz_key('f#2'), 42, 'f#2'); eq(IM.sfz_key('45'), 45, 'number')
+do
+  local t = [[<control> default_path=Samples\ // comment
+<group> lokey=36 hikey=47 pitch_keycenter=c3 loop_mode=loop_continuous
+<region> sample=Bass One.wav offset=100 end=999
+<region> sample=..\Other\b.wav lokey=48 hikey=59
+<group>
+<region> sample=/abs/k.wav key=d#1]]
+  local r = IM.sfz(t, '/lib/sfz')
+  eq(#r, 3, 'sfz 3 regions')
+  eq(r[2].sample, '/lib/sfz/Samples/Bass One.wav', 'path with a space, default_path')
+  eq(r[2].key, 48, 'group pitch_keycenter c3'); eq(r[2].loop, true, 'group loop'); eq(r[2].offset, 100, 'offset'); eq(r[2].end_, 999, 'end')
+  eq(r[3].sample, '/lib/sfz/Other/b.wav', '.. folds'); eq(r[3].lokey, 48, 'own lokey wins')
+  eq(r[1].sample, '/abs/k.wav', 'absolute path'); eq(r[1].lokey, 27, 'key= sets lokey'); eq(r[1].loop, false, 'new group clears loop')
+end
 eq(IM.kind('/a/b.RX2'), 'rex', 'kind rx2'); eq(IM.kind('x.xrni'), 'xrni', 'kind xrni'); eq(IM.kind('x.wav'), nil, 'kind wav')
 local rx = '/Users/Shared/Prismatic Bliss Library/Samples/Loops/Drums/Snare[98] Stellate.rx2'
 if io.open(rx, 'rb') then

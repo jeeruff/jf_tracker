@@ -74,7 +74,7 @@ local function load_marks()
 end
 
 local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, ogg = true, m4a = true, wv = true, caf = true,
-                rx2 = true, rex = true, xrni = true, jfcurve = true }   -- jfcurve — кривые automation (6 окт)   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
+                rx2 = true, rex = true, xrni = true, sfz = true, jfcurve = true }   -- 11 окт: sfz — Enter: сэмплы в lib   -- jfcurve — кривые automation (6 окт)   -- REX / Renoise-Redux: Enter = импорт с нарезкой (2 окт)
 local function shown(name) return B.hidden or name:sub(1, 1) ~= '.' end
 local function wanted(name)
   local ext = name:match('%.([%w]+)$')
@@ -836,7 +836,7 @@ end
 -- путь для прослушивания строки (nil — нечего слушать)
 function B.preview_path(e)
   if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
-  if (e.name or ''):lower():match('%.xrni$') then return nil end       -- архив инструмента, не звук
+  if (e.name or ''):lower():match('%.xrni$') or (e.name or ''):lower():match('%.sfz$') then return nil end   -- инструмент (архив / текст SFZ), не звук
   if (e.name or ''):lower():match('%.jfcurve$') then return nil end    -- кривая — не звук
   if e.other then return nil end                                      -- не звук (*.*): не слушаем
   if e.pm then return B.pm_preview(e) end

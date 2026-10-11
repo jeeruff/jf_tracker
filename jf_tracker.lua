@@ -8477,6 +8477,60 @@ ctx = {
         or 'REX import failed (REAPER could not open the file)'
       return it
     end
+    if kind == 'sfz' then
+      -- 11 окт: SFZ — каждый файл сэмпла инструментом в lib; регион с offset / end — окно item,
+      -- несколько регионов одного файла с разными offset — слайсы; имя — файл и диапазон клавиш
+      local fh = io.open(path, 'rb')
+      if not fh then vim.msg = 'SFZ: cannot read ' .. name; return end
+      local text = fh:read('*a'); fh:close()
+      local regions = IMP.sfz(text, path:match('^(.*)/[^/]*$') or '.')
+      local by, order = {}, {}
+      for _, r in ipairs(regions) do
+        if not by[r.sample] then by[r.sample] = {}; order[#order + 1] = r.sample end
+        local t = by[r.sample]; t[#t + 1] = r
+      end
+      local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+      local function nn(k) return NN[k % 12 + 1] .. (k // 12 - 1) end
+      local n, miss, first = 0, 0, nil
+      edit.run('import SFZ ' .. name, function()
+        for _, file in ipairs(order) do
+          local rs = by[file]
+          if not reaper.file_exists(file) then miss = miss + 1
+          else
+            local it = edit.depot_add(file, c.track)
+            if it then
+              n = n + 1; first = first or it
+              local tk = reaper.GetActiveTake(it)
+              local src = tk and reaper.GetMediaItemTake_Source(tk)
+              local sr = src and reaper.GetMediaSourceSampleRate(src) or 0
+              local r1 = rs[1]
+              local lo, hi = 127, 0
+              for _, r in ipairs(rs) do lo = math.min(lo, r.lokey); hi = math.max(hi, r.hikey) end
+              if tk then
+                local stem = file:match('([^/]+)%.%w+$') or file
+                reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', stem .. ((lo > 0 or hi < 127) and (' ' .. nn(lo) .. '..' .. nn(hi)) or ''), true)
+              end
+              if sr > 0 and #rs == 1 and ((r1.offset or 0) > 0 or r1.end_) then
+                local t0 = (r1.offset or 0) / sr
+                local t1 = r1.end_ and (r1.end_ + 1) / sr or (reaper.GetMediaSourceLength(src) or 0)
+                if t1 > t0 then
+                  reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', t0)
+                  reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
+                end
+              elseif sr > 0 and #rs > 1 then
+                local t, seen = {}, {}
+                for _, r in ipairs(rs) do local o = (r.offset or 0) / sr; if not seen[o] then seen[o] = true; t[#t + 1] = o end end
+                table.sort(t)
+                if #t > 1 then edit.set_slices(it, t) end
+              end
+            end
+          end
+        end
+      end)
+      model.invalidate()
+      vim.msg = ('SFZ → lib %s: %s, %d sample(s) from %d region(s)%s'):format(c.name or '', name, n, #regions, miss > 0 and (', ' .. miss .. ' file(s) not found') or '')
+      return first
+    end
     if kind ~= 'xrni' then return end
     local _, proj = reaper.EnumProjects(-1, '')
     local base = (proj and proj ~= '' and reaper.GetProjectPath()) or (reaper.GetResourcePath() .. '/Data/jf_tracker_imported')
