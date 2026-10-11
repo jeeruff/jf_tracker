@@ -71,6 +71,11 @@ pn, wd, l, r = CM.panpad(500, 1000, 1000, 1000)
 near(wd, -1, 'bottom = reversed'); near(l, 1, 'bottom: L right'); near(r, -1, 'bottom: R left')
 pn, wd, l, r = CM.panpad(750, 250, 1000, 1000)
 near(pn, 0.5, 'balance right'); near(l, 0, 'L = bal - w'); near(r, 1, 'R = bal + w')
+-- относительный пан-пэд (11 окт): старт у левого края не уводит пан влево
+pn, wd = CM.panpad_rel({ 0, 500, 0.2, 1 }, 0, 500, 1000, 1000)
+near(pn, 0.2, 'rel: no jump at the press point'); near(wd, 1, 'rel: width kept')
+pn, wd = CM.panpad_rel({ 0, 500, 0.2, 1 }, 100, 750, 1000, 1000)
+near(pn, 0.4, 'rel: right by a tenth = +0.2'); near(wd, 0.5, 'rel: down a quarter = -0.5')
 -- старт с трека под мышью (9 окт): мышь в зоне 3, старт — трек 7; вбок на зону — 8
 local gs = CM.gesture_step(nil, 250, 500, 10, 1000, 7)
 eq(gs.ti, 7, 'start on ti0')

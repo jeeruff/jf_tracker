@@ -3693,7 +3693,7 @@ D.FADER_W = function(L) return math.max(3 * L.cw + 4, ms('-48') + 6) end   -- ш
 D.MINI_W = function(L) return L.cw + 5 end   -- 11 окт: мини-полоса (свёрнутая колонка / низкий микшер)
 -- 11 окт: мини-полоса — мини-кноб панорамы сверху, под ним фейдер в знак шириной
 -- (метр + риска уровня); свёрнутая колонка и микшер ниже 3 строк фейдера
-function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my)
+function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local live = info.trs_live
   local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
   local ks = info.kslider
@@ -3714,6 +3714,22 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my)
     if D.csel_on(col.guid, 'pan') then csel_frame(x - 1, y0 - 1, kd + 2, kd + 2) end
     hint('trs', x, y0, kd, kd, { col = col, what = 'pan' })
     y0 = y0 + kd + 2
+  end
+  -- 11 окт: M S R внизу, если над ними остаётся фейдер от 3 строк
+  local bh = L and (L.rh - 2) or 0
+  if L and y1 - y0 >= 3 * (bh + 2) + 3 * L.rh then
+    local bs = { { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' }, { 'R', col.armed, D.ARM, 'arm' } }
+    local by = y1 - 3 * (bh + 2) + 2
+    for _, b in ipairs(bs) do
+      local hot = mx >= x and mx < x + w and my >= by and my < by + bh + 2
+      set(b[2] and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or (hot and D.CURROW or U.PANEL)); gfx.rect(x, by, w, bh, 1)
+      set(b[2] and b[3] or U.DIM); gfx.rect(x, by, w, bh, 0)
+      text(x + math.floor((w - ms(b[1])) / 2), by, b[1], b[2] and b[3] or (b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or U.readable(U.GREY, U.PANEL, 4.5)))
+      if hot then hover.btn = { col = col, what = b[4] } end
+      hint('btn', x, by, w, bh + 2, { col = col, what = b[4] })
+      by = by + bh + 2
+    end
+    y1 = y1 - 3 * (bh + 2)
   end
   if y1 - y0 < 12 then return end
   local th = y1 - y0
@@ -4087,7 +4103,7 @@ function D.frame(L, snap, rows, state, info)
       end
       local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5)
       D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
-      if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my) end   -- 11 окт: + мини-кноб панорамы
+      if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my, L) end   -- 11 окт: + мини-кноб панорамы
     elseif not c.master then
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
@@ -4371,7 +4387,7 @@ function D.frame(L, snap, rows, state, info)
         end   -- узкий master не перестраивает треки (9 окт)
         local und = tonumber(D.mix_under) or 0
         local fh = (und > 0 and not (c.master and not side)) and (H - und * L.rh) or H
-        if compact then D.mini_strip(col, sx, fx_w, y1, y1 + fh - 2, info, hover, mx, my) else
+        if compact then D.mini_strip(col, sx, fx_w, y1, y1 + fh - 2, info, hover, mx, my, L) else
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
         if lufs_w > 0 then

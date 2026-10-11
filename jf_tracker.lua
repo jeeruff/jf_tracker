@@ -14331,13 +14331,23 @@ local function frame()
       local cols = snap and snap.cols or {}
       local g0 = ctx.cm_gest
       local pcol = gfx.mouse_cap & 4 == 4 and g0 and cols[g0.ti]
+      if not pcol then ctx.cm_pp = nil end   -- Cmd отпущен — следующий пан-пэд от новой точки
       if pcol and reaper.ValidatePtr(pcol.track, 'MediaTrack*') then
         -- + Cmd (8 окт): трек держится, всё окно — пан-пэд: x — пан / баланс,
         -- y — ширина (верх широко, середина 0, низ — каналы местами);
         -- двойной пан — левый / правый расходятся или перекрещиваются
         local tr = pcol.track
-        local pn, wd, l, r = CM.panpad(gfx.mouse_x, gfx.mouse_y, gfx.w, gfx.h)
         local dual = reaper.GetMediaTrackInfo_Value(tr, 'I_PANMODE') == 6
+        -- 11 окт: относительно — от точки нажатия Cmd и текущих значений трека
+        if not (ctx.cm_pp and ctx.cm_pp.tr == tr) then
+          local p0, w0
+          if dual then
+            local l0, r0 = reaper.GetMediaTrackInfo_Value(tr, 'D_DUALPANL'), reaper.GetMediaTrackInfo_Value(tr, 'D_DUALPANR')
+            p0, w0 = (l0 + r0) / 2, (r0 - l0) / 2
+          else p0, w0 = reaper.GetMediaTrackInfo_Value(tr, 'D_PAN'), reaper.GetMediaTrackInfo_Value(tr, 'D_WIDTH') end
+          ctx.cm_pp = { gfx.mouse_x, gfx.mouse_y, p0, w0, tr = tr }
+        end
+        local pn, wd, l, r = CM.panpad_rel(ctx.cm_pp, gfx.mouse_x, gfx.mouse_y, gfx.w, gfx.h)
         if dual then edit.track_value(tr, 'D_DUALPANL', l); edit.track_value(tr, 'D_DUALPANR', r); pcol.panL, pcol.panR = l, r
         else edit.track_value(tr, 'D_PAN', pn); edit.track_value(tr, 'D_WIDTH', wd); pcol.pan, pcol.width = pn, wd end   -- 9 окт: снимок — сразу
         g0.moved, g0.mode, g0.mx, g0.my, g0.ax, g0.ay, g0.dy = true, 'fader', gfx.mouse_x, gfx.mouse_y, 0, 0, 0   -- Cmd отпущен — снова фейдер, без скачка
@@ -14374,7 +14384,7 @@ local function frame()
       ::cm_gest_done::
     elseif ctx.cm_gest then
       if ctx.cm_gest.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: track faders'); model.invalidate() end
-      ctx.cm_gest = nil
+      ctx.cm_gest = nil; ctx.cm_pp = nil
     end
     if gest then
     elseif ctrl and not CM.latch then

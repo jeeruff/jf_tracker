@@ -158,4 +158,12 @@ function CM.panpad(mx, my, w, h)
   return pan, width, c(pan - width), c(pan + width)
 end
 
+-- 11 окт: относительный пан-пэд — от точки, где зажали Cmd, и от текущих пан / ширины
+-- (абсолютный с левого края тачпада сразу уводил пан влево). a = { mx, my, pan, width }
+function CM.panpad_rel(a, mx, my, w, h)
+  local function c(v) return math.max(-1, math.min(1, v)) end
+  local pan = c(a[3] + (mx - a[1]) / math.max(1, w) * 2)
+  local width = c(a[4] - (my - a[2]) / math.max(1, h) * 2)
+  return pan, width, c(pan - width), c(pan + width)
+end
 return CM
