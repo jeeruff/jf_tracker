@@ -392,7 +392,16 @@ function motion(c, n, op)
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
   elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(0, cur.row - n), linewise = true }
   -- поле инструмента (5 окт): подполе ноты между нотой и громкостью
-  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and V.inst_field_ok() and (cur.field or 1) == 1 and cur.sub ~= 'inst' then
+  -- 11 окт: подполе слайса (Sxx) — за инструментом: нота → инструмент → слайс → громкость
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and V.inst_field_ok() and (cur.field or 1) == 1 and cur.sub ~= 'inst' and cur.sub ~= 'slc' then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'inst' and V.slc_field_ok() then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'slc' }
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'slc' then
+    return { fi = cur.fi, row = cur.row, field = 2 }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and V.slc_field_ok() and ((cur.field or 1) == 2 and cur.sub ~= 'slc') then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'slc' }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'slc' then
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and V.inst_field_ok() and ((cur.field or 1) == 2 and cur.sub ~= 'inst') then
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
@@ -569,7 +578,10 @@ local function apply(op, f0, f1, r0, r1)
   elseif op == '+' or op == '-' then
     local d = (V.count or 1) * (op == '+' and 1 or -1)
     local fld = V.cur.field or 1
-    if fld == 1 and V.cur.sub == 'inst' then
+    if fld == 1 and V.cur.sub == 'slc' then
+      -- 11 окт: слайс ±d
+      for _, h in ipairs(heads) do if ctx.set_slice then ctx.set_slice({ h }, math.max(0, (h.slice or 0) + d)) end end
+    elseif fld == 1 and V.cur.sub == 'inst' then
       -- инструмент ±d (5 окт)
       for _, h in ipairs(heads) do
         local n0 = ctx.inst_num_of and ctx.inst_num_of(h) or nil
@@ -1494,6 +1506,19 @@ function V.key_impl(c)
       end
       V.hexbuf = nil; return
     end
+    if V.cur.sub == 'slc' and fld == 1 then
+      -- 11 окт: поле слайса — две hex-цифры, номер слайса ноты (00 — весь сэмпл)
+      local ch2 = (c < 256) and string.char(c):upper() or ''
+      if ch2:match('^[0-9A-F]$') then
+        local buf = (V.hexbuf or '') .. ch2
+        if #buf < 2 then V.hexbuf = buf; return end
+        V.hexbuf = nil
+        if ctx.set_slice then ctx.set_slice(V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row), tonumber(buf, 16)) end
+        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      end
+      if V.hexbuf then return end
+      keys_control(c); return
+    end
     if V.cur.sub == 'inst' and fld == 1 then
       -- поле инструмента (5 окт): две hex-цифры — номер инструмента ноты
       local ch2 = (c < 256) and string.char(c):upper() or ''
@@ -2407,6 +2432,7 @@ function V.smart()
   local function done() if vis then V.mode = 'normal' end; V.cmdbuf = {} end
   local where = (f.col and f.col.name or '') .. (' @ %04d'):format(row)
   local items, cols, sel, title, pick
+  local listen, crows, cellw            -- 11 окт: прослушивание выбора (кнопка listen) и ячейки с волной
   if f.ml then
     if not (f.ml.kind == 'cc' or f.ml.kind == 'pc') then V.msg = 'smart: this MIDI lane has no values'; return false end
     items, cols, sel = SM.values(128, nil, hexf, 'delete the events of this row')
@@ -2423,22 +2449,59 @@ function V.smart()
       if it.v == 'clear' then ctx.env_del(f.env, row) else ctx.env_set(f.env, row, it.v / (n - 1)) end
       done()
     end
+  elseif V.cur.sub == 'slc' and fld == 1 then
+    -- 11 окт: слайсы инструмента ноты
+    local h1 = heads()[1]
+    local n = h1 and ctx.snap().inst_of and ctx.snap().inst_of[h1.item]
+    local pe = n and f.col.pool and f.col.pool[n]
+    local root = pe and (pe.parent or pe)
+    if not (root and root.slices and #root.slices > 0) then V.msg = 'smart: this note has no sliced instrument'; return false end
+    items = { { label = '00 the whole sample', v = 0 } }
+    for k2 = 1, #root.slices do items[#items + 1] = { label = ('S%02X'):format(k2), v = k2 } end
+    for k2, it in ipairs(items) do if it.v == (h1.slice or 0) then sel = k2 end end
+    cols, title = math.min(6, #items), 'slice  ' .. where
+    -- 11 окт: ячейка — номер и волна куска; listen — кусок звучит
+    local function span(k2) if k2 == 0 then return 0, root.len end; return root.slices[k2], root.slices[k2 + 1] or root.len end
+    crows, cellw = 3, ctx.layout().cw * 9
+    for _, it in ipairs(items) do
+      local a, b = span(it.v)
+      it.label = it.v == 0 and 'all' or it.label
+      it.tip = it.v == 0 and 'the whole sample' or ('slice S%02X  %.3f s'):format(it.v, b - a)
+      it.draw = function(x, y, w, h, on) if ctx.mini_wave then ctx.mini_wave(root, a, b, x, y, w, h, on, it.label) end end
+    end
+    listen = function(it) local a, b = span(it.v); if ctx.preview_slice then ctx.preview_slice(f.col.track, root, a, b) end end
+    pick = function(it) if ctx.set_slice then ctx.set_slice(heads(), it.v) end; done() end
   elseif V.cur.sub == 'inst' and fld == 1 then
     items = {}
     local h1 = heads()[1]
     for i, e in pairs(f.col.pool or {}) do
-      if type(i) == 'number' and e then items[#items + 1] = { label = ('%02X %s'):format(i, e.name or ''), v = i, tip = e.name } end
+      -- 11 окт: только сами инструменты — слайсы (дети в lib) не дублируют имя
+      if type(i) == 'number' and e and not e.parent then
+        items[#items + 1] = { label = ('%02X %s'):format(i, e.name or ''), v = i, tip = e.name .. (e.slices and #e.slices > 0 and ('  /' .. #e.slices .. ' slices') or ''),
+          draw = (e.item and e.stype == 'audio') and function(x, y, w, h, on) if ctx.mini_wave then ctx.mini_wave(e, 0, e.len, x, y, w, h, on, ('%02X %s'):format(i, e.name or '')) end end or nil }
+      end
     end
     table.sort(items, function(a, b) return a.v < b.v end)
     if #items == 0 then V.msg = 'smart: no instruments on this track (lib)'; return false end
     for k, it in ipairs(items) do if it.v == V.inst then sel = k end end
     cols, title = 1, 'instrument  ' .. where
+    crows, cellw = 2, ctx.layout().cw * 30
+    listen = function(it)
+      local e = f.col.pool[it.v]
+      if e and e.item and ctx.preview then ctx.preview(f.col.track, ctx.model_base_note or 60, e.item, row, 1) end
+    end
     pick = function(it) if ctx.set_inst then ctx.set_inst(heads(), it.v) end; V.inst = it.v; done() end
     if not h1 then V.msg = 'smart: an empty row - the instrument is chosen for the next notes' end
   elseif fld == 1 then
     local h1 = heads()[1]
     items, cols, sel = SM.notes(h1 and h1.pitch, V.octave)
     title = (h1 and ('note %s'):format(h1.note or '') or 'note') .. '  ' .. where
+    listen = function(it)
+      if type(it.v) ~= 'number' or not ctx.preview then return end
+      local inst = (f.col.pool or {})[V.inst]
+      if ctx.inst_fx and ctx.inst_fx(f.col) then inst = nil end
+      ctx.preview(f.col.track, it.v, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), row, 1)
+    end
     pick = function(it)
       if it.v == nil then return SM.p end
       local hs = heads()
@@ -2463,6 +2526,10 @@ function V.smart()
     local n = (fld == 2 and h1.kind == 'midi') and 128 or 256
     items, cols, sel = SM.values(n, cur, true, fld == 2 and 'volume back to default' or 'no delay')
     title = (fld == 2 and 'volume' or 'delay xx/256 row') .. '  ' .. where
+    if fld == 2 then
+      -- 11 окт: нота ячейки звучит с этой громкостью
+      listen = function(it) if ctx.listen_vol and type(it.v) == 'number' then ctx.listen_vol(f.col, h1, it.v, n) end end
+    end
     pick = function(it)
       local hs = heads()
       if fld == 2 then E.set_vol(hs, lpb(), it.v == 'clear' and 128 or it.v)
@@ -2492,10 +2559,16 @@ function V.smart()
     title = 'command  ' .. where
     pick = function(it) return vals(it.v, nil) end
   end
-  return ctx.smart_open({ title = title, items = items, cols = cols, sel = sel, on_pick = pick })
+  return ctx.smart_open({ title = title, items = items, cols = cols, sel = sel, on_pick = pick, on_sel = listen, cell_rows = crows, cell_w = cellw })
 end
 
 -- поле инструмента есть, если в раскладке есть колонка номера (не узкая колонка)
+function V.slc_field_ok()
+  if not V.inst_field_ok() then return false end
+  local f = flat()[V.cur.fi]
+  local G = f.G or ctx.layout()
+  return G.x_slc ~= nil and not G.notes_only
+end
 function V.inst_field_ok()
   local f = flat()[V.cur.fi]
   if not f or f.env or f.compact or f.folded then return false end

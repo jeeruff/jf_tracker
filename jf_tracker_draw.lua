@@ -1319,8 +1319,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
     else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     if L.x_slc then
       local sk = cell and cell.kind == 'audio' and cell.slice
-      if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), cell.muted and U.GREY or D.RN_OTHER)   -- своё поле: курсор инструмента его не красит
-      else text(x + L.x_slc, ty, '...', ( (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+      if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), c('slc', cell.muted and U.GREY or D.RN_OTHER))   -- своё поле: курсор инструмента его не красит
+      else text(x + L.x_slc, ty, '...', c('slc',  (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     end
   end
   if not cell then
@@ -5012,6 +5012,7 @@ function D.frame(L, snap, rows, state, info)
           if x then
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
+            if inv == 1 and vc.sub == 'slc' and (f.G or L).x_slc then inv = 'slc' end     -- 11 окт: курсор на слайсе
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
@@ -5609,6 +5610,7 @@ function D.frame(L, snap, rows, state, info)
         for _, pp in ipairs(parts) do
           local hot = not drag and mx >= pp[3] and mx < pp[3] + pp[4] and my >= by + 1 and my < by + L.rh
           if hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(pp[3], by + 1, pp[4], L.rh - 1, 1); hover.dspbtn = { fx = k, f = f, what = pp[2] }; on_btn = true end
+          hint('dspbtn', pp[3], by + 1, pp[4], L.rh - 1, { fx = k, what = pp[2] })
           text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and (pre.none and U.GREY or U.CYAN) or U.GREY))
         end
         tw = tw - ptw - L.pad
@@ -5634,6 +5636,7 @@ function D.frame(L, snap, rows, state, info)
             gfx.setfont(D.font_id or 1)
           else text(kx + L.pad, by + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
+          hint('dspbtn', kx, by + 1, kb, L.rh - 1, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
       end
       if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end

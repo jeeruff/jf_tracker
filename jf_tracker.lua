@@ -257,7 +257,8 @@ local state = {
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
   autoinst = reaper.GetExtState(EXT, 'autoinst') ~= '0',
-  armsel = reaper.GetExtState(EXT, 'armsel') == '1',   -- 11 окт: запись следует за выбором треков (B_AUTO_RECARM у всех треков)   -- 11 окт: курсор на треке — его инструмент (плагин или аудиоклип под курсором)
+  armsel = reaper.GetExtState(EXT, 'armsel') == '1',
+  smlisten = reaper.GetExtState(EXT, 'smlisten') ~= '0',   -- 11 окт: кнопка listen смарт-панели   -- 11 окт: запись следует за выбором треков (B_AUTO_RECARM у всех треков)   -- 11 окт: курсор на треке — его инструмент (плагин или аудиоклип под курсором)
   automidi = reaper.GetExtState(EXT, 'automidi') ~= '0',   -- 10 окт: плагин-инструмент на треке с аудиовходом — вход на все MIDI
   hintpos = reaper.GetExtState(EXT, 'hintpos') == 'status' and 'status' or 'panes',   -- 10 окт: либо под каждым модулем, либо одной строкой внизу
   libtab = 'audio',
@@ -605,7 +606,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -1588,6 +1589,33 @@ ctx = {
   -- поле инструмента (5 окт): номер инструмента ноты и его смена — нота
   -- заменяется нотой инструмента n того же трека (строка, длина, питч те же)
   inst_num_of = function(h) return h and h.item and snap and ((snap.inst_num and snap.inst_num[h.item]) or (snap.inst_of and snap.inst_of[h.item])) end,
+  -- 11 окт: поле слайса ноты — нота переходит на слайс k своего инструмента (0 — весь сэмпл), строка и длина те же
+  set_slice = function(heads, k)
+    local f = L.flat[vim.cur.fi]; local col = f and f.col
+    if not col then return end
+    local done, why = 0, nil
+    edit.run('set slice', function()
+      for _, h in ipairs(heads) do
+        local n = h.kind == 'audio' and snap and snap.inst_of and snap.inst_of[h.item]
+        local pe = n and col.pool[n]
+        local root = pe and (pe.parent or pe)
+        if not (root and root.item) then why = 'not an instrument of the lib'
+        elseif k == 0 then
+          local rows = math.max(1, h.rows or 1)
+          edit.delete({ h }, state.lpb)
+          edit.insert_note(col.track, nil, state.lpb, h.row0, model.BASE_NOTE + math.floor((h.semis or 0) + 0.5), vim.vel, rows, root.item)
+          done = done + 1
+        elseif not (root.slices and #root.slices > 0) then why = (root.name or 'sample') .. ' has no slices'
+        else
+          edit.delete({ h }, state.lpb)
+          edit.insert_slice(col.track, nil, state.lpb, h.row0, root.item, math.min(k, #root.slices))
+          done = done + 1
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = done > 0 and (k == 0 and 'slice: the whole sample' or ('slice S%02X'):format(k)) or ('slice: ' .. (why or 'audio notes only'))
+  end,
   set_inst = function(heads, n)
     local f = L.flat[vim.cur.fi]; local col = f and f.col
     local e = col and (col.pool or {})[n]
@@ -2686,7 +2714,43 @@ ctx = {
   end,
   envfmt = function() return state.envfmt or 'midi' end,
   SM = MX.SMART,
-  smart_open = function(p) local at = ctx.smart_at; ctx.smart_at = nil; return MX.SMART.open(p, at) end,   -- 9 окт; at — от среднего щелчка, иначе якорь у курсора при рисовании
+  smart_open = function(p)
+    local at = ctx.smart_at; ctx.smart_at = nil
+    MX.SMART.listen = state.smlisten ~= false                         -- 11 окт: кнопка listen — запоминается
+    MX.SMART.on_listen = function(v) state.smlisten = v; vim.msg = 'smart panel listen ' .. (v and 'on' or 'off') end
+    return MX.SMART.open(p, at)
+  end,
+  model_base_note = model.BASE_NOTE,
+  -- 11 окт: ячейка выпадашки — подпись и волна куска сэмпла [a, b] (секунды item)
+  mini_wave = function(root, a, b, x, y, w, h, on, label)
+    U.text(x + 2, y, ctx.fit(label or '', w - 4), on and U.TEXT or U.GREY)
+    local wy, wh = y + L.rh, h - L.rh
+    if wh < 3 or not root or not root.src or b <= a then return end
+    local rate = (root.rate and root.rate > 0) and root.rate or 1
+    local head = { src = root.src, guid = tostring(root.guid) .. ':' .. ('%.4f'):format(a), offs = (root.offs or 0) + a * rate, len = b - a, rate = rate }
+    local pk = model.peaks(head, math.max(2, w))
+    local cy = wy + math.floor(wh / 2)
+    U.set(on and U.CYAN or U.mix(U.CYAN, U.BG, 0.4))
+    if not pk or not pk.n or pk.n == 0 then gfx.rect(x, cy, w, 1, 1); return end
+    for px = 0, w - 1 do
+      local i = math.floor(px * pk.n / w) + 1
+      local mx2, mn = math.min(1, pk.max[i] or 0), math.max(-1, pk.min[i] or 0)
+      local y0, y1 = cy - math.floor(mx2 * wh / 2), cy - math.floor(mn * wh / 2)
+      gfx.rect(x + px, y0, 1, math.max(1, y1 - y0), 1)
+    end
+  end,
+  -- 11 окт: нота ячейки с громкостью v (смарт-панель громкости, listen)
+  listen_vol = function(col, h, v, n)
+    if not (col and h) then return end
+    if h.kind == 'audio' and h.item then
+      PV.gain = v / (n == 128 and 127 or 128)
+      PV.audio(col.track, h.item, 0, 2)
+    elseif h.pitch then
+      local v0 = vim.vel; vim.vel = math.max(1, math.min(127, v))
+      ctx.preview(col.track, h.pitch, 'midi', vim.cur.row, 1)
+      vim.vel = v0
+    end
+  end,   -- 9 окт; at — от среднего щелчка, иначе якорь у курсора при рисовании
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
@@ -9754,6 +9818,12 @@ local function hint_go(t)
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'swapbtn' then ctx.swap_click()
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
+  elseif t.kind == 'dspbtn' then   -- 11 окт: кнопки шапки эффекта по f — как щелчок
+    ctx.set_focus('dsp'); dsp_sel.fx = d.fx
+    local w = d.what
+    if w == 'open' then ctx.dsp_show(d.fx) elseif w == 'bypass' then ctx.dsp_bypass(d.fx) elseif w == 'delta' then ctx.dsp_delta(d.fx)
+    elseif w == 'lastp' then ctx.dsp_lastparam_menu(d.fx) elseif w == 'pprev' then ctx.dsp_preset(d.fx, 'prev') elseif w == 'pnext' then ctx.dsp_preset(d.fx, 'next')
+    elseif w == 'preset' then ctx.dsp_preset(d.fx, 'pick') elseif w == 'del' then ctx.dsp_delete(d.fx, d.fx) end
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d

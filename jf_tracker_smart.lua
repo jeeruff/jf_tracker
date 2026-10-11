@@ -12,9 +12,17 @@
 -- Без reaper.* — тест tests/test_smart.lua.
 
 local SM = { p = nil, rect = nil, hot = nil }
+-- 11 окт: listen (кнопка внизу, по умолчанию вкл) — смена выбора звучит: p.on_sel(it) у вызывающего
+SM.listen = true
+SM.on_listen = nil      -- main: запомнить вкл / выкл
+local function notify(p, i)
+  if not (SM.listen and p and p.on_sel) then return end
+  local it = p.items[i]
+  if it then pcall(p.on_sel, it) end
+end
 
 function SM.active() return SM.p ~= nil end
-function SM.close() SM.p, SM.rect, SM.hot = nil, nil, nil end
+function SM.close() SM.p, SM.rect, SM.hot, SM.hot_prev = nil, nil, nil, nil end
 
 function SM.open(p, anchor)
   if not p or not p.items or #p.items == 0 then SM.close(); return false end
@@ -39,6 +47,12 @@ function SM.key(c)
   local p = SM.p
   if not p then return false end
   local n, cols = #p.items, p.cols
+  local s0 = p.sel
+  local r = SM.key_in(c, p, n, cols)
+  if SM.p == p and p.sel ~= s0 then notify(p, p.sel) end
+  return r
+end
+function SM.key_in(c, p, n, cols)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   if c == ESC or ch == 'q' then SM.close()
   elseif c == ENTER or ch == ' ' then pick(p.sel)
@@ -66,7 +80,7 @@ function SM.layout(L, ms, W, H)
   local w = p.cols * cw + 2 * L.pad
   local tw = ms(p.title or '') + 2 * L.pad
   if w < tw then cw = cw + math.ceil((tw - w) / p.cols); w = p.cols * cw + 2 * L.pad end
-  local h = rows * crh + 2 * L.rh + 2 * L.pad     -- заголовок, сетка, строка подсказки
+  local h = rows * crh + 2 * L.rh + 2 * L.pad     -- заголовок, сетка, строка подсказки (и кнопка listen)
   local a = p.anchor or { x = L.pad, y = L.pad }
   local x = math.max(2, math.min(W - w - 2, a.x))
   local y = a.y
@@ -105,10 +119,22 @@ function SM.draw(d)
     elseif hot then set(C.TEXT); gfx.rect(cx, cy, cw - 1, crh, 0)
     elseif it.on then set(C.AMBER); gfx.rect(cx, cy, cw - 1, crh, 0) end
   end
+  -- наведение на другую ячейку — тоже прослушивание
+  if SM.hot and SM.hot ~= SM.hot_prev then notify(p, SM.hot) end
+  SM.hot_prev = SM.hot
+  -- кнопка listen справа внизу
+  local by = gy + rows * crh
+  local lw = ms('listen') + 2 * L.pad
+  local lx = x + w - L.pad - lw
+  local lhot = mx >= lx and mx < lx + lw and my >= by and my < by + L.rh
+  set(SM.listen and C.SELF or C.PANEL); gfx.rect(lx, by, lw, L.rh, 1)
+  set(SM.listen and C.AMBER or C.GREY); gfx.rect(lx, by, lw, L.rh, 0)
+  text(lx + L.pad, by, 'listen', (SM.listen or lhot) and C.AMBER or C.GREY)
+  SM.lbtn = { lx, by, lw, L.rh }
   -- подсказка: под мышью, иначе выбранное
   local ti = p.items[SM.hot or p.sel]
-  local tip = ti and (ti.tip or ti.label) or ''
-  text(x + L.pad, gy + rows * crh, d.fit(tip, w - 2 * L.pad), C.GREY)
+  local tip = lhot and ('listen: the choice sounds when it changes - ' .. (SM.listen and 'on' or 'off')) or (ti and (ti.tip or ti.label) or '')
+  text(x + L.pad, by, d.fit(tip, lx - x - 2 * L.pad), C.GREY)
 end
 
 -- мышь: щелчок по ячейке — выбор, мимо (или ПКМ) — закрыть. true — съели
@@ -117,6 +143,12 @@ function SM.click(mx, my, right)
   local r = SM.rect
   local inside = r and mx >= r[1] and mx < r[1] + r[3] and my >= r[2] and my < r[2] + r[4]
   if right or not inside then SM.close(); return true end
+  local b = SM.lbtn
+  if b and mx >= b[1] and mx < b[1] + b[3] and my >= b[2] and my < b[2] + b[4] then
+    SM.listen = not SM.listen
+    if SM.on_listen then SM.on_listen(SM.listen) end
+    return true
+  end
   if SM.hot then SM.p.sel = SM.hot; pick(SM.hot) end
   return true
 end

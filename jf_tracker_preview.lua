@@ -69,7 +69,8 @@ function P.audio(track, depot_item, semis, max_sec)
   if not pv then return false end
   local base = take and R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') or 0
   R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0))      -- нота поверх transpose инструмента (6 окт)
-  R.CF_Preview_SetValue(pv, 'D_VOLUME', take and R.GetMediaItemTakeInfo_Value(take, 'D_VOL') or 1)
+  R.CF_Preview_SetValue(pv, 'D_VOLUME', (take and R.GetMediaItemTakeInfo_Value(take, 'D_VOL') or 1) * (P.gain or 1))   -- 11 окт: P.gain — разовая громкость (смарт: прослушать vol)
+  P.gain = nil
   local offs = take and R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') or 0
   local rate = take and R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE') or 1
   if rate <= 0 then rate = 1 end

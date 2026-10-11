@@ -25,7 +25,8 @@ local ALPHA = 'asdfghjklqweruiopzxcvnmtyb'
 -- чистил его каждый кадр, и после f меток не было вовсе)
 function H.reset() if not H.active then H.targets = {} end end
 
-H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1,
+H.ALT = { dspbtn = true }
+H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1, dspbtn = 1,
             mx = 3, bar = 3, trsmark = 3, sess = 3, mxname = 3, mxdur = 3, fxbrow = 3 }
 function H.add(kind, x, y, w, h, data)
   if H.active then return end        -- во время набора список заморожен
@@ -58,10 +59,18 @@ function H.start(filter)
   for _, o in ipairs(order) do
     local t = o.t
     t.label = nil
-    local free = k < max
-    if free then
-      for _, p in ipairs(placed) do
-        if t.x < p.x + lw + 1 and p.x < t.x + lw + 1 and t.y < p.y + lh and p.y < t.y + lh then free = false; break end
+    t.lx, t.ly = nil, nil
+    local free = false
+    -- 11 окт: узкие кнопки вплотную (шапка эффекта DSP) — метка может встать строкой выше / ниже
+    local spots = H.ALT[t.kind] and { { t.x, t.y }, { t.x, t.y - lh }, { t.x, t.y + lh } } or { { t.x, t.y } }
+    if k < max then
+      for _, sp in ipairs(spots) do
+        local ok = true
+        for _, p in ipairs(placed) do
+          local px, py = p.lx or p.x, p.ly or p.y
+          if sp[1] < px + lw + 1 and px < sp[1] + lw + 1 and sp[2] < py + lh and py < sp[2] + lh then ok = false; break end
+        end
+        if ok then free = true; if sp[2] ~= t.y then t.lx, t.ly = sp[1], sp[2] end; break end
       end
     end
     if free then
@@ -116,7 +125,7 @@ function H.draw(U, L)
   H.lw, H.lh = lw, lh
   for _, t in ipairs(H.targets) do
     if t.label and (H.typed == '' or t.label:sub(1, #H.typed) == H.typed) then
-      local x, y = t.x, t.y
+      local x, y = t.lx or t.x, t.ly or t.y
       local bg = t.picked and U.GREEN or U.AMBER          -- 11 окт: отмеченная (Shift+F) — зелёная, с рамкой цели
       if t.picked then U.set(U.GREEN); gfx.rect(t.x, t.y, t.w, t.h, 0) end
       U.set(bg); gfx.rect(x, y, lw, lh, 1)
