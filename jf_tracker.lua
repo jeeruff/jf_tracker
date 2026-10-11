@@ -6114,19 +6114,17 @@ ctx = {
   end,
   -- 11 окт: шапка lib — выпадашки kit и sort (у кнопки, без перебора по кругу)
   kit_menu = function()
-    local kits = B.read_kits()
+    local list = edit.lib_presets()
+    local col = cur_col()
+    local cur = col and edit.lib_preset_name(col.track)
     local items, keys = {}, 'abcdefghijklmnopqrtuvwxyz'
-    items[#items + 1] = { key = 's', label = 'save the lib as a kit …', fn = function() ctx.kit_save_prompt() end }
-    local k = 0
-    for _, e in ipairs(kits) do
-      if e.kit then
-        k = k + 1
-        local key = k <= 9 and tostring(k) or keys:sub(k - 9, k - 9)
-        if key ~= '' then items[#items + 1] = { key = key, label = 'take ' .. e.name .. ' into the lib', fn = function() ctx.kit_load(e.path, e.name) end } end
-      end
+    items[#items + 1] = { key = 's', label = 'save the lib as a preset …', fn = function() ctx.kit_save_prompt() end }
+    for k, e in ipairs(list) do
+      local key = k <= 9 and tostring(k) or keys:sub(k - 9, k - 9)
+      if key ~= '' then items[#items + 1] = { key = key, label = e.name .. (e.name == cur and '  (on)' or ''), fn = function() ctx.kit_load(e.path, e.name) end } end
     end
-    if k == 0 then items[#items + 1] = { key = 'x', label = '(no kits yet - s saves the lib as one)', fn = function() end } end
-    vim.open_hydra({ title = 'kits: track templates TrackTemplates/jf_kits', items = items })
+    if #list == 0 then items[#items + 1] = { key = 'x', label = '(no presets yet - s saves this lib as one)', fn = function() end } end
+    vim.open_hydra({ title = 'lib presets: the whole lib of the track (Cmd+Z - back)', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
   sort_menu = function()
@@ -6146,16 +6144,27 @@ ctx = {
     for _, e in ipairs(col and col.pool or {}) do if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then items[#items + 1] = e.item end end
     if #items == 0 then vim.msg = 'libsave: the lib is empty'; return end
     local path, n = edit.kit_save(items, name)
-    if path and col then ctx.kitnames = ctx.kitnames or {}; ctx.kitnames[col.guid] = name end
-    vim.msg = path and ('kit saved: %s (%d samples) - TrackTemplates/jf_kits, browser tab kits'):format(name, n) or 'libsave: cannot write the file'
-    if B.mode == 'kits' then B.set_all(B.read_kits()) end
+    if path and col then edit.lib_preset_name(col.track, name) end
+    vim.msg = path and ('lib preset saved: %s (%d samples) - TrackTemplates/jf_libs, browser tab libs'):format(name, n) or 'libsave: cannot write the file'
+    if B.mode == 'libs' then B.set_all(B.read_kits()) end
   end,
+  -- 11 окт: пресет lib — заменяет всю lib трека (прежние сэмплы lib долой, ноты в паттернах остаются); Cmd+Z назад
   kit_load = function(path, name)
-    local col = cur_col(); if not col then vim.msg = 'kit: no track under the cursor'; return end
-    local n = edit.kit_load(path, col.track)
+    local col = cur_col(); if not col then vim.msg = 'lib preset: no track under the cursor'; return end
+    local n = edit.kit_load(path, col.track, true, name)
     model.invalidate()
-    ctx.kitnames = ctx.kitnames or {}; ctx.kitnames[col.guid] = name   -- 11 окт: имя в шапке lib
-    vim.msg = ('kit %s: %d sample(s) into the lib of %s'):format(name or '', n, col.name or '')
+    vim.msg = ('lib preset %s: %d sample(s) - the lib of %s replaced (Cmd+Z - back)'):format(name or '', n, col.name or '')
+  end,
+  lib_presets = function() return edit.lib_presets() end,
+  libp_step = function(d)
+    local col = cur_col(); if not col then return end
+    local list = edit.lib_presets()
+    if #list == 0 then vim.msg = 'no lib presets yet - click the preset name: save'; return end
+    local cur = edit.lib_preset_name(col.track)
+    local k = 0
+    for i, e in ipairs(list) do if e.name == cur then k = i end end
+    local e = list[k == 0 and (d > 0 and 1 or #list) or ((k - 1 + d) % #list + 1)]
+    ctx.kit_load(e.path, e.name)
   end,
   -- jf_pm (3 окт): открыть проект из вкладки pm (o). Уже открыт — переключить
   -- вкладку; иначе — вопрос: REAPER останавливает скрипты при открытии проекта,
@@ -9676,6 +9685,7 @@ local function hint_go(t)
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
   elseif t.kind == 'poolkit' then ctx.set_focus('inst'); ctx.kit_menu()
+  elseif t.kind == 'poolpprev' or t.kind == 'poolpnext' then ctx.set_focus('inst'); ctx.libp_step(t.kind == 'poolpnext' and 1 or -1)
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
   elseif t.kind == 'mxname' then ctx.mx_name_prompt(d)
@@ -12374,7 +12384,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, kit_name = ctx.kitnames and cur_col() and ctx.kitnames[cur_col().guid] or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -13263,7 +13273,8 @@ local function frame()
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
   elseif hover.dbplus or hover.dbpar then state.status = (hover.dbtip or '') .. ' - click: fzf of the effects'
-  elseif hover.poolkit then state.status = 'kit of this lib: click - the kits (take one into the lib) and save the lib as a kit (a REAPER track template, TrackTemplates/jf_kits)'
+  elseif hover.poolkit then state.status = 'lib preset: the whole lib of the track - click: the presets and save, < > the previous / next one (replaces the lib, Cmd+Z back)'
+  elseif hover.poolpprev or hover.poolpnext then state.status = (hover.poolpprev and 'previous' or 'next') .. ' lib preset - replaces the lib of the track (Cmd+Z back)'
   elseif hover.swapbtn then
     local st, file = ctx.swap_info()
     state.status = st == 'on' and ('swap: the sample plays ' .. (file or '?') .. ' - click: back to the original file')
@@ -13965,6 +13976,8 @@ local function frame()
       click = { t = now2, zone = 'tourzone' }
     elseif hover.poolkit then
       ctx.set_focus('inst'); ctx.kit_menu(); click = { t = now2, zone = 'poolkit' }
+    elseif hover.poolpprev or hover.poolpnext then
+      ctx.set_focus('inst'); ctx.libp_step(hover.poolpnext and 1 or -1); click = { t = now2, zone = 'poolpstep' }
     elseif hover.swapbtn then
       ctx.set_focus('inst'); ctx.swap_click()
       click = { t = now2, zone = 'swapbtn' }

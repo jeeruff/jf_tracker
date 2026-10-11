@@ -656,16 +656,9 @@ end
 -- наборы lib (4 окт): шаблоны треков TrackTemplates/jf_kits; Enter — в lib трека
 function B.read_kits()
   local out = {}
-  local dir = res_path() .. '/TrackTemplates/jf_kits'
-  local i = 0
-  while true do
-    local fn = R.EnumerateFiles and R.EnumerateFiles(dir, i)
-    if not fn then break end
-    if fn:lower():match('%.rtracktemplate$') then out[#out + 1] = { name = fn:gsub('%.[Rr][Tt]rack[Tt]emplate$', ''), path = dir .. '/' .. fn, kit = true } end
-    i = i + 1
-  end
-  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
-  if #out == 0 then out[1] = { name = '(no kits yet - save button in the lib)', kit = false, dir = false, empty = true } end
+  -- 11 окт: пресеты lib (jf_libs + прежние jf_kits) — Enter заменяет lib трека курсора
+  for _, e in ipairs(ctx.lib_presets and ctx.lib_presets() or {}) do out[#out + 1] = { name = e.name, path = e.path, kit = true } end
+  if #out == 0 then out[1] = { name = '(no lib presets yet - the preset name in the lib header: save)', kit = false, dir = false, empty = true } end
   return out
 end
 
@@ -698,20 +691,20 @@ end
 B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'kits' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
   B.pm_scroll.v = 0
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'kits' then B.set_all(B.read_kits()) else B.set_all(B.read_pm()) end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) else B.set_all(B.read_pm()) end
 end
 
 -- кнопки шапки: files | db | size | hide
 function B.click(what)
   -- 9 окт: панели — кнопка файлового режима в панели pm переводит в панель browser
-  if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'kits') and ctx.browser_from_pm then
+  if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'kits' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'pvvol' then B.vol_drag = true
@@ -882,7 +875,7 @@ function B.describe(idx)
     return ('project %s%s - Enter: inside, o: open in REAPER, T: tags, s: status, drag to track: subproject, Space: preview%s'):format(e.path, len, B.pm_preview(e) and '' or ' (no render)')
   end
   if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
-  if e.kit then return ('kit %s (REAPER track template) - Enter: its samples into the lib of the cursor track'):format(e.name) end
+  if e.kit then return ('lib preset %s (REAPER track template) - Enter: it replaces the lib of the cursor track (Cmd+Z back)'):format(e.name) end
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
   if e.rgn then return ('region %s [%.2f - %.2f] - Enter: subproject trimmed to region @cursor, drag: to track/row'):format(e.name, e.pos, e.fin) end
   if e.mark then return 'marker ' .. e.name end
@@ -923,7 +916,7 @@ function B.key(c)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'kits', kits = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'libs', libs = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -986,7 +979,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'kits' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'kits' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'kits', 'fx' } or { 'files', 'db', 'pm', 'proj', 'kits' })) do
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs' })) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end

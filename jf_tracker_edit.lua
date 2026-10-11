@@ -2847,7 +2847,43 @@ end
 -- Набор = сэмплы lib (item с нарезкой, метками, take FX) в родном формате
 -- REAPER — шаблоне трека TrackTemplates/jf_kits/<имя>.RTrackTemplate: его
 -- открывает и сам REAPER (Insert track from template). items — item сэмплов.
-function E.kit_dir() return R.GetResourcePath() .. '/TrackTemplates/jf_kits' end
+-- 11 окт: это пресеты lib (вся lib трека), не kits: kit — один инструмент из нескольких звуков (набор &).
+-- Новые — в TrackTemplates/jf_libs, сохранённые раньше в jf_kits тоже видны.
+function E.kit_dir() return R.GetResourcePath() .. '/TrackTemplates/jf_libs' end
+function E.lib_presets()
+  local out, seen = {}, {}
+  for _, d in ipairs({ E.kit_dir(), R.GetResourcePath() .. '/TrackTemplates/jf_kits' }) do
+    local i = 0
+    while true do
+      local fn = R.EnumerateFiles(d, i); if not fn then break end
+      local nm = fn:match('^(.*)%.[Rr][Tt]rack[Tt]emplate$')
+      if nm and not seen[nm:lower()] then seen[nm:lower()] = true; out[#out + 1] = { name = nm, path = d .. '/' .. fn } end
+      i = i + 1
+    end
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  return out
+end
+-- имя пресета lib трека (P_EXT трека)
+function E.lib_preset_name(track, name)
+  if not (track and R.ValidatePtr(track, 'MediaTrack*')) then return nil end
+  if name then R.GetSetMediaTrackInfo_String(track, 'P_EXT:jf_libpreset', name, true); return name end
+  local _, v = R.GetSetMediaTrackInfo_String(track, 'P_EXT:jf_libpreset', '', false)
+  return v ~= '' and v or nil
+end
+-- сэмплы lib трека home (item трека LIB с его jf_home) — убрать; ноты на самом треке не трогаются
+local function lib_clear(home)
+  local tr = E.lib_track(false)
+  if not tr then return 0 end
+  local g = model.track_guid(home)
+  local n = 0
+  for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local _, h = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_home', '', false)
+    if h == g then R.DeleteTrackMediaItem(tr, it); n = n + 1 end
+  end
+  return n
+end
 local function set_chunk_pos(chunk, pos)
   return (chunk:gsub('\nPOSITION [^\n]*', '\nPOSITION ' .. ('%.10f'):format(pos), 1))
 end
@@ -2886,12 +2922,15 @@ function E.kit_items(text)
   return out
 end
 -- набор → lib трека track (за =LIB, после последнего item); число сэмплов
-function E.kit_load(path, track)
+-- replace (11 окт, пресет lib): сначала прежние сэмплы lib трека долой — один undo
+function E.kit_load(path, track, replace, name)
   local f = io.open(path, 'r'); if not f then return 0 end
   local text = f:read('*a'); f:close()
   local chunks = E.kit_items(text)
   local n = 0
-  run('kit load', function()
+  run(replace and 'lib preset' or 'kit load', function()
+    if replace then lib_clear(track) end
+    if name then E.lib_preset_name(track, name) end
     for _, ch in ipairs(chunks) do                 -- 8 окт: каждый сэмпл — свой лейн трека LIB
       local tr, lane = E.lib_slot()
       local it = R.AddMediaItemToTrack(tr)

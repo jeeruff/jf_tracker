@@ -3168,18 +3168,21 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local sw2 = ms('sort') + 2 * L.pad
   local sx2 = bx2 - sw2 - L.pad
   if sx2 > ix + L.pad + ms('kit') + 2 * L.pad then hbtn(sx2, sw2, 'sort', false, U.CYAN, 'poolsort'); bx2 = sx2 end
-  -- kit (11 окт, вместо «N samples»): набор lib трека — щелчок: список kits (взять в lib), сохранить lib как kit
+  -- 11 окт: пресет lib — справа, как у эффекта в DSP: < имя > (имя — список и сохранить, < > — соседний; заменяет всю lib)
   do
-    local kl = info.kit_name or 'kit'
-    local kw = math.min(ms(kl) + 2 * L.pad, bx2 - L.pad - (ix + L.pad))
-    if kw > ms('k') + 2 * L.pad then
-      local kx = ix + L.pad
-      local hot = mx >= kx and mx < kx + kw and my >= by0 and my < by0 + L.rh
-      set(hot and D.CURROW or U.BG); gfx.rect(kx, by0, kw, L.rh, 1)
-      set(U.LINE); gfx.rect(kx, by0, kw, L.rh, 0)
-      text(kx + L.pad, iy + 3, fit(kl, kw - 2 * L.pad), hot and U.TEXT or (info.kit_name and U.CYAN or U.GREY))
-      if hot then hover.poolkit = true end
-      hint('poolkit', kx, by0, kw, L.rh, true)
+    local nm = info.kit_name or 'no preset'
+    local aw = ms('<') + 2
+    local room = bx2 - L.pad - (ix + L.pad)
+    local ptw = math.min(ms('< ' .. nm .. ' >') + L.pad, room)
+    if ptw > ms('<>') + ms('pre') then
+      local px = bx2 - L.pad - ptw
+      local parts = { { '<', 'poolpprev', px, aw }, { nm, 'poolkit', px + aw, ptw - 2 * aw }, { '>', 'poolpnext', px + ptw - aw, aw } }
+      for _, pp in ipairs(parts) do
+        local hot = mx >= pp[3] and mx < pp[3] + pp[4] and my >= by0 and my < by0 + L.rh
+        if hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(pp[3], by0, pp[4], L.rh, 1); hover[pp[2]] = true end
+        text(pp[3] + (pp[2] == 'poolkit' and 2 or 1), iy + 3, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'poolkit' and (info.kit_name and U.CYAN or U.GREY) or U.GREY))
+        hint(pp[2], pp[3], by0, pp[4], L.rh, true)
+      end
     end
   end
   -- внизу — два буквенных тоггла (2 окт): звук при выборе / звук при вставке
@@ -3809,6 +3812,7 @@ function D.frame(L, snap, rows, state, info)
     hover.insprevbtn = th.insprevbtn
     hover.poolfind = th.poolfind
     hover.poolkit = th.poolkit or hover.poolkit
+    hover.poolpprev, hover.poolpnext = th.poolpprev or hover.poolpprev, th.poolpnext or hover.poolpnext
     hover.poolsort = th.poolsort or hover.poolsort
     hover.poolsortcol = th.poolsortcol
     hover.poolbsync = th.poolbsync or hover.poolbsync
