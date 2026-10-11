@@ -4661,27 +4661,75 @@ ctx = {
       end
     end
   end,
-  -- превью шейдера из ReaVisor (web/thumbs/<shaders|effects>/<имя>.png), картинка 1018
-  visor_thumb = function(kind, fn, x, y, w, h)
-    local T = ctx.vz_thumb or {}; ctx.vz_thumb = T
-    local path = MX.VZ.WEB .. '/thumbs/' .. kind .. '/' .. (fn:gsub('%.fs$', '')) .. '.png'
-    if T.path ~= path then
-      T.path, T.ok = path, false
-      if reaper.file_exists(path) and gfx.loadimg(1018, path) >= 0 then
-        T.w, T.h = gfx.getimgdim(1018); T.ok = T.w > 0 and T.h > 0
-      end
+  -- превью ReaVisor (web/thumbs/<shaders|effects|presets>/<имя>.png): 11 окт — кольцо картинок
+  -- 936..959 (отрезаны от вертикальных подписей), по пути; сетка пресетов держит их все сразу
+  visor_img = function(path)
+    local T = ctx.vz_imgs or { by = {}, next = 936 }; ctx.vz_imgs = T
+    local e = T.by[path]
+    if e then return e end
+    if not reaper.file_exists(path) then T.by[path] = false; return false end
+    local slot = T.next
+    T.next = slot >= 959 and 936 or slot + 1
+    for k, v in pairs(T.by) do if v and v.slot == slot then T.by[k] = nil end end
+    e = false
+    if gfx.loadimg(slot, path) >= 0 then
+      local w, h = gfx.getimgdim(slot)
+      if w > 0 and h > 0 then e = { slot = slot, w = w, h = h } end
     end
-    if not T.ok then return false end
-    local sc = math.min(w / T.w, h / T.h)
-    local dw, dh = math.floor(T.w * sc), math.floor(T.h * sc)
+    T.by[path] = e
+    return e
+  end,
+  visor_blit = function(e, x, y, w, h, fill)
+    -- fill — обрезать по коробке (карточки сетки), иначе вписать справа сверху
     gfx.a = 1
-    gfx.blit(1018, 1, 0, 0, 0, T.w, T.h, x + w - dw, y, dw, dh)
+    if fill then
+      local sc = math.max(w / e.w, h / e.h)
+      local sw, sh = w / sc, h / sc
+      gfx.blit(e.slot, 1, 0, (e.w - sw) / 2, (e.h - sh) / 2, sw, sh, x, y, w, h)
+    else
+      local sc = math.min(w / e.w, h / e.h)
+      local dw, dh = math.floor(e.w * sc), math.floor(e.h * sc)
+      gfx.blit(e.slot, 1, 0, 0, 0, e.w, e.h, x + w - dw, y, dw, dh)
+    end
+  end,
+  visor_thumb = function(kind, fn, x, y, w, h)
+    local e = ctx.visor_img(MX.VZ.WEB .. '/thumbs/' .. kind .. '/' .. (fn:gsub('%.fs$', '')) .. '.png')
+    if not e then return false end
+    ctx.visor_blit(e, x, y, w, h)
+    return true
+  end,
+  -- превью пресета: своя картинка (thumbs/presets), иначе картинка первого шейдера пресета
+  visor_pthumb = function(name, x, y, w, h)
+    local VZ = MX.VZ
+    local P = ctx.vz_pfirst or {}; ctx.vz_pfirst = P
+    if P[name] == nil then
+      local ps = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset:' .. name))
+      local first = false
+      if type(ps) == 'table' then
+        local tabs = ps.tabs or ps.layers
+        if type(tabs) == 'table' then
+          for _, t in ipairs(tabs) do local fn = type(t) == 'table' and (t.shader or t.fn) or t; if type(fn) == 'string' and not fn:match('^@') then first = fn; break end end
+        end
+        if not first and type(ps.shader) == 'string' then first = ps.shader end
+      end
+      P[name] = first
+    end
+    local e = ctx.visor_img(VZ.WEB .. '/thumbs/presets/' .. name .. '.png')
+    if not e and P[name] then e = ctx.visor_img(VZ.WEB .. '/thumbs/shaders/' .. (P[name]:gsub('%.fs$', '')) .. '.png') end
+    if not e then return false end
+    ctx.visor_blit(e, x, y, w, h, true)
     return true
   end,
   visor_env = function()
     local VZ = MX.VZ
+    local now = reaper.time_precise()
+    if now - (ctx.vz_pn_t or 0) > 1 then   -- имена пресетов ReaVisor — раз в секунду
+      ctx.vz_pn_t = now
+      local n = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset_names'))
+      VZ.pnames = type(n) == 'table' and n or {}
+    end
     local sl = ctx.visor_slot_at(vim.cur.row)
-    return { on = VZ.on, t = reaper.time_precise(), peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb,
+    return { on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb,
              scene = sl, scene_has = sl and VZ.st.scenes[sl] ~= nil }
   end,
   -- файлы шейдеров / эффектов (один раз за сессию)
@@ -4798,17 +4846,23 @@ ctx = {
       if not nm then vim.msg = 'visor: the cursor is not in a slot - scenes belong to slots of the matrix'; return end
       st.scenes[nm] = VZ.scene_take(); VZ.dirty = true
       vim.msg = 'visor: scene of slot ' .. nm .. (st.follow and ' - comes back when the playhead enters it' or ' - S: follow the playhead')
-    elseif k == 'import' then
-      local names = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset_names')) or {}
+    elseif k == 'import' then VZ.key(('i'):byte())
+    elseif k == 'zoom' then ctx.zz_zoom()
+    elseif k == 'preset' then
+      local ps = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset:' .. a.name))
+      local sc = VZ.from_reavisor(ps)
+      if not sc then vim.msg = 'visor: preset ' .. a.name .. ' does not read'; return end
+      sc.preset = a.name
+      VZ.scene_apply(sc); VZ.sel, VZ.psel = 1, 1
+      for i, nm in ipairs(VZ.pnames or {}) do if nm == a.name then VZ.gsel = i end end
+      vim.msg = ('visor: %s - %d layers, %d effects%s'):format(a.name, #sc.layers, #sc.fx, VZ.on and '' or ' - p sends it to the page')
+    elseif k == 'preset_step' then
+      local names = VZ.pnames or {}
       if #names == 0 then vim.msg = 'visor: no ReaVisor presets (ISFVIZ preset_names)'; return end
-      local items = {}
-      for _, nm in ipairs(names) do items[#items + 1] = { label = nm, data = nm } end
-      vim.open_picker('ReaVisor preset - layers, effects, values, LFOs, track routes', items, function(it)
-        local sc = VZ.from_reavisor(VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset:' .. it.data)))
-        if not sc then vim.msg = 'visor: preset ' .. it.data .. ' does not read'; return end
-        VZ.scene_apply(sc); VZ.sel, VZ.psel = 1, 1
-        vim.msg = ('visor: %s - %d layers, %d effects'):format(it.data, #sc.layers, #sc.fx)
-      end)
+      local cur = 0
+      for i, nm in ipairs(names) do if nm == st.preset then cur = i end end
+      local nx = cur == 0 and (a.dir > 0 and 1 or #names) or ((cur - 1 + a.dir) % #names + 1)
+      ctx.visor_do({ kind = 'preset', name = names[nx] })
     elseif k == 'drag' or k == 'drag_fade' then ctx.vz_drag = a
     end
   end,
@@ -5567,6 +5621,9 @@ ctx = {
     elseif state.focus == 'fxb' then hv.fxb = { row = FB.cur }
     elseif state.focus == 'browser' then hv.browser = B.cur
     elseif state.focus == 'slices' then hv.slices = ctx.ssel and ctx.ssel.k or 0   -- 10 окт: меню выбранного слайса
+    elseif state.focus == 'top' and state.toptab == 'visor' then
+      hv.visor = MX.VZ.gal and { kind = 'preset', i = MX.VZ.gsel, name = (MX.VZ.pnames or {})[MX.VZ.gsel] } or { kind = 'sel' }
+      if hv.visor.kind == 'preset' and not hv.visor.name then hv.visor = { kind = 'sel' } end
     end
     -- 10 окт: якорь — лист панели в фокусе (вкладки — их стек), иначе прямоугольник модуля
     local pid = state.focus == 'top' and state.toptab or state.focus
@@ -9427,7 +9484,7 @@ local function hint_go(t)
     if state.mixer and d.what == 'vol' then vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(d.col.name or '')
     else vim.msg = ('%s %s: h l change (H L coarse), j k next slider, 0 reset, Esc done'):format(d.col.name or '', d.what) end
   elseif t.kind == 'video' then ctx.set_focus('top'); state.toptab = 'video'; ctx.video_do({ kind = d })
-  elseif t.kind == 'visor' then ctx.set_focus('top'); state.toptab = 'visor'; ctx.visor_do(MX.VZ.click({ kind = d }))
+  elseif t.kind == 'visor' then ctx.pane_focus('visor'); ctx.visor_do(MX.VZ.click(type(d) == 'table' and d or { kind = d }))
   elseif t.kind == 'harm' then ctx.set_focus('top'); state.toptab = 'harm'; ctx.harm_do(MMX.HM.click(d, ctx.harm_pitches(cur_col())))
   elseif t.kind == 'trsmark' then                                -- 8 окт: метка dB у фейдера — громкость на неё (2f — ходом)
     -- метка заглавной (Shift) — нырок: туда и обратно за N тактов (без счёта — за 1)
@@ -9693,6 +9750,7 @@ ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', in
                     slices = 'slices', sprops = 'sprops', sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
+  if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
   if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
@@ -9789,6 +9847,48 @@ function ctx.context_items(hover)
   local function add(label, fn, key, rp) items[#items + 1] = { label, fn, key = key, reaper = rp } end
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local lpb = state.lpb
+  -- 11 окт: своё меню визора — строка / параметр под мышью (или выбранные, по \), потом общее
+  if type(hover.visor) == 'table' then
+    local VZ, hv = MX.VZ, hover.visor
+    local function K(ch) return function()
+      ctx.pane_focus('visor')
+      local r = VZ.key(ch == 'Enter' and 13 or ch == 'Space' and 32 or ch:byte())
+      if type(r) == 'table' then ctx.visor_do(r) end
+    end end
+    if hv.kind == 'row' then VZ.sel = hv.i elseif hv.kind == 'param' then VZ.psel = hv.i end
+    if hv.kind == 'preset' then
+      add('Take preset ' .. hv.name, function() ctx.pane_focus('visor'); ctx.visor_do({ kind = 'preset', name = hv.name }) end)
+    end
+    local e = VZ.cur()
+    local row = e and e.rows and e.rows[VZ.psel]
+    if e and e.slot and row and (hv.kind == 'param' or hv.kind == 'sel') then
+      local p = VZ.param(e.slot, row)
+      add((p.m and p.m.k == 'lfo' and '!' or '') .. 'Modulate ' .. row.name .. ' by an LFO', function()
+        p.m = { k = 'lfo', sh = 0, hz = 0.5, amt = 0.5 }; VZ.dirty = true; vim.msg = 'visor: ' .. row.name .. ' - LFO, { } rate, [ ] depth, w shape' end)
+      add((p.m and p.m.k == 'trk' and '!' or '') .. 'Modulate ' .. row.name .. ' by a track peak …', function() ctx.pane_focus('visor'); ctx.visor_do({ kind = 'pick_track', key = row.key }) end)
+      if p.m then add('No modulation', function() p.m = nil; VZ.dirty = true end) end
+      add('Default value (0)', K('0'))
+    end
+    if e and (e.kind == 'layer' or e.kind == 'fx') then
+      local nm = VZ.short(e.slot.fn)
+      add('Replace ' .. nm .. ' (Enter)', K('Enter'))
+      add((e.slot.on ~= false and '!' or '') .. nm .. ' on (Space)', K('Space'))
+      add('Random values (R)', K('R'))
+      add('Move up (<)', K('<')); add('Move down (>)', K('>'))
+      add('Remove ' .. nm .. ' (x)', K('x'))
+    end
+    add('--')
+    add('Presets with previews (i)', K('i'))
+    add('Next preset (n)', K('n')); add('Previous preset (N)', K('N'))
+    add('Add a shader layer (a)', K('a')); add('Add an effect (e)', K('e'))
+    add('Save the scene of the cursor slot (s)', K('s'))
+    add((VZ.st.follow and '!' or '') .. 'Scenes follow the playhead (S)', K('S'))
+    add((VZ.st.blend == 'add' and '!' or '') .. 'Layers add up (b)', K('b'))
+    add((VZ.on and '!' or '') .. 'Send to the page (p)', K('p'))
+    add('Open the page in the browser (o)', K('o'))
+    add('Visor on the whole window (zz)', function() ctx.pane_focus('visor'); ctx.zz_zoom() end)
+    return items
+  end
   if type(hover.fxb) == 'table' and hover.fxb.row then
     -- эффект в браузере (3 окт): куда добавить, избранное, нативный браузер
     FB.cur = hover.fxb.row
@@ -12223,6 +12323,8 @@ local function frame()
         else ctx.vz_drag = nil end
       end
       local hv = VZ.draw(Lx, U, x, y, w, h, state.focus == 'top' and state.toptab == 'visor', ctx.visor_env(), ctx.fit, ctx.hint)
+      -- 11 окт: мышь в панели, но не на строке — всё равно визор (ПКМ — его меню, не общее)
+      if not hv and gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= y and gfx.mouse_y < y + h then hv = { kind = 'sel', tip = 'visor - rclick / \\ menu, i presets, zz whole window' } end
       if hv and gfx.mouse_wheel ~= 0 and (hv.kind == 'param' or hv.kind == 'row') then
         VZ.wheel(hv, gfx.mouse_wheel > 0 and 1 or -1, gfx.mouse_cap & 8 == 8)
         gfx.mouse_wheel = 0

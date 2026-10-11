@@ -86,4 +86,17 @@ VZ.key(('L'):byte()); near(VZ.st.layers[1].p.speed.v, 4.26, 'L steps 2% of the r
 eq(VZ.key(('m'):byte()), true, 'm -> lfo'); eq(VZ.key(('m'):byte()).kind, 'pick_track', 'm again -> pick a track')
 eq(VZ.key(('x'):byte()), true, 'x'); eq(#VZ.st.layers, 0, 'x removes')
 eq(VZ.key(27).kind, 'leave', 'Esc'); eq(VZ.key(('Z'):byte()), nil, 'Z not ours')
+-- 11 окт: zz, пресеты n N, сетка i
+eq(VZ.key(('z'):byte()), true, 'z waits'); eq(VZ.key(('z'):byte()).kind, 'zoom', 'zz -> zoom')
+VZ.key(('z'):byte()); eq(VZ.key(('j'):byte()), true, 'z then j - j still moves')
+eq(VZ.key(('n'):byte()).dir, 1, 'n next preset'); eq(VZ.key(('N'):byte()).dir, -1, 'N previous')
+VZ.pnames = { 'a', 'b', 'c', 'd', 'e' }; VZ.st.preset = 'b'
+VZ.key(('i'):byte()); eq(VZ.gal, true, 'i opens the gallery'); eq(VZ.gsel, 2, 'gallery starts on the current preset')
+VZ.gcols = 2; VZ.key(('j'):byte()); eq(VZ.gsel, 4, 'j - a row of cards down'); VZ.key(('l'):byte()); eq(VZ.gsel, 5, 'l - next card')
+VZ.key(('l'):byte()); eq(VZ.gsel, 5, 'l stops at the end')
+eq(VZ.key(13).name, 'e', 'Enter takes the card'); VZ.key(27); eq(VZ.gal, false, 'Esc closes the gallery')
+eq(VZ.click({ kind = 'preset', i = 3, name = 'c' }).name, 'c', 'click on a card'); eq(VZ.gsel, 3, 'click selects')
+eq(VZ.click({ kind = 'pnext' }).dir, 1, '> next')
+VZ.click({ kind = 'pgal' }); eq(VZ.gal, true, 'click on the name toggles the gallery'); VZ.gal = false
+local sc2 = VZ.scene_take(); VZ.st.preset = nil; VZ.scene_apply(sc2); eq(VZ.st.preset, 'b', 'scene keeps the preset name')
 print(('test_visor: %d checks, %d failed'):format(n, bad))

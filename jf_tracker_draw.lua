@@ -1103,9 +1103,9 @@ end
 -- результат прямоугольником назначения, поэтому поворачиваем честно:
 -- текст → картинка A (w×h) → попиксельно в картинку B (h×w), B блитится с
 -- масштабом. Кеш по строке+цвету, картинки 1000..1022 (сброс по кругу).
--- вертикальный текст: картинки 800..959 (160 подписей: имена в матрице,
+-- вертикальный текст: картинки 800..935 (136 подписей: имена в матрице,
 -- регионы и маркеры линейки), 1023 — черновик поворота
-local VFIRST, VLAST = 800, 959
+local VFIRST, VLAST = 800, 935   -- 11 окт: 936..959 — превью визора (кольцо картинок ReaVisor)
 local vcache, vnext = {}, VFIRST
 D.reset_vcache = function() vcache, vnext = {}, VFIRST end
 -- top = true — прижать к верху отведённой высоты (имена на линейке, 2 окт),
@@ -3702,7 +3702,11 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)
       end
       D.clip = nil
-      rects[(PN.BY[id].tab and 'top') or id] = { ct.x, ct.y, ct.w, ct.h }
+      -- 11 окт: 'top' — лист АКТИВНОЙ вкладки (стеков вкладок может быть два: clips сверху, visor слева;
+      -- последний нарисованный перетирал, и рамка фокуса стояла не там, куда шли клавиши)
+      local rk = PN.BY[id].tab and 'top' or id
+      if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
+      if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
       -- 10 окт: строка клавиш панели (хинты включены) — в самом низу листа
       if c.hint and info.hint_bars then
         local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id

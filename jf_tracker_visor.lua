@@ -30,6 +30,10 @@ VZ.MAXL = 8
 VZ.sel = 1          -- строка левого списка (слои, эффекты, master)
 VZ.psel = 1         -- строка параметра справа
 VZ.pscroll = 0
+VZ.gal = false      -- 11 окт: клавиши в сетке пресетов (i)
+VZ.gsel = 1         -- карточка пресета в сетке
+VZ.gcols = 1        -- колонок в сетке (из отрисовки — для j k)
+VZ.pnames = {}      -- имена пресетов ReaVisor (main кладёт из ISFVIZ/preset_names)
 VZ.heads = {}       -- путь → разобранные входы (кэш, false — не читается)
 VZ.cache = {}       -- последние отданные значения ExtState (пишем только изменения)
 VZ.dirty = false    -- модель изменилась — main сохранит в проект
@@ -336,13 +340,14 @@ end
 -- снимок сцены: всё, кроме самих сцен и качества картинки
 function VZ.scene_take()
   local st = VZ.st
-  return { layers = copy(st.layers), fx = copy(st.fx), master = copy(st.master), blend = st.blend }
+  return { layers = copy(st.layers), fx = copy(st.fx), master = copy(st.master), blend = st.blend, preset = st.preset }
 end
 function VZ.scene_apply(sc)
   if type(sc) ~= 'table' then return false end
   local st = VZ.st
   st.layers = copy(sc.layers or {}); st.fx = copy(sc.fx or {})
   st.master = copy(sc.master or { p = {} }); st.blend = sc.blend or 'normal'
+  st.preset = sc.preset
   VZ.dirty = true
   return true
 end
@@ -487,6 +492,24 @@ function VZ.key(c, fine)
   VZ.psel = math.max(1, math.min(math.max(1, #rows), VZ.psel))
   local row = rows[VZ.psel]
   local p = row and e.slot and VZ.param(e.slot, row)
+  -- 11 окт: zz — визор на всё окно (zoom), как в других модулях; z сам по себе — ждёт второй
+  if VZ.zpend then
+    VZ.zpend = nil
+    if ch == 'z' then return { kind = 'zoom' } end
+  elseif ch == 'z' then VZ.zpend = true; return true end
+  -- 11 окт: n N — следующий / предыдущий пресет (как < > у пресета эффекта в DSP)
+  if ch == 'n' or ch == 'N' then return { kind = 'preset_step', dir = ch == 'n' and 1 or -1 } end
+  -- сетка пресетов (i): h j k l по карточкам, Enter — взять, Esc / i — назад к списку
+  if VZ.gal then
+    local n, cols = #(VZ.pnames or {}), math.max(1, VZ.gcols or 1)
+    if c == 27 or ch == 'i' then VZ.gal = false; return true
+    elseif c == 13 or ch == ' ' then local nm = (VZ.pnames or {})[VZ.gsel]; if nm then return { kind = 'preset', name = nm } end; return true
+    elseif ch == 'l' then VZ.gsel = math.min(n, VZ.gsel + 1); return true
+    elseif ch == 'h' then VZ.gsel = math.max(1, VZ.gsel - 1); return true
+    elseif ch == 'j' then VZ.gsel = math.min(n, VZ.gsel + cols); return true
+    elseif ch == 'k' then VZ.gsel = math.max(1, VZ.gsel - cols); return true
+    end
+  end
   if c == 27 then return { kind = 'leave' }
   elseif ch == 'j' then VZ.sel = math.min(#list, VZ.sel + 1); VZ.psel = 1; return true
   elseif ch == 'k' then VZ.sel = math.max(1, VZ.sel - 1); VZ.psel = 1; return true
@@ -545,7 +568,11 @@ function VZ.key(c, fine)
   elseif ch == 'b' then st.blend = st.blend == 'add' and 'normal' or 'add'; VZ.dirty = true; return true
   elseif ch == 's' then return { kind = 'scene_save' }
   elseif ch == 'S' then st.follow = not st.follow; VZ.dirty = true; return { kind = 'msg', text = 'visor: scenes ' .. (st.follow and 'follow the slot under the playhead' or 'stay as they are') }
-  elseif ch == 'i' then return { kind = 'import' }
+  elseif ch == 'i' then
+    -- 11 окт: i — сетка пресетов с превью (выбор h j k l / мышью), вместо списка fzf
+    VZ.gal = true
+    for k2, nm in ipairs(VZ.pnames or {}) do if nm == st.preset then VZ.gsel = k2 end end
+    return true
   elseif ch == 'p' then return { kind = 'power' }
   end
   return nil
@@ -575,6 +602,13 @@ function VZ.click(hv)
     else VZ.step(row, p, 1) end
     return true
   end
+  if hv.kind == 'preset' then VZ.gsel = hv.i; return { kind = 'preset', name = hv.name } end
+  if hv.kind == 'pgal' then
+    VZ.gal = not VZ.gal
+    for k2, nm in ipairs(VZ.pnames or {}) do if nm == VZ.st.preset then VZ.gsel = k2 end end
+    return true
+  end
+  if hv.kind == 'pprev' or hv.kind == 'pnext' then return { kind = 'preset_step', dir = hv.kind == 'pnext' and 1 or -1 } end
   return { kind = hv.kind }
 end
 
@@ -608,6 +642,53 @@ end
 local function short(fn) return (fn or ''):gsub('%.fs$', ''):gsub('_', ' ') end
 VZ.short = short
 
+-- сетка пресетов: карточка = превью (картинка первого шейдера пресета) + имя;
+-- env.pthumb(name, x, y, w, h) рисует превью; выбранная — янтарная рамка
+function VZ.draw_gallery(L, U, x, y, w, h, focused, env, fit, hint)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local ms, pad, rh = U.measure, L.pad, L.rh
+  local names = VZ.pnames or {}
+  local hover
+  if #names == 0 then
+    U.text(x + pad, y, fit('no ReaVisor presets (ISFVIZ preset_names) - save one in ReaVisor first', w - 2 * pad), U.GREY)
+    return nil
+  end
+  local cwmin = ms('W') * 14
+  local cols = math.max(1, math.floor(w / cwmin))
+  local cw = math.floor(w / cols)
+  local th = math.min(math.floor((cw - 2 * pad) * 9 / 16), h - rh - pad)
+  if th < rh then return nil end                  -- 11 окт: карточка не влезает по высоте — без сетки
+  local ch = th + rh + pad
+  VZ.gcols = cols
+  VZ.gsel = math.max(1, math.min(#names, VZ.gsel))
+  local nrows = math.max(1, math.floor(h / ch))
+  local row0 = VZ.grow0 or 0
+  local sr = (VZ.gsel - 1) // cols
+  if sr < row0 then row0 = sr elseif sr >= row0 + nrows then row0 = sr - nrows + 1 end
+  VZ.grow0 = row0
+  local cur = VZ.st.preset
+  for i = row0 * cols + 1, math.min(#names, (row0 + nrows) * cols) do
+    local k = i - 1 - row0 * cols
+    local cx = x + (k % cols) * cw + pad
+    local cy = y + (k // cols) * ch
+    local bw = cw - 2 * pad
+    local nm = names[i]
+    local hot = mx >= cx and mx < cx + bw and my >= cy and my < cy + ch - pad
+    local sel = i == VZ.gsel and VZ.gal
+    U.set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(cx, cy, bw, th, 1)
+    if not (env.pthumb and env.pthumb(nm, cx, cy, bw, th)) then
+      U.text(cx + pad, cy + math.floor((th - rh) / 2), fit('no preview', bw - 2 * pad), U.DIM)
+    end
+    local col = (sel and focused) and U.AMBER or (hot and U.TEXT or (nm == cur and U.CYAN or U.LINE))
+    U.set(col); gfx.rect(cx, cy, bw, th, 0)
+    if sel or hot then gfx.rect(cx + 1, cy + 1, bw - 2, th - 2, 0) end
+    U.text(cx, cy + th, fit(nm, bw), nm == cur and U.CYAN or ((hot or sel) and U.AMBER or U.TEXT))
+    if hot then hover = { kind = 'preset', i = i, name = nm, tip = 'preset ' .. nm .. ': click - take it (layers, effects, values, LFOs, track routes)' } end
+    if hint then hint('visor', cx, cy, bw, th, { kind = 'preset', i = i, name = nm }) end
+  end
+  return hover
+end
+
 function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local ms = U.measure
@@ -621,6 +702,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   local function b(label, on, kind, tip)
     local bw = ms(label) + 2 * pad
     room(bw)
+    if by + rh > y + h then return end            -- 11 окт: перенос ниже дна панели — не рисовать
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
     U.set(on and U.tint(U.AMBER, 0.25) or (hot and U.mix(U.BG, U.TEXT, 0.16) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
     U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, rh, 0)
@@ -630,14 +712,32 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
     bx = bx + bw + pad
   end
   b(env.on and 'on' or 'off', env.on, 'power', 'send the picture state to the visualizer page (p); off - the page keeps the last frame')
-  b('page', false, 'open', 'open the visualizer page in the browser (o): localhost:8080/isf/index.html, F fullscreen, H hide the HUD')
+  b('web page', false, 'open', 'open the visualizer page in the browser (o): localhost:8080/isf/index.html - the picture is there; F fullscreen, H hides the HUD')
+  -- 11 окт: пресет, как у эффекта в DSP: < имя > — щелчок по имени — сетка с превью, стрелки — соседний
+  do
+    local nm = st.preset or 'preset'
+    local aw = ms('<') + 2 * pad
+    local tw = math.min(ms(nm), ms('W') * 16) + 2 * pad
+    room(2 * aw + tw)
+    local parts = { { '<', 'pprev', bx, aw, 'previous preset (N)' }, { nm, 'pgal', bx + aw, tw, 'presets of ReaVisor with previews (i): click one to take it' }, { '>', 'pnext', bx + aw + tw, aw, 'next preset (n)' } }
+    for _, pp in ipairs(by + rh <= y + h and parts or {}) do
+      local hot = mx >= pp[3] and mx < pp[3] + pp[4] and my >= by and my < by + rh
+      local on = pp[2] == 'pgal' and VZ.gal
+      U.set(on and U.tint(U.AMBER, 0.25) or (hot and U.mix(U.BG, U.TEXT, 0.16) or U.BG)); gfx.rect(pp[3], by, pp[4], rh, 1)
+      U.set(U.LINE); gfx.rect(pp[3], by, pp[4], rh, 0)
+      U.text(pp[3] + pad, by, fit(pp[1], pp[4] - 2 * pad), hot and U.AMBER or (pp[2] == 'pgal' and (st.preset and U.CYAN or U.GREY) or U.GREY))
+      if hot then hover = { kind = pp[2], tip = pp[5] } end
+      if hint then hint('visor', pp[3], by, pp[4], rh, pp[2]) end
+    end
+    bx = bx + 2 * aw + tw + pad
+  end
   b(st.blend == 'add' and 'add' or 'mix', st.blend == 'add', 'blend', 'how layers stack (b): mix - by fade, add - light adds up')
   b('scene', env.scene_has, 'scene_save', 'save everything as the scene of the cursor slot ' .. (env.scene or '') .. ' (s); with follow it comes back when the playhead enters the slot')
   b('follow', st.follow, 'follow', 'scenes follow the slot under the playhead (S)')
-  b('import', false, 'import', 'take a preset of ReaVisor (i) - layers, effects, values, LFOs and track routes')
   b(('res %d%%'):format(math.floor((st.scale or 0.3) * 100 + 0.5)), false, 'res', 'render resolution of the page: click - next (lower is lighter for the GPU)')
   b(('fps %d'):format(st.fps or 60), false, 'fps', 'frame rate cap of the page: click - next')
   local top = by + rh + 4
+  if top + rh > y + h then return hover end        -- 11 окт: под кнопками места нет
   -- левая колонка: список
   local list = VZ.list()
   VZ.sel = math.max(1, math.min(#list, VZ.sel))
@@ -686,6 +786,17 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
       end
     end
     ly = ly + rh
+  end
+  -- 11 окт: сетка пресетов — справа всегда, если панель широкая (zz), иначе по i вместо параметров
+  local wide = w - lw >= ms('W') * 110
+  if wide or VZ.gal then
+    local gw = wide and math.floor((w - lw) * 0.45) or (w - lw - pad)
+    local gx = x + w - gw
+    U.set(U.LINE); gfx.rect(gx - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)
+    local gh = VZ.draw_gallery(L, U, gx, top, gw - pad, y + h - top, focused, env, fit, hint)
+    if gh then hover = gh end
+    if not wide then return hover end
+    w = w - gw
   end
   -- справа: параметры выбранного
   local e = VZ.cur()
