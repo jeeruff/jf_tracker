@@ -415,6 +415,7 @@ function M.build(lpb)
     local sfx = R.TrackFX_GetByName and R.TrackFX_GetByName(mt, 'jf_tracker_scope', false)
     if sfx and sfx >= 0 then ms.scope_slot = math.floor(R.TrackFX_GetParam(mt, sfx, 0)) end
     ms.envs = M.track_envs(mt, lpb)   -- 11 окт: колонка мастера в трекере — его огибающие (темп, громкость …)
+    ms.cmd = M.cmd_lane(lpb)          -- 11 окт: колонка cmd мастера — маркеры проекта
     snap.master = ms
   end
   for ti = 0, R.CountTracks(0) - 1 do
@@ -1420,6 +1421,28 @@ function M.track_midilanes(tr, lpb, guid)
     table.sort(l.rows)
   end
   return out
+end
+
+-- 11 окт: колонка cmd мастера — маркеры проекта по строкам (не регионы и не
+-- служебные «=…» трекера). Тот же вид, что MIDI-лейн: ev[row] = { text, n, idx },
+-- rows — по порядку. Маркер «!<действие>» REAPER сам исполняет при проигрывании
+function M.cmd_lane(lpb)
+  local ml = { kind = 'cmd', name = 'cmd', ev = {}, rows = {} }
+  local i = 0
+  while true do
+    local ret, isrgn, pos, _, name, idx = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    name = name or ''
+    if not isrgn and not name:match('^=') then
+      local r = M.row_of_qn(R.TimeMap2_timeToQN(0, pos), lpb)
+      local e = ml.ev[r]
+      if e then e.n = e.n + 1; e.text = e.text .. ' ' .. name; e.idx[#e.idx + 1] = idx
+      else ml.ev[r] = { text = name, n = 1, idx = { idx }, pos = pos }; ml.rows[#ml.rows + 1] = r end
+    end
+    i = i + 1
+  end
+  table.sort(ml.rows)
+  return ml
 end
 
 function M.track_envs(tr, lpb)

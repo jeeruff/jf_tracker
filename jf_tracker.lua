@@ -3442,6 +3442,33 @@ ctx = {
     model.invalidate()
     vim.msg = ('%s %02X at %04d'):format(ml.name, v, row)
   end,
+  -- 11 окт: колонка cmd мастера — маркер проекта в строке row: текст ставит / меняет,
+  -- пустой удаляет. «!<номер или _имя действия>» REAPER исполняет при проигрывании
+  mcmd_set = function(row, text)
+    text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    local found, i = {}, 0
+    while true do
+      local ret, isrgn, pos, _, name, idx, color = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
+      i = i + 1
+    end
+    if text == '' and #found == 0 then vim.msg = 'cmd: no command on this row'; return end
+    edit.run(text == '' and 'delete command' or 'command', function()
+      if text == '' then for _, f in ipairs(found) do reaper.DeleteProjectMarker(0, f.idx, false) end
+      elseif #found > 0 then reaper.SetProjectMarker3(0, found[1].idx, false, found[1].pos, 0, text, found[1].color or 0)
+      else reaper.AddProjectMarker2(0, false, t0, 0, text, -1, 0) end
+    end)
+    model.invalidate()
+    if text == '' then vim.msg = ('cmd: deleted on row %04d (u - undo)'):format(row); return end
+    local act = text:match('^!%s*(%S+)')
+    if act then
+      local id = tonumber(act) or reaper.NamedCommandLookup(act:sub(1, 1) == '_' and act or ('_' .. act))
+      local nm = id and id > 0 and reaper.kbd_getTextFromCmd(id, 0) or ''
+      vim.msg = nm ~= '' and ('cmd %04d: %s - REAPER runs it when playback passes'):format(row, nm) or ('cmd %04d: %s - no such REAPER action'):format(row, text)
+    else vim.msg = ('cmd %04d: %s (marker)'):format(row, text) end
+  end,
   ml_del = function(f, row)
     local tr = f.col.track
     local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)

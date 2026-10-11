@@ -658,7 +658,8 @@ function D.layout(snap, state, nregions)
   L.mtrack = state.showmaster ~= false and snap.master and snap.master.track and not state.ptmode or false
   if L.mtrack then
     local ne = math.max(1, #(snap.master.envs or {}))
-    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1)
+    L.cmd_w = snap.master.cmd and (2 * L.pad + ms('WWWWWWWW')) or 0     -- 11 окт: колонка cmd (маркеры)
+    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0))
   end
   L.cols_r = L.win_w - L.master_w
   L.flat, L.cols = {}, {}
@@ -777,8 +778,13 @@ function D.layout(snap, state, nregions)
       c.envs[#c.envs + 1] = { e = e, x = lx, w = L.env_w, fi = #L.flat }
       lx = lx + L.env_w + 1
     end
+    if mc.cmd then
+      L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.cmd, sub = {}, x = lx, w = L.cmd_w }
+      c.mls[#c.mls + 1] = { ml = mc.cmd, x = lx, w = L.cmd_w, fi = #L.flat }
+      lx = lx + L.cmd_w + 1
+    end
     c.w = L.master_w - 1
-    c.empty = #c.envs == 0
+    c.empty = #c.envs == 0 and not mc.cmd
     L.mcol = c
     L.cols[#L.cols + 1] = c
   else L.mcol = nil end
@@ -5235,9 +5241,9 @@ function D.frame(L, snap, rows, state, info)
             end
           end
           if e then
-            local t = ml.kind == 'tx' and (e.text or '') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
+            local t = (ml.kind == 'tx' or ml.kind == 'cmd') and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
             text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN)
-          else text(m.x + L.pad, ty, ml.kind == 'tx' and '....' or '..', D.EMPTY) end
+          else text(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
         ::ml_next::

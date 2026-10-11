@@ -1014,6 +1014,7 @@ local function run_cmd(line)
   elseif cmd == 'logo' then if ctx.logo_show then ctx.logo_show(arg) end
   elseif cmd == 'dev' then if ctx.dev_set then ctx.dev_set(arg) end
   elseif cmd == 'tutorial' or cmd == 'tutor' then if ctx.tutorial then ctx.tutorial(arg == 'text') end
+  elseif cmd == 'mcmd' then if ctx.mcmd_set then ctx.mcmd_set(V.cur.row, arg) end   -- 11 окт: команда мастера (маркер) в строке курсора
   elseif cmd == 'libsave' then if ctx.kit_save then ctx.kit_save(arg) end
   elseif cmd == 'legato' then
     -- :legato [off|auto] (3 окт): ноты трека курсора встык со следующими, под темп;
@@ -1399,6 +1400,20 @@ function V.key_impl(c)
   end
 
   record(c)
+
+  -- 11 окт: колонка cmd мастера (маркеры проекта): Enter — текст команды в строке :,
+  -- ! — действие REAPER (маркер «!id» REAPER исполняет сам), BS / Del (и x в NORMAL) — удалить
+  do
+    local cf = flat()[V.cur.fi]
+    if cf and cf.ml and cf.ml.kind == 'cmd' and (V.mode == 'normal' or V.mode == 'insert') then
+      local e = cf.ml.ev[V.cur.row]
+      if c == 13 then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd ' .. (e and e.text or ''); return end
+      if c == ('!'):byte() then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd !'; return end
+      if c == BS or c == DEL or (V.mode == 'normal' and c == ('x'):byte()) then
+        if ctx.mcmd_set then ctx.mcmd_set(V.cur.row, '') end; return
+      end
+    end
+  end
 
   -- INSERT
   if V.mode == 'insert' then
