@@ -13862,6 +13862,8 @@ local function frame()
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
   elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then state.status = ({ a = 'clip start - drag (offset of the clip item)', b = 'clip end - drag (its length)', move = 'clip - drag the strip: the whole clip in the source', la = 'loop start L - drag: the part the session loops', lb = 'loop end L - drag', xf = 'loop crossfade at the seam - click: 0 / 10 / 30 / 60 / 120 ms (default off)' })[SL.zone_hot] or ''
+  elseif hover.sample and SL.item_hot then state.status = SL.item_hot == 'ia' and 'item start - drag: trim (inside) or extend (past the left edge, up to the file start); all notes of the instrument, one undo'
+      or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
@@ -14595,6 +14597,16 @@ local function frame()
         vim.msg = 'spectrogram: recalculating'
       else SL.view = hover.sample.view end
       click = { t = now2, zone = 'sampleview' }
+    elseif hover.sample and SL.item_hot and SL.item_e then
+      -- 11 окт: начало / конец item-инструмента — протяжка (see SL.item_drag ниже)
+      local e = SL.item_e
+      local tk = reaper.ValidatePtr(e.item, 'MediaItem*') and reaper.GetActiveTake(e.item)
+      local src = tk and reaper.GetMediaItemTake_Source(tk)
+      local slen = src and reaper.GetMediaSourceLength(src) or nil
+      local rate = (e.rate and e.rate ~= 0) and e.rate or 1
+      local hi = slen and math.max(e.len, (slen - (e.offs or 0)) / rate) or e.len
+      SL.item_drag = { edge = SL.item_hot, e = e, t = SL.item_hot == 'ia' and 0 or e.len, lo = -(e.offs or 0) / rate, hi = hi }
+      click = { t = now2, zone = 'itemedge' }
     elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then
       -- клип сессии (6 окт): начало / конец / перенос / метки лупа L / xf
       ctx.set_focus('top')
@@ -15700,6 +15712,29 @@ local function frame()
         elseif not e.mark then ctx.drop_to(hover.fi, hover.row.row, e.pm and e.path or B.full(e)) end
       end
       B.drag = nil
+    end
+  end
+  -- 11 окт: начало / конец item-инструмента: тянется (за край волны — расширение
+  -- в пределах файла), на отпускании — offset и длина всех нот инструмента (один undo)
+  if SL.item_drag then
+    local d, wv = SL.item_drag, SL.wave
+    local e = d.e
+    if gfx.mouse_cap & 1 == 1 then
+      if wv and wv.w > 0 then
+        local va, vb = wv.va or 0, wv.vb or wv.len
+        local t = va + (gfx.mouse_x - wv.x) / wv.w * (vb - va)
+        if d.edge == 'ia' then t = math.max(d.lo, math.min(e.len - 0.005, t)) else t = math.max(0.005, math.min(d.hi, t)) end
+        d.t = t
+        state.status = d.edge == 'ia' and ('item start %+.3fs (offset %.3fs) - release: all notes of %s'):format(t, (e.offs or 0) + t * (e.rate or 1), e.name or 'the instrument')
+          or ('item end %.3fs (length %.3fs) - release: all notes of %s'):format(t, t, e.name or 'the instrument')
+      end
+    else
+      SL.item_drag = nil
+      local t = d.t
+      if t and math.abs(t - (d.edge == 'ia' and 0 or e.len)) > 1e-4 then
+        if d.edge == 'ia' then ctx.autotrim(e, t, e.len) else ctx.autotrim(e, 0, t) end
+        vim.msg = ('%s %s: %.3fs (u - undo)'):format(e.name or 'item', d.edge == 'ia' and 'start' or 'end', d.edge == 'ia' and (e.offs or 0) or (e.len or 0))
+      end
     end
   end
   -- сэмпл-модуль: протяжка выделения / вынос выделения на колонку трекера

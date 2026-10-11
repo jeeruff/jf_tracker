@@ -1026,6 +1026,34 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.rect(px0, wy + wh - 4, math.max(2, px1 - px0 + 1), 4, 1)
     gfx.a = 1
   end
+  -- 11 окт: начало и конец самого item — ручки-треугольники снизу волны (голубые);
+  -- тянуть внутрь — обрезать, за край волны — расширить в пределах файла.
+  -- На отпускании main правит все ноты инструмента (ctx.autotrim, один undo)
+  S.item_hot, S.item_e = nil, nil
+  if e.item and not e.file and wave_view then
+    S.item_e = e
+    local mxw, myw = gfx.mouse_x, gfx.mouse_y
+    local IY = wy + wh - 18
+    local idg = S.item_drag and S.item_drag.e and S.item_drag.e.item == e.item and S.item_drag or nil
+    for _, ed in ipairs({ { 'ia', 0 }, { 'ib', len } }) do
+      local mine = idg and idg.edge == ed[1]
+      local t = (mine and idg.t) or ed[2]
+      if mine or (t >= va - 1e-6 and t <= vb + 1e-6) then
+        local px = math.max(x, math.min(x + w - 1, tx(t)))
+        if ed[1] == 'ib' and not mine then px = math.max(x, px - 1) end
+        if not S.drag and not idg and not (S.zone_drag) and myw >= IY and myw < IY + 10 and math.abs(mxw - px) <= 6 then S.item_hot = ed[1]; S.zone_hot = nil end
+        local hot = S.item_hot == ed[1] or mine
+        -- отрезаемая часть — притушена
+        if mine and ed[1] == 'ia' and t > 0 then gfx.set(0, 0, 0, 0.55); gfx.rect(x, wy, math.max(0, px - x), wh, 1) end
+        if mine and ed[1] == 'ib' and t < len then gfx.set(0, 0, 0, 0.55); gfx.rect(px, wy, math.max(0, x + w - px), wh, 1) end
+        gfx.a = 1
+        U.set(hot and U.AMBER or U.CYAN)
+        if mine or hot then gfx.rect(px, wy, 1, wh, 1) end
+        local d = ed[1] == 'ia' and 1 or -1
+        for k = 0, 6 do local wdt = 7 - k; gfx.rect(d > 0 and px or (px - wdt + 1), IY + 9 - k, wdt, 1, 1) end
+      end
+    end
+  end
   -- клип сессии (6 окт): метки лупа L (тянутся: S.zone_hot 'la' / 'lb'),
   -- кнопка xf — кроссфейд шва лупа (клик — 0 / 10 / 30 / 60 / 120 мс)
   if zone and zone.loop then
