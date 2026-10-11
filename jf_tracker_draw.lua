@@ -1072,7 +1072,10 @@ function D.route_diagram(L, cols, master, x, y, w, h)
   for _, c in ipairs(L.cols or {}) do
     if c.col and c.col.track and c.x then cx[c.col.track] = c.x + math.floor(c.w / 2); cc[c.col.track] = c end
   end
-  if master and master.track then cx[master.track] = L.matrix_w + math.floor(L.label_w / 2) end
+  -- 11 окт: мастер справа (его полоса микшера в углу) — туда и провода; слева — как было
+  local mxx, mxw = L.matrix_w, L.label_w
+  if L.master_right then mxx = L.cols_r end
+  if master and master.track then cx[master.track] = mxx + math.floor(mxw / 2); cc[master.track] = { x = mxx, w = mxw, col = master, master = true } end
   local bot = y + h - 2
   -- связи по порядку: сенды, аппаратные, выходы в папку / мастер (последними — ниже всех)
   local links = {}
@@ -1084,10 +1087,53 @@ function D.route_diagram(L, cols, master, x, y, w, h)
     end
   end
   table.sort(links, function(p, q) if p.ord ~= q.ord then return p.ord > q.ord end; return math.abs(p.a - p.b) < math.abs(q.a - q.b) end)
-  local step = math.max(3, math.min(L.rh, math.floor((h - L.rh - 8) / math.max(1, #links))))
+  -- 11 окт: провода — нижняя часть (до 40 %), над ними — устройства треков столбиком
+  local links_h = math.min(math.floor(h * 0.4), #links * L.rh + 6)
+  local step = math.max(3, math.min(L.rh, math.floor((links_h - 4) / math.max(1, #links))))
   text(x + L.pad, y + 2, fit('routing - all tracks over the mixer: cyan sends, grey to folder / master, amber hardware; click over a track - its routing; Esc - back', w - 2 * L.pad), U.AMBER)
   -- стойки колонок (тонко) — чтобы было видно, где чья колонка
   for tr, xx in pairs(cx) do set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(xx, y + L.rh + 4, 1, h - L.rh - 6, 1) end
+  -- 11 окт: устройства трека — цепь DSP, повёрнутая на 90° против часовой: первое
+  -- у полосы микшера (внизу), дальше вверх; блок — имя и мини-полоски параметров.
+  -- Щелчок — этот эффект в DSP
+  local dtop, dbot = y + L.rh + 4, bot - links_h - 4
+  for tr, c in pairs(cc) do
+    local fxs = c.col and c.col.fx or {}
+    local bw0 = c.w - 4
+    if #fxs > 0 and dbot - dtop >= L.rh + 4 and bw0 >= 3 * L.cw then
+      local bx0 = c.x + 2
+      local avail = dbot - dtop
+      local bh0 = math.max(L.rh + 4, math.min(6 * L.rh + 4, math.floor(avail / #fxs) - 2))
+      local yb = dbot
+      for k, f in ipairs(fxs) do
+        local by0 = yb - bh0
+        if by0 < dtop then
+          text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY); break
+        end
+        local hot = mx >= bx0 and mx < bx0 + bw0 and my >= by0 and my < yb
+        set(hot and D.CURROW or U.PANEL); gfx.rect(bx0, by0, bw0, bh0, 1)
+        set(hot and U.AMBER or (f.enabled and U.LINE or U.DIM)); gfx.rect(bx0, by0, bw0, bh0, 0)
+        text(bx0 + 2, by0 + 2, fit(f.name or '?', bw0 - 4), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+        local prow = math.floor((bh0 - L.rh - 4) / L.rh)
+        local pw = bw0 - 6
+        for pi = 1, math.min(prow, #(f.params or {})) do
+          local pp = f.params[pi]
+          local py = by0 + 2 + pi * L.rh
+          local okp, v = pcall(reaper.TrackFX_GetParamNormalized, tr, pp.fx or f.i, pp.i)
+          local nl = fit(pp.name or '', math.floor(pw * 0.45))
+          text(bx0 + 3, py, nl, U.GREY)
+          local bx1 = bx0 + 3 + math.floor(pw * 0.48)
+          local bw1 = bx0 + bw0 - 3 - bx1
+          if bw1 > 4 then
+            set(U.mix(U.LINE, U.BG, 0.4)); gfx.rect(bx1, py + math.floor(L.rh / 2) - 1, bw1, 2, 1)
+            if okp and v then set(f.enabled and U.CYAN or U.GREY); gfx.rect(bx1, py + math.floor(L.rh / 2) - 1, math.max(1, math.floor(bw1 * v)), 2, 1) end
+          end
+        end
+        if hot then hover.rdev = { col = c.col, k = k, master = c.master } end
+        yb = by0 - 2
+      end
+    end
+  end
   for k, l in ipairs(links) do
     local ly = bot - k * step
     if ly < y + L.rh + 4 then break end
@@ -1109,9 +1155,8 @@ function D.route_diagram(L, cols, master, x, y, w, h)
   -- щелчок над колонкой — её маршрутизация
   if my >= y and my < y + h then
     for tr, c in pairs(cc) do
-      if mx >= c.x and mx < c.x + c.w then hover.btn = { col = c.col, what = 'route' } end
+      if not hover.rdev and mx >= c.x and mx < c.x + c.w then hover.btn = { col = c.col, what = 'route' } end
     end
-    if master and master.track and mx >= L.matrix_w and mx < L.matrix_w + L.label_w then hover.btn = { col = master, what = 'route' } end
   end
   return hover
 end

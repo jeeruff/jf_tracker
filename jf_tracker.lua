@@ -3913,6 +3913,18 @@ ctx = {
   slq_label = function() return 'q ' .. (({ off = '0', row = 'row', ['2row'] = '2', beat = 'beat', bar = 'bar' })[state.slq or 'off'] or '0') end,
   -- 11 окт: render слайсов (кнопка внизу списка слайсов): lib — каждый слайс своим инструментом
   -- (кусок item в =LIB), rs5k — по RS5K на слайс на треке курсора, нота = клавиша слайса
+  -- 11 окт: устройство трека в виде routing — курсор на трек, этот эффект в DSP
+  rdev_open = function(d)
+    if d.master then vim.msg = 'master fx: the master tab (F-key) - its chain is there'; return end
+    for fi, f in ipairs(L and L.flat or {}) do
+      if f.col and d.col and f.col.track == d.col.track then vim.cur.fi = fi; break end
+    end
+    state.routeview = false
+    dsp_sel.fx, dsp_sel.param = d.k, 1
+    ctx.set_focus('dsp')
+    local f = d.col and d.col.fx and d.col.fx[d.k]
+    vim.msg = ('dsp: %s - %s'):format(d.col and d.col.name or '', f and f.name or '')
+  end,
   slices_render_menu = function()
     vim.open_hydra({ title = 'render slices', items = {
       { key = 'l', label = 'to the lib - every slice its own instrument', fn = function() ctx.slices_render('lib') end },
@@ -14950,6 +14962,7 @@ local function frame()
       ::sprop_done::
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
+    elseif hover.rdev then ctx.rdev_open(hover.rdev); click = { t = now2, zone = 'rdev' }   -- 11 окт: устройство в routing — в DSP
     elseif hover.rs5k then ctx.rs5k_do(hover.rs5k.f, hover.rs5k.what); click = { t = now2, zone = 'rs5k' }   -- 10 окт: кнопки RS5K
     elseif hover.mixmode then ctx.master_meter_menu()
     elseif hover.mixpk then
