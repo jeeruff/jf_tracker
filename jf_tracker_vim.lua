@@ -1460,24 +1460,20 @@ function V.key_impl(c)
     end
     local env = env_of(V.cur.fi)
     if (c == 62 or c == 60) and fld == 1 and not env then ctx.loop(c == 62 and 'item' or 'region'); return end
-    if env and fld == 2 and nfields() >= 2 then
-      -- поле формы: буквы сокращения (lin sqr slo fas fae bez) → форма точки строки
-      local lc = (c < 256) and string.char(c):lower() or ''
-      local raw = (c < 256) and string.char(c) or ''
-      if c == ESC then V.shapebuf = nil
-      -- 6 окт: h j k l — курсор и здесь (раньше съедались вводом формы и
-      -- курсор не уходил с лейна); все формы, и lin, — Ctrl+Opt+1..6 на лейне
-      elseif not V.shapebuf and (raw == 'h' or raw == 'j' or raw == 'k' or raw == 'l') then
-        local m = motion(c, 1)
-        if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
-      elseif lc:match('^[a-z]$') then
-        local buf = (V.shapebuf or '') .. lc
-        local m = V.shape_match(buf)
-        if m == false then V.shapebuf = nil; V.msg = 'shape: sqr slo fas fae bez; any shape: Ctrl+Opt+1..6 (1 lin)'
-        elseif m == nil then V.shapebuf = buf; V.msg = 'shape ' .. buf .. '…'
-        else V.shapebuf = nil; ctx.env_shape(env, V.cur.row, m); V.cur.row = V.cur.row + step_rows(); ensure_visible() end
+    -- 11 окт: огибающая в INSERT — как Vim: цифры — значение, остальное — команды NORMAL
+    -- (dd x yy p w } счётчики …), после них снова INSERT; форма точки — Ctrl+Opt+1..6 / Ctrl+Enter
+    local function env_normal(c2)
+      V.mode = 'normal'
+      local r = V.key_impl(c2)
+      if V.mode == 'normal' then
+        if V.pending or V.op then V.back_insert = true else V.mode = 'insert' end
       end
-      return
+      return r
+    end
+    if env and fld == 2 and nfields() >= 2 then
+      V.shapebuf = nil
+      if c == ESC then return env_normal(c) end
+      return env_normal(c)
     end
     if env then
       -- колонка огибающей: две hex-цифры — точка; BS — удалить; / и \ —
@@ -1494,33 +1490,14 @@ function V.key_impl(c)
         ctx.env_set(env, V.cur.row, v)
         V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
       end
-      -- 6 окт: буквы на лейне не ноты — Vim-клавиши: h j k l курсор, + / -
-      -- шаг значения точки строки (1/127 или 1/255), x вырезать точку, y
-      -- копировать, p вставить, dw / dd удалить (в hex d — цифра, там x)
+      -- + / - — шаг значения точки строки; остальное — команды NORMAL (11 окт)
+      V.hexbuf = nil
       local lk = (c < 256) and string.char(c) or ''
-      V.hexbuf = nil                                 -- 11 окт: недобранное число не держит клавиши
-      if V.env_d then
-        V.env_d = nil
-        if lk == 'w' or lk == 'd' then if apply('d', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() end; return end
-      end
       local hexm = (ctx.envfmt and ctx.envfmt() or 'midi') == 'hex'
-      if lk == 'h' or lk == 'j' or lk == 'k' or lk == 'l' then
-        local m = motion(c, 1)
-        if m then V.cur.fi, V.cur.row = m.fi, m.row; if m.field then V.cur.field = m.field; V.cur.sub = m.sub end; clamp_cur(); ensure_visible() end
-      elseif lk == '+' or lk == '=' or lk == '-' then
-        ctx.env_nudge(env, V.cur.row, (lk == '-' and -1 or 1) / (hexm and 255 or 127))
-      elseif lk == 'x' then
-        if apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() end
-      elseif lk == 'y' then
-        V.regs['"'] = { kind = 'env', pts = ctx.env_points(env, V.cur.row, V.cur.row), rows = 1 }
-        V.msg = ('yank %d point(s)'):format(#V.regs['"'].pts)
-      elseif lk == 'p' then
-        local reg = V.regs['"']
-        if reg and reg.kind == 'env' then ctx.env_paste(env, V.cur.row, reg); V.cur.row = V.cur.row + (reg.rows or 1); ensure_visible()
-        else V.msg = 'register has no envelope points (y / x on a point)' end
-      elseif lk == 'd' and not hexm then V.env_d = true; V.msg = 'd - w / d deletes the point'
+      if lk == '+' or lk == '=' or lk == '-' then
+        ctx.env_nudge(env, V.cur.row, (lk == '-' and -1 or 1) / (hexm and 255 or 127)); return
       end
-      return
+      return env_normal(c)
     end
     if fld == 2 and (c == ('/'):byte() or c == ('\\'):byte()) then
       -- vol аудио-события: / фейд-ин, \ фейд-аут за 1 бит (команды Ixx/Oxx, xx = 1/16 строки)

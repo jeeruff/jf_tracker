@@ -553,8 +553,9 @@ reset()
 L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Volume' }, sub = {} }
 local efi2 = #L.flat
 V.cur = { fi = efi2, row = 4, field = 2 }
-keysin('ib');     eq('INSERT b on shape → bez', last(), 'envshape:Volume@4:5'); eq('shape steps down', V.cur.row, 5)
-keysin('fa');     eq('fa still ambiguous', last(), 'envshape:Volume@4:5'); keysin('s'); eq('fas → fast start', last(), 'envshape:Volume@5:3')
+-- 11 окт: в INSERT на огибающей буквы — команды Vim (форма — Ctrl+Opt+1..6 / :shape / ^A)
+keysin('ij');     eq('INSERT j on the envelope moves down (Vim)', V.cur.row, 5); eq('INSERT stays after a Vim key', V.mode, 'insert')
+keysin('k');      eq('INSERT k back up', V.cur.row, 4)
 V.key(27); V.mode = 'normal'; V.shapebuf = nil      -- Esc в NORMAL теперь — снова INSERT (4 окт)
 V.cur = { fi = efi2, row = 4, field = 2 }
 V.key(1);         eq('NORMAL ^A on shape cycles', last(), 'envshapestep:Volume@4:+1')
@@ -705,9 +706,11 @@ reset()
 keysin('iq'); eq('INSERT: q writes C-4 at once', last(), 'ins:trA@0:60:1'); eq('INSERT: keyboard on', V.piano, true)
 keysin('m'); eq('INSERT: m does not turn it off', V.piano, true)
 V.key(27); eq('Esc: NORMAL, keyboard off', V.piano, false)
--- 10 окт: INSERT KEYS слит с INSERT — клавиатура спрятана, ноты всё равно пишутся
+-- 11 окт: клавиатура спрятана — INSERT НЕ пишет ноты (буквы = команды NORMAL, потом снова INSERT)
 reset(); PIANO_ON = false
-keysin('iw'); eq('INSERT with the keyboard hidden still writes notes', last(), 'ins:trA@0:62:1')
+local nc0 = #calls
+keysin('iw'); eq('INSERT with the keyboard hidden writes no note', #calls, nc0); eq('…and stays in INSERT', V.mode, 'insert')
+keysin('x'); eq('keyboard hidden: w moved to the next event (ov), x deleted it like NORMAL', last(), 'delete:ov'); eq('…back in INSERT', V.mode, 'insert')
 PIANO_ON = nil; V.key(27)
 -- Esc переключает INSERT (4 окт, как Renoise)
 reset(); V.key(27); eq('NORMAL Esc -> INSERT', V.mode, 'insert'); V.key(27); eq('INSERT Esc -> NORMAL', V.mode, 'normal')
@@ -803,9 +806,9 @@ reset()
 local CAP
 local ins0 = E.insert_note
 E.insert_note = function(...) CAP = E.cap_row or 'none'; return ins0(...) end
-V.cur = { fi = 1, row = 4, field = 1 }; V.mode = 'insert'
+V.cur = { fi = 1, row = 4, field = 1 }; V.mode = 'insert'; PIANO_ON = true
 local pk; for code, off in pairs(keys.piano) do if off == 0 then pk = code end end
-V.key(pk)
+V.key(pk); PIANO_ON = nil
 eq('insert: cap = the next event of the subcolumn (snare @8)', CAP, 8)
 eq('insert: cap cleared after the insert', E.cap_row, nil)
 E.insert_note = ins0
