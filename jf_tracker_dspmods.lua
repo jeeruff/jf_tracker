@@ -41,7 +41,7 @@ DM.modules = {
       { 'FX dry/wet',            'dry/wet' },
       { 'Playthrough',           'thru',    labels = { 'off', 'on' } },
       { 'Pitch wheel range',     'bend' },
-      { 'Max capture',           'capture' },
+      { 'Input passthrough',     'input',   labels = { 'off', 'pass' } },   -- 11 окт: аудио трека сквозь slixer (Max capture — в окне плагина)
 
       { 'ARP: on',               'arp',     labels = { 'off', 'on' } },
       { 'ARP: rate',             'rate',    labels = { '1', '2', '4', '8', '8T', '16', '32' } },
