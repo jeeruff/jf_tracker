@@ -5566,9 +5566,11 @@ function D.frame(L, snap, rows, state, info)
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 } }
+      -- 11 окт: + — меню последнего тронутого параметра этого эффекта (как кнопка Param в REAPER)
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 },
+                    { '+', 'lastp', bx + bw - 5 * kb - 11 } }
       local dlt = info.fx_delta and info.fx_delta(f)
-      local tw = bw - 2 * L.pad - 4 * kb - 9
+      local tw = bw - 2 * L.pad - 5 * kb - 12
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
       if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - 2 * kb - 5 end
       -- ReaEQ (7 окт): P — только параметры, G — только график

@@ -8427,6 +8427,18 @@ ctx = {
     end)
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
+  -- 11 окт: + в шапке эффекта — меню последнего тронутого параметра ЭТОГО эффекта (то же, что ПКМ по параметру)
+  dsp_lastparam_menu = function(k)
+    local t, f = ctx.dsp_fx(k); if not (t and f) then return end
+    local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+    local tr = ok and (tn == 0 and reaper.GetMasterTrack(0) or reaper.GetTrack(0, (tn & 0xFFFF) - 1)) or nil
+    local pi
+    if tr == t.track and fxn == f.i then
+      for i, p in ipairs(f.params or {}) do if p.i == pn and not p.fx then pi = i end end
+    end
+    if not pi then vim.msg = f.name .. ': touch a parameter of it first (drag a slider here or in its window) - then + opens its menu'; return end
+    ctx.open_context({ dsp = { fx = k, f = f, param = pi }, only = true })   -- only: без клавиш DSP — одно меню параметра
+  end,
   dsp_delta = function(k)
     local col, f = ctx.dsp_fx(k); if not f then return end
     local on = edit.fx_delta(col.track, f.i)
@@ -9918,6 +9930,7 @@ function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
   if hover.btn and hover.btn.what == 'arm' then return nil end   -- 11 окт: меню записи — только своё
+  if hover.only then return nil end
   if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
@@ -13213,7 +13226,7 @@ local function frame()
     state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
-  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)' })[hover.dspbtn.what]
+  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -14468,6 +14481,7 @@ local function frame()
       if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'lastp' then ctx.dsp_lastparam_menu(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
       elseif hover.dspbtn.what == 'vmode' then
