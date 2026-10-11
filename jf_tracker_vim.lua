@@ -1642,7 +1642,10 @@ function V.key_impl(c)
         if cell and cell.kind == 'cont' and cell.of and not tx then E.note_off({ cell.of }, lpb(), V.cur.row)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
       end
-      local it = E.insert_slice(f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
+      if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end
+      local okI, it = pcall(E.insert_slice, f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
+      E.cap_row = nil
+      if not okI then error(it, 0) end
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, semis) end
@@ -1709,7 +1712,10 @@ function V.key_impl(c)
           end
         end
         local stp = V.step_auto and 1 or V.step
-        E.insert_note(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
+        if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end
+        local okN, errN = pcall(E.insert_note,f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
+        E.cap_row = nil
+        if not okN then E.beside = false; error(errN, 0) end
         E.beside = false
         if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
         V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
@@ -2585,6 +2591,14 @@ function V.smart()
 end
 
 -- поле инструмента есть, если в раскладке есть колонка номера (не узкая колонка)
+-- 11 окт: строка следующего события (голова ноты / item) в подколонке ниже row — новая нота обрывается на ней
+function V.next_event_row(sub, row)
+  local best
+  for r, cell in pairs(sub or {}) do
+    if r > row and (cell.kind == 'audio' or cell.kind == 'midi') and (not best or r < best) then best = r end
+  end
+  return best
+end
 function V.slc_field_ok()
   if not V.inst_field_ok() then return false end
   local f = flat()[V.cur.fi]

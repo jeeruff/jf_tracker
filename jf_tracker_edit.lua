@@ -1366,6 +1366,13 @@ end
 local function finish_insert(track, lane_idx, it)
   if not it then return end
   E.bsync_fit(it)                                     -- beatsync инструмента: под темп в этом месте
+  -- 11 окт: следующее событие подколонки курсора (E.cap_row, ставит vim) обрывает новую ноту —
+  -- иначе длинный слайс налезал на MIDI-ноту ниже и уезжал в новую подколонку
+  if E.cap_row and E.cap_lpb then
+    local tc = row_time(E.cap_row, E.cap_lpb, 0)
+    local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    if tc > p + 1e-4 and p + R.GetMediaItemInfo_Value(it, 'D_LENGTH') > tc + 1e-6 then R.SetMediaItemInfo_Value(it, 'D_LENGTH', tc - p) end
+  end
   if E.mono and not E.beside then mono_cut(track, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
