@@ -1652,7 +1652,15 @@ function V.key_impl(c)
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
-        V.stitch = { fi = V.cur.fi, row = r, t = t_end }
+        local q = ctx.slq_rows and ctx.slq_rows() or 0
+        if q > 0 then
+          -- 11 окт: старт по сетке — ближайшая клетка q строк после конца слайса (не раньше следующей строки)
+          local r0, d0 = E.row_of_time(t_end, lpb())
+          local rf = r0 + d0 / 256
+          r = math.floor(rf / q + 0.5) * q
+          while r <= V.cur.row do r = r + q end
+          V.stitch = nil
+        else V.stitch = { fi = V.cur.fi, row = r, t = t_end } end
         V.cur.row = r
       else
         V.stitch = nil

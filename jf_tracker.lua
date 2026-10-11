@@ -265,6 +265,7 @@ local state = {
   hintpos = reaper.GetExtState(EXT, 'hintpos') == 'status' and 'status' or 'panes',   -- 10 окт: либо под каждым модулем, либо одной строкой внизу
   libtab = 'audio',
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
+  slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
   sliceaudition = reaper.GetExtState(EXT, 'sliceaud2') ~= '0',   -- 10 окт: по умолчанию вкл (новый ключ — старое «0» от прежнего умолчания не держит)   -- 10 окт: auto play в зуме края   -- 10 окт: слайсер, кнопка follow   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
@@ -3847,6 +3848,28 @@ ctx = {
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
   mono_on = function() return state.slicemono end,
+  -- 11 окт: квантизация старта слайсов (кнопка q во вкладке item): шаг auto ставит
+  -- следующий слайс не в точный конец предыдущего, а на ближайшую клетку сетки
+  slq_rows = function()
+    local q = state.slq or 'off'
+    if q == 'row' then return 1 elseif q == '2row' then return 2
+    elseif q == 'beat' then return state.lpb or 4
+    elseif q == 'bar' then local _, num = reaper.TimeMap_GetTimeSigAtTime(0, reaper.GetCursorPosition()); return (state.lpb or 4) * math.max(1, num or 4) end
+    return 0
+  end,
+  slq_label = function() return 'q ' .. (({ off = '0', row = 'row', ['2row'] = '2', beat = 'beat', bar = 'bar' })[state.slq or 'off'] or '0') end,
+  slq_menu = function()
+    local items = {}
+    for _, o in ipairs({ { '0', 'off', 'off - the next slice starts exactly where the last one ended' }, { '1', 'row', '1 row' }, { '2', '2row', '2 rows' },
+                         { 'b', 'beat', 'beat' }, { 'm', 'bar', 'bar (measure)' } }) do
+      items[#items + 1] = { key = o[1], label = o[3] .. ((state.slq or 'off') == o[2] and '  (on)' or ''), fn = function()
+        state.slq = o[2]; reaper.SetExtState(EXT, 'slq', o[2], true)
+        vim.msg = 'slice start quantize: ' .. o[3] .. (o[2] ~= 'off' and ' (step auto puts the next slice on this grid)' or '')
+      end }
+    end
+    vim.open_hydra({ title = 'slice start quantize (step auto)', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   -- 9 окт: опция pm as a pane — показать панель pm в стеке браузера / спрятать
   pmpane_apply = function()
     if not (state.panes and draw.panes) then return end
