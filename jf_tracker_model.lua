@@ -592,10 +592,26 @@ function M.build(lpb)
     placed[e] = true; e.depth = depth; ordered[#ordered + 1] = e
     for _, k in ipairs(kids[e] or {}) do put(k, 1) end
   end
-  for _, col in ipairs(snap.cols) do
-    for _, e in ipairs(all) do if not e.parent and e.home == col.name then put(e, 0) end end
+  -- 11 окт: номера стабильны — сначала сэмплы библиотеки в её порядке (позиция на
+  -- треке LIB), потом остальные в порядке появления. Раньше порядок шёл по первому
+  -- использованию на треке: смена инструмента ноты меняла номера (набрал 2 — нота
+  -- стала 02, и её сэмпл тут же стал 01)
+  local roots = {}
+  for i, e in ipairs(all) do
+    if not e.parent then
+      local dp = e.depot and e.item and (not R.ValidatePtr or R.ValidatePtr(e.item, 'MediaItem*')) and R.GetMediaItemInfo_Value(e.item, 'D_POSITION') or nil
+      roots[#roots + 1] = { e = e, i = i, dp = dp }
+    end
   end
-  for _, e in ipairs(all) do if not e.parent then put(e, 0) end end
+  table.sort(roots, function(a, b)
+    if (a.dp ~= nil) ~= (b.dp ~= nil) then return a.dp ~= nil end
+    if a.dp and a.dp ~= b.dp then return a.dp < b.dp end
+    return a.i < b.i
+  end)
+  for _, col in ipairs(snap.cols) do
+    for _, r in ipairs(roots) do if r.e.home == col.name then put(r.e, 0) end end
+  end
+  for _, r in ipairs(roots) do put(r.e, 0) end
   for _, e in ipairs(all) do put(e, e.parent and 1 or 0) end
   -- свой порядок исходников (3 окт): перетаскивание в lib пишет P_EXT:jf_ord
   -- на item исходника; без метки — после размеченных, в порядке дерева
@@ -1211,8 +1227,12 @@ function build_one(tr, fx, out)
           params[#params + 1] = e
         end
       end
+      -- 11 окт: кит — все дети RS5K (конвертация слайсов): две колонки — список
+      -- слайсов и свойства выбранного (draw.kit_sel), а не колонка на каждого
+      local kit = #kids > 1
+      for _, kid in ipairs(kids) do if not (kid.entry and kid.entry.rs5k) then kit = false; break end end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
-                        cols = math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m }
+                        cols = kit and 2 or math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m, kit = kit or nil }
     elseif um then
       -- пользовательский модуль (learn касанием): параметры по номерам
       for _, sp in ipairs(um.params or {}) do
