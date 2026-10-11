@@ -9490,7 +9490,9 @@ MX.SS.init(U, ctx)
 do   -- правки DSP big — через edit (undo), дерево после правки перечитывается
   local function obj() local t = dsp_target(); return t and t.track end
   local function after() ctx.db_cache = nil end
-  MX.DB.init(U, ctx, {
+  ctx.db_ops = {}
+  MX.DB.init(U, ctx, ctx.db_ops)
+  for k, v in pairs({
     close = function() if state.router_big then ctx.router_big() else ctx.dsp_big() end end,
     big = function() ctx.router_big() end,
     msg = function(m) vim.msg = m end,
@@ -9500,17 +9502,18 @@ do   -- правки DSP big — через edit (undo), дерево после
     parallel = function(a, v) local o = obj(); if o then edit.fx_parallel(o, a, v); after(); vim.msg = v > 0 and 'fx joins the row (parallel)' or 'fx leaves the row (serial)' end end,
     param = function(a, i, v) local o = obj(); if o then edit.fx_param(o, a, i, v); after() end end,
     remove = function(a, unpar) local o = obj(); if o then edit.fx_remove(o, a, unpar); after() end end,
-    add = function(n, par)
+    -- first (11 окт): + перед первым узлом — в начало цепочки
+    add = function(n, par, first)
       local o = obj(); if not o then return end
       local parent, pos, pv = MX.DB.insert_point(n, par)
       if parent and not parent.parent.root then vim.msg = 'dsp big: adding inside a nested container is not supported yet'; return end
-      if not n then local root = ctx.db_tree(); pos = root and #root.kids or 0 end
-      vim.open_picker(par and 'add fx in parallel' or 'add fx after', ctx.fx_list(), function(it)
+      if not n then local root = ctx.db_tree(); pos = first and 0 or (root and #root.kids or 0) end
+      vim.open_picker(par and 'add fx in parallel' or (first and 'add fx at the start' or 'add fx after'), ctx.fx_list(), function(it)
         if edit.fx_insert(o, parent and parent.k or nil, pos, it.data, pv) then vim.msg = '+ ' .. it.label .. (par and ' (parallel)' or '') end
         after()
       end)
     end,
-  })
+  }) do ctx.db_ops[k] = v end
 end
 MX.clips = false   -- 7 окт: вида clips в матрице больше нет (сессия — в теле трекера, zs; zz в матрице — на всё окно)
 -- инструмент ноты (6 окт): item-представитель из снимка — база транспоза
@@ -9582,6 +9585,8 @@ local function hint_go(t)
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
   elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
+  elseif t.kind == 'dbplus' then ctx.set_focus('dsp'); if d.first then ctx.db_ops.add(nil, false, true) else ctx.db_ops.add(d.after, false) end   -- 11 окт: + стыка роутера
+  elseif t.kind == 'dbpar' then ctx.set_focus('dsp'); ctx.db_ops.add(d, true)                                                                   -- = под узлом
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
@@ -13148,6 +13153,7 @@ local function frame()
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
+  elseif hover.dbplus or hover.dbpar then state.status = (hover.dbtip or '') .. ' - click: fzf of the effects'
   elseif hover.poolkit then state.status = 'kit of this lib: click - the kits (take one into the lib) and save the lib as a kit (a REAPER track template, TrackTemplates/jf_kits)'
   elseif hover.swapbtn then
     local st, file = ctx.swap_info()
@@ -13573,6 +13579,14 @@ local function frame()
       local d, t = MX.DB.pdrag, dsp_target()
       if t then edit.fx_param(t.track, d.addr, d.i, (gfx.mouse_x - d.x) / math.max(1, d.w)) end
     else MX.DB.pdrag = nil end
+  end
+  -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
+  if U.click and (hover.dbplus or hover.dbpar) then
+    ctx.set_focus('dsp')
+    if hover.dbpar then ctx.db_ops.add(hover.dbpar, true)
+    elseif hover.dbplus.first then ctx.db_ops.add(nil, false, true)
+    else ctx.db_ops.add(hover.dbplus.after, false) end
+    U.click = false
   end
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   -- параметр TCP под эффектом (8 окт): тянуть по горизонтали, двойной

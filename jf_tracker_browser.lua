@@ -1065,10 +1065,10 @@ function B.draw(U, L, x, y, w, h)
   do
     local bx = x + L.pad + 2
     if B.mode == 'files' then
-      bx = btn(bx, y, 'find', 'find', B.filtering or B.filter ~= '')   -- 11 окт: поиск — на виду, перед стрелками
       bx = btn(bx, y, '<', 'back', false)
       bx = btn(bx, y, '>', 'fwd', false)
       bx = btn(bx, y, '*', 'mkdir', false)
+      bx = btn(bx, y, 'find', 'find', B.filtering or B.filter ~= '')   -- 11 окт: поиск — на виду, справа от * (новая папка)
       if wrap_marks then bx = B.draw_marks(btn, bx, y, U) end
       if B.filter == '' and not B.filtering then
         local parts = B.path_parts(B.path)

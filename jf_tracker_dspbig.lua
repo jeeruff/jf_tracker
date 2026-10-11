@@ -310,7 +310,7 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   DB.view_w = w
   if compact then
     local cw = U.measure('m')
-    m.nw, m.nh, m.gap, m.bus, m.pad, m.th = cw * 14, L.rh + 4, cw * 2, cw, 3, L.rh
+    m.nw, m.nh, m.gap, m.bus, m.pad, m.th = cw * 14, L.rh + 4, cw * 5, cw, 3, L.rh   -- 11 окт: промежуток шире — в нём кнопка +
   end
   if big then
     local cw = U.measure('m')
@@ -332,7 +332,7 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   top = y + L.rh + 3 * L.pad
   end
   local bh = h - (top - y) - (compact and 2 or L.pad)
-  local io = U.measure('in') + 2 * L.pad
+  local io = U.measure('in') + 4 * L.pad + U.measure('+') + 8   -- 11 окт: + перед первым узлом не налезает на «in»
   local cw, ch = DB.layout(root, m, 0, 0, bh)
   DB.total = cw + 2 * io + 4 * L.pad
   DB.scroll = math.max(0, math.min(math.max(0, DB.total - w), DB.scroll))
@@ -350,11 +350,18 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   if not (DB.sel and DB.find(root, DB.sel)) and root.kids[1] then DB.sel = root.kids[1].guid end   -- выбор виден сразу
   local sel = DB.sel
   -- провода одной цепочки: вход → ряды → выход
+  -- 11 окт: + на стыках цепочки (вставить эффект туда), = под узлом (эффект параллельно ему);
+  -- только верхний уровень — внутрь вложенного контейнера вставка пока не умеет
+  local joints = {}
   local function wires(owner, xin, xout)
     U.set(U.LINE)
     local px = xin
     local cy = math.floor(owner.cy)
-    for _, st in ipairs(owner.stages) do
+    for si, st in ipairs(owner.stages) do
+      if owner.root then
+        local prev = si > 1 and owner.stages[si - 1] or nil
+        joints[#joints + 1] = { x = (px + st.x) // 2, y = cy, after = prev and prev[#prev] or nil, first = si == 1 }
+      end
       if #st == 1 then
         local n = st[1]
         gfx.line(px, cy, n.x, cy); px = n.x + n.w
@@ -371,6 +378,10 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
       end
     end
     gfx.line(px, cy, xout, cy)
+    if owner.root and #owner.stages > 0 then
+      local last = owner.stages[#owner.stages]
+      joints[#joints + 1] = { x = (px + xout) // 2, y = cy, after = last[#last] }
+    end
   end
   local function box(n)
     local hot = mx >= n.x and mx < n.x + n.w and my >= n.y and my < n.y + n.h
@@ -432,6 +443,24 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   else
     wires(root, xin + U.measure('in') + L.pad, xout)
     for _, n in ipairs(root.kids) do box(n) end
+    -- кнопки-буквы: + на стыке, = под узлом верхнего уровня
+    local function lbtn(cx, cy, lab, key, data, tip)
+      local bw, bh = U.measure(lab) + 4, L.rh
+      local bx, by = cx - bw // 2, cy - bh // 2
+      if bx < x or bx + bw > x + w or by < y or by + bh > y + h then return end
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
+      U.set(hot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 11 окт: без рамки, подложка — только под проводом / при наведении
+      U.text(bx + 2, by, lab, hot and U.AMBER or U.GREY)
+      if hot then hover[key] = data; hover.dbnode = nil; hover.dbtip = tip end
+      if ctx.hint then ctx.hint(key, bx, by, bw, bh, data) end
+    end
+    for _, j in ipairs(joints) do
+      lbtn(j.x, j.y, '+', 'dbplus', j, j.first and 'add an effect at the start of the chain' or ('add an effect after ' .. (j.after and j.after.name or '')))
+    end
+    for _, st in ipairs(root.stages or {}) do
+      local n = st[#st]                          -- под нижним узлом ряда: ниже — ничего, не налезает
+      if n and not open(n) then lbtn(n.x + n.w // 2, n.y + n.h + L.rh // 2 + 4, '=', 'dbpar', n, 'add an effect in parallel to ' .. (n.name or '') .. (#st > 1 and ' (joins this row)' or '')) end
+    end
   end
   -- прокрутка: полоса снизу
   if DB.total > w then
