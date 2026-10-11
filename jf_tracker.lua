@@ -166,7 +166,8 @@ local state = {
   bigbpm = flag('bigbpm2', false),
   bigstatus = flag('bigstatus', true),
   tpbuttons = flag('tpbuttons', false),
-  tpstyle = ({ symbols = 'big', big = 'big', text = 'text', min = 'min' })[reaper.GetExtState(EXT, 'tpstyle')] or (flag('tpbuttons', false) and 'big' or 'min'),   -- кнопки транспорта: min | big | text (6 окт; symbols → big)
+  -- 11 окт: full (по умолчанию) — кнопки словами + строка |<< freeze slow >>| dub, крупный BPM; text = slim
+  tpstyle = ({ full = 'full', big = 'big', text = 'text', min = 'min' })[reaper.GetExtState(EXT, 'tpstyle3')] or 'full',   -- кнопки транспорта: min | big | text (6 окт; symbols → big)
   tintmute = flag('tintmute', true),
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
@@ -604,7 +605,7 @@ local function save_win()
   for _, k in ipairs({ 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
-  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
+  S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
@@ -6222,6 +6223,112 @@ ctx = {
     vim.msg = on and 'rec follows selection: the selected tracks are armed (REAPER auto record-arm on every track)' or 'rec follows selection off'
     return n
   end,
+  -- 11 окт: подписи кнопок
+  frz_label = function(len)
+    local t = { [0.125] = '1/32', [0.25] = '1/16', [0.5] = '1/8', [1] = '1/4', [2] = '1/2', [4] = '1 bar', [8] = '2 bar' }
+    return t[len] or ('%gq'):format(len)
+  end,
+  slow_label = function(r) return ({ [0.5] = '1/2', [0.25] = '1/4' })[r] or (math.abs(r - 2 / 3) < 1e-3 and '2/3') or (math.abs(r - 1 / 3) < 1e-3 and '1/3') or ('x%.2f'):format(r) end,
+  -- freeze: луп на len четвертей вокруг плейхеда (по сетке длины), repeat вкл; ещё раз — луп и repeat как были
+  freeze_set = function(len)
+    local f = ctx.frz
+    local a = f.qa
+    reaper.GetSet_LoopTimeRange2(0, true, true, reaper.TimeMap2_QNToTime(0, a), reaper.TimeMap2_QNToTime(0, a + len), false)
+    f.len = len
+  end,
+  freeze_toggle = function(len)
+    if ctx.frz and not len then
+      local f = ctx.frz; ctx.frz = nil
+      reaper.GetSet_LoopTimeRange2(0, true, true, f.la, f.lb, false)
+      reaper.GetSetRepeat(f.rep)
+      vim.msg = 'freeze off - loop and repeat as they were'
+      return
+    end
+    len = len or state.frzlen or 1
+    if not ctx.frz then
+      local la, lb = reaper.GetSet_LoopTimeRange2(0, false, true, 0, 0, false)
+      local pos = reaper.GetPlayState() & 1 == 1 and reaper.GetPlayPosition() or reaper.GetCursorPosition()
+      local qn = reaper.TimeMap2_timeToQN(0, pos)
+      ctx.frz = { la = la, lb = lb, rep = reaper.GetSetRepeat(-1), qa = math.floor(qn / len + 1e-9) * len }
+      reaper.GetSetRepeat(1)
+    end
+    state.frzlen = len
+    ctx.freeze_set(len)
+    vim.msg = ('freeze %s - the loop repeats it; wheel: shorter / longer, rclick: length, click: off'):format(ctx.frz_label(len))
+  end,
+  freeze_len = function(mul)
+    local len = math.max(0.125, math.min(8, (state.frzlen or 1) * mul))
+    state.frzlen = len
+    if ctx.frz then ctx.freeze_set(len) end
+    vim.msg = 'freeze ' .. ctx.frz_label(len)
+  end,
+  freeze_menu = function()
+    local items = {}
+    for k, len in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8 }) do
+      items[#items + 1] = { key = tostring(k), label = 'freeze ' .. ctx.frz_label(len) .. ((state.frzlen or 1) == len and '  (on)' or ''), fn = function()
+        if ctx.frz then ctx.freeze_len(len / (state.frzlen or 1)) else ctx.freeze_toggle(len) end end }
+    end
+    vim.open_hydra({ title = 'freeze: loop this much around the playhead', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+  end,
+  -- dub: копия лупа вперёд (Item: Duplicate selected area of items по лупу); mode: copy | move (луп — на копию) |
+  -- mute (копия, на части треков копия заглушена) | mutemove
+  dub = function(mode)
+    local a, b = reaper.GetSet_LoopTimeRange2(0, false, true, 0, 0, false)
+    if not (b > a) then vim.msg = 'dub: set a loop first (loop / freeze)'; return end
+    local id = ctx.cmd_exact('Item: Duplicate selected area of items')
+    if not id then vim.msg = 'dub: REAPER action "Item: Duplicate selected area of items" not found'; return end
+    local sel0 = {}
+    for i = 0, reaper.CountSelectedMediaItems(0) - 1 do sel0[#sel0 + 1] = reaper.GetSelectedMediaItem(0, i) end
+    local ta, tb = reaper.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
+    local n, muted = 0, 0
+    edit.run('dub loop', function()
+      reaper.SelectAllMediaItems(0, false)
+      for t = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, t)
+        local _, tn = reaper.GetTrackName(tr)
+        if not model.LIB_NAMES[tn] then
+          for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+            local it = reaper.GetTrackMediaItem(tr, i)
+            local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION'); local l = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+            if p < b - 1e-6 and p + l > a + 1e-6 then reaper.SetMediaItemSelected(it, true); n = n + 1 end
+          end
+        end
+      end
+      if n == 0 then return end
+      reaper.GetSet_LoopTimeRange2(0, true, false, a, b, false)
+      reaper.Main_OnCommand(id, 0)
+      if mode == 'mute' or mode == 'mutemove' then
+        -- копия на месте [b, 2b-a]: у части треков (~1/3) заглушить всю копию
+        local by = {}
+        for i = 0, reaper.CountSelectedMediaItems(0) - 1 do
+          local it = reaper.GetSelectedMediaItem(0, i)
+          local tr = reaper.GetMediaItem_Track(it)
+          by[tr] = by[tr] or {}; table.insert(by[tr], it)
+        end
+        for _, its in pairs(by) do
+          if math.random() < 0.34 then for _, it in ipairs(its) do reaper.SetMediaItemInfo_Value(it, 'B_MUTE', 1); muted = muted + 1 end end
+        end
+      end
+      if mode == 'move' or mode == 'mutemove' then reaper.GetSet_LoopTimeRange2(0, true, true, b, b + (b - a), false)
+        if ctx.frz then ctx.frz.qa = reaper.TimeMap2_timeToQN(0, b) end end
+      reaper.GetSet_LoopTimeRange2(0, true, false, ta, tb, false)
+      reaper.SelectAllMediaItems(0, false)
+      for _, it in ipairs(sel0) do if reaper.ValidatePtr(it, 'MediaItem*') then reaper.SetMediaItemSelected(it, true) end end
+    end)
+    model.invalidate()
+    vim.msg = n == 0 and 'dub: nothing in the loop' or (('dub: the loop copied forward (%d item(s))'):format(n) .. (muted > 0 and (', ' .. muted .. ' muted in the copy') or '') .. ((mode == 'move' or mode == 'mutemove') and ', the loop moved onto it' or '') .. ' - Cmd+Z back')
+  end,
+  dub_menu = function()
+    local cur = state.dubmode or 'move'
+    local items = {}
+    for _, o in ipairs({ { 'c', 'copy', 'dub: copy the loop forward' }, { 'm', 'move', 'dub: copy forward, the loop moves onto the copy (keep dubbing)' },
+                         { 'r', 'mute', 'dub: copy forward, random tracks muted in the copy' }, { 'x', 'mutemove', 'dub: copy with random mutes, the loop moves on' } }) do
+      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.dubmode = o[2]; ctx.dub(o[2]) end }
+    end
+    vim.open_hydra({ title = 'dub - click repeats the chosen one', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+  end,
   slow_rec = function()
     if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(1016, 0); return end   -- идёт запись — стоп
     local r = state.slowrate
@@ -7923,7 +8030,7 @@ ctx = {
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
-      { key = 'tpstyle', label = 'transport buttons', kind = 'cycle', values = { 'min', 'big', 'text' }, desc = 'min - only [rec] and [loop] (Space plays, Opt+R records); big - big << > || O >> loop; text - two rows of small word buttons, rec red', get = function() return state.tpstyle or 'min' end, set = function(v) state.tpstyle = v end },
+      { key = 'tpstyle', label = 'transport', kind = 'cycle', values = { 'full', 'text', 'big', 'min' }, desc = 'full - word buttons, under them |<< freeze slow >>| dub, big BPM; text - slim transport (word buttons only); big - big << > || O >> loop; min - only [rec] and [loop]', get = function() return state.tpstyle or 'full' end, set = function(v) state.tpstyle = v; ctx.relayout() end },
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'transpos', label = 'transport bar', kind = 'cycle', values = { 'tracker', 'top', 'bottom' }, desc = 'tracker - under the tracker; top - the whole width over the top panel (sample module); bottom - under the DSP modules, over the status bar', get = function() return state.transpos or 'tracker' end, set = function(v) state.transpos = v; ctx.relayout() end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
@@ -11500,7 +11607,21 @@ function ctrl_action(name, delta)
     else ctx.rec_start('tracker') end
   elseif name == 'tp_rew' then reaper.Main_OnCommand(40084, 0)            -- Transport: Rewind a little bit
   elseif name == 'tp_fwd' then reaper.Main_OnCommand(40085, 0)            -- Transport: Fast forward a little bit
+  elseif name == 'tp_play' and delta ~= 0 then ctrl_action('rate', delta)   -- 11 окт: колесо на play — скорость
   elseif name == 'tp_play' then reaper.Main_OnCommand(reaper.GetPlayState() & 1 == 1 and 1016 or 1007, 0)   -- play / stop
+  -- 11 окт: вторая строка full-транспорта
+  elseif name == 'tp_start' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to start of project') or 40042, 0) end
+  elseif name == 'tp_end' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to end of project') or 40043, 0) end
+  elseif name == 'freeze' then
+    if delta ~= 0 then ctx.freeze_len(delta > 0 and 2 or 0.5) else ctx.freeze_toggle() end
+  elseif name == 'slowbtn' then
+    if delta == 0 then
+      if not state.slowrate then state.slowrate = 0.5 end
+      ctx.slow_rec()
+    end
+  elseif name == 'dub' then if delta == 0 then ctx.dub(state.dubmode or 'move') end
+  elseif name == 'ratebar' then
+    if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
   elseif name == 'punch' then
     local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch')
@@ -12219,6 +12340,16 @@ local function frame()
     local f = L and L.flat and L.flat[vim.cur.fi]
     if f and f.ci and (state.hscroll or 1) > f.ci then state.hscroll = f.ci; relayout() end
   end
+  -- 11 окт: протяжка слайдера скорости (точки-защёлки 0.25 0.5 0.75 1 1.5 2 — ближе 0.04 — прилипает)
+  if ctx.ratedrag then
+    local r0 = draw.strip_cell and draw.strip_cell.ratebar
+    if gfx.mouse_cap & 1 == 1 and r0 then
+      local sw2 = 8 * L.cw
+      local r = 0.25 + math.max(0, math.min(1, (gfx.mouse_x - r0[1]) / math.max(1, sw2 - 1))) * 1.75
+      for _, m in ipairs(draw.RATE_SNAPS) do if math.abs(r - m) < 0.04 then r = m end end
+      if math.abs(r - reaper.Master_GetPlayRate(0)) > 1e-4 then reaper.CSurf_OnPlayRateChange(r); vim.msg = ('playrate x%.2f'):format(r) end
+    else ctx.ratedrag = nil end
+  end
   -- 9 окт: протяжка слайдера свинга в транспорте (ячейка swingbar)
   if ctx.swdrag then
     local r = draw.strip_cell and draw.strip_cell.swingbar
@@ -12634,7 +12765,8 @@ local function frame()
         return out
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
+      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -15392,6 +15524,9 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
+  elseif U.rclick and hover.ctrl == 'slowbtn' then ctrl_action('slow', 0)
+  elseif U.rclick and hover.ctrl == 'dub' then ctx.dub_menu()
   elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
@@ -16406,6 +16541,13 @@ local function frame()
   -- Tab (7 окт): Tab — трекер ↔ session, Shift+Tab — фокус назад, Option+Tab /
   -- Option+Shift+Tab — фокус по модулям по кругу (был Tab), Ctrl+Tab — вкладки
   -- верхнего дока (был Option+Tab)
+  -- 11 окт: Cmd+I — интерполятор (:interp): VISUAL — значения от первого к последнему событию линейно по строкам,
+  -- поле — по курсору (нота / vol / delay / команда). Cmd+I приходит кодом 9, как Tab (Cmd+H — 8)
+  if (c == 9 or c == 105 or c == 73) and ctx.mods().cmd and not ctx.mods().ctrl and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    if vim.mode == 'visual' or vim.mode == 'vline' then vim.cmd_from = vim.mode; vim.run_cmd('interp')
+    else vim.msg = 'Cmd+I interpolates: select rows first (v / V), the field under the cursor - note, vol, delay or a command' end
+    c = 0
+  end
   if (c == 9 or c == 25) and not ctrl_note and not HN.active and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local m = ctx.mods()
     local back = c == 25 or m.shift or (inject_cap or gfx.mouse_cap) & 8 == 8

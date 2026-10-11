@@ -495,7 +495,7 @@ function D.layout(snap, state, nregions)
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
-  L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0)) or 0
+  L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)) or 0   -- 11 окт: full — строка |<< freeze slow >>| dub
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0
   D.jr_bg = state.jrbg                                -- 10 окт: подложка линейки прыжков (опция)                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
@@ -545,7 +545,7 @@ function D.layout(snap, state, nregions)
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
-  L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6
+  L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6 + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 11 окт: full — строка под кнопками
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
@@ -2786,17 +2786,28 @@ function D.transport_buttons(c)
            { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'O', c.recording and U.RED or nil, U.RED },
            { 'tp_fwd', '>>' }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
 end
+-- 11 окт: вторая строка full-транспорта, по колонкам кнопок: rew | pause | play | rec | ff | loop
+D.RATE_SNAPS = { 0.25, 0.5, 0.75, 1, 1.5, 2 }
+function D.transport_sub(c)
+  local frz = c.frz and ('frz %s'):format(c.frz) or 'freeze'
+  return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
+           { false }, -- под play: rev у REAPER нет (отрицательной скорости транспорт не знает)
+           { 'slowbtn', c.slowrate and ('slow ' .. c.slowtxt) or 'slow', c.slowrec and U.RED or nil, U.RED },
+           { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
+end
 function D.transport_groups(c)
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
   local num = math.max(1, math.min(16, c.sig_num or 4))
   local cur = c.beat and (math.floor(c.beat) + 1) or 0
   local function tg(id, label, on) return { id, label .. ' ' .. (on and 'on' or 'off'), on and U.CYAN or U.GREY } end
   local g = {}
-  if not c.bigbpm then
+  if not (c.bigbpm or c.tpfull) then
     g[#g + 1] = { { { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },   -- > — намёк: клик играет (5 окт)
-                  { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
-                    { 'rate', ('x%.2f'):format(c.rate or 1), math.abs((c.rate or 1) - 1) > 1e-3 and U.AMBER or U.GREY } } }   -- 11 окт: playrate
+                  { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
   end
+  -- 11 окт: скорость проекта — своей группой: x1.00 (щелчок — список, колесо ±0.05) и слайдер с точками-защёлками
+  g[#g + 1] = { { { 'rate', ('rate x%.2f'):format(c.rate or 1), math.abs((c.rate or 1) - 1) > 1e-3 and U.AMBER or U.GREY } },
+                { { 'ratebar', '', nil, slider = { rate = c.rate or 1 } } } }
   -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
@@ -2969,7 +2980,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
           end
         end
-        if it.slider then                                 -- 9 окт: слайдер свинга −100..100 %, от центра
+        if it.slider and it.slider.rate then
+          -- 11 окт: слайдер скорости 0.25..2, точки-защёлки на 0.25 0.5 0.75 1 1.5 2
+          local sw2 = 8 * L.cw
+          local yy = cy + math.floor(L.rh / 2)
+          set(U.DIM); gfx.rect(cx, yy - 1, sw2, 2, 1)
+          for _, m in ipairs(D.RATE_SNAPS) do
+            local mx2 = cx + math.floor((m - 0.25) / 1.75 * (sw2 - 1) + 0.5)
+            set(m == 1 and U.GREY or U.DIM); gfx.rect(mx2, cy + 3, 1, L.rh - 6, 1)
+          end
+          local r = math.max(0.25, math.min(2, it.slider.rate))
+          local px = cx + math.floor((r - 0.25) / 1.75 * (sw2 - 1) + 0.5)
+          set(hot and U.AMBER or (math.abs(r - 1) > 1e-3 and U.AMBER or U.GREY))
+          gfx.rect(px - 1, cy + 2, 3, L.rh - 4, 1)
+        elseif it.slider then                                 -- 9 окт: слайдер свинга −100..100 %, от центра
           local sw2 = 8 * L.cw
           local mid = cx + math.floor(sw2 / 2)
           local yy = cy + math.floor(L.rh / 2)
@@ -3002,6 +3026,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if c.tptext then
     tbw = 0
     for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[2]), ms(b[5] or ''), ms('pause')) end
+    if c.tpfull then for _, b in ipairs(D.transport_sub(c)) do if b[1] then tbw = math.max(tbw, ms(b[2])) end end end   -- 11 окт: и нижняя строка
     tbw = tbw + 2 * L.pad
     btot = #blist * (tbw + 2) - 2
   end
@@ -3023,6 +3048,23 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
+    end
+    -- 11 окт: full — строка кнопок под транспортом (|<< freeze · slow >>| dub), колонка в колонку
+    if c.tpfull then
+      local sub = D.transport_sub(c)
+      local sx, sy = bx0, by + bh + 2
+      for _, b in ipairs(sub) do
+        if b[1] then
+          local hot = mx >= sx and mx < sx + tbw and my >= sy and my < sy + L.rh
+          local on = b[3] ~= nil
+          set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tbw, L.rh, 1)
+          set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(sx, sy, tbw, L.rh, 0)
+          text(sx + math.floor((tbw - ms(b[2])) / 2), sy, fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY))
+          if hot then hover.ctrl = b[1] end
+          hint('ctrl', sx, sy, tbw, L.rh, b[1])
+        end
+        sx = sx + tbw + 2
+      end
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
   end
@@ -3059,7 +3101,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
   end
   -- время и BPM крупно (опция big time and BPM)
-  local big = c.bigbpm and {
+  local big = (c.bigbpm or c.tpfull) and {
     { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
     { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
   } or nil
@@ -3082,6 +3124,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   addg('step')
   order[#order + 1] = { w = btot, draw = draw_buttons }
   if big then order[#order + 1] = { w = bigw, draw = draw_big } else addg('play') end
+  addg('rate')                                   -- 11 окт: скорость проекта
   addg('sig'); addg('punch')       -- 9 окт: LPB — в блоке step; блок размера такта начинается с sig
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
   local last = by_id.swing and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
@@ -4644,14 +4687,17 @@ function D.frame(L, snap, rows, state, info)
           end
         end
       end
+      local last_r = -1e9                     -- 11 окт: метка, налезающая на предыдущую, пропускается (узкие поля инструмент / слайс)
       for _, p in ipairs(pos) do
         local d = cur_i and (p.i - cur_i) or nil
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           local cx = p.f.x + (fx or 0)
           local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
-          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W then
-            text(cx + math.floor(((fw or 0) - ms(lab)) / 2), jy, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
+          local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
+          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W and (lx > last_r + 1 or d == 0) then
+            text(lx, jy, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
+            last_r = lx + ms(lab)
           end
         end
       end
@@ -5118,7 +5164,7 @@ function D.frame(L, snap, rows, state, info)
             local held
             for k = #ml.rows, 1, -1 do if ml.rows[k] <= r.row then held = ml.ev[ml.rows[k]].v; break end end
             if held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
-              set(U.mix(U.CYAN, U.BG, 0.75)); gfx.rect(m.x + 1, y + L.rh - 3, math.max(1, math.floor(held / 127 * (m.w - 2))), 2, 1)
+              set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
             end
           end
           if e then
