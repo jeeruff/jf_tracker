@@ -93,6 +93,18 @@ function SP.draw(L, x, y, w, h, e, focused)
     U.text(bx + L.pad, y, 'v', vh and U.AMBER or U.TEXT)
     if vh then SP.hover = { fit = true } end
   end
+  -- 11 окт: уровень правки — кнопка справа в заголовке (выпадашка: sample / slice / note)
+  local sc = ctx.sp_scope and ctx.sp_scope() or 'sample'
+  local scw = U.measure(sc) + 2 * L.pad
+  local scx = x + w - vbw - scw - (vbw > 0 and 2 or 0)
+  if scx > x + L.pad + U.measure('WWWW') then
+    local sh = tmx >= scx and tmx < scx + scw and tmy >= y and tmy < y + L.rh
+    U.set(sh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(scx, y, scw, L.rh, 1)
+    U.set(sh and U.AMBER or U.LINE); gfx.rect(scx, y, scw, L.rh, 0)
+    U.text(scx + L.pad, y, sc, sh and U.AMBER or (sc == 'sample' and U.TEXT or U.CYAN))
+    if sh then SP.hover = { scope = true } end
+    vbw = vbw + scw + 2
+  end
   U.text(x + L.pad, y, ctx.fit(title, w - L.pad - vbw - L.pad), U.AMBER)
   -- колонки (5 окт): широкая панель — строки сверху вниз, потом следующая
   -- колонка; ширина колонки как у прежней узкой панели, ничего не тянется

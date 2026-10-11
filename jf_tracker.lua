@@ -6112,6 +6112,17 @@ ctx = {
     vim.open_hydra({ title = which == 'rec' and 'record' or 'play', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   end,
+  sp_scope = function() return state.spscope or ((ctx.sp_sel and ctx.sp_sel.parent) and 'slice' or 'sample') end,
+  sp_scope_menu = function()
+    local cur = ctx.sp_scope()
+    local items = {}
+    for _, o in ipairs({ { 's', 'sample', 'sample - the whole sample, all its notes and slices' }, { 'l', 'slice', 'slice - the selected slice and its notes' },
+                         { 'n', 'note', 'note - only the note under the cursor of the tracker' } }) do
+      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.spscope = o[2] ~= 'slice' and o[2] or nil; ctx.sp_note = nil; vim.msg = 'properties change: ' .. o[3] end }
+    end
+    vim.open_hydra({ title = 'properties change', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   -- 11 окт: шапка lib — выпадашки kit и sort (у кнопки, без перебора по кругу)
   kit_menu = function()
     local list = edit.lib_presets()
@@ -7324,7 +7335,7 @@ ctx = {
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
     local fine = ctx.mods().shift
-    local items = ctx.inst_group(e)
+    local items = e.note_scope and { it } or ctx.inst_group(e)   -- 11 окт: уровень note — только эта нота
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     if k == 'vol' then
       local v = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
@@ -12708,6 +12719,30 @@ local function frame()
         else state.ss_zone = nil end   -- 8 окт: клип не этого файла — зоны нет
       else state.ss_zone = nil end
       -- 10 окт: свойства — отдельный модуль props; видим — вкладка item отдаёт волне всю ширину
+      -- 11 окт: уровень правки (кнопка в заголовке properties): sample — весь сэмпл, slice — выбранный слайс,
+      -- note — нота под курсором трекера (её значения, правка только её)
+      if sel_e and not sel_e.file then
+        local sc = state.spscope            -- nil — как раньше: что выбрано (слайс или сэмпл), то и правится
+        local root0 = sel_e.parent or sel_e
+        if sc == 'sample' then sel_e = root0
+        elseif sc == 'note' then
+          local f = L.flat and L.flat[vim.cur.fi]
+          local cell = f and f.sub and f.sub[vim.cur.row]
+          if cell and cell.kind == 'cont' then cell = cell.of end
+          local it = cell and cell.item
+          local n = it and snap and snap.inst_of and snap.inst_of[it]
+          local pe = n and cur_col() and cur_col().pool[n]
+          if pe and (pe == root0 or pe.parent == root0) then
+            local key = tostring(it) .. ':' .. reaper.GetProjectStateChangeCount(0)
+            if not (ctx.sp_note and ctx.sp_note.key == key) then
+              local ne = model.entry_of(it)
+              if ne then ne.note_scope = true; ne.name = 'note at row ' .. vim.cur.row .. ' - ' .. (root0.name or '') end
+              ctx.sp_note = { key = key, e = ne }
+            end
+            sel_e = ctx.sp_note.e or sel_e
+          end
+        end
+      end
       ctx.sp_sel = sel_e
       state.sp_none = sel_e == nil   -- 11 окт: нет сэмпла — панели properties нет (раскладка прячет)
       if state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops') then
@@ -13345,6 +13380,7 @@ local function frame()
     state.status = ctx.aied_hover.status
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
+  elseif SPROP.hover and SPROP.hover.scope then state.status = 'what the properties change: sample (all its notes) / slice (the selected slice and its notes) / note (only the note under the cursor) - click: the list'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
   elseif SPROP.hover and not SPROP.hover.title and ctx.sp_live() then
     local rk = SPROP.ROWS[SPROP.hover.row].k
@@ -14258,6 +14294,7 @@ local function frame()
     elseif SPROP.hover and ctx.sp_live() then
       ctx.set_focus(ctx.sp_in_pane and 'sprops' or 'top')
       local e = cur_col() and (cur_col().pool or {})[vim.inst]
+      if SPROP.hover.scope then ctx.sp_scope_menu(); click = { t = now2, zone = 'spropscope' }; goto sprop_done end
       if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
       if SPROP.hover.fit then ctx.sprops_fit(); click = { t = now2, zone = 'spropfit' }; goto sprop_done end
       local same = click.zone == 'sprop' and click.row == SPROP.hover.row

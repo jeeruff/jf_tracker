@@ -774,6 +774,15 @@ local function pool_add(pool, seen, it, from_depot)
   pool_add_entry(pool, #pool + 1, it, take, name, key, from_depot)
 end
 
+-- 11 окт: запись lib по одному item (панель properties на уровне note — значения самой ноты)
+function M.entry_of(it)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return nil end
+  local tk = R.GetActiveTake(it)
+  if not tk then return nil end
+  local t = {}
+  pool_add_entry(t, 1, it, tk, R.GetTakeName(tk), 'note', false)
+  return t[1]
+end
 pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   local gkey = key
   local src0 = R.GetMediaItemTake_Source(take)
