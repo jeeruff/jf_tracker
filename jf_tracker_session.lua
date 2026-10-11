@@ -43,8 +43,10 @@ end
 -- hdr_w — колонка имён сцен; top — шапка (строка кнопок + имена треков);
 -- клетки не уже 8 знаков и не ниже 3 строк; влезают все — тянутся (до 6
 -- строк / 24 знаков), иначе прокрутка
-function SS.layout(w, h, ncols, nrows, cw, rh, pad, compact)
+function SS.layout(w, h, ncols, nrows, cw, rh, pad, compact, need)
+  -- 11 окт: колонка сцен — по самому длинному «> имя» (need, px), не шире трети; без need — как было
   local hdr_w = compact and math.max(cw * 6, math.min(cw * 10, math.floor(w * 0.3))) or math.max(cw * 10, math.min(cw * 16, math.floor(w * 0.18)))
+  if need then hdr_w = math.max(cw * 6, math.min(need, math.floor(w / 3))) end
   local top = compact and (rh + 2 * pad) or (2 * rh + 3 * pad)
   local avail_w, avail_h = w - hdr_w - 2 * pad, h - top - pad
   local min_w, min_h = cw * (compact and 5 or 8), compact and (rh + 4) or rh * 3
@@ -508,7 +510,13 @@ end
 function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compact)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local ncols, nrows = #snap.cols, #seq
-  local lay = SS.layout(w, h, ncols, nrows, L.cw, L.rh, L.pad, compact)
+  -- ширина колонки сцен по именам (кэш по таблице seq — пересобирается вместе с ней)
+  if SS.need_seq ~= seq or SS.need_cw ~= L.cw then   -- и смена шрифта
+    local m = 0
+    for ri, rg in ipairs(seq) do m = math.max(m, U.measure('> ' .. SS.slot_name(rg, ri))) end
+    SS.need_seq, SS.need_cw, SS.need_w = seq, L.cw, m + 2 * L.pad + 6
+  end
+  local lay = SS.layout(w, h, ncols, nrows, L.cw, L.rh, L.pad, compact, SS.need_w)
   SS.rows_fit, SS.cols_fit = lay.rows_fit, lay.cols_fit
   local gx0, gy0 = x + lay.hdr_w + L.pad, y + lay.top
   local cy = y + L.pad
@@ -536,11 +544,20 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
     -- заголовок сцены
     local hot = mx >= x and mx < gx0 - L.pad and my >= ry and my < ry + lay.cell_h
     local rgb = rg.color and rg.color ~= 0 and U.rgb_of_native and U.rgb_of_native(rg.color) or nil
-    U.set(hot and U.tint(U.AMBER, 0.25) or (rgb and U.tint(rgb, 0.25) or U.PANEL)); gfx.rect(x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, 1)
-    U.set(ri == SS.cur.ri and U.AMBER or U.LINE); gfx.rect(x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, 0)
+    -- 11 окт: минимально, как слоты матрицы: без рамки, «> имя» (> — сцену можно запустить),
+    -- цвет региона — полоской слева, текст по центру строки (раньше съезжал за низ рамки)
+    local hh = lay.cell_h - 1
+    if hot then U.set(U.tint(U.AMBER, 0.20)); gfx.rect(x + L.pad, ry, lay.hdr_w - L.pad, hh, 1) end
+    if rgb then U.set(rgb); gfx.rect(x + L.pad, ry, 2, hh, 1) end
     local nm = SS.slot_name(rg, ri)
-    U.text(x + 2 * L.pad, ry + L.pad, ctx.fit(nm, lay.hdr_w - 4 * L.pad), rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT))
-    if lay.cell_h >= 2 * L.rh + L.pad and rg.qn1 and rg.qn0 then U.text(x + 2 * L.pad, ry + L.pad + L.rh, ('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', U.GREY) end
+    local two = hh >= 2 * L.rh and rg.qn1 and rg.qn0
+    local ty = ry + math.max(0, math.floor((hh - (two and 2 or 1) * L.rh) / 2))
+    local tx = x + L.pad + 4
+    local col = rg.gap and U.GREY or (ri == SS.cur.ri and U.AMBER or U.TEXT)
+    U.text(tx, ty, '>', hot and U.AMBER or (rg.gap and U.DIM or U.GREEN))
+    local nx = tx + U.measure('> ')
+    U.text(nx, ty, ctx.fit(nm, x + lay.hdr_w - L.pad - nx), col)
+    if two then U.text(nx, ty + L.rh, ('%.3g'):format((rg.qn1 - rg.qn0) / 4) .. 'b', U.GREY) end
     if hot then hover.sessrow = ri end
     if ctx.hint then ctx.hint('sessrow', x + L.pad, ry, lay.hdr_w - L.pad, lay.cell_h - 1, ri) end
     -- клетки
@@ -793,16 +810,22 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           U.set((ri == SS.cur.ri and vi == SS.cur.ci) and U.TEXT or (hot2 and U.GREY or U.LINE)); gfx.rect(cx, cy, cw, bh - 1, 0)
           if hot2 then hover.sess = { ri = ri, ci = vi } end
           if ctx.hint then ctx.hint('sess', cx, ky, cw, L.rh, { ri = ri, ci = vi }) end
-          if ri == (last_clip[vi] or 0) + 1 then corner(bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = vi }) end
+          if ri == (last_clip[vi] or 0) + 1 then
+            -- 11 окт: запись — красная плашка без рамки (рамку съедали метки f над ней)
+            local rw = U.measure('o') + 4
+            local rhot = mx >= bx and mx < bx + rw and my >= byb and my < byb + L.rh
+            U.set(rhot and U.RED or U.mix(U.BG, U.RED, 0.75)); gfx.rect(bx, byb, rw, L.rh - 1, 1)
+            U.text(bx + 2, byb, 'o', rhot and U.TEXT or U.BG)
+            if rhot then hover.ssrecbtn = { ri = ri, ci = vi } end
+            if ctx.hint then ctx.hint('ssrecbtn', bx, byb, rw, L.rh, { ri = ri, ci = vi }) end
+          end
         end
         -- клип-мод: буква клавиши — слева сверху, над кнопкой > (8 окт; была
         -- справа и ярко-жёлтой): приглушённая плашка, буква янтарём
         local kl = SS.clip_mode and SS.key_of(ri, vi, SS.vis_draw)
-        if kl then
-          local kw = U.measure(kl) + 4
-          U.set(U.mix(U.BG, U.AMBER, 0.28)); gfx.rect(bx, ky + 1, kw, L.rh - 1, 1)
-          U.text(bx + 2, ky + 1, kl, U.AMBER)
-        end
+        -- 11 окт: просто буква, без плашки — серая полупрозрачная (смесь GREY с фоном темы),
+        -- в левом верхнем углу над кнопкой > / o
+        if kl then U.text(bx + 2, ky + 1, kl, U.mix(U.BG, U.GREY, 0.6)) end
       end
     end
   end
