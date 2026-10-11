@@ -805,6 +805,9 @@ local function dsp_target()
   if state.dsp_take then
     local e = (col.pool or {})[vim.inst]
     local tk = e and e.take
+    -- 11 окт: T o — take самой ноты под курсором (пока не выбран другой инструмент)
+    local nt = ctx.dsp_note_tk
+    if nt and nt.inst == vim.inst and reaper.ValidatePtr(nt.tk, 'MediaItem_Take*') then tk, e = nt.tk, { name = nt.name } end
     if tk and reaper.ValidatePtr(tk, 'MediaItem_Take*') then
       if dspt_cache.snap ~= snap or dspt_cache.take ~= tk then dspt_cache = { snap = snap, take = tk, fx = model.take_fx(tk) } end
       return { track = tk, fx = dspt_cache.fx, name = e.name or 'take', take = true, col = col }
@@ -2688,13 +2691,25 @@ ctx = {
     return false
   end,
   -- aF (7 окт): take FX на ноту / слайс под курсором трекера (её item)
+  -- 11 окт: T o — цепь take FX ноты под курсором в DSP
+  take_fx_open = function()
+    local f = L.flat and L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    local it = cell and cell.item
+    local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+    if not tk then vim.msg = 'T o: put the tracker cursor on a note first'; return end
+    local _, nm = reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)
+    ctx.dsp_note_tk = { tk = tk, inst = vim.inst, name = nm }
+    ctx.take_fx_focus({ take = tk, item = it, name = nm })
+  end,
   dsp_take_slice = function()
     local f = L.flat and L.flat[vim.cur.fi]
     local cell = f and f.sub and f.sub[vim.cur.row]
     if cell and cell.kind == 'cont' then cell = cell.of end
     local it = cell and cell.item
     local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
-    if not tk then vim.msg = 'aF: put the tracker cursor on a note / slice first'; return end
+    if not tk then vim.msg = 'T f: put the tracker cursor on a note / slice first'; return end
     vim.open_picker('take fx of the note under the cursor', ctx.fx_list(), function(x)
       edit.run('take fx on the slice', function() reaper.TakeFX_AddByName(tk, x.data, -1) end)
       model.invalidate()
@@ -10827,7 +10842,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
+    if d == 'more' then ctx.mx_more() elseif d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then if d == 0 then ctx.region_len_menu() else ctx.region_len_step(d) end
@@ -15737,37 +15752,7 @@ local function frame()
       click = { t = now2, zone = 'mxrep' }
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
-      if hover.matrix.btn == 'zoom' then ctx.mx_zoom()
-      elseif hover.matrix.btn == 'fold' then ctx.mx_zoom_cycle()
-      elseif hover.matrix.btn == 'fill' then MX.fill = not MX.fill
-      elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
-      elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
-      elseif hover.matrix.btn == 'rglen-' or hover.matrix.btn == 'rglen+' then ctx.region_len_step(hover.matrix.btn == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
-      elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
-      elseif hover.matrix.btn == 'se' then
-        state.mxmarks = not state.mxmarks
-        vim.msg = state.mxmarks and 'matrix s/e: from =START to =END' or 'matrix s/e off: the whole project, as the REAPER timeline (the markers stay)'
-        seq = ctx.sequence()
-      elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
-      elseif hover.matrix.btn == 'clips' then ctx.mx_clips_toggle()
-      elseif hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend' then
-        -- поле Start / End: клик — ввод такта, Shift+клик — строка курсора
-        local w = hover.matrix.btn == 'mkstart' and 'start' or 'end'
-        if gfx.mouse_cap & 8 == 8 then ctx.seq_marker(w)
-        else ctx.set_focus('matrix'); MX.mkedit = { which = w, buf = '' } end
-      elseif hover.matrix.btn == 'add' then ctx.mx_add()
-      elseif hover.matrix.btn == 'arrprev' then ctx.arr('prev')
-      elseif hover.matrix.btn == 'arrnext' then ctx.arr('next')
-      elseif hover.matrix.btn == 'arrname' then ctx.arr_rename_prompt()
-      elseif hover.matrix.btn == 'arrnew' then ctx.arr('new')
-      elseif hover.matrix.btn == 'arrdup' then ctx.arr('dup')
-      elseif hover.matrix.btn == 'arrclear' then
-        OPT.ask.open('clear the arrangement?', 'every track gets a new empty lane that plays alone; the old lanes stay (kept as "... before clear")', {
-          { key = 'k', label = 'keep', fn = function() vim.msg = 'arrangement kept' end },
-          { key = 'c', label = 'clear', fn = function() ctx.arr('clear') end },
-        })
-      elseif hover.matrix.btn == 'arrdel' then ctx.arr('del')
-      elseif hover.matrix.btn == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
+      ctx.mx_btn_do(hover.matrix.btn)
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
       ctx.set_focus('matrix')
@@ -18122,6 +18107,50 @@ if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
     end
     if n > 0 then ctx.ss_write(sets, order) end
   end) then reaper.SetExtState(EXT, 'ss_mods', '1', true) end
+-- 11 окт: кнопка матрицы по id — щелчок и выпадашка » (кнопки, что не влезли в ширину модуля)
+ctx.mx_btn_do = function(b)
+  if b == 'more' then ctx.mx_more()
+  elseif b == 'zoom' then ctx.mx_zoom()
+  elseif b == 'fold' then ctx.mx_zoom_cycle()
+  elseif b == 'fill' then MX.fill = not MX.fill
+  elseif b == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
+  elseif b == 'trim' then ctx.mx_trim()
+  elseif b == 'rglen-' or b == 'rglen+' then ctx.region_len_step(b == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
+  elseif b == 'ruler' then ctx.mx_ruler_toggle()
+  elseif b == 'se' then
+    state.mxmarks = not state.mxmarks
+    vim.msg = state.mxmarks and 'matrix s/e: from =START to =END' or 'matrix s/e off: the whole project, as the REAPER timeline (the markers stay)'
+    seq = ctx.sequence()
+  elseif b == 'loops' then ctx.mx_loops_toggle()
+  elseif b == 'clips' then ctx.mx_clips_toggle()
+  elseif b == 'mkstart' or b == 'mkend' then
+    -- поле Start / End: клик — ввод такта, Shift+клик — строка курсора
+    local w = b == 'mkstart' and 'start' or 'end'
+    if gfx.mouse_cap & 8 == 8 then ctx.seq_marker(w)
+    else ctx.set_focus('matrix'); MX.mkedit = { which = w, buf = '' } end
+  elseif b == 'add' then ctx.mx_add()
+  elseif b == 'arrprev' then ctx.arr('prev')
+  elseif b == 'arrnext' then ctx.arr('next')
+  elseif b == 'arrname' then ctx.arr_rename_prompt()
+  elseif b == 'arrnew' then ctx.arr('new')
+  elseif b == 'arrdup' then ctx.arr('dup')
+  elseif b == 'arrclear' then
+    OPT.ask.open('clear the arrangement?', 'every track gets a new empty lane that plays alone; the old lanes stay (kept as "... before clear")', {
+      { key = 'k', label = 'keep', fn = function() vim.msg = 'arrangement kept' end },
+      { key = 'c', label = 'clear', fn = function() ctx.arr('clear') end },
+    })
+  elseif b == 'arrdel' then ctx.arr('del')
+  elseif b == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
+end
+ctx.mx_more = function()
+  local items = {}
+  for _, bt in ipairs(MX.overflow or {}) do
+    items[#items + 1] = { key = bt[2]:sub(1, 1), label = bt[2], fn = function() ctx.set_focus('matrix'); ctx.mx_btn_do(bt[1]) end }
+  end
+  if #items == 0 then return end
+  vim.open_hydra({ title = 'matrix', items = items })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
 reaper.atexit(save_win)
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end

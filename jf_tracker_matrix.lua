@@ -296,9 +296,28 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   hover.inside = mx >= 0 and mx < W and my >= hy and my < ybot      -- колесо над матрицей (5 окт)
   -- кнопки
   local bx = L.pad
-  for _, b in ipairs(btns()) do
+  -- 11 окт: не влезающие в ширину модуля кнопки — в выпадашку » в конце ряда
+  local list, over = btns(), {}
+  do
+    local tot, more_w = L.pad, U.measure('»') + 3 * L.pad
+    local fit_n = #list
+    for i, b in ipairs(list) do
+      local lb = ctx.ic and ctx.ic(b[1], b[2]) or b[2]
+      tot = tot + U.measure(lb) + 3 * L.pad
+      local room = W - L.pad - ((i < #list) and more_w or 0)
+      if tot > room then fit_n = i - 1; break end
+    end
+    if fit_n < #list then
+      local keep = {}
+      for i, b in ipairs(list) do if i <= fit_n then keep[#keep + 1] = b else over[#over + 1] = b end end
+      keep[#keep + 1] = { 'more', '»' }
+      list = keep
+    end
+  end
+  MX.overflow = over
+  for _, b in ipairs(list) do
     local label = b[2]
-    if ctx.ic then label = ctx.ic(b[1], label) end
+    if ctx.ic and b[1] ~= 'more' then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)

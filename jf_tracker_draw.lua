@@ -6763,47 +6763,7 @@ function D.frame(L, snap, rows, state, info)
     D.clip = nil
   end
 
-  -- кнопки у линии раздела трекер | правая панель (2 окт): > свернуть, < развернуть,
-  -- = тянуть ширину; стоят слева от линии, чтобы не закрывать кнопки браузера
-  do
-    local bw = ms('<') + 2 * L.pad
-    local bot = gfx.h - L.status_h
-    local lx = L.side_x or L.win_w                   -- левый край правой панели / полосы
-    if not state.side then
-      -- свёрнутый браузер (6 окт): полоса во всю высоту (раньше с шапки — верх
-      -- выглядел рваным) и кнопка «<» посередине — развернуть
-      local y0 = math.min(L.header_y, L.top_y or 0)
-      set(U.PANEL); gfx.rect(lx, y0, L.rstrip_w, bot - y0, 1)
-      set(D.SEP); gfx.rect(lx, y0, D.SEPW, bot - y0, 1)
-      local obw, obh = L.rstrip_w - 6, 3 * L.rh
-      local obx, oby = lx + 3, math.floor((y0 + bot - obh) / 2)
-      local ohot = mx >= lx and mx < lx + L.rstrip_w and my >= oby and my < oby + obh
-      set(ohot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(obx, oby, obw, obh, 1)
-      set(ohot and U.AMBER or U.LINE); gfx.rect(obx, oby, obw, obh, 0)
-      text(obx + math.floor((obw - ms('<')) / 2), oby + L.rh, '<', ohot and U.AMBER or U.TEXT)
-      hint('sidectl', obx, oby, obw, obh, 'open')
-    end
-    local function knob(y, lbl, what)
-      local bx = lx - math.floor(bw / 2)               -- на линии модуля (4 окт), по центру
-      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
-      set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
-      set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
-      text(bx + L.pad, y, lbl, hot and U.AMBER or U.TEXT)
-      if hot then hover.sidectl = what end
-      hint('sidectl', bx, y, bw, L.rh, what)
-    end
-    -- панель открыта: кнопки в трекере у низа его тела, над нижней панелью
-    -- (DSP / справка), иначе они ложились на текст справки (2 окт)
-    -- 4 окт: кнопок нет — тянется сама линия, свёрнутая полоса — клик
-    -- разворачивает; свернуть — быстрая кнопка browser
-    local _ = knob
-    if mx >= lx - 3 and mx <= lx + 3 and my >= L.header_y and my < bot then
-      for _, k in ipairs({ 'row', 'cell', 'fi', 'col', 'field', 'browser', 'matrix', 'pool', 'rownum' }) do hover[k] = nil end; hover.sidectl = state.side and 'grip' or 'open'
-      set(U.AMBER); gfx.rect(lx - 1, L.header_y, 2, bot - L.header_y, 1)
-    elseif not state.side and mx > lx + 3 and mx < lx + L.rstrip_w and my >= math.min(L.header_y, L.top_y or 0) and my < bot then
-      hover.sidectl = 'open'
-    end
-  end
+  -- 11 окт: кнопка «<» и протяжка у линии трекер | браузер убраны — размеры и показ панелей у дерева (ручки, Ctrl+W)
 
   -- прямоугольники модулей (3 окт) — для рамки фокуса; границы модулей рисуют
   -- разделители D.SEP: 1 px, тусклые (одна линия, без наложений)

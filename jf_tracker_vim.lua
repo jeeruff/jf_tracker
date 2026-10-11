@@ -1948,6 +1948,12 @@ function V.key_impl(c)
       local keys = name and V.regs['@' .. name]
       if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
       V.count = nil; return
+    elseif p == 'T' then
+      -- 11 окт: T f — take FX ноте под курсором (fzf), T o — её цепь в DSP
+      local ch = string.char(c < 256 and c or 0)
+      if ch == 'f' and ctx.dsp_take_slice then ctx.dsp_take_slice()
+      elseif ch == 'o' and ctx.take_fx_open then ctx.take_fx_open() end
+      finish_move(); V.count = nil; return
     elseif p == 't' then
       if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
       -- 10 окт: td / tx / tp — удалить / вырезать / вставить N треков (5td — пять)
@@ -2134,6 +2140,7 @@ function V.key_impl(c)
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
+  elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
     if V.macro then
@@ -2440,6 +2447,7 @@ local PENDING_HINT = {
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | Esc',
+  T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
   z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom | s clips (session)',
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
