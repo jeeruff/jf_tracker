@@ -997,7 +997,7 @@ function B.draw(U, L, x, y, w, h)
   if not (B.pmpane and B.mode == 'pm') then         -- 9 окт: панель pm — без файловых кнопок (find wave track sync …)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
-    for _, b in ipairs({ { 'find', 'find', false }, { 'wave', 'wave', B.wave },
+    for _, b in ipairs({ { 'wave', 'wave', B.wave },   -- 11 окт: find — слева от стрелок < > (на виду), здесь не дублируется
                          { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
@@ -1065,6 +1065,7 @@ function B.draw(U, L, x, y, w, h)
   do
     local bx = x + L.pad + 2
     if B.mode == 'files' then
+      bx = btn(bx, y, 'find', 'find', B.filtering or B.filter ~= '')   -- 11 окт: поиск — на виду, перед стрелками
       bx = btn(bx, y, '<', 'back', false)
       bx = btn(bx, y, '>', 'fwd', false)
       bx = btn(bx, y, '*', 'mkdir', false)
@@ -1117,6 +1118,7 @@ function B.draw(U, L, x, y, w, h)
   end
   if B.mode ~= 'files' then
     local tx0 = x + L.pad + 2
+    if not (B.pmpane and B.mode == 'pm') then tx0 = btn(tx0, y, 'find', 'find', B.filtering or B.filter ~= '') end   -- 11 окт: find — первым в строке
     -- pm (6 окт): кнопки вида / сортировки / DAW / big перед текстом
     if B.mode == 'pm' and not B.pmproj and not B.pm_folders and B.pm_mod() then
       local bx = tx0

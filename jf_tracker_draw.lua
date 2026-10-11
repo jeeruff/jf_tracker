@@ -6223,6 +6223,35 @@ function D.frame(L, snap, rows, state, info)
   -- статус-бар (3 окт): внизу окна (bottom) или строкой под телом трекера,
   -- по ширине матрица + трекер (tracker)
   local sx, sy, sw, sh = 0, gfx.h - L.status_h, gfx.w, L.status_h
+  -- 11 окт: подсказки в статусе («…: h l signal, j k row, a / A add») — клавиши яркими, описание обычным текстом
+  local KEYW = { Esc = 1, Enter = 1, Tab = 1, Space = 1, Bksp = 1, click = 1, rclick = 1, dblclick = 1, wheel = 1, drag = 1, zz = 1, Del = 1 }
+  local function keyish(t)
+    return #t <= 2 or t:match('^%p+$') or KEYW[t] or t:match('^%^') or t:match('^Shift') or t:match('^Cmd') or t:match('^Ctrl') or t:match('^Opt') or t:match('^Alt')
+  end
+  local function key_text(x, y, str, maxw, head_col)
+    str = fit(str, maxw)
+    local pre, list = str:match('^(.-:%s)(.*)$')
+    local parts = {}
+    if list then for p in (list .. ', '):gmatch('(.-), ') do parts[#parts + 1] = p end end
+    local hits = 0
+    for _, p in ipairs(parts) do if keyish(p:match('^(%S+)') or 'longword') then hits = hits + 1 end end
+    if #parts < 2 or hits * 2 < #parts then text(x, y, str, head_col); return end
+    text(x, y, pre, head_col); x = x + ms(pre)
+    for i, p in ipairs(parts) do
+      local keys, rest, n = {}, nil, 0
+      for tok in p:gmatch('%S+') do
+        n = n + 1
+        if not rest and keyish(tok) and n <= 4 then keys[#keys + 1] = tok else rest = rest and (rest .. ' ' .. tok) or tok end
+      end
+      if #keys == 0 then text(x, y, p, U.TEXT); x = x + ms(p)
+      else
+        local ks = table.concat(keys, ' ')
+        text(x, y, ks, U.AMBER); x = x + ms(ks)
+        if rest then local r = ' ' .. rest; text(x, y, r, U.TEXT); x = x + ms(r) end
+      end
+      if i < #parts then text(x, y, ', ', U.GREY); x = x + ms(', ') end
+    end
+  end
   -- панели (9 окт): строка клавиш панели в фокусе (как zellij), статус под ней
   if L.pn and (L.pn_keys or 0) > 0 then
     local f = info.focus
@@ -6263,7 +6292,7 @@ function D.frame(L, snap, rows, state, info)
     if ins then
       text(sx + L.pad, sy + 2, '-- INSERT --', D.FOCUS_INS or U.RED)
       text(sx + L.pad + ms('-- INSERT --'), sy + 2, left:sub(13), U.AMBER)
-    else text(sx + L.pad, sy + 2, left, U.AMBER) end
+    else key_text(sx + L.pad, sy + 2, left, sw / 3, U.AMBER) end
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
@@ -6271,7 +6300,7 @@ function D.frame(L, snap, rows, state, info)
     D.aw_status = nil
     if desc ~= '' then
       if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 1, sh - 2, 1) end
-      text(hx, sy + 2, fit(desc, sx + sw - hx - L.pad), U.TEXT)
+      key_text(hx, sy + 2, desc, sx + sw - hx - L.pad, U.TEXT)
     end
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect((L.side_x or L.win_w) - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end
