@@ -6114,6 +6114,16 @@ ctx = {
     end
     if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
     if #seq > 0 then MX.goto_cell(seq, snap, MX.cur.ri, MX.cur.ci) else ctx.set_focus('tracker') end
+    -- 11 окт: свободный такт — не объект, а кусок пустого места по сетке тактов; после
+    -- него до =END только пустота — сетка режет её так же, и пропадает ПОСЛЕДНЯЯ строка
+    if rg.gap then
+      local tail = true
+      for i = MX.cur.ri, #seq do if not seq[i].gap then tail = false; break end end
+      if tail and (sl == nil or (sl.nitems or 0) == 0) then
+        vim.msg = ('free bar: empty time up to =END - %d rows cut, so the list is one bar shorter at its end (=END moved back); u undo'):format(math.floor((rg.r1 or 0) - (rg.r0 or 0) + 0.5))
+        return
+      end
+    end
     vim.msg = ('deleted slot %s (%d item(s)) - p puts it back, u undo'):format(rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. rg.idx)), sl and sl.nitems or 0)
   end,
   -- длина слота: ±1 такт / ±1 шаг (ripple, как :len)
