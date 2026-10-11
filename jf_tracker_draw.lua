@@ -4950,6 +4950,22 @@ function D.frame(L, snap, rows, state, info)
       set(U.DIM); gfx.rect(m.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
       hint('mlane', m.x, hy + L.lane_row * L.rh, m.w, L.rh, m.fi)
     end
+    -- 11 окт: мастер без показанных огибающих — a+ (любая автоматизация мастера: громкость,
+    -- панорама, параметры его FX, Tempo); с огибающими + стоит у последней, как у треков
+    if c.master and #c.envs == 0 and c.col and c.col.track then
+      local aw = ms('a+') + 4
+      local m = (c.mls or {})[#(c.mls or {})]
+      local ax = m and (m.x + m.w - aw - 2) or (c.x + c.w - aw - 2)
+      local by = hy + L.lane_row * L.rh + 1
+      if not m or ax > m.x + ms('cmd') + 2 * L.pad then
+        local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
+        set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
+        set(U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
+        text(ax + 2, by, 'a+', ahot and U.AMBER or BTXT)
+        if ahot then hover.envpm = { col = c.col, d = 1 } end
+        hint('envpm', ax, by, aw, L.rh, { col = c.col, d = 1 })
+      end
+    end
     for ei, ev in ipairs(c.envs) do
       -- 6 окт: справа в шапке лейна − (спрятать лейн; огибающая и точки
       -- остаются), у последнего лейна ещё + (добавить: выбор параметра);
