@@ -15840,7 +15840,7 @@ local function frame()
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
              and (type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac))) then
         ctx.lib_append_slice(bd.e.pm and bd.e.path or B.full(bd.e))   -- 10 окт: на слайсы / волну item — новым слайсом (набор &)
-      elseif bd.active and hover.pool and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
+      elseif bd.active and hover.pool and not bd.e.fromlib and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
         ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
       elseif bd.active and hover.matrix and hover.matrix.ri and hover.matrix.ci and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.ss_drop(hover.matrix.ri, hover.matrix.ci, bd.e.pm and bd.e.path or B.full(bd.e))   -- на ячейку матрицы — клипом в слот (6 окт)
@@ -15966,13 +15966,21 @@ local function frame()
   if draw.lib_drag then
     local d = draw.lib_drag
     if gfx.mouse_cap & 1 == 1 then
-      if not d.active and math.abs(gfx.mouse_y - d.y0) > 6 then d.active = true end
-      if d.active then state.status = 'lib: drop to place the sample here (numbers follow the order)' end
+      if not d.active and (math.abs(gfx.mouse_y - d.y0) > 6 or math.abs(gfx.mouse_x - d.x0) > 6) then d.active = true end
+      -- 11 окт: увёл из lib — дальше как файл из браузера (трек, слайсы, волна RS5K, клетка матрицы …)
+      local pe = d.active and not hover.pool and cur_col() and cur_col().pool[d.i]
+      if pe and (pe.fpath or '') ~= '' and pe.stype ~= 'midi' then
+        B.drag = { e = { name = pe.name or pe.fpath:match('[^/]+$'), path = pe.fpath, fromlib = true }, x0 = d.x0, y0 = d.y0, active = true }
+        draw.lib_drag, draw.lib_drop = nil, nil
+        goto lib_drag_done
+      end
+      if d.active then state.status = 'lib: drop to place the sample here (numbers follow the order); out of the lib - as a file' end
     else
       if d.active and draw.lib_drop then ctx.lib_move(d.i, draw.lib_drop.before) end
       draw.lib_drag, draw.lib_drop = nil, nil
     end
   end
+  ::lib_drag_done::
   if draw.send_drag then
     local d = draw.send_drag
     local tr = d.col.track
