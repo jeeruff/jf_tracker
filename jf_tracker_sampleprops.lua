@@ -229,6 +229,23 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   local RH = L.rh * SP.szoom
   -- подсказка клавиш (4 окт): только с опцией hints, нижней строкой
   local hints = ctx.state and ctx.state.hints
+  -- 11 окт: внизу — кнопка render (выпадашка: в lib / в RS5K), когда есть слайсы
+  local rnd = #rows > 1 and h >= 4 * L.rh
+  if rnd then
+    local lbl = 'render v'
+    local bw = U.measure(lbl) + 2 * L.pad
+    local bx, by = x + L.pad, y + h - L.rh
+    local mx2, my2, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
+    local hot = mx2 >= bx and mx2 < bx + bw and my2 >= by and my2 < by + L.rh
+    local press = cap & 1 == 1 and (SP.rprev or 0) & 1 == 0
+    SP.rprev = cap
+    if hot and press and ctx.slices_render_menu then ctx.slices_render_menu() end
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh - 1, 1)
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh - 1, 0)
+    U.text(bx + L.pad, by, lbl, hot and U.AMBER or U.TEXT)
+    SP.render_hot = hot
+    h = h - L.rh - 2
+  else SP.render_hot = false end
   local n = math.max(1, math.floor((h - L.rh) / RH))   -- 10 окт: клавиши — строкой хинтов панели
   SP.slice_scroll = SP.slice_scroll or 0
   local si = 1

@@ -3911,6 +3911,71 @@ ctx = {
     return 0
   end,
   slq_label = function() return 'q ' .. (({ off = '0', row = 'row', ['2row'] = '2', beat = 'beat', bar = 'bar' })[state.slq or 'off'] or '0') end,
+  -- 11 окт: render слайсов (кнопка внизу списка слайсов): lib — каждый слайс своим инструментом
+  -- (кусок item в =LIB), rs5k — по RS5K на слайс на треке курсора, нота = клавиша слайса
+  slices_render_menu = function()
+    vim.open_hydra({ title = 'render slices', items = {
+      { key = 'l', label = 'to the lib - every slice its own instrument', fn = function() ctx.slices_render('lib') end },
+      { key = 's', label = 'to the sampler - an RS5K per slice on the cursor track (slice note)', fn = function() ctx.slices_render('rs5k') end },
+    } })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  slices_render = function(how)
+    local root, col = ctx.slice_root()
+    local sl = root and root.slices or {}
+    if not (root and col and root.item and #sl > 0) then vim.msg = 'render: no slices on the selected instrument'; return end
+    local spans = {}
+    for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end
+    if how == 'lib' then
+      local n = 0
+      edit.run('render slices to the lib', function()
+        for _, sp in ipairs(spans) do if sp[2] - sp[1] > 0.002 and edit.depot_span(col.track, root, sp[1], sp[2]) then n = n + 1 end end
+      end)
+      model.invalidate()
+      vim.msg = ('render: %d slice(s) -> the lib of %s'):format(n, col.name or 'track')
+      return
+    end
+    local tk = reaper.GetActiveTake(root.item)
+    if not tk or reaper.TakeIsMIDI(tk) then vim.msg = 'render: audio only'; return end
+    local src = reaper.GetMediaItemTake_Source(tk)
+    local fsrc = (reaper.GetMediaSourceParent and reaper.GetMediaSourceParent(src)) or src
+    local path, flen = reaper.GetMediaSourceFileName(fsrc, ''), reaper.GetMediaSourceLength(fsrc)
+    if not path or path == '' or not flen or flen <= 0 then vim.msg = 'render: no file'; return end
+    local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+    local base = (ctx.slice_base and ctx.slice_base()) or 61
+    local tr = col.track
+    local function pidx(fx, want)   -- параметр RS5K по имени (индексы не зашиваем)
+      for p = 0, reaper.TrackFX_GetNumParams(tr, fx) - 1 do
+        local _, pn = reaper.TrackFX_GetParamName(tr, fx, p, '')
+        if (pn or ''):lower():find(want, 1, true) then return p end
+      end
+    end
+    local n = 0
+    edit.run('render slices to RS5K', function()
+      for k, sp in ipairs(spans) do
+        local fx = reaper.TrackFX_AddByName(tr, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+        if fx and fx >= 0 then
+          local a = math.max(0, math.min(1, (offs + sp[1] * rate) / flen))
+          local b = math.max(a + 0.0001, math.min(1, (offs + sp[2] * rate) / flen))
+          local note = math.max(0, math.min(127, base + k - 1))
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'FILE0', path)
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'MODE', '1')        -- sample: высота как есть, нота только выбирает
+          local ps, pe2 = pidx(fx, 'sample start offset'), pidx(fx, 'sample end offset')
+          if ps then reaper.TrackFX_SetParamNormalized(tr, fx, ps, a) end
+          if pe2 then reaper.TrackFX_SetParamNormalized(tr, fx, pe2, b) end
+          local ns, ne = pidx(fx, 'note range start'), pidx(fx, 'note range end')
+          if ns then reaper.TrackFX_SetParamNormalized(tr, fx, ns, note / 127) end
+          if ne then reaper.TrackFX_SetParamNormalized(tr, fx, ne, note / 127) end
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'renamed_name', ('S%02X %s'):format(k, root.name or ''))
+          n = n + 1
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('render: %d RS5K on %s, slice S01 = note %d (a key each)'):format(n, col.name or 'track', base)
+  end,
   slq_menu = function()
     local items = {}
     for _, o in ipairs({ { '0', 'off', 'off - the next slice starts exactly where the last one ended' }, { '1', 'row', '1 row' }, { '2', '2row', '2 rows' },
