@@ -353,6 +353,19 @@ function SS.key(c, seq, snap, grid, mods)
   return eaten
 end
 function SS.key_body(c, ch, seq, snap, grid, ncols)
+  -- 11 окт: цифры — номер сцены для s (3s — сцена 3), s — сцена курсора
+  local d = tonumber(ch)
+  if d and not SS.pending_y and not SS.pending_d and (d > 0 or SS.count) then
+    SS.count = (SS.count or 0) * 10 + d
+    ctx.msg(('%d: s - start scene %d | Esc'):format(SS.count, SS.count)); return true
+  end
+  local cnt = SS.count; SS.count = nil
+  if ch == 's' then
+    local ri = cnt or SS.cur.ri
+    if not seq[ri] then ctx.msg('no scene ' .. ri); return true end
+    SS.cur.ri = ri; SS.follow(seq); SS.scene(ri, seq, grid, ncols); return true
+  end
+  if cnt and c == 27 then ctx.msg(''); return true end
   if (ch == 'a' or ch == 'A') and ctx.ss_fa_set then   -- follow action клипа курсора (7 окт)
     local cell = grid[SS.cur.ri] and grid[SS.cur.ri][SS.cur.ci]
     if cell and cell.state ~= 'empty' then
@@ -817,7 +830,7 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
             U.set(rhot and U.RED or U.mix(U.BG, U.RED, 0.75)); gfx.rect(bx, byb, rw, L.rh - 1, 1)
             U.text(bx + 2, byb, 'o', rhot and U.TEXT or U.BG)
             if rhot then hover.ssrecbtn = { ri = ri, ci = vi } end
-            if ctx.hint then ctx.hint('ssrecbtn', bx, byb, rw, L.rh, { ri = ri, ci = vi }) end
+            -- 11 окт: без метки f: она забирала место метки клипа, и f + буква начинало запись
           end
         end
         -- клип-мод: буква клавиши — слева сверху, над кнопкой > (8 окт; была

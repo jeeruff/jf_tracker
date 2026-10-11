@@ -3434,6 +3434,11 @@ ctx = {
   end,
   -- редактор automation item (5 окт): вкладка modulation, страница item
   -- ── панели (9 окт, бета): фокус и операции дерева tmux / zellij ─────────
+  -- 11 окт: трек под мышью для броска (колонка трекера, его шапка, полоса / шапка микшера)
+  drop_track_col = function(hover)
+    return hover.header_col or hover.col or (hover.fi and L.flat and L.flat[hover.fi] and L.flat[hover.fi].col)
+      or (hover.trs and hover.trs.col) or (hover.hdrfx and hover.hdrfx.col) or (hover.btn and hover.btn.col) or nil
+  end,
   -- id панели в фокусе (вкладки живут как 'top' + toptab)
   pane_cur = function()
     if state.focus == 'top' then return state.toptab end
@@ -9577,6 +9582,11 @@ local function hint_go(t)
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d
   elseif t.kind == 'browserbtn' then B.click(d)
+  elseif t.kind == 'multi' then
+    -- 11 окт: Shift+F + метки + Enter — несколько клипов разом; пустая клетка — стоп её трека (как одиночный запуск)
+    local n = 0
+    for _, p in ipairs(t.picked) do if p.data then MX.SS.launch(p.data.ri, p.data.ci, seq); n = n + 1 end end
+    vim.msg = n > 0 and (('%d clips launched (quantize %s)'):format(n, tostring(MX.SS.quant))) or 'no clips picked'
   elseif t.kind == 'sess' then
     -- session (6 окт): f + метка — клип; после F — вся сцена ряда
     if MX.SS.scene_mode then MX.SS.scene(d.ri, seq, ctx.ss_G(), #ctx.ss_V().cols) else MX.SS.launch(d.ri, d.ci, seq) end
@@ -15173,12 +15183,33 @@ local function frame()
       if not dsp_drag.active and (math.abs(gfx.mouse_x - dsp_drag.x0) > 6 or math.abs(gfx.mouse_y - dsp_drag.y0) > 6) then dsp_drag.active = true end
       if dsp_drag.active then
         local g = hover.dsp_gap
+        local tc = not g and not hover.dsp_into and ctx.drop_track_col(hover)
         state.status = hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
-          or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)') or ('move ' .. dsp_drag.f.name .. ' - drop between blocks or into a container'))
+          or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)'))
+          or (tc and ('move ' .. dsp_drag.f.name .. ' → ' .. (tc.name or 'track') .. ' (instrument - first slot, effect - end of the chain)'))
+          or ('move ' .. dsp_drag.f.name .. ' - drop between blocks, into a container or onto a track / mixer strip')
       end
     else
       local dd = dsp_drag; dsp_drag = nil       -- снять ДО действия (6 окт): ошибка не повторит перенос
       local g, s = hover.dsp_gap, dd.fx
+      -- 11 окт: на колонку трека / полосу или шапку микшера — перенос на тот трек:
+      -- инструмент — первым в цепь, эффект — в конец (как вставка в консоли)
+      local tc = dd.active and not g and not hover.dsp_into and ctx.drop_track_col(hover)
+      local src = tc and dsp_target()
+      if src and tc.track and tc.track ~= src.track and reaper.ValidatePtr(tc.track, 'MediaTrack*') then
+        local A = model.fxapi(src.track)
+        local _, raw = A.GetFXName(src.track, dd.f.i, '')
+        local okn, orig = A.GetNamedConfigParm(src.track, dd.f.i, 'original_name')
+        raw = raw or ''
+        if okn and orig ~= '' and not raw:match('^%a+i?:') then raw = orig end
+        local lo = raw:lower()
+        local inst = raw:match('^%a+i:') or (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true)))
+        local to = inst and 0 or reaper.TrackFX_GetCount(tc.track)
+        edit.fx_copy(src.track, dd.f.i, tc.track, to, true, 'move fx ' .. dd.f.name)
+        model.invalidate()
+        vim.msg = 'moved ' .. dd.f.name .. ' -> ' .. ((tc.name and tc.name ~= '') and tc.name or 'track') .. (inst and ' (first slot - instrument)' or ' (end of the chain)')
+        g = nil
+      end
       local col = dd.active and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]
       if cf then
@@ -15923,8 +15954,11 @@ local function frame()
     if not HN.active then ctx.glide = nil end
     c = 0
   elseif c == ('F'):byte() and (state.ss_big or (state.clipsview and state.focus == 'tracker') or (MX.clips and state.focus == 'matrix') or (state.top and state.toptab == 'clips' and state.focus == 'top')) and vim.mode == 'normal' and not vim.hydra and not vim.picker then
-    MX.SS.scene_mode = true
-    if HN.start() then vim.msg = 'scene: type the label of any cell in the row, Esc' else MX.SS.scene_mode = false; vim.msg = 'no targets' end
+    -- 11 окт: Shift+F — метки только на клипах; набранные метки отмечают (ещё раз — снять),
+    -- Enter запускает все отмеченные вместе (квантизация сессии), Esc — отмена
+    HN.multi = true
+    if HN.start(function(t) return t.kind == 'sess' end) then vim.msg = 'clips: type labels to pick several, Enter launches them together (quantize ' .. tostring(MX.SS.quant) .. '), Esc'
+    else vim.msg = 'no clips on screen' end
     c = 0
   elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли

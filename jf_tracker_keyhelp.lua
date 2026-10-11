@@ -253,8 +253,9 @@ KH.PAGES = {
   session = { title = 'session: clips over the whole window (zz in the matrix)', e = {
     { k = 'h j k l', d = 'cell (scene row x track column)' },
     { k = 'Enter o', d = 'launch the clip at the next quantize boundary (its items loop in the =SESSION zone with their own phase)' },
-    { k = 'O F', d = 'scene: launch every clip of the row; F + label - the row of any labelled cell; empty cells stop their tracks' },
+    { k = 'O s', d = 'scene: launch every clip of the cursor row; 3s - scene 3 (a number, then s); empty cells stop their tracks' },
     { k = 'f', d = 'labels: f + letters launches that clip' },
+    { k = 'F', d = 'pick several clips: labels on the clips, type them (again - unpick), Enter launches them together on the quantize boundary, Esc' },
     { k = 'x X', d = 'stop this track / all tracks at the boundary' },
     { k = 'q', d = 'quantize: bar / beat / now (:session quant ...)' },
     { k = 'Space', d = 'transport play / stop' },

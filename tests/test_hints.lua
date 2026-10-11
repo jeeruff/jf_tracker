@@ -25,4 +25,16 @@ H.start()
 eq('overlapped target gets no label', H.targets[2].label, nil)
 eq('next free target gets the second label', H.targets[3].label, 'as')
 H.stop(); H.reset(); eq('no targets', H.start(), false)
+-- 11 окт: Shift+F — только клипы, несколько, Enter отдаёт отмеченные
+H.stop(); H.reset()
+for i = 1, 4 do H.add('sess', 0, i * 20, 10, 10, { ri = i, ci = 1 }) end
+H.add('mx', 50, 0, 10, 10, 'other')
+H.multi = true
+eq('multi start', H.start(function(t2) return t2.kind == 'sess' end), true)
+eq('filter keeps clips only', #H.targets, 4)
+H.key(('a'):byte()); eq('pick keeps typing', H.key(('a'):byte()), 'pending'); eq('picked', H.targets[1].picked, true)
+H.key(('a'):byte()); H.key(('d'):byte()); eq('second picked', H.targets[3].picked, true)
+H.key(('a'):byte()); H.key(('a'):byte()); eq('again - unpicked', H.targets[1].picked, false)
+local r = H.key(13); eq('Enter -> multi', r.kind, 'multi'); eq('one picked left', #r.picked, 1); eq('it is clip 3', r.picked[1].data.ri, 3)
+eq('multi off after Enter', H.multi, false)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

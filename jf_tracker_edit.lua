@@ -2118,6 +2118,11 @@ local function copy_fx(src, si, dst, di, move)
   elseif dt then R.TrackFX_CopyToTake(src, si, dst, di, move)
   else R.TrackFX_CopyToTrack(src, si, dst, di, move) end
 end
+-- 11 окт: перенос / копия эффекта на другой объект одним undo (бросок блока DSP на трек)
+function E.fx_copy(src, si, dst, di, move, label)
+  E.run(label or (move and 'move fx' or 'copy fx'), function() copy_fx(src, si, dst, di, move) end)
+  if model then model.invalidate() end
+end
 local function add_fx(obj, name, inst)
   if model.is_take(obj) then return R.TakeFX_AddByName(obj, name, inst) end
   return R.TrackFX_AddByName(obj, name, false, inst)
