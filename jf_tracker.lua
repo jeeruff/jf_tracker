@@ -6203,6 +6203,28 @@ ctx = {
     vim.msg = on and 'rec follows selection: the selected tracks are armed (REAPER auto record-arm on every track)' or 'rec follows selection off'
     return n
   end,
+  -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
+  -- 12 LUFS-M, 16 LUFS-S max, 20 LUFS-S current); метр трекера читает тот же VU — без JSFX
+  MM_MODES = { { 0, 'peak', 'peak (stereo)' }, { 4, 'RMS', 'RMS (stereo)' }, { 8, 'RMS', 'RMS (combined)' },
+               { 12, 'LUFS-M', 'LUFS-M - momentary loudness' }, { 16, 'LUFS-S', 'LUFS-S - short-term, readout max' }, { 20, 'LUFS-S', 'LUFS-S - short-term, readout current' } },
+  master_meter_mode = function()
+    local v = math.floor(reaper.GetMediaTrackInfo_Value(reaper.GetMasterTrack(0), 'I_VUMODE') or 0) & 30
+    for _, m in ipairs(ctx.MM_MODES) do if m[1] == v then return m[2] end end
+    return 'meter'
+  end,
+  master_meter_menu = function()
+    local mt = reaper.GetMasterTrack(0)
+    local cur = math.floor(reaper.GetMediaTrackInfo_Value(mt, 'I_VUMODE') or 0)
+    local items = {}
+    for k, m in ipairs(ctx.MM_MODES) do
+      items[#items + 1] = { key = tostring(k), label = m[3] .. (((cur & 30) == m[1]) and '  (on)' or ''), fn = function()
+        reaper.SetMediaTrackInfo_Value(mt, 'I_VUMODE', (cur & ~30) | m[1])
+        vim.msg = 'master meter: ' .. m[3]
+      end }
+    end
+    vim.open_hydra({ title = 'master meter (REAPER VU)', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+  end,
   -- 11 окт: шапка lib — выпадашки kit и sort (у кнопки, без перебора по кругу)
   kit_menu = function()
     local list = edit.lib_presets()
@@ -9785,6 +9807,7 @@ local function hint_go(t)
   elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
   elseif t.kind == 'dbplus' then ctx.set_focus('dsp'); if d.first then ctx.db_ops.add(nil, false, true) else ctx.db_ops.add(d.after, false) end   -- 11 окт: + стыка роутера
   elseif t.kind == 'dbpar' then ctx.set_focus('dsp'); ctx.db_ops.add(d, true)                                                                   -- = под узлом
+  elseif t.kind == 'mixmode' then ctx.master_meter_menu()
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
@@ -12495,7 +12518,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -13405,6 +13428,7 @@ local function frame()
   elseif hover.sendpop then state.status = ({ add = '+ send: pick a track (fzf)', routing = 'REAPER routing window', mute = 'mute this send', del = 'remove this send' })[hover.sendpop.what] or ''
   elseif hover.sendvol then state.status = 'send volume - drag'
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
+  elseif hover.mixmode then state.status = 'meter of the master (REAPER VU): RMS / LUFS-M / LUFS-S / peak - click: the list (native, no plugin)'
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
@@ -14396,6 +14420,7 @@ local function frame()
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
     elseif hover.rs5k then ctx.rs5k_do(hover.rs5k.f, hover.rs5k.what); click = { t = now2, zone = 'rs5k' }   -- 10 окт: кнопки RS5K
+    elseif hover.mixmode then ctx.master_meter_menu()
     elseif hover.mixpk then
       -- 10 окт: Shift+щелчок — сброс пиков / клипов у ВСЕХ треков и мастера (как Ctrl+щелчок в микшере REAPER)
       local function rst(tr) for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(tr, ch, true) end end

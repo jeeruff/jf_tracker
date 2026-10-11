@@ -4377,13 +4377,22 @@ function D.frame(L, snap, rows, state, info)
           -- строка над routing — как у REAPER: «RMS -16.9», его удержание (то,
           -- что показывает VU мастера: RMS / LUFS — по режиму его метра)
           if D.lufs_row_y then
-            local lbl = 'RMS'
+            -- 11 окт: подпись — кнопка режима метра мастера REAPER (RMS / LUFS-M / LUFS-S …, без JSFX):
+            -- щелчок — выпадашка режимов; щелчок по числу — сброс удержания
+            local lbl = (info.master_meter_mode and info.master_meter_mode()) or 'RMS'
             local val = (hmax or -150) > -60 and ('%.1f'):format(hmax) or '-inf'
-            if ms(lbl .. ' ' .. val) <= c.w - 2 * L.pad then
-              text(c.x + L.pad, D.lufs_row_y, lbl, U.readable(U.GREEN, rbg, 3))
-              text(c.x + L.pad + ms(lbl .. ' '), D.lufs_row_y, val, U.TEXT)
+            local lw2 = ms(lbl) + 2 * L.pad
+            if lw2 + ms(' ' .. val) <= c.w - L.pad then
+              local bx3, by3 = c.x + 2, D.lufs_row_y
+              local bhot = mx >= bx3 and mx < bx3 + lw2 and my >= by3 and my < by3 + L.rh
+              set(bhot and U.tint(U.AMBER, 0.3) or rbg); gfx.rect(bx3, by3, lw2, L.rh, 1)
+              set(bhot and U.AMBER or U.LINE); gfx.rect(bx3, by3, lw2, L.rh, 0)
+              text(bx3 + L.pad, by3, lbl, bhot and U.AMBER or U.readable(U.GREEN, rbg, 3))
+              text(bx3 + lw2 + L.pad, by3, val, U.TEXT)
+              if bhot then hover.mixmode = true end
+              hint('mixmode', bx3, by3, lw2, L.rh, true)
             end
-            if mx >= c.x and mx < c.x + c.w and my >= D.lufs_row_y and my < D.lufs_row_y + L.rh then hover.mixpk = col.track end   -- щелчок — сброс
+            if not hover.mixmode and mx >= c.x and mx < c.x + c.w and my >= D.lufs_row_y and my < D.lufs_row_y + L.rh then hover.mixpk = col.track end   -- щелчок — сброс
           end
         end
         -- ручка [-]: колпачок в рамке поверх метра, риска посередине — уровень
