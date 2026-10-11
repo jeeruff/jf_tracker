@@ -3,7 +3,7 @@
 -- строк, ноты, курсор, плейхед, статус INSERT); шрифт — строка, нарисованная
 -- этим шрифтом. h j k l — выбор (сетка тем, потом список шрифтов), Enter /
 -- щелчок — применить; o — свой шрифт, i — поставить шрифты из комплекта,
--- r — перечитать свои темы. Колесо — прокрутка.
+-- r — перечитать свои темы, - + — размер шрифта, [ ] — интервал строк (11 окт). Колесо — прокрутка.
 --
 -- Окно Options отдаёт вкладке прямоугольник (TT.draw) и клавиши (TT.key);
 -- данные и действия — через ctx (TT.init): themes() → { {name, pal}, … },
@@ -96,6 +96,7 @@ local function font_img(fonts, pw, ph)
   TT.fkey = key
 end
 
+local SCALES = { 1, 1.5, 2, 3 }
 local BTNS = { { 'o', 'own font' }, { 'i', 'install bundled fonts' }, { 'd', 'download fonts' }, { 'r', 'reload my themes' } }
 
 function TT.draw(x, y, w, h)
@@ -115,7 +116,8 @@ function TT.draw(x, y, w, h)
   TT.tcols, TT.fcols, TT.nt, TT.nf = tcols, fcols, #themes, #fonts
   font_img(fonts, pw, ph)
   local trows = math.ceil(#themes / tcols)
-  local fy0 = rh + trows * (ch + pad) + rh            -- от верха контента: заголовок тем, сетка, заголовок шрифтов
+  local srow = rh + 4                                 -- 11 окт: строка размер / интервал под заголовком шрифтов
+  local fy0 = rh + trows * (ch + pad) + rh + srow     -- от верха контента: заголовок тем, сетка, заголовок шрифтов, настройки
   -- держать выбранное в окне
   local sy0, sy1
   if TT.sec == 1 then local r = (TT.i[1] - 1) // tcols; sy0 = rh + r * (ch + pad); sy1 = sy0 + ch
@@ -141,7 +143,31 @@ function TT.draw(x, y, w, h)
     end
   end
   local fy = oy + fy0
-  if vis(fy, rh) then text(x, fy, 'fonts - each in its own face; font scale changes their size', U.AMBER) end
+  if vis(fy - srow, rh) then text(x, fy - srow, 'fonts - each in its own face', U.AMBER) end
+  -- размер (font scale) и интервал строк — кнопками, + - и [ ] с клавиатуры
+  do
+    local sy = fy - srow + rh + 1
+    if vis(sy, rh) then
+      local bx = x
+      local function btn(lab, on, what)
+        local bw = ms(lab) + 2 * pad
+        if bx + bw > x + w then return end
+        local hot = mx >= bx and mx < bx + bw and my >= sy and my < sy + rh
+        if hot then TT.btn_hot = what end
+        C(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, sy, bw, rh, 1)
+        C(on and U.AMBER or U.LINE); gfx.rect(bx, sy, bw, rh, 0)
+        text(bx + pad, sy, lab, (on or hot) and U.AMBER or U.TEXT)
+        bx = bx + bw + 2
+      end
+      local function lab(t) if bx + ms(t) + pad <= x + w then text(bx, sy, t, U.GREY); bx = bx + ms(t) + pad end end
+      local sc = ctx.scale()
+      lab('size (- +)')
+      for _, v in ipairs(SCALES) do btn(tostring(v), sc == v, { 'scale', v }) end
+      bx = bx + 3 * pad
+      lab('line spacing ([ ])')
+      btn('-', false, { 'space', -1 }); lab(tostring(ctx.space())); btn('+', false, { 'space', 1 })
+    end
+  end
   local cur_f = ctx.font()
   for i, f in ipairs(fonts) do
     local r, c = (i - 1) // fcols, (i - 1) % fcols
@@ -181,6 +207,10 @@ local function apply()
 end
 
 local function act(k)
+  if type(k) == 'table' then
+    if k[1] == 'scale' then ctx.set_scale(k[2]) else ctx.set_space(ctx.space() + k[2]) end
+    TT.fkey = nil; return
+  end
   if k == 'o' then ctx.own_font() elseif k == 'i' then ctx.install_fonts() elseif k == 'd' then ctx.download_fonts()
   elseif k == 'r' then ctx.reload_themes(); TT.fkey = nil end
 end
@@ -201,6 +231,12 @@ function TT.key(c)
   elseif ch == 'G' then TT.sec, TT.i[2] = 2, TT.nf or 1
   elseif c == 13 or ch == ' ' then apply()
   elseif ch == 'o' or ch == 'i' or ch == 'd' or ch == 'r' then act(ch)
+  elseif ch == '+' or ch == '=' or ch == '-' then
+    local sc, j = ctx.scale(), 1
+    for k2, v in ipairs(SCALES) do if v == sc then j = k2 end end
+    j = math.max(1, math.min(#SCALES, j + (ch == '-' and -1 or 1)))
+    act({ 'scale', SCALES[j] })
+  elseif ch == '[' or ch == ']' then act({ 'space', ch == ']' and 1 or -1 })
   else return false end
   return true
 end

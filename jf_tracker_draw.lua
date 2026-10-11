@@ -5558,7 +5558,15 @@ function D.frame(L, snap, rows, state, info)
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
           set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
           set(hot and (b[2] == 'del' and U.RED or U.AMBER) or U.LINE); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
-          text(kx + L.pad, by + 1, b[1], hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+          local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY)
+          if b[2] == 'delta' then
+            -- 11 окт: Δ — сама буква линиями (у пиксельных шрифтов вроде ProFont своя Δ — «домик» ⌂)
+            local gw = math.max(5, ms('A')); local gh = math.max(5, TH() - 4)
+            local gx = kx + math.floor((kb - gw) / 2); local gy = by + 1 + math.floor((L.rh - 1 - gh) / 2)
+            local cx = gx + math.floor(gw / 2)
+            set(bc)
+            gfx.line(gx, gy + gh - 1, cx, gy, 0); gfx.line(cx, gy, gx + gw - 1, gy + gh - 1, 0); gfx.line(gx, gy + gh - 1, gx + gw - 1, gy + gh - 1, 0)
+          else text(kx + L.pad, by + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
         end
       end

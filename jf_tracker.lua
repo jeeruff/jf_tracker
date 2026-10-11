@@ -7723,7 +7723,7 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'look', { 'theme', 'ttf', 'fontscale', 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
+      { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
@@ -7734,7 +7734,8 @@ ctx = {
     }
     local byk, used = {}, {}
     for _, it in ipairs(ctx.option_items()) do
-      if not it.sep and (state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
+      -- 11 окт: тема, шрифт и его размер — только во вкладке theme (там с примерами), здесь не дублируются
+      if not it.sep and it.key ~= 'theme' and it.key ~= 'ttf' and it.key ~= 'fontscale' and (state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
     end
     local function add_sect(title, keys)
       local first = true
@@ -7759,7 +7760,7 @@ ctx = {
     -- audio (10 окт): устройство REAPER в стиле трекера; правки копятся, apply применяет
     -- 10 окт: вкладка theme — темы и шрифты с примерами (jf_tracker_themetab.lua рисует сам)
     items[#items + 1] = { sep = true, title = 'theme', group = 'theme' }
-    items[#items + 1] = { label = 'themes and fonts', kind = 'action', group = 'theme', key = 'theme', desc = 'theme cards and fonts in their own faces: h j k l, Enter', fn = function() end }
+    items[#items + 1] = { label = 'themes and fonts', kind = 'action', group = 'theme', key = 'theme', desc = 'theme cards and fonts in their own faces: h j k l, Enter; font size (font scale) and line spacing - under the fonts', fn = function() end }
     for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
@@ -9371,6 +9372,11 @@ ctx.theme_tab.init(U, {
   end,
   theme = function() return state.theme or 'reaper' end,
   apply_theme = function(n) ctx.apply_theme(n); vim.msg = 'theme: ' .. n end,
+  -- 11 окт: настройки шрифта под списком шрифтов (были в опциях look)
+  scale = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end,
+  set_scale = function(v) ctx.set_scale(v); vim.msg = 'font size x' .. v end,
+  space = function() return tonumber(state.fontspace) or 2 end,
+  set_space = function(n) n = math.max(0, math.min(12, n)); ctx.set_space(n); ctx.relayout(); vim.msg = 'line spacing ' .. n end,
   fonts = function()
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
