@@ -6081,6 +6081,37 @@ ctx = {
     local nm = (pname and pname ~= '' and pname:match('([^/]+)%.[Rr][Pp][Pp]$')) or 'kit'
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'libsave ' .. nm
   end,
+  -- 11 окт: ПКМ по rec / play транспорта — меню как в REAPER, в стиле трекера. Действия REAPER —
+  -- по номеру, подпись — имя действия из самого REAPER; номер не совпал с ожидаемым словом — пункта нет
+  transport_menu = function(which)
+    local items = {}
+    local used = {}
+    local function act(pat, key, id)
+      id = id or ctx.cmd_by_text(pat)
+      local nm = id and reaper.kbd_getTextFromCmd(id, 0) or ''
+      if nm == '' or not nm:lower():find(pat, 1, true) then return end   -- нет такого действия — нет пункта
+      local on = reaper.GetToggleCommandState(id) == 1
+      nm = nm:gsub('^[%w ]+: ', '')
+      items[#items + 1] = { key = key, label = nm .. (on and '  (on)' or ''), fn = function() reaper.Main_OnCommand(id, 0) end }
+    end
+    local function own(key, label, on, fn) items[#items + 1] = { key = key, label = label .. (on and '  (on)' or ''), fn = fn } end
+    if which == 'rec' then
+      act('record mode: normal', 'n'); act('record mode: time selection auto punch', 't'); act('record mode: auto-punch selected items', 'i')
+      act('new recording splits existing items', 's'); act('new recording trims existing items', 'm'); act('new recording creates new media items in separate lanes', 'l')
+      act('pre-roll on record', 'p'); act('metronome', 'c')
+      own('b', 'rec > lib: a new recording goes into the lib too (tracker)', state.reclib, function() ctrl_action('reclib', 0) end)
+      own('R', 'the cursor track: arm, record mode, monitoring, input …', false, function()
+        local col = cur_col(); if col then ctx.open_context({ btn = { col = col, what = 'arm' } }) end
+      end)
+    else
+      act('toggle repeat', 'r', 1068); act('auto-view-scroll during playback', 'v'); act('continuous scrolling', 'c'); act('pre-roll on play', 'p')
+      act('stop playback at end of project', 's')
+      own('f', 'follow the playhead (tracker)', state.follow, function() ctrl_action('follow', 0) end)
+      own('e', 'stop at =END (tracker)', state.endstop, function() state.endstop = not state.endstop; vim.msg = 'stop at =END ' .. (state.endstop and 'on' or 'off') end)
+    end
+    vim.open_hydra({ title = which == 'rec' and 'record' or 'play', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+  end,
   -- 11 окт: шапка lib — выпадашки kit и sort (у кнопки, без перебора по кругу)
   kit_menu = function()
     local kits = B.read_kits()
@@ -9876,6 +9907,7 @@ ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', in
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
+  if hover.btn and hover.btn.what == 'arm' then return nil end   -- 11 окт: меню записи — только своё
   if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
@@ -9972,6 +10004,29 @@ function ctx.context_items(hover)
   local function add(label, fn, key, rp) items[#items + 1] = { label, fn, key = key, reaper = rp } end
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local lpb = state.lpb
+  -- 11 окт: меню записи — ПКМ по R (шапка трека, полоса микшера): арм, режим, мониторинг, вход
+  if hover.btn and hover.btn.what == 'arm' and hover.btn.col and hover.btn.col.track then
+    local tr = hover.btn.col.track
+    local function G(k) return reaper.GetMediaTrackInfo_Value(tr, k) end
+    local function S(k, v, what) return function() edit.run(what, function() reaper.SetMediaTrackInfo_Value(tr, k, v) end); model.invalidate() end end
+    add((G('I_RECARM') == 1 and '!' or '') .. 'Record arm (R)', S('I_RECARM', G('I_RECARM') == 1 and 0 or 1, 'rec arm'), 'r')
+    add('--')
+    local mode = G('I_RECMODE')
+    for _, m in ipairs({ { 0, 'input (audio or MIDI)', 'i' }, { 1, 'output (stereo)', 'o' }, { 5, 'output (mono)', 'm' }, { 4, 'output (MIDI)', 'u' },
+                         { 7, 'MIDI overdub', 'v' }, { 8, 'MIDI replace', 'e' }, { 9, 'MIDI touch-replace', 't' }, { 2, 'none - monitor only', 'n' } }) do
+      add((mode == m[1] and '!' or '') .. 'Record: ' .. m[2], S('I_RECMODE', m[1], 'rec mode'), m[3])
+    end
+    add('--')
+    local mon = G('I_RECMON')
+    for _, m in ipairs({ { 0, 'off', '0' }, { 1, 'on', '1' }, { 2, 'auto (tape style)', '2' } }) do
+      add((mon == m[1] and '!' or '') .. 'Monitoring: ' .. m[2], S('I_RECMON', m[1], 'rec monitor'), m[3])
+    end
+    add('Input …', function()
+      local h = ctx.hydra_inputs()
+      if h then vim.open_hydra(h); state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
+    end, 'p')
+    return items
+  end
   -- 11 окт: своё меню визора — строка / параметр под мышью (или выбранные, по \), потом общее
   if type(hover.visor) == 'table' then
     local VZ, hv = MX.VZ, hover.visor
@@ -15091,6 +15146,8 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then
+    ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
   elseif U.rclick and hover.trs and hover.trs.col and (hover.trs.what == 'pan' or hover.trs.what == 'width' or hover.trs.what == 'panl' or hover.trs.what == 'panr') then
