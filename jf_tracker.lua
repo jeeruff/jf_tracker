@@ -5020,6 +5020,20 @@ ctx = {
     vim.msg = 'ty: ' .. (col.name ~= '' and col.name or 'track') .. ' duplicated'
     return true
   end,
+  -- 11 окт: tF — трек курсора в папку: трек слева становится папкой, этот — его последним ребёнком
+  track_into_left = function()
+    local col = cur_col(); if not (col and col.track) then return false end
+    local idx = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')) - 1
+    if idx < 1 then vim.msg = 'tF: no track to the left to become the folder'; return false end
+    edit.run('track into folder', function()
+      reaper.SetOnlyTrackSelected(col.track)
+      reaper.ReorderSelectedTracks(idx, 1)
+    end)
+    model.invalidate(); ctx.goto_track = col.track
+    local _, pn = reaper.GetTrackName(reaper.GetTrack(0, idx - 1))
+    vim.msg = ('%s is now in the folder %s'):format(col.name or 'track', pn or '?')
+    return true
+  end,
   track_move = function(d, n)
     local col = cur_col(); if not (col and col.track) then return false end
     local idx = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')) - 1
@@ -15290,6 +15304,54 @@ local function frame()
   end
   -- 9 окт: протяжка вставки (insert) между треками: отпустить над колонкой
   -- трека — эффект переезжает в конец его цепочки; Option — копия
+  if ctx.hdr_drag then
+    local d = ctx.hdr_drag
+    local function tnum(tr) return math.floor(reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')) end
+    if gfx.mouse_cap & 1 == 1 and reaper.ValidatePtr(d.track, 'MediaTrack*') then
+      if not d.active and math.abs(gfx.mouse_x - d.x0) > 6 then d.active = true end
+      if d.active then
+        d.kind, d.target = nil, nil; draw.hdr_drop = nil
+        for _, c in ipairs(L.cols or {}) do
+          if c.x and c.col and c.col.track and not c.mtrack and not c.master and gfx.mouse_x >= c.x and gfx.mouse_x < c.x + c.w then
+            local f = (gfx.mouse_x - c.x) / math.max(1, c.w)
+            d.target = c.col
+            if c.col.track == d.track then d.kind = nil
+            elseif f < 0.3 then d.kind = 'before'; draw.hdr_drop = { kind = 'line', x = c.x }
+            elseif f > 0.7 then d.kind = 'after'; draw.hdr_drop = { kind = 'line', x = c.x + c.w }
+            else d.kind = 'into'; draw.hdr_drop = { kind = 'into', x = c.x, w = c.w } end
+          end
+        end
+        -- что случится и чем это же сделать с клавиатуры
+        local a = tnum(d.track)
+        if d.kind and d.target then
+          local b = tnum(d.target.track)
+          -- итоговое место трека (1-based) после переноса: соседство с целью
+          local fin
+          if d.kind == 'before' then fin = (a < b) and (b - 1) or b else fin = (a < b) and b or (b + 1) end
+          local dist = fin - a
+          local mv = dist == 0 and '' or (dist > 0 and ((dist > 1 and dist or '') .. 'tj') or ((-dist > 1 and -dist or '') .. 'tk'))
+          local what = d.kind == 'into' and ('into the folder ' .. (d.target.name or '?')) or ((d.kind == 'before' and 'before ' or 'after ') .. (d.target.name or '?'))
+          state.status = ('move %s %s'):format(d.name or 'track', what)
+          if state.hints ~= false then
+            local keys = d.kind == 'into' and ((mv ~= '' and (mv .. ' ') or '') .. 'tF') or mv
+            if keys and keys ~= '' then state.status = state.status .. '   - keys: ' .. keys end
+          end
+        else state.status = 'drag the track: between columns - move, onto the middle of one - into it as a folder' end
+      end
+    else
+      if d.active and d.kind and d.target and reaper.ValidatePtr(d.track, 'MediaTrack*') and reaper.ValidatePtr(d.target.track, 'MediaTrack*') then
+        local b = tnum(d.target.track)
+        edit.run(d.kind == 'into' and 'track into folder' or 'move track', function()
+          reaper.SetOnlyTrackSelected(d.track)
+          if d.kind == 'into' then reaper.ReorderSelectedTracks(b, 1)      -- первым ребёнком: цель становится папкой
+          else reaper.ReorderSelectedTracks(d.kind == 'before' and b - 1 or b, 0) end
+        end)
+        model.invalidate(); ctx.goto_track = d.track
+        vim.msg = d.kind == 'into' and ('%s is now in the folder %s'):format(d.name or 'track', d.target.name or '?') or ('moved %s'):format(d.name or 'track')
+      end
+      ctx.hdr_drag = nil; draw.hdr_drop = nil
+    end
+  end
   if ctx.ins_drag then
     local d = ctx.ins_drag
     if gfx.mouse_cap & 1 == 1 then
@@ -16090,6 +16152,10 @@ local function frame()
           else reaper.SetOnlyTrackSelected(tr); ctx.sel_anchor = tr end
           vim.msg = ('%d track(s) selected  (Shift+click: range, Cmd+click: add / remove)'):format(reaper.CountSelectedTracks(0))
         end
+      end
+      -- 11 окт: протяжка за имя — перенос трека (между колонками) или в папку (на середину колонки)
+      if gfx.mouse_y < L.header_y + L.rh and not hover.header_col.master and reaper.ValidatePtr(hover.header_col.track, 'MediaTrack*') then
+        ctx.hdr_drag = { track = hover.header_col.track, name = hover.header_col.name, x0 = gfx.mouse_x, y0 = gfx.mouse_y }
       end
       -- двойной клик по имени трека — переименовать (строка :tname с текущим именем)
       if dbl and click.zone == 'header' and click.guid == hover.header_col.guid and gfx.mouse_y < L.header_y + L.rh then

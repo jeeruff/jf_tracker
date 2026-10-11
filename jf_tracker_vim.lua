@@ -1950,7 +1950,8 @@ function V.key_impl(c)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
         elseif ch == 'f' and ctx.fx_picker then ctx.fx_picker()
         elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col)
-        elseif ch == 'T' and ctx.template_picker then ctx.template_picker() end   -- 11 окт: tT — шаблоны треков (fzf)
+        elseif ch == 'T' and ctx.template_picker then ctx.template_picker()   -- 11 окт: tT — шаблоны треков (fzf)
+        elseif ch == 'F' and ctx.track_into_left then ctx.track_into_left() end   -- 11 окт: tF — в папку трека слева
         finish_move()
       end
       V.count = nil; return

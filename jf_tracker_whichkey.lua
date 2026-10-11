@@ -35,7 +35,7 @@ local T = {
   T = { title = 'T - take (the note under the cursor)', items = { { 'f', 'add take fx (fzf)' }, { 'o', 'its take fx chain in DSP' } } },
   t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 'd', 'delete tracks (5td), to the buffer' }, { 'x', 'cut tracks' }, { 'p', 'paste tracks' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },
         { 'n', 'rename' }, { 'c', 'colour' }, { 'y', 'duplicate' }, { 'a', 'rec arm' }, { 'i', 'input (list)' }, { 'I', 'input: the active one' },
-        { 'l', 'fixed lanes on / off' }, { 'f', 'add fx (fzf)' }, { 'R', 'routing (S R O)' }, { 'T', 'track template (list) - after this track' }, { 'j k', 'move right / left (3tj)' } } },
+        { 'l', 'fixed lanes on / off' }, { 'f', 'add fx (fzf)' }, { 'R', 'routing (S R O)' }, { 'T', 'track template (list) - after this track' }, { 'F', 'into a folder: the track to the left becomes it' }, { 'j k', 'move right / left (3tj)' } } },
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' } } },

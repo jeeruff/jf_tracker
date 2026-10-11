@@ -7119,6 +7119,14 @@ function D.frame(L, snap, rows, state, info)
       if ins then gfx.rect(r[1] - 1, r[2] - 1, r[3] + 2, r[4] + 2, 0) end
     end
   end
+  -- 11 окт: перенос трека за шапку — куда ляжет: линия между колонками или рамка (в папку)
+  local hd = D.hdr_drop
+  if hd then
+    set(U.AMBER)
+    local y0, y1 = L.header_y, L.trk_bot or (gfx.h - L.status_h)
+    if hd.kind == 'into' then gfx.rect(hd.x, y0, hd.w, y1 - y0, 0); gfx.rect(hd.x + 1, y0 + 1, hd.w - 2, y1 - y0 - 2, 0)
+    else gfx.rect(hd.x - 1, y0, 3, y1 - y0, 1) end
+  end
 
   return hover
 end
