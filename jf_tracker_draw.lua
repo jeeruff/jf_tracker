@@ -3690,6 +3690,56 @@ end
 -- (около 0 dB) растянут, низ сжат, как у фейдеров пультов
 local FMAX = 10 ^ (12 / 20)
 D.FADER_W = function(L) return math.max(3 * L.cw + 4, ms('-48') + 6) end   -- ширина коробки фейдера (9 окт: была 5 знаков)
+D.MINI_W = function(L) return L.cw + 5 end   -- 11 окт: мини-полоса (свёрнутая колонка / низкий микшер)
+-- 11 окт: мини-полоса — мини-кноб панорамы сверху, под ним фейдер в знак шириной
+-- (метр + риска уровня); свёрнутая колонка и микшер ниже 3 строк фейдера
+function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my)
+  local live = info.trs_live
+  local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
+  local ks = info.kslider
+  local kd = w | 1
+  if y1 - y0 >= kd + 14 then
+    local r = kd >> 1
+    local cx, cy = x + r, y0 + r
+    local frac = (lv('pan', col.pan or 0) + 1) / 2
+    local khot = mx >= x and mx < x + kd and my >= y0 and my < y0 + kd
+    local kon = ks and ks.what == 'pan' and ks.col and ks.col.guid == col.guid
+    local kdark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
+    set(kdark); gfx.circle(cx, cy, r, 1, 0)
+    set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
+    local a = (frac - 0.5) * 1.5 * math.pi
+    set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
+    gfx.rect(cx + math.floor(math.sin(a) * (r - 2) + 0.5), cy - math.floor(math.cos(a) * (r - 2) + 0.5), 1, 1, 1)
+    if khot then hover.trs = { col = col, what = 'pan', knob = true, sv = frac } end
+    if D.csel_on(col.guid, 'pan') then csel_frame(x - 1, y0 - 1, kd + 2, kd + 2) end
+    hint('trs', x, y0, kd, kd, { col = col, what = 'pan' })
+    y0 = y0 + kd + 2
+  end
+  if y1 - y0 < 12 then return end
+  local th = y1 - y0
+  local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
+  local vol = lv('vol', col.vol or 1)
+  local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
+  local hotf = mx >= x and mx < x + w and my >= y0 and my < y1
+  local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
+  local function yp(d) return y1 - 2 - math.floor((th - 4) * D.fader_pos(d) + 0.5) end
+  set(dark); gfx.rect(x, y0, w, th, 1)
+  set((hotf or kon) and U.AMBER or U.LINE); gfx.rect(x, y0, w, th, 0)
+  if info.peaks then
+    local pl, pr = info.peaks(col)
+    local pk = math.max(pl or 0, pr or 0)
+    local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+    if pdb > -60 then
+      local ya = yp(pdb)
+      set(pdb > 0 and U.RED or (pdb > -6 and U.AMBER or U.GREEN)); gfx.rect(x + 2, ya, math.max(1, w - 4), y1 - 2 - ya, 1)
+    end
+  end
+  set(U.readable(U.GREY, dark, 3)); gfx.rect(x + 1, yp(0), 2, 1, 1)                        -- риска 0 dB
+  set(U.readable((hotf or kon) and U.AMBER or U.TEXT, dark, 4)); gfx.rect(x + 1, yp(db) - 1, w - 2, 3, 1)
+  if hotf then hover.trs = { col = col, what = 'vol', vert = true, y0 = y1 - 2, h = th - 4, sv = math.max(0, math.min(1, (y1 - 2 - my) / math.max(1, th - 4))) } end
+  if D.csel_on(col.guid, 'vol') then csel_frame(x, y0, w, th) end
+  hint('trs', x, y0, w, th, { col = col, what = 'vol' })
+end
 D.mix_hold = {}   -- guid → удержание пиков фейдера (рисунок __): {db,t} L, {db,t} R; max / clip — нативные
 function D.fader_pos(db)
   if db <= -150 then return 0 end
@@ -3757,7 +3807,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   L.pn_dsp = nil
   local PN, lay = D.panes, L.pn
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local foc = info.focus
+  local foc = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
   local function focused(id) return foc == id or (foc == 'top' and id == info.toptab) end
   local rects = {}
   for _, c in ipairs(lay.cells) do
@@ -4037,33 +4087,7 @@ function D.frame(L, snap, rows, state, info)
       end
       local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5)
       D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
-      if fy0 and fy1 - fy0 >= 12 then
-        local fx0, fw, th = c.x + 2, c.w - 3, fy1 - fy0
-        local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
-        local live = info.trs_live
-        local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
-        local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
-        local hotf = mx >= fx0 and mx < fx0 + fw and my >= fy0 and my < fy1
-        local ks = info.kslider
-        local kon = ks and ks.what == 'vol' and ks.col and ks.col.guid == col.guid
-        local function yp(d) return fy1 - 2 - math.floor((th - 4) * D.fader_pos(d) + 0.5) end
-        set(dark); gfx.rect(fx0, fy0, fw, th, 1)
-        set((hotf or kon) and U.AMBER or U.LINE); gfx.rect(fx0, fy0, fw, th, 0)
-        if info.peaks then
-          local pl, pr = info.peaks(col)
-          local pk = math.max(pl or 0, pr or 0)
-          local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
-          if pdb > -60 then
-            local ya = yp(pdb)
-            set(pdb > 0 and U.RED or (pdb > -6 and U.AMBER or U.GREEN)); gfx.rect(fx0 + 2, ya, math.max(1, fw - 4), fy1 - 2 - ya, 1)
-          end
-        end
-        set(U.readable(U.GREY, dark, 3)); gfx.rect(fx0 + 1, yp(0), 2, 1, 1)                        -- риска 0 dB
-        set(U.readable((hotf or kon) and U.AMBER or U.TEXT, dark, 4)); gfx.rect(fx0 + 1, yp(db) - 1, fw - 2, 3, 1)
-        if hotf then hover.trs = { col = col, what = 'vol', vert = true, y0 = fy1 - 2, h = th - 4, sv = math.max(0, math.min(1, (fy1 - 2 - my) / math.max(1, th - 4))) } end
-        if D.csel_on(col.guid, 'vol') then csel_frame(fx0, fy0, fw, th) end
-        hint('trs', fx0, fy0, fw, th, { col = col, what = 'vol' })
-      end
+      if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my) end   -- 11 окт: + мини-кноб панорамы
     elseif not c.master then
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     end
@@ -4103,16 +4127,8 @@ function D.frame(L, snap, rows, state, info)
         -- 9 окт: крупнее — до 2× по высоте (сколько позволяет фейдер) и по
         -- ширине, если эффекты остаются сбоку; 6-я — trim (автоматизация)
         if mixcol then
-          -- квадратные (9 окт): сторона — по высоте, не шире места, при котором эффекты остаются сбоку
-          local hmax = math.max(L.rh - 2, math.min(2 * L.rh - 2, math.floor(fh0 / 7) - 2))   -- 7: R I M S ø trim SRO
-          local wmax = math.max(L.btn_w, lw1 - 2 * L.pad - fxb - 4 - L.pad - 5 * L.cw - 4)
-          D.mcb_w = math.max(L.btn_w, math.min(hmax, wmax))
-          -- SRO столбиком (не влез в ширину) выше квадрата — квадраты меньше, чтобы все 7 встали
-          if ms('SRO') + 4 > D.mcb_w then
-            local h2 = math.floor((fh0 - (3 * (L.rh - 4) + 4) - 2) / 6) - 2
-            D.mcb_w = math.max(L.btn_w, math.min(D.mcb_w, h2))
-          end
-          D.mcb_h = D.mcb_w
+          -- 11 окт: как в микшере REAPER — маленькие, в строку высотой, плотным столбиком сверху (не растягиваются)
+          D.mcb_w, D.mcb_h = math.max(L.btn_w, L.rh + 4), L.rh
         end
       end
       local function hbtn(b, x, by, bwk, bh)
@@ -4316,6 +4332,10 @@ function D.frame(L, snap, rows, state, info)
         -- пиков в 2.5 раза уже прежней широкой; справа всегда место под эффекты
         -- мастера (от 3 букв)
         local lufs_w = (c.master and col.track) and 3 * math.max(3, math.floor(L.cw / 2)) or 0
+        -- 11 окт: низкий микшер (фейдер короче 3 строк) — мини-полоса, как у свёрнутой колонки
+        local und0 = tonumber(D.mix_under) or 0
+        local compact = (((und0 > 0 and not c.master) and (H - und0 * L.rh) or H) - 4 - (4 * L.rh + 7)) < 3 * L.rh
+        if compact then lufs_w = 0; fx_w = D.MINI_W(L) end
         if lufs_w > 0 then sx = sx + lufs_w + 2 end
         -- 10 окт: мастер без эффектов — свёрнут в широкий фейдер (вся полоса;
         -- пики L R посередине, LUFS по краям, имя — в строке значения)
@@ -4351,6 +4371,7 @@ function D.frame(L, snap, rows, state, info)
         end   -- узкий master не перестраивает треки (9 окт)
         local und = tonumber(D.mix_under) or 0
         local fh = (und > 0 and not (c.master and not side)) and (H - und * L.rh) or H
+        if compact then D.mini_strip(col, sx, fx_w, y1, y1 + fh - 2, info, hover, mx, my) else
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
         if lufs_w > 0 then
@@ -4544,6 +4565,7 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
+        end   -- compact / фейдер
         if mixcol then
           for k = 1, 6 do
             local b = labels[k]
@@ -6679,7 +6701,7 @@ function D.frame(L, snap, rows, state, info)
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши; последней в
   -- кадре (5 окт) — скроллбар, пианинка и разделители закрывали низ и право
   do
-    local f = info.focus
+    local f = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
     local rects = D.module_rects or {}
     local r = rects[f]
     if r then

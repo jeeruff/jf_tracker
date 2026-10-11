@@ -3557,7 +3557,25 @@ ctx = {
       or (hover.trs and hover.trs.col) or (hover.hdrfx and hover.hdrfx.col) or (hover.btn and hover.btn.col) or nil
   end,
   -- id панели в фокусе (вкладки живут как 'top' + toptab)
+  -- 11 окт: фокус микшера — слайдер громкости трека под курсором трекера (k j, h l пан, 0 сброс)
+  mixer_arm = function()
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local col = f and snap and snap.cols[f.ci]
+    if col and col.track then state.kslider = { col = col, what = 'vol', mix = true }
+      vim.msg = ('mixer: %s  k j volume, h l pan (Shift fine), 0 reset, [ ] track, Esc tracker'):format(col.name or '') end
+  end,
+  mixer_key = function(c)
+    if c == 27 or c == 13 then ctx.set_focus('tracker'); vim.msg = ''; return true end
+    if c == 91 or c == 93 or c == 9 then
+      vim.key((c == 91 and 'H' or 'L'):byte()); ctx.mixer_arm(); return true
+    end
+    if not (state.kslider and state.kslider.mix) then ctx.mixer_arm() end
+    if state.kslider and ctx.kslider_key(c) then return true end
+    state.mixfocus = nil; state.kslider = nil      -- другая клавиша — назад в трекер, клавиша идёт ему
+    return false
+  end,
   pane_cur = function()
+    if state.focus == 'tracker' and state.mixfocus then return 'mixer' end
     if state.focus == 'top' then return state.toptab end
     if state.focus == 'session' then return 'tracker' end
     return state.focus
@@ -9527,7 +9545,12 @@ ctx = {
     relayout()
   end,
   set_focus = function(f)
-    if f == 'mixer' then f = 'tracker' end              -- 11 окт: модуль mixer — часть трекера (полоски его колонок, клавиши — трекера)
+    -- 11 окт: модуль mixer — часть трекера (полоски его колонок): фокус — трекер с флагом
+    -- mixfocus (рамка — у mixer, Cmd+hjkl от него, k j громкость / h l пан трека курсора)
+    local mixf = f == 'mixer'
+    if mixf then f = 'tracker' end
+    state.mixfocus = (mixf and L and L.pn and L.pn.by_panel and L.pn.by_panel.mixer) and true or nil
+    if state.mixfocus then ctx.mixer_arm() elseif state.kslider and state.kslider.mix then state.kslider = nil end
     -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
     if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' and f ~= 'slices' then return end   -- 10 окт: и список слайсов — щелчок даёт фокус (j k)   -- поиск эффектов — по клику (5 окт)
     if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад
@@ -12753,7 +12776,7 @@ local function frame()
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    vcur = vim.cur, vis = vis, focus = state.focus, regions = seq, vmode = vim.mode,
+    vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
@@ -16770,6 +16793,7 @@ local function frame()
     c = 0
   end
   if c == 27 and MMX.CM.count() > 0 and not HN.active and not vim.picker and not vim.hydra and vim.mode == 'normal' then MMX.CM.clear(); vim.msg = 'ctrl-mouse: selection cleared'; c = 0 end
+  if c > 0 and state.mixfocus and state.focus == 'tracker' and not HN.active and vim.mode ~= 'cmd' and vim.mode ~= 'search' then if ctx.mixer_key(c) then c = 0 end end   -- 11 окт
   if c > 0 and state.kslider and not HN.active and ctx.kslider_key(c) then c = 0 end
   if c > 0 and HN.active then
     local r = HN.key(c)
