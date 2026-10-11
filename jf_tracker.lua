@@ -2007,6 +2007,18 @@ ctx = {
     vim.msg = col.name .. ': envelopes ' .. (not cur and 'on' or 'off')
   end,
   -- действие REAPER по подстроке названия (скан 40000..42700 один раз, кеш)
+  -- 11 окт: id действия по точному имени (весь список REAPER, один проход за сессию)
+  cmd_exact = function(name)
+    if not ctx.cmd_names then
+      local t = {}
+      for id = 1, 70000 do
+        local nm = reaper.kbd_getTextFromCmd(id, 0)
+        if nm and nm ~= '' and not t[nm:lower()] then t[nm:lower()] = id end
+      end
+      ctx.cmd_names = t
+    end
+    return ctx.cmd_names[name:lower()]
+  end,
   cmd_by_text = function(pat)
     cmd_text_cache = cmd_text_cache or {}
     if cmd_text_cache[pat] ~= nil then return cmd_text_cache[pat] or nil end
@@ -6152,26 +6164,33 @@ ctx = {
   transport_menu = function(which)
     local items = {}
     local used = {}
-    local function act(pat, key, id)
-      id = id or ctx.cmd_by_text(pat)
-      local nm = id and reaper.kbd_getTextFromCmd(id, 0) or ''
-      if nm == '' or not nm:lower():find(pat, 1, true) then return end   -- нет такого действия — нет пункта
+    -- 11 окт: действие по ТОЧНОМУ имени из списка REAPER (часть текста ловила дубли [deprecated] и не то)
+    local function act(name, key, label)
+      local id = ctx.cmd_exact(name)
+      if not id then return end
       local on = reaper.GetToggleCommandState(id) == 1
-      nm = nm:gsub('^[%w ]+: ', '')
-      items[#items + 1] = { key = key, label = nm .. (on and '  (on)' or ''), fn = function() reaper.Main_OnCommand(id, 0) end }
+      items[#items + 1] = { key = key, label = (label or name:gsub('^[%w ]+: ', '')) .. (on and '  (on)' or ''), fn = function() reaper.Main_OnCommand(id, 0) end }
     end
     local function own(key, label, on, fn) items[#items + 1] = { key = key, label = label .. (on and '  (on)' or ''), fn = fn } end
     if which == 'rec' then
-      act('record mode: normal', 'n'); act('record mode: time selection auto punch', 't'); act('record mode: auto-punch selected items', 'i')
-      act('new recording splits existing items', 's'); act('new recording trims existing items', 'm'); act('new recording creates new media items in separate lanes', 'l')
-      act('pre-roll on record', 'p'); act('metronome', 'c')
+      act('Record: Set record mode to normal', 'n', 'record mode: normal')
+      act('Record: Set record mode to time selection auto-punch', 't', 'record mode: time selection auto-punch')
+      act('Record: Set record mode to selected item auto-punch', 'i', 'record mode: selected items auto-punch')
+      act('Options: New recording splits existing items and adds takes (default)', 's', 'new recording: splits items, adds takes')
+      act('Options: New recording trims existing items (tape mode)', 'm', 'new recording: trims items (tape)')
+      act('Options: New recording adds lanes (new lanes play exclusively)', 'l', 'new recording: adds lanes')
+      act('Pre-roll: toggle pre-roll on record', 'p', 'pre-roll on record')
+      act('Options: Toggle metronome', 'c', 'metronome')
+      own('w', 'slow rec speed: ' .. (state.slowrate and ('x%.2f'):format(state.slowrate) or 'off') .. ' … (Shift+Space records)', state.slowrate ~= nil and state.slowrate ~= false, function() ctrl_action('slow', 0) end)
       own('b', 'rec > lib: a new recording goes into the lib too (tracker)', state.reclib, function() ctrl_action('reclib', 0) end)
       own('R', 'the cursor track: arm, record mode, monitoring, input …', false, function()
         local col = cur_col(); if col then ctx.open_context({ btn = { col = col, what = 'arm' } }) end
       end)
     else
-      act('toggle repeat', 'r', 1068); act('auto-view-scroll during playback', 'v'); act('continuous scrolling', 'c'); act('pre-roll on play', 'p')
-      act('stop playback at end of project', 's')
+      act('Transport: Toggle repeat', 'r', 'repeat')
+      act('View: Toggle auto-view-scroll during playback', 'v', 'scroll the view while playing')
+      act('Pre-roll: toggle pre-roll on play', 'p', 'pre-roll on play')
+      own('x', ('playrate x%.2f …'):format(reaper.Master_GetPlayRate(0)), false, function() ctrl_action('rate', 0) end)
       own('f', 'follow the playhead (tracker)', state.follow, function() ctrl_action('follow', 0) end)
       own('e', 'stop at =END (tracker)', state.endstop, function() state.endstop = not state.endstop; vim.msg = 'stop at =END ' .. (state.endstop and 'on' or 'off') end)
     end
@@ -11484,10 +11503,10 @@ function ctrl_action(name, delta)
   elseif name == 'tp_play' then reaper.Main_OnCommand(reaper.GetPlayState() & 1 == 1 and 1016 or 1007, 0)   -- play / stop
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
   elseif name == 'punch' then
-    local p = ctx.cmd_by_text('record mode: time selection auto punch')
-    if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_by_text('record mode: normal') or 40252, 0)
+    local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch')
+    if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_exact('Record: Set record mode to normal') or 40252, 0)
     elseif p then reaper.Main_OnCommand(p, 0) end
-  elseif name == 'preroll' then local p = ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
+  elseif name == 'preroll' then local p = ctx.cmd_exact('Pre-roll: toggle pre-roll on record') or ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'reclib' then state.reclib = not state.reclib; vim.msg = 'rec -> lib ' .. (state.reclib and 'on: recorded takes also become instruments' or 'off')
   -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
   elseif name == 'sig' or name == 'beats' then if delta == 0 then ctx.sig_menu() else ctx.sig_wheel(delta) end
@@ -12500,7 +12519,7 @@ local function frame()
       local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')
       return b, reaper.format_timestr_pos(t, '', 0)
     end or nil,
-    punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+    punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
     timesel = (function()
       local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
       if b - a < 1e-6 then return nil end
@@ -12616,7 +12635,7 @@ local function frame()
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text', playstate = reaper.GetPlayState(),
-      punch = (function() local p = ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+      punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,

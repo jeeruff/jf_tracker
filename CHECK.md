@@ -537,3 +537,4 @@
 - [ ] Shift+Space — slow rec: запись на скорости slow (армлен трек с MIDI-входом; аудиовход — отказ), стоп (Space / Shift+Space) — скорость обратно, ноты и AT в темпе
 - [ ] поле слайса на линейке прыжков (шаг после инструмента), щелчок по Sxx — курсор туда
 - [ ] rec follows selection: трек курсора трекера армится сам (остальные с авто-армом — нет)
+- [ ] ПКМ по rec: режимы записи normal / time selection / selected items, новая запись split / tape / lanes, pre-roll, метроном, slow rec speed …, rec > lib, трек курсора; ПКМ по play: repeat, автопрокрутка, pre-roll, playrate …, follow, stop at =END
