@@ -3916,6 +3916,7 @@ ctx = {
     local before = draw.panes.encode(state.panes)
     if fn() then
       draw.panes.pin_mixer(state.panes)   -- 11 окт: mixer — всегда под трекером
+      draw.panes.pin_sprops(state.panes)
       ctx.pn_undo = ctx.pn_undo or {}
       table.insert(ctx.pn_undo, before)
       if #ctx.pn_undo > 20 then table.remove(ctx.pn_undo, 1) end
@@ -18194,7 +18195,7 @@ if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
       local t = sets[nm]
       if t and type(t.panes) == 'string' and t.panes ~= '' then
         local m = draw.panes.decode(t.panes)
-        if draw.panes.add_new(m, t.panes) then draw.panes.pin_mixer(m); t.panes = draw.panes.encode(m); n = n + 1 end
+        if draw.panes.add_new(m, t.panes) then draw.panes.pin_mixer(m); draw.panes.pin_sprops(m); t.panes = draw.panes.encode(m); n = n + 1 end
       end
     end
     if n > 0 then ctx.ss_write(sets, order) end

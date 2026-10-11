@@ -247,6 +247,20 @@ do
   PN.hide(d, 'mixer'); ok('pin: hidden mixer stays hidden', not PN.pin_mixer(d) and not PN.visible(d, 'mixer'))
   tiling('pinned user layout', u, 1600, 900)
 end
+-- 11 окт: properties — обязательно своей панелью у item (случай пользователя: H:sprops)
+do
+  local u = PN.decode('h[0.18:v[0.273:ctrl*|0.451:matrix*,notes,visor|0.276:tracks*]|0.656:v[0.111:h[0.871:retro,modulation,scopes,master,grid,garden,sample*,video,macros|0.129:slices*]|0.517:tracker*|0.152:mixer*|0.22:dsp*]|0.164:v[0.43:inst*|0.57:browser*,fxb]] H:sprops,pm,midi,harm,clips Z:')
+  ok('sprops: hidden in the user layout', not PN.visible(u, 'sprops'))
+  ok('sprops pin: changed', PN.pin_sprops(u))
+  local sl, pl = PN.find(u, 'sample'), PN.find(u, 'sprops')
+  ok('sprops pin: own leaf next to item', pl and pl ~= sl and #pl.panes == 1)
+  ok('sprops pin: idempotent', not PN.pin_sprops(u))
+  PN.stack(u, 'sprops', 'sample'); ok('sprops in the item stack', PN.find(u, 'sprops') == PN.find(u, 'sample'))
+  ok('sprops pin: out of the stack', PN.pin_sprops(u) and PN.find(u, 'sprops') ~= PN.find(u, 'sample'))
+  tiling('sprops pinned', u, 1600, 900)
+  local d = PN.DEFAULT(); PN.hide(d, 'sample')
+  ok('sprops pin: no item - nothing', not PN.pin_sprops(d))
+end
 -- 11 окт: скринсет старше модулей — add_new ставит их на места, скрытые пользователем не трогает
 do
   local raw = 'h[0.199:v[0.192:ctrl*|0.565:matrix*|0.242:fxb*]|0.64:v[0.05:retro,modulation,scopes,master,grid,garden,sample,video*|0.8:tracker*|0.15:dsp*]|0.161:v[0.434:inst*|0.133:slices*|0.433:browser*]] H:notes,midi,harm Z:'

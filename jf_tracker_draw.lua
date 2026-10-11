@@ -322,7 +322,7 @@ D.pn_sig = {}
 function D.panes_layout(state, L, nregions, ncols)
   local M, s = D.pn_M, D.pn_sig
   local m = state.panes
-  if m then D.panes.pin_mixer(m) end   -- 11 окт: mixer — всегда прямо под трекером (полоски — под его колонками)
+  if m then D.panes.pin_mixer(m); D.panes.pin_sprops(m) end   -- 11 окт: и properties — всегда своей панелью у item   -- 11 окт: mixer — всегда прямо под трекером (полоски — под его колонками)
   local H = gfx.h - L.status_h
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
   local mxa = (state.mixer and state.mixpos == 'bottom') and 1 or 0

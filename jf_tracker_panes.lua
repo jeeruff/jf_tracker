@@ -33,6 +33,7 @@ PN.PANELS = {
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
   { id = 'sprops',     label = 'properties', key = 'e', hint = 'sprops',  side = 'right', avail = 'itemtab' },   -- 10 окт: свойства item / слайса — свой модуль (был справа во вкладке item)
   { id = 'mixer',      label = 'mixer',      key = 'x', hint = 'tracker', side = 'bottom', avail = 'mixer' },   -- 11 окт: нижний микшер — свой модуль (полоски под колонками треков)
+  { id = 'tracks',     label = 'tracks',     key = 'k', hint = 'tracks',  side = 'left' },    -- 11 окт: Track Manager (как в REAPER): видимость и M S R матрицей
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)
@@ -523,6 +524,17 @@ function PN.pin_mixer(model)
   if #lf.panes == 1 and par and par.ax == 'v' and ix and ix > 1 and par.kids[ix - 1] == tl and #tl.panes == 1 then return false end
   detach(model, 'mixer')
   insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
+  return bump(model)
+end
+-- 11 окт: properties обязательны отдельной панелью — пока видна вкладка item (sample):
+-- скрыт или лежит в одном стеке с item → встаёт справа от item; true — что-то поменяли
+function PN.pin_sprops(model)
+  local sl = PN.find(model, 'sample')
+  if not sl then return false end
+  local pl = PN.find(model, 'sprops')
+  if pl and pl ~= sl then return false end
+  if pl then detach(model, 'sprops') else model.hidden['sprops'] = nil end
+  insert_beside(model, PN.find(model, 'sample'), leaf('sprops'), 'r', 0.4)
   return bump(model)
 end
 -- 11 окт: модули, появившиеся позже раскладки (в строке скринсета их нет совсем —
