@@ -292,6 +292,7 @@ KH.PAGES = {
     { k = 'm M', d = 'mark the row (and step down) / clear all marks; marks stay across folders - Enter puts every marked file into the lib in marking order' },
     { k = 'h - BS', d = 'folder up' },
     { k = 'Cmd+Enter', d = 'replace sample of the selected instrument everywhere' },
+    { k = 'S-dblclick', d = 'the same with the mouse: Shift + double click on a file replaces the sample of the selected instrument' },
     { k = 'Enter .rx2 .xrni', d = 'import REX / Renoise-Redux instrument with its slices' },
     { k = 'sync', d = 'button: while the project plays, a file starts on the next bar' },
     { k = '*.* .*', d = 'buttons: all file types / hidden files; Enter on MIDI / video inserts it, others open in their app' },

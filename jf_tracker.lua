@@ -15003,7 +15003,9 @@ local function frame()
       if dbl and click.zone == 'browser' and click.row == hover.browser then
         -- 10 окт: двойной щелчок — в lib (как Enter); Option + двойной — слайсом выбранного инструмента (как Opt+Enter)
         local fe = B.entries[hover.browser]
-        if ctx.mods().alt and fe and not (fe.dir or fe.db or fe.pm or fe.pmdir or fe.kit or fe.trk or fe.rgn or fe.mark or fe.other or fe.empty) then ctx.lib_append_slice(B.full(fe))
+        -- 11 окт: Shift + двойной — заменить сэмпл выбранного инструмента lib (как Cmd+Enter)
+        if ctx.mods().shift and fe and ctx.browser_replace and not (fe.dir or fe.db or fe.pm or fe.pmdir or fe.kit or fe.trk or fe.rgn or fe.mark or fe.other or fe.empty) then ctx.browser_replace()
+        elseif ctx.mods().alt and fe and not (fe.dir or fe.db or fe.pm or fe.pmdir or fe.kit or fe.trk or fe.rgn or fe.mark or fe.other or fe.empty) then ctx.lib_append_slice(B.full(fe))
         else B.enter() end
       end
       click = { t = now2, zone = 'browser', row = hover.browser }
