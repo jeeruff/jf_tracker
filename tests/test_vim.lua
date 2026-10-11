@@ -546,6 +546,11 @@ V.key(27)
 reset(); keysin('z'); eq('z hint', (V.pending_hint() or ''):match('^z:') ~= nil, true); V.key(27)
 reset(); keysin('i'); keysin('d'); eq('d from INSERT shows hint', (V.pending_hint() or ''):match('^d:') ~= nil, true)
 keysin('W'); eq('dW from INSERT', last(), 'delitem'); eq('back to INSERT', V.mode, 'insert'); V.key(27)
+-- 11 окт: INSERT на поле команды — S / s не выделение, а буква команды (S80)
+reset(); V.cur = { fi = 1, row = 0, field = 4 }; keysin('i'); keysin('S')
+eq('INSERT S on the fx field is not VISUAL', V.mode, 'insert'); V.key(27); V.mode = 'normal'; V.hexbuf = nil
+reset(); V.cur = { fi = 1, row = 0, field = 1 }; keysin('i'); keysin('s')
+eq('INSERT s on the note field still selects', V.mode, 'visual'); V.key(27); V.mode = 'normal'
 -- форма сегмента огибающей (2 окт): поле 2 колонки огибающей
 eq('shape b → bez', V.shape_match('b'), 5); eq('shape s ambiguous', V.shape_match('s'), nil)
 eq('shape sq → sqr', V.shape_match('sq'), 1); eq('shape fas', V.shape_match('fas'), 3); eq('shape x none', V.shape_match('x'), false)

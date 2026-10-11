@@ -1381,8 +1381,11 @@ function V.key_impl(c)
       end
       -- Shift+стрелки = Shift+hjkl (6 окт)
       local sha = mods.shift and ({ [LEFT] = 'h', [DOWN] = 'j', [UP] = 'k', [RIGHT] = 'l' })[c]
+      -- 11 окт: INSERT на поле значения (vol / delay / команда / огибающая) — буквы и есть ввод
+      -- (S80, L.., D..), как в Renoise: s и Shift+HJKL не выделяют; выделение — Shift+стрелки
+      local valf = V.mode == 'insert' and not sha and (((V.cur.field or 1) > 1) or env_of(V.cur.fi))
       if sha then chs = sha:upper() end
-      if SH[chs] or (chs == 's' and V.mode == 'insert') then
+      if not valf and (SH[chs] or (chs == 's' and V.mode == 'insert')) then
         if V.mode ~= 'visual' and V.mode ~= 'vline' then
           if V.mode == 'insert' then V.back_insert = true end
           V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
