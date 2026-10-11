@@ -165,7 +165,7 @@ end
 function S.mouse_move(frac)
   if S.drag and S.drag.kind == 'slice' and S.entry and frac then
     local k = S.drag.k
-    local lo = (S.slices[k - 1] or 0) + 0.002
+    local lo = S.slices[k - 1] and (S.slices[k - 1] + 0.002) or 0   -- 11 окт: первый слайс — до самого нулевого сэмпла
     local hi = (S.slices[k + 1] or S.entry.len) - 0.002
     -- 10 окт: Shift — fine, как в зуме: мышь двигает линию в 10 раз медленнее от места, где нажат Shift;
     -- отпустил Shift — линия не прыгает к мыши, смещение остаётся
@@ -720,7 +720,16 @@ local function zoom_samples(e, t0, span)
   local rate = (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
   local n = math.max(16, math.min(65536, math.floor(span * rate * zr.sr)))
   local ft = zr.file and ((e.offs or 0) + math.max(0, t0) * rate) or math.max(0, t0)
-  local s = zr.fn(ft, n)
+  -- 11 окт: окно левее начала item — слева нули, звук с 0 встаёт на своё место
+  -- (раньше читался с 0 и растягивался на всё окно: волна съезжала влево от линии)
+  local pad = t0 < 0 and math.min(n, math.floor(-t0 / span * n + 0.5)) or 0
+  local s = zr.fn(ft, n - pad)
+  if pad > 0 and s then
+    local s2 = {}
+    for i = 1, pad do s2[i] = 0 end
+    for i = 1, n - pad do s2[pad + i] = s[i] or 0 end
+    s = s2
+  end
   S.zs = { key = key, s = s, n = n }
   return s, n
 end
@@ -1269,7 +1278,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
     if S.zdrag and S.slices[S.zdrag.k] then
       local k3 = S.zdrag.k
-      local lo, hi = (S.slices[k3 - 1] or 0) + 0.002, (S.slices[k3 + 1] or len) - 0.002
+      local lo, hi = S.slices[k3 - 1] and (S.slices[k3 - 1] + 0.002) or 0, (S.slices[k3 + 1] or len) - 0.002   -- первый — до 0
       S.slices[k3] = math.max(lo, math.min(hi, S.zdrag.t0 + (mx2 - S.zdrag.mx0) / w * S.zdrag.span))
       if down and math.abs(S.slices[k3] - S.zdrag.t0) > 1e-6 then S.roll(S.slices[k3], S.line_is_end(S.zdrag.t0)) end   -- roll
       if not down then
