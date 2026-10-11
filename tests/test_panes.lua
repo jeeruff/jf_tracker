@@ -247,5 +247,19 @@ do
   PN.hide(d, 'mixer'); ok('pin: hidden mixer stays hidden', not PN.pin_mixer(d) and not PN.visible(d, 'mixer'))
   tiling('pinned user layout', u, 1600, 900)
 end
+-- 11 окт: скринсет старше модулей — add_new ставит их на места, скрытые пользователем не трогает
+do
+  local raw = 'h[0.199:v[0.192:ctrl*|0.565:matrix*|0.242:fxb*]|0.64:v[0.05:retro,modulation,scopes,master,grid,garden,sample,video*|0.8:tracker*|0.15:dsp*]|0.161:v[0.434:inst*|0.133:slices*|0.433:browser*]] H:notes,midi,harm Z:'
+  local m = PN.decode(raw)
+  ok('add_new: something added', PN.add_new(m, raw))
+  for _, id in ipairs({ 'sprops', 'mixer', 'visor', 'clips', 'macros' }) do ok('add_new: ' .. id .. ' visible', PN.visible(m, id)) end
+  ok('add_new: matrix stays active', PN.is_active(m, 'matrix'))
+  ok('add_new: video stays active', PN.is_active(m, 'video'))
+  ok('add_new: second pass - nothing', not PN.add_new(m, PN.encode(m)))
+  local raw2 = raw:gsub(' H:notes', ' H:sprops,notes')
+  local m2 = PN.decode(raw2); PN.add_new(m2, raw2)
+  ok('add_new: hidden by the user stays hidden', not PN.visible(m2, 'sprops'))
+  tiling('screenset with new modules', m, 1600, 900)
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

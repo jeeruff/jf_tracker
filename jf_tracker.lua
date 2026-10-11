@@ -975,6 +975,7 @@ ctx = {
     if type(t.panes) == 'string' and t.panes ~= '' then   -- дерево панелей (9 окт); старые наборы его не трогают
       local v = state.panes.v
       state.panes = draw.panes.decode(t.panes); state.panes.v = v + 1
+      draw.panes.add_new(state.panes, t.panes)   -- 11 окт: набор старше модулей properties / mixer / … — они встают на свои места
     end
     if MX then MX.fold = false end   -- 9 окт: свёрнутой матрицы больше нет
     draw.set_font(state); model.invalidate()
@@ -17213,6 +17214,20 @@ frame = (function(inner)
   end
 end)(frame)
 
+-- 11 окт: скринсеты, сохранённые до модулей (properties, mixer, visor, clips, macros), —
+-- один раз переписать файл: новые модули на свои места
+if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
+    local sets, order = ctx.ss_read()
+    local n = 0
+    for _, nm in ipairs(order) do
+      local t = sets[nm]
+      if t and type(t.panes) == 'string' and t.panes ~= '' then
+        local m = draw.panes.decode(t.panes)
+        if draw.panes.add_new(m, t.panes) then draw.panes.pin_mixer(m); t.panes = draw.panes.encode(m); n = n + 1 end
+      end
+    end
+    if n > 0 then ctx.ss_write(sets, order) end
+  end) then reaper.SetExtState(EXT, 'ss_mods', '1', true) end
 reaper.atexit(save_win)
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end

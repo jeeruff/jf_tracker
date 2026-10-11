@@ -525,6 +525,34 @@ function PN.pin_mixer(model)
   insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
   return bump(model)
 end
+-- 11 окт: модули, появившиеся позже раскладки (в строке скринсета их нет совсем —
+-- ни в дереве, ни в H:) — встают на своё место по умолчанию; true — что-то добавили
+local function stack_keep(m, id, into)
+  local cur = PN.active_of(m, into)
+  if not PN.stack(m, id, into) then return false end
+  if cur then PN.set_active(m, cur) end
+  return true
+end
+PN.LATE = {
+  { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
+  { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },
+  { 'visor', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'visor', 'matrix') end },
+  { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
+  { 'macros', function(m)
+    for _, at in ipairs({ 'sample', 'retro', 'modulation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
+  end },
+}
+function PN.add_new(model, raw)
+  if type(raw) ~= 'string' or raw == '' then return false end
+  local any = false
+  for _, it in ipairs(PN.LATE) do
+    if not raw:find('%f[%w]' .. it[1] .. '%f[^%w]') and not PN.visible(model, it[1]) then
+      model.hidden[it[1]] = true
+      if it[2](model) then any = true end
+    end
+  end
+  return any
+end
 local SIDE_DIR = { left = 'l', right = 'r', top = 'u', bottom = 'd' }
 -- показать: at — панель, рядом с которой (по умолчанию трекер со стороны
 -- PANELS[id].side); share — доля новичка
