@@ -3657,7 +3657,7 @@ ctx = {
     while true do
       local ret, isrgn, pos, _, name, idx, color = reaper.EnumProjectMarkers3(0, i)
       if not ret or ret == 0 then break end
-      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') and not (name or ''):match('^v:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
       i = i + 1
     end
     if text == '' and #found == 0 then vim.msg = 'cmd: no command on this row'; return end
@@ -5589,6 +5589,82 @@ ctx = {
     return F
   end,
   -- кадр: проект → модель, сцены за плейхедом, отправка странице, сохранение
+  -- 11 окт: сцена visor по имени: своя сцена (сохранённая на слот / имя) или пресет ReaVisor
+  visor_apply_name = function(name, quiet)
+    local VZ = MX.VZ
+    local sc = VZ.st.scenes[name]
+    if sc then VZ.scene_apply(sc); if not quiet then vim.msg = 'visor: scene ' .. name end; return true end
+    local ps = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset:' .. name))
+    local p2 = VZ.from_reavisor(ps)
+    if not p2 then if not quiet then vim.msg = 'visor: no scene / preset ' .. name end; return false end
+    p2.preset = name; VZ.scene_apply(p2)
+    if not quiet then vim.msg = 'visor: preset ' .. name end
+    return true
+  end,
+  -- превью по имени: сцена — картинка её первого слоя (или её пресета), иначе пресет
+  visor_namethumb = function(name, x, y, w, h)
+    local VZ = MX.VZ
+    local sc = VZ.st.scenes[name]
+    if sc then
+      if sc.preset and ctx.visor_pthumb(sc.preset, x, y, w, h) then return true end
+      local l1 = (sc.layers or {})[1]
+      if l1 and l1.fn then
+        local e = ctx.visor_img(VZ.WEB .. '/thumbs/shaders/' .. (l1.fn:gsub('%.fs$', '')) .. '.png')
+        if e then ctx.visor_blit(e, x, y, w, h, true); return true end
+      end
+      return false
+    end
+    return ctx.visor_pthumb(name, x, y, w, h)
+  end,
+  -- событие visor в строке: маркер «v:имя» (пусто — удалить)
+  vis_set = function(row, name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    local found, i = {}, 0
+    while true do
+      local ret, isrgn, pos, _, nm, idx, color = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and (nm or ''):match('^v:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
+      i = i + 1
+    end
+    if name == '' and #found == 0 then vim.msg = 'visor: no event on this row'; return end
+    edit.run(name == '' and 'visor event delete' or 'visor event', function()
+      if name == '' then for _, f in ipairs(found) do reaper.DeleteProjectMarker(0, f.idx, false) end
+      elseif #found > 0 then reaper.SetProjectMarker3(0, found[1].idx, false, found[1].pos, 0, 'v:' .. name, found[1].color or 0)
+      else reaper.AddProjectMarker2(0, false, t0, 0, 'v:' .. name, -1, 0) end
+    end)
+    model.invalidate()
+    if name == '' then vim.msg = ('visor: event deleted on row %04d (u - undo)'):format(row)
+    else ctx.visor_apply_name(name, true); vim.msg = ('visor %04d: %s - playback switches to it here'):format(row, name) end
+  end,
+  -- выбор сцены / пресета для строки — сетка превью (Ctrl+Enter / Enter на колонке visor)
+  visor_pick = function(row)
+    local VZ = MX.VZ
+    ctx.visor_env()                                     -- имена пресетов ReaVisor
+    local items, seen = {}, {}
+    local function add(nm, kind)
+      if seen[nm] then return end
+      seen[nm] = true
+      items[#items + 1] = { label = nm, v = nm, tip = kind .. ' ' .. nm,
+        draw = function(x, y, w, h, on)
+          U.set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(x, y, w, h, 1)
+          ctx.visor_namethumb(nm, x, y, w, h - L.rh)
+          U.text(x + 2, y + h - L.rh, ctx.fit(nm, w - 4), on and U.AMBER or U.TEXT)
+        end }
+    end
+    local sn = {}
+    for nm in pairs(VZ.st.scenes or {}) do sn[#sn + 1] = nm end
+    table.sort(sn)
+    for _, nm in ipairs(sn) do add(nm, 'scene') end
+    for _, nm in ipairs(VZ.pnames or {}) do add(nm, 'preset') end
+    if #items == 0 then vim.msg = 'visor: no scenes or ReaVisor presets yet (visor tab: s takes a scene on the slot)'; return end
+    items[#items + 1] = { label = 'clear', v = '', tip = 'delete the event of this row' }
+    local cur = (snap and snap.master and snap.master.vis and snap.master.vis.ev[row] or {}).text
+    local sel = 1
+    for k, it in ipairs(items) do if it.v == cur then sel = k end end
+    ctx.smart_open({ title = ('visor @ %04d - scene / preset (Enter)'):format(row), items = items, cols = math.min(4, #items), sel = sel,
+      cell_rows = 4, cell_w = L.cw * 14, on_pick = function(it) ctx.vis_set(row, it.v) end })
+  end,
   visor_tick = function()
     local VZ = MX.VZ
     local proj = reaper.EnumProjects(-1)
@@ -5598,9 +5674,22 @@ ctx = {
       VZ.decode(s); VZ.dirty = false
       if VZ.on == nil then VZ.on = reaper.GetExtState(EXT, 'visor_on') == '1' end
     end
+    state.visor_on = VZ.on and true or false          -- 11 окт: раскладка показывает колонку visor
     if not VZ.on and not VZ.dirty then return end
     local now = reaper.time_precise()
-    if VZ.st.follow and reaper.GetPlayState() & 1 == 1 then
+    -- 11 окт: колонка visor (маркеры v:) — главнее сцен слотов: последнее событие до плейхеда
+    local vis = snap and snap.master and snap.master.vis
+    local playing = reaper.GetPlayState() & 1 == 1
+    local vname
+    if playing and vis and #vis.rows > 0 then
+      local pp = reaper.GetPlayPosition()
+      for _, r in ipairs(vis.rows) do local e = vis.ev[r]; if e.pos <= pp + 1e-6 then vname = e.text else break end end
+    end
+    if vname then
+      if vname ~= ctx.vz_vis then ctx.vz_vis = vname; local dirty = VZ.dirty; ctx.visor_apply_name(vname, true); VZ.dirty = dirty end
+    elseif not playing then ctx.vz_vis = nil end
+    if vname then -- сцены слотов молчат, пока ведёт колонка
+    elseif VZ.st.follow and playing then
       local nm = ctx.visor_slot_at(nil, reaper.GetPlayPosition())
       if nm ~= ctx.vz_rg then
         ctx.vz_rg = nm
@@ -13769,7 +13858,7 @@ local function frame()
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
-    inspreview = state.preview, lib_bytrack = state.libtrack,
+    inspreview = state.preview, lib_bytrack = state.libtrack, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
     trsel = (function()

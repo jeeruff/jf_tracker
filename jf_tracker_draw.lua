@@ -682,7 +682,10 @@ function D.layout(snap, state, nregions)
   if L.mtrack then
     local ne = math.max(1, #(snap.master.envs or {}))
     L.cmd_w = snap.master.cmd and (2 * L.pad + ms('WWWWWWWW')) or 0     -- 11 окт: колонка cmd (маркеры)
-    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0))
+    -- 11 окт: колонка visor (маркеры v:) — когда visor включён или в песне есть его события
+    local mv = snap.master.vis
+    L.vis_w = (mv and (#mv.rows > 0 or state.visor_on)) and (2 * L.pad + ms('WWWWWWWWWW')) or 0
+    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
   end
   L.cols_r = L.win_w - L.master_w
   L.flat, L.cols = {}, {}
@@ -806,6 +809,11 @@ function D.layout(snap, state, nregions)
       L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.cmd, sub = {}, x = lx, w = L.cmd_w }
       c.mls[#c.mls + 1] = { ml = mc.cmd, x = lx, w = L.cmd_w, fi = #L.flat }
       lx = lx + L.cmd_w + 1
+    end
+    if mc.vis and L.vis_w > 0 then
+      L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.vis, sub = {}, x = lx, w = L.vis_w }
+      c.mls[#c.mls + 1] = { ml = mc.vis, x = lx, w = L.vis_w, fi = #L.flat }
+      lx = lx + L.vis_w + 1
     end
     c.w = L.master_w - 1
     c.empty = #c.envs == 0 and not mc.cmd
@@ -5564,6 +5572,19 @@ function D.frame(L, snap, rows, state, info)
               set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
             end
           end
+          if ml.kind == 'vis' then
+            -- 11 окт: событие visor — превью сцены на строки до следующего (до 4), рисуется после строк
+            if e then
+              local nxt
+              for _, rr in ipairs(ml.rows) do if rr > r.row then nxt = rr; break end end
+              local span = math.max(1, math.min(4, (nxt or (r.row + 4)) - r.row))
+              D.vis_thumbs = D.vis_thumbs or {}
+              D.vis_thumbs[#D.vis_thumbs + 1] = { name = e.text, x = m.x + 1, y = y + 1, w = m.w - 2, h = span * L.rh - 2, foc = foc, many = e.n > 1 }
+              D.vis_span = r.row + span
+            elseif not (D.vis_span and r.row < D.vis_span) then text(m.x + L.pad, ty, '....', D.EMPTY) end
+            if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
+            goto ml_next
+          end
           if e then
             local t = (ml.kind == 'tx' or ml.kind == 'cmd') and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
             text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN)
@@ -5574,6 +5595,17 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  -- 11 окт: превью событий visor (поверх строк): картинка сцены, имя внизу на подложке
+  local vbot = (L.body_y or 0) + (L.body_h or gfx.h)
+  for _, t in ipairs(D.vis_thumbs or {}) do
+    t.h = math.max(L.rh - 2, math.min(t.h, vbot - t.y))
+    set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(t.x, t.y, t.w, t.h, 1)
+    local drawn = info.visor_namethumb and t.h >= 4 and info.visor_namethumb(t.name, t.x, t.y, t.w, t.h)
+    local ny = t.y + math.max(0, t.h - L.rh)
+    text(t.x + 1, ny, fit(t.name, t.w - 2), drawn and U.TEXT or (t.many and U.AMBER or U.CYAN), drawn and U.BG or nil)
+    if t.foc then set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(t.x - 1, t.y - 1, t.w + 2, L.rh, 0) end
+  end
+  D.vis_thumbs, D.vis_span = nil, nil
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil

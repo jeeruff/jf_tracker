@@ -1409,6 +1409,13 @@ function V.key_impl(c)
   -- ! — действие REAPER (маркер «!id» REAPER исполняет сам), BS / Del (и x в NORMAL) — удалить
   do
     local cf = flat()[V.cur.fi]
+    -- 11 окт: колонка visor (маркеры v:): Enter — выбор сцены / пресета с превью, BS / Del / x — удалить
+    if cf and cf.ml and cf.ml.kind == 'vis' and (V.mode == 'normal' or V.mode == 'insert') then
+      if c == 13 and ctx.visor_pick then ctx.visor_pick(V.cur.row); return end
+      if c == BS or c == DEL or (V.mode == 'normal' and c == ('x'):byte()) then
+        if ctx.vis_set then ctx.vis_set(V.cur.row, '') end; return
+      end
+    end
     if cf and cf.ml and cf.ml.kind == 'cmd' and (V.mode == 'normal' or V.mode == 'insert') then
       local e = cf.ml.ev[V.cur.row]
       if c == 13 then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd ' .. (e and e.text or ''); return end
@@ -2501,6 +2508,7 @@ function V.smart()
   local items, cols, sel, title, pick
   local listen, crows, cellw            -- 11 окт: прослушивание выбора (кнопка listen) и ячейки с волной
   if f.ml then
+    if f.ml.kind == 'vis' and ctx.visor_pick then ctx.visor_pick(row); return true end   -- 11 окт: сетка сцен с превью
     if not (f.ml.kind == 'cc' or f.ml.kind == 'pc') then V.msg = 'smart: this MIDI lane has no values'; return false end
     items, cols, sel = SM.values(128, nil, hexf, 'delete the events of this row')
     title = ('%s %s  %s'):format(f.ml.kind:upper(), f.ml.num and tostring(f.ml.num) or '', where)

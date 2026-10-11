@@ -156,6 +156,14 @@ do
   eq(ml.ev[2] and ml.ev[2].n, 2, 'cmd lane: two markers on row 2 counted')
   eq(ml.ev[2] and ml.ev[2].text, '!40044 B01', 'cmd lane: both texts shown')
   eq(ml.ev[8] and ml.ev[8].text, '', 'cmd lane: unnamed marker kept (shown as mark)')
+  -- 11 окт: v: — колонка visor, не cmd
+  MARKS = { { false, 0.25, 'v:blobtv', 1 }, { false, 0.5, '!40044', 2 }, { false, 1.0, 'v: fluid ', 3 } }
+  eq(#M.cmd_lane(4).rows, 1, 'cmd lane: v: markers go to the visor column')
+  local vl = M.vis_lane(4)
+  eq(vl.kind, 'vis', 'visor lane kind')
+  eq(#vl.rows, 2, 'visor lane: two events')
+  eq(vl.ev[2] and vl.ev[2].text, 'blobtv', 'visor lane: name without v:')
+  eq(vl.ev[8] and vl.ev[8].text, 'fluid', 'visor lane: name trimmed')
   MARKS = {}
   eq(#M.cmd_lane(4).rows, 0, 'cmd lane: no markers - empty')
 end
