@@ -6203,9 +6203,37 @@ ctx = {
     vim.msg = on and 'rec follows selection: the selected tracks are armed (REAPER auto record-arm on every track)' or 'rec follows selection off'
     return n
   end,
+  slow_rec = function()
+    if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(1016, 0); return end   -- идёт запись — стоп
+    local r = state.slowrate
+    if not r then vim.msg = 'slow rec: pick a speed - the slow button in the transport (1/2, 1/3 …)'; return end
+    -- только MIDI: аудио на скорости ≠ 1 пишется неверно
+    local narm, naudio = 0, 0
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, i)
+      if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 then
+        narm = narm + 1
+        if reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT') < 4096 then naudio = naudio + 1 end
+      end
+    end
+    if narm == 0 then vim.msg = 'slow rec: arm a track (R) with a MIDI input first'; return end
+    if naudio > 0 then vim.msg = ('slow rec: %d armed track(s) record audio - audio at x%.2f records wrong; MIDI inputs only'):format(naudio, r); return end
+    ctx.slowrec = { prev = reaper.Master_GetPlayRate(0) }
+    reaper.CSurf_OnPlayRateChange(r)
+    reaper.Main_OnCommand(1013, 0)                              -- Transport: Record
+    vim.msg = ('-- SLOW REC x%.2f -- play in your tempo; Space / Shift+Space stops, x1 comes back'):format(r)
+  end,
+  -- кадр: запись slow rec кончилась — скорость назад
+  slow_rec_tick = function()
+    if ctx.slowrec and reaper.GetPlayState() & 4 == 0 then
+      reaper.CSurf_OnPlayRateChange(ctx.slowrec.prev or 1)
+      ctx.slowrec = nil
+      vim.msg = 'slow rec done - x1; Ctrl+Enter fixes a note or value'
+    end
+  end,
   -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
   -- 12 LUFS-M, 16 LUFS-S max, 20 LUFS-S current); метр трекера читает тот же VU — без JSFX
-  MM_MODES = { { 0, 'peak', 'peak (stereo)' }, { 4, 'RMS', 'RMS (stereo)' }, { 8, 'RMS', 'RMS (combined)' },
+  MM_MODES = { { 0, 'peak', 'peak (stereo)' }, { 2, 'peak', 'peaks (multichannel)' }, { 4, 'RMS', 'RMS (stereo)' }, { 8, 'RMS', 'RMS (combined)' },
                { 12, 'LUFS-M', 'LUFS-M - momentary loudness' }, { 16, 'LUFS-S', 'LUFS-S - short-term, readout max' }, { 20, 'LUFS-S', 'LUFS-S - short-term, readout current' } },
   master_meter_mode = function()
     local v = math.floor(reaper.GetMediaTrackInfo_Value(reaper.GetMasterTrack(0), 'I_VUMODE') or 0) & 30
@@ -11360,6 +11388,28 @@ function ctrl_action(name, delta)
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
   elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
   elseif name == 'play' then if delta == 0 then edit.play_stop() end
+  -- 11 окт: скорость проекта (playrate) — щелчок: выпадашка, колесо ±0.05
+  elseif name == 'rate' then
+    if delta ~= 0 then
+      local r = math.max(0.25, math.min(4, reaper.Master_GetPlayRate(0) + delta * 0.05))
+      reaper.CSurf_OnPlayRateChange(r); vim.msg = ('playrate x%.2f'):format(r)
+    else
+      local items = {}
+      for k, r in ipairs({ 1, 0.75, 2 / 3, 0.5, 1 / 3, 0.25 }) do
+        items[#items + 1] = { key = tostring(k), label = ('x%.2f'):format(r) .. (math.abs(reaper.Master_GetPlayRate(0) - r) < 1e-3 and '  (on)' or ''), fn = function() reaper.CSurf_OnPlayRateChange(r) end }
+      end
+      vim.open_hydra({ title = 'playrate of the project', items = items })
+      state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+    end
+  elseif name == 'slow' then
+    -- 11 окт: slow rec — скорость, с которой Shift+Space пишет (MIDI ложится в темп проекта)
+    local items = {}
+    for k, o in ipairs({ { false, 'off' }, { 2 / 3, '2/3' }, { 0.5, '1/2' }, { 1 / 3, '1/3' }, { 0.25, '1/4' } }) do
+      items[#items + 1] = { key = tostring(k - 1), label = 'slow rec ' .. o[2] .. ((state.slowrate or false) == o[1] and '  (on)' or ''), fn = function()
+        state.slowrate = o[1]; vim.msg = o[1] and ('slow rec %s: Shift+Space records at this speed, it stops - back to x1'):format(o[2]) or 'slow rec off' end }
+    end
+    vim.open_hydra({ title = 'slow rec: play slowly, it lands in tempo (MIDI)', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   elseif name == 'bpm' then
     if delta ~= 0 then
       local bpm = reaper.Master_GetTempo() + delta
@@ -12540,7 +12590,7 @@ local function frame()
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
-      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), bpm_edit = state.bpm_edit,
+      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
       insmode = state.insmode, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
@@ -15892,6 +15942,23 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
+  -- 11 окт: rec follows selection — и за треком курсора трекера: сменился трек курсора — армлен он,
+  -- остальные треки с авто-армом — нет (выбор REAPER курсор не меняет, поэтому REAPER сам этого не делал)
+  if state.armsel and L and L.flat then
+    local f = L.flat[vim.cur.fi]
+    local tr = f and f.col and f.col.track
+    if tr and ctx.armsel_tr ~= tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      ctx.armsel_tr = tr
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local t2 = reaper.GetTrack(0, i)
+        if reaper.GetMediaTrackInfo_Value(t2, 'B_AUTO_RECARM') == 1 then
+          local want = t2 == tr and 1 or 0
+          if reaper.GetMediaTrackInfo_Value(t2, 'I_RECARM') ~= want then reaper.SetMediaTrackInfo_Value(t2, 'I_RECARM', want) end
+        end
+      end
+      model.invalidate()
+    end
+  end
   -- 11 окт: rec follows selection — новым трекам тоже авто-арм (раз в смену числа треков)
   if state.armsel then
     local nt = reaper.CountTracks(0)
@@ -15945,7 +16012,8 @@ local function frame()
   if SL.qpreview and not (OPT.active and OPT.compact and (OPT.compact.title or ''):match('^quantize')) then SL.qpreview = false end   -- панель закрыта — без превью
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
-  do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
+  do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end
+  if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')
@@ -15971,6 +16039,10 @@ local function frame()
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
+  -- 11 окт: Shift+Space — slow rec: запись на скорости slow (MIDI ложится в темп), стоп — скорость назад
+  if c == 32 and ctx.mods().shift and not ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    ctx.slow_rec(); c = 0
+  end
   -- Ctrl+Enter (9 окт): смарт-панель в любом режиме трекера (в INSERT gs — ноты)
   if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     vim.smart(); c = 0

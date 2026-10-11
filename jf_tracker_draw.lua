@@ -1191,6 +1191,7 @@ end
 
 function D.field_rect(L, fld)
   if fld == 'inst' then return L.x_inst or L.x_note, ms('00') end      -- поле инструмента (5 окт)
+  if fld == 'slc' then return L.x_slc or L.x_note, L.w_slc or ms('S00') end   -- 11 окт: поле слайса
   if fld == 1 then return L.x_note, L.w_note
   elseif fld == 2 then return L.x_vol, L.w_vol
   elseif fld == 3 then return L.x_del, L.w_del
@@ -2793,7 +2794,8 @@ function D.transport_groups(c)
   local g = {}
   if not c.bigbpm then
     g[#g + 1] = { { { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT } },   -- > — намёк: клик играет (5 окт)
-                  { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT } } }
+                  { { 'bpm', c.bpm_edit and ('BPM [%s]'):format(c.bpm_edit ~= '' and c.bpm_edit or '...') or ('BPM %.1f'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
+                    { 'rate', ('x%.2f'):format(c.rate or 1), math.abs((c.rate or 1) - 1) > 1e-3 and U.AMBER or U.GREY } } }   -- 11 окт: playrate
   end
   -- metro — рядом с долями (визуальный метроном), в свободном месте строки LPB (5 окт)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
@@ -2805,8 +2807,12 @@ function D.transport_groups(c)
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
   -- кнопки [<<][>][II][o][>>] — крупно справа от модуса (D.transport_buttons)
-  g[#g + 1] = { { tg('punch', 'punch', c.punch), tg('preroll', 'pre-roll', c.preroll) },
-                { tg('reclib', 'rec>lib', c.reclib) } }
+  -- 11 окт: тоглы записи — без on / off (цвет: голубой — вкл), иначе блок не влезал рядом с x1.00
+  local function tc(id, label, on) return { id, label, on and U.CYAN or U.GREY } end
+  g[#g + 1] = { { tc('punch', 'punch', c.punch), tc('preroll', 'pre-roll', c.preroll) },
+                { tc('reclib', 'rec>lib', c.reclib),
+                  { 'slow', c.slowrate and ('slow %s'):format(({ [0.5] = '1/2', [0.25] = '1/4' })[c.slowrate] or (math.abs(c.slowrate - 2 / 3) < 1e-3 and '2/3') or '1/3') or 'slow',
+                    c.slowrec and U.RED or (c.slowrate and U.CYAN or U.GREY) } } }   -- 11 окт: slow rec (Shift+Space)
   g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
@@ -4624,12 +4630,17 @@ function D.frame(L, snap, rows, state, info)
         local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst ~= nil
         for _, fld in ipairs(vo(fi)) do
           idx = idx + 1
-          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' then cur_i = idx end
+          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' then cur_i = idx end
           if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld } end
           if fld == 1 and inst_ok then          -- подполе инструмента — тоже шаг (10 окт)
             idx = idx + 1
             if fi == vc.fi and vc.sub == 'inst' then cur_i = idx end
             if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'inst' } end
+            if G.x_slc and not G.notes_only then   -- 11 окт: и подполе слайса — шаг
+              idx = idx + 1
+              if fi == vc.fi and vc.sub == 'slc' then cur_i = idx end
+              if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'slc' } end
+            end
           end
         end
       end
@@ -5057,6 +5068,7 @@ function D.frame(L, snap, rows, state, info)
               -- номер инструмента под мышью (5 окт) — подполе ноты
               local G2 = f.G or L
               if G2.x_inst and mx >= x + G2.x_inst and mx < x + G2.x_inst + ms('00') + 2 then hover.field = 1; hover.fsub = 'inst' end
+              if G2.x_slc and not G2.notes_only and mx >= x + G2.x_slc and mx < x + G2.x_slc + (G2.w_slc or ms('S00')) + 2 then hover.field = 1; hover.fsub = 'slc' end   -- 11 окт
               do
               end
             end
