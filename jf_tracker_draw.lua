@@ -529,7 +529,8 @@ function D.layout(snap, state, nregions)
   L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4 + L.route_h) or 0
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   L.lane_row = 2 + L.hr_vp + L.hr_in + L.hr_info
-  L.header_rows = 3 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
+  -- 11 окт: +1 строка уголка — кнопка markers под регионом
+  L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -3931,7 +3932,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if info.perf_draw then info.perf_draw(L, ct.x, ct.y, ct.w, ct.h)
         elseif MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
-            return MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+            return MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
@@ -4943,7 +4944,7 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router);
     -- 9 окт: высокая шапка (микшер) — имя и кнопки внизу, прямо над длиной
     -- «< N >» (регион одним блоком), не под session
-    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
+    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 4) * L.rh + 1)
     if rg then
       local c = rg.rgb or U.LINE
       set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
@@ -4958,7 +4959,7 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 2: /2 x2 dup
     if rg then
       local by2 = ny + L.rh
-      if by2 + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
+      if by2 + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
         -- 7 окт: /2 x2 слева, als cln — парой справа (копии паттерна рядом)
         local x = bx
         for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
@@ -4969,14 +4970,26 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
-  -- длина региона курсора в шагах — последняя строка шапки: «<  24  >»
+  -- 11 окт: последняя строка уголка — markers (выпадашка: показ маркеров и регионов)
+  do
+    local bx, y4 = tx0 + 3, hy + (L.header_rows - 1) * L.rh + 2
+    local lbl = (ms('markers') + 2 <= L.label_w - 4) and 'markers' or 'mk'
+    local w1 = ms(lbl) + 2
+    local hot = mx >= bx and mx < bx + w1 and my >= y4 and my < y4 + L.rh
+    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y4, w1, L.rh, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(bx, y4, w1, L.rh, 0)
+    text(bx + 1, y4, lbl, hot and U.AMBER or U.TEXT)
+    if hot then hover.viewbtn = 'markers' end
+    hint('viewbtn', bx, y4, w1, L.rh, 'markers')
+  end
+  -- длина региона курсора в шагах — предпоследняя строка шапки: «<  24  >»
   -- одной строкой (7 окт: стрелки рядом с числом, которым управляют;
   -- клик / колесо = ±1 шаг, ripple как :len)
   if info.cur_region then
     local rg = info.cur_region
     local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
     local bx, bw = tx0 + 1, L.label_w - 2
-    local y3 = hy + (L.header_rows - 1) * L.rh + 2
+    local y3 = hy + (L.header_rows - 2) * L.rh + 2
     set(U.LINE); gfx.rect(bx, y3 - 1, bw, L.rh + 1, 0)
     local aw = ms('<') + 2
     text(bx + math.max(aw, math.floor((bw - ms(s)) / 2)), y3, fit(s, bw - 2 * aw), U.TEXT)
@@ -5203,7 +5216,7 @@ function D.frame(L, snap, rows, state, info)
   -- граница регионов (5 окт): тонкие линии цвета регионов у линии такта —
   -- уходящий над ней, следующий под ней; фоном, items рисуются поверх
   local rgedge = {}
-  if info.ruler and info.ruler.regions then
+  if info.ruler and info.ruler.regions and state.rgedges ~= false then
     for _, rg in ipairs(info.ruler.regions) do
       local e0 = rgedge[rg.r0] or {}; e0.nxt = rg.rgb or D.BAR; rgedge[rg.r0] = e0
       local e1 = rgedge[rg.r1] or {}; e1.prv = rg.rgb or D.BAR; rgedge[rg.r1] = e1
@@ -5491,7 +5504,7 @@ function D.frame(L, snap, rows, state, info)
         set(c); gfx.rect(laneR, y0, 3, y1 - y0, 1)
         set(bgc); gfx.rect(laneR + 3, y0, L.th + 2, y1 - y0, 1)
         if rg.r0 >= row0 then set(c); gfx.rect(laneR, y0, L.th + 5, 1, 1) end
-        if y1 - y0 > L.th then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
+        if y1 - y0 > L.th and state.rgnames ~= false then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
       end
     end
     local mks = {}
@@ -5505,13 +5518,13 @@ function D.frame(L, snap, rows, state, info)
       local ynext = mks[k + 1] and ry(mks[k + 1].row) or bot
       local c = m.mk.rgb or U.AMBER
       set(c); gfx.rect(laneR, y, L.rg_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
-      if ynext - y > L.th then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
+      if ynext - y > L.th and state.mknames ~= false then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
     if mx >= tx0 + L.jl_w and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
-  if L.ruler_w > 0 and info.ruler and #rows > 0 then
+  if L.ruler_w > 0 and info.ruler and #rows > 0 and state.rgbar ~= false then
     local row0, nr = rows[1].row, #rows
     local c0 = info.view_clip and info.view_clip[1] or -math.huge
     local c1 = info.view_clip and info.view_clip[2] or math.huge
@@ -5553,7 +5566,7 @@ function D.frame(L, snap, rows, state, info)
     local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
     info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
     -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
     -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)

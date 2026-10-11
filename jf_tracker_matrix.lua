@@ -364,9 +364,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
     if nrow >= 1 and ax1 - ax0 >= 8 * L.cw then
       local rows = {}
-      if nrow >= 3 then rows[#rows + 1] = 'title' end
+      -- 11 окт: регион курсора — как в уголке трекера (кнопка markers: region over the matrix)
+      local rgv = not (ctx.state and ctx.state.mxregion == false)
+      if nrow >= (rgv and 4 or 3) then rows[#rows + 1] = 'title' end
       rows[#rows + 1] = 'name'
       if nrow >= 2 then rows[#rows + 1] = 'ops' end
+      if rgv and nrow >= 3 then rows[#rows + 1] = 'region' end
       for _, r in ipairs(rows) do
         if r == 'title' then
           local nol = anum > 0 and ctx.arr_has_lanes and not ctx.arr_has_lanes()
@@ -382,6 +385,29 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           if hot then hover.btn = 'arrname' end
           if ctx.hint then ctx.hint('mxbtn', bx, ay, nw, L.rh, 'arrname') end
           btn(bx + nw + L.pad, ay, '>', 'arrnext')
+        elseif r == 'region' then
+          local rg, rl = info.cur_region_full, info.cur_region
+          if not rg then U.text(ax0 + 5, ay + 1, ctx.fit('no region', ax1 - ax0 - 7), U.DIM); goto rg_row_done end
+          do
+          local c = rg.rgb or U.LINE
+          U.set(U.tint(c, 0.30)); gfx.rect(ax0, ay, ax1 - ax0, L.rh, 1)
+          U.set(c); gfx.rect(ax0, ay, 3, L.rh, 1)
+          local len = rl and tostring(math.max(0, math.floor((rl.r1 - rl.r0) + 0.5))) or ''
+          local aw = U.measure('<') + 2
+          local lw = U.measure(len) + 2 * aw + 2 * L.pad
+          U.text(ax0 + 5, ay + 1, ctx.fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), ax1 - ax0 - lw - 7), U.TEXT)
+          if rl then
+            local lx = ax1 - lw
+            local hl = mx >= lx and mx < lx + aw + L.pad and my >= ay and my < ay + L.rh
+            local hr = mx >= ax1 - aw - L.pad and mx < ax1 and my >= ay and my < ay + L.rh
+            U.text(lx + L.pad, ay + 1, '<', hl and U.AMBER or U.GREY)
+            U.text(lx + L.pad + aw, ay + 1, len, U.TEXT)
+            U.text(ax1 - aw, ay + 1, '>', hr and U.AMBER or U.GREY)
+            if hl then hover.btn = 'rglen-' elseif hr then hover.btn = 'rglen+' end
+            if ctx.hint then ctx.hint('mxbtn', lx, ay, aw + L.pad, L.rh, 'rglen-'); ctx.hint('mxbtn', ax1 - aw - L.pad, ay, aw + L.pad, L.rh, 'rglen+') end
+          end
+          end
+          ::rg_row_done::
         else
           local bx = btn(ax0, ay, 'new', 'arrnew')
           bx = btn(bx, ay, 'dup', 'arrdup')

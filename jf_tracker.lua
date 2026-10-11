@@ -218,6 +218,7 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
+  ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
@@ -610,7 +611,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'ruler', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3934,6 +3935,31 @@ ctx = {
     ctx.set_focus('dsp')
     local f = d.col and d.col.fx and d.col.fx[d.k]
     vim.msg = ('dsp: %s - %s'):format(d.col and d.col.name or '', f and f.name or '')
+  end,
+  -- 11 окт: кнопка markers в уголке — показ маркеров и регионов (вкл / выкл, отметка on)
+  markers_menu = function()
+    local items = {}
+    local function tog(key, k, label)
+      items[#items + 1] = { key = k, label = label .. (state[key] ~= false and '  (on)' or ''), fn = function()
+        state[key] = state[key] == false
+        reaper.SetExtState(EXT, key, state[key] and '1' or '0', true)
+        relayout(); vim.msg = label .. ': ' .. (state[key] and 'on' or 'off')
+      end }
+    end
+    tog('ruler', 'r', 'region / marker strip left of the rows')
+    tog('rgnames', 'n', 'region names in the strip')
+    tog('mknames', 'm', 'marker names in the strip')
+    tog('rgbar', 'b', 'region colour bar at the row numbers')
+    tog('rgedges', 'e', 'region edges across the tracks')
+    tog('mxregion', 'x', 'region of the cursor over the matrix')
+    tog('mxmarks', 's', '=START / =END rows in the matrix')
+    for k, v in ipairs({ 'off', 'beats', 'time', 'both' }) do
+      items[#items + 1] = { key = tostring(k), label = 'timeline ruler: ' .. v .. ((state.tlruler or 'off') == v and '  (on)' or ''), fn = function()
+        state.tlruler = v; reaper.SetExtState(EXT, 'tlruler', v, true); relayout(); vim.msg = 'timeline ruler: ' .. v
+      end }
+    end
+    vim.open_hydra({ title = 'markers and regions', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
   slices_render_menu = function()
     vim.open_hydra({ title = 'convert slices', items = {
@@ -10257,13 +10283,14 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
+    if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then ctx.region_len_step(d)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
+  elseif t.kind == 'viewbtn' and d == 'markers' then ctx.markers_menu()
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
@@ -13950,6 +13977,7 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
+  elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
@@ -14919,6 +14947,7 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
+    elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
     elseif hover.viewbtn == 'fxparams' then
       state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true)
@@ -15080,6 +15109,7 @@ local function frame()
       elseif hover.matrix.btn == 'fill' then MX.fill = not MX.fill
       elseif hover.matrix.btn == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
       elseif hover.matrix.btn == 'trim' then ctx.mx_trim()
+      elseif hover.matrix.btn == 'rglen-' or hover.matrix.btn == 'rglen+' then ctx.region_len_step(hover.matrix.btn == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
       elseif hover.matrix.btn == 'se' then
         state.mxmarks = not state.mxmarks
