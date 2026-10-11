@@ -1120,10 +1120,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local nx = slices[k + 1] and math.min(x + w, tx(slices[k + 1])) or (x + w)
     if lx + lw <= nx - 1 and lx >= lab_end + 2 and wh >= 3 * rh + 8 then
       local cc = hot and U.TEXT or (onkey and U.AMBER or U.CYAN)
-      U.text(lx, wy + 1, num, cc)
+      -- 11 окт: подписи на чёрной подложке — волна под ними не мешает читать
+      local function lab(ty, str, col)
+        if str == '' then return end
+        gfx.set(0, 0, 0, 1); gfx.rect(lx - 1, ty, U.measure(str) + 2, rh - 1, 1)
+        U.text(lx, ty, str, col)
+      end
+      lab(wy + 1, num, cc)
       local by = wy + wh - rh - 7                        -- над полосой переноса зоны
-      U.text(lx, by, note, hot and U.TEXT or U.GREY)
-      if keyl ~= '' then U.text(lx, by - rh, keyl, cc) end
+      lab(by, note, hot and U.TEXT or U.GREY)
+      lab(by - rh, keyl, cc)
       lab_end = lx + lw
     end
     ::next_slice::
@@ -1228,7 +1234,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)
     if pht and pht > t0 and pht < t0 + 2 * W2 then U.set(U.TEXT); gfx.rect(x + math.floor((pht - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
-    U.text(x + 4, zy + 1, ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6)), U.GREY)
+    do   -- 11 окт: на чёрной подложке, как подписи слайсов
+      local zs = ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6))
+      gfx.set(0, 0, 0, 1); gfx.rect(x + 3, zy + 1, U.measure(zs) + 2, rh - 1, 1)
+      U.text(x + 4, zy + 1, zs, U.GREY)
+    end
     if ctx.hints_on and ctx.hints_on() and ZH > 3 * rh then
       U.text(x + 4, zy + ZH - rh - 1, ctx.fit(zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8), U.GREY)
     end
