@@ -61,6 +61,8 @@ B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '
 -- sync (3 окт): пока проект играет, прослушивание файла стартует с начала следующего такта
 B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
+-- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
+B.wscroll = not (R.GetExtState and R.GetExtState('jf_tracker', 'brwscroll') == '0')
 B.marks = {}
 B.crumbs = {}       -- сегменты пути последней отрисовки { label=, path= }
 -- закладок 10 (5 окт): 1..9 и 0; Shift — перезаписать
@@ -724,6 +726,10 @@ function B.click(what)
     B.sync = not B.sync
     if R.SetExtState then R.SetExtState('jf_tracker', 'brsync', B.sync and '1' or '0', true) end
     if ctx.msg then ctx.msg(B.sync and 'sync: while the project plays, files start on the next bar' or 'sync off: files start at once') end
+  elseif what == 'wscroll' then
+    B.wscroll = not B.wscroll
+    if R.SetExtState then R.SetExtState('jf_tracker', 'brwscroll', B.wscroll and '1' or '0', true) end
+    if ctx.msg then ctx.msg(B.wscroll and 'wheel scrolls the list, the cursor stays (click, j k, f move it)' or 'wheel moves the cursor') end
   elseif what == 'allfiles' or what == 'hidden' then
     if what == 'allfiles' then B.all_files = not B.all_files else B.hidden = not B.hidden end
     if R.SetExtState then
@@ -998,7 +1004,7 @@ function B.draw(U, L, x, y, w, h)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'wave', 'wave', B.wave },   -- 11 окт: find — слева от стрелок < > (на виду), здесь не дублируется
-                         { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
+                         { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { 'scroll', 'wscroll', B.wscroll }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

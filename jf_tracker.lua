@@ -15643,6 +15643,7 @@ local function frame()
     -- колесо над огибающей — только прокрутка (2 окт): значения правит ^A ^X / INSERT
     elseif hover.ctrl then ctrl_action(hover.ctrl, step > 0 and -1 or 1)
     elseif type(hover.browser) == 'number' and B.mode == 'pm' and B.grid and not B.pmproj and state.pmgrid then B.pm_scroll.v = math.max(0, B.pm_scroll.v + (step > 0 and 1 or -1)); B.pm_scroll.wheel = true
+    elseif type(hover.browser) == 'number' and B.wscroll then B.scroll = math.max(0, B.scroll + (step > 0 and 3 or -3))   -- 11 окт: кнопка scroll — листает, курсор стоит
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
