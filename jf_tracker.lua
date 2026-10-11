@@ -6204,6 +6204,7 @@ ctx = {
       act('Options: New recording adds lanes (new lanes play exclusively)', 'l', 'new recording: adds lanes')
       act('Pre-roll: toggle pre-roll on record', 'p', 'pre-roll on record')
       act('Options: Toggle metronome', 'c', 'metronome')
+      own('W', 'start slow rec (records at the slow speed)', ctx.slowrec ~= nil and not ctx.slowrec.play, function() if not state.slowrate then state.slowrate = 0.5 end; ctx.slow_rec() end)
       own('w', 'slow rec speed: ' .. (state.slowrate and ('x%.2f'):format(state.slowrate) or 'off') .. ' … (the red slow button records)', state.slowrate ~= nil and state.slowrate ~= false, function() ctrl_action('slow', 0) end)
       own('b', 'rec > lib: a new recording goes into the lib too (tracker)', state.reclib, function() ctrl_action('reclib', 0) end)
       own('R', 'the cursor track: arm, record mode, monitoring, input …', false, function()
@@ -11692,6 +11693,9 @@ function ctrl_action(name, delta)
   elseif name == 'tp_end' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to end of project') or 40043, 0) end
   elseif name == 'freeze' then
     if delta ~= 0 then ctx.freeze_len(delta > 0 and 2 or 0.5) else ctx.freeze_toggle() end
+  elseif name == 'slowplay' then if delta == 0 then ctx.half_play() end
+  elseif name == 'smartrec' then
+    if delta == 0 then state.smartrec = not state.smartrec; vim.msg = 'smart rec ' .. (state.smartrec and 'on (being designed: a held note records in time, the frame shows where it ends)' or 'off') end
   elseif name == 'slowbtn' then
     if delta == 0 then
       if not state.slowrate then state.slowrate = 0.5 end
@@ -12844,7 +12848,7 @@ local function frame()
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
-      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
+      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play or nil, smartrec = state.smartrec, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -15606,7 +15610,7 @@ local function frame()
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
-  elseif U.rclick and hover.ctrl == 'slowbtn' then ctrl_action('slow', 0)
+  elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
   elseif U.rclick and hover.ctrl == 'dub' then ctx.dub_menu()
   elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER

@@ -2836,9 +2836,10 @@ end
 D.RATE_SNAPS = { 0.25, 0.5, 0.75, 1, 1.5, 2 }
 function D.transport_sub(c)
   local frz = c.frz and ('frz %s'):format(c.frz) or 'freeze'
+  -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
-           { false }, -- под play: rev у REAPER нет (отрицательной скорости транспорт не знает)
-           { 'slowbtn', c.slowrate and ('slow ' .. c.slowtxt) or 'slow', c.slowrec and U.RED or nil, U.RED },
+           { 'slowplay', 'slow', c.halfplay and U.TEXT or nil, U.TEXT },
+           { 'smartrec', 'smart', c.smartrec and U.RED or nil },
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
 end
 function D.transport_groups(c)
