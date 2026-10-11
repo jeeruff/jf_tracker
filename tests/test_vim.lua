@@ -153,6 +153,8 @@ local function reset()
     insert_slice_cmd = function(k, r, sm) calls[#calls + 1] = ('slcmd:%d:%s:%s'):format(k, tostring(r), tostring(sm)) end,
     repeat_pattern = function(all) calls[#calls + 1] = all and 'repeat:all' or 'repeat:track' end,
     inst_transpose = function(d) calls[#calls + 1] = 'transpose:' .. d end,   -- 10 окт: Shift+Opt+J / K
+    inst_rate = function(d) calls[#calls + 1] = 'rate:' .. d end,             -- 11 окт: Shift+Opt+H / L
+    mcmd_set = function(row, text) calls[#calls + 1] = ('mcmd:%d:%s'):format(row, text) end,   -- 11 окт: колонка cmd мастера
     smart_open = function(p) calls[#calls + 1] = 'smart:' .. (p.title or ''); SMART_P = p; return true end,   -- 10 окт: zt
     region_rows = function() return 0, 31 end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
@@ -761,5 +763,60 @@ reset()
 V.cur = { fi = 1, row = 0, field = 1 }
 local okp = V.transpose_scope('pattern', 12); eq('pattern transpose +12 runs', okp and (last() or ''):match('^transpose:.*:%+12$') ~= nil or not okp, true)
 local okt = V.transpose_scope('track', -1); eq('track transpose -1 runs', okt and (last() or ''):match(':%-1$') ~= nil or not okt, true)
+
+-- ── 11 окт: регрессии сессии ───────────────────────────────────────────────
+-- узкая подколонка: x_inst = false — поля инструмента / слайса нет, l идёт сразу в vol
+reset(); L.flat[1].G = { x_inst = false, x_slc = false }
+keysin('l'); eq('narrow sub: l goes note -> vol (no hidden inst)', V.cur.field, 2); eq('narrow sub: no sub field', V.cur.sub, nil)
+-- полная подколонка: нота -> инструмент -> слайс -> громкость и обратно
+reset(); L.flat[1].G = { x_inst = 40, x_slc = 60 }
+keysin('l'); eq('full sub: l -> inst', V.cur.sub, 'inst')
+keysin('l'); eq('full sub: l -> slc', V.cur.sub, 'slc')
+keysin('l'); eq('full sub: l -> vol', V.cur.field, 2); eq('full sub: vol has no sub', V.cur.sub, nil)
+keysin('h'); eq('full sub: h -> slc', V.cur.sub, 'slc')
+keysin('h'); eq('full sub: h -> inst', V.cur.sub, 'inst')
+keysin('h'); eq('full sub: h -> note', V.cur.sub, nil); eq('full sub: note field', V.cur.field, 1)
+L.flat[1].G = nil
+-- Shift+Opt+H / L — playrate инструмента, курсор стоит (не переход по трекам)
+reset(); alt_down, shift_down = true, true
+V.key(172); eq('Shift+Opt+L: playrate +1', last(), 'rate:1'); eq('Shift+Opt+L: cursor stays', V.cur.fi, 1)
+V.key(729); eq('Shift+Opt+H: playrate -1', last(), 'rate:-1')
+alt_down, shift_down = false, false
+reset(); keysin('3'); alt_down, shift_down = true, true; V.key(172); alt_down, shift_down = false, false
+eq('3 Shift+Opt+L: playrate +3', last(), 'rate:3')
+-- колонка cmd мастера: Enter — правка в строке :, ! — действие, x — удалить, :mcmd — ставит
+reset()
+L.flat[#L.flat + 1] = { ci = 3, col = { name = 'master', lanes = {} }, ml = { kind = 'cmd', name = 'cmd', ev = { [2] = { text = '!40044', n = 1 } }, rows = { 2 } }, sub = {}, x = 0, w = 10 }
+local cfi = #L.flat
+V.cur = { fi = cfi, row = 2, field = 1 }
+V.key(13); eq('cmd: Enter opens the command line', V.mode, 'cmd'); eq('cmd: prefilled with the row text', V.cmdline, 'mcmd !40044')
+V.key(27); eq('cmd: Esc back to NORMAL', V.mode, 'normal')
+V.key(('!'):byte()); eq('cmd: ! starts a REAPER action', V.cmdline, 'mcmd !'); V.key(27)
+V.cur = { fi = cfi, row = 5, field = 1 }
+V.key(13); eq('cmd: empty row - empty text', V.cmdline, 'mcmd ')
+V.cmdline = 'mcmd hello world'; V.key(13); eq(':mcmd sets the row text', last(), 'mcmd:5:hello world')
+V.cur = { fi = cfi, row = 2, field = 1 }
+keysin('x'); eq('cmd: x deletes the row command', last(), 'mcmd:2:')
+local ncalls = #calls; keysin('j'); eq('cmd: j still moves', V.cur.row, 3); eq('cmd: j writes nothing', #calls, ncalls)
+-- вставка ноты обрывается следующим событием подколонки (E.cap_row на время вставки)
+reset()
+local CAP
+local ins0 = E.insert_note
+E.insert_note = function(...) CAP = E.cap_row or 'none'; return ins0(...) end
+V.cur = { fi = 1, row = 4, field = 1 }; V.mode = 'insert'
+local pk; for code, off in pairs(keys.piano) do if off == 0 then pk = code end end
+V.key(pk)
+eq('insert: cap = the next event of the subcolumn (snare @8)', CAP, 8)
+eq('insert: cap cleared after the insert', E.cap_row, nil)
+E.insert_note = ins0
+-- чистые функции вставки
+eq('next_event_row: next head below', V.next_event_row(snap.cols[1].lanes[1].subs[1], 0), 8)
+eq('next_event_row: conts are not events', V.next_event_row(snap.cols[1].lanes[1].subs[1], 9), 16)
+eq('next_event_row: none below', V.next_event_row(snap.cols[1].lanes[1].subs[1], 16), nil)
+eq('slq_snap: nearest beat', V.slq_snap(9.3, 4, 0), 8)
+eq('slq_snap: never on or before the cursor', V.slq_snap(1.2, 4, 0), 4)
+eq('slq_snap: bar grid', V.slq_snap(10, 12, 0), 12)
+eq('slq_snap: row grid keeps the row', V.slq_snap(5.0, 1, 2), 5)
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

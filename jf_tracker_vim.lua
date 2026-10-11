@@ -1671,9 +1671,7 @@ function V.key_impl(c)
         if q > 0 then
           -- 11 окт: старт по сетке — ближайшая клетка q строк после конца слайса (не раньше следующей строки)
           local r0, d0 = E.row_of_time(t_end, lpb())
-          local rf = r0 + d0 / 256
-          r = math.floor(rf / q + 0.5) * q
-          while r <= V.cur.row do r = r + q end
+          r = V.slq_snap(r0 + d0 / 256, q, V.cur.row)
           V.stitch = nil
         else V.stitch = { fi = V.cur.fi, row = r, t = t_end } end
         V.cur.row = r
@@ -2614,6 +2612,12 @@ function V.smart()
 end
 
 -- поле инструмента есть, если в раскладке есть колонка номера (не узкая колонка)
+-- 11 окт: старт по сетке — ближайшая клетка q строк к дробной строке rf, строго после cur
+function V.slq_snap(rf, q, cur)
+  local r = math.floor(rf / q + 0.5) * q
+  while r <= cur do r = r + q end
+  return r
+end
 -- 11 окт: строка следующего события (голова ноты / item) в подколонке ниже row — новая нота обрывается на ней
 function V.next_event_row(sub, row)
   local best
