@@ -259,6 +259,7 @@ local state = {
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
   autoinst = reaper.GetExtState(EXT, 'autoinst') ~= '0',
   armsel = reaper.GetExtState(EXT, 'armsel') == '1',
+  masterpos = reaper.GetExtState(EXT, 'masterpos') == 'left' and 'left' or 'right',   -- 11 окт: полоса мастера в микшере — справа (по умолчанию) / слева
   smlisten = reaper.GetExtState(EXT, 'smlisten') ~= '0',   -- 11 окт: кнопка listen смарт-панели   -- 11 окт: запись следует за выбором треков (B_AUTO_RECARM у всех треков)   -- 11 окт: курсор на треке — его инструмент (плагин или аудиоклип под курсором)
   automidi = reaper.GetExtState(EXT, 'automidi') ~= '0',   -- 10 окт: плагин-инструмент на треке с аудиовходом — вход на все MIDI
   hintpos = reaper.GetExtState(EXT, 'hintpos') == 'status' and 'status' or 'panes',   -- 10 окт: либо под каждым модулем, либо одной строкой внизу
@@ -607,7 +608,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -4750,6 +4751,10 @@ ctx = {
     return ctx.vz_pk and ctx.vz_pk.names[g] or 'track?'
   end,
   -- слот (регион последовательности) под строкой
+  -- 11 окт: последняя строка региона (слота) под строкой row; нет региона — nil
+  region_end_row = function(row)
+    for _, rg in ipairs(seq) do if not rg.gap and row >= rg.r0 and row < rg.r1 then return rg.r1 - 1 end end
+  end,
   visor_slot_at = function(row, pos)
     for _, rg in ipairs(seq) do
       if not rg.gap then
@@ -6199,7 +6204,7 @@ ctx = {
       act('Options: New recording adds lanes (new lanes play exclusively)', 'l', 'new recording: adds lanes')
       act('Pre-roll: toggle pre-roll on record', 'p', 'pre-roll on record')
       act('Options: Toggle metronome', 'c', 'metronome')
-      own('w', 'slow rec speed: ' .. (state.slowrate and ('x%.2f'):format(state.slowrate) or 'off') .. ' … (Shift+Space records)', state.slowrate ~= nil and state.slowrate ~= false, function() ctrl_action('slow', 0) end)
+      own('w', 'slow rec speed: ' .. (state.slowrate and ('x%.2f'):format(state.slowrate) or 'off') .. ' … (the red slow button records)', state.slowrate ~= nil and state.slowrate ~= false, function() ctrl_action('slow', 0) end)
       own('b', 'rec > lib: a new recording goes into the lib too (tracker)', state.reclib, function() ctrl_action('reclib', 0) end)
       own('R', 'the cursor track: arm, record mode, monitoring, input …', false, function()
         local col = cur_col(); if col then ctx.open_context({ btn = { col = col, what = 'arm' } }) end
@@ -6381,10 +6386,17 @@ ctx = {
     vim.open_hydra({ title = 'dub - click repeats the chosen one', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   end,
+  half_play = function()
+    if reaper.GetPlayState() & 1 == 1 then reaper.Main_OnCommand(1016, 0); return end   -- играет — стоп (скорость вернёт tick)
+    ctx.slowrec = { prev = reaper.Master_GetPlayRate(0), play = true }
+    reaper.CSurf_OnPlayRateChange(0.5)
+    reaper.Main_OnCommand(1007, 0)
+    vim.msg = '-- PLAY /2 -- half speed; Space / Shift+Space stops, x1 comes back'
+  end,
   slow_rec = function()
     if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(1016, 0); return end   -- идёт запись — стоп
     local r = state.slowrate
-    if not r then vim.msg = 'slow rec: pick a speed - the slow button in the transport (1/2, 1/3 …)'; return end
+    if not r then vim.msg = 'slow rec: pick a speed - rclick the slow button in the transport (1/2, 1/3 …)'; return end
     -- только MIDI: аудио на скорости ≠ 1 пишется неверно
     local narm, naudio = 0, 0
     for i = 0, reaper.CountTracks(0) - 1 do
@@ -6399,14 +6411,15 @@ ctx = {
     ctx.slowrec = { prev = reaper.Master_GetPlayRate(0) }
     reaper.CSurf_OnPlayRateChange(r)
     reaper.Main_OnCommand(1013, 0)                              -- Transport: Record
-    vim.msg = ('-- SLOW REC x%.2f -- play in your tempo; Space / Shift+Space stops, x1 comes back'):format(r)
+    vim.msg = ('-- SLOW REC x%.2f -- play in your tempo; Space stops, x1 comes back'):format(r)
   end,
   -- кадр: запись slow rec кончилась — скорость назад
   slow_rec_tick = function()
-    if ctx.slowrec and reaper.GetPlayState() & 4 == 0 then
+    if ctx.slowrec and reaper.GetPlayState() & (ctx.slowrec.play and 1 or 4) == 0 then
+      local was_play = ctx.slowrec.play
       reaper.CSurf_OnPlayRateChange(ctx.slowrec.prev or 1)
       ctx.slowrec = nil
-      vim.msg = 'slow rec done - x1; Ctrl+Enter fixes a note or value'
+      vim.msg = was_play and 'play /2 stopped - x1' or 'slow rec done - x1; Ctrl+Enter fixes a note or value'
     end
   end,
   -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
@@ -8029,6 +8042,7 @@ ctx = {
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
       { key = 'armsel', label = 'rec follows selection', kind = 'toggle', desc = 'record arm follows the selected tracks: REAPER auto record-arm (track menu: Automatic record-arm when track selected) on every track, new ones too; off - removed from all tracks', get = function() return state.armsel end, set = function(v) state.armsel = v; ctx.armsel_apply(v) end },
+      { key = 'masterpos', label = 'master strip', kind = 'cycle', values = { 'right', 'left' }, desc = 'the master in the bottom mixer: right - its own corner on the right (as in Renoise), the tracks stop before it; left - under the row numbers', get = function() return state.masterpos or 'right' end, set = function(v) state.masterpos = v; ctx.relayout() end },
       flag('autoinst', 'auto instrument', 'the cursor picks the instrument of its track: the audio clip under the cursor (or the last one above it), on a track without audio - its plugin instrument; choosing one by hand holds until the cursor reaches another clip or track'),
       flag('automidi', 'auto MIDI input', 'you play notes into a track with a plugin instrument but its input is audio - switch the input to all MIDI inputs (all channels) and turn monitoring on'),
       flag('waveinv', 'selection: inverse wave', 'the selected slice in the sample wave: off - its wave a bit brighter; on - inverse (a lit block, the wave cut out dark)'),
@@ -8136,7 +8150,7 @@ ctx = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -11596,9 +11610,9 @@ function ctrl_action(name, delta)
     local items = {}
     for k, o in ipairs({ { false, 'off' }, { 2 / 3, '2/3' }, { 0.5, '1/2' }, { 1 / 3, '1/3' }, { 0.25, '1/4' } }) do
       items[#items + 1] = { key = tostring(k - 1), label = 'slow rec ' .. o[2] .. ((state.slowrate or false) == o[1] and '  (on)' or ''), fn = function()
-        state.slowrate = o[1]; vim.msg = o[1] and ('slow rec %s: Shift+Space records at this speed, it stops - back to x1'):format(o[2]) or 'slow rec off' end }
+        state.slowrate = o[1]; vim.msg = o[1] and ('slow rec %s: the red slow button records at this speed, it stops - back to x1'):format(o[2]) or 'slow rec off' end }
     end
-    vim.open_hydra({ title = 'slow rec: play slowly, it lands in tempo (MIDI)', items = items })
+    vim.open_hydra({ title = 'slow rec speed (the red slow button records): play slowly, it lands in tempo (MIDI)', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   elseif name == 'bpm' then
     if delta ~= 0 then
@@ -14192,8 +14206,11 @@ local function frame()
     end
     -- жест «треки» (Control+Option): окно по ширине — все треки зонами; вбок —
     -- выбор трека (фейдер в фокусе клавиатуры), вертикально — его громкость
-    local gest = gfx.mouse_cap & 48 == 48
-    local ctrl = gfx.mouse_cap & 32 == 32 and not gest
+    -- 11 окт: Ctrl+Option — сначала просто модификаторы; режим слайдеров — только когда мышь пошла (> 6 px)
+    local gest_raw = gfx.mouse_cap & 48 == 48
+    if gest_raw then ctx.cm_g0 = ctx.cm_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.cm_g0 = nil end
+    local gest = gest_raw and (ctx.cm_gest ~= nil or math.abs(gfx.mouse_x - ctx.cm_g0[1]) + math.abs(gfx.mouse_y - ctx.cm_g0[2]) > 6)
+    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}
@@ -16257,9 +16274,9 @@ local function frame()
   ctx.ctrlj_t = reaper.time_precise()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
-  -- 11 окт: Shift+Space — slow rec: запись на скорости slow (MIDI ложится в темп), стоп — скорость назад
+  -- 11 окт: Shift+Space — play / 2 (половинная скорость; стоп — скорость назад); медленная запись — кнопка slow
   if c == 32 and ctx.mods().shift and not ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    ctx.slow_rec(); c = 0
+    ctx.half_play(); c = 0
   end
   -- Ctrl+Enter (9 окт): смарт-панель в любом режиме трекера (в INSERT gs — ноты)
   if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then

@@ -651,6 +651,10 @@ function D.layout(snap, state, nregions)
     L.top_y, L.dsp_y = 0, bot
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
+  -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
+  L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.label_w >= 6 * L.cw or false
+  L.master_w = L.master_right and L.label_w or 0
+  L.cols_r = L.win_w - L.master_w
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
   L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
@@ -662,7 +666,7 @@ function D.layout(snap, state, nregions)
     if hide_below and depth <= hide_below then hide_below = nil end
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
-    local vis = (not hidden) and ci >= first and cx < L.win_w
+    local vis = (not hidden) and ci >= first and cx < L.cols_r
     -- PT-mode (3 окт): ровно 4 канала от прокрутки
     if state.ptmode and not hidden and ci >= first then
       L.pt_avail = L.pt_avail + 1
@@ -740,8 +744,8 @@ function D.layout(snap, state, nregions)
     c.w = lx - (c.x or 0)
     -- 8 окт: колонка не влезла целиком — режем по границе трекера (шапка и
     -- строка эффектов выходили за линию модуля); подколонки за краем — без x
-    if vis and c.x and c.x + c.w > L.win_w - 2 then
-      local lim = L.win_w - 2
+    if vis and c.x and c.x + c.w > L.cols_r - 2 then
+      local lim = L.cols_r - 2
       c.w = math.max(0, lim - c.x)
       for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do
         local f = L.flat[k]
@@ -751,7 +755,7 @@ function D.layout(snap, state, nregions)
       end
       for _, ev in ipairs(c.envs) do if ev.x >= lim then ev.x = lim; ev.w = 0 elseif ev.x + ev.w > lim then ev.w = lim - ev.x end end
     end
-    if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.win_w then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
+    if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.cols_r then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
     if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
     -- скрытые дети свёрнутой папки: записи L.flat остаются (курсор не ломается), x = nil
     if hidden then for _, f in ipairs(L.flat) do if f.ci == ci then f.x = nil end end end
@@ -3912,7 +3916,7 @@ function D.frame(L, snap, rows, state, info)
   local hcols = L.cols
   if L.mix_bottom and snap and snap.master and snap.master.vol and L.label_w >= 6 * L.cw then
     hcols = { table.unpack(L.cols) }
-    hcols[#hcols + 1] = { col = snap.master, x = tx0, w = L.label_w, lanes = {}, envs = {}, mls = {}, master = true }
+    hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
   for _, c in ipairs(hcols) do
     local col = c.col

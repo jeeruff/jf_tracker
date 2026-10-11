@@ -565,6 +565,21 @@ local function apply(op, f0, f1, r0, r1)
   if op == 'd' or op == 'x' or op == 'c' then
     V.regs['"'] = E.yank(heads, lpb(), r0, f0)
     E.delete(heads, lpb())
+    -- 11 окт: OFF в диапазоне — убрать: нота звучит до следующего события подколонки (нет — до конца региона), как в Renoise
+    for fi = f0, f1 do
+      local fl = flat()[fi]
+      for _, sub in ipairs(fl and subs_of(fl) or {}) do
+        for r = r0, r1 do
+          local c = sub[r]
+          if c and c.kind == 'off' and c.of then
+            local nxt
+            for r2 = r + 1, r + 4096 do local c2 = sub[r2]; if c2 and (c2.kind == 'audio' or c2.kind == 'midi') then nxt = r2; break end end
+            local last = nxt and (nxt - 1) or (ctx.region_end_row and ctx.region_end_row(r)) or (r + 16)
+            E.note_off({ c.of }, lpb(), last + (E.OFF_END and 0 or 1))
+          end
+        end
+      end
+    end
     if op == 'c' then V.mode = 'insert' end
   elseif op == 'y' then
     V.regs['"'] = E.yank(heads, lpb(), r0, f0); edited = false
