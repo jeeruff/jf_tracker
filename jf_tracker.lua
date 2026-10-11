@@ -12696,6 +12696,7 @@ local function frame()
       else state.ss_zone = nil end
       -- 10 окт: свойства — отдельный модуль props; видим — вкладка item отдаёт волне всю ширину
       ctx.sp_sel = sel_e
+      state.sp_none = sel_e == nil   -- 11 окт: нет сэмпла — панели properties нет (раскладка прячет)
       if state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops') then
         SPROP.hover_tab = nil
         return SL.draw_in(U, L, x, y, w, h, e, col and col.track, zone)
@@ -12726,7 +12727,7 @@ local function frame()
     end,
     sprops_draw = function(Lx, x, y, w, h)
       local se = ctx.sp_sel
-      if not se then U.text(x, y, ctx.fit('properties: open an instrument in the item tab', w), U.GREY); SPROP.hover = nil; return end
+      if not se then SPROP.hover = nil; return end   -- 11 окт: без сэмпла панель спрятана; подпись не дублирует заголовок
       if se.file then
         local _, _, ppath = PV.position()
         SPROP.draw_info(Lx, x, y, w, h, ctx.file_info(se.path), ppath == se.path)

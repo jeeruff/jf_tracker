@@ -319,6 +319,7 @@ function D.panes_layout(state, L, nregions, ncols)
   -- 10 окт: properties — только когда вкладка item активна в своём стеке
   local it = 0
   do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
+  if state.sp_none then it = 0 end                      -- 11 окт: сэмпла нет — нечего показывать
   if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
     return D.pn_lay
   end
@@ -2405,7 +2406,7 @@ local function draw_topbar(L, info)
       if mx >= wx and mx < wx + ww and my >= wy and my < wy + wh then hover.sample = e end
     else
       -- пустой трек: запись — во вкладке rec (3 окт: кнопки [rec] здесь больше нет)
-      text(sx0, cy0 + 1, 'no instrument - the rec tab records one', U.GREY)
+      text(sx0, cy0 + 1, 'no instrument - select one in the lib, or record one in the rec tab', U.GREY)
     end
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK

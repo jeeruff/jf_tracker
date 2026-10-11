@@ -724,7 +724,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   S.ap_hot = false
   if not e then
     -- пустой трек: запись — во вкладке rec (3 окт)
-    U.text(x, y + 1, ctx.fit('no instrument - the rec tab records one', w), U.GREY)
+    U.text(x, y + 1, ctx.fit('no instrument - select one in the lib, or record one in the rec tab', w), U.GREY)
     return nil
   end
   -- 9 окт: свежий файл (только записан / склеен) — пиков ещё нет или они
