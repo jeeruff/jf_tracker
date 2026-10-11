@@ -632,6 +632,8 @@ function M.build(lpb)
   all = ordered
   snap.pool = all
   for _, col in ipairs(snap.cols) do col.pool = all end
+  -- 11 окт: мастер — тот же общий пул (курсор на его Tempo / cmd: lib, swap и пр. читали nil и роняли трекер)
+  if snap.master then snap.master.pool = all end
   -- номер инструмента по item (показывается в строке имени ячейки)
   local by_key = {}
   for i, e in ipairs(all) do by_key[e.gkey] = i end

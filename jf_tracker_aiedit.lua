@@ -155,6 +155,9 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
     press = false
   end
   local gx, gy, gw, gh = x + L.pad + 4, y + 2 * L.rh + 6, w - 2 * L.pad - 8, h - 2 * L.rh - 10
+  -- 11 окт: линейка над графиком — такты.доли по времени проекта
+  local ruler_y = gy
+  gy, gh = gy + L.rh + 2, gh - L.rh - 2
   if gw < 20 or gh < 12 then return nil end
   -- несколько пулов (6 окт): стопка узких лейнов; правится активный,
   -- клик по другому делает активным его (A.on_pick)
@@ -216,6 +219,34 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
         U.set(math.abs(q - math.floor(q + 0.5)) < 1e-9 and U.LINE or U.DIM); gfx.rect(px, gy, 1, gh, 1)
         q = q + A.grid
       end
+    end
+  end
+  -- линейка: доли — риска, такты — подпись ярче; подписи не налезают
+  do
+    local q0, q1 = tq(t0), tq(t1)
+    local per = (q1 - q0) / math.max(1, gw)              -- QN на пиксель
+    local step = 1
+    while step / per < U.measure('88.8') + 6 and step < 64 do step = step * 2 end
+    U.set(U.PANEL); gfx.rect(gx, ruler_y, gw, L.rh + 1, 1)
+    local last_r = -1e9
+    local q = math.ceil(q0 - 1e-9)
+    while q <= q1 + 1e-9 do
+      local px = X(qt(q))
+      local tm = R.TimeMap2_QNToTime(0, q)
+      local _, mi = R.TimeMap2_timeToBeats(0, tm)
+      local _, qms = R.TimeMap_QNToMeasures(0, q + 1e-6)
+      local bar_start = qms and math.abs(qms - q) < 1e-6
+      local beat = qms and (math.floor(q - qms + 0.5) + 1) or 1
+      U.set(bar_start and U.GREY or U.DIM); gfx.rect(px, ruler_y + L.rh - 3, 1, 4, 1)
+      if (q - math.ceil(q0 - 1e-9)) % step == 0 or bar_start then
+        local lab = bar_start and tostring((mi or 0) + 1) or (((mi or 0) + 1) .. '.' .. beat)
+        local lw = U.measure(lab)
+        if px + 2 > last_r + 4 and px + 2 + lw <= gx + gw then
+          U.text(px + 2, ruler_y, lab, bar_start and U.TEXT or U.GREY)
+          last_r = px + 2 + lw
+        end
+      end
+      q = q + 1
     end
   end
   U.set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
