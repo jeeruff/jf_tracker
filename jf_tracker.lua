@@ -8164,11 +8164,14 @@ ctx = {
   -- GetPresetIndex); список имён — из файлов REAPER presets/: заводские
   -- [factory] в *-builtin.ini и свои [PresetN] Name= в *.ini; выбор — по имени
   fx_preset = function(f)
-    local t = dsp_target(); if not (t and f) or model.is_take(t.track) then return nil end
-    local idx, cnt = reaper.TrackFX_GetPresetIndex(t.track, f.i)
-    local ok, nm = reaper.TrackFX_GetPreset(t.track, f.i, '')
-    if (cnt or 0) <= 0 and not (ok and nm ~= '') then return nil end
-    return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt }
+    -- 11 окт: стандарт (как у slixer) — строка < пресет > у каждого эффекта, и у take FX;
+    -- пресетов нет — «no preset» (< > всё равно листают то, что есть у самого плагина)
+    local t = dsp_target(); if not (t and f) or f.container then return nil end
+    local A = model.fxapi(t.track)
+    local idx, cnt = A.GetPresetIndex(t.track, f.i)
+    local ok, nm = A.GetPreset(t.track, f.i, '')
+    local has = (cnt or 0) > 0 or (ok and nm ~= '')
+    return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt, none = not has }
   end,
   preset_cache = {},
   -- Airwindopedia (4 окт): категория и первая фраза описания плагина Airwindows
@@ -8274,7 +8277,7 @@ ctx = {
     return out
   end,
   preset_names = function(tr, fx)
-    local _, ident = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'fx_ident')
+    local _, ident = model.fxapi(tr).GetNamedConfigParm(tr, fx, 'fx_ident')
     ident = ident or ''
     if ctx.preset_cache[ident] then return ctx.preset_cache[ident] end
     -- 7 окт: «reaeq.vst.dylib» — срезаются ВСЕ расширения (было только последнее:
@@ -8315,11 +8318,12 @@ ctx = {
     return names
   end,
   dsp_preset = function(k, what)
-    local t, f = ctx.dsp_fx(k); if not f or model.is_take(t.track) then return end
+    local t, f = ctx.dsp_fx(k); if not f then return end
+    local A = model.fxapi(t.track)
     if what == 'prev' or what == 'next' then
-      reaper.TrackFX_NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
-      local _, nm = reaper.TrackFX_GetPreset(t.track, f.i, '')
-      vim.msg = f.name .. ': ' .. (nm or '')
+      A.NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
+      local _, nm = A.GetPreset(t.track, f.i, '')
+      vim.msg = f.name .. ': ' .. ((nm and nm ~= '') and nm or 'no presets in the plugin')
       return
     end
     local names = ctx.preset_names(t.track, f.i)
@@ -8327,7 +8331,7 @@ ctx = {
     local items = {}
     for _, nm in ipairs(names) do items[#items + 1] = { label = nm, data = nm } end
     vim.open_picker('preset of ' .. f.name, items, function(it)
-      local ok = reaper.TrackFX_SetPreset(t.track, f.i, it.data)
+      local ok = A.SetPreset(t.track, f.i, it.data)
       vim.msg = ok and (f.name .. ': ' .. it.data) or (f.name .. ': could not load ' .. it.data)
     end)
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }

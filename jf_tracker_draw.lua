@@ -5546,7 +5546,7 @@ function D.frame(L, snap, rows, state, info)
         for _, pp in ipairs(parts) do
           local hot = not drag and mx >= pp[3] and mx < pp[3] + pp[4] and my >= by + 1 and my < by + L.rh
           if hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(pp[3], by + 1, pp[4], L.rh - 1, 1); hover.dspbtn = { fx = k, f = f, what = pp[2] }; on_btn = true end
-          text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and U.CYAN or U.GREY))
+          text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and (pre.none and U.GREY or U.CYAN) or U.GREY))
         end
         tw = tw - ptw - L.pad
       end
