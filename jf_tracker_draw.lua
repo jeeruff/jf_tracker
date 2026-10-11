@@ -415,6 +415,9 @@ function D.layout(snap, state, nregions)
     t.x_del = xx; t.sub_w = xx + L.w_del + L.pad
     L.GL[3 + k] = setmetatable(t, { __index = L })
   end
+  -- 11 окт: wave only — аудио-подколонка полосой волны; ширина по зуму трека (кэш по ширине)
+  L.GW = {}
+  L.waveonly_on = state.waveonly and not state.textonly   -- не wave_only: его унаследовали бы все геометрии (__index = L)
   L.env_hex_w = ms(state.envfmt == 'hex' and 'FF' or '127')   -- формат значений (6 окт)
   L.env_bar_w = ms('WWWW')
   -- поле формы сегмента (2 окт): lin sqr slo fas fae bez — справа от значения
@@ -682,6 +685,13 @@ function D.layout(snap, state, nregions)
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
+          if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
+            -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
+            local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
+            L.GW[ww] = L.GW[ww] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, w_wave = ww, x_wave = L.pad,
+              wave = state.wavemode == 'column' and 'spec' or 'peaks', x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
+            G = L.GW[ww]
+          end
           local sw = G and G.sub_w or L.sub_w
           ln.sx[si] = off
           L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
@@ -1274,6 +1284,15 @@ local EMPTY = { '...', '..', '..' }
 local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '...' end
 
 local function draw_cell(L, cell, x, y, ty, inv)
+  -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
+  if L.wave_only then
+    if D.cur_box then D.cur_box(); D.cur_box = nil end
+    local head = cell and (cell.kind == 'cont' and cell.of or cell)
+    if head and head.kind == 'audio' then draw_wave(L, head, cell.kind == 'cont' and cell.i or 0, x, y, head.muted, false)
+    elseif head and head.note then text(x + L.pad, ty, head.note, U.TEXT)   -- нота MIDI в аудио-подколонке — как есть
+    else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
+    return
+  end
   local function c(fld, col) return (inv == fld) and U.BG or col end
   -- инверсное поле: текст с непрозрачной подложкой цвета заливки
   local text_ = text

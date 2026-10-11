@@ -42,6 +42,27 @@ for _, sc in ipairs({ 1, 2, 4 }) do
   local ok3, L3 = pcall(D.layout, snap, state, 0)
   eq(ok3 and L3.flat[2].folded, true, 'mini fold x' .. sc)
 end
+-- 11 окт: wave only — аудио-подколонка полосой волны, MIDI рядом как была; зум трека расширяет
+do
+  local ca = col('AU', 2); ca.lanes[1].audio_sub = { true }
+  local s2 = { cols = { ca, col('M', 1) } }
+  local state = { fontscale = 2, folds = {}, fxcols = 1, envs = false, hscroll = 1, wave = 'off', waveonly = true }
+  D.set_font(state)
+  local ok, L = pcall(D.layout, s2, state, 0)
+  eq(ok, true, 'wave only layout ' .. tostring(not ok and L or ''))
+  if ok then
+    eq(L.flat[1].G and L.flat[1].G.wave_only, true, 'audio sub is a wave strip')
+    eq(L.flat[2].G and L.flat[2].G.wave_only or nil, nil, 'second (MIDI) sub stays')
+    eq(L.flat[1].w < L.flat[3].w, true, 'wave strip narrower than a normal column')
+    local w0 = L.flat[1].w
+    state.wlevel = { AU = 4 }
+    local ok2, L2 = pcall(D.layout, s2, state, 0)
+    eq(ok2 and L2.flat[1].w > w0, true, 'track zoom widens the strip')
+  end
+  state.textonly = true
+  local ok3, L3 = pcall(D.layout, s2, state, 0)
+  eq(ok3 and (L3.flat[1].G and L3.flat[1].G.wave_only or nil), nil, 'text only wins')
+end
 -- PT-mode (3 окт): ровно 4 канала, без огибающих и свёрток, x4 разрешён
 do
   local cols6 = {}
