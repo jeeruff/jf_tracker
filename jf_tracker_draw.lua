@@ -5609,8 +5609,15 @@ function D.frame(L, snap, rows, state, info)
             local gw = math.max(5, ms('A')); local gh = math.max(5, TH() - 4)
             local gx = kx + math.floor((kb - gw) / 2); local gy = by + 1 + math.floor((L.rh - 1 - gh) / 2)
             local cx = gx + math.floor(gw / 2)
-            set(bc)
-            gfx.line(gx, gy + gh - 1, cx, gy, 0); gfx.line(cx, gy, gx + gw - 1, gy + gh - 1, 0); gfx.line(gx, gy + gh - 1, gx + gw - 1, gy + gh - 1, 0)
+            -- 11 окт: знак — закрашенный ярко-жёлтый треугольник, поверх чёрный «!» (контрастно в любой теме)
+            gw = math.max(gw, 7); gx = kx + math.floor((kb - gw) / 2); cx = gx + math.floor(gw / 2)
+            gfx.set(1, 0.84, 0.1, (hot or lit) and 1 or 0.85)
+            gfx.triangle(gx, gy + gh - 1, cx, gy, gx + gw - 1, gy + gh - 1)
+            gfx.set(0, 0, 0, 1)
+            local ey0, ey1 = gy + math.floor(gh * 0.35), gy + gh - 4
+            gfx.rect(cx, ey0, 1, math.max(1, ey1 - ey0), 1)
+            gfx.rect(cx, gy + gh - 2, 1, 1, 1)
+            gfx.a = 1
           else text(kx + L.pad, by + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
         end

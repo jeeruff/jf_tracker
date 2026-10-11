@@ -241,7 +241,13 @@ function S.roll(t, is_end, force)
   if not force and now - (S.roll_t or 0) < S.RW then return end
   S.roll_t = now
   local a, b
-  if is_end then a, b = math.max(0, t - S.RW), t else a, b = t, math.min(S.entry.len, t + S.RW) end
+  -- 11 окт: кусок не длиннее самого слайса — короткий слайс (0.07 с) не залезает в соседний
+  local prev, nxt = 0, S.entry.len
+  for _, u in ipairs(S.slices or {}) do
+    if u < t - 1e-6 and u > prev then prev = u end
+    if u > t + 1e-6 and u < nxt then nxt = u end
+  end
+  if is_end then a, b = math.max(prev, t - S.RW), t else a, b = t, math.min(nxt, t + S.RW) end
   if b > a then ctx.preview_slice(S.track, S.entry, a, b) end
 end
 -- тянется ли конец выбранного слайса (линия = конец зоны)

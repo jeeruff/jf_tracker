@@ -229,9 +229,15 @@ end
 
 -- звать каждый кадр
 function P.tick()
+  local now = R.time_precise()
+  local dt = math.min(0.05, now - (P.last_tick or now))   -- длина кадра (defer ~30 Гц)
+  P.last_tick = now
   if cur and P.stop_pos then
     local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
-    if ok and pos >= P.stop_pos - 0.002 then audio_stop_at = nil; stop_audio() end
+    -- 11 окт: стоп с упреждением на полкадра — иначе короткий слайс (70 мс) проигрывал до 30 мс соседнего
+    local ok2, rate = R.CF_Preview_GetValue(cur, 'D_PLAYRATE')
+    local lead = 0.5 * dt * ((ok2 and rate and rate > 0) and rate or 1)
+    if ok and pos >= P.stop_pos - 0.002 - lead then audio_stop_at = nil; stop_audio() end
   end
   if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio() end
   if stop_at and R.time_precise() >= stop_at then
