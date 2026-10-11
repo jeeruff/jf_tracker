@@ -2466,7 +2466,9 @@ local function draw_ctrl(L, info, H, hover)
       set(on and U.AMBER or ((hot or kbd) and U.AMBER or U.LINE)); gfx.rect(x, y, colw - 2, L.rh, 0)
       if hot then hover.ctrl = it[1] end
       D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
-      text(x + 3, y + 1, fit(it[2], colw - 6), on and U.BG or ((hot or kbd) and U.AMBER or U.GREY))
+      -- 11 окт: тёмный текст на жёлтом — с подложкой (при масштабе текст кладётся сложением, чёрный пропадал)
+      if on then text(x + 3, y + 1, fit(it[2], colw - 6), U.BG, U.AMBER)
+      else text(x + 3, y + 1, fit(it[2], colw - 6), (hot or kbd) and U.AMBER or U.GREY) end
       hint('ctrl', x, y, colw, L.rh, it[1])
       return
     end
