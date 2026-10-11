@@ -5567,7 +5567,20 @@ ctx = {
       VZ.pnames = type(n) == 'table' and n or {}
     end
     local sl = ctx.visor_slot_at(vim.cur.row)
+    -- 11 окт: строки матрицы модуляций — мастер и треки песни (GUID REAPER), макросы
+    local trs = {}
+    if ctx.vz_trk_cc ~= reaper.GetProjectStateChangeCount(0) then
+      ctx.vz_trk_cc = reaper.GetProjectStateChangeCount(0)
+      ctx.vz_trks = { { g = reaper.GetTrackGUID(reaper.GetMasterTrack(0)), name = 'master' } }
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, i)
+        local _, nm = reaper.GetTrackName(tr)
+        if not model.is_lib_name(nm) then ctx.vz_trks[#ctx.vz_trks + 1] = { g = reaper.GetTrackGUID(tr), name = nm } end
+      end
+    end
+    trs = ctx.vz_trks
     return { on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb,
+             tracks = trs, macros = ctx.visor_macros and ctx.visor_macros() or 0,
              scene = sl, scene_has = sl and VZ.st.scenes[sl] ~= nil }
   end,
   -- файлы шейдеров / эффектов (один раз за сессию)

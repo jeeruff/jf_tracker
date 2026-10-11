@@ -99,4 +99,34 @@ eq(VZ.click({ kind = 'preset', i = 3, name = 'c' }).name, 'c', 'click on a card'
 eq(VZ.click({ kind = 'pnext' }).dir, 1, '> next')
 VZ.click({ kind = 'pgal' }); eq(VZ.gal, true, 'click on the name toggles the gallery'); VZ.gal = false
 local sc2 = VZ.scene_take(); VZ.st.preset = nil; VZ.scene_apply(sc2); eq(VZ.st.preset, 'b', 'scene keeps the preset name')
+-- 11 окт: матрица модуляций — общие источники, сила в клетке
+do
+  local row = { ty = 'f', min = 0, max = 10, name = 'speed', key = 'speed' }
+  local p = { v = 5, mods = { L1 = 0.5 } }
+  VZ.st.lfos = VZ.default_lfos()
+  -- LFO 1 (sin): фаза 0.25 — максимум волны (+0.5)
+  local w = VZ.wave(0, 0.25) - 0.5
+  near(VZ.eval(row, p, 0.25 / 0.5, nil), 5 + w * 0.5 * 10, 'L1 moves the value by depth * span')
+  p.mods = { ['T:g1'] = 1 }
+  near(VZ.eval(row, p, 0, function() return 0.3 end), 8, 'track peak adds peak * depth * span')
+  p.mods = { M1 = -0.5 }; VZ.env_macro = function() return 1 end
+  near(VZ.eval(row, p, 0, nil), 0, 'macro with negative depth pulls down (clamped at min)')
+  VZ.env_macro = nil
+  local srcs = VZ.sources({ tracks = { { g = 'g1', name = 'drums' } }, macros = 2 })
+  eq(#srcs, 7, 'sources: 4 LFO + 1 track + 2 macros')
+  eq(srcs[5].id, 'T:g1', 'track source id')
+  -- клавиши: слой с параметром, M — вид матрицы, 5 — 0.5, + — шаг, ~ — знак, x — убрать
+  VZ.st.layers = { { fn = 'x.fs', on = true, fade = 1, p = {} } }
+  VZ.rows = function() return { row } end
+  VZ.sel, VZ.mxv, VZ.mr, VZ.mc = 1, false, 1, 1
+  local env = { tracks = {}, macros = 0 }
+  VZ.last_env = env
+  eq(VZ.key(('M'):byte()), true, 'M opens the matrix'); eq(VZ.mxv, true, 'matrix view on')
+  VZ.key(('5'):byte()); near(VZ.st.layers[1].p.speed.mods.L1, 0.5, '5 sets depth 0.5')
+  VZ.key(('+'):byte()); near(VZ.st.layers[1].p.speed.mods.L1, 0.55, '+ steps 0.05')
+  VZ.key(('~'):byte()); near(VZ.st.layers[1].p.speed.mods.L1, -0.55, '~ flips the sign')
+  VZ.key(('x'):byte()); eq(VZ.st.layers[1].p.speed.mods.L1, nil, 'x clears the route')
+  VZ.mc = 0; VZ.key(('w'):byte()); eq(VZ.st.lfos[1].sh, 1, 'w on the LFO label - next shape')
+  VZ.key(27); eq(VZ.mxv, false, 'Esc leaves the matrix')
+end
 print(('test_visor: %d checks, %d failed'):format(n, bad))

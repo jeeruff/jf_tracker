@@ -38,9 +38,15 @@ VZ.heads = {}       -- путь → разобранные входы (кэш, f
 VZ.cache = {}       -- последние отданные значения ExtState (пишем только изменения)
 VZ.dirty = false    -- модель изменилась — main сохранит в проект
 
+-- 11 окт: матрица модуляций — общие источники: 4 LFO (своя форма и частота), пики треков, макросы
+function VZ.default_lfos() return { { sh = 0, hz = 0.5 }, { sh = 1, hz = 0.25 }, { sh = 2, hz = 1 }, { sh = 3, hz = 2 } } end
+VZ.mxv = false      -- вид матрицы вместо параметров (M)
+VZ.mr, VZ.mc = 1, 1 -- курсор матрицы: строка источника, колонка параметра (0 — подпись источника)
+VZ.mcs = 0          -- прокрутка колонок
+VZ.env_macro = nil  -- значение макроса k (0..1) — main кладёт в кадре
 local function new_state()
   return { layers = {}, fx = {}, master = { p = {} }, blend = 'normal', follow = true, scenes = {},
-           scale = 0.3, fps = 60 }
+           scale = 0.3, fps = 60, lfos = VZ.default_lfos() }
 end
 VZ.st = new_state()
 
@@ -253,6 +259,13 @@ end
 
 -- значение float-параметра в момент t; peak(guid) → 0..1
 function VZ.eval(row, p, t, peak)
+  local v = VZ.eval1(row, p, t, peak)
+  if type(p.mods) ~= 'table' or next(p.mods) == nil or type(v) ~= 'number' then return v end
+  local span = row.max - row.min
+  for src, amt in pairs(p.mods) do v = v + VZ.src_val(src, t, peak) * amt * span end
+  return math.min(math.max(v, row.min), row.max)
+end
+function VZ.eval1(row, p, t, peak)
   local v, m = p.v, p.m
   if type(m) ~= 'table' then return v end
   local span = row.max - row.min
@@ -263,6 +276,21 @@ function VZ.eval(row, p, t, peak)
     out = v + ((peak and m.g and peak(m.g)) or 0) * (m.amt or 1) * span
   end
   return math.min(math.max(out, row.min), row.max)
+end
+-- значение источника матрицы сейчас: LFO -0.5..0.5, пик трека и макрос 0..1
+function VZ.src_val(src, t, peak)
+  local k = tostring(src)
+  local li = tonumber(k:match('^L(%d)$'))
+  if li then
+    local l = (VZ.st.lfos or {})[li]
+    if not l then return 0 end
+    return VZ.wave(l.sh or 0, ((t or 0) * (l.hz or 0.5)) % 1) - 0.5
+  end
+  local g = k:match('^T:(.+)$')
+  if g then return (peak and peak(g)) or 0 end
+  local mi = tonumber(k:match('^M(%d+)$'))
+  if mi then return (VZ.env_macro and VZ.env_macro(mi)) or 0 end
+  return 0
 end
 
 -- строка значений одного слоя / эффекта / master
@@ -331,6 +359,7 @@ function VZ.decode(s)
     if type(st.fx) ~= 'table' then st.fx = {} end
     if type(st.master) ~= 'table' then st.master = { p = {} } end
     if type(st.scenes) ~= 'table' then st.scenes = {} end
+    if type(st.lfos) ~= 'table' or #st.lfos < 4 then st.lfos = VZ.default_lfos() end
   end
   VZ.st = st
   VZ.cache = {}
@@ -478,6 +507,139 @@ function VZ.randomize(e)
   VZ.dirty = true
 end
 
+-- ── матрица модуляций (11 окт) ───────────────────────────────────────────
+-- строки — источники: L1..L4, пики треков (env.tracks), макросы M1..M16 (env.macros);
+-- колонки — числовые параметры выбранного слоя / эффекта / master; клетка — сила связи
+function VZ.sources(env)
+  local out = {}
+  for i, l in ipairs(VZ.st.lfos or {}) do
+    out[#out + 1] = { id = 'L' .. i, name = ('L%d %s %.2fHz'):format(i, VZ.SHAPES[l.sh or 0] or '?', l.hz or 0.5), lfo = i }
+  end
+  for _, t in ipairs(env and env.tracks or {}) do out[#out + 1] = { id = 'T:' .. t.g, name = t.name ~= '' and t.name or 'track', trk = t.g } end
+  for k = 1, (env and env.macros or 0) do out[#out + 1] = { id = 'M' .. k, name = ('M%d macro'):format(k), mac = k } end
+  return out
+end
+function VZ.mx_params(e)
+  local out = {}
+  for i, r in ipairs(e and e.rows or {}) do if r.ty == 'f' then out[#out + 1] = { row = r, i = i } end end
+  return out
+end
+-- клавиши матрицы: h j k l — курсор, + - — сила (Shift / fine — мелко), 1..9 — 0.1..0.9,
+-- 0 / x — убрать, ~ — знак; на подписи LFO: + - частота, w форма; J K — слой, M / Esc — назад
+function VZ.mx_key(c, fine, env)
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  local e = VZ.cur()
+  local srcs, pars = VZ.sources(env), VZ.mx_params(e)
+  VZ.mr = math.max(1, math.min(#srcs, VZ.mr))
+  VZ.mc = math.max(0, math.min(#pars, VZ.mc))
+  local src = srcs[VZ.mr]
+  if c == 27 or ch == 'M' then VZ.mxv = false; return true end
+  if ch == 'j' then VZ.mr = math.min(#srcs, VZ.mr + 1); return true end
+  if ch == 'k' then VZ.mr = math.max(1, VZ.mr - 1); return true end
+  if ch == 'l' then VZ.mc = math.min(#pars, VZ.mc + 1); return true end
+  if ch == 'h' then VZ.mc = math.max(0, VZ.mc - 1); return true end
+  if ch == 'J' then VZ.sel = math.min(#VZ.list(), VZ.sel + 1); return true end
+  if ch == 'K' then VZ.sel = math.max(1, VZ.sel - 1); return true end
+  if not src then return true end
+  if VZ.mc == 0 then
+    local l = src.lfo and VZ.st.lfos[src.lfo]
+    if l and (ch == '+' or ch == '=' or ch == '-') then l.hz = math.min(16, math.max(0.01, ch == '-' and l.hz / 1.25 or l.hz * 1.25)); VZ.dirty = true
+    elseif l and ch == 'w' then l.sh = ((l.sh or 0) + 1) % 7; VZ.dirty = true end
+    return true
+  end
+  local pc = pars[VZ.mc]
+  if not (pc and e and e.slot) then return true end
+  local p = VZ.param(e.slot, pc.row)
+  p.mods = type(p.mods) == 'table' and p.mods or {}
+  local a = p.mods[src.id] or 0
+  local d = tonumber(ch)
+  if ch == '+' or ch == '=' or ch == '-' then a = a + (ch == '-' and -1 or 1) * (fine and 0.01 or 0.05)
+  elseif ch == '~' then a = -a
+  elseif ch == 'x' or ch == '0' then a = 0
+  elseif d then a = d / 10
+  else return nil end
+  a = math.max(-2, math.min(2, math.floor(a * 100 + 0.5) / 100))
+  p.mods[src.id] = a ~= 0 and a or nil
+  VZ.dirty = true
+  return true
+end
+-- отрисовка матрицы в прямоугольнике (вместо параметров)
+function VZ.draw_matrix(L, U, x, y, w, h, focused, env, fit, hint)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local ms, pad, rh = U.measure, L.pad, L.rh
+  local e = VZ.cur()
+  local srcs, pars = VZ.sources(env), VZ.mx_params(e)
+  local hover
+  if not (e and e.slot) or #pars == 0 then
+    U.text(x, y, fit('matrix: pick a layer / effect with numeric parameters (J K)', w), U.GREY)
+    return nil
+  end
+  VZ.mr = math.max(1, math.min(#srcs, VZ.mr))
+  VZ.mc = math.max(0, math.min(#pars, VZ.mc))
+  local lw = math.min(ms('W') * 16, math.floor(w * 0.35))
+  local cw = ms('-0.00') + 2 * pad
+  local ncv = math.max(1, math.floor((w - lw) / cw))
+  if VZ.mc > VZ.mcs + ncv then VZ.mcs = VZ.mc - ncv end
+  if VZ.mc >= 1 and VZ.mc <= VZ.mcs then VZ.mcs = VZ.mc - 1 end
+  VZ.mcs = math.max(0, math.min(VZ.mcs, #pars - ncv))
+  -- заголовок: имена параметров (коротко), полное — в подсказке
+  for k = 1, ncv do
+    local pc = pars[VZ.mcs + k]
+    if not pc then break end
+    local cx = x + lw + (k - 1) * cw
+    local nm = pc.row.name .. (pc.row.axis and (pc.row.axis == 1 and '.x' or '.y') or '')
+    local on = VZ.mcs + k == VZ.mc
+    U.text(cx + pad, y, fit(nm, cw - pad), on and U.AMBER or U.GREY)
+    if mx >= cx and mx < cx + cw and my >= y and my < y + rh then hover = { kind = 'mxh', tip = 'parameter ' .. nm } end
+  end
+  local ty = y + rh + 2
+  local nrv = math.max(1, math.floor((y + h - ty) / rh))
+  VZ.mrs = VZ.mrs or 0
+  if VZ.mr > VZ.mrs + nrv then VZ.mrs = VZ.mr - nrv end
+  if VZ.mr <= VZ.mrs then VZ.mrs = math.max(0, VZ.mr - 1) end
+  for k = 1, nrv do
+    local si = (VZ.mrs or 0) + k
+    local src = srcs[si]
+    if not src then break end
+    local ry = ty + (k - 1) * rh
+    local sv = VZ.src_val(src.id, env.t or 0, env.peak)
+    local lv = src.lfo and (sv + 0.5) or sv
+    -- подпись источника + его уровень сейчас
+    local lab_on = si == VZ.mr and VZ.mc == 0
+    if si == VZ.mr then U.set(focused and U.mix(U.BG, U.TEXT, 0.10) or U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(x, ry, w, rh, 1) end
+    U.set(U.mix(U.CYAN, U.BG, 0.55)); gfx.rect(x, ry + rh - 3, math.max(1, math.floor(math.max(0, math.min(1, lv)) * (lw - pad))), 2, 1)
+    U.text(x + 2, ry, fit(src.name, lw - pad - 2), lab_on and U.AMBER or (src.lfo and U.CYAN or (src.mac and U.GREEN or U.TEXT)))
+    if mx >= x and mx < x + lw and my >= ry and my < ry + rh then
+      hover = { kind = 'mxcell', si = si, pc = 0, tip = src.lfo and ('LFO %d: + - rate, w shape; drag a cell: depth'):format(src.lfo) or (src.name .. ': level now - feeds the parameters it is routed to') }
+    end
+    for c2 = 1, ncv do
+      local pi = VZ.mcs + c2
+      local pc = pars[pi]
+      if not pc then break end
+      local cx = x + lw + (c2 - 1) * cw
+      local p = VZ.param(e.slot, pc.row)
+      local a = type(p.mods) == 'table' and p.mods[src.id] or nil
+      local on = si == VZ.mr and pi == VZ.mc
+      U.set(U.DIM); gfx.rect(cx, ry, cw - 1, rh, 0)
+      if a then
+        local mid = cx + math.floor(cw / 2)
+        local len = math.floor(math.min(1, math.abs(a)) * (cw / 2 - 2) + 0.5)
+        U.set(a > 0 and U.CYAN or U.AMBER)
+        if a > 0 then gfx.rect(mid, ry + 3, math.max(1, len), rh - 6, 1) else gfx.rect(mid - len, ry + 3, math.max(1, len), rh - 6, 1) end
+      end
+      if on then
+        U.set(focused and U.AMBER or U.LINE); gfx.rect(cx, ry, cw - 1, rh, 0)
+        if a then U.text(cx + pad, ry, fit(('%.2f'):format(a), cw - pad), U.TEXT, U.BG) end
+      end
+      if mx >= cx and mx < cx + cw and my >= ry and my < ry + rh then
+        hover = { kind = 'mxcell', si = si, pc = pi, tip = ('%s -> %s: %s - click: select, wheel: depth, 1..9 0.1..0.9, ~ sign, x clear'):format(src.name, pc.row.name, a and ('%.2f'):format(a) or 'off') }
+      end
+      if hint then hint('visor', cx, ry, cw - 1, rh, { kind = 'mxcell', si = si, pc = pi }) end
+    end
+  end
+  return hover
+end
+
 -- ── клавиши ─────────────────────────────────────────────────────────────
 -- j k — список, J K — параметр, h l — уровень слоя, H L — значение (Ctrl — мелко,
 -- main передаёт fine), Space — вкл / выкл, a — слой, e — эффект, Enter / r —
@@ -510,6 +672,10 @@ function VZ.key(c, fine)
     elseif ch == 'k' then VZ.gsel = math.max(1, VZ.gsel - cols); return true
     end
   end
+  if VZ.mxv then
+    local r = VZ.mx_key(c, fine, VZ.last_env)
+    if r ~= nil then return r end
+  elseif ch == 'M' then VZ.mxv = true; return true end
   if c == 27 then return { kind = 'leave' }
   elseif ch == 'j' then VZ.sel = math.min(#list, VZ.sel + 1); VZ.psel = 1; return true
   elseif ch == 'k' then VZ.sel = math.max(1, VZ.sel - 1); VZ.psel = 1; return true
@@ -602,6 +768,8 @@ function VZ.click(hv)
     else VZ.step(row, p, 1) end
     return true
   end
+  if hv.kind == 'mxcell' then VZ.mr, VZ.mc = hv.si, hv.pc; return true end
+  if hv.kind == 'mxtoggle' then VZ.mxv = not VZ.mxv; return true end
   if hv.kind == 'preset' then VZ.gsel = hv.i; return { kind = 'preset', name = hv.name } end
   if hv.kind == 'pgal' then
     VZ.gal = not VZ.gal
@@ -627,6 +795,11 @@ end
 -- колесо над параметром
 function VZ.wheel(hv, dir, fine)
   if not hv then return end
+  if hv.kind == 'mxcell' then
+    VZ.mr, VZ.mc = hv.si, hv.pc
+    VZ.mx_key((dir > 0 and '+' or '-'):byte(), fine, VZ.last_env)
+    return
+  end
   if hv.kind == 'param' then
     local e = VZ.cur()
     local row = e and e.rows and e.rows[hv.i]
@@ -694,6 +867,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   local ms = U.measure
   local hover
   env = env or {}
+  VZ.last_env = env
   local st = VZ.st
   local pad, rh = L.pad, L.rh
   -- верхняя строка: кнопки (буквами), не влезло — следующая строка
@@ -734,6 +908,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   b(st.blend == 'add' and 'add' or 'mix', st.blend == 'add', 'blend', 'how layers stack (b): mix - by fade, add - light adds up')
   b('scene', env.scene_has, 'scene_save', 'save everything as the scene of the cursor slot ' .. (env.scene or '') .. ' (s); with follow it comes back when the playhead enters the slot')
   b('follow', st.follow, 'follow', 'scenes follow the slot under the playhead (S)')
+  b('matrix', VZ.mxv, 'mxtoggle', 'modulation matrix (M): sources - LFO 1-4, track peaks, macros - into the parameters of the selected layer')
   b(('res %d%%'):format(math.floor((st.scale or 0.3) * 100 + 0.5)), false, 'res', 'render resolution of the page: click - next (lower is lighter for the GPU)')
   b(('fps %d'):format(st.fps or 60), false, 'fps', 'frame rate cap of the page: click - next')
   local top = by + rh + 4
@@ -797,6 +972,13 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
     if gh then hover = gh end
     if not wide then return hover end
     w = w - gw
+  end
+  -- 11 окт: матрица модуляций вместо параметров (M)
+  if VZ.mxv then
+    local mx0 = x + lw + pad
+    U.set(U.LINE); gfx.rect(mx0 - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)
+    local mh = VZ.draw_matrix(L, U, mx0, top, x + w - mx0 - pad, y + h - top, focused, env, fit, hint)
+    return mh or hover
   end
   -- справа: параметры выбранного
   local e = VZ.cur()
