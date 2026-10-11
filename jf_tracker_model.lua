@@ -676,7 +676,7 @@ function M.rows(row0, n, lpb)
     local beat = math.abs(qn - math.floor(qn + 0.5)) < 1e-6
     local bar = beat and qms and math.abs(qn - qms) < 1e-6
     out[i] = { row = row, qn = qn, t = t, bar = row >= 0 and bar, beat = row >= 0 and beat, measure = meas,
-               label = row >= 0 and string.format('%04d', row % 10000) or '' }   -- до начала (fixed cursor) — пусто
+               label = row >= 0 and string.format('%04d', row % 10000) or string.format('-%03d', (-row) % 1000) }   -- 11 окт: до начала проекта — с минусом (было пусто)
   end
   return out
 end

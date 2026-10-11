@@ -3121,7 +3121,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local cur = pool[inst]
   local nroots = 0
   for _, e in ipairs(pool) do if not e.parent then nroots = nroots + 1 end end
-  local head = ('lib %d'):format(nroots)                -- слайсы не считаются (вложены)
+  local head = ('%d sample%s'):format(nroots, nroots == 1 and '' or 's')   -- 11 окт: было «lib 2» — непонятно; слайсы не считаются (вложены)
   if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
   -- справа налево: sort (track / len / mark), find (fzf, 2 окт), bsync (3 окт);
   -- у каждой своя x (раньше sort рисовалась поверх find — от неё торчало «d»)
@@ -3151,6 +3151,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local bw2 = ms(blbl) + 2 * L.pad
   local bx2 = fx - bw2 - L.pad
   hbtn(bx2, bw2, blbl, on and true or false, U.CYAN, 'poolbsync')
+  -- 11 окт: порядок — снова кнопкой (по заголовкам колонок его не находили): sort track / name / len / mark / type
+  local slbl = 'sort ' .. sort
+  local sw2 = ms(slbl) + 2 * L.pad
+  local sx2 = bx2 - sw2 - L.pad
+  if sx2 > ix + L.pad + ms('0 samples') then hbtn(sx2, sw2, slbl, false, U.CYAN, 'poolsort'); bx2 = sx2 end
   sbx = bx2                                  -- заголовок обрезается до кнопок
   text(ix + L.pad, iy + 3, fit(head, sbx - ix - 2 * L.pad), U.GREY)
   -- внизу — два буквенных тоггла (2 окт): звук при выборе / звук при вставке
@@ -4972,7 +4977,15 @@ function D.frame(L, snap, rows, state, info)
               if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
             end
             local cell
-            if r.row < 0 or r.clip then
+            if r.clip then
+            elseif r.row < 0 then
+              -- 11 окт: до начала проекта — пустые ячейки точками, вдвое тусклее (видно, что это «минус»)
+              if not (c.chord or c.folded) then
+                local e0, u0 = D.EMPTY, D.EMPTY_UNDER
+                D.EMPTY = U.mix(U.BG, e0, 0.45); D.EMPTY_UNDER = D.EMPTY
+                draw_cell(f.G or L, nil, x, y, ty, inv)
+                D.EMPTY, D.EMPTY_UNDER = e0, u0
+              end
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end

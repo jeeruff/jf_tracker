@@ -255,6 +255,7 @@ local state = {
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
+  autoinst = reaper.GetExtState(EXT, 'autoinst') ~= '0',   -- 11 окт: курсор на треке — его инструмент (плагин или аудиоклип под курсором)
   automidi = reaper.GetExtState(EXT, 'automidi') ~= '0',   -- 10 окт: плагин-инструмент на треке с аудиовходом — вход на все MIDI
   hintpos = reaper.GetExtState(EXT, 'hintpos') == 'status' and 'status' or 'panes',   -- 10 окт: либо под каждым модулем, либо одной строкой внизу
   libtab = 'audio',
@@ -602,7 +603,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle', state.tpstyle or 'min'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -2687,7 +2688,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,autoinst,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -2704,6 +2705,7 @@ ctx = {
     end
     if q and not q:find('pianokeys', 1, true) then q = q:gsub('q_hints', 'q_hints,pianokeys', 1); state.quick = q end   -- 8 окт: keys — под hints
     if q and not q:find('title', 1, true) then local a, rest = q:match('^([^|]*)(|.*)$'); if a then q = a .. ',title' .. rest; state.quick = q end end   -- 8 окт: title — в конец левой колонки
+    if q and not q:find('autoinst', 1, true) and q:find('autofocus', 1, true) then q = q:gsub('autofocus', 'autofocus,autoinst', 1); state.quick = q end   -- 11 окт: auto instrument — под autofocus
     if q and q:find('dsp_big', 1, true) and not q:find('mixer', 1, true) then q = q:gsub('dsp_big', 'dsp_big,mixer', 1); state.quick = q end   -- 8 окт: mixer — под router
     if q and not q:find('dsp_big', 1, true) then
       q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
@@ -7637,6 +7639,7 @@ ctx = {
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
+      flag('autoinst', 'auto instrument', 'the cursor picks the instrument of its track: the audio clip under the cursor (or the last one above it), on a track without audio - its plugin instrument; choosing one by hand holds until the cursor reaches another clip or track'),
       flag('automidi', 'auto MIDI input', 'you play notes into a track with a plugin instrument but its input is audio - switch the input to all MIDI inputs (all channels) and turn monitoring on'),
       flag('waveinv', 'selection: inverse wave', 'the selected slice in the sample wave: off - its wave a bit brighter; on - inverse (a lit block, the wave cut out dark)'),
       flag('wavebar', 'wave scrollbar', 'when the sample wave is zoomed, the scrollbar under it shows the whole item as a small wave with the visible window; off - a plain thin scrollbar. Not zoomed - no scrollbar'),
@@ -7743,7 +7746,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'llm', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'llm', 'autoinst', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -9549,7 +9552,7 @@ local function hint_go(t)
   elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
-  elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'instrument order: ' .. state.poolsort
+  elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'name', name = 'len', len = 'mark', mark = 'type', type = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'lib order: ' .. state.poolsort
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
   elseif t.kind == 'mxname' then ctx.mx_name_prompt(d)
@@ -13119,7 +13122,7 @@ local function frame()
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
-  elseif hover.poolsort then state.status = 'instrument order: track (groups by first track, then length) / len / mark (@ $ *) - click to cycle; numbers stay'
+  elseif hover.poolsort then state.status = 'lib order: track (groups by the first track that plays it) / name / len / mark (@ $ *) / type - click to cycle (or click a column head); numbers stay'
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
@@ -13820,8 +13823,8 @@ local function frame()
       click = { t = now2, zone = 'poolsortcol' }
     elseif hover.poolsort then
       ctx.set_focus('inst')
-      state.poolsort = ({ track = 'len', len = 'mark', mark = 'track' })[state.poolsort or 'track'] or 'track'
-      vim.msg = 'instrument order: ' .. state.poolsort
+      state.poolsort = ({ track = 'name', name = 'len', len = 'mark', mark = 'type', type = 'track' })[state.poolsort or 'track'] or 'track'
+      vim.msg = 'lib order: ' .. ({ track = 'by track (tree: each track, its samples, their slices)', mark = 'marks @ $ *', name = 'name', len = 'length', type = 'type: audio / midi / video' })[state.poolsort]
       click = { t = now2, zone = 'poolsort' }
     elseif hover.garden then
       ctx.set_focus('top')
@@ -15554,6 +15557,43 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
+  -- 11 окт: auto instrument — трек / клип под курсором сменились: инструмент lib — его
+  -- (аудио: клип под курсором или последний выше; без аудио — плагин-инструмент трека);
+  -- ручной выбор держится, пока курсор не дошёл до другого клипа или трека
+  local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
+  if aipos and aipos ~= ctx.autoinst_pos and state.focus == 'tracker' and L and L.flat and snap then
+    ctx.autoinst_pos = aipos                          -- искать только когда курсор / снимок сменились
+    local f = L.flat[vim.cur.fi]
+    local col = f and f.col
+    if col and col.guid then
+      local item
+      if f.sub then
+        for r = vim.cur.row, math.max(0, vim.cur.row - 2048), -1 do
+          local cell = f.sub[r]
+          if cell and cell.kind == 'cont' then cell = cell.of end
+          if cell and cell.item then item = cell.item; break end
+        end
+      end
+      local key = col.guid .. ':' .. tostring(item)
+      if ctx.autoinst_last ~= key then
+        ctx.autoinst_last = key
+        local n = item and snap.inst_of and snap.inst_of[item]
+        local pool = col.pool or {}
+        local pe = n and pool[n]
+        if pe and pe.parent then for i, e in ipairs(pool) do if e == pe.parent then n = i; break end end end
+        if not n and #ctx.track_insts(col) > 0 then
+          n = #pool + draw.empty_slots(#pool) + 1
+          local fx = ctx.inst_fx(col)
+          for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then n = #pool + draw.empty_slots(#pool) + k end end
+        end
+        if n and n ~= vim.inst then
+          local pp = state.poolprev; state.poolprev = false   -- без прослушки: курсор просто ходит
+          pool_select(n)
+          state.poolprev = pp
+        end
+      end
+    end
+  end
   -- autofocus (6 окт): курсор клавиатуры сменил ячейку — показать её модуль
   if state.autofocus and state.focus == 'tracker' and L and L.flat then
     local k = vim.cur.fi .. ':' .. vim.cur.row
