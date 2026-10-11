@@ -32,6 +32,7 @@ PN.PANELS = {
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
   { id = 'sprops',     label = 'properties', key = 'e', hint = 'sprops',  side = 'right', avail = 'itemtab' },   -- 10 окт: свойства item / слайса — свой модуль (был справа во вкладке item)
+  { id = 'mixer',      label = 'mixer',      key = 'x', hint = 'tracker', side = 'bottom', avail = 'mixer' },   -- 11 окт: нижний микшер — свой модуль (полоски под колонками треков)
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)
@@ -72,7 +73,7 @@ function PN.DEFAULT()
       node('v', { 0.3, 0.7 }, leaf('ctrl'), leaf('matrix')),
       node('v', { 0.22, 0.60, 0.18 },
         tabs,
-        leaf('tracker'),
+        node('v', { 0.72, 0.28 }, leaf('tracker'), leaf('mixer')),   -- 11 окт: микшер — модуль под трекером
         leaf('dsp')),
       -- 9 окт: browser | pm | fx — один стек справа внизу
       node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'))),

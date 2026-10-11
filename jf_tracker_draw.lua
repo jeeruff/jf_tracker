@@ -321,16 +321,18 @@ function D.panes_layout(state, L, nregions, ncols)
   local m = state.panes
   local H = gfx.h - L.status_h
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
+  local mxa = (state.mixer and state.mixpos == 'bottom') and 1 or 0
   -- 10 окт: properties — только когда вкладка item активна в своём стеке
   local it = 0
   do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
   if state.sp_none then it = 0 end                      -- 11 окт: сэмпла нет — нечего показывать
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
   s.ab = state.tababc and 1 or 0
   s.it = it
+  s.mxa = mxa
   s.hi = (state.hints and state.hintpos ~= 'status') and 1 or 0
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
@@ -338,12 +340,16 @@ function D.panes_layout(state, L, nregions, ncols)
   M.hint_h = (state.hints and state.hintpos ~= 'status') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
-  M.minh = function(id) if id == 'sample' and D.sprops_rows then return (math.ceil(D.sprops_rows / 2) + 1) * L.rh + 2 * L.rh + 10 end end
+  M.minh = function(id)
+    if id == 'sample' and D.sprops_rows then return (math.ceil(D.sprops_rows / 2) + 1) * L.rh + 2 * L.rh + 10 end
+    if id == 'mixer' then return 8 * L.rh end           -- 11 окт: фейдер и кнопки читаемы
+  end
   M.avail = function(id)
     local p = D.panes.BY[id]
     local a = p and p.avail
     if a == 'itemtab' then return it == 1 end
     if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
+    if a == 'mixer' then return mxa == 1 end            -- 11 окт: модуль mixer — когда микшер включён и он снизу
     return true
   end
   D.pn_lay = D.panes.layout(m, gfx.w, H, M)
@@ -639,10 +645,21 @@ function D.layout(snap, state, nregions)
     local zoomed_other = state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker'
     L.sess_h = (state.clipsview and not zoomed_other) and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
     L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
+    -- 11 окт: модуль mixer — полоски рисуются в его листе (по колонкам трекера), в теле трекера места не берут
+    local mxl = L.mix_bottom and lay.by_panel.mixer
+    local mxr = mxl and mxl.content
+    if mxr then L.low_h = L.low_h - L.mix_h; L.mix_h = 0 end
     L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
     L.mix_y = L.body_y + L.body_h
     L.route_y = L.mix_y
     L.hsb_y = L.mix_y + L.mix_h
+    L.mix_pane = mxr or nil
+    if mxr then
+      L.route_h = math.min(L.route_h, math.max(0, mxr.h - 6 * L.rh))
+      L.mix_y, L.mix_h = mxr.y, mxr.h
+      L.mix_rows = math.max(4, math.floor((mxr.h - 4 - L.route_h) / L.rh))
+      L.route_y = L.mix_y
+    end
     L.piano_y = L.hsb_y + L.hsb_h
     if L.tppos == 'top' then L.piano_y = tr.y elseif L.tppos == 'bottom' then L.piano_y = bot - L.tp_h end
     L.stat_y = L.body_y + L.body_h + L.low_h
@@ -3750,7 +3767,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       end
     elseif id then
       local ct = c.content
-      set(U.PANEL); gfx.rect(c.x, c.y, c.w, c.h, 1)
+      -- 11 окт: mixer — полоски уже нарисованы трекером (раньше оболочки): фон только под подписью
+      set(U.PANEL); gfx.rect(c.x, c.y, c.w, id == 'mixer' and math.max(0, ct.y - c.y) or c.h, 1)
       -- верхняя линия рамки и подписи на ней
       local fon = focused(id)
       if c.tab then
@@ -3861,7 +3879,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           th = nil
         end
         if inside and type(th) == 'table' then for k, v in pairs(th) do if k ~= 'tab' then hover[k] = v end end end
-      else
+      elseif id ~= 'mixer' then
         text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)
       end
       D.clip = nil
@@ -3956,6 +3974,8 @@ function D.frame(L, snap, rows, state, info)
   end
 
   D.pmark('draw: track headers')
+  -- 11 окт: модуль mixer — фон его листа до полосок (оболочка листов рисуется позже и его не трогает)
+  if L.mix_pane then set(U.PANEL); gfx.rect(L.mix_pane.x, L.mix_pane.y, L.mix_pane.w, L.mix_pane.h, 1) end
   -- заголовок
   local hy = L.header_y
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)

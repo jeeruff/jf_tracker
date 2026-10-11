@@ -328,6 +328,12 @@ if state.panes and reaper.GetExtState(EXT, 'sprops_init') ~= '1' then
   end
   reaper.SetExtState(EXT, 'sprops_init', '1', true)
 end
+-- 11 окт: микшер — свой модуль; один раз поставить его под трекер (дальше — как пользователь разложит)
+if state.panes and reaper.GetExtState(EXT, 'mixer_init') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'mixer') then PNm.split(state.panes, 'tracker', 'mixer', 'd', 0.28) end
+  reaper.SetExtState(EXT, 'mixer_init', '1', true)
+end
 -- 9 окт (миграция 7): старый F3 раскрыл скрытые вкладки отдельными панелями —
 -- вкладка своей панелью (одна в листе) снова скрыта; стек вкладок не трогаем
 if state.panes and reaper.GetExtState(EXT, 'panes_mig7') ~= '1' then
@@ -9521,6 +9527,7 @@ ctx = {
     relayout()
   end,
   set_focus = function(f)
+    if f == 'mixer' then f = 'tracker' end              -- 11 окт: модуль mixer — часть трекера (полоски его колонок, клавиши — трекера)
     -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
     if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' and f ~= 'slices' then return end   -- 10 окт: и список слайсов — щелчок даёт фокус (j k)   -- поиск эффектов — по клику (5 окт)
     if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад

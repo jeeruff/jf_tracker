@@ -30,7 +30,7 @@ end
 local m = PN.DEFAULT()
 local lay = tiling('default 1600x900', m, 1600, 900)
 tiling('default 800x500', m, 800, 500)
-eq('cells', #lay.cells, 8)   -- 9 окт: browser | pm | fx — один стек, dsp один
+eq('cells', #lay.cells, 9)   -- 9 окт: browser | pm | fx — один стек, dsp один; 11 окт: + mixer под трекером
 ok('tracker rect', lay.rects.tracker ~= nil)
 ok('tracker has no tab', lay.by_panel.tracker.tab == nil)
 eq('order starts with tracker', lay.order[1], 'tracker')
@@ -40,7 +40,7 @@ ok('tabs in one cell', lay.by_panel.sample == lay.by_panel.midi)
 -- недоступная панель: slices нет → лист схлопнут
 local M2 = setmetatable({ avail = function(id) return id ~= 'slices' end }, { __index = M })
 local lay2 = tiling('no slices', m, 1600, 900, M2)
-eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 7)
+eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 8)
 -- все скрыты
 local t = PN.preset('tracker')
 local lay3 = tiling('tracker only', t, 1600, 900)
@@ -65,9 +65,10 @@ eq('miss', PN.hit(lay, -5, -5), nil)
 
 -- фокус по направлению из трекера
 eq('tracker l', PN.focus_dir(lay, 'tracker', 'l'), 'matrix')
-eq('tracker r', PN.focus_dir(lay, 'tracker', 'r'), 'browser')   -- наибольшее перекрытие по вертикали
+eq('tracker r', PN.focus_dir(lay, 'tracker', 'r'), 'slices')   -- наибольшее перекрытие по вертикали (11 окт: трекер ниже — над mixer)
 eq('tracker u', PN.focus_dir(lay, 'tracker', 'u'), 'master')
-eq('tracker d', PN.focus_dir(lay, 'tracker', 'd'), 'dsp')
+eq('tracker d', PN.focus_dir(lay, 'tracker', 'd'), 'mixer')   -- 11 окт: под трекером — его микшер
+eq('mixer d', PN.focus_dir(lay, 'mixer', 'd'), 'dsp')
 eq('matrix l none', PN.focus_dir(lay, 'matrix', 'l'), nil)
 eq('inst d', PN.focus_dir(lay, 'inst', 'd'), 'slices')   -- справа: lib, slices, браузер
 
@@ -113,7 +114,7 @@ ok('stack dsp into sample', PN.stack(m, 'dsp', 'sample'))
 lay = PN.layout(m, 1600, 900, M)
 ok('dsp in tabs cell', lay.by_panel.dsp == lay.by_panel.sample)
 eq('dsp active', lay.by_panel.dsp.active_id, 'dsp')
-ok('tracker to the bottom', lay.by_panel.tracker.y + lay.by_panel.tracker.h == 900)
+ok('tracker + mixer to the bottom', lay.by_panel.mixer.y + lay.by_panel.mixer.h == 900 and lay.by_panel.tracker.y + lay.by_panel.tracker.h <= lay.by_panel.mixer.y)
 eq('stack tracker', PN.stack(m, 'tracker', 'sample'), false)
 ok('unstack dsp', PN.unstack(m, 'dsp', 'd'))
 lay = PN.layout(m, 1600, 900, M)
@@ -190,7 +191,7 @@ ok('tracker unstacked', #PN.find(stk, 'tracker').panes == 1)
 
 -- migrate
 local d = PN.migrate({ top = true, side = true, dsp = true, fxb = true, toppos = 'mid', toptab = 'sample' }, 1600, 900)
-eq('migrate default-ish', #PN.layout(d, 1600, 900, M).cells, 8)
+eq('migrate default-ish', #PN.layout(d, 1600, 900, M).cells, 9)
 eq('migrate toptab', PN.active_of(d, 'retro'), 'sample')
 d = PN.migrate({ side = false }, 1600, 900); eq('side off → browser hidden', d.hidden.browser, true); eq('lib stays', d.hidden.inst, nil)
 d = PN.migrate({ mx_hidden = true, dsp = false }, 1600, 900); eq('matrix hidden', d.hidden.matrix, true); eq('dsp hidden', d.hidden.dsp, true); eq('fxb hidden', d.hidden.fxb, true)
