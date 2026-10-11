@@ -5073,11 +5073,11 @@ function D.frame(L, snap, rows, state, info)
           local e = ml.ev[r.row]
           local foc = vc and vc.fi == m.fi and vc.row == r.row
           if foc then set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(m.x, y, m.w, L.rh, 0) end
-          if (ml.kind == 'cc' or ml.kind == 'pc') then
+          if (ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
             -- держится ли значение: последнее событие до строки
             local held
             for k = #ml.rows, 1, -1 do if ml.rows[k] <= r.row then held = ml.ev[ml.rows[k]].v; break end end
-            if held and ml.kind == 'cc' then
+            if held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
               set(U.mix(U.CYAN, U.BG, 0.75)); gfx.rect(m.x + 1, y + L.rh - 3, math.max(1, math.floor(held / 127 * (m.w - 2))), 2, 1)
             end
           end

@@ -1380,7 +1380,11 @@ function M.track_midilanes(tr, lpb, guid)
         local _, _, _, ppq, chanmsg, _, m2, m3 = R.MIDI_GetCC(tk, k)
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
         if chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)
-        elseif chanmsg == 0xC0 then put(lane('pc', 'pc'), row, m2) end
+        elseif chanmsg == 0xC0 then put(lane('pc', 'pc'), row, m2)
+        -- 11 окт: aftertouch (канальный / полифонический) и pitch bend — тоже лейны (записывались, но не были видны)
+        elseif chanmsg == 0xD0 then put(lane('at', 'at'), row, m2)
+        elseif chanmsg == 0xA0 then put(lane('pat', 'pat'), row, m3)
+        elseif chanmsg == 0xE0 then put(lane('pb', 'pb'), row, ((m3 or 0) * 128 + (m2 or 0)) // 128) end
       end
       for k = 0, (txn or 0) - 1 do
         local _, _, _, ppq, typ, msg = R.MIDI_GetTextSysexEvt(tk, k)
@@ -1400,10 +1404,10 @@ function M.track_midilanes(tr, lpb, guid)
   end
   local out = {}
   for _, l in pairs(by) do out[#out + 1] = l end
-  local ORD = { cc = 1, pc = 2, tx = 3, sx = 4 }
+  local ORD = { at = 0, pat = 0.5, pb = 0.7, cc = 1, pc = 2, tx = 3, sx = 4 }
   table.sort(out, function(a, b) if ORD[a.kind] ~= ORD[b.kind] then return ORD[a.kind] < ORD[b.kind] end return (a.num or 0) < (b.num or 0) end)
   for _, l in ipairs(out) do
-    l.name = l.kind == 'cc' and ('CC' .. l.num) or (l.kind == 'pc' and 'PC' or (l.kind == 'tx' and 'art' or 'SX'))
+    l.name = l.kind == 'cc' and ('CC' .. l.num) or ({ pc = 'PC', tx = 'art', at = 'AT', pat = 'PAT', pb = 'PB' })[l.kind] or 'SX'
     l.rows = {}
     for r in pairs(l.ev) do l.rows[#l.rows + 1] = r end
     table.sort(l.rows)
