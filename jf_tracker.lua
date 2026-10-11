@@ -3876,6 +3876,16 @@ ctx = {
   -- инструменты-плагины трека (9 окт): VSTi / VST3i / AUi / CLAPi / LV2i и
   -- JSFX-инструменты (по имени). Кэш по снимку. Выбранный в lib — state.instfx
   -- [guid] = fx: ноты с клавиатуры пишутся MIDI в трек (звучит плагин)
+  -- 11 окт: плагин-инструмент по имени FX: VSTi / VST3i (цифра в префиксе — %a её не брал) /
+  -- AUi / CLAPi / LV2i; AU music effect (MFX: драм-машина эффектом, Nerve MFX) — тоже;
+  -- JSFX — по словам в имени
+  is_inst_name = function(raw)
+    raw = raw or ''
+    if raw:match('^%w+i:') then return true end
+    local lo = raw:lower()
+    if lo:match('^au%w*:') and (lo:find('mfx', 1, true) or lo:find('music effect', 1, true)) then return true end
+    return (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true))) and true or false
+  end,
   track_insts = function(col)
     if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return {} end
     ctx.ti_cache = (ctx.ti_cache and ctx.ti_cache.snap == snap) and ctx.ti_cache or { snap = snap }
@@ -3888,12 +3898,12 @@ ctx = {
       -- 10 окт: переименованный плагин (RS5K берёт имя сэмпла) терял префикс «VSTi:» и выпадал из lib —
       -- узнаём по original_name
       local okn, orig = reaper.TrackFX_GetNamedConfigParm(col.track, fx, 'original_name')
-      if okn and orig ~= '' and not raw:match('^%a+i?:') then raw = orig end
+      if okn and orig ~= '' and not raw:match('^%w+i?:') then raw = orig end
       local lo = raw:lower()
-      if raw:match('^%a+i:') or (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true))) then
+      if ctx.is_inst_name(raw) then
         local nm = (raw:gsub('^[^:]*: ', ''))
         for _, f in ipairs(col.fx or {}) do if f.i == fx and f.name and f.name ~= '' then nm = f.name; break end end   -- имя как в DSP (slixer, не описание JSFX)
-        c[#c + 1] = { fx = fx, name = nm, kind = (raw:match('^(%a+):') or 'fx'):lower() }   -- kind: js / vsti / vst3i / aui / clapi
+        c[#c + 1] = { fx = fx, name = nm, kind = (raw:match('^(%w+):') or 'fx'):lower() }   -- kind: js / vsti / vst3i / aui / au (mfx) / clapi
       end
     end
     ctx.ti_cache[col.guid] = c
@@ -16119,9 +16129,9 @@ local function frame()
         local _, raw = A.GetFXName(src.track, dd.f.i, '')
         local okn, orig = A.GetNamedConfigParm(src.track, dd.f.i, 'original_name')
         raw = raw or ''
-        if okn and orig ~= '' and not raw:match('^%a+i?:') then raw = orig end
+        if okn and orig ~= '' and not raw:match('^%w+i?:') then raw = orig end
         local lo = raw:lower()
-        local inst = raw:match('^%a+i:') or (lo:match('^js:') and (lo:find('slixer', 1, true) or lo:find('synth', 1, true) or lo:find('sampl', 1, true) or lo:find('grgrain', 1, true) or lo:find('drum', 1, true)))
+        local inst = ctx.is_inst_name(raw)
         local to = inst and 0 or reaper.TrackFX_GetCount(tc.track)
         edit.fx_copy(src.track, dd.f.i, tc.track, to, true, 'move fx ' .. dd.f.name)
         model.invalidate()
