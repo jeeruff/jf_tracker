@@ -58,6 +58,11 @@ function D.init(u, peaks_fn, matrix)
   D.CONT  = U.GREY
   D.ENVBAR = U.tint(U.CYAN, 0.45)
   D.FX    = U.mix(U.TEXT, U.AMBER, 0.5)
+  -- 11 окт: цвета колонок как в Renoise (Default.xrnc: Pattern_Default_Font_*), контраст к фону темы:
+  -- нота и инструмент — текстом, громкость жёлтая, delay голубой, слайс / смещение сэмпла — Other (лиловый)
+  local function rn(r, g, b) return U.readable({ r / 255, g / 255, b / 255 }, U.BG, 3) end
+  D.RN_VOL, D.RN_PAN, D.RN_DELAY = rn(212, 206, 42), rn(158, 214, 140), rn(66, 193, 234)
+  D.RN_PITCH, D.RN_GLOBAL, D.RN_OTHER = rn(180, 80, 34), rn(253, 151, 21), rn(186, 104, 187)
   D.SEP   = U.mix(U.BG, U.TEXT, 0.38)           -- границы модулей: тусклые (3 окт; фокус — ярче)
   D.SEPW  = 2                                   -- толщина границ модулей (3 окт: жирнее), линии внутри модулей — 1 px
   D.FOCUS = U.mix(U.TEXT, { 1, 1, 1 }, 0.55)    -- светлый ободок модуля с фокусом (просьба 1 окт: без розового)
@@ -378,7 +383,10 @@ function D.layout(snap, state, nregions)
   -- показа, поля курсора Vim прежние (нота, vol, delay, fx)
   L.w_inst = ms('00')
   L.x_inst = L.x_note + L.w_note + L.pad
-  L.x_vol = L.x_inst + L.w_inst + L.pad
+  -- 11 окт: номер слайса — своё поле после инструмента (нота | инструмент | слайс | vol), hex как в списке слайсов
+  L.w_slc = ms('S00')
+  L.x_slc = L.x_inst + L.w_inst + L.pad
+  L.x_vol = L.x_slc + L.w_slc + L.pad
   -- порядок: волна | нота | инстр. | vol | fx1..n | delay (просьба 1 окт)
   L.x_fx = {}
   local x = L.x_vol + L.w_vol + L.pad
@@ -1307,8 +1315,13 @@ local function draw_cell(L, cell, x, y, ty, inv)
   local function draw_inst()
     if not (L.x_inst and not name_row) then return end
     local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
-    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.GREEN))
+    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
     else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+    if L.x_slc then
+      local sk = cell and cell.kind == 'audio' and cell.slice
+      if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), cell.muted and U.GREY or D.RN_OTHER)   -- своё поле: курсор инструмента его не красит
+      else text(x + L.x_slc, ty, '...', ( (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+    end
   end
   if not cell then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
@@ -1348,13 +1361,18 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or U.TEXT)))   -- видео-событие (9 окт)
-    if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or U.CYAN)) end
+    if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
-    elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, U.TEXT))
+    elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.RN_DELAY))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     local fx = cell.fx or {}
     for i = 1, L.nfx do
-      if fx[i] then text(x + L.x_fx[i], ty, fx[i], c(3 + i, muted and U.GREY or D.FX))
+      if fx[i] then
+        -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
+        local l1 = fx[i]:sub(1, 1)
+        local col = (l1 == 'I' or l1 == 'O' or l1 == 'V') and D.RN_VOL or (l1 == '8' and D.RN_PAN) or ((l1 == 'P' or l1 == 'U' or l1 == 'D' or l1 == 'G') and D.RN_PITCH)
+          or ((l1 == 'T' or l1 == 'F') and D.RN_GLOBAL) or D.RN_OTHER
+        text(x + L.x_fx[i], ty, fx[i], c(3 + i, muted and U.GREY or col))
       else text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
     end
   elseif k == 'off' then
@@ -1379,7 +1397,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
         end
       end
       -- точка огибающей громкости take на этой строке (5 окт)
-      if cell.vol and not L.notes_only and not (named and nf < 2) then text(x + L.x_vol, ty, cell.vol, c(2, U.CYAN)) end
+      if cell.vol and not L.notes_only and not (named and nf < 2) then text(x + L.x_vol, ty, cell.vol, c(2, D.RN_VOL)) end
       if named then
         -- вторая строка: имя item (опция item names, 3 окт); номер — на строке ноты
         -- курсор на этой строке: подложка — шириной поля ноты, не всего имени (3 окт)
@@ -5567,7 +5585,7 @@ function D.frame(L, snap, rows, state, info)
       local kb = ms('O') + 2 * L.pad
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
       -- 11 окт: + — меню последнего тронутого параметра этого эффекта (как кнопка Param в REAPER)
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { 'Δ', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 },
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { '∆', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 },
                     { '+', 'lastp', bx + bw - 5 * kb - 11 } }
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 5 * kb - 12
@@ -5601,23 +5619,19 @@ function D.frame(L, snap, rows, state, info)
           local kx = b[3]
           local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
+          -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
+          if b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 1 then lit = false end
           set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
           set(hot and (b[2] == 'del' and U.RED or U.AMBER) or U.LINE); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
           local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY)
           if b[2] == 'delta' then
-            -- 11 окт: Δ — сама буква линиями (у пиксельных шрифтов вроде ProFont своя Δ — «домик» ⌂)
-            local gw = math.max(5, ms('A')); local gh = math.max(5, TH() - 4)
-            local gx = kx + math.floor((kb - gw) / 2); local gy = by + 1 + math.floor((L.rh - 1 - gh) / 2)
-            local cx = gx + math.floor(gw / 2)
-            -- 11 окт: знак — закрашенный ярко-жёлтый треугольник, поверх чёрный «!» (контрастно в любой теме)
-            gw = math.max(gw, 7); gx = kx + math.floor((kb - gw) / 2); cx = gx + math.floor(gw / 2)
-            gfx.set(1, 0.84, 0.1, (hot or lit) and 1 or 0.85)
-            gfx.triangle(gx, gy + gh - 1, cx, gy, gx + gw - 1, gy + gh - 1)
-            gfx.set(0, 0, 0, 1)
-            local ey0, ey1 = gy + math.floor(gh * 0.35), gy + gh - 4
-            gfx.rect(cx, ey0, 1, math.max(1, ey1 - ey0), 1)
-            gfx.rect(cx, gy + gh - 2, 1, 1, 1)
-            gfx.a = 1
+            -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»
+            local th = math.max(8, math.floor(TH() * 1.05))
+            if D.menlo_th ~= th then gfx.setfont(5, 'Menlo', th); D.menlo_th = th else gfx.setfont(5) end   -- шрифт с именем — один раз на размер
+            local gw2 = gfx.measurestr('∆')
+            set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = by + 1 + math.floor((L.rh - 1 - gfx.texth) / 2)
+            gfx.drawstr('∆')
+            gfx.setfont(D.font_id or 1)
           else text(kx + L.pad, by + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
         end

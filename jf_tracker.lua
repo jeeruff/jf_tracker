@@ -10812,7 +10812,7 @@ local function poll_midi_in()
           vim.cur.row = midiin.row + vim.step                  -- шаг после отпускания всех клавиш
           if vim.cur.row >= state.row0 + L.nrows - 1 then state.row0 = vim.cur.row - math.floor(L.nrows / 3) end
         end
-      elseif (kind == 0xA0 or kind == 0xD0 or kind == 0xB0) and midiin.nheld > 0 and midiin.row then
+      elseif (kind == 0xA0 or kind == 0xD0 or kind == 0xB0) and midiin.nheld > 0 and midiin.row and not (kind == 0xA0 and d2 == 0) then   -- 11 окт: poly AT 0 (отпускание) не пишем
         local len = edit.row_time(midiin.row + math.max(1, vim.step), state.lpb, 0) - midiin.t0
         local t = midiin.t0 + math.min(len * 0.999, reaper.time_precise() - midiin.wall0)
         edit.rec_cc(col.track, lane_idx, t, kind, ch, d1, d2)

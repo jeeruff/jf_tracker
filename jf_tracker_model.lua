@@ -241,6 +241,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
   head.fx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
+  do local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); head.slice = tonumber(sk) end   -- 11 окт: номер слайса — поле в ячейке
   head.rgb = M.item_rgb(it)
   -- видео-лейн (9 окт): видео-item — событие как аудио (фейды Ixx / Oxx
   -- REAPER применяет и к картинке), в поле ноты — VID
@@ -1403,7 +1404,12 @@ function M.track_midilanes(tr, lpb, guid)
     if type(x) == 'number' then lane('cc' .. x, 'cc', x) elseif x == 'pc' then lane('pc', 'pc') end
   end
   local out = {}
-  for _, l in pairs(by) do out[#out + 1] = l end
+  for _, l in pairs(by) do
+    -- 11 окт: poly AT только с нулями (контроллер шлёт 0 при отпускании) — не лейн: курсор туда не встаёт
+    local zero = l.kind == 'pat'
+    if zero then for _, e in pairs(l.ev) do if (e.v or 0) > 0 then zero = false; break end end end
+    if not zero then out[#out + 1] = l end
+  end
   local ORD = { at = 0, pat = 0.5, pb = 0.7, cc = 1, pc = 2, tx = 3, sx = 4 }
   table.sort(out, function(a, b) if ORD[a.kind] ~= ORD[b.kind] then return ORD[a.kind] < ORD[b.kind] end return (a.num or 0) < (b.num or 0) end)
   for _, l in ipairs(out) do
