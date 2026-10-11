@@ -884,8 +884,8 @@ function D.big_text(x, y, s, col, k)
   end
   local s0 = D.SCALE; D.SCALE = s0 * k; text(x, y, s, col); D.SCALE = s0
 end
--- 11 окт: мелкий шрифт (половина) — подписи колонок, деления dB; TTF — не мельче 7 px
-D.SMALL = 0.5
+-- 11 окт: мелкий шрифт (×0.75) — подписи колонок, деления dB; TTF — не мельче 7 px
+D.SMALL = 0.75   -- 11 окт: 0.5 мелковат
 function D.small_measure(s)
   if D.ttf then gfx.setfont(3, D.ttf_face, math.max(7, D.ttf_size * D.SMALL)); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
   return math.ceil(ms(s) * D.SMALL)
@@ -4690,7 +4690,7 @@ function D.frame(L, snap, rows, state, info)
       local function cap(x, w, txt, kind)
         -- 11 окт: подписи полными словами мелким шрифтом (note / vol / fx1 / delay); не влезло — короче
         local t = txt
-        while #t > 1 and D.small_measure(t) > w + L.pad do t = t:sub(1, -2) end
+        while #t > 1 and D.small_measure(t) > w do t = t:sub(1, -2) end   -- строго по полю: соседние не слипаются
         D.small_text(x, cy3 + math.floor(L.rh / 4), t, U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
       end
