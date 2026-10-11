@@ -2940,21 +2940,31 @@ ctx = {
   sequence = function()
     local s0 = regions.start_pos or 0
     local s1 = regions.end_pos
+    -- 11 окт: s/e выключена — матрица = весь проект, как таймлайн REAPER: от 0 до
+    -- конца проекта (items, регионы, и библиотека после =END тоже) + 16 тактов места
+    local full = state.mxmarks == false
+    if full then
+      s0 = 0
+      local e = reaper.GetProjectLength(0)
+      for _, rg in ipairs(regions) do if not rg.session and rg.rgnend > e then e = rg.rgnend end end
+      local _, me = reaper.TimeMap2_timeToBeats(0, e)
+      s1 = reaper.TimeMap2_beatsToTime(0, 0, math.ceil((me or 0) - 1e-6) + 16)
+    end
     -- 8 окт: без =END матрица длинная — 512 тактов свободных строк от =START
     -- (маркер не ставится; :end переносит конец)
     if not s1 then
       local _, m0 = reaper.TimeMap2_timeToBeats(0, s0)
       s1 = reaper.TimeMap2_beatsToTime(0, 0, (m0 or 0) + ctx.MX_BARS)
     end
-    local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1)
+    local key = tostring(regions) .. '|' .. state.lpb .. '|' .. s0 .. '|' .. tostring(s1) .. (full and '|full' or '')
     if seq_cache.key == key then return seq_cache.seq end
     local out, real = {}, {}
     for _, rg in ipairs(regions) do
-      if not rg.lib and not rg.session and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6) then real[#real + 1] = rg end
+      if (full or not rg.lib) and not rg.session and rg.rgnend > s0 + 1e-6 and (not s1 or rg.pos < s1 - 1e-6) then real[#real + 1] = rg end
     end
     local function bars(t0, t1)
       local t, n = t0, 0
-      while t < t1 - 1e-4 and n < 512 do
+      while t < t1 - 1e-4 and n < (full and 2000 or 512) do   -- 11 окт: весь проект — до 2000 тактов на пустое место
         local qn = reaper.TimeMap2_timeToQN(0, t)
         local _, _, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
         local tn = qme and reaper.TimeMap2_QNToTime(0, qme) or t1
@@ -13078,7 +13088,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
-  elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e: show / hide the =START and =END rows in the matrix (only the view - the markers stay in the project)'
+  elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e on: the matrix goes from =START to =END; off: the whole project as the REAPER timeline (library regions after =END too, 16 free bars at the end) - only the view, the markers stay'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
   elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
@@ -14155,7 +14165,8 @@ local function frame()
       elseif hover.matrix.btn == 'ruler' then ctx.mx_ruler_toggle()
       elseif hover.matrix.btn == 'se' then
         state.mxmarks = not state.mxmarks
-        vim.msg = 'matrix s/e: =START / =END rows ' .. (state.mxmarks and 'shown' or 'hidden (the markers stay in the project)')
+        vim.msg = state.mxmarks and 'matrix s/e: from =START to =END' or 'matrix s/e off: the whole project, as the REAPER timeline (the markers stay)'
+        seq = ctx.sequence()
       elseif hover.matrix.btn == 'loops' then ctx.mx_loops_toggle()
       elseif hover.matrix.btn == 'clips' then ctx.mx_clips_toggle()
       elseif hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend' then
