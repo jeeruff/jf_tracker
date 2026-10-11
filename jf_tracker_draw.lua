@@ -3140,8 +3140,6 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local cur = pool[inst]
   local nroots = 0
   for _, e in ipairs(pool) do if not e.parent then nroots = nroots + 1 end end
-  local head = ('%d sample%s'):format(nroots, nroots == 1 and '' or 's')   -- 11 окт: было «lib 2» — непонятно; слайсы не считаются (вложены)
-  if cur and cur.tracks and #cur.tracks > 0 then head = head .. '  @ ' .. table.concat(cur.tracks, ', ') end
   -- справа налево: sort (track / len / mark), find (fzf, 2 окт), bsync (3 окт);
   -- у каждой своя x (раньше sort рисовалась поверх find — от неё торчало «d»)
   local sort = info.poolsort or 'track'
@@ -3159,10 +3157,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local fw = ms('find') + 2 * L.pad
   local fx = sbx - fw - L.pad
   hbtn(fx, fw, 'find', false, U.GREY, 'poolfind')
-  -- save (4 окт): набор lib — шаблон трека REAPER (jf_kits)
-  local svw = ms('save') + 2 * L.pad
-  fx = fx - svw - L.pad
-  hbtn(fx, svw, 'save', false, U.GREY, 'poolsave')
+  -- 11 окт: save — в меню kit (одно место); sort — выпадашка (не перебор по кругу: положений больше двух)
   -- bsync: beatsync выбранного инструмента — длина под N долей темпа в месте
   -- каждой ноты; горит, когда включён
   local on = cur and cur.bsync
@@ -3170,13 +3165,23 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local bw2 = ms(blbl) + 2 * L.pad
   local bx2 = fx - bw2 - L.pad
   hbtn(bx2, bw2, blbl, on and true or false, U.CYAN, 'poolbsync')
-  -- 11 окт: порядок — снова кнопкой (по заголовкам колонок его не находили): sort track / name / len / mark / type
-  local slbl = 'sort ' .. sort
-  local sw2 = ms(slbl) + 2 * L.pad
+  local sw2 = ms('sort') + 2 * L.pad
   local sx2 = bx2 - sw2 - L.pad
-  if sx2 > ix + L.pad + ms('0 samples') then hbtn(sx2, sw2, slbl, false, U.CYAN, 'poolsort'); bx2 = sx2 end
-  sbx = bx2                                  -- заголовок обрезается до кнопок
-  text(ix + L.pad, iy + 3, fit(head, sbx - ix - 2 * L.pad), U.GREY)
+  if sx2 > ix + L.pad + ms('kit') + 2 * L.pad then hbtn(sx2, sw2, 'sort', false, U.CYAN, 'poolsort'); bx2 = sx2 end
+  -- kit (11 окт, вместо «N samples»): набор lib трека — щелчок: список kits (взять в lib), сохранить lib как kit
+  do
+    local kl = info.kit_name or 'kit'
+    local kw = math.min(ms(kl) + 2 * L.pad, bx2 - L.pad - (ix + L.pad))
+    if kw > ms('k') + 2 * L.pad then
+      local kx = ix + L.pad
+      local hot = mx >= kx and mx < kx + kw and my >= by0 and my < by0 + L.rh
+      set(hot and D.CURROW or U.BG); gfx.rect(kx, by0, kw, L.rh, 1)
+      set(U.LINE); gfx.rect(kx, by0, kw, L.rh, 0)
+      text(kx + L.pad, iy + 3, fit(kl, kw - 2 * L.pad), hot and U.TEXT or (info.kit_name and U.CYAN or U.GREY))
+      if hot then hover.poolkit = true end
+      hint('poolkit', kx, by0, kw, L.rh, true)
+    end
+  end
   -- внизу — два буквенных тоггла (2 окт): звук при выборе / звук при вставке
   do
     local by = iy + H - L.rh - 3
@@ -3803,7 +3808,8 @@ function D.frame(L, snap, rows, state, info)
     hover.recbtn = th.recbtn
     hover.insprevbtn = th.insprevbtn
     hover.poolfind = th.poolfind
-    hover.poolsave = th.poolsave or hover.poolsave
+    hover.poolkit = th.poolkit or hover.poolkit
+    hover.poolsort = th.poolsort or hover.poolsort
     hover.poolsortcol = th.poolsortcol
     hover.poolbsync = th.poolbsync or hover.poolbsync
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro

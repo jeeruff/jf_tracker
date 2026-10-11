@@ -6081,6 +6081,33 @@ ctx = {
     local nm = (pname and pname ~= '' and pname:match('([^/]+)%.[Rr][Pp][Pp]$')) or 'kit'
     vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'libsave ' .. nm
   end,
+  -- 11 окт: шапка lib — выпадашки kit и sort (у кнопки, без перебора по кругу)
+  kit_menu = function()
+    local kits = B.read_kits()
+    local items, keys = {}, 'abcdefghijklmnopqrtuvwxyz'
+    items[#items + 1] = { key = 's', label = 'save the lib as a kit …', fn = function() ctx.kit_save_prompt() end }
+    local k = 0
+    for _, e in ipairs(kits) do
+      if e.kit then
+        k = k + 1
+        local key = k <= 9 and tostring(k) or keys:sub(k - 9, k - 9)
+        if key ~= '' then items[#items + 1] = { key = key, label = 'take ' .. e.name .. ' into the lib', fn = function() ctx.kit_load(e.path, e.name) end } end
+      end
+    end
+    if k == 0 then items[#items + 1] = { key = 'x', label = '(no kits yet - s saves the lib as one)', fn = function() end } end
+    vim.open_hydra({ title = 'kits: track templates TrackTemplates/jf_kits', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  sort_menu = function()
+    local cur = state.poolsort or 'track'
+    local items = {}
+    for _, o in ipairs({ { 't', 'track', 'by track (tree: track, its samples, their slices)' }, { 'n', 'name', 'by name' }, { 'l', 'len', 'by length' },
+                         { 'm', 'mark', 'by marks @ $ *' }, { 'y', 'type', 'by type: audio / midi / video' } }) do
+      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.poolsort = o[2]; vim.msg = 'lib order: ' .. o[3] end }
+    end
+    vim.open_hydra({ title = 'lib order', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   kit_save = function(name)
     name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
     if name == '' then vim.msg = 'libsave: a name please'; return end
@@ -6088,6 +6115,7 @@ ctx = {
     for _, e in ipairs(col and col.pool or {}) do if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then items[#items + 1] = e.item end end
     if #items == 0 then vim.msg = 'libsave: the lib is empty'; return end
     local path, n = edit.kit_save(items, name)
+    if path and col then ctx.kitnames = ctx.kitnames or {}; ctx.kitnames[col.guid] = name end
     vim.msg = path and ('kit saved: %s (%d samples) - TrackTemplates/jf_kits, browser tab kits'):format(name, n) or 'libsave: cannot write the file'
     if B.mode == 'kits' then B.set_all(B.read_kits()) end
   end,
@@ -6095,6 +6123,7 @@ ctx = {
     local col = cur_col(); if not col then vim.msg = 'kit: no track under the cursor'; return end
     local n = edit.kit_load(path, col.track)
     model.invalidate()
+    ctx.kitnames = ctx.kitnames or {}; ctx.kitnames[col.guid] = name   -- 11 окт: имя в шапке lib
     vim.msg = ('kit %s: %d sample(s) into the lib of %s'):format(name or '', n, col.name or '')
   end,
   -- jf_pm (3 окт): открыть проект из вкладки pm (o). Уже открыт — переключить
@@ -9555,7 +9584,8 @@ local function hint_go(t)
   elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
-  elseif t.kind == 'poolsort' then state.poolsort = ({ track = 'name', name = 'len', len = 'mark', mark = 'type', type = 'track' })[state.poolsort or 'track'] or 'track'; vim.msg = 'lib order: ' .. state.poolsort
+  elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
+  elseif t.kind == 'poolkit' then ctx.set_focus('inst'); ctx.kit_menu()
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
   elseif t.kind == 'mxname' then ctx.mx_name_prompt(d)
@@ -12230,7 +12260,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, kit_name = ctx.kitnames and cur_col() and ctx.kitnames[cur_col().guid] or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -13118,14 +13148,14 @@ local function frame()
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N'
-  elseif hover.poolsave then state.status = 'save the lib as a kit: a REAPER track template (TrackTemplates/jf_kits) - load it in the browser tab kits or with Insert track from template'
+  elseif hover.poolkit then state.status = 'kit of this lib: click - the kits (take one into the lib) and save the lib as a kit (a REAPER track template, TrackTemplates/jf_kits)'
   elseif hover.swapbtn then
     local st, file = ctx.swap_info()
     state.status = st == 'on' and ('swap: the sample plays ' .. (file or '?') .. ' - click: back to the original file')
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
-  elseif hover.poolsort then state.status = 'lib order: track (groups by the first track that plays it) / name / len / mark (@ $ *) / type - click to cycle (or click a column head); numbers stay'
+  elseif hover.poolsort then state.status = 'lib order: ' .. (state.poolsort or 'track') .. ' - click: the list (track / name / len / marks / type), or click a column head; numbers stay'
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
@@ -13810,8 +13840,8 @@ local function frame()
     elseif hover.zone then
       if hover.zone == 'prev' then OPT.tour.go(-1) elseif hover.zone == 'next' then OPT.tour.go(1) elseif hover.zone == 'stop' then OPT.tour.stop() end
       click = { t = now2, zone = 'tourzone' }
-    elseif hover.poolsave then
-      ctx.set_focus('inst'); ctx.kit_save_prompt(); click = { t = now2, zone = 'poolsave' }
+    elseif hover.poolkit then
+      ctx.set_focus('inst'); ctx.kit_menu(); click = { t = now2, zone = 'poolkit' }
     elseif hover.swapbtn then
       ctx.set_focus('inst'); ctx.swap_click()
       click = { t = now2, zone = 'swapbtn' }
@@ -13826,8 +13856,7 @@ local function frame()
       click = { t = now2, zone = 'poolsortcol' }
     elseif hover.poolsort then
       ctx.set_focus('inst')
-      state.poolsort = ({ track = 'name', name = 'len', len = 'mark', mark = 'type', type = 'track' })[state.poolsort or 'track'] or 'track'
-      vim.msg = 'lib order: ' .. ({ track = 'by track (tree: each track, its samples, their slices)', mark = 'marks @ $ *', name = 'name', len = 'length', type = 'type: audio / midi / video' })[state.poolsort]
+      ctx.sort_menu()
       click = { t = now2, zone = 'poolsort' }
     elseif hover.garden then
       ctx.set_focus('top')

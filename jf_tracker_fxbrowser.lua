@@ -47,8 +47,19 @@ end
 function FB.dev(it)
   local d = FB.tags.dev[FB.fxkey(it)]
   if d and d ~= '' then return d end
-  local p = (it.label or ''):match('%(([^()]+)%)%s*$')
-  return p or '?'
+  -- 11 окт: не последняя скобка вообще (группы «2->12ch», «-24 + 24 range», «x86_64»), а последняя,
+  -- похожая на имя: каналы, разрядность, legacy id, диапазоны — пропуск; JS без тега — «JS»
+  local groups = {}
+  for g in (it.label or ''):gmatch('%(([^()]+)%)') do groups[#groups + 1] = g end
+  for k = #groups, 1, -1 do
+    local g = groups[k]:lower()
+    local spec = g:match('^[%-%+%d]') or g:find('%d+ch') or g:find('->', 1, true) or g:find('x86', 1, true) or g:find('x64', 1, true)
+      or g:find('arm64', 1, true) or g:find('legacy', 1, true) or g:find('range', 1, true) or g:find('mono', 1, true) or g:find('stereo', 1, true)
+      or g:find('demo', 1, true) or g:find('voices', 1, true)
+    if not spec then return groups[k] end
+  end
+  if FB.kind(it) == 'JS' then return 'JS' end
+  return '?'
 end
 function FB.cat(it) return FB.tags.cat[FB.fxkey(it)] or '?' end
 function FB.is_fav(it) return FB.natfav[FB.fxkey(it)] or FB.ownfav[it.label] or false end
