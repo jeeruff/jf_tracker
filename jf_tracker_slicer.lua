@@ -1182,9 +1182,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if ZH > 0 then
     local zy = wy + wh + 2
     local W2 = S.zwin or 0.04
-    -- 11 окт: край — у левого края окна (1/8), справа — то, что после него; у начала файла окно
-    -- упирается в 0 (первый слайс — в самом начале, а не по центру)
-    local t0 = math.max(0, zt - 2 * W2 / 8)
+    local t0 = zt - W2                     -- край — по центру окна
     U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
     local smp, n = zoom_samples(e, t0, 2 * W2)
     local zc, zh2 = zy + ZH / 2, ZH / 2 - 2
@@ -1225,12 +1223,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
       end
     else U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
-    -- линии слайсов в окне и сам край (у левого края окна)
+    -- 11 окт: до нулевого сэмпла item и после его конца — пустота (не звук файла за краями item)
+    if t0 < 0 then U.set(U.BG); gfx.rect(x, zy, math.min(w, math.floor(-t0 / (2 * W2) * w)), ZH, 1) end
+    if t0 + 2 * W2 > len then
+      local ex = x + math.max(0, math.floor((len - t0) / (2 * W2) * w))
+      U.set(U.BG); gfx.rect(ex, zy, x + w - ex, ZH, 1)
+    end
+    -- линии слайсов в окне и сам край по центру
     local zsl = (S.active and S.entry and S.entry.item == e.item) and S.slices or (e.slices or {})
     for k2, t2 in ipairs(zsl) do
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
-    U.set(U.AMBER); gfx.rect(x + math.floor((zt - t0) / (2 * W2) * w), zy, 2, ZH, 1)
+    U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
     trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)
     if pht and pht > t0 and pht < t0 + 2 * W2 then U.set(U.TEXT); gfx.rect(x + math.floor((pht - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
