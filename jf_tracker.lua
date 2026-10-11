@@ -361,6 +361,20 @@ if state.panes and reaper.GetExtState(EXT, 'panes_mig8') ~= '1' then
   end
   reaper.SetExtState(EXT, 'panes_mig8', '1', true)
 end
+-- 11 окт (миграция 9): macros снова пропала из вкладок (скрыта пресетом / Ctrl+W c) — вернуть к item
+if state.panes and reaper.GetExtState(EXT, 'panes_mig9') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'macros') then
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    if host then
+      local lf = PNm.find(state.panes, host)
+      local act = lf and lf.active
+      PNm.stack(state.panes, 'macros', host)
+      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
+    end
+  end
+  reaper.SetExtState(EXT, 'panes_mig9', '1', true)
+end
 -- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
 -- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
 if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
@@ -1496,15 +1510,25 @@ ctx = {
         else state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. it.label end
       end end)
   end,
+  -- 11 окт: запись параметра блока DSP; кит в режиме all (draw: f.kit_all) — то же
+  -- значение на этот параметр у каждого RS5K кита (общий контроль)
+  fx_write = function(track, f, p, v)
+    v = math.max(0, math.min(1, v))
+    local A = model.fxapi(track)
+    if f and f.kit and f.kit_all and f.kids then
+      for _, kid in ipairs(f.kids) do A.SetParamNormalized(track, kid.i, p.i, v) end
+    else A.SetParamNormalized(track, p.fx or f.i, p.i, v) end
+  end,
   dsp_value = function(k, pi, d, coarse)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
     if not p then return end
     local id = p.fx or f.i
     local v = model.fxapi(col.track).GetParamNormalized(col.track, id, p.i)
-    if p.kind == 'toggle' then edit.fx_param(col.track, id, p.i, v >= 0.5 and 0 or 1)
-    elseif p.kind == 'steps' and p.nsteps then edit.fx_param(col.track, id, p.i, v + d / (p.nsteps - 1))
-    else edit.fx_param(col.track, id, p.i, v + d * (coarse and 0.1 or 0.02)) end
+    if p.kind == 'toggle' then ctx.fx_write(col.track, f, p, v >= 0.5 and 0 or 1)
+    elseif p.kind == 'steps' and p.nsteps then ctx.fx_write(col.track, f, p, v + d / (p.nsteps - 1))
+    else ctx.fx_write(col.track, f, p, v + d * (coarse and 0.1 or 0.02)) end
+    model.invalidate()
   end,
   dsp_enter = function(k, pi)
     local col, f = ctx.dsp_fx(k)
@@ -1613,7 +1637,16 @@ ctx = {
         local n = h.kind == 'audio' and snap and snap.inst_of and snap.inst_of[h.item]
         local pe = n and col.pool[n]
         local root = pe and (pe.parent or pe)
-        if not (root and root.item) then why = 'not an instrument of the lib'
+        if h.kind == 'midi' then
+          -- 11 окт: MIDI-нота кита (контейнер RS5K) — слайс k = нота k-го RS5K
+          local pool = col.pool or {}
+          local mi = ctx.midi_inst_num(h.item, h.pitch)
+          local kit = mi and ctx.track_insts(col)[mi - #pool - draw.empty_slots(#pool)]
+          if not (kit and kit.kids) then why = 'MIDI note: not a kit (RS5K container)'
+          elseif k == 0 then why = 'kit: no whole sample (S01..)'
+          elseif not kit.kids[k] then why = ('kit has %d slices'):format(#kit.kids)
+          elseif kit.kids[k].lo then edit.set_pitch({ h }, state.lpb, kit.kids[k].lo); done = done + 1 end
+        elseif not (root and root.item) then why = 'not an instrument of the lib'
         elseif k == 0 then
           local rows = math.max(1, h.rows or 1)
           edit.delete({ h }, state.lpb)
@@ -1630,24 +1663,89 @@ ctx = {
     model.invalidate()
     vim.msg = done > 0 and (k == 0 and 'slice: the whole sample' or ('slice S%02X'):format(k)) or ('slice: ' .. (why or 'audio notes only'))
   end,
+  -- 11 окт: номер, как его показывают lib и ячейка (исходники 01.., пустые слоты,
+  -- плагины), ↔ индекс в pool (там между исходниками лежат их слайсы — «02»
+  -- попадал в слайс первого сэмпла). nil — такого номера нет
+  inst_from_num = function(col, d)
+    local pool = col and col.pool or {}
+    if not d or d < 1 then return nil end
+    local nr = 0
+    for i, e in ipairs(pool) do
+      if not e.parent then nr = nr + 1; if nr == d then return i end end
+    end
+    local E = draw.empty_slots(#pool)
+    if d <= nr + E then return #pool + (d - nr) end
+    local base = #pool + E
+    if d > base and d - base <= #ctx.track_insts(col) then return d end
+    return nil
+  end,
+  empty_slots = function(n) return draw.empty_slots(n) end,
+  inst_disp = function(col, i)
+    local pool = col and col.pool or {}
+    local e = pool[i]
+    if e then return e.num or i end
+    if i <= #pool then return i end
+    local nr = 0
+    for _, e2 in ipairs(pool) do if not e2.parent then nr = nr + 1 end end
+    if i <= #pool + draw.empty_slots(#pool) then return nr + (i - #pool) end
+    return i
+  end,
+  -- поле inst (5 окт; 11 окт — и MIDI): номер из lib. Сэмпл — нота становится аудио
+  -- (MIDI-нота тоже); плагин — нота становится MIDI, у RS5K / кита высота — в его диапазон
   set_inst = function(heads, n)
     local f = L.flat[vim.cur.fi]; local col = f and f.col
-    local e = col and (col.pool or {})[n]
-    if not (e and e.item) then vim.msg = ('no instrument %02d on this track'):format(n); return end
+    if not col then return end
+    local pool = col.pool or {}
+    local e = pool[n]
+    local base = #pool + draw.empty_slots(#pool)
+    local insts = ctx.track_insts(col)
+    local pi = n > base and insts[n - base] or nil
+    if not (e and e.item) and not pi then vim.msg = ('no instrument %02d on this track'):format(ctx.inst_disp(col, n)); return end
+    local function inr(x, pitch) return x.lo and x.hi and pitch >= math.min(x.lo, x.hi) and pitch <= math.max(x.lo, x.hi) end
     local done = 0
+    vim.inst = n                                       -- 11 окт: набранный номер — текущий инструмент (как в lib)
+    if #heads == 0 then
+      -- 11 окт: пустая строка — нота C текущей октавы с этим инструментом (цифры «не вставлялись»)
+      local pitch = model.BASE_NOTE + ((vim.octave or 4) - 4) * 12
+      if pi then
+        if pi.kids and pi.kids[1] and pi.kids[1].lo then pitch = pi.kids[1].lo
+        elseif pi.lo and pi.hi and not inr(pi, pitch) then pitch = pi.lo end
+      end
+      edit.run('set instrument', function()
+        edit.insert_note(col.track, nil, state.lpb, vim.cur.row, pitch, vim.vel, 1, (e and e.item) or 'midi', e and e.item and true)
+      end)
+      model.invalidate()
+      vim.msg = ('instrument %02d (%s): new note %s'):format(ctx.inst_disp(col, n), (e and e.name) or (pi and pi.name) or '', model.note_name(pitch))
+      return
+    end
     edit.run('set instrument', function()
       for _, h in ipairs(heads) do
-        if h.kind == 'audio' then
-          local pitch = model.BASE_NOTE + math.floor((h.semis or 0) + 0.5)
+        if h.kind == 'audio' or h.kind == 'midi' then
+          local pitch = h.kind == 'midi' and h.pitch or (model.BASE_NOTE + math.floor((h.semis or 0) + 0.5))
           local rows = math.max(1, h.rows or 1)
-          edit.delete({ h }, state.lpb)
-          edit.insert_note(col.track, nil, state.lpb, h.row0, pitch, vim.vel, rows, e.item)
+          if e and e.item then
+            edit.delete({ h }, state.lpb)
+            edit.insert_note(col.track, nil, state.lpb, h.row0, pitch, vim.vel, rows, e.item, true)
+          else
+            local p2 = pitch
+            if pi.kids then
+              local hit = false
+              for _, ke in ipairs(pi.kids) do if inr(ke, pitch) then hit = true; break end end
+              if not hit and pi.kids[1] and pi.kids[1].lo then p2 = pi.kids[1].lo end
+            elseif pi.lo and pi.hi and not inr(pi, pitch) then p2 = pi.lo end
+            if h.kind == 'midi' then
+              if p2 ~= pitch then edit.set_pitch({ h }, state.lpb, p2) end
+            else
+              edit.delete({ h }, state.lpb)
+              edit.insert_note(col.track, nil, state.lpb, h.row0, p2, vim.vel, rows, 'midi')
+            end
+          end
           done = done + 1
         end
       end
     end)
     model.invalidate()
-    vim.msg = done > 0 and ('instrument %02d (%s)'):format(n, e.name or '') or 'instrument: audio notes only'
+    vim.msg = done > 0 and ('instrument %02d (%s)'):format(ctx.inst_disp(col, n), (e and e.name) or (pi and pi.name) or '') or 'instrument: nothing to set in this row'
   end,
   -- импульс ReaVerb (5 окт): путь к файлу — FILE0 плагина, иначе из его
   -- состояния в чанке трека (base64 → поиск пути .wav / .aif / .flac)
@@ -2780,7 +2878,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,mixer,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_side,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -2799,12 +2897,17 @@ ctx = {
     if q and not q:find('title', 1, true) then local a, rest = q:match('^([^|]*)(|.*)$'); if a then q = a .. ',title' .. rest; state.quick = q end end   -- 8 окт: title — в конец левой колонки
     if q and not q:find('autoinst', 1, true) and q:find('autofocus', 1, true) then q = q:gsub('autofocus', 'autofocus,autoinst', 1); state.quick = q end   -- 11 окт: auto instrument — под autofocus
     if q and not q:find('armsel', 1, true) and q:find('autoinst', 1, true) then q = q:gsub('autoinst', 'autoinst,armsel', 1); state.quick = q end   -- 11 окт: rec follows selection — под ним
-    if q and q:find('dsp_big', 1, true) and not q:find('mixer', 1, true) then q = q:gsub('dsp_big', 'dsp_big,mixer', 1); state.quick = q end   -- 8 окт: mixer — под router
     if q and not q:find('dsp_big', 1, true) then
       q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
       local a, b = q:match('^([^|]*)|(.*)$')
       q = a and (a .. '|clipsview,dsp_big,' .. b) or q
       state.quick = q
+    end
+    -- 11 окт: browser < > и mixer ^ v убраны из быстрых — положение задают панели (Ctrl+W)
+    if q then
+      local q2 = q:gsub('[^,|]+', function(x) if x == 'q_side' or x == 'mixer' then return '' end end)
+      q2 = q2:gsub(',,+', ','):gsub(',|', '|'):gsub('|,', '|'):gsub('^,', ''):gsub(',$', '')
+      if q2 ~= q then q = q2; state.quick = q end
     end
     return q or ctx.QUICK_DEFAULT
   end,
@@ -3896,22 +3999,101 @@ ctx = {
     local c = ctx.ti_cache[col.guid]
     if c then return c end
     c = {}
-    for fx = 0, reaper.TrackFX_GetCount(col.track) - 1 do
-      local _, raw = reaper.TrackFX_GetFXName(col.track, fx, '')
+    local tr = col.track
+    -- 11 окт: RS5K — диапазон нот (по нему MIDI-нота получает номер инструмента)
+    local function note_range(fx)
+      local lo, hi
+      for p = 0, reaper.TrackFX_GetNumParams(tr, fx) - 1 do
+        local _, pn = reaper.TrackFX_GetParamName(tr, fx, p, '')
+        pn = (pn or ''):lower()
+        if pn:find('note range start', 1, true) then lo = math.floor(reaper.TrackFX_GetParamNormalized(tr, fx, p) * 127 + 0.5)
+        elseif pn:find('note range end', 1, true) then hi = math.floor(reaper.TrackFX_GetParamNormalized(tr, fx, p) * 127 + 0.5) end
+        if lo and hi then break end
+      end
+      return lo, hi
+    end
+    local function visit(fx, top)
+      local _, raw = reaper.TrackFX_GetFXName(tr, fx, '')
       raw = raw or ''
+      local shown = raw
       -- 10 окт: переименованный плагин (RS5K берёт имя сэмпла) терял префикс «VSTi:» и выпадал из lib —
       -- узнаём по original_name
-      local okn, orig = reaper.TrackFX_GetNamedConfigParm(col.track, fx, 'original_name')
+      local okn, orig = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'original_name')
       if okn and orig ~= '' and not raw:match('^%w+i?:') then raw = orig end
-      local lo = raw:lower()
+      -- 11 окт: контейнер — кит (все дети инструменты, 2+: нарезка в RS5K) — ОДНОЙ строкой lib,
+      -- его слайсы — в панели slices; иначе инструменты внутри — каждый своей строкой
+      local okc, cnt = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'container_count')
+      if okc and tonumber(cnt) then
+        local kids, all_inst = {}, tonumber(cnt) >= 2
+        for k = 0, tonumber(cnt) - 1 do
+          local ok2, id = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'container_item.' .. k)
+          id = ok2 and tonumber(id)
+          if id then
+            local _, kr = reaper.TrackFX_GetFXName(tr, id, '')
+            local okn2, ko = reaper.TrackFX_GetNamedConfigParm(tr, id, 'original_name')
+            local kraw = (okn2 and ko ~= '' and not (kr or ''):match('^%w+i?:')) and ko or (kr or '')
+            if ctx.is_inst_name(kraw) then
+              local ke = { fx = id, name = ((kr or ''):match('^%w+i?:') and kr:gsub('^[^:]*: ', '') or kr) }
+              if kraw:lower():find('reasamplomatic', 1, true) then ke.lo, ke.hi = note_range(id) end
+              kids[#kids + 1] = ke
+            else all_inst = false end
+          end
+        end
+        if all_inst then
+          local nm = (shown ~= '' and not shown:match('^%w+:')) and shown or 'kit'
+          if top then for _, f in ipairs(col.fx or {}) do if f.i == fx and f.name and f.name ~= '' then nm = f.name; break end end end
+          c[#c + 1] = { fx = fx, name = nm, kind = 'kit', kids = kids }
+        else
+          for k = 0, tonumber(cnt) - 1 do
+            local ok2, id = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'container_item.' .. k)
+            if ok2 and tonumber(id) then visit(tonumber(id), false) end
+          end
+        end
+        return
+      end
       if ctx.is_inst_name(raw) then
         local nm = (raw:gsub('^[^:]*: ', ''))
-        for _, f in ipairs(col.fx or {}) do if f.i == fx and f.name and f.name ~= '' then nm = f.name; break end end   -- имя как в DSP (slixer, не описание JSFX)
-        c[#c + 1] = { fx = fx, name = nm, kind = (raw:match('^(%w+):') or 'fx'):lower() }   -- kind: js / vsti / vst3i / aui / au (mfx) / clapi
+        if top then
+          for _, f in ipairs(col.fx or {}) do if f.i == fx and f.name and f.name ~= '' then nm = f.name; break end end   -- имя как в DSP (slixer, не описание JSFX)
+        elseif shown ~= '' and not shown:match('^%w+i?:') then nm = shown end   -- внутри контейнера — своё (переименованное) имя
+        local e = { fx = fx, name = nm, kind = (raw:match('^(%w+):') or 'fx'):lower() }   -- kind: js / vsti / vst3i / aui / au (mfx) / clapi
+        if raw:lower():find('reasamplomatic', 1, true) then e.lo, e.hi = note_range(fx) end
+        c[#c + 1] = e
       end
     end
+    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do visit(fx, true) end
     ctx.ti_cache[col.guid] = c
     return c
+  end,
+  -- 11 окт: номер инструмента у MIDI-ноты (поле inst): плагин трека, что её играет —
+  -- RS5K, чей диапазон нот её включает, иначе единственный инструмент трека; номер
+  -- как в lib (после сэмплов и пустых слотов)
+  midi_inst_num = function(item, pitch)
+    if not (item and pitch and snap) then return nil end
+    local mc = ctx.mi_cache
+    if not mc or mc.snap ~= snap then mc = { snap = snap, cols = {}, n = {} }; ctx.mi_cache = mc
+      for _, c in ipairs(snap.cols) do if c.track then mc.cols[c.track] = c end end
+    end
+    local key = tostring(item) .. ':' .. pitch
+    local v = mc.n[key]
+    if v ~= nil then return v or nil end
+    v = false
+    local tr = reaper.ValidatePtr(item, 'MediaItem*') and reaper.GetMediaItem_Track(item)
+    local col = tr and mc.cols[tr]
+    if col then
+      local insts = ctx.track_insts(col)
+      local base = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
+      local only
+      local function hit(e) return e.lo and e.hi and pitch >= math.min(e.lo, e.hi) and pitch <= math.max(e.lo, e.hi) end
+      for k, fi in ipairs(insts) do
+        if hit(fi) then v = base + k; break end
+        if fi.kids then for _, ke in ipairs(fi.kids) do if hit(ke) then v = base + k; break end end; if v then break end end   -- кит: нота слайса — номер контейнера
+        if not fi.lo and not fi.kids then only = only and -1 or k end
+      end
+      if not v and only and only > 0 and #insts == 1 then v = base + only end
+    end
+    mc.n[key] = v
+    return v or nil
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
   mono_on = function() return state.slicemono end,
@@ -3958,6 +4140,228 @@ ctx = {
     if not hit then state.hscroll = ci; relayout(); for i, f in ipairs(L.flat or {}) do if f.ci == ci then vim.cur.fi = i; break end end end
     ctx.set_focus('tracker')
     vim.msg = 'track: ' .. (col.name or '')
+  end,
+  -- 11 окт: меню трека (как ПКМ по треку в REAPER): вставка / шаблоны / удаление,
+  -- папки, freeze, lock, лейны, авто-arm, цвет, timebase, автоматизация, производительность,
+  -- огибающие, Track Manager. Действия REAPER — по тексту (cmd_by_text), без зашитых номеров
+  track_menu = function(col)
+    if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
+    local tr = col.track
+    if not reaper.IsTrackSelected(tr) then reaper.SetOnlyTrackSelected(tr) end
+    local function act(txt) return function()
+      local id = ctx.cmd_by_text(txt)
+      if id then reaper.Main_OnCommand(id, 0); model.invalidate(); relayout() else vim.msg = 'no REAPER action: ' .. txt end
+    end end
+    local function on(txt) local id = ctx.cmd_by_text(txt); return id and reaper.GetToggleCommandState(id) == 1 end
+    local function mark(b) return b and '  (on)' or '' end
+    local function sub(title, list) return function()
+      local items = {}
+      for _, e in ipairs(list) do items[#items + 1] = { key = e[1], label = e[2], fn = e[3] } end
+      return { title = title, items = items }
+    end end
+    local tb = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'C_BEATATTACHMODE'))
+    local am = reaper.GetTrackAutomationMode(tr)
+    local pf = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_PERFFLAGS'))
+    local function set_tb(v) return function() edit.run('track timebase', function() reaper.SetMediaTrackInfo_Value(tr, 'C_BEATATTACHMODE', v) end) end end
+    local function set_am(v) return function() edit.run('track automation mode', function() reaper.SetTrackAutomationMode(tr, v) end) end end
+    local function tog_pf(bit) return function() edit.run('track performance', function() reaper.SetMediaTrackInfo_Value(tr, 'I_PERFFLAGS', pf ~ bit) end) end end
+    local items = {
+      { key = 'n', label = 'Insert new track (tt)', fn = function() ctx.new_track(1) end },
+      { key = 'N', label = 'Insert new track at end of track list', fn = act('Insert new track at end of track list') },
+      { key = 'v', label = 'Insert virtual instrument on new track …', fn = act('Insert virtual instrument on new track') },
+      { key = 'T', label = 'Insert track from template … (tT)', fn = function() ctx.template_picker() end },
+      { key = 'S', label = 'Save tracks as track template …', fn = act('Save tracks as track template') },
+      { key = 'd', label = 'Remove tracks - to the buffer (td)', fn = function() ctx.tracks_op('delete', 1) end },
+      { key = 'y', label = 'Duplicate tracks (ty)', fn = function() ctx.track_dup() end },
+      { key = 'f', label = 'Folder', sub = sub('folder', {
+          { 'f', 'Make folder from selected tracks', act('Make folder from selected tracks') },
+          { 'p', 'Move tracks to new subproject', act('Move tracks to new subproject') },
+          { 'z', (state.folds[col.guid] and 'Unfold' or 'Fold') .. ' track in the tracker (za)', function() ctx.fold(col, not state.folds[col.guid]) end } }) },
+      { key = 'r', label = 'Render / freeze tracks', sub = sub('render / freeze', {
+          { 's', 'Freeze to stereo', act('Freeze to stereo') }, { 'm', 'Freeze to mono', act('Freeze to mono') },
+          { 'u', 'Unfreeze tracks', act('Unfreeze tracks') },
+          { 'r', 'Render tracks to stereo stem tracks (and mute originals)', act('Render tracks to stereo stem tracks (and mute') } }) },
+      { key = 'L', label = 'Lock', sub = sub('lock', {
+          { 'c', 'Lock track controls' .. mark(reaper.GetMediaTrackInfo_Value(tr, 'C_LOCK') % 2 == 1), act('Lock/unlock track controls') },
+          { 'i', 'Lock track items', act('Lock track items') } }) },
+      { key = 'l', label = 'Fixed item lanes (tl)', fn = function() ctx.toggle_lanes() end },
+      { key = 'a', label = 'Automatic record-arm when track selected' .. mark(reaper.GetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM') == 1), fn = function()
+          edit.run('auto record-arm', function() reaper.SetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM', reaper.GetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM') == 1 and 0 or 1) end) end },
+      { key = 'c', label = 'Track colour (tc)', fn = function() ctx.track_colour() end },
+      { key = 'e', label = 'Rename (tn)', fn = function() ctx.rename_track_prompt(col) end },
+      { key = 'i', label = 'Input … (ti)', fn = function() ctx.input_picker(col) end },
+      { key = 'x', label = 'Add FX … (tf)', fn = function() ctx.fx_picker() end },
+      { key = 'R', label = 'Routing … (tR)', fn = function() ctx.route_menu(col) end },
+      { key = 'b', label = 'Track timebase', sub = sub('timebase', {
+          { 'p', 'Project default' .. mark(tb == -1), set_tb(-1) }, { 't', 'Time' .. mark(tb == 0), set_tb(0) },
+          { 'b', 'Beats (position, length, rate)' .. mark(tb == 1), set_tb(1) }, { 'o', 'Beats (position only)' .. mark(tb == 2), set_tb(2) } }) },
+      { key = 'A', label = 'Track automation mode', sub = sub('automation mode', {
+          { 't', 'Trim / Read' .. mark(am == 0), set_am(0) }, { 'r', 'Read' .. mark(am == 1), set_am(1) }, { 'o', 'Touch' .. mark(am == 2), set_am(2) },
+          { 'l', 'Latch' .. mark(am == 4), set_am(4) }, { 'p', 'Latch preview' .. mark(am == 5), set_am(5) }, { 'w', 'Write' .. mark(am == 3), set_am(3) } }) },
+      { key = 'P', label = 'Track performance options', sub = sub('performance', {
+          { 'b', 'Prevent media buffering' .. mark(pf & 1 == 1), tog_pf(1) },
+          { 'a', 'Prevent anticipative FX' .. mark(pf & 2 == 2), tog_pf(2) } }) },
+      { key = 'E', label = 'Envelopes', sub = sub('envelopes', {
+          { 's', 'Show all envelopes for tracks', act('Show all envelopes for tracks') },
+          { 'h', 'Hide all envelopes for tracks', act('Hide all envelopes for tracks') },
+          { 'k', 'Envelope columns in the tracker on / off', function() state.envs = not state.envs; relayout() end } }) },
+      { key = 'G', label = 'Track grouping …', fn = act('Track grouping parameters') },
+      { key = 'M', label = 'Track Manager (show / hide tracks)', fn = function() ctx.pane_focus('tracks') end },
+      { key = 'm', label = 'Mute' .. mark(col.muted), fn = function() edit.run('track mute', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', col.muted and 0 or 1) end) end },
+      { key = 's', label = 'Solo' .. mark(col.solo), fn = function() edit.run('track solo', function() reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', col.solo and 0 or 2) end) end },
+    }
+    vim.open_hydra({ title = 'track: ' .. (col.name ~= '' and col.name or 'track'), items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  TRK_BTN = { mute = 'B_MUTE', solo = 'I_SOLO', arm = 'I_RECARM', monitor = 'I_RECMON', phase = 'B_PHASE' },   -- 11 окт: кнопки M S R шапки / микшера
+  -- 11 окт: шаблоны треков (колонка справа в DSP): TrackTemplates с подпапками, без шелла
+  -- (EnumerateFiles / EnumerateSubdirectories); перечитывается раз в 30 с
+  presets = function()
+    local now = reaper.time_precise()
+    if ctx.pr_items and now - (ctx.pr_t or 0) < 30 then return ctx.pr_items end
+    local root = reaper.GetResourcePath() .. '/TrackTemplates'
+    local out = {}
+    local function scan(dir, rel, depth)
+      reaper.EnumerateFiles(dir, -1)                 -- сброс кеша REAPER
+      local files, i = {}, 0
+      while true do
+        local f = reaper.EnumerateFiles(dir, i); if not f then break end
+        if f:lower():match('%.rtracktemplate$') then files[#files + 1] = f end
+        i = i + 1
+      end
+      table.sort(files, function(a, b) return a:lower() < b:lower() end)
+      for _, f in ipairs(files) do out[#out + 1] = { name = f:gsub('%.[Rr][Tt]rack[Tt]emplate$', ''), path = dir .. '/' .. f, dir = rel } end
+      if depth >= 4 then return end
+      local subs, j = {}, 0
+      while true do
+        local d = reaper.EnumerateSubdirectories(dir, j); if not d then break end
+        subs[#subs + 1] = d; j = j + 1
+      end
+      table.sort(subs, function(a, b) return a:lower() < b:lower() end)
+      for _, d in ipairs(subs) do scan(dir .. '/' .. d, rel == '' and d or (rel .. '/' .. d), depth + 1) end
+    end
+    scan(root, '', 0)
+    ctx.pr_items, ctx.pr_t = out, now
+    return out
+  end,
+  -- < шаблон > в шапке DSP (11 окт): ±1 — соседний шаблон, 0 — выпадашка
+  tmpl_do = function(d)
+    local items = ctx.presets()
+    if #items == 0 then vim.msg = 'no track templates in TrackTemplates'; return end
+    local PR = draw.PR
+    if d == 0 then ctx.template_picker(); state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }; return end
+    PR.cur = ((PR.cur or 1) - 1 + d) % #items + 1
+    vim.msg = ('track template %d/%d: %s - click the name: the list, pick inserts after the cursor track'):format(PR.cur, #items, items[PR.cur].name)
+  end,
+  -- tT (11 окт): выпадашка-fzf шаблонов треков у курсора; Enter — вставить после трека курсора
+  template_picker = function()
+    local items = {}
+    for _, it in ipairs(ctx.presets()) do items[#items + 1] = { label = (it.dir ~= '' and (it.dir .. '/') or '') .. it.name, data = it } end
+    if #items == 0 then vim.msg = 'no track templates in TrackTemplates'; return end
+    vim.open_picker('track template - after the cursor track', items, function(e)
+      for k, it in ipairs(ctx.presets()) do if it == e.data then draw.PR.cur = k end end
+      ctx.preset_insert(e.data)
+    end, '')
+  end,
+  -- вставить шаблон: трек(и) после трека курсора (REAPER кладёт шаблон за выделенным)
+  preset_insert = function(it)
+    if not (it and it.path) then return end
+    local col = cur_col()
+    edit.run('insert track template: ' .. it.name, function()
+      if col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then reaper.SetOnlyTrackSelected(col.track) end
+      reaper.Main_openProject(it.path)
+    end)
+    model.invalidate(); relayout()
+    vim.msg = 'track template inserted: ' .. it.name
+  end,
+  -- 11 окт: блок трека в DSP (R I M S, vol, pan, in, out) — щелчок по имени трека в шапке DSP
+  dsptrack_toggle = function()
+    state.dsptrack = not state.dsptrack
+    reaper.SetExtState(EXT, 'dsptrack', state.dsptrack and '1' or '0', true)
+    vim.msg = 'dsp track block: ' .. (state.dsptrack and 'on' or 'off')
+  end,
+  hover_tip_dsptrk = 'click: the track block (R I M S, volume, pan, input, output) on / off',
+  -- 11 окт: модуль tracks (Track Manager): значение клетки и его смена; столбцы — draw.TL_COLS
+  tlist_get = function(col, k)
+    if k == 'T' then return not (state.thide and state.thide[col.guid]) end
+    local tr = col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return false end
+    if k == 'tcp' then return reaper.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1
+    elseif k == 'mcp' then return reaper.GetMediaTrackInfo_Value(tr, 'B_SHOWINMIXER') == 1
+    elseif k == 'M' then return reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1
+    elseif k == 'S' then return reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0
+    elseif k == 'R' then return reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 end
+    return false
+  end,
+  -- v — новое значение для списка индексов snap.cols (одно отменяемое действие)
+  tlist_set = function(cis, k, v)
+    if k == 'T' then
+      state.thide = state.thide or {}
+      for _, ci in ipairs(cis) do local col = snap.cols[ci]; if col then state.thide[col.guid] = (not v) or nil end end
+      relayout(); return
+    end
+    local F = { tcp = 'B_SHOWINTCP', mcp = 'B_SHOWINMIXER', M = 'B_MUTE', S = 'I_SOLO', R = 'I_RECARM' }
+    local f = F[k]
+    if not f then return end
+    edit.run('tracks: ' .. k, function()
+      for _, ci in ipairs(cis) do
+        local col = snap.cols[ci]
+        local tr = col and col.track
+        if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(tr, f, v and (k == 'S' and 2 or 1) or 0) end
+      end
+      if k == 'tcp' or k == 'mcp' then reaper.TrackList_AdjustWindows(false) end
+    end)
+  end,
+  tlist_toggle = function(ci, k)
+    local col = snap and snap.cols[ci]
+    if not col then return end
+    local v = not ctx.tlist_get(col, k)
+    ctx.tlist_set({ ci }, k, v)
+    vim.msg = ('%s %s: %s'):format(col.name or '', k, v and 'on' or 'off')
+    return v
+  end,
+  -- весь столбец (строки списка, с фильтром — только найденные): все включены — выключить, иначе включить
+  tlist_column = function(k)
+    local list = draw.tl_rows(state, snap)
+    local all = #list > 0
+    for _, ci in ipairs(list) do if not ctx.tlist_get(snap.cols[ci], k) then all = false; break end end
+    if k == 'T' and all then
+      -- последний видимый трек не прячем: в трекере должно что-то остаться
+      local cg = L and L.flat and L.flat[vim.cur.fi] and L.flat[vim.cur.fi].col
+      local keep = {}
+      for _, ci in ipairs(list) do if not (cg and snap.cols[ci].guid == cg.guid) then keep[#keep + 1] = ci end end
+      ctx.tlist_set(keep, k, false)
+    else ctx.tlist_set(list, k, not all) end
+    vim.msg = ('tracks %s: %s (%d)'):format(k, all and 'off' or 'on', #list)
+  end,
+  -- клавиши модуля tracks; false — клавиша не его (уходит в vim)
+  tlist_key = function(c)
+    local TL = draw.TL
+    local ch = c < 256 and string.char(c) or ''
+    if TL.typing then
+      if c == 27 then TL.typing = false; TL.filter = ''
+      elseif c == 13 then TL.typing = false
+      elseif c == 8 then TL.filter = TL.filter:sub(1, -2)
+      elseif c >= 32 and c < 127 then TL.filter = TL.filter .. ch; TL.cur = 1 end
+      return true
+    end
+    local list = draw.tl_rows(state, snap)
+    local ci = list[TL.cur]
+    local K = draw.TL_COLS[TL.col]
+    if ch == 'j' or c == keys.down then TL.cur = math.min(#list, TL.cur + 1)
+    elseif ch == 'k' or c == keys.up then TL.cur = math.max(1, TL.cur - 1)
+    elseif ch == 'h' or c == keys.left then TL.col = math.max(1, TL.col - 1)
+    elseif ch == 'l' or c == keys.right then TL.col = math.min(#draw.TL_COLS, TL.col + 1)
+    elseif ch == 'g' then TL.cur = 1
+    elseif ch == 'G' then TL.cur = math.max(1, #list)
+    elseif ch == ' ' or ch == 'x' then if ci and K then ctx.tlist_toggle(ci, K.k) end
+    elseif ch == 'a' then if K then ctx.tlist_column(K.k) end
+    elseif c == 13 then if ci then ctx.tlist_do(ci, 'go') end
+    elseif ch == 'z' then if ci and snap.cols[ci].folder then ctx.tlist_do(ci, 'fold') end
+    elseif ch == '/' then TL.typing = true; TL.filter = ''; TL.cur = 1
+    elseif c == 27 then if TL.filter ~= '' then TL.filter = '' else ctx.set_focus('tracker') end
+    else return false end
+    return true
   end,
   markers_menu = function()
     local items = {}
@@ -4021,7 +4425,7 @@ ctx = {
         if (pn or ''):lower():find(want, 1, true) then return p end
       end
     end
-    local n = 0
+    local n, i0, packed = 0, reaper.TrackFX_GetCount(tr), false
     edit.run('convert slices to RS5K', function()
       for k, sp in ipairs(spans) do
         local fx = reaper.TrackFX_AddByName(tr, 'ReaSamplOmatic5000 (Cockos)', false, -1)
@@ -4042,9 +4446,23 @@ ctx = {
           n = n + 1
         end
       end
+      -- 11 окт: слайсов много — все RS5K одним контейнером «имя сэмпла N$» (REAPER 7);
+      -- в DSP он раскрывается видом кита: слайс за слайсом со свойствами
+      if n > 1 and edit.fx_pack and edit.fx_pack(tr, i0, i0 + n - 1) then
+        packed = true
+        -- 11 окт: REAPER открыл окно каждого нового RS5K — после нарезки все закрыть
+        local okc, cnt = reaper.TrackFX_GetNamedConfigParm(tr, i0, 'container_count')
+        for k = 0, (okc and tonumber(cnt) or 0) - 1 do
+          local ok2, id = reaper.TrackFX_GetNamedConfigParm(tr, i0, 'container_item.' .. k)
+          if ok2 and tonumber(id) then reaper.TrackFX_Show(tr, tonumber(id), 2) end
+        end
+        reaper.TrackFX_Show(tr, i0, 2)
+        reaper.TrackFX_SetNamedConfigParm(tr, i0, 'renamed_name', ('%s %d$'):format(root.name or 'slices', n))   -- 11 окт: «имя сэмпла 7$» — $ = слайсы
+      end
     end)
+    if not packed then for f2 = i0, i0 + n - 1 do reaper.TrackFX_Show(tr, f2, 2) end end
     model.invalidate()
-    vim.msg = ('convert: %d RS5K on %s, slice S01 = note %d (a key each)'):format(n, col.name or 'track', base)
+    vim.msg = ('convert: %d RS5K%s on %s, slice S01 = note %d (a key each)'):format(n, packed and ' in a container' or '', col.name or 'track', base)
   end,
   slq_menu = function()
     local items = {}
@@ -8710,6 +9128,33 @@ ctx = {
     if steps < 1 then vim.msg = 'min 1 step'; return end
     ctx.set_region_len(rg, edit.row_time(rg.r0 + steps, state.lpb, 0))
   end,
+  -- 11 окт: клик по числу «< N >» — выпадашка длин: такты и доли размера
+  -- в начале региона, вдвое / вполовину от текущей; текущая — (on)
+  region_len_menu = function()
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if not rg then vim.msg = 'cursor is not inside a region'; return end
+    local cur = math.floor((rg.r1 - rg.r0) + 0.5)
+    local _, qms, qme = reaper.TimeMap_QNToMeasures(0, (rg.qn0 or 0) + 1e-6)
+    local bar = math.max(1, math.floor(((qme and qms) and (qme - qms) or 4) * state.lpb + 0.5))
+    local vals, seen = {}, {}
+    local function add(n, why) n = math.floor(n + 0.5); if n >= 1 and not seen[n] then seen[n] = true; vals[#vals + 1] = { n, why } end end
+    add(math.max(1, bar // 4), '1/4 bar'); add(bar // 2, '1/2 bar')
+    for _, b in ipairs({ 1, 2, 3, 4, 6, 8, 12, 16 }) do add(bar * b, b .. (b == 1 and ' bar' or ' bars')) end
+    add(cur // 2, 'half'); add(cur * 2, 'double')
+    table.sort(vals, function(a, b) return a[1] < b[1] end)
+    local KEYS = '1234567890qwertyuiop'
+    local items = {}
+    for i, v in ipairs(vals) do
+      local n = v[1]
+      items[#items + 1] = { key = KEYS:sub(i, i), label = ('%d  %s'):format(n, v[2]) .. (n == cur and '  (on)' or ''), fn = function()
+        if n ~= cur then ctx.set_region_len(rg, edit.row_time(rg.r0 + n, state.lpb, 0)) end
+        vim.msg = ('region length: %d steps'):format(n)
+      end }
+    end
+    vim.open_hydra({ title = 'region length (steps)', items = items })
+    local a = draw.rglen_at
+    state.popup_at = a and { kind = 'xy', x = a[1], y = a[2] } or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   -- кнопки под именем региона (2 окт): /2 x2 — длина вдвое (ripple, как :len),
   -- dup — копия региона справа как новый паттерн (как D в матрице)
   region_btn = function(what)
@@ -10256,6 +10701,7 @@ edit.inst_ref = function(it)
   return e and e.item or nil
 end
 SPROP.init(U, ctx)
+draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
 local function hint_go(t)
@@ -10308,12 +10754,13 @@ local function hint_go(t)
     if d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
-  elseif t.kind == 'rglen' then ctx.region_len_step(d)
+  elseif t.kind == 'rglen' then if d == 0 then ctx.region_len_menu() else ctx.region_len_step(d) end
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
   elseif t.kind == 'viewbtn' and d == 'markers' then ctx.markers_menu()
   elseif t.kind == 'tlist' then ctx.tlist_do(d.ci, d.what)   -- 11 окт: track list по f
+  elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
   elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
@@ -10386,6 +10833,10 @@ local function hint_go(t)
   elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
   elseif t.kind == 'poolinst' then ctx.inst_fx_pick(cur_col(), d)
   elseif t.kind == 'dsptarget' then ctx.set_focus('dsp'); ctx.dsp_toggle_target(d == 'take')
+  elseif t.kind == 'dsprouting' and d == 'route' then ctx.dsp_big()
+  elseif t.kind == 'dsptrkname' then ctx.dsptrack_toggle()
+  elseif t.kind == 'tmpl' then ctx.tmpl_do(d)
+  elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
 end
@@ -10581,6 +11032,8 @@ function ctx.ctx_page(hover)
   return ctx.CTX_FOCUS[f] and f or nil
 end
 local function context_menu(hover, anchor)
+  -- 11 окт: ПКМ по имени трека — меню трека, как в REAPER (не смесь с пунктами модуля в фокусе)
+  if hover.header_col and not hover.header_env and ctx.track_menu then ctx.track_menu(hover.header_col); return end
   local items = ctx.context_items(hover) or {}
   local used, hitems, have = { ['?'] = true }, {}, {}
   local function pick_key(want, label)
@@ -12458,6 +12911,20 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  -- 11 окт: микшер снизу = модуль mixer. Панель спрятали (Ctrl+W c, пресет) — микшер выкл;
+  -- микшер включили (zm, опции) — панель снова под трекером. Иначе трекер рисовал
+  -- полоски у себя внутри, без модуля
+  if state.panes_ui and state.panes then
+    local PNm = draw.panes
+    local vis = PNm.visible(state.panes, 'mixer')
+    local want = state.mixer and (state.mixpos or 'bottom') == 'bottom'
+    if want and not vis then
+      if ctx.mix_vis_prev then state.mixer = false; vim.msg = 'mixer off (its pane was hidden; zm - back)'
+      else PNm.split(state.panes, 'tracker', 'mixer', 'd', 0.28) end
+      relayout()
+    end
+    ctx.mix_vis_prev = PNm.visible(state.panes, 'mixer') and state.mixer
+  end
   if model.OFF_END ~= (state.offend or false) then model.OFF_END, edit.OFF_END = state.offend or false, state.offend or false; model.invalidate() end   -- OFF в конце строки (опция, 8 окт)
   if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
   theme_check()
@@ -13008,7 +13475,7 @@ local function frame()
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
     smart_ok = reaper.file_exists(ctx.smart_input_path),
-    dsptrack = state.dsptrack,
+    dsptrack = state.dsptrack, presets = ctx.presets,
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
@@ -13186,7 +13653,7 @@ local function frame()
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
-    keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale,
+    keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -13521,6 +13988,38 @@ local function frame()
         draw.vbar('slices', x + w - 4, y + Lx.rh, 3, nvis * Lx.rh * (SPROP.szoom or 1), SPROP.slice_scroll or 0, nvis, #list)
         return hv
       end
+      -- 11 окт: в lib выбран кит (контейнер слайсов RS5K) — его слайсы: имя, нота, громкость;
+      -- щелчок — прослушать слайс и выбрать его в ките DSP
+      ctx.kit_hot = nil
+      do
+        local col = cur_col()
+        local sel = col and ctx.inst_fx(col)
+        local kit
+        if sel then for _, e in ipairs(ctx.track_insts(col)) do if e.fx == sel and e.kids then kit = e end end end
+        if kit then
+          U.text(x, y, ctx.fit(('%d$  %s'):format(#kit.kids, kit.name or 'kit'), w - 5), U.AMBER)
+          local mx, my = gfx.mouse_x, gfx.mouse_y
+          local nvis = math.max(1, math.floor((h - Lx.rh) / Lx.rh))
+          local kkey = tostring(col.guid) .. ':' .. tostring(kit.fx)
+          local ks = draw.kit_sel and draw.kit_sel[kkey] or 0
+          for i = 1, math.min(nvis, #kit.kids) do
+            local ke = kit.kids[i]
+            local ry = y + i * Lx.rh
+            local hot = mx >= x and mx < x + w and my >= ry and my < ry + Lx.rh
+            if hot or i == ks then U.set(U.tint(U.AMBER, hot and 0.3 or 0.18)); gfx.rect(x, ry, w - 5, Lx.rh, 1) end
+            local nm = (ke.name or ''):match('^(%S+)') or ('S%02d'):format(i)
+            local note = ke.lo and model.note_name(ke.lo) or '--'
+            local vol = ''
+            for p = 0, math.min(3, reaper.TrackFX_GetNumParams(col.track, ke.fx) - 1) do
+              local _, pn = reaper.TrackFX_GetParamName(col.track, ke.fx, p, '')
+              if (pn or ''):lower():find('volume', 1, true) then local _, fv = reaper.TrackFX_GetFormattedParamValue(col.track, ke.fx, p, ''); vol = fv or ''; break end
+            end
+            U.text(x + 2, ry, ctx.fit(('%-4s %-4s %s'):format(nm, note, vol), w - 9), (i == ks) and U.AMBER or (hot and U.TEXT or U.GREY))
+            if hot then ctx.kit_hot = { col = col, kit = kit, i = i, key = kkey } end
+          end
+          return nil
+        end
+      end
       -- 10 окт (по приколу): выбран RS5K в DSP — вместо слайсов список его сэмплов FILE0..n
       do
         local t = dsp_target()
@@ -13756,6 +14255,7 @@ local function frame()
   -- метки f и призраки бросков — после всех оверлеев (session, эффекты,
   -- роутер), иначе их заливка закрашивала метки клипов и сцен (8 окт)
   draw.pmark('post: hints, ghosts, popups')
+  draw.pane_badge_tracker(L, state.pane_mode)
   HN.draw(U, L)
   B.draw_drag(U, L)
   if dsp_drag and dsp_drag.active then draw.ghost(dsp_drag.f.name) end
@@ -14004,7 +14504,9 @@ local function frame()
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
-  elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step; later regions and items ripple (:len N)'
+  elseif hover.dsptrkname then state.status = ctx.hover_tip_dsptrk
+  elseif hover.tlist_tip then state.status = 'tracks: ' .. hover.tlist_tip .. ' - click toggles, drag down the column sets the same, header - whole column'
+  elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step, click the number: a list of lengths; later regions and items ripple (:len N)'
   elseif hover.sess then state.status = ('clip: %s / %s - click: cursor, dblclick / Enter: launch at %s, rclick: menu, drop a file or a pm card here'):format(ctx.ss_colname(hover.sess.ci), MX.SS.slot_name(seq[hover.sess.ri], hover.sess.ri), MX.SS.quant)
   elseif hover.sessrow then state.status = 'scene: click / Enter / O - launch every clip of the row (empty cells stop their tracks)'
   elseif hover.sesscol then state.status = 'track: click - stop its clip at the next boundary'
@@ -14652,6 +15154,15 @@ local function frame()
     edit.fx_param(hp.track, hp.fx, hp.param, reaper.TrackFX_GetParamNormalized(hp.track, hp.fx, hp.param) + (gfx.mouse_wheel > 0 and 0.01 or -0.01))
     gfx.mouse_wheel = 0
   end
+  -- 11 окт: Option+клик по эффекту (шапка / микшер) — удалить, как в REAPER
+  local hfx = hover.hdrfx or hover.hdrinst
+  if U.click and hfx and (gfx.mouse_cap & 16 == 16) and hfx.it and hfx.it.i and hfx.col and hfx.col.track then
+    local h2 = hfx
+    edit.fx_remove(h2.col.track, h2.it.i)
+    model.invalidate(); ctx.hdr_cache = {}
+    vim.msg = 'fx removed: ' .. (h2.it.name or 'fx') .. ' (u - undo)'
+    U.click = false
+  end
   if U.click and (hover.hdrfx or hover.hdrinst or hover.hdrsend) then   -- фишки шапки (7 окт)
     local h2 = hover.hdrfx or hover.hdrinst or hover.hdrsend
     local kind = hover.hdrfx and 'fx' or (hover.hdrinst and 'inst' or 'send')
@@ -14735,7 +15246,15 @@ local function frame()
   if U.click then
     local now2 = reaper.time_precise()
     local dbl = (now2 - click.t) < 0.4
-    if hover.prevbtn then
+    if ctx.kit_hot then
+      -- 11 окт: панель slices с китом — щелчок по слайсу: прослушать его ноту и выбрать в ките DSP
+      local k = ctx.kit_hot
+      draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[k.key] = k.i
+      local ke = k.kit.kids[k.i]
+      if ke and ke.lo and ctx.preview then ctx.preview(k.col.track, ke.lo, 'midi', vim.cur.row, 1) end
+      vim.msg = ('%s: %s'):format(k.kit.name or 'kit', ke and ke.name or '')
+      click = { t = now2, zone = 'kit' }
+    elseif hover.prevbtn then
       ctx.set_focus('inst')
       state.poolprev = not state.poolprev; vim.msg = 'play on select ' .. (state.poolprev and 'on' or 'off')
       click = { t = now2, zone = 'prevbtn' }
@@ -14971,6 +15490,14 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
+    elseif hover.tlist_hdr then ctx.tlist_column(hover.tlist_hdr); click = { t = now2, zone = 'tlist' }   -- 11 окт: tracks — весь столбец
+    elseif hover.tlist and hover.tlist.what == 'cell' then
+      -- 11 окт: tracks — клетка; протяжка по столбцу ставит то же значение (ctx.tl_paint)
+      local v = ctx.tlist_toggle(hover.tlist.ci, hover.tlist.key)
+      if hover.tlist.li then draw.TL.cur = hover.tlist.li end
+      for i, c in ipairs(draw.TL_COLS) do if c.k == hover.tlist.key then draw.TL.col = i end end
+      ctx.tl_paint = { key = hover.tlist.key, v = v, done = { [hover.tlist.ci] = true } }
+      click = { t = now2, zone = 'tlist' }
     elseif hover.tlist then ctx.tlist_do(hover.tlist.ci, hover.tlist.what); click = { t = now2, zone = 'tlist' }   -- 11 окт: track list
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
     elseif hover.viewbtn == 'fxparams' then
@@ -14981,7 +15508,7 @@ local function frame()
     elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
-      if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) end
+      if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) else ctx.region_len_menu() end
       click = { t = now2, zone = 'rglen' }
     elseif hover.ruler then
       -- линейка (9 окт, как в REAPER): щелчок — курсор в строку, протяжка — time selection
@@ -15066,6 +15593,12 @@ local function frame()
     elseif hover.hdrin then
       if hover.hdrin.what == 'smart' then ctx.smart_input(hover.hdrin.col) else ctx.input_picker(hover.hdrin.col) end
       click = { t = now2, zone = 'hdrin' }
+    elseif hover.dsphsb then
+      -- 11 окт: полоса прокрутки цепочки DSP — ползунок тянется, клик мимо — страница
+      local h = hover.dsphsb
+      if h.thumb then draw.dsphsb_drag = { x0 = gfx.mouse_x, f0 = draw.dsp_first or 1, w = h.w, n = h.n }
+      else draw.dsp_first = math.max(1, math.min(h.n, (draw.dsp_first or 1) + h.dir * h.page)) end
+      click = { t = now2, zone = 'dsphsb' }
     elseif hover.hsb then
       -- скролл-бар треков (3 окт): ползунок тянется, клик мимо — страница
       if hover.hsb.thumb then draw.hsb_drag = { x0 = gfx.mouse_x, b0 = L.hs_before, w = hover.hsb.w, n = hover.hsb.n }
@@ -15273,6 +15806,13 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
+    elseif hover.dspkit then
+      -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
+      draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
+      if hover.dsp then ctx.set_focus('dsp') end
+      click = { t = now2, zone = 'dspkit' }
+    elseif hover.tmpl then ctx.tmpl_do(hover.tmpl); click = { t = now2, zone = 'tmpl' }   -- 11 окт: < шаблон > в шапке DSP
+    elseif hover.dsptrkname then ctx.dsptrack_toggle(); click = { t = now2, zone = 'dsptrkname' }   -- 11 окт: имя трека в DSP
     elseif hover.dsprouter then
       -- router (7 окт): щелчок — вкл / выкл в DSP FX, Shift+щелчок — большой роутер
       if gfx.mouse_cap & 8 == 8 then ctx.router_big() else ctx.dsp_big() end
@@ -15432,12 +15972,16 @@ local function frame()
       click = { t = now2, zone = 'btn' }
     elseif hover.btn then
       local tr, what = hover.btn.col.track, hover.btn.what
+      local F = ctx.TRK_BTN[what] or 'I_RECARM'
+      local v
       edit.run('track ' .. what, function()
-        if what == 'monitor' then reaper.SetMediaTrackInfo_Value(tr, 'I_RECMON', (math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECMON')) + 1) % 3)
-        elseif what == 'mute' then reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1 and 0 or 1)
-        elseif what == 'solo' then reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0 and 0 or 1)
-        else reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 and 0 or 1) end
+        if what == 'monitor' then v = (math.floor(reaper.GetMediaTrackInfo_Value(tr, F)) + 1) % 3
+        elseif what == 'solo' then v = reaper.GetMediaTrackInfo_Value(tr, F) > 0 and 0 or 2
+        else v = reaper.GetMediaTrackInfo_Value(tr, F) == 1 and 0 or 1 end
+        reaper.SetMediaTrackInfo_Value(tr, F, v)
       end)
+      -- 11 окт: протяжка по трекам, как в REAPER — то же значение на эту кнопку других треков
+      ctx.btn_paint = { what = what, v = v, done = { [hover.btn.col.guid] = true } }
       click = { t = now2, zone = 'btn' }
     elseif hover.header_env then
       local ok, e = pcall(context_menu, hover)
@@ -15922,7 +16466,7 @@ local function frame()
     -- (model.invalidate). Значение DSP рисует живым, поэтому пишем только
     -- изменение, а модель — один раз, при отпускании
     if p and p.kind ~= 'toggle' and hover.dsp.sv and math.abs(hover.dsp.sv - (ctx.dspdrag_v or -1)) > 1e-5 then
-      model.fxapi(col.track).SetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i, math.max(0, math.min(1, hover.dsp.sv)))
+      ctx.fx_write(col.track, hover.dsp.f, p, hover.dsp.sv)   -- 11 окт: кит all — на все RS5K
       ctx.dspdrag_v, ctx.dspdrag_dirty = hover.dsp.sv, true
     end
   end
@@ -15953,7 +16497,7 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
-  elseif U.rclick and hover.tlist then ctx.tlist_do(hover.tlist.ci, 'hide')   -- 11 окт: track list — скрыть / показать в трекере
+  elseif U.rclick and hover.tlist then local c2 = snap and snap.cols[hover.tlist.ci]; if c2 then ctx.track_menu(c2) end   -- 11 окт: tracks — меню трека (скрыть — столбец T)
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
@@ -16159,6 +16703,18 @@ local function frame()
       draw.send_drag = nil
     end
   end
+  if draw.dsphsb_drag then
+    local d = draw.dsphsb_drag
+    if gfx.mouse_cap & 1 == 1 then
+      draw.dsp_first = math.max(1, math.min(d.n, d.f0 + math.floor((gfx.mouse_x - d.x0) / math.max(1, d.w) * d.n + 0.5)))
+    else draw.dsphsb_drag = nil end
+  end
+  if gfx.mouse_wheel ~= 0 and hover and hover.tmpl then   -- 11 окт: колесо над < шаблон > — листать
+    ctx.tmpl_do(gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover and hover.dsphsb then
+    draw.dsp_first = math.max(1, math.min(hover.dsphsb.n, (draw.dsp_first or 1) + (gfx.mouse_wheel > 0 and -1 or 1))); gfx.mouse_wheel = 0
+  end
   if draw.hsb_drag then
     local d = draw.hsb_drag
     if gfx.mouse_cap & 1 == 1 then
@@ -16329,7 +16885,28 @@ local function frame()
   end
 
   if gfx.mouse_wheel ~= 0 and hover and hover.tlist_area then   -- 11 окт: track list листается колесом
-    draw.tl_scroll = (draw.tl_scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1) * 3; gfx.mouse_wheel = 0
+    draw.TL.scroll = (draw.TL.scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1) * 3; gfx.mouse_wheel = 0
+  end
+  -- 11 окт: M S R (шапка / микшер) — протяжка ставит значение первой кнопки на кнопки других треков
+  if ctx.btn_paint then
+    local p = ctx.btn_paint
+    if gfx.mouse_cap & 1 == 0 then ctx.btn_paint = nil
+    elseif hover and hover.btn and hover.btn.what == p.what and hover.btn.col and not p.done[hover.btn.col.guid] then
+      local tr = hover.btn.col.track
+      p.done[hover.btn.col.guid] = true
+      if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+        edit.run('track ' .. p.what, function() reaper.SetMediaTrackInfo_Value(tr, ctx.TRK_BTN[p.what] or 'I_RECARM', p.v) end)
+      end
+    end
+  end
+  -- 11 окт: tracks — протяжка по столбцу: значение первой клетки на каждую новую строку
+  if ctx.tl_paint then
+    local p = ctx.tl_paint
+    if gfx.mouse_cap & 1 == 0 then ctx.tl_paint = nil
+    elseif hover and hover.tlist and hover.tlist.what == 'cell' and hover.tlist.key == p.key and not p.done[hover.tlist.ci] then
+      p.done[hover.tlist.ci] = true
+      ctx.tlist_set({ hover.tlist.ci }, p.key, p.v)
+    end
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.dspeq then   -- ReaEQ: колесо на виде — ширина ближайшей полосы
     local d = hover.dspeq
@@ -17040,7 +17617,15 @@ local function frame()
   if c > 0 and state.kslider and not HN.active and ctx.kslider_key(c) then c = 0 end
   if c > 0 and HN.active then
     local r = HN.key(c)
-    if type(r) == 'table' then local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1 end
+    if type(r) == 'table' then
+      local hy0, pk0 = vim.hydra, vim.picker
+      local ok, e = pcall(hint_go, r); if not ok then vim.msg = tostring(e):match('[^\n]*$') end; state.hjumps = (state.hjumps or 0) + 1
+      -- 11 окт: меню, открытое прыжком f, — под кнопкой-целью, а не у мыши (она где угодно)
+      local opened = (vim.hydra and vim.hydra ~= hy0) or (vim.picker and vim.picker ~= pk0)
+      if ok and opened and (not state.popup_at or state.popup_at.kind == 'xy') then
+        state.popup_at = { kind = 'xy', x = r.x, y = r.y + r.h + 1 }
+      end
+    end
     if not HN.active then ctx.glide = nil end
     c = 0
   elseif c == ('F'):byte() and (state.ss_big or (state.clipsview and state.focus == 'tracker') or (MX.clips and state.focus == 'matrix') or (state.top and state.toptab == 'clips' and state.focus == 'top')) and vim.mode == 'normal' and not vim.hydra and not vim.picker then
@@ -17237,6 +17822,9 @@ local function frame()
         elseif ch == '-' then ctrl_action(sel, -1)
         elseif sel == 'bpm' and ch:match('%d') then state.bpm_edit = ch
         else return vim.key(c) end
+      elseif state.focus == 'tracks' then   -- 11 окт: Track Manager
+        if not draw.TL.typing and (vim.mode == 'cmd' or vim.mode == 'search') then return vim.key(c) end
+        if not ctx.tlist_key(c) then return vim.key(c) end
       elseif state.focus == 'notes' and state.notes_open then
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then

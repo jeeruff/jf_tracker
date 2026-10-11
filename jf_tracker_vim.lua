@@ -647,6 +647,7 @@ local function hex_entry(c, fld, heads)
     local h = V.covering(V.cur.fi, V.cur.row)[1]
     if h and h.kind == 'audio' and h.item then ctx.edit.cont_vol(h.item, ctx.row_time(V.cur.row), tonumber(buf, 16), ctx.row_time(V.cur.row + 1)); return true end
   end
+  if #heads == 0 then V.msg = 'no note in this row - type the note first (vol / delay / effects belong to a note)'; return 'none' end
   if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
   else ctx.edit.set_fx(heads, lpb(), buf:sub(1, 1), tonumber(buf:sub(2), 16)) end
@@ -1454,7 +1455,7 @@ function V.key_impl(c)
           V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
         end
       end
-      if V.hexbuf then return end
+      V.hexbuf = nil                                 -- 11 окт: недобранное число не держит клавиши
       keys_control(c); return
     end
     local env = env_of(V.cur.fi)
@@ -1497,7 +1498,7 @@ function V.key_impl(c)
       -- шаг значения точки строки (1/127 или 1/255), x вырезать точку, y
       -- копировать, p вставить, dw / dd удалить (в hex d — цифра, там x)
       local lk = (c < 256) and string.char(c) or ''
-      if V.hexbuf then return end
+      V.hexbuf = nil                                 -- 11 окт: недобранное число не держит клавиши
       if V.env_d then
         V.env_d = nil
         if lk == 'w' or lk == 'd' then if apply('d', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) then finish_edit() end; return end
@@ -1551,29 +1552,56 @@ function V.key_impl(c)
         if ctx.set_slice then ctx.set_slice(V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row), tonumber(buf, 16)) end
         V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
       end
-      if V.hexbuf then return end
+      V.hexbuf = nil
       keys_control(c); return
     end
     if V.cur.sub == 'inst' and fld == 1 then
-      -- поле инструмента (5 окт): две hex-цифры — номер инструмента ноты
-      local ch2 = (c < 256) and string.char(c):upper() or ''
-      if ch2:match('^[0-9A-F]$') then
+      -- поле инструмента (5 окт): номер инструмента ноты. 11 окт: десятичный, как его
+      -- пишут ячейка и lib (01 02 … 09 10); первая цифра ставит сразу (2 → 02),
+      -- вторая дописывает (1 2 → 12) и шагает вниз; номер — как в lib, не индекс pool
+      local ch2 = (c < 256) and string.char(c) or ''
+      if ch2:match('^[0-9]$') then
         local buf = (V.hexbuf or '') .. ch2
-        if #buf < 2 then V.hexbuf = buf; return end
+        local f = flat()[V.cur.fi]
+        local idx = ctx.inst_from_num and ctx.inst_from_num(f and f.col, tonumber(buf))
+        local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
+        if #buf < 2 then
+          V.hexbuf = buf
+          if idx and ctx.set_inst then ctx.set_inst(heads, idx) end
+          return
+        end
         V.hexbuf = nil
-        if ctx.set_inst then ctx.set_inst(V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row), tonumber(buf, 16)) end
+        if idx and ctx.set_inst then ctx.set_inst(heads, idx)
+        elseif not idx then V.msg = ('no instrument %s on this track'):format(buf) end
         V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
       end
-      if V.hexbuf then return end
+      V.hexbuf = nil                                   -- другая клавиша — набор окончен, клавиша работает
       keys_control(c); return
+    end
+    -- 11 окт: клавиатура выключена — INSERT для правки значений: нот нет, hex пишет
+    -- поля, все остальные клавиши — команды NORMAL (вся клавиатура, все буквы), после
+    -- них — снова INSERT (оператор d… дождётся движения и тоже вернёт)
+    local function as_normal(c2)
+      V.mode = 'normal'
+      local r = V.key_impl(c2)
+      if V.mode == 'normal' then
+        if V.pending or V.op then V.back_insert = true else V.mode = 'insert' end
+      end
+      return r
     end
     if fld > 1 then
       -- поля vol / delay / команд: hex-ввод, потом шаг вниз; не-hex → управление KEYS
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
-      if hex_entry(c, fld, heads) then V.cur.row = V.cur.row + step_rows(); ensure_visible(); return end
-      if V.hexbuf then return end
+      local b0 = V.hexbuf
+      local he = hex_entry(c, fld, heads)
+      if he == 'none' then return end
+      if he then V.cur.row = V.cur.row + step_rows(); ensure_visible(); return end
+      if V.hexbuf and V.hexbuf ~= b0 then return end   -- набор продолжается
+      V.hexbuf = nil                                   -- 11 окт: чужая клавиша обрывает набор и работает
+      if not V.piano then return as_normal(c) end
       keys_control(c); return
     end
+    if not V.piano then return as_normal(c) end      -- поле ноты без клавиатуры: ноты не пишутся
     if keys_control(c) then return end
     -- note-off (9 окт): ` — подколонка курсора, ~ — весь трек, Ctrl+` — все треки
     if c == ('`'):byte() or c == ('~'):byte() then
@@ -1584,8 +1612,7 @@ function V.key_impl(c)
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
     if c == (']'):byte() then V.octave = math.min(8, V.octave + 1); return end
-    -- 10 окт: INSERT KEYS слит с INSERT — нотные клавиши (верхний ряд) пишут
-    -- всегда; m только показывает / прячет клавиатуру (и слой KEYS в NORMAL)
+    -- нотные клавиши пишут только при включённой клавиатуре (11 окт; 10 окт писали всегда)
     -- модификатор ноты (2 окт): Shift — только прослушать, Option — вставить
     -- рядом (новая подколонка), Ctrl — захват звука канала (F5, пока прослушка)
     local how, mods = 'insert', (ctx.mods and ctx.mods() or {})
@@ -1939,7 +1966,8 @@ function V.key_impl(c)
         elseif ch == 'I' and ctx.smart_input and col then ctx.smart_input(col)   -- 10 окт: tI — активный вход (jf_smart_set_input)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
         elseif ch == 'f' and ctx.fx_picker then ctx.fx_picker()
-        elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col) end
+        elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col)
+        elseif ch == 'T' and ctx.template_picker then ctx.template_picker() end   -- 11 окт: tT — шаблоны треков (fzf)
         finish_move()
       end
       V.count = nil; return
@@ -2445,6 +2473,7 @@ function V.key(c)
   if ctx.piano_on then V.piano = ctx.piano_on() end
   -- набор сокращения формы живёт только на месте: курсор ушёл — сброс (ревью 2 окт)
   if V.shapebuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.shapebuf = nil end
+  if V.hexbuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.hexbuf = nil end   -- 11 окт: набор живёт в своей ячейке
   if V.mode ~= 'insert' then V.shapebuf = nil end
   -- в INSERT вернуться, когда операция (или выделение — s / Shift+hjkl, 5 окт) закончилась
   if V.back_insert and not V.pending and not V.op and V.mode ~= 'visual' and V.mode ~= 'vline' then
@@ -2526,13 +2555,28 @@ function V.smart()
     for i, e in pairs(f.col.pool or {}) do
       -- 11 окт: только сами инструменты — слайсы (дети в lib) не дублируют имя
       if type(i) == 'number' and e and not e.parent then
-        items[#items + 1] = { label = ('%02X %s'):format(i, e.name or ''), v = i, tip = e.name .. (e.slices and #e.slices > 0 and ('  /' .. #e.slices .. ' slices') or ''),
-          draw = (e.item and e.stype == 'audio') and function(x, y, w, h, on) if ctx.mini_wave then ctx.mini_wave(e, 0, e.len, x, y, w, h, on, ('%02X %s'):format(i, e.name or '')) end end or nil }
+        -- 11 окт: номер как в lib (e.num), не индекс pool
+        local lb = ('%02d %s'):format(e.num or i, e.name or '')
+        items[#items + 1] = { label = lb, v = i, tip = e.name .. (e.slices and #e.slices > 0 and ('  /' .. #e.slices .. ' slices') or ''),
+          draw = (e.item and e.stype == 'audio') and function(x, y, w, h, on) if ctx.mini_wave then ctx.mini_wave(e, 0, e.len, x, y, w, h, on, lb) end end or nil }
       end
     end
     table.sort(items, function(a, b) return a.v < b.v end)
+    -- 11 окт: и плагины-инструменты трека (VSTi / AUi / RS5K) — номером из lib
+    local pool0 = f.col.pool or {}
+    local base = #pool0 + (ctx.empty_slots and ctx.empty_slots(#pool0) or 0)
+    for k, fi2 in ipairs(ctx.track_insts and ctx.track_insts(f.col) or {}) do
+      items[#items + 1] = { label = ('%02d %s'):format(base + k, fi2.name or 'instrument'), v = base + k, tip = (fi2.name or '') .. '  (plugin - the note becomes MIDI)' }
+    end
     if #items == 0 then V.msg = 'smart: no instruments on this track (lib)'; return false end
-    for k, it in ipairs(items) do if it.v == V.inst then sel = k end end
+    -- выбран инструмент ноты под курсором (слайс — его исходник), иначе текущий
+    local cur = V.inst
+    local ni = h1 and h1.item and ctx.snap().inst_of and ctx.snap().inst_of[h1.item]
+    if h1 and h1.kind == 'midi' and ctx.midi_inst_num then ni = ctx.midi_inst_num(h1.item, h1.pitch) end
+    if ni then cur = ni end
+    local pe = (f.col.pool or {})[cur]
+    if pe and pe.parent then for i2, e2 in ipairs(f.col.pool) do if e2 == pe.parent then cur = i2 end end end
+    for k, it in ipairs(items) do if it.v == cur then sel = k end end
     cols, title = 1, 'instrument  ' .. where
     crows, cellw = 2, ctx.layout().cw * 30
     listen = function(it)
