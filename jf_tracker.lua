@@ -6412,6 +6412,18 @@ ctx = {
     for _, o in ipairs(ctx.mx_solo) do if reaper.ValidatePtr(o[1], 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', o[2]) end end
     ctx.mx_solo = nil
   end,
+  -- 12 окт: автогромкость: фейдер трека так, чтобы удержанный пик выхода (сыгранное) стал target дБ
+  auto_peak = function(col, target)
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+    local pk = math.max(reaper.Track_GetPeakHoldDB(tr, 0, false), reaper.Track_GetPeakHoldDB(tr, 1, false)) * 100
+    if pk < -120 then vim.msg = 'auto volume: no peak yet - play the part first, then click'; return end
+    local vol = reaper.GetMediaTrackInfo_Value(tr, 'D_VOL')
+    local nv = math.max(0, math.min(4, vol * 10 ^ ((target - pk) / 20)))
+    edit.run(('auto volume %d dB'):format(target), function() reaper.SetMediaTrackInfo_Value(tr, 'D_VOL', nv) end)
+    reaper.Track_GetPeakHoldDB(tr, 0, true); reaper.Track_GetPeakHoldDB(tr, 1, true)
+    vim.msg = ('%s: peak %.1f dB -> %d dB, fader %+.1f dB'):format(col.name ~= '' and col.name or 'track', pk, target, 20 * math.log(math.max(nv, 1e-6), 10))
+  end,
   mx_refresh = function()
     model.invalidate()
     regions = model.regions(state.lpb)
@@ -7227,15 +7239,16 @@ ctx = {
   mx_len = function(text)
     local rg = seq[MX.cur.ri]
     if not rg then vim.msg = 'no region'; return end
-    if rg.gap then vim.msg = 'free bar: name it first (n)'; return end
+    -- 12 окт: свободный такт — тоже длина: время после него сдвигается (без своего региона)
     local v, unit = (text or ''):match('^%s*([%d%.]+)%s*(%a*)%s*$')
     v = tonumber(v)
     if not v or v <= 0 then vim.msg = 'len N (steps) | Ns (seconds) | Nb (bars)'; return end
     local t1
     if unit == 's' then t1 = rg.pos + v
     elseif unit == 'b' then
-      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, rg.qn0)
-      t1 = reaper.TimeMap2_QNToTime(0, rg.qn0 + v * ((qme and qms) and (qme - qms) or 4))
+      local q0 = rg.qn0 or reaper.TimeMap2_timeToQN(0, rg.pos)
+      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, q0)
+      t1 = reaper.TimeMap2_QNToTime(0, q0 + v * ((qme and qms) and (qme - qms) or 4))
     else t1 = edit.row_time(rg.r0 + v, state.lpb, 0) end
     ctx.set_region_len(rg, t1)
   end,
@@ -7253,14 +7266,14 @@ ctx = {
     edit.after = nil
     edit.run('region length', function()
       alias.shift_markers(rg.rgnend, dt)
-      alias.set_end(rg, t1)
+      if not rg.gap then alias.set_end(rg, t1) end
       if dt > 0 then edit.time_insert(tracks, rg.rgnend, dt, math.huge)
       else edit.time_delete(tracks, t1, rg.rgnend, math.huge) end
     end)
     edit.after = hook
     ctx.mx_refresh()
-    local steps = (reaper.TimeMap2_timeToQN(0, t1) - rg.qn0) * state.lpb
-    vim.msg = ('region %s: %d steps (%+.3fs; later regions and items moved)'):format(rg.name, math.floor(steps + 0.5), dt)
+    local steps = (reaper.TimeMap2_timeToQN(0, t1) - (rg.qn0 or reaper.TimeMap2_timeToQN(0, rg.pos))) * state.lpb
+    vim.msg = ('%s: %d steps (%+.3fs; later regions and items moved)'):format(rg.gap and 'free bar' or ('region ' .. rg.name), math.floor(steps + 0.5), dt)
   end,
   -- ── панель свойств сэмпла (2 окт) ───────────────────────────────────
   pitch_mode_name = function(m)
@@ -15200,6 +15213,7 @@ local function frame()
     local db = draw.meter_db and draw.meter_db[hover.dspmeter] or -150
     local dt = db <= -60 and '-inf' or ('%.1f dB'):format(db)
     state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
+  elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
@@ -16369,6 +16383,8 @@ local function frame()
       ::sprop_done::
     elseif hover.dspcomp then
       ctx.gain_comp(hover.dspcomp); click = { t = now2, zone = 'dspcomp' }
+    elseif hover.dspauto then
+      ctx.auto_peak(hover.dspauto.col, hover.dspauto.db); click = { t = now2, zone = 'dspauto' }
     elseif hover.rdev then ctx.rdev_open(hover.rdev); click = { t = now2, zone = 'rdev' }   -- 11 окт: устройство в routing — в DSP
     elseif hover.rs5k then ctx.rs5k_do(hover.rs5k.f, hover.rs5k.what); click = { t = now2, zone = 'rs5k' }   -- 10 окт: кнопки RS5K
     elseif hover.mixmode then ctx.master_meter_menu()

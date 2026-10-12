@@ -5,6 +5,11 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'matrix: digits on the pattern number set it (or put that pattern into a free bar); the slot length is an input cell too (l from the name, also on free bars); Enter on a cell - the patterns that sound on this track, with preview',
+    'matrix cells: 2 px gaps, cut corners, the grabbed edge lights up',
+    'transport: a short description of every cell in the status (pitch, LPB, rate, freeze ...); hear (play inserted notes) moved here from the lib; step / inst / LPB keep their width; cut corners on the outer buttons',
+    'DSP: output meter on the right edge, compensate smaller with auto volume buttons 0 / -6 / -12 / -18 / -24 dB (the fader so that the played peak hits it); the input meter waits for the sound at play start',
+    'browser: u unmarks all (as in lf)',
     'status bar: under the keyboard by default (the in-tracker place is gone; option: keyboard / bottom), below the second row of transport buttons (it overlapped them), the mode big x2',
     'lock: play from the tracker always starts at the tracker cursor row; a cursor moved while playing (gg) goes to REAPER once it stops - it used to start from the old REAPER cursor',
     'shift rec (the smart button under rec is now shift, :shiftrec): waits for a MIDI note, it starts the recording from the cursor row at the project rate (x0.5 - record slow, play fast); the first note lands on the row; pre-roll is skipped',

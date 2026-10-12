@@ -6915,15 +6915,33 @@ function D.frame(L, snap, rows, state, info)
       local cx = DR - L.pad - cvw
       local ox = cx - 2 - mw
       D.dsp_meter(L, ox, mby, mw, mbh, 'o', lvl.out, 'out', hover)
-      local hot = mx >= cx and mx < cx + cvw and my >= mby and my < mby + mbh
+      -- 12 окт: compensate — треть высоты; ниже — автогромкость: фейдер так, чтобы пик выхода стал 0 / −6 / −12 / −18 / −24 дБ
+      local ch = math.max(L.rh, math.floor(mbh / 3))
+      local hot = mx >= cx and mx < cx + cvw and my >= mby and my < mby + ch
       local on = lvl.comp_on
       local bg = on and U.tint(U.CYAN, 0.35) or (hot and U.tint(U.AMBER, 0.3) or U.BG)
-      set(bg); gfx.rect(cx, mby, cvw, mbh, 1)
-      set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(cx, mby, cvw, mbh, 0)
-      local lbl = 'compensate'
-      local tl = math.min(ms(lbl), mbh - 4)
-      D.vtext(cx + math.floor((cvw - L.th) / 2), mby + math.floor((mbh - tl) / 2), tl, lbl, on and U.CYAN or (hot and U.AMBER or U.GREY), bg)
+      set(bg); gfx.rect(cx, mby, cvw, ch, 1)
+      set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(cx, mby, cvw, ch, 0)
+      local lbl = ms('compensate') <= ch - 4 and 'compensate' or 'comp'
+      local tl = math.min(ms(lbl), ch - 4)
+      D.vtext(cx + math.floor((cvw - L.th) / 2), mby + math.floor((ch - tl) / 2), tl, lbl, on and U.CYAN or (hot and U.AMBER or U.GREY), bg)
       if hot then hover.dspcomp = info.pool_col end
+      local T = { 0, -6, -12, -18, -24 }
+      local ay, ah = mby + ch + 2, math.floor((mbh - ch - 2) / #T)
+      if ah >= ms('-24') + 4 then
+        for k, tdb in ipairs(T) do
+          local by2 = ay + (k - 1) * ah
+          local h2 = ah - 2
+          local hot2 = mx >= cx and mx < cx + cvw and my >= by2 and my < by2 + h2
+          local bg2 = hot2 and U.tint(U.AMBER, 0.3) or U.BG
+          set(bg2); gfx.rect(cx, by2, cvw, h2, 1)
+          set(hot2 and U.AMBER or U.LINE); gfx.rect(cx, by2, cvw, h2, 0)
+          local s = tostring(tdb)
+          local tl2 = math.min(ms(s), h2 - 4)
+          D.vtext(cx + math.floor((cvw - L.th) / 2), by2 + math.floor((h2 - tl2) / 2), tl2, s, hot2 and U.AMBER or U.GREY, bg2)
+          if hot2 then hover.dspauto = { col = info.pool_col, db = tdb } end
+        end
+      end
     end
     -- перетаскивание (блок или FX из списка): куда встанет — янтарная черта
     -- между блоками; половина блока под мышью решает «до» или «после»
