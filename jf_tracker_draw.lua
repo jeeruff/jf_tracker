@@ -3182,9 +3182,9 @@ function D.transport_groups(c)
   g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
                 { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
-  -- 12 окт: listen — что звучит при правке: step (вставленная нота), sel (выделение), line (шаг под курсором)
+  -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки)
   g[#g + 1] = { { { 'listen', 'listen', U.GREY } },
-                { { 'ls_step', 'step', c.hear and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } } }
+                { { 'ls_ins', 'insert', c.hear and U.CYAN or U.GREY }, { 'ls_step', 'step', c.trklisten and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } } }
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib

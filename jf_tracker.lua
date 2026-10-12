@@ -236,6 +236,7 @@ local state = {
   waveonly = reaper.GetExtState(EXT, 'waveonly') == '1',   -- 11 окт: аудио-подколонка — узкая полоса волны, без текста
   steplisten = reaper.GetExtState(EXT, 'steplisten') == '1',
   sellisten = reaper.GetExtState(EXT, 'sellisten') == '1',   -- 12 окт: listen sel
+  trklisten = reaper.GetExtState(EXT, 'trklisten') == '1',   -- 12 окт: listen step (трек курсора)
   fxopen = reaper.GetExtState(EXT, 'fxopen') == '1',
   dspmeters = reaper.GetExtState(EXT, 'dspmeters') ~= '0',          -- метры входа / выхода в DSP (5 окт)               -- окно FX после добавления (5 окт)
   slicespos = (reaper.GetExtState(EXT, 'slicespos') == 'split') and 'split' or 'module',   -- модуль слайсов: отдельно / половина lib (4 окт)      -- step listen (4 окт)
@@ -651,7 +652,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -7453,8 +7454,9 @@ ctx = {
   end,
   -- 12 окт: подсказки транспорта в статусе — что это и зачем, не только «click / wheel»
   CTRL_TIP = {
-    listen = 'listen: what sounds while you edit - step (an inserted note), sel (a selection), line (the row under the cursor)',
-    ls_step = 'listen step: a note you insert plays its sample at once (off - silent; Shift+note always just plays). = quick option preview',
+    listen = 'listen: what sounds while you edit - insert (what you type in), step (the cursor row, this track), sel (a selection), line (the cursor row, all tracks)',
+    ls_ins = 'listen insert: a note you insert plays its sample at once (off - silent; Shift+note always just plays). = quick option preview',
+    ls_step = 'listen step: the row the cursor lands on plays on the cursor track only (stopped transport)',
     ls_sel = 'listen sel: a selection (v / V) plays its rows on its tracks only (the other tracks quiet while it plays)',
     ls_line = 'listen line: the row the cursor lands on plays, all tracks, one row long (stopped transport). = option step listen',
     pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
@@ -13144,7 +13146,8 @@ function ctrl_action(name, delta)
   elseif name == 'xfade' then if delta ~= 0 then ctx.xfade_len(delta) else ctx.xfade_toggle() end
   elseif name == 'loop' then reaper.GetSetRepeat(2)
   elseif name == 'clips' then ctx.clips_toggle()                -- грид: страница clips (7 окт)
-  elseif name == 'ls_step' then state.preview = not state.preview; vim.msg = 'listen step ' .. (state.preview and 'on: a note you insert plays its sample' or 'off: inserting is silent (Shift+note still just plays)')
+  elseif name == 'ls_ins' then state.preview = not state.preview; vim.msg = 'listen insert ' .. (state.preview and 'on: a note you insert plays its sample' or 'off: inserting is silent (Shift+note still just plays)')
+  elseif name == 'ls_step' then state.trklisten = not state.trklisten; vim.msg = 'listen step ' .. (state.trklisten and 'on: the row the cursor lands on plays on the cursor track only' or 'off')
   elseif name == 'ls_sel' then state.sellisten = not state.sellisten; vim.msg = 'listen sel ' .. (state.sellisten and 'on: a selection (v / V) plays its rows on its tracks' or 'off')
   elseif name == 'ls_line' then state.steplisten = not state.steplisten; vim.msg = 'listen line ' .. (state.steplisten and 'on: the row the cursor lands on plays (all tracks)' or 'off')
   elseif name == 'pitch' then
@@ -14036,14 +14039,18 @@ local function frame()
   draw.pmark('pre: listen, follow, view, hover')
   -- step listen (4 окт): транспорт стоит, курсор трекера сменил строку — эта
   -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
-  if state.steplisten and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
+  -- 12 окт: listen line (step listen) — строка под курсором, все треки; listen step — та же строка, только трек курсора
+  if (state.steplisten or state.trklisten) and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
     local r = vim.cur.row
-    if ctx.sl_row ~= r then
+    local cf = L and L.flat[vim.cur.fi]
+    local ctr = cf and cf.col and cf.col.track
+    local k = r .. ':' .. tostring(state.steplisten and 0 or ctr)
+    if ctx.sl_row ~= k then
       local prev = ctx.sl_row
-      ctx.sl_row = r
+      ctx.sl_row = k
       if prev and (not is_playing or ctx.sl_own) and (vim.mode == 'normal' or vim.mode == 'insert' or vim.mode == 'visual' or vim.mode == 'vline') then
-        local t0 = edit.row_time(r, state.lpb, 0)
-        PV.midi(t0, edit.row_time(r + 1, state.lpb, 0))
+        local t0, t1 = edit.row_time(r, state.lpb, 0), edit.row_time(r + 1, state.lpb, 0)
+        if state.steplisten then PV.midi(t0, t1) elseif ctr then ctx.mx_cell_preview(ctr, t0, t1, 'step') end
         ctx.sl_own = true
       end
     end
@@ -14378,7 +14385,7 @@ local function frame()
         return out
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
@@ -18011,8 +18018,8 @@ local function frame()
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
   do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end
-  if ctx.mx_solo and ctx.mx_solo_owner ~= 'sel' and not (MX.SMART.active and MX.SMART.active()) then ctx.mx_cell_preview_end() end   -- 12 окт: панель клетки закрыта — соло как были
-  if ctx.mx_solo and ctx.mx_solo_owner == 'sel' and not PV.playing() then ctx.mx_cell_preview_end() end
+  if ctx.mx_solo and ctx.mx_solo_owner == 'smart' and not (MX.SMART.active and MX.SMART.active()) then ctx.mx_cell_preview_end() end   -- 12 окт: панель клетки закрыта — соло как были
+  if ctx.mx_solo and ctx.mx_solo_owner ~= 'smart' and not PV.playing() then ctx.mx_cell_preview_end() end   -- sel / step: звук кончился
   -- 12 окт: listen sel — выделение (v / V) звучит на своих треках, когда перестало меняться (0.25 с)
   if state.sellisten and state.focus == 'tracker' and (vim.mode == 'visual' or vim.mode == 'vline') and vim.visual_range then
     local f0, f1, r0, r1 = vim.visual_range()
