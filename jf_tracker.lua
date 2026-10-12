@@ -2757,6 +2757,20 @@ ctx = {
     state.wave = state.wavemode == 'column' and 'spec' or 'off'
     vim.msg = 'wave: ' .. ({ column = 'own column - spectral peaks (colour = frequency), amber = stretch markers', note = 'in the note field on the item rows', back = 'background - the whole item width, dim, under the text', off = 'off' })[state.wavemode]
   end,
+  -- 12 окт: zw — вид волны выпадашкой (колонка / в поле ноты / фоном / нет) + только волна / только текст
+  fixed_toggle = function() ctrl_action('fixed', 0) end,   -- 12 окт: zZ
+  wave_menu = function()
+    local wm = state.wavemode or 'column'
+    local function pick(m) return function() state.textonly = false; state.waveonly = false; ctx.wave_mode(m); model.invalidate(); ctx.relayout() end end
+    vim.open_hydra({ title = 'wave view (zw)', items = {
+      { key = 'c', label = (wm == 'column' and not state.waveonly and not state.textonly and '* ' or '') .. 'own column: spectral peaks beside the note', fn = pick('column') },
+      { key = 'n', label = (wm == 'note' and '* ' or '') .. 'in the note field, on the item rows', fn = pick('note') },
+      { key = 'b', label = (wm == 'back' and '* ' or '') .. 'background: the whole item width, under the text', fn = pick('back') },
+      { key = 'o', label = (wm == 'off' and not state.waveonly and '* ' or '') .. 'off', fn = pick('off') },
+      { key = 'w', label = (state.waveonly and '* ' or '') .. 'wave only: audio columns are a strip of wave (wheel widens)', fn = function() state.waveonly = true; state.textonly = false; model.invalidate(); ctx.relayout(); vim.msg = 'wave only' end },
+      { key = 't', label = (state.textonly and '* ' or '') .. 'text only: no wave, no item fill or frame', fn = function() state.textonly = true; state.waveonly = false; model.invalidate(); ctx.relayout(); vim.msg = 'text only' end },
+    } })
+  end,
   -- анализатор: scope → spec → sgram (кнопки у вкладок, :scopemode)
   scopemode = function(m)
     local order = { scope = 'spec', spec = 'sgram', sgram = 'scope' }
@@ -11489,6 +11503,8 @@ function view_actions()
     { (state.envs and '!' or '') .. 'Envelopes (:env)', key = 'e', fn = function() state.envs = not state.envs end },
     { 'FX columns +1', key = 'x', fn = function() state.fxcols = math.min(4, state.fxcols + 1) end },
     { 'FX columns -1', key = 'X', fn = function() state.fxcols = math.max(0, state.fxcols - 1) end },
+    { 'Wave view ... (zw)', key = 'v', fn = function() ctx.wave_menu() end },   -- 12 окт
+    { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (F11)', key = 'd', fn = toggle_dock },
     { 'Help (F1)', key = 'h', fn = function() ctx.help_big() end },

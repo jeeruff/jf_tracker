@@ -1888,6 +1888,8 @@ function V.key_impl(c)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
       elseif c == ('e'):byte() then if ctx.env_view then ctx.env_view() end   -- 12 окт: ze — вид колонки огибающей: значения / кривая
+      elseif c == ('w'):byte() then if ctx.wave_menu then ctx.wave_menu() end   -- 12 окт: zw — вид волны (выпадашка)
+      elseif c == ('Z'):byte() then if ctx.fixed_toggle then ctx.fixed_toggle() end   -- 12 окт: zZ — фиксированный курсор (zz — один раз в центр, zZ — всегда)
       elseif c == ('t'):byte() then st.row0 = math.max(0, V.cur.row)   -- 12 окт: zt — снова Vim: строка курсора наверх (транспозиция — Opt/Shift/Ctrl+F1 F2, меню)
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then

@@ -131,6 +131,8 @@ KH.PAGES = {
     { k = 'Opt+F1 F2', d = 'transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise)' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt', d = 'the cursor row to the top (as in Vim)' },
+    { k = 'zw', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },
+    { k = 'zZ', d = 'fixed cursor on / off: the cursor row stays in the middle, the pattern scrolls under it (zz - centre once)' },
     { k = 'gt  gT', d = 'module tab / REAPER project tab - a menu (Ngt, NgT - the Nth at once)' },
     { k = ':transpose', d = 'transpose popup: -24..+24 and where - selection / column / track / pattern (also the right-click menu); :transpose N - the selection by N' },
     { k = 'td tx tp', d = 'delete (= cut, as d in Vim) / cut N tracks from the cursor track (5td - five), paste them after the cursor track; dd deletes rows (5dd - five)' },

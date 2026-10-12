@@ -21,7 +21,7 @@ local T = {
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },
   da = { title = 'da - delete all', items = { { 'w', 'every item of the track' } } },
   g = { title = 'g - go', items = { { 'g', 'top of the track' }, { '12 Enter', 'go to row 0012 (also 12gg)' }, { 'w', 'swap with the next event (3gw - third)' }, { 's', 'smart panel: values of the field under the cursor, pick with the mouse' }, { 't', 'module tab (menu; 3gt - the third)' }, { 'T', 'REAPER project tab (menu; 2gT - the second)' } } },
-  z = { title = 'z - view', items = { { 'z', 'this module on the whole window (again - back)' }, { 't', 'row to the top' }, { 'b', 'row to the bottom' },
+  z = { title = 'z - view', items = { { 'z', 'this module on the whole window (again - back)' }, { 'Z', 'fixed cursor: the row stays in the middle' }, { 'w', 'wave view: column / note / back / off / only' }, { 't', 'row to the top' }, { 'b', 'row to the bottom' },
         { 'a', 'fold track' }, { 'e', 'envelope column view: curve / values / steps' }, { 'C', '1-char strip' }, { 'f', 'fold folder' },
         { 'M', 'fold <-> all' }, { 'm', 'mixer on / off' }, { '> <', 'all tracks wider / narrower' }, { '. ,', 'cursor track wider / narrower' }, { 's', 'session' }, { 'r', 'router' },
         { 'R', 'big router' } } },
