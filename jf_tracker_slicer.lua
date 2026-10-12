@@ -476,7 +476,14 @@ function S.key(c)
     S.msg = 'file: slices live on items - drag selection to a track or D: to lib, then slice'
   -- нарезка (4 окт): префикс s — всплывашка: t транзиенты, 2 4 8 1 3 6 —
   -- равные части 2 4 8 16 32 64 (цифры без s — клавиши нот, слушают слайсы)
-  elseif ch == 's' and ctx.slice_hydra then ctx.slice_hydra()
+  -- 12 окт: прицел ноты под курсором трекера: [ ] — ±5 мс, { } — ±0.5 мс (h l заняты панелью свойств),
+  -- s — разрезать эту ноту здесь; меню нарезки — S (без ноты под курсором — и s)
+  elseif S.cross and not a and (ch == '[' or ch == ']' or ch == '{' or ch == '}') then
+    local st = (ch == '{' or ch == '}') and 0.0005 or 0.005
+    S.cross.dt = S.cross.dt + ((ch == ']' or ch == '}') and st or -st)
+    S.msg = ('cut point %+.1f ms from the row - s cuts the note here'):format(S.cross.dt * 1000)
+  elseif ch == 's' and S.cross and ctx.cut_at then ctx.cut_at(S.cross, S.cross.t + S.cross.dt); S.cross = nil
+  elseif (ch == 'S' or ch == 's') and ctx.slice_hydra then ctx.slice_hydra()
   elseif ch == 'd' then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
@@ -689,6 +696,14 @@ function S.dt_draw(U, L, x, y, w, h)
   return mx >= x and mx < x + w and my >= y and my < y + h
 end
 
+-- 12 окт: прицел у ноты под курсором трекера (если она этого инструмента): base — место звука на строке
+-- курсора (секунды e), dt — сдвиг h l / H L / мышью; s режет только эту ноту в точке прицела
+function S.cross_update(e)
+  local c = ctx.cursor_cross and ctx.cursor_cross(e)
+  if not c then S.cross = nil; return end
+  if not S.cross or S.cross.key ~= c.key then c.dt = 0; S.cross = c
+  else local dt = S.cross.dt; S.cross = c; c.dt = dt end
+end
 function S.edge_focus(e, zone, editing)
   if not (ctx.state and ctx.state.edgezoom ~= false) then return nil end
   local sl = editing and S.slices or (e.slices or {})
@@ -696,6 +711,7 @@ function S.edge_focus(e, zone, editing)
   if S.zdrag and S.zdrag.k and sl[S.zdrag.k] then return sl[S.zdrag.k], ('S%02X line'):format(S.zdrag.k), S.zdrag.k end
   local zd = S.zone_drag
   if zd and zone and (zd.edge == 'a' or zd.edge == 'b') then return zd.edge == 'a' and zone[1] or zone[2], zd.edge == 'a' and 'zone start' or 'zone end' end
+  if S.cross then return S.cross.t + S.cross.dt, ('cursor %+.1f ms'):format(S.cross.dt * 1000) end
   local k = ctx.selected_slice and ctx.selected_slice(e)
   if k and k > 0 and sl[k] then return sl[k], ('S%02X start'):format(k), k end
   if S.zedge_k and sl[S.zedge_k] and S.zedge_e == (e.item or e.path) then return sl[S.zedge_k], ('S%02X line'):format(S.zedge_k), S.zedge_k end
@@ -858,6 +874,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
   local SBH = (zoomed0 and not sbrect) and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0   -- в ряду кнопок места нет — под волной, как раньше
+  S.cross_update(e)
   local zt, zlab, zk = S.edge_focus(e, zone, S.active and S.entry and S.entry.item == e.item)
   local ZH = 0
   -- 12 окт: прицел (зум края) — раньше полосы-обзора: при зуме обзор отнимал высоту, и прицел пропадал
@@ -1285,6 +1302,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if inz then S.zoom_hot = true end
     if down and inz and not S.zd_prev and zk and S.active and S.entry and S.entry.item == e.item and S.slices[zk] then
       S.zdrag = { k = zk, mx0 = mx2, t0 = S.slices[zk], span = 2 * W2 }
+    end
+    -- 12 окт: прицел ноты курсора — тянуть мышью в окне (точка реза)
+    if down and inz and not S.zd_prev and not zk and S.cross then S.xdrag = { mx0 = mx2, dt0 = S.cross.dt, span = 2 * W2 } end
+    if S.xdrag then
+      if down and S.cross then S.cross.dt = S.xdrag.dt0 + (mx2 - S.xdrag.mx0) / w * S.xdrag.span else S.xdrag = nil end
     end
     if S.zdrag and S.slices[S.zdrag.k] then
       local k3 = S.zdrag.k

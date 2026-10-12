@@ -6428,6 +6428,38 @@ ctx = {
     reaper.Track_GetPeakHoldDB(tr, 0, true); reaper.Track_GetPeakHoldDB(tr, 1, true)
     vim.msg = ('%s: peak %.1f dB -> %d dB, fader %+.1f dB'):format(col.name ~= '' and col.name or 'track', pk, target, 20 * math.log(math.max(nv, 1e-6), 10))
   end,
+  -- 12 окт: прицел item у ноты под курсором трекера — если её звук из того же файла, что инструмент e
+  cursor_cross = function(e)
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then return nil end
+    local h = (vim.covering(vim.cur.fi, vim.cur.row) or {})[1]
+    if not (h and h.kind == 'audio' and h.item and reaper.ValidatePtr(h.item, 'MediaItem*')) then return nil end
+    local tk, etk = reaper.GetActiveTake(h.item), reaper.GetActiveTake(e.item)
+    if not (tk and etk) or reaper.TakeIsMIDI(tk) then return nil end
+    local fp = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '')
+    local efp = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(etk), '')
+    if not fp or fp == '' or fp ~= efp then return nil end
+    local c = { item = h.item, npos = reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION'),
+      noffs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'), nrate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'),
+      eoffs = reaper.GetMediaItemTakeInfo_Value(etk, 'D_STARTOFFS'), erate = reaper.GetMediaItemTakeInfo_Value(etk, 'D_PLAYRATE') }
+    if c.nrate <= 0 or c.erate <= 0 then return nil end
+    local tr = edit.row_time(vim.cur.row, state.lpb, 0)
+    c.t = (c.noffs + (tr - c.npos) * c.nrate - c.eoffs) / c.erate
+    c.key = tostring(h.item) .. ':' .. vim.cur.row
+    return c
+  end,
+  -- 12 окт: разрезать ноту в точке прицела (секунды e) — не по строке; правая часть без метки слайса
+  cut_at = function(c, te)
+    if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
+    local t = c.npos + (c.eoffs + te * c.erate - c.noffs) / c.nrate
+    local len = reaper.GetMediaItemInfo_Value(c.item, 'D_LENGTH')
+    if t <= c.npos + 1e-4 or t >= c.npos + len - 1e-4 then vim.msg = 'cut point is outside the note'; return end
+    edit.run('cut the note at the aim point', function()
+      local right = reaper.SplitMediaItem(c.item, t)
+      if right then reaper.GetSetMediaItemInfo_String(right, 'P_EXT:jf_slice', '', true) end
+    end)
+    model.invalidate()
+    vim.msg = ('note cut at %.3fs (%+.1f ms from its row) - Cmd+Z back'):format(t, c.dt and c.dt * c.erate / c.nrate * 1000 or 0)
+  end,
   mx_refresh = function()
     model.invalidate()
     regions = model.regions(state.lpb)
