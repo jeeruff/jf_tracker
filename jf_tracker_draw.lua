@@ -4534,10 +4534,15 @@ function D.frame(L, snap, rows, state, info)
         end
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
       end
+      -- 12 окт: R I M S ø и SRO — вдвое шире, если до trim хватает места
+      local avail = (trim_x or (c.x + c.w)) - bx - L.pad
+      local srw = ms('SRO') + 4
+      local bwh = math.max(L.btn_w, math.min(2 * L.cw + 4, math.floor((avail - srw * 1.5) / 5) - 1))   -- сколько влезает, не шире двойной
+      D.hbtn_w = bwh
       for k, b in ipairs(c.master and {} or labels) do
-        local x = bx + (k - 1) * (L.btn_w + 1)
-        local bwk = L.btn_w
-        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (L.btn_w + 1) + L.pad then break end end
+        local x = bx + (k - 1) * (bwh + 1)
+        local bwk = bwh
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (bwh + 1) + L.pad then break end end
         if x + bwk > c.x + c.w - 1 then break end
         if not mixcol then hbtn(b, x, by, bwk) end
       end
@@ -4557,7 +4562,8 @@ function D.frame(L, snap, rows, state, info)
         for i, ch in ipairs({ 'S', 'R', 'O' }) do
           local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)   -- S голубой, R зелёный, O янтарь
           if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
-          else text(lx, ly, ch, cc); lx = lx + ms(ch) end
+          elseif rw >= 2 * ms('SRO') then text(rx + math.floor((i - 1) * rw / 3 + (rw / 3 - ms(ch)) / 2), ly, ch, cc)   -- 12 окт: широкая — буквы врозь
+        else text(lx, ly, ch, cc); lx = lx + ms(ch) end
         end
         if hot then hover.btn = { col = col, what = 'route' } end
         hint('btn', rx, ry, rw, rhh + 2, { col = col, what = 'route' })
@@ -4570,8 +4576,8 @@ function D.frame(L, snap, rows, state, info)
           local fh0 = (L.mix_rows - (tonumber(D.mix_under) or 0)) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
           if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
         end
-        local rw = ms('SRO') + 4
-        local rx = mixcol and bx or (bx + 5 * (L.btn_w + 1))
+        local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, (trim_x - L.pad) - (bx + 5 * ((D.hbtn_w or L.btn_w) + 1))))   -- 12 окт: SRO шире, сколько влезает
+        local rx = mixcol and bx or (bx + 5 * ((D.hbtn_w or L.btn_w) + 1))
         local lim = mixcol and (c.x + c.w - 1) or (trim_x - L.pad)
         if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, L.rh - 2, false) end
       end

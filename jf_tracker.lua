@@ -6452,6 +6452,9 @@ ctx = {
     if c.nrate <= 0 or c.erate <= 0 then return nil end
     local tr = edit.row_time(vim.cur.row, state.lpb, 0)
     c.t = (c.noffs + (tr - c.npos) * c.nrate - c.eoffs) / c.erate
+    -- 12 окт: тот же файл, но другой кусок (короткие слайсы-инструменты): точка вне показанного инструмента — прицела нет
+    local elen = reaper.GetMediaItemInfo_Value(e.item, 'D_LENGTH')
+    if c.t < -1e-3 or c.t > elen + 1e-3 then return nil end
     c.key = tostring(h.item) .. ':' .. vim.cur.row
     return c
   end,
