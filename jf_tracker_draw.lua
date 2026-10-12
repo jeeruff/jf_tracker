@@ -3179,8 +3179,8 @@ function D.transport_groups(c)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0) }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0) } },
-                { { 'vel', ('vel %d'):format(c.vel or 100) }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift') } } }
+  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },
+                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch shift' } } }
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
@@ -3321,7 +3321,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local c = info.ctrl or {}
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
   local gap, sep = 2 * L.pad, 3 * L.pad
-  local function cw_of(it) return ms(it[2]) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
+  -- 12 окт: it.res — самая длинная подпись этой ячейки (step 1 → step auto): место заранее, соседи не прыгают
+  local function cw_of(it) return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   local function group_w(g)
     local gw = 0
     for _, row in ipairs(g) do
@@ -3375,6 +3376,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         hint('ctrl', cx, cy, iw, L.rh, it[1])
         D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
         cx = cx + iw + gap
+        -- 12 окт: тонкая черта между ячейками группы — бледнее разделителя групп
+        if row[_ + 1] then set(U.mix(U.LINE, U.PANEL, 0.75)); gfx.rect(cx - math.floor(gap / 2) - 1, cy + 3, 1, L.rh - 6, 1) end
       end
     end
     local first = g[1] and g[1][1] and g[1][1][1]
