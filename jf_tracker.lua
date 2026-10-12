@@ -106,6 +106,8 @@ local state = {
   fixed = flag('fixed', false),                   -- курсор всегда в центре экрана (Impulse Tracker)
   fxcols = math.max(1, tonumber(ext('fxcols', 1)) or 1),   -- стандартные колонки: хотя бы одна fx (1 окт)
   envs = flag('envs', true),
+  -- 12 окт: колонки огибающих видом «значения» (как команды, без кривой): guid/имя → true; ze
+  envvals = (function() local t = {}; for k in (reaper.GetExtState(EXT, 'envvals') or ''):gmatch('[^|]+') do t[k] = true end; return t end)(),
   trackenvs = (function()                       -- огибающие по трекам: guid → true/false (nil = как envs)
     local t = {}
     for g, v in (reaper.GetExtState(EXT, 'trackenvs') or ''):gmatch('([^=,]+)=(%d)') do t[g] = v == '1' end
@@ -119,7 +121,7 @@ local state = {
   poolsort = tostring(ext('poolsort', 'track')),
   libtrack = reaper.GetExtState(EXT, 'libtrack') == '1',   -- 11 окт: lib по трекам (кнопка track)
   fontspace = tonumber(ext('fontspace', 2)) or 2,
-  toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'modulation' elseif t == 'scope' then t = 'master' elseif t == 'clips' then t = 'sample' end; return t end)(),   -- clips вкладкой убраны (7 окт)
+  toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'automation' elseif t == 'scope' then t = 'master' elseif t == 'clips' then t = 'sample' end; return t end)(),   -- clips вкладкой убраны (7 окт)
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
   pool = flag('pool', true),                    -- (устар.) = top
@@ -356,7 +358,7 @@ end
 if state.panes and reaper.GetExtState(EXT, 'panes_mig8') ~= '1' then
   local PNm = draw.panes
   if not PNm.find(state.panes, 'clips') then
-    local host = (PNm.visible(state.panes, 'macros') and 'macros') or (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    local host = (PNm.visible(state.panes, 'macros') and 'macros') or (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
     if host then
       local lf = PNm.find(state.panes, host)
       local act = lf and lf.active
@@ -370,7 +372,7 @@ end
 if state.panes and reaper.GetExtState(EXT, 'panes_mig9') ~= '1' then
   local PNm = draw.panes
   if not PNm.visible(state.panes, 'macros') then
-    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
     if host then
       local lf = PNm.find(state.panes, host)
       local act = lf and lf.active
@@ -385,7 +387,7 @@ end
 if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
   local PNm = draw.panes
   if not PNm.visible(state.panes, 'macros') then
-    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'modulation') and 'modulation') or nil
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
     if host then
       local lf = PNm.find(state.panes, host)
       local act = lf and lf.active
@@ -483,7 +485,7 @@ local idle = { n = 0, active_t = 0, input_t = 0, mkey = '' }   -- простой
 local fps_buf = { w = 0, h = 0, last = 0 }  -- буфер кадров для опции fps (1021)
 local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
-local mod_pane = 'matrix'     -- 'matrix' | 'lfo': куда идут клавиши вкладки modulation
+local mod_pane = 'params'     -- 'params' | 'lfo' | 'curve' | 'ai': страница вкладки automation (12 окт: матрица — вкладка modulation)
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
 local lfo_drag = nil          -- протяжка слайдера генератора кривых
 local mm_drag = nil           -- слайдер полосы матрицы модуляции
@@ -637,6 +639,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
+  do local t = {}; for k in pairs(state.envvals or {}) do t[#t + 1] = k end; S('envvals', table.concat(t, '|')) end
   S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
@@ -953,7 +956,7 @@ ctx = {
     items[#items + 1] = { key = 'e', label = 'automation …', sub = function() return { title = 'automation (cursor on an envelope column)', items = {
       { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ramp ' end },
       { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fade ' end },
-      { key = 'c', label = 'curve (LFO / podkat / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'modulation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
+      { key = 'c', label = 'curve (LFO / podkat / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
       { key = 'p', label = 'pick a parameter to automate (fzf)', fn = function() ctx.automation_picker() end },
     } } end }
     return { title = 'insert', items = items }
@@ -2125,6 +2128,14 @@ ctx = {
   end,
   peaks = model.peaks,
   -- `a` — все треки разом (сбрасывает поканальные переключения кнопкой A)
+  -- 12 окт: ze на колонке огибающей — вид «значения по строкам» (как команды) / «кривая»
+  env_view = function()
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    if not (f and f.env and f.col) then vim.msg = 'ze: put the cursor on an envelope column'; return end
+    local k = (f.col.guid or '') .. '/' .. (f.env.name or '')
+    state.envvals[k] = not state.envvals[k] or nil
+    vim.msg = (f.env.name or 'envelope') .. (state.envvals[k] and ': values (as commands) - ze: curve' or ': curve - ze: values')
+  end,
   toggle_envs = function() state.envs = not state.envs; state.trackenvs = {}; vim.msg = 'envelopes ' .. (state.envs and 'on' or 'off') .. ' (all tracks)' end,
   -- кнопка A в шапке — только этот трек
   toggle_track_envs = function(col)
@@ -2202,7 +2213,7 @@ ctx = {
     for i, m in ipairs(col and col.mods or {}) do
       if m.fx == r.fx and m.param == r.param then MMX.row = i; break end
     end
-    mod_pane = 'matrix'
+    ctx.pane_focus('modulation')
   end,
   -- кривая LFO-генератора в огибающую строки (создаётся видимой)
   curve_to = function(tr, r)
@@ -2217,7 +2228,7 @@ ctx = {
   -- trim ПКМ: вкладка modulation, панель params на этом треке
   open_params = function(col)
     for i, f in ipairs(L and L.flat or {}) do if f.col == col then vim.cur.fi = i; break end end
-    state.top = true; state.toptab = 'modulation'; mod_pane = 'params'
+    state.top = true; state.toptab = 'automation'; mod_pane = 'params'
     ctx.set_focus('top')
     vim.msg = col.name .. ': all parameters - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
   end,
@@ -3294,7 +3305,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'automation', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     if state.gridtab then t[#t + 1] = 'grid' end
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -5982,7 +5993,7 @@ ctx = {
       ctx.ai_edit_open(b)
     end
     state.ai_edit = { env = a.env, idx = a.idx, pos = a.pos, len = a.len, label = a.label, min = a.min, max = a.max, pool = a.pool, col = a.col, take = a.take, item = a.item }
-    state.top = true; state.toptab = 'modulation'; mod_pane = 'ai'; ctx.set_focus('top')
+    state.top = true; state.toptab = 'automation'; mod_pane = 'ai'; ctx.set_focus('top')
     vim.msg = 'automation item ' .. (a.label or '') .. ': edit the points, the generator on the right writes into it'
   end,
   -- VISUAL = ПКМ-рамка REAPER (6 окт): блок выделяет items треков своих
@@ -7506,7 +7517,7 @@ ctx = {
     if state.router_big then
       state.rb_saved = state.dsp; state.dsp = true            -- клавиши DSP-ветки требуют панель
       state.rb_top = { state.top, state.toptab }
-      state.top, state.toptab = true, 'modulation'           -- наверху — автоматизация (7 окт)
+      state.top, state.toptab = true, 'automation'           -- наверху — автоматизация (7 окт)
       state.rb_bmode = B.mode; B.mode = 'fx'; state.side = true   -- браузер — на вкладку fx (эффекты бросать в роутер)
       ctx.db_cache = nil; relayout(); ctx.set_focus('dsp'); vim.msg = 'router big: drag the sliders, dblclick - default, h l j k walk, zR / Esc back'
     else
@@ -7798,6 +7809,51 @@ ctx = {
     add((ctx.param_in_tcp(tr, fx, pi) and '!' or '') .. 'Show in the track header in REAPER (TCP)', function() ctx.param_tcp_toggle(tr, fx, pi, pname) end, nil, true)
     add('Default value', function() edit.fx_param_default(tr, fx, pi); vim.msg = pname .. ': default' end)
     add('--', function() end)
+  end,
+  -- 12 окт: Opt+A откуда угодно — последний подёрганный параметр → колонка
+  -- автоматизации на его треке (создаётся / показывается и включается), курсор туда;
+  -- параметр take FX — огибающая take во вкладке automation
+  auto_touched = function()
+    local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+    if not ok then vim.msg = 'Opt+A: touch a parameter first - move a knob in a plugin or in DSP'; return end
+    local ti, ii = tn & 0xFFFF, tn >> 16
+    local tr = ti == 0 and reaper.GetMasterTrack(0) or reaper.GetTrack(0, ti - 1)
+    if not tr then vim.msg = 'Opt+A: the track of the last touched parameter is gone'; return end
+    if ii > 0 then
+      local it = reaper.GetTrackMediaItem(tr, ii - 1)
+      local tk = it and reaper.GetMediaItemTake(it, fxn >> 16)
+      local fx = fxn & 0xFFFF
+      if not tk then vim.msg = 'Opt+A: the take of the last touched parameter is gone'; return end
+      local _, pname = reaper.TakeFX_GetParamName(tk, fx, pn, '')
+      local env
+      edit.run('automate ' .. (pname or 'param'), function()
+        env = reaper.TakeFX_GetEnvelope(tk, fx, pn, true)
+        if env and reaper.CountEnvelopePoints(env) == 0 then
+          reaper.InsertEnvelopePoint(env, 0, reaper.TakeFX_GetParamNormalized(tk, fx, pn), 0, 0, false, true); reaper.Envelope_SortPoints(env)
+        end
+      end)
+      if not env then vim.msg = 'Opt+A: REAPER did not create the envelope of ' .. (pname or 'the parameter'); return end
+      model.invalidate(); ctx.tenv_cc = nil; if ctx.tenv_cache then ctx.tenv_cache[it] = nil end
+      for _, a in ipairs(ctx.take_envs(it)) do
+        if a.env == env then ctx.ai_edit_open(a); vim.msg = 'take envelope ' .. (pname or '') .. ': edit its points (automation tab)'; return end
+      end
+      vim.msg = 'take envelope ' .. (pname or '') .. ' added'; return
+    end
+    if fxn & 0x1000000 ~= 0 then vim.msg = 'Opt+A: input FX (rec FX) parameters have no envelopes'; return end
+    local _, pname = reaper.TrackFX_GetParamName(tr, fxn, pn, '')
+    pname = (pname and pname ~= '') and pname or ('param ' .. pn)
+    local env
+    edit.run('automate ' .. pname, function()
+      env = reaper.GetFXEnvelope(tr, fxn, pn, true)
+      if env then
+        reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true)
+        reaper.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true)
+        reaper.TrackList_AdjustWindows(false)
+      end
+    end)
+    if not env then vim.msg = 'Opt+A: no envelope for ' .. pname; return end
+    state.trackenvs[reaper.GetTrackGUID(tr)] = true
+    ctx.env_jump = { env = env, name = pname }; model.invalidate()
   end,
   -- меню эффекта (8 окт): то же, что в DSP — bypass, окно, удалить, добавить
   fx_menu_items = function(tr, fx, fname, add)
@@ -11062,7 +11118,7 @@ local function hint_go(t)
   elseif t.kind == 'tab' then state.toptab = d; ctx.set_focus('top')
   elseif t.kind == 'scopemode' then ctx.scopemode(d)
   elseif t.kind == 'sampleview' then SL.view = d
-  elseif t.kind == 'mm' then ctx.set_focus('top'); state.toptab = 'modulation'; MMX.row, MMX.col = d.row, d.col
+  elseif t.kind == 'mm' then ctx.pane_focus('modulation'); MMX.row, MMX.col = d.row, d.col
   elseif t.kind == 'monobtn' then ctx.mono_take(d == 'take')
   elseif t.kind == 'retrobtn' then
     ctx.set_focus('top')
@@ -11305,7 +11361,7 @@ function ctx.ctx_page(hover)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus
-  if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'modulation' or t == 'midi' or t == 'master' or t == 'visor') and t or nil end
+  if f == 'top' then local t = state.toptab; if t == 'clips' then return 'session' end; return (t == 'retro' or t == 'sample' or t == 'automation' or t == 'modulation' or t == 'midi' or t == 'master' or t == 'visor') and t or nil end
   if f == 'slices' then return 'slices' end   -- 10 окт: своя страница (было — справка item)
   if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker' end
   if f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm' end
@@ -13681,6 +13737,7 @@ local function frame()
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
   draw.envfmt = state.envfmt or 'midi'
+  draw.envvals = state.envvals
   draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
   local hover
   if idle_skip then hover = idle.hover else
@@ -13690,8 +13747,8 @@ local function frame()
   do
     local tab = state.top and state.toptab or nil
     if tab ~= ctx.tab_seen then
-      if tab == 'modulation' and not state.auto_inst then state.auto_inst = true; ctx.auto_by_tab = true
-      elseif ctx.tab_seen == 'modulation' and ctx.auto_by_tab then state.auto_inst = false; ctx.auto_by_tab = nil end
+      if tab == 'automation' and not state.auto_inst then state.auto_inst = true; ctx.auto_by_tab = true
+      elseif ctx.tab_seen == 'automation' and ctx.auto_by_tab then state.auto_inst = false; ctx.auto_by_tab = nil end
       ctx.tab_seen = tab
     end
     if not state.auto_inst then ctx.auto_by_tab = nil end
@@ -14059,15 +14116,12 @@ local function frame()
           if ph then ctx.aied_hover = ph end
           return nil
         end
-        if mod_pane == 'params' then
-          local hv = MMX.PP.draw(Lx, lx, ly, lw2, lh, col, focused)
-          if hv then lfo_hover = lfo_hover or { pane = 'params', pp = hv } end
-          return nil
-        end
-        return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'matrix', col and (col.name .. ' modulation') or 'modulation')
+        local hv = MMX.PP.draw(Lx, lx, ly, lw2, lh, col, focused)    -- params — страница по умолчанию
+        if hv then lfo_hover = lfo_hover or { pane = 'params', pp = hv } end
+        return nil
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' }, { 'curves', 'lfo' } })
+        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'curve', 'curve' }, { 'curves', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -14080,8 +14134,13 @@ local function frame()
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' } } or { { 'params', 'params' }, { 'matrix', 'matrix' }, { 'curve', 'curve' } })   -- 9 окт: curve — кривая целиком
+      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' } } or { { 'params', 'params' }, { 'curve', 'curve' } })   -- 9 окт: curve — кривая целиком
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
+    end,
+    -- 12 окт: вкладка modulation — нативная матрица REAPER (LFO / ACS / link) во всю ширину
+    mmx_draw = function(Lx, x, y, w, h)
+      local col = cur_col()
+      return MMX.draw(Lx, x, y, w, h, col and col.mods or {}, state.focus == 'top' and state.toptab == 'modulation', col and (col.name .. ' modulation') or 'modulation')
     end,
     sample_draw = function(x, y, w, h)
       local col = cur_col()
@@ -14868,7 +14927,7 @@ local function frame()
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
     state.status = ({ open = 'open the matrix', close = 'fold the matrix to a strip', grip = 'drag the line: matrix width, dblclick: auto; fold - quick toggle matrix' })[hover.mxctl]
-  elseif ctx.aied_hover and ctx.aied_hover.status and mod_pane == 'ai' and state.toptab == 'modulation' then
+  elseif ctx.aied_hover and ctx.aied_hover.status and mod_pane == 'ai' and state.toptab == 'automation' then
     state.status = ctx.aied_hover.status
   elseif hover.slices == 'convert' then
     state.status = 'convert slices: l - every slice its own lib instrument, s - an RS5K per slice on the cursor track (slice note)'
@@ -15655,7 +15714,7 @@ local function frame()
       elseif MM.cur == i then MM.key(13)          -- второй клик по строке — learn
       else MM.cur = i end
       click = { t = now2, zone = 'midimap' }
-    elseif lfo_hover and state.top and state.toptab == 'modulation' then
+    elseif lfo_hover and state.top and state.toptab == 'automation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
@@ -16793,7 +16852,7 @@ local function frame()
     local down = gfx.mouse_cap & 1 == 1
     if down then
       -- клик по автоматизации открывает вкладку modulation (фокус остаётся тут) — 2 окт
-      if not env_drag.key then state.top = true; state.toptab = 'modulation' end
+      if not env_drag.key then state.top = true; state.toptab = 'automation' end
       if hover.field == 2 then
         -- поле формы: только курсор туда (правка — буквами в INSERT, ^A ^X)
         if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 2 end
@@ -17334,12 +17393,12 @@ local function frame()
     SL.vol_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'modulation' then
+  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'automation' then
     LG.sel = lfo_hover.field
     LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 0.1 or 1))
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.pane == 'params' and state.top and state.toptab == 'modulation' then
+  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.pane == 'params' and state.top and state.toptab == 'automation' then
     MMX.PP.wheel(gfx.mouse_wheel > 0 and -3 or 3)
     gfx.mouse_wheel = 0
   end
@@ -17598,7 +17657,7 @@ local function frame()
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
   -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
   do
-    local FTAB = { [26162] = 'sample', [26163] = 'modulation', [26164] = 'midi', [26165] = 'scopes', [26166] = 'master' }
+    local FTAB = { [26162] = 'sample', [26163] = 'automation', [26164] = 'midi', [26165] = 'scopes', [26166] = 'master' }
     local tab = FTAB[c]
     -- 10 окт: lib вкладками — F4 листает их (Shift+F4 назад) и ставит фокус в lib
     if c == 26164 and state.libtabs and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
@@ -17874,6 +17933,8 @@ local function frame()
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
+  -- 12 окт: Opt+A (å) из любого модуля — последний подёрганный параметр в колонку автоматизации
+  if c == 229 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then ctx.auto_touched(); c = 0 end
   -- 9 окт: ` (обратная кавычка, как `` в Vim) — прыжок назад, без Control
   if c == 96 and (vim.mode == 'normal' or state.focus ~= 'tracker') and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and not vim.pending then   -- в INSERT / KEYS ` — note-off
     ctx.jump_back(); c = 0
@@ -18241,18 +18302,20 @@ local function frame()
           if r == 'leave' then ctx.set_focus('tracker')
           elseif r == 'save' then mm_save()
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'modulation' and mod_pane == 'lfo' then
+        elseif state.toptab == 'automation' and mod_pane == 'lfo' then
           local r = LG.key(c, ctx.mods().shift and 0.1 or 1)   -- Shift — мелкий шаг (6 окт)
-          if r == 'leave' then mod_pane = 'matrix'
+          if r == 'leave' then mod_pane = 'params'
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
           elseif r == 'pick' then ctx.lfo_pick_env()
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'modulation' and mod_pane == 'params' then
+        elseif state.toptab == 'automation' and mod_pane == 'params' then
           local r = MMX.PP.key(c, cur_col())
-          if r == 'leave' then mod_pane = 'matrix'
+          if r == 'leave' then ctx.set_focus('tracker')
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'modulation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
-        elseif state.toptab == 'modulation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
+        elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
+        elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
+        elseif state.toptab == 'automation' then
+          if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
         elseif state.toptab == 'modulation' then
           local col = cur_col(); local mods = col and col.mods or {}
           if c == 27 then ctx.set_focus('tracker')

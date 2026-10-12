@@ -1767,8 +1767,15 @@ D.env_colour = function(e) return env_colour(e) end   -- для матрицы (
 
 -- формы сегмента REAPER 0..5 → сокращения (как меню Set segment shape)
 D.ENV_SHAPES = { [0] = 'lin', [1] = 'sqr', [2] = 'slo', [3] = 'fas', [4] = 'fae', [5] = 'bez' }
-local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt)
+local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if not ev then return end
+  if vals then
+    -- 12 окт: вид «значения» (ze) — как колонка команд: число в строке точки, иначе точки
+    if ev.pt then
+      text(x + L.env_bx, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or ('%3d'):format(math.floor(ev.v * 127 + 0.5)), env_colour(e))
+    else text(x + L.env_bx, ty, D.envfmt == 'hex' and '..' or '...', D.EMPTY) end
+    return
+  end
   -- ломаная по подточкам строки (M.ENV_SUB) и дальше до первого значения
   -- следующей строки — линия сплошная, в 1 px, как в аранжировке (2 окт: без
   -- разрывов на границах строк); цвет — тот же, что у этой огибающей (ключ темы)
@@ -2638,8 +2645,8 @@ local function draw_topbar(L, info)
   local tab = info.toptab or 'scope'
   local tx = sx0
   if tab == 'scope' then tab = 'master' end   -- вкладки scope больше нет: анализаторы в master
-  for _, t in ipairs(info.tabs or { 'sample', 'modulation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
-    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'modulation' and 'automation') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or (t == 'harm' and 'harmonizer') or t)
+  for _, t in ipairs(info.tabs or { 'sample', 'automation', 'midi', 'retro', 'garden', 'master' }) do   -- garden подписан «orca», midi — learn, grid — опция (2 окт)
+    local lbl = D.ic(t, (t == 'garden' and 'orca') or (t == 'sample' and 'item') or (t == 'retro' and 'rec') or (t == 'harm' and 'harmonizer') or t)
     local tw = ms(lbl) + 2 * L.pad
     local on = t == tab
     -- 6 окт: вкладки с y = 2, как кнопки главного модуля — пиксель фона под кромкой
@@ -2709,9 +2716,12 @@ local function draw_topbar(L, info)
       -- пустой трек: запись — во вкладке rec (3 окт: кнопки [rec] здесь больше нет)
       text(sx0, cy0 + 1, 'no instrument - select one in the lib, or record one in the rec tab', U.GREY)
     end
+  elseif tab == 'automation' then
+    -- автоматизация (12 окт): params, кривая, генератор LFO, automation item
+    if info.mm_draw then hover.mm = info.mm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'modulation' then
     -- модуляционная матрица (jf_tracker_modmatrix.lua): таблица L1 / ENV / LNK
-    if info.mm_draw then hover.mm = info.mm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
+    if info.mmx_draw then hover.mm = info.mmx_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'grid' then
     -- monome (jf_grid): шина, владелец, мини-грид, легенда
     draw_mono(L, info, sx0, cy0, sx1 - sx0, H - 2, hover)
@@ -5542,7 +5552,7 @@ function D.frame(L, snap, rows, state, info)
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
           gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
-        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1])
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')])
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
           hover.envx = math.max(0, math.min(1, (mx - ev.x - L.env_bx) / (EG.env_bar_w - 1)))

@@ -111,7 +111,10 @@ KH.PAGES = {
     { k = 'env: field 2', d = 'segment shape: INSERT letters sqr slo fas fae bez, ^A ^X cycle, :shape fas' },
     { k = 'env: Ctrl+Opt+1..6', d = 'segment shape of the point on the row, in any field and mode: 1 lin 2 sqr 3 slo 4 fas 5 fae 6 bez' },
     { k = 'i', d = 'INSERT: keyboard plays notes (Ableton layout)' },
-    { k = 'a', d = 'envelope column' },
+    { k = 'a', d = 'envelope columns of all tracks on / off' },
+    { k = 'A', d = 'automate: pick any parameter of the track (fzf) - envelope column, or a take envelope of the note' },
+    { k = 'Opt+A', d = 'the last touched parameter (a knob you just moved, any track) - its envelope column, cursor there' },
+    { k = 'ze', d = 'on an envelope column: view as values (like a command column, a number where a point is) / as a curve' },
     { k = '> < N>', d = 'loop: item to region / region to item / N rows', t = { '>', '<' } },
     { k = '[ ] ( )', d = 'octave down / up, instrument previous / next' },
     { k = '/', d = 'commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)' },
@@ -446,13 +449,16 @@ KH.PAGES = {
     { k = 'buttons', d = 'equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play' },
     { k = 'Esc', d = 'back to tracker' },
   } },
-  modulation = { title = 'modulation matrix + LFO generator', e = {
-    { k = 'L', d = 'curves (generator) / matrix - side by side when wide, pages [matrix] [curves] when narrow' },
+  automation = { title = 'automation: envelopes over the song - params, curve, LFO generator, automation items', e = {
+    { k = 'Opt+A', d = 'from anywhere: the last touched parameter (move a knob in a plugin or in DSP) becomes an envelope column on its track, the cursor goes there - type values in INSERT; a take FX parameter opens its take envelope here' },
+    { k = 'L', d = 'curves (generator) - beside the params when wide, a page [curves] when narrow; L again - back' },
     { k = 'P', d = 'params: every parameter of the track (track envelopes + all FX params) - ENV ACT ARM PTS MOD value; also rclick on trim in a track header' },
-    { k = 'params', d = 'Enter: cell, e: envelope create / show / hide, a: arm, b: active, m: modulate (LFO) / to the matrix, c: curve into it, o: FX window, w: modulation window, v: used only, M: automation mode, /: find' },
+    { k = 'params', d = 'Enter: cell, e: envelope create / show / hide, a: arm, b: active, m: modulate (LFO) - the row in the modulation tab, c: curve into it, o: FX window, w: modulation window, v: used only, M: automation mode, /: find' },
     { k = 'LFO j k h l', d = 'field / value: shape (sin tri saw+ saw- sqr rnd), period in rows, depth, center, phase, points per period' },
     { k = 'type', d = 'lfo | podkat (Anticipate: lead curve before every hit of a source track - its events or audio transients, hold, release, duck / swell) | follow (curve from another envelope or the audio level of a track: attack, release, shift = lookahead, invert)' },
     { k = 'LFO g p', d = 'g: new automation item with the curve, p: write points into the envelope - envelope at the tracker cursor (or selected in REAPER); time selection, else cursor region, else one bar' },
+  } },
+  modulation = { title = 'modulation: REAPER parameter modulation of the track - LFO, audio control (ACS), link; nothing is written in time', e = {
     { k = 'h j k l', d = 'cell' },
     { k = 'g G 0 $', d = 'first / last row, first / last column' },
     { k = 'Enter Space', d = 'toggle, next shape, pick link source' },
@@ -532,6 +538,7 @@ KH.BARS = {
   session = { { 'Tab', 'clip mode' }, { 'click >', 'launch' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
+  tracks = { { 'j k', 'track' }, { 'h l', 'column' }, { 'Space', 'toggle' }, { 'a', 'column all' }, { 'Enter', 'go' }, { 'z', 'fold' }, { '/', 'filter' }, { 'Esc', 'tracker' } },   -- 11 окт: Track Manager
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
@@ -548,7 +555,8 @@ KH.BARS = {
   visor = { { 'p', 'on' }, { 'o', 'page' }, { 'a e', 'add' }, { 'j k', 'row' }, { 'J K', 'param' }, { 'H L', 'value' }, { 'h l', 'level' }, { 'm', 'mod' }, { 's', 'scene' }, { 'i', 'presets' }, { 'n N', 'preset' }, { 'zz', 'big' }, { '?', 'help' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' }, { '?', 'help' } },
-  modulation = { { 'L', 'curves' }, { 'P', 'params' }, { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
+  automation = { { 'Opt+A', 'last touched' }, { 'L', 'curves' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
+  modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
   retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },
@@ -559,7 +567,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

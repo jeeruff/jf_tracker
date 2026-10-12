@@ -40,7 +40,8 @@ PN.PANELS = {
   { id = 'dsp',        label = 'dsp',        key = 'd', hint = 'dsp',     side = 'bottom' },
   { id = 'retro',      label = 'rec',        key = 'r', hint = 'retro',   side = 'top', tab = true },
   { id = 'sample',     label = 'item',       key = 'i', hint = 'sample',  side = 'top', tab = true },
-  { id = 'modulation', label = 'automation', key = 'a', hint = 'modulation', side = 'top', tab = true },
+  { id = 'automation', label = 'automation', key = 'a', hint = 'automation', side = 'top', tab = true },   -- 12 окт: огибающие по времени (был id modulation)
+  { id = 'modulation', label = 'modulation', key = 'u', hint = 'modulation', side = 'top', tab = true },   -- 12 окт: матрица LFO / ACS / link REAPER — своя вкладка
   { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
   { id = 'clips',      label = 'clips',      key = 'C', hint = 'session', side = 'top', tab = true },   -- 10 окт: клипы сессии — своя панель (свои шапки треков), куда угодно
@@ -549,9 +550,11 @@ PN.LATE = {
   { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
   { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },
   { 'visor', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'visor', 'matrix') end },
+  -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
+  { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },
   { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
   { 'macros', function(m)
-    for _, at in ipairs({ 'sample', 'retro', 'modulation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
+    for _, at in ipairs({ 'sample', 'retro', 'automation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
   end },
 }
 function PN.add_new(model, raw)
@@ -627,7 +630,7 @@ function PN.parse_name(s)
   if PN.BY[s] then return s end
   for _, p in ipairs(PN.PANELS) do if p.label == s then return p.id end end
   if s == 'lib' then return 'inst' elseif s == 'main' then return 'ctrl' elseif s == 'fx' or s == 'fxlist' then return 'fxb'
-  elseif s == 'rec' then return 'retro' elseif s == 'item' then return 'sample' elseif s == 'automation' then return 'modulation'
+  elseif s == 'rec' then return 'retro' elseif s == 'item' then return 'sample' elseif s == 'auto' then return 'automation' elseif s == 'mod' then return 'modulation'
   elseif s == 'harmonizer' then return 'harm' elseif s == 'orca' then return 'garden' end
   return nil
 end

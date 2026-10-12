@@ -857,8 +857,8 @@ local function run_cmd(line)
   elseif cmd == 'tab' then
     -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden
     if arg == 'sample' then V.msg = 'tab: item (the old sample tab)'; return end
-    local a = (arg == 'mod' or arg == 'modulate' or arg == 'automation' or arg == 'auto') and 'modulation' or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
-    st.toptab = (a == 'sample' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
+    local a = (arg == 'automation' or arg == 'auto') and 'automation' or ((arg == 'mod' or arg == 'modulate' or arg == 'modulation') and 'modulation') or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
+    st.toptab = (a == 'sample' or a == 'automation' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
   elseif cmd == 'retro' then
     st.top = true; st.toptab = 'retro'
@@ -1864,6 +1864,7 @@ function V.key_impl(c)
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
+      elseif c == ('e'):byte() then if ctx.env_view then ctx.env_view() end   -- 12 окт: ze — вид колонки огибающей: значения / кривая
       elseif c == ('t'):byte() then V.transpose_smart()          -- 10 окт: zt — транспозиция (было прокрутка курсора наверх)
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
