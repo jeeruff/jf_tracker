@@ -6359,6 +6359,59 @@ ctx = {
     end
     return loop_cache.grid
   end,
+  -- 12 окт: смарт-панель клетки матрицы: какие паттерны можно поставить на этот трек (у них тут есть звук);
+  -- выбор звучит (трек соло на время прослушки), Enter — клетка из этого паттерна (алиас), clear — пусто
+  mx_smart = function()
+    local ri, ci = MX.cur.ri, MX.cur.ci
+    local rg, col = seq[ri], snap and snap.cols[ci]
+    if not (rg and col and col.track) then vim.msg = 'matrix smart: a track cell'; return false end
+    local nums = {}
+    for _, q in ipairs(model.patterns(regions)) do nums[q.name] = q.num end
+    local items, seen, sel = {}, {}, 1
+    for sri, s in ipairs(seq) do
+      if not s.gap and not seen[s.name] then
+        seen[s.name] = true
+        if #alias.items_over(col.track, s.pos, s.rgnend) > 0 then
+          local num = nums[s.name] or 0
+          items[#items + 1] = { label = ('%02d %s'):format(num, s.name), t = ('%02d'):format(num), v = sri, tip = ('%s on %s: %d steps'):format(s.name, col.name, math.floor(s.r1 - s.r0 + 0.5)) }
+          if s.name == rg.name then sel = #items end
+        end
+      end
+    end
+    if #items == 0 then vim.msg = ('matrix smart: no pattern has anything on %s yet'):format(col.name); return false end
+    items[#items + 1] = { label = 'clear', v = 0, tip = 'empty this cell' }
+    local r = MX.cur_rect
+    if r then ctx.smart_at = { x = r.x, y = r.y + r.h + 2, top = r.y } end
+    return ctx.smart_open({ title = ('%s @ slot %d - a pattern for this cell (Enter)'):format(col.name, ri), items = items, cols = 1, sel = sel,
+      on_sel = function(it) if it.v and it.v > 0 then local s = seq[it.v]; ctx.mx_cell_preview(col.track, s.pos, s.rgnend) end end,
+      on_pick = function(it)
+        ctx.mx_cell_preview_end()
+        if it.v == 0 then ctx.mx_block('cut'); return end
+        local n = 0
+        edit.run('matrix: cell from ' .. seq[it.v].name, function()
+          local clip = alias.cells_copy(seq, snap, it.v, it.v, ci, ci, true)
+          n = alias.cells_paste(seq, snap, ri, ci, clip, true)
+        end)
+        ctx.mx_refresh()
+        vim.msg = ('%s slot %d: the cell of %s (alias, %d item(s))'):format(col.name, ri, items[1] and it.label or '', n)
+      end })
+  end,
+  mx_cell_preview = function(tr, t0, t1)
+    if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then return end   -- идёт игра — не перебивать
+    if not ctx.mx_solo then
+      local sv = {}
+      for i = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i); sv[#sv + 1] = { t, reaper.GetMediaTrackInfo_Value(t, 'I_SOLO') } end
+      ctx.mx_solo = sv
+    end
+    for _, o in ipairs(ctx.mx_solo) do reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', o[1] == tr and 2 or 0) end
+    PV.midi(t0, math.min(t1, t0 + 8))
+  end,
+  mx_cell_preview_end = function()
+    if not ctx.mx_solo then return end
+    PV.stop()
+    for _, o in ipairs(ctx.mx_solo) do if reaper.ValidatePtr(o[1], 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', o[2]) end end
+    ctx.mx_solo = nil
+  end,
   mx_refresh = function()
     model.invalidate()
     regions = model.regions(state.lpb)
@@ -17934,6 +17987,7 @@ local function frame()
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
   do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end
+  if ctx.mx_solo and not (MX.SMART.active and MX.SMART.active()) then ctx.mx_cell_preview_end() end   -- 12 окт: панель клетки закрыта — соло как были
   if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры

@@ -693,6 +693,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
       if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
       if MX.cur.ri == ri and MX.cur.ci == ci then
+        MX.cur_rect = { x = x, y = y, w = L.mx_cell_w, h = rh }      -- 12 окт: якорь смарт-панели клетки
         U.set(MX.focus and U.AMBER or U.LINE); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
         gfx.rect(x + 2, y + 2, L.mx_cell_w - 4, rh - 4, 0)
       end
@@ -900,6 +901,8 @@ function MX.key(c, regions, snap)
   -- (ci −1) — Enter: номер паттерна цифрами (10 окт; < > — листать)
   if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
   if MX.cur.ci == -1 and c == 13 then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() else ctx.slot_cycle(MX.cur.ri, 1) end; return true end
+  -- 12 окт: Enter на клетке — смарт-панель: паттерны с содержимым на этом треке, выбор звучит, Enter ставит
+  if MX.cur.ci >= 1 and c == 13 and ctx.mx_smart then ctx.mx_smart(); return true end
   if MX.cur.ci < 1 and (ch == 'm' or ch == 'M' or ch == 'x' or c == 22 or c == 3 or c == 24) then ctx.msg('on the region name / number - move to a track cell (l)'); return true end
   MX.numbuf = nil
   -- слой лупов: цифры+Enter, > < + - = — лупы ячейки (вместо паттерна / длины)
