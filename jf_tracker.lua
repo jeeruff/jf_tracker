@@ -7384,6 +7384,7 @@ ctx = {
   end,
   -- 12 окт: подсказки транспорта в статусе — что это и зачем, не только «click / wheel»
   CTRL_TIP = {
+    hear = 'hear: a note you insert plays its sample at once (off - inserting is silent; Shift+note always just plays). Same as the quick option preview',
     pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
     lpb = 'LPB, lines per beat: how many rows make one beat (4 - a row is a 16th note, 8 - a 32nd). More rows = finer grid. Click / wheel - change',
     inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; a , . in INSERT do the same',
@@ -13071,6 +13072,7 @@ function ctrl_action(name, delta)
   elseif name == 'xfade' then if delta ~= 0 then ctx.xfade_len(delta) else ctx.xfade_toggle() end
   elseif name == 'loop' then reaper.GetSetRepeat(2)
   elseif name == 'clips' then ctx.clips_toggle()                -- грид: страница clips (7 окт)
+  elseif name == 'hear' then state.preview = not state.preview; vim.msg = 'hear ' .. (state.preview and 'on: a note you insert plays its sample' or 'off: inserting is silent (Shift+note still just plays)')
   elseif name == 'pitch' then
     if col then ctx.set_pitchmode(col, state.pitchmodes[col.guid] == 'resample' and 'shift' or 'resample') end
   elseif name == 'font' then
@@ -14302,7 +14304,7 @@ local function frame()
         return out
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
-      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
+      recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),

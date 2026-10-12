@@ -3179,8 +3179,9 @@ function D.transport_groups(c)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },
-                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch shift' } } }
+  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
+
+                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'hear', 'hear', c.hear and U.CYAN or U.GREY, res = 'hear' } } }   -- 12 окт: hear — слышать вставленную ноту (была insert в lib)
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
@@ -3689,7 +3690,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       bx = bx + bw + L.pad
     end
     tbtn('preview', info.poolprev, 'prevbtn')
-    tbtn('insert', info.inspreview, 'insprevbtn')
+    -- 12 окт: insert (играть при вставке) переехал в транспорт — кнопка hear у step / inst / LPB
     -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
   end
