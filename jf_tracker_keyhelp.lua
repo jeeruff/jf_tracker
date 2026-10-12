@@ -298,7 +298,7 @@ KH.PAGES = {
     { k = ':z words  :zi', d = 'zoxide: jump to the most used / recent folder matching the words (last word - in the folder name); :zi - pick from the visited folders' },
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },
-    { k = 'm M', d = 'mark the row (and step down) / clear all marks; marks stay across folders - Enter puts every marked file into the lib in marking order' },
+    { k = 'm u', d = 'mark the row (and step down) / unmark all (u, as in lf); marks stay across folders - Enter puts every marked file into the lib in marking order' },
     { k = 'h - BS', d = 'folder up' },
     { k = 'Cmd+Enter', d = 'replace sample of the selected instrument everywhere' },
     { k = 'S-dblclick', d = 'the same with the mouse: Shift + double click on a file replaces the sample of the selected instrument' },

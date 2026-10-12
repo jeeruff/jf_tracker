@@ -120,6 +120,6 @@ do
   eq('Enter puts all marked into the lib', #added, 2)
   eq('in marking order', added[1], '/r/Drums/hat_open.wav')
   eq('marks cleared after Enter', B.nmarked(), 0)
-  B.key(('m'):byte()); B.key(('M'):byte()); eq('M clears', B.nmarked(), 0)
+  B.key(('m'):byte()); B.key(('u'):byte()); eq('u unmarks all (as in lf, 12 окт)', B.nmarked(), 0)
 end
 print(('%d checks, %d failed'):format(n, bad))

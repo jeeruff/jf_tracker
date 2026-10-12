@@ -791,7 +791,7 @@ function B.toggle_mark()
       B.sel[k] = true
       B.sel_order[#B.sel_order + 1] = { key = k, e = e, full = B.full(e) }
     end
-    if ctx.msg then ctx.msg(('%d marked - Enter: all into the lib, M: clear'):format(#B.sel_order)) end
+    if ctx.msg then ctx.msg(('%d marked - Enter: all into the lib, u: unmark all'):format(#B.sel_order)) end
   end
   B.cur = math.min(#B.entries, B.cur + 1)
 end
@@ -934,7 +934,7 @@ function B.key(c)
     local e = B.entries[B.cur]
     if e and not (e.dir or e.db or e.pm or e.pmdir or e.kit or e.trk or e.rgn or e.mark or e.other or e.empty) and ctx.lib_append_slice then ctx.lib_append_slice(B.full(e)) end
   elseif ch == 'm' then B.toggle_mark()                                -- 10 окт: отметка строк
-  elseif ch == 'M' then B.clear_marks()
+  elseif ch == 'u' then B.clear_marks()                                -- 12 окт: u — снять все отметки, как в lf (было M)
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
