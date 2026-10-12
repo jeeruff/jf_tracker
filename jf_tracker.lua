@@ -7452,6 +7452,49 @@ ctx = {
     vim.open_hydra({ title = 'metronome', items = items, how = 'click metro in the transport, or f + its label, then the letter' })
     state.popup_at = { kind = 'strip', id = 'metro' }
   end,
+  -- 12 окт: выпадашка ячейки транспорта (f на ней): step, inst, LPB, vel, oct, pitch — значения сеткой, hjkl / набор + Enter
+  ctrl_menu = function(id)
+    local items, sel, title, pick = {}, 1, nil, nil
+    if id == 'step' then
+      for n = 0, 16 do items[#items + 1] = { label = tostring(n), v = n }; if not vim.step_auto and not vim.step_next and vim.step == n then sel = #items end end
+      items[#items + 1] = { label = 'auto', v = 'auto', tip = 'to the end of the inserted item / slice' }; if vim.step_auto then sel = #items end
+      items[#items + 1] = { label = 'next', v = 'next', tip = 'to the next note / item / command of the track' }; if vim.step_next then sel = #items end
+      title = 'edit step - rows the cursor moves after a note'
+      pick = function(it)
+        vim.step_auto, vim.step_next = it.v == 'auto', it.v == 'next'
+        if type(it.v) == 'number' then vim.step = it.v end
+        vim.msg = 'step ' .. tostring(it.v)
+      end
+    elseif id == 'lpb' then
+      for _, v in ipairs(LPBS) do items[#items + 1] = { label = tostring(v), v = v }; if state.lpb == v then sel = #items end end
+      title = 'LPB - rows per beat'
+      pick = function(it) set_lpb(it.v) end
+    elseif id == 'vel' then
+      for v = 8, 128, 8 do local vv = math.min(127, v); items[#items + 1] = { label = tostring(vv), v = vv }; if math.abs((vim.vel or 100) - vv) < 4 then sel = #items end end
+      title = 'velocity of new notes'
+      pick = function(it) vim.vel = it.v; vim.msg = 'vel ' .. it.v end
+    elseif id == 'oct' then
+      for o = 0, 8 do items[#items + 1] = { label = tostring(o), v = o }; if vim.octave == o then sel = #items end end
+      title = 'octave of the note keys'
+      pick = function(it) vim.octave = it.v end
+    elseif id == 'pitch' then
+      local col = cur_col(); if not col then return false end
+      local cur = state.pitchmodes[col.guid] == 'resample' and 2 or 1
+      items = { { label = 'shift', v = 'shift', tip = 'pitch only, the length stays' }, { label = 'resample', v = 'resample', tip = 'pitch and speed together (tape / sampler)' } }
+      sel = cur; title = 'pitch mode of ' .. col.name
+      pick = function(it) ctx.set_pitchmode(col, it.v); vim.msg = 'pitch ' .. it.v end
+    elseif id == 'inst' then
+      local col = cur_col(); local pool = col and col.pool or {}
+      if #pool == 0 then return false end
+      for i, e in ipairs(pool) do items[#items + 1] = { label = ('%02d %s'):format(i, e.name or ''), t = ('%02d'):format(i), v = i }; if vim.inst == i then sel = #items end end
+      title = 'instrument of new notes - ' .. col.name
+      pick = function(it) pool_select(it.v) end
+    else return false end
+    local r = draw.strip_cell and draw.strip_cell[id]
+    if r then ctx.smart_at = { x = r[1], y = r[2] - 4, top = r[2] } end
+    ctx.smart_open({ title = title .. ' (Enter)', items = items, cols = id == 'inst' and 1 or math.min(9, #items), sel = sel, on_pick = pick })
+    return true
+  end,
   -- 12 окт: подсказки транспорта в статусе — что это и зачем, не только «click / wheel»
   CTRL_TIP = {
     listen = 'listen: what sounds while you edit - insert (what you type in), step (the cursor row, this track), sel (a selection), line (the cursor row, all tracks)',
@@ -11526,6 +11569,7 @@ local function hint_go(t)
   elseif t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar') then   -- 11 окт: фейдер транспорта по f — с клавиатуры
     state.kslider = { ctrl = d }
     vim.msg = (d == 'ratebar' and 'playrate' or 'swing') .. ': h l change (H L fine), 0 reset, Esc done'
+  elseif t.kind == 'ctrl' and ctx.ctrl_menu and ctx.ctrl_menu(d) then   -- 12 окт: f на ячейке транспорта — её выпадашка (выбор с клавиатуры)
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)

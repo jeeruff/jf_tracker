@@ -3179,12 +3179,14 @@ function D.transport_groups(c)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
+  local lsn = { { 'ls_ins', 'insert', c.hear and U.CYAN or U.GREY }, { 'ls_step', 'step', c.trklisten and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } }
+  g[#g + 1] = { boxed = true, { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
                 { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
-  -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки)
-  g[#g + 1] = { { { 'listen', 'listen', U.GREY } },
-                { { 'ls_ins', 'insert', c.hear and U.CYAN or U.GREY }, { 'ls_step', 'step', c.trklisten and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } } }
+  -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
+  -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
+  if c.tpfull then table.insert(g[#g], lsn)
+  else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
@@ -3272,6 +3274,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
     text(x + L.pad, ly + L.rh, zx, U.GREY)
     local kx = x + lw
+    if cc.tpfull then text(kx, ly + 2 * L.rh + 2, 'listen', U.GREY) end   -- 12 окт: подпись группы listen — под клавиатурой
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
     local kw0 = (D.PIANO_SMALL and 0 or ms('W')) + ms('W') + 4
@@ -3327,22 +3330,27 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local gap, sep = 2 * L.pad, 3 * L.pad
   -- 12 окт: it.res — самая длинная подпись этой ячейки (step 1 → step auto): место заранее, соседи не прыгают
   local function cw_of(it) return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
+  -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
+  local function gap_of(g) return g.boxed and (gap + 6) or gap end
   local function group_w(g)
     local gw = 0
+    local gp = gap_of(g)
     for _, row in ipairs(g) do
       local rw = 0
-      for k, it in ipairs(row) do rw = rw + cw_of(it) + (k > 1 and gap or 0) end
+      for k, it in ipairs(row) do rw = rw + cw_of(it) + (k > 1 and gp or 0) end
       gw = math.max(gw, rw)
     end
     return gw
   end
   local function draw_group(g, gx, gw, y0)
+    local gap = gap_of(g)
     for ri, row in ipairs(g) do
       local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh
       for _, it in ipairs(row) do
         local iw = cw_of(it)
         local hot = cell_hot(cx, cy, iw, L.rh)
         if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, L.rh, 1); hover.ctrl = it[1] end
+        if g.boxed then set(hot and U.AMBER or U.mix(U.LINE, U.PANEL, 0.4)); gfx.rect(cx - 3, cy, iw + 6, L.rh - 1, 0) end
         text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
         if it.beats then
           local bs = math.max(4, L.rh - 6)
@@ -3381,7 +3389,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
         cx = cx + iw + gap
         -- 12 окт: тонкая черта между ячейками группы — бледнее разделителя групп
-        if row[_ + 1] then set(U.mix(U.LINE, U.PANEL, 0.75)); gfx.rect(cx - math.floor(gap / 2) - 1, cy + 3, 1, L.rh - 6, 1) end
+        if row[_ + 1] and not g.boxed then set(U.mix(U.LINE, U.PANEL, 0.75)); gfx.rect(cx - math.floor(gap / 2) - 1, cy + 3, 1, L.rh - 6, 1) end
       end
     end
     local first = g[1] and g[1][1] and g[1][1][1]
