@@ -815,6 +815,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- [rec] в левом углу ряда (3 окт): запись в item — режим вкладки (кольцо
   -- jf_rec); есть всегда — и у файла браузера
   local bx = x
+  local sbrect                         -- 12 окт: место полосы прокрутки в ряду кнопок
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
@@ -836,7 +837,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if ctx.hint then ctx.hint('slicebtn', bx, by, bw, rh, b[2]) end
       bx = bx + bw + 2
     end
-    if editing and #S.trans > 0 then U.text(bx + L.pad, y + rh + brow * rh + 1, ctx.fit(('sens %.2f'):format(S.sens), (brow == 0 and (x + hint_w) or (x + w)) - bx - L.pad), U.GREY) end
+    if editing and #S.trans > 0 then
+      local st = ctx.fit(('sens %.2f'):format(S.sens), (brow == 0 and (x + hint_w) or (x + w)) - bx - L.pad)
+      U.text(bx + L.pad, y + rh + brow * rh + 1, st, U.GREY)
+      bx = bx + U.measure(st) + 2 * L.pad
+    end
+    -- 12 окт: полоса прокрутки зума — в ряду кнопок, за follow (пользователь: не отнимать высоту у волны и прицела)
+    local sx1 = brow == 0 and (x + hint_w) or (x + w)
+    if sx1 - (bx + L.pad) >= 10 * L.cw then sbrect = { x = bx + L.pad, y = y + rh + brow * rh, w = sx1 - bx - L.pad - 2 } end
   else
     U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
@@ -849,7 +857,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
   local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
-  local SBH = zoomed0 and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0
+  local SBH = (zoomed0 and not sbrect) and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0   -- в ряду кнопок места нет — под волной, как раньше
   local zt, zlab, zk = S.edge_focus(e, zone, S.active and S.entry and S.entry.item == e.item)
   local ZH = 0
   -- 12 окт: прицел (зум края) — раньше полосы-обзора: при зуме обзор отнимал высоту, и прицел пропадал
@@ -1293,8 +1301,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     S.zd_prev = down
   end
   -- полоска-обзор (10 окт): весь item, рамка — что видно сейчас; тянуть / щёлкнуть — прокрутка
-  if SBH > 0 then
+  if SBH > 0 or (sbrect and zoomed0) then
     local sy = wy + wh + (ZH > 0 and (ZH + 3) or 1)
+    local x, w, SBH = x, w, SBH
+    if sbrect then x, w, sy, SBH = sbrect.x, sbrect.w, sbrect.y, rh end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
     U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)

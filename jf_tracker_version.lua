@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'item tab: the zoom scroll strip sits in the button row after follow - the wave and the edge zoom keep their height (the edge zoom no longer vanishes when zoomed)',
     'item tab: the auto play button is called spam',
     'command field in two halves, as in Renoise: the code (D = 0D, U = 0U; S_ Z_ prefixes - SI, ZT) and the value (two hex digits); l / h step between them, the jump ruler counts both; digits on the value half alone keep the code there or take the dim one running from above (08 under 0D10 = 0D08)',
     'command column: a command that still runs (slide, vibrato, arpeggio, volume slide, retrigger) shows dim on the rows below until it is replaced or stopped; ` on the command field writes its stop (0D.. -> 0D00), like note-off for a note',
