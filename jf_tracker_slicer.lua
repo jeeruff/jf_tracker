@@ -850,10 +850,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
   local SBH = zoomed0 and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0
-  if SBH > 0 then wh = wh - SBH - 2 end
   local zt, zlab, zk = S.edge_focus(e, zone, S.active and S.entry and S.entry.item == e.item)
   local ZH = 0
+  -- 12 окт: прицел (зум края) — раньше полосы-обзора: при зуме обзор отнимал высоту, и прицел пропадал
   if zt and wh > 9 * rh then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end   -- волна пополам: сверху целиком, снизу край
+  if SBH > 8 and wh - SBH - 2 < 3 * rh then SBH = 8 end   -- места мало — обзор тонкой полосой, прицел остаётся
+  if SBH > 0 then wh = wh - SBH - 2 end
   if wh < 6 then return end
   -- 10 окт: модуль детектора транзиентов (Opt+D) — слева от волны, волна сужается
   S.dt_hot = nil
