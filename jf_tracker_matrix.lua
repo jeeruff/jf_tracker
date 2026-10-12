@@ -564,7 +564,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.text(xb, y + 1, '>', hot_next and U.AMBER or U.GREY)
       if hot_prev then hover.prev = ri elseif hot_next then hover.next = ri end
     end
-    -- курсор на номере (9 окт): Enter / < > — паттерн слота
+    -- курсор на номере (9 окт): Enter / цифры / Ctrl+Shift+H L — паттерн слота
     if MX.cur.ri == ri and MX.cur.ci == -1 then
       U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(xa - 2, y, xb + aw + 3 - xa + 2, L.rh, 0)
     end
@@ -837,6 +837,8 @@ function MX.key(c, regions, snap)
   if c == 22 then ctx.mx_block('paste'); return true end
   if c == 18 then ctx.edit.redo(); ctx.mx_refresh(); return true end
   -- Ctrl+hjkl приходят кодами 8/10/11/12 — те же движения
+  -- 12 окт: Ctrl+Shift+H / L — номер паттерна слота −/+ (как Ctrl+←/→ в Renoise; было < >)
+  if mods.ctrl and mods.shift and (c == 8 or c == 12) then ctx.slot_cycle(MX.cur.ri, c == 8 and -1 or 1); return true end
   if mods.ctrl and (c == 8 or c == 10 or c == 11 or c == 12) then
     local dx, dy = 0, 0
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
@@ -898,7 +900,7 @@ function MX.key(c, regions, snap)
   if (ch == '0' and not MX.count) or ch == '^' then MX.goto_cell(regions, snap, MX.cur.ri, MX.fold and -1 or 0); return true end
   if ch == '$' then MX.goto_cell(regions, snap, MX.cur.ri, #snap.cols); return true end
   -- 9 окт: курсор на имени (ci 0) — Enter / i / r переименовать; на номере
-  -- (ci −1) — Enter: номер паттерна цифрами (10 окт; < > — листать)
+  -- (ci −1) — Enter: номер паттерна цифрами (10 окт; Ctrl+Shift+H / L — листать, 12 окт)
   if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
   if MX.cur.ci == -1 and c == 13 then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() else ctx.slot_cycle(MX.cur.ri, 1) end; return true end
   -- 12 окт: Enter на клетке — смарт-панель: паттерны с содержимым на этом треке, выбор звучит, Enter ставит
@@ -941,8 +943,6 @@ function MX.key(c, regions, snap)
   elseif ch == '[' then ctx.slot_len_step('bar', -1)
   elseif ch == '}' then ctx.slot_len_step('step', 1)
   elseif ch == '{' then ctx.slot_len_step('step', -1)
-  elseif ch == '<' then ctx.slot_cycle(MX.cur.ri, -1)
-  elseif ch == '>' then ctx.slot_cycle(MX.cur.ri, 1)
   elseif ch == 'u' then ctx.edit.undo(); ctx.mx_refresh()
   elseif c == 9 or c == 27 then ctx.toggle_focus()
   elseif ch == ' ' then MX.space(regions)
