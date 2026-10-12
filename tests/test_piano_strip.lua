@@ -14,7 +14,7 @@ local U = setmetatable({ readable = function(c) return c end, mix = function(a) 
 local D = dofile(DIR .. '/jf_tracker_draw.lua')
 D.init(U, nil, nil)
 local snap = { cols = { { guid = 'A', name = 'A', lanes = { { idx = 0, subs = { {} }, items = {} } }, envs = {}, depth = 0 } } }
-local state = { fontscale = 1, folds = {}, fxcols = 1, envs = false, hscroll = 1, wave = 'off' }
+local state = { fontscale = 1, folds = {}, fxcols = 1, envs = false, hscroll = 1, wave = 'off', statpos = 'bottom' }
 D.set_font(state)
 local L0 = D.layout(snap, state, 0)
 -- 5 окт: полоса транспорта есть всегда, клавиатура в ней — по m
@@ -24,9 +24,11 @@ local L1 = D.layout(snap, state, 0)
 eq(L1.piano_h, L0.piano_h, 'keyboard on / off does not move the layout')
 state.statpos = 'keyboard'
 local L2 = D.layout(snap, state, 0)
-eq(L2.piano_h, L0.piano_h + L0.rh, 'status in the strip: one more row')
+eq(L2.piano_h, L0.piano_h + 2 * L0.rh + 2, 'status in the strip: two more rows (the mode x2, 12 окт)')
 eq(L2.status_h, 0, 'no bottom status bar then')
-state.statpos = nil
+state.statpos = 'bottom'
+local L3 = D.layout(snap, { fontscale = 1, folds = {}, fxcols = 1, envs = false, hscroll = 1, wave = 'off' }, 0)
+eq(L3.piano_h, L2.piano_h, 'default: status under the keyboard (12 окт)')
 local r = D.piano_strip(L1, 0, 0, 800, L1.piano_h, { octave = 4, held = { [0] = true }, last = 2 })
 eq(r.white, 10, '10 white keys'); eq(r.black, 7, '7 black keys'); eq(r.letters, 17, 'all letters')
 local r2 = D.piano_strip(L1, 0, 0, 120, L1.piano_h, { octave = 4, held = {} })

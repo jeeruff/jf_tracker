@@ -497,7 +497,7 @@ function D.layout(snap, state, nregions)
   -- положение верхнего модуля (3 окт): top — над трекером, mid — над DSP,
   -- bottom — под DSP; статус-бар: bottom — низ окна, tracker — строка в модуле трекера
   L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom' or state.toppos == 'clips') and state.toppos or 'top'   -- 8 окт: clips — под клипами, над строками трекера
-  L.statpos = (state.statpos == 'tracker' or state.statpos == 'keyboard') and state.statpos or 'bottom'
+  L.statpos = state.statpos == 'bottom' and 'bottom' or 'keyboard'   -- 12 окт: статус в трекере убран, по умолчанию — под клавиатурой
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
   L.kbstat = L.statpos == 'keyboard'                  -- полоса транспорта есть всегда (5 окт)
@@ -505,7 +505,7 @@ function D.layout(snap, state, nregions)
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
-  L.tp_h = L.tppos ~= 'tracker' and (((L.kbstat and 3 or 2) * L.rh + 6) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)) or 0   -- 11 окт: full — строка |<< freeze slow >>| dub
+  L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)) or 0   -- 11 окт: full — строка |<< freeze slow >>| dub
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0
   D.jr_bg = state.jrbg                                -- 10 окт: подложка линейки прыжков (опция)                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
@@ -559,7 +559,7 @@ function D.layout(snap, state, nregions)
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
-  L.piano_h = (L.kbstat and 3 or 2) * L.rh + 6 + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 11 окт: full — строка под кнопками
+  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
@@ -3534,13 +3534,21 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- big status: режим уже крупно слева — здесь только мелкое, во всю ширину
     if st.small and st[2] ~= '' then text(x_all + L.pad, ly + 2 * L.rh, fit(st[2], w_all - 2 * L.pad), U.TEXT) end
   elseif st and st.small ~= false then
-    local sy = ly + 2 * L.rh
+    -- 12 окт: ниже второго ряда кнопок (full: |<< freeze /2 x2 …) — раньше налезало; режим крупно x2,
+    -- остальное (после |) и правая часть — обычным шрифтом по середине его высоты
+    local sy = ly + 2 * L.rh + (cc.tpfull and (L.rh + 2) or 0) + 2
     local sx0 = x + L.pad
     local sw = x + w - L.pad - sx0
-    local left = fit(st[1], math.floor(sw / 3))
-    text(sx0, sy, left, (p and p.ins) and D.FOCUS_INS or U.AMBER)
-    local dx = sx0 + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
-    if st[2] ~= '' and dx < sx0 + sw then text(dx, sy, fit(st[2], sx0 + sw - dx), U.TEXT) end
+    local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
+    mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
+    while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
+    local col = (p and p.ins) and D.FOCUS_INS or U.AMBER
+    local dx = sx0
+    if mode ~= '' then D.big_text(sx0, sy, mode, col, 2); dx = sx0 + D.big_measure(mode, 2) + 3 * L.pad end
+    local small = ((rest or ''):gsub('^%s+', ''))
+    if st[2] ~= '' then small = small ~= '' and (small .. '   ' .. st[2]) or st[2] end
+    local ty = sy + math.floor((2 * L.th - L.th) / 2)
+    if small ~= '' and dx < sx0 + sw then text(dx, ty, fit(small, sx0 + sw - dx), U.TEXT) end
   end
   return out
 end

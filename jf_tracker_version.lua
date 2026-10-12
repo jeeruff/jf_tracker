@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'status bar: under the keyboard by default (the in-tracker place is gone; option: keyboard / bottom), below the second row of transport buttons (it overlapped them), the mode big x2',
     'lock: play from the tracker always starts at the tracker cursor row; a cursor moved while playing (gg) goes to REAPER once it stops - it used to start from the old REAPER cursor',
     'shift rec (the smart button under rec is now shift, :shiftrec): waits for a MIDI note, it starts the recording from the cursor row at the project rate (x0.5 - record slow, play fast); the first note lands on the row; pre-roll is skipped',
     'Backspace / Insert of rows (Shift - all tracks): a note that runs through the rows gets shorter / longer, it is no longer cut into a second note (0Sxx); a note starting on a deleted row goes away; MIDI as before',
