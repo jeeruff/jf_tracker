@@ -22,16 +22,44 @@ local function notify(p, i)
 end
 
 function SM.active() return SM.p ~= nil end
-function SM.close() SM.p, SM.rect, SM.hot, SM.hot_prev = nil, nil, nil, nil end
+function SM.close() SM.p, SM.rect, SM.hot, SM.hot_prev, SM.typed = nil, nil, nil, nil, nil end
 
 function SM.open(p, anchor)
   if not p or not p.items or #p.items == 0 then SM.close(); return false end
   p.cols = math.max(1, math.min(p.cols or 16, #p.items))
   p.sel = math.max(1, math.min(#p.items, p.sel or 1))
   if anchor then p.anchor = anchor elseif SM.p then p.anchor = SM.p.anchor end
-  SM.p, SM.hot = p, nil
+  SM.p, SM.hot, SM.typed = p, nil, nil
   return true
 end
+
+-- 12 окт: набор с клавиатуры — что ячейка «печатает»: it.t, иначе подпись без пробелов и дефисов
+-- (C-4 → C4, 9E → 9E); пустые / служебные (--, ---) не набираются
+local function typed_of(it)
+  if it.t then return it.t end
+  local t = (it.label or ''):upper():gsub('[%s%-]', '')
+  return t
+end
+-- набранный символ: true — принят (выбор сдвинулся), false — не начало ни одного значения
+local function type_char(p, ch)
+  local b = (SM.typed or '') .. ch:upper()
+  local best, bd, exact
+  local s0 = SM.typed_from or p.sel
+  for i, it in ipairs(p.items) do
+    local t = typed_of(it)
+    if t ~= '' and t:sub(1, #b) == b then
+      if t == b and not exact then exact = i end
+      local d = math.abs(i - s0)
+      if not bd or d < bd then best, bd = i, d end
+    end
+  end
+  if not best then return false end
+  if not SM.typed then SM.typed_from = p.sel end
+  SM.typed = b
+  p.sel = exact or best
+  return true
+end
+SM.type_char = type_char
 
 local function pick(i)
   local p = SM.p
@@ -54,6 +82,18 @@ function SM.key(c)
 end
 function SM.key_in(c, p, n, cols)
   local ch = c > 0 and c < 256 and string.char(c) or ''
+  -- 12 окт: печатный символ, который продолжает значение, — набор (сильнее навигации: 9E, C#4, 0U)
+  if ch:match('^[%w#]$') and type_char(p, ch) then return true end
+  if c == 8 then                                -- Backspace — символ набора назад
+    if SM.typed then
+      local b = SM.typed:sub(1, -2); SM.typed = nil; p.sel = SM.typed_from or p.sel
+      for k = 1, #b do type_char(p, b:sub(k, k)) end
+      if b == '' then SM.typed, SM.typed_from = nil, nil end
+    end
+    return true
+  end
+  if SM.typed and ch:match('^[%w#]$') then SM.msg = SM.typed .. ch:upper() .. ': no such value'; return true end
+  if c ~= ENTER and ch ~= ' ' then SM.typed, SM.typed_from = nil, nil end   -- навигация обрывает набор
   if c == ESC or ch == 'q' then SM.close()
   elseif c == ENTER or ch == ' ' then pick(p.sel)
   elseif ch == 'h' or c == LEFT then p.sel = math.max(1, p.sel - 1)
@@ -73,7 +113,7 @@ end
 function SM.layout(L, ms, W, H)
   local p = SM.p
   local cw = 0
-  for _, it in ipairs(p.items) do cw = math.max(cw, ms(it.label)) end
+  for _, it in ipairs(p.items) do cw = math.max(cw, ms(it.label) + (it.sub and (ms(' ') + ms(it.sub)) or 0)) end
   cw = p.cell_w or (cw + 2 * L.pad)
   local crh = (p.cell_rows or 1) * L.rh
   local rows = math.ceil(#p.items / p.cols)
@@ -98,7 +138,8 @@ function SM.draw(d)
   SM.rect = { x, y, w, h }
   set(C.PANEL); gfx.rect(x, y, w, h, 1)
   set(C.FRAME); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
-  text(x + L.pad, y + L.pad, d.fit(p.title or '', w - 2 * L.pad), C.CYAN)
+  local tline = (p.title or '') .. (SM.typed and ('   typed: ' .. SM.typed) or '')
+  text(x + L.pad, y + L.pad, d.fit(tline, w - 2 * L.pad), C.CYAN)
   local gx, gy = x + L.pad, y + L.pad + L.rh
   local mx, my = gfx.mouse_x, gfx.mouse_y
   SM.hot = nil
@@ -113,7 +154,15 @@ function SM.draw(d)
     if it.draw then it.draw(cx + 1, cy + 1, cw - 3, crh - 2, sel)
     else
       local col = sel and C.TEXT or (it.on and C.AMBER or (it.dim and C.GREY or C.TEXT))
-      text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
+      if it.sub then
+        -- 12 окт: hex и рядом десятичное тусклым (9E 158)
+        local tw = ms(it.label) + ms(' ') + ms(it.sub)
+        local tx = cx + math.floor((cw - tw) / 2)
+        text(tx, cy + 1, it.label, col)
+        text(tx + ms(it.label) + ms(' '), cy + 1, it.sub, sel and C.TEXT or C.GREY)
+      else
+        text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
+      end
     end
     if sel then set(C.AMBER); gfx.rect(cx, cy, cw - 1, crh, 0)
     elseif hot then set(C.TEXT); gfx.rect(cx, cy, cw - 1, crh, 0)
@@ -134,6 +183,8 @@ function SM.draw(d)
   -- подсказка: под мышью, иначе выбранное
   local ti = p.items[SM.hot or p.sel]
   local tip = lhot and ('listen: the choice sounds when it changes - ' .. (SM.listen and 'on' or 'off')) or (ti and (ti.tip or ti.label) or '')
+  if not SM.hot and SM.msg then tip = SM.msg end
+  SM.msg = nil
   text(x + L.pad, by, d.fit(tip, lx - x - 2 * L.pad), C.GREY)
 end
 
@@ -182,11 +233,13 @@ end
 
 -- значения 0..n−1 (n = 128 или 256): hex — две цифры, midi — десятичные;
 -- clear — ячейка «--» в конце (убрать значение)
-function SM.values(n, cur, hex, clear)
+function SM.values(n, cur, hex, clear, mean)
   local items = {}
   for v = 0, n - 1 do
+    local m = mean and mean(v)
     items[#items + 1] = { label = hex and ('%02X'):format(v) or tostring(v), v = v, on = v == cur,
-                          tip = ('%d  (hex %02X)'):format(v, v) }
+                          sub = hex and tostring(v) or nil,
+                          tip = hex and (('%02X = %d'):format(v, v) .. (m and ('  ->  ' .. m) or '')) or (('%d  (hex %02X)'):format(v, v) .. (m and ('  ->  ' .. m) or '')) }
   end
   if clear then items[#items + 1] = { label = '--', v = 'clear', tip = clear } end
   local sel = cur and (cur + 1) or 1
@@ -210,9 +263,33 @@ SM.FX = {
 SM.FX_NAME = { ['0S'] = 'slice', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
+-- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
+local function st(x) return ('%+.2f'):format(x):gsub('0+$', ''):gsub('%.$', '') end
+SM.FX_MEAN = {
+  ['0S'] = function(v) return ('slice %d, or offset %d%% of the sample'):format(v, math.floor(v / 256 * 100 + 0.5)) end,
+  ['0M'] = function(v) return ('volume %d%%'):format(math.floor(v / 128 * 100 + 0.5)) end,
+  ['0P'] = function(v) if v == 128 then return 'centre' end; return (v < 128 and 'left ' or 'right ') .. math.floor(math.abs(v - 128) / 128 * 100 + 0.5) .. '%' end,
+  ['0U'] = function(v) return st(v / 16) .. ' semitone per row' end,
+  ['0D'] = function(v) return st(-v / 16) .. ' semitone per row' end,
+  ['0G'] = function(v) return ('glide over %d rows'):format(v) end,
+  ['0V'] = function(v) local x, y = v >> 4, v & 15; return x == 0 and 'vibrato off' or ('period %s rows, depth %s semitone'):format(st(16 / x):gsub('^%+', ''), st(y / 8):gsub('^%+', '')) end,
+  ['0A'] = function(v) return ('arpeggio 0, +%d, +%d semitones'):format(v >> 4, v & 15) end,
+  ['0I'] = function(v) return ('volume +%d%% per row'):format(math.floor(v / 256 * 100 + 0.5)) end,
+  ['0O'] = function(v) return ('volume -%d%% per row'):format(math.floor(v / 256 * 100 + 0.5)) end,
+  ['0R'] = function(v) local x, y = v >> 4, v & 15; return ('retrig every %s row, volume -%d%% each'):format(st((y > 0 and y or 4) / 16):gsub('^%+', ''), math.floor(x / 16 * 100 + 0.5)) end,
+  ['0Y'] = function(v) return ('plays %d%% of the time'):format(math.floor(v / 255 * 100 + 0.5)) end,
+  SI = function(v) return ('fade in %s row'):format(st(v / 16):gsub('^%+', '')) end,
+  SO = function(v) return ('fade out %s row'):format(st(v / 16):gsub('^%+', '')) end,
+  SB = function(v) return v == 0 and 'beatsync off' or ('fits %d rows'):format(v) end,
+  SF = function(v) return ('%+d cents'):format(v - 128) end,
+  SL = function(v) return v == 0 and 'loop off' or 'loop on' end,
+  SM = function(v) return ({ 'normal', 'reverse stereo', 'mono (mix)', 'mono left', 'mono right' })[v + 1] or ('mode ' .. v) end,
+  ZT = function(v) return ('tempo %d BPM'):format(v) end,
+  ZJ = function(v) return ('jump to sequence slot %d'):format(v) end,
+}
 function SM.fx_letters()
   local items = {}
-  for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1] .. ' ' .. (SM.FX_NAME[e[1]] or ''), v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end
+  for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1] .. ' ' .. (SM.FX_NAME[e[1]] or ''), t = e[1], v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end
   return items, 4, 1
 end
 

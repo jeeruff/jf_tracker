@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'every smart dropdown takes typing: 9E, C#4, 0U select the cell, Enter picks, BS steps back; hex cells show the decimal (9E 158), the tip says what the value means (0U 08 = +0.5 semitone per row, 80 vol = 0 dB, SF 8E = +14 cents)',
     'zw - wave view dropdown (column / note / back / off, wave only, text only); zZ - fixed cursor; both in the view menu too',
     'the - + command column buttons in a track header change that track (they changed a global setting the track did not follow); the delay caption reads del, not de',
     'Enter opens the smart dropdown of the field under the cursor in any mode (Ctrl+Enter is gone; Enter no longer moves the REAPER edit cursor); the command list reads as words: 0U pitch up, SI fade in ...',

@@ -2649,7 +2649,11 @@ function V.smart()
     if not h1 then V.msg = 'smart: no event in this row'; return false end
     local cur = fld == 2 and tonumber(h1.vol or '', 16) or (fld == 3 and math.floor((h1.delay or 0) + 0.5) or nil)
     local n = (fld == 2 and h1.kind == 'midi') and 128 or 256
-    items, cols, sel = SM.values(n, cur, true, fld == 2 and 'volume back to default' or 'no delay')
+    -- 12 окт: смысл значения в подсказке: громкость — dB (80 = 0 dB) / velocity, задержка — доля строки
+    local mean = fld == 3 and function(v) return ('%d/256 row (%d%%)'):format(v, math.floor(v / 256 * 100 + 0.5)) end
+      or (h1.kind == 'midi' and function(v) return 'velocity ' .. math.min(127, v) end
+      or function(v) return v == 0 and '-inf dB' or ('%+.1f dB'):format(20 * math.log(v / 128, 10)) end)
+    items, cols, sel = SM.values(n, cur, true, fld == 2 and 'volume back to default' or 'no delay', mean)
     title = (fld == 2 and 'volume' or 'delay xx/256 row') .. '  ' .. where
     if fld == 2 then
       -- 11 окт: нота ячейки звучит с этой громкостью
@@ -2671,7 +2675,7 @@ function V.smart()
     if not h1 then V.msg = 'commands belong to a note: no note sounds in this row - put the cursor on a note (or its rows)'; return false end
     local have = (h1.fx or {})[fld - 3]
     local function vals(letter, curx)
-      local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx')
+      local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx', SM.FX_MEAN and SM.FX_MEAN[letter])
       local desc = SM.FX_DESC[letter] or ''
       return { title = ('%sxx  %s  %s'):format(letter, desc, where), items = its, cols = cs, sel = sl,
                on_pick = function(it)
