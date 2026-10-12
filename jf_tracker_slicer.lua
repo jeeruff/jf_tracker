@@ -1248,7 +1248,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if pht and pht > t0 and pht < t0 + 2 * W2 then U.set(U.TEXT); gfx.rect(x + math.floor((pht - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     -- 10 окт: сверху — только цифры; подсказка — внизу и только с хинтами
     do   -- 11 окт: на чёрной подложке, как подписи слайсов
-      local zs = ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('auto play') + 2 * L.pad + 6))
+      local zs = ctx.fit(('%s  %.4fs  ±%d ms'):format(zlab or 'edge', zt, math.floor(W2 * 1000 + 0.5)), w - 8 - (U.measure('spam') + 2 * L.pad + 6))
       gfx.set(0, 0, 0, 1); gfx.rect(x + 3, zy + 1, U.measure(zs) + 2, rh - 1, 1)
       U.text(x + 4, zy + 1, zs, U.GREY)
     end
@@ -1259,7 +1259,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local down = (gfx.mouse_cap & 1) == 1
     -- 10 окт: кнопка auto play справа — сдвинул линию и отпустил: слайс играет сам
     local ap_on = ctx.state and ctx.state.sliceaudition
-    local apl = 'auto play'
+    local apl = 'spam'   -- 12 окт: было auto play (пользователь: auto play -> spam)
     local apw = U.measure(apl) + 2 * L.pad
     local apx, apy = x + w - apw - 2, zy + 1
     local aphot = mx2 >= apx and mx2 < apx + apw and my2 >= apy and my2 < apy + rh
@@ -1269,7 +1269,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.text(apx + L.pad, apy, apl, ap_on and U.CYAN or (aphot and U.AMBER or U.TEXT))
     if aphot and down and not S.zd_prev and ctx.state then
       ctx.state.sliceaudition = not ctx.state.sliceaudition
-      S.msg = 'auto play ' .. (ctx.state.sliceaudition and 'on: a moved slice line plays its slice' or 'off')
+      S.msg = 'spam ' .. (ctx.state.sliceaudition and 'on: a moved slice line plays its slice' or 'off')
     end
     local inz = not aphot and mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
     if inz then S.zoom_hot = true end
