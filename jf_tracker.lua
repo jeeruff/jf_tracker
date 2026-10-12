@@ -9821,6 +9821,15 @@ ctx = {
       end
     end
     local ol, or_ = reaper.Track_GetPeakInfo(tr, 0), reaper.Track_GetPeakInfo(tr, 1)
+    -- 12 окт: на старте игры REAPER ~180 мс готовит звук заранее, а позиция воспроизведения стоит на месте —
+    -- вход до FX показывал удар раньше, чем он звучит (замер в amen_galore: p на 8 мс, o на 180 мс). Пока позиция
+    -- после старта не сдвинулась — вход молчит; дальше p и o идут вместе (сдвиг в пределах кадра)
+    if not armed then
+      local playing = reaper.GetPlayState() & 1 == 1
+      local pos = playing and reaper.GetPlayPosition() or nil
+      if playing and not D.p0 then D.p0 = pos elseif not playing then D.p0 = nil end
+      if pos and D.p0 and math.abs(pos - D.p0) < 1e-4 then il, ir = 0, 0 else D.p0 = playing and -1e9 or nil end
+    end
     local function fall(o, v) return math.max(v, o * 0.85) end
     D.inp = { fall(D.inp[1], il), fall(D.inp[2], ir) }
     D.out = { fall(D.out[1], ol), fall(D.out[2], or_) }
