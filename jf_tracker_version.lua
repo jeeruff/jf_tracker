@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'item: 0-cross / t-snap / quant under spam - s cuts on a zero crossing / the nearest transient, quant puts the transient on the grid (swing too); matrix menu: patternize by bars / items / markers; listen line / step stop by the play position (they were silent while REAPER pre-renders)',
     'item: the aim follows the note under the tracker cursor ([ ] { } or drag to move it), s cuts only that note right there; the slice menu is S',
     'transport: listen - insert (an inserted note plays), step (the cursor row on its track), sel (a selection on its tracks), line (the cursor row, all tracks); matrix: Ctrl+Shift+H / L step the slot pattern (was < >)',
     'matrix: digits on the pattern number set it (or put that pattern into a free bar); the slot length is an input cell too (l from the name, also on free bars); Enter on a cell - the patterns that sound on this track, with preview',

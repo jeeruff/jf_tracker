@@ -199,7 +199,10 @@ function P.midi(t0, t1)
   restore_cur = R.GetCursorPosition()
   R.SetEditCurPos(t0, false, false)
   R.OnPlayButton()
-  stop_at = R.time_precise() + math.max(0.1, t1 - t0)
+  -- 12 окт: стоп — когда позиция воспроизведения дошла до t1, а не по часам: REAPER до ~180 мс готовит звук
+  -- заранее (позиция стоит), и короткая строка останавливалась раньше, чем звучала (line молчал)
+  P.stop_pos = t1
+  stop_at = R.time_precise() + math.max(0.1, t1 - t0) + 1.0      -- страховка, если позиция не пойдёт
   return true
 end
 
@@ -241,8 +244,9 @@ function P.tick()
     if ok and pos >= P.stop_pos - 0.002 - lead then audio_stop_at = nil; stop_audio() end
   end
   if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio() end
+  if stop_at and P.stop_pos and R.GetPlayState() & 1 == 1 and R.GetPlayPosition() >= P.stop_pos - 0.002 then stop_at = R.time_precise() end
   if stop_at and R.time_precise() >= stop_at then
-    stop_at = nil
+    stop_at = nil; P.stop_pos = nil
     R.OnStopButton()
     if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end
   end
@@ -250,6 +254,7 @@ end
 
 function P.stop()
   stop_audio()
+  P.stop_pos = nil
   if stop_at then stop_at = nil; R.OnStopButton(); if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end end
 end
 

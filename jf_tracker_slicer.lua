@@ -482,7 +482,9 @@ function S.key(c)
     local st = (ch == '{' or ch == '}') and 0.0005 or 0.005
     S.cross.dt = S.cross.dt + ((ch == ']' or ch == '}') and st or -st)
     S.msg = ('cut point %+.1f ms from the row - s cuts the note here'):format(S.cross.dt * 1000)
-  elseif ch == 's' and S.cross and ctx.cut_at then ctx.cut_at(S.cross, S.cross.t + S.cross.dt); S.cross = nil
+  elseif ch == 's' and S.cross and ctx.cut_at then
+    local te = S.cut_point(S.cross.t + S.cross.dt)
+    ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
   elseif (ch == 'S' or ch == 's') and ctx.slice_hydra then ctx.slice_hydra()
   elseif ch == 'd' then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
@@ -698,9 +700,23 @@ end
 
 -- 12 окт: прицел у ноты под курсором трекера (если она этого инструмента): base — место звука на строке
 -- курсора (секунды e), dt — сдвиг h l / H L / мышью; s режет только эту ноту в точке прицела
+-- 12 окт: точка реза с привязками: t-snap — ближайший транзиент, 0-cross — ближайший переход через ноль (±10 мс)
+function S.cut_point(te)
+  local st = ctx.state or {}
+  local e = S.cross and S.cross.e
+  if st.cutsnap then
+    if #(S.trans or {}) == 0 and S.detect then S.detect() end
+    local best
+    for _, t in ipairs(S.trans or {}) do if not best or math.abs(t - te) < math.abs(best - te) then best = t end end
+    if best then te = best end
+  end
+  if st.cut0x and e and S.zero_cross then te = S.zero_cross(e, te) or te end
+  return te
+end
 function S.cross_update(e)
   local c = ctx.cursor_cross and ctx.cursor_cross(e)
   if not c then S.cross = nil; return end
+  c.e = e
   if not S.cross or S.cross.key ~= c.key then c.dt = 0; S.cross = c
   else local dt = S.cross.dt; S.cross = c; c.dt = dt end
 end
@@ -748,6 +764,19 @@ local function zoom_samples(e, t0, span)
   end
   S.zs = { key = key, s = s, n = n }
   return s, n
+end
+-- 12 окт: ближайший к te переход через ноль в окне ±10 мс (секунды e)
+function S.zero_cross(e, te)
+  local span = 0.02
+  local s, n = zoom_samples(e, te - span / 2, span)
+  if not s or n < 4 then return nil end
+  local c = math.floor(n / 2) + 1
+  for d = 0, math.floor(n / 2) - 1 do
+    for _, i in ipairs({ c + d, c - d }) do
+      if i > 1 and i <= n and (s[i - 1] or 0) * (s[i] or 0) <= 0 then return te - span / 2 + (i - 1) / n * span end
+    end
+  end
+  return nil
 end
 
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
@@ -1298,7 +1327,32 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       ctx.state.sliceaudition = not ctx.state.sliceaudition
       S.msg = 'spam ' .. (ctx.state.sliceaudition and 'on: a moved slice line plays its slice' or 'off')
     end
-    local inz = not aphot and mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
+    -- 12 окт: под spam — точка реза s (прицел ноты курсора): 0-cross — на переход через ноль, t-snap — на
+    -- ближайший транзиент, quant (только с t-snap) — правая часть так, чтобы транзиент встал на строку (со свингом)
+    local tg_hot = false
+    do
+      local st = ctx.state or {}
+      local ty = apy + rh + 1
+      for _, b in ipairs({ { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }) do
+        local bw2 = U.measure(b[2]) + 2 * L.pad
+        local bx2 = x + w - bw2 - 2
+        if ty + rh <= zy + ZH then
+          local on = st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
+          local hot2 = mx2 >= bx2 and mx2 < bx2 + bw2 and my2 >= ty and my2 < ty + rh
+          if hot2 then tg_hot = true; S.cut_hot = b[1] end
+          U.set(on and U.tint(U.AMBER, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx2, ty, bw2, rh - 1, 1)
+          U.set(on and U.AMBER or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx2, ty, bw2, rh - 1, 0)
+          U.text(bx2 + L.pad, ty, b[2], on and U.AMBER or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))
+          if hot2 and down and not S.zd_prev and ctx.state then
+            st[b[1]] = not st[b[1]]
+            S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
+          end
+          ty = ty + rh
+        end
+      end
+    end
+    if not tg_hot then S.cut_hot = nil end
+    local inz = not aphot and not tg_hot and mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
     if inz then S.zoom_hot = true end
     if down and inz and not S.zd_prev and zk and S.active and S.entry and S.entry.item == e.item and S.slices[zk] then
       S.zdrag = { k = zk, mx0 = mx2, t0 = S.slices[zk], span = 2 * W2 }
