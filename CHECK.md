@@ -679,3 +679,5 @@
 - [ ] строка, где ничего не звучит: первая же клавиша кода — «commands belong to a note …»
 - [ ] note mod: `t` — midi trig; у нот сэмпла take FX `jf tracker note trigger`; поставь на трек Saxmand Counter (или любой MIDI-модулятор) — он реагирует на ноты-сэмплы; `t` ещё раз — FX снят со всех нот
 - [ ] help: раздел Automation and modulation и правила в Why
+- [ ] шапка трека: `-` `+` у колонок команд — у этого трека 0..4 колонки (fx1 … fx4), статус «command columns of Track 2: N»; при sync header меняется и высота трека
+- [ ] подпись поля задержки — `del` (не `de`), не налезает на подпись соседней подколонки

@@ -1108,6 +1108,28 @@ ctx = {
     reaper.TrackList_AdjustWindows(false)
     ctx.hdr_t = reaper.time_precise() + 0.5           -- REAPER применит высоту не сразу — опрос чуть позже
   end,
+  -- 12 окт: −+ колонок команд в шапке трека — у ЭТОГО трека (его уровень ширины; раньше менялась общая
+  -- fxcols, а трек со своим уровнем её не слушал — кнопки «не работали»); sync header — и высота трека
+  fx_cols_of = function(col)
+    local lv = col and state.wlevel and state.wlevel[col.guid] or state.wzlevel
+    if not lv then return math.min(L and L.MAXFX or 4, state.fxcols or 0) end
+    return math.max(0, math.min(L and L.MAXFX or 4, lv - 3))
+  end,
+  fx_cols_step = function(col, d)
+    if not (col and col.guid) then return end
+    local maxfx = L and L.MAXFX or 4
+    local n = math.max(0, math.min(maxfx, ctx.fx_cols_of(col) + d))
+    state.wlevel = state.wlevel or {}
+    state.wlevel[col.guid] = 3 + n
+    state.folds[col.guid] = nil
+    if state.synchdr and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+      reaper.SetMediaTrackInfo_Value(col.track, 'I_HEIGHTOVERRIDE', 24 + 10 * (3 + n))
+      reaper.TrackList_AdjustWindows(false)
+      ctx.hdr_t = reaper.time_precise() + 0.5
+    end
+    relayout()
+    vim.msg = ('%s: %d command column(s)'):format(col.name ~= '' and col.name or 'track', n)
+  end,
   hdr_poll = function()
     if not state.synchdr then return end
     local now = reaper.time_precise()
@@ -15089,7 +15111,7 @@ local function frame()
     local vs = w == 'vol' and (v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf') or (w == 'width' and ('%d%%'):format(math.floor(v * 100 + 0.5))
       or (math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5))))
     state.status = ('%s %s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what, vs)
-  elseif hover.fxcolbtn then state.status = ('fx columns per subcolumn: %d - click -/+ (0..4)'):format(state.fxcols)
+  elseif hover.fxcolbtn then state.status = ('command columns of %s: %d - click - / + (0..4)'):format(hover.fxcolbtn.col and hover.fxcolbtn.col.name or 'the track', ctx.fx_cols_of(hover.fxcolbtn.col))
   elseif hover.envpm then state.status = hover.envpm.d > 0 and 'add an automation lane: pick a parameter of the track or its fx'
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
@@ -16171,7 +16193,7 @@ local function frame()
       end
       click = { t = now2, zone = 'trs', row = t.what }
     elseif hover.fxcolbtn then
-      ctrl_action('fx', hover.fxcolbtn); vim.msg = ('fx columns: %d'):format(state.fxcols)
+      ctx.fx_cols_step(hover.fxcolbtn.col, hover.fxcolbtn.d)
       click = { t = now2, zone = 'fxcolbtn' }
     elseif hover.envpm then
       if hover.envpm.d > 0 then ctx.automation_picker(hover.envpm.col) else ctx.env_hide(hover.envpm.e) end

@@ -4964,7 +4964,7 @@ function D.frame(L, snap, rows, state, info)
         end
         local fx0 = ln.x + ln.w - bw2 - 1
         if li == #c.lanes and fx0 > nx + bw2 + L.pad then
-          pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = d end)
+          pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = { d = d, col = col } end)   -- 12 окт: и трек кнопки
           -- 6 окт: лейнов огибающих нет — a+ (добавить лейн автоматизации) левее
           local aw = ms('a+') + 4
           local ax = fx0 - aw - L.pad
@@ -5033,12 +5033,16 @@ function D.frame(L, snap, rows, state, info)
     -- описание — в статус-баре при наведении (hover.caption)
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
       local cy3 = hy + (L.lane_row + 1) * L.rh + 2
-      local function cap(x, w, txt, kind)
+      local SHORT = { delay = 'del' }                  -- 12 окт: короткая форма до обрезки по буквам (de → del)
+      local function cap(x, w, txt, kind, last)
         -- 11 окт: подписи полными словами мелким шрифтом (note / vol / fx1 / delay); не влезло — короче
         -- 11 окт: подпись может занять половину отступа с каждой стороны поля (vol влезает целиком), соседние не слипаются
+        -- 12 окт: последнее поле подколонки — справа весь свой отступ до подписи соседней подколонки (зазор 1 px)
         local hp = math.floor(L.pad / 2)
+        local room = last and (w + hp + 2 * L.pad - hp - 1) or (w + 2 * hp - 1)
         local t = txt
-        while #t > 1 and D.small_measure(t) > w + 2 * hp - 1 do t = t:sub(1, -2) end
+        if D.small_measure(t) > room and SHORT[t] then t = SHORT[t] end
+        while #t > 1 and D.small_measure(t) > room do t = t:sub(1, -2) end
         D.small_text(x - hp, cy3 + math.max(0, math.floor((L.rh - math.floor((L.th or L.rh) * D.SMALL)) / 2) - D.SPACE), t, U.GREY)
         if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
       end
@@ -5053,7 +5057,7 @@ function D.frame(L, snap, rows, state, info)
             -- 11 окт: поля — по раскладке самой подколонки (уровень зума), не по полной: за краем — нет подписей
             local sw = (L.flat[ln.f0 + si - 1] or {}).w or L.sub_w
             for k = 1, (G.nfx or L.nfx) do local fx = (G.x_fx or L.x_fx)[k]; if fx and fx < sw then cap(sx + fx, L.w_fx, 'fx' .. k, 'fx') end end
-            if (G.x_del or L.x_del) < sw then cap(sx + (G.x_del or L.x_del), L.w_del, 'delay', 'delay') end
+            if (G.x_del or L.x_del) < sw then cap(sx + (G.x_del or L.x_del), L.w_del, 'delay', 'delay', true) end
           end
         end
       end
