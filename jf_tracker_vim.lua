@@ -1584,11 +1584,19 @@ function V.key_impl(c)
     if fld > 1 then
       -- поля vol / delay / команд: hex-ввод, потом шаг вниз; не-hex → управление KEYS
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
-      local b0 = V.hexbuf
+      local b0, m0 = V.hexbuf, V.msg
       local he = hex_entry(c, fld, heads)
       if he == 'none' then return end
       if he then V.cur.row = V.cur.row + step_rows(); ensure_visible(); return end
       if V.hexbuf and V.hexbuf ~= b0 then return end   -- набор продолжается
+      -- 12 окт: колонка команд — буквы и цифры это код (0x Sx Zx), а не команды NORMAL:
+      -- d / y / c … здесь не удаляют и не копируют. Движение (h j k l) — как было
+      if fld >= 4 and c < 256 and string.char(c):match('^%w$') and not string.char(c):match('^[hjklHJKL]$') then
+        if V.msg == m0 then   -- hex_entry сам не объяснил
+          V.msg = (V.hexbuf and (V.hexbuf .. string.char(c):upper() .. ': no such effect') or (string.char(c) .. ': effect codes start with 0, S or Z (0U 0D 0V SI ZT ...)')) .. ' - Enter: the list'
+        end
+        return
+      end
       V.hexbuf = nil                                   -- 11 окт: чужая клавиша обрывает набор и работает
       if not V.piano then return as_normal(c) end
       keys_control(c); return
@@ -2111,6 +2119,12 @@ function V.key_impl(c)
   -- NORMAL команды
   local ch = (c < 256) and string.char(c) or ''
   if ch == 'i' then V.mode = 'insert'; V.count = nil; return
+  elseif ch == 'I' and not env_of(V.cur.fi) then
+    -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
+    -- (было «вставить время» — пустая строка со сдвигом; это Insert и :instime)
+    local f = flat()[V.cur.fi]
+    if f and f.col then for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end end
+    V.cur.field = 1; clamp_cur(); V.mode = 'insert'; V.count = nil; return
   elseif ch == 'a' then ctx.toggle_envs(); V.count = nil; return
   elseif ch == 'o' then if ctx.reveal_item then ctx.reveal_item() end; V.count = nil; return
   elseif ch == '=' then
@@ -2148,9 +2162,9 @@ function V.key_impl(c)
       V.last_macro = V.macro.name; V.msg = 'macro @' .. V.macro.name; V.macro = nil
     else V.pending = 'q' end
     V.count = nil; return
-  elseif (c == BS or c == INS or ch == 'I') and not env_of(V.cur.fi) then
+  elseif (c == BS or c == INS) and not env_of(V.cur.fi) then
     -- Backspace: удалить время строки (трек курсора; Shift — все треки) в
-    -- рамках региона; Insert / I — вставить время. Счётчик = строк.
+    -- рамках региона; Insert (или :instime) — вставить время. Счётчик = строк.
     local all = ctx.mods and ctx.mods().shift or false
     if ctx.time_edit then ctx.time_edit(c == BS and 'delete' or 'insert', V.cur.fi, V.cur.row, n, all) end
     finish_edit()
@@ -2639,7 +2653,7 @@ function V.smart()
     end
   else
     local h1 = heads()[1]
-    if not h1 then V.msg = 'smart: no event in this row'; return false end
+    if not h1 then V.msg = 'commands belong to a note: this row has none - put the cursor on a row with a note'; return false end
     local have = (h1.fx or {})[fld - 3]
     local function vals(letter, curx)
       local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx')

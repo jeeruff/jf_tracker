@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'I is the Vim one: INSERT from the start of the row (it used to insert a time row - that is Insert / :instime); INSERT on a command column: letters are the code, a wrong one never runs a NORMAL command (d no longer deletes there)',
     'note mod (stage 1): modulation started by the notes - a module next to properties (item tab); a adds the last touched fx parameter of the instrument track, every note of the instrument gets a pooled automation item on its envelope (from the note start, the note length) that follows insert / move / copy / delete; one curve for all (Enter edits the pool), rate - faster for higher notes, loop',
     'smart panel: a middle click on a value picks it too (open with the middle button - pick with it)',
     'z is only the view now: zt is the Vim one again (the cursor row to the top), zB is gone (:audio opens the options tab audio); gt - module tab menu, gT - REAPER project tab menu (Ngt / NgT - the Nth); transpose: Opt / Shift / Ctrl + F1 F2 F11 F12 as in Renoise, the popup in the right-click menu and :transpose',

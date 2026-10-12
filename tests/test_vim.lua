@@ -344,7 +344,20 @@ V.key(27)
 reset(); state.fxcols = 2; V.cur = { fi = 1, row = 0, field = 5 }; keysin('i')
 keysin('0U14'); eq('empty fx column: 0U14 typed', last(), 'fx:kick:0U14')
 V.cur.row = 0; keysin('sf8e'); eq('SF8E typed (lower case too)', last(), 'fx:kick:SF8E')
-V.cur.row = 0; keysin('0X'); eq('unknown code 0X is not taken', V.hexbuf, nil)
+local nc = #calls
+V.cur.row = 0; keysin('0X'); eq('unknown code 0X is not taken', #calls, nc); eq('0X: the prefix stays, X does nothing', V.hexbuf, '0')
+eq('0X: says so', (V.msg or ''):find('no such effect', 1, true) ~= nil, true); eq('0X: still INSERT', V.mode, 'insert')
+keysin('U20'); eq('…then U20 completes 0U20', last(), 'fx:kick:0U20')
+-- 12 окт: буква, которой код не начинается, в колонке команд — не команда NORMAL (d не удаляет)
+V.cur.row = 0; keysin('d'); eq('d on the fx field in INSERT: no operator', V.pending, nil); eq('d: hint', (V.msg or ''):find('start with 0, S or Z', 1, true) ~= nil, true)
+eq('d: still INSERT', V.mode, 'insert')
+V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
+V.key(27); V.mode = 'normal'; V.hexbuf = nil
+-- 12 окт: I — как в Vim: INSERT с начала строки (поле ноты), без вставки времени
+local nI = #calls
+V.cur = { fi = 1, row = 2, field = 5 }; keysin('I')
+eq('I: INSERT', V.mode, 'insert'); eq('I: note field', V.cur.field, 1); eq('I: same row', V.cur.row, 2); eq('I: nothing written', #calls, nI)
+V.key(27); V.mode = 'normal'
 V.key(27); state.fxcols = 1; V.mode = 'normal'; V.hexbuf = nil
 reset()
 keysin('lr40');             eq('r on vol', last(), 'vol:kick:64'); eq('r no advance', V.cur.row, 0); eq('back to normal', V.mode, 'normal')

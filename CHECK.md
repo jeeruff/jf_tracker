@@ -666,3 +666,9 @@
 - take FX `jf_tracker_trig` на audio item шлёт note-on в цепочку трека: 4 ноты = 4 срабатывания за проход, ложных нет
 - обычные JSFX (Saxmand Counter) слышат только шину 1: на шине 16 — 0 нот; поэтому триггер по умолчанию bus 1, канал 16
 - экземпляр AI: значение = baseline + amplitude × (кривая − 0.5); amplitude 0 → значение = baseline (степпер без MIDI)
+
+## 12 окт — срочное: I и ввод команд в INSERT
+- [ ] `I` в NORMAL — INSERT в поле ноты трека, строка не вставляется (вставка времени — Insert / `:instime N`)
+- [ ] INSERT на колонке команд: `d`, `y`, `c`, `x` … не запускают NORMAL (which-key «d» не всплывает), в статусе «codes start with 0, S or Z»
+- [ ] `0X` — «no such effect», префикс `0` остаётся, `U20` дописывает `0U20`
+- [ ] Enter на строке без ноты в колонке команд — «commands belong to a note …»
