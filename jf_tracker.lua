@@ -6469,6 +6469,15 @@ ctx = {
     c.key = tostring(h.item) .. ':' .. vim.cur.row
     return c
   end,
+  -- 12 окт: где прицел разрежет ноту — дробная строка для полоски в трекере (с привязками t-snap / 0-cross);
+  -- только пока вкладка item на виду (иначе прицел не обновляется)
+  aim_cut_row = function()
+    local c = SL.cross
+    if not (c and state.top and state.toptab == 'sample' and reaper.ValidatePtr(c.item, 'MediaItem*')) then return nil end
+    local t = ctx.AIM.proj_of(c.n, c.e, SL.cut_point(c.t + c.dt))
+    if not ctx.AIM.inside(c.n, t) then return nil end
+    return { item = c.item, rf = model.row_of_time(t, state.lpb) }
+  end,
   -- 12 окт: разрезать ноту в точке прицела (секунды e) — не по строке; правая часть без метки слайса
   cut_at = function(c, te, quant)
     if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
@@ -14325,6 +14334,7 @@ local function frame()
   end
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
+    aim_cut = ctx.aim_cut_row(),
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,

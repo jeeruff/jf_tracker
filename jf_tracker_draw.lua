@@ -5411,6 +5411,11 @@ function D.frame(L, snap, rows, state, info)
               local col = it.sel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
               if D.mono then col = U.mix(col, U.TEXT, 0.35) end   -- mono: кайма светлее (была слишком тёмной)
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
+              -- 12 окт: точка реза прицела вкладки item — полоска поперёк ноты, рисуется поверх волны (ниже)
+              if info.aim_cut and info.aim_cut.item == it.item then
+                local ay = yr(info.aim_cut.rf)
+                if ay > cy0 and ay < cy1 then D.aim_line = { x0, ay, w0 } end
+              end
               local fa = state.textonly and 0 or (state.itemalpha or 5) / 100
               set(rgb); gfx.a = it.sel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
               gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
@@ -5756,6 +5761,12 @@ function D.frame(L, snap, rows, state, info)
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
+  if D.aim_line then   -- 12 окт: полоска реза прицела — янтарь, как линия прицела во вкладке item, с мягким ореолом
+    local a = D.aim_line
+    set(U.AMBER, 0.25); gfx.rect(a[1] + 2, a[2] - 2, a[3] - 4, 5, 1)
+    set(U.AMBER); gfx.rect(a[1] + 2, a[2], a[3] - 4, 1, 1)
+    D.aim_line = nil
+  end
   -- ручки automation items (6 окт): поверх линий строк, непрозрачные; имя
   -- вертикально; швы лупа — вырезы цвета фона в ручке
   for _, hd in ipairs(D.ai_handles or {}) do
