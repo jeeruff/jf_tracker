@@ -2812,7 +2812,15 @@ end
 function E.undo() R.Main_OnCommand(40029, 0); if model then model.invalidate() end end
 function E.redo() R.Main_OnCommand(40030, 0); if model then model.invalidate() end end
 function E.save() R.Main_SaveProject(0, false) end
-function E.play_stop() R.Main_OnCommand(40044, 0) end
+-- 12 окт: старт — с курсора трекера (lock): main ставит E.start_at; иначе REAPER стартовал со своего курсора,
+-- который мог остаться старым (gg во время игры)
+function E.play_stop()
+  if R.GetPlayState() & 1 == 0 and E.start_at then
+    local t = E.start_at()
+    if t then R.SetEditCurPos(t, false, false) end
+  end
+  R.Main_OnCommand(40044, 0)
+end
 function E.cursor_to(t) R.SetEditCurPos(t, false, false) end
 
 -- mute всех items трека внутри [t0, t1) — для матрицы

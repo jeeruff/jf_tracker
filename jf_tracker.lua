@@ -11053,6 +11053,8 @@ ctx = {
 }
 
 edit.init(model)
+-- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
+edit.start_at = function() if state.lock and vim and vim.cur then return edit.row_time(vim.cur.row, state.lpb, 0) end end
 alias.init(model, edit)
 CM.init(model)
 edit.cmds = CM
@@ -13853,6 +13855,13 @@ local function frame()
   -- сдвинулся (клавиши, мышь) → edit-курсор и выделение трека REAPER следом.
   -- Сравнение с последним синхронным состоянием, чтобы стороны не спорили.
   if state.lock and L and L.flat and #L.flat > 0 then
+    -- 12 окт: курсор трекера ушёл во время игры — после стопа edit-курсор REAPER туда (раньше оставался старым)
+    if lock_sync.pend and not is_playing then
+      lock_sync.pend = nil
+      reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false)
+      curpos = reaper.GetCursorPosition()
+      lock_sync.cp, lock_sync.row = curpos, vim.cur.row
+    end
     local sel_tr = reaper.GetSelectedTrack(0, 0)
     local function fi_of(tr)
       for i, f in ipairs(L.flat) do if f.col and f.col.track == tr and not f.env then return i end end
@@ -13875,8 +13884,9 @@ local function frame()
       lock_sync.cp, lock_sync.tr, lock_sync.row, lock_sync.fi = curpos, sel_tr, vim.cur.row, vim.cur.fi
     elseif (vim.cur.row ~= lock_sync.row or vim.cur.fi ~= lock_sync.fi) and not (sel_drag and sel_drag.active) then   -- 8 окт: протяжка мышью — в REAPER не толкаем (каждое выделение трека = пересборка)
       -- трекер → REAPER
-      if vim.cur.row ~= lock_sync.row and not is_playing then
-        reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false)
+      if vim.cur.row ~= lock_sync.row then
+        if not is_playing then reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false)
+        else lock_sync.pend = true end      -- во время игры не перематываем — после стопа
       end
       if vim.cur.fi ~= lock_sync.fi and cur_tr and cur_tr ~= sel_tr then reaper.SetOnlyTrackSelected(cur_tr) end
       lock_sync.cp, lock_sync.tr = reaper.GetCursorPosition(), reaper.GetSelectedTrack(0, 0)
