@@ -63,5 +63,32 @@ eq('resync: no members left - untouched', #fix, 0)
 fix = S.resync(c, { rg(1, 'A1', 1, 3), rg(2, 'A2', 3, 5) }, { rg(10, 'verse', 1, 5) })
 eq('resync: shifted together - nothing', #fix, 0)
 
+-- hex / dec: два знака по умолчанию, оба вида распознаются
+eq('hex code AB = variant 11', select(2, S.code_of('AB')), 11)
+eq('hex code AF verse', select(2, S.code_of('AF verse')), 15)
+eq('decimal A12 = 12', select(2, S.code_of('A12')), 12)
+eq('word ADD is not a code', S.code_of('ADD'), nil)
+eq('word FADE is not a code', S.code_of('FADE'), nil)
+S.style = 'hex'
+local H = { rg(1, 'A1', 0, 1), rg(2, 'A9', 1, 2) }
+eq('hex: after A9 comes AA', S.next_variant(H, 'A1'), 'AA')
+eq('hex: after AE comes AF', S.next_variant({ rg(1, 'AE', 0, 1) }, 'AE'), 'AF')
+eq('hex: after AF - decimal A16', S.next_variant({ rg(1, 'AF', 0, 1) }, 'AF'), 'A16')
+S.style = 'dec'
+eq('dec: after A9 comes A10', S.next_variant(H, 'A1'), 'A10')
+eq('dec: after AB (11) comes A12', S.next_variant({ rg(1, 'AB', 0, 1) }, 'AB'), 'A12')
+S.style = 'hex'
+-- конвертер
+local C = { rg(1, 'A12 x', 0, 1), rg(2, 'AB', 1, 2), rg(3, 'intro', 2, 3), rg(4, 'intro', 3, 4), rg(5, 'B1', 4, 5) }
+local m = S.convert(C, 'hex')
+eq('to hex: A12 x -> AC x', m['A12 x'], 'AC x'); eq('to hex: AB stays', m['AB'], nil)
+m = S.convert(C, 'dec')
+eq('to dec: AB -> A11', m['AB'], 'A11'); eq('to dec: B1 stays', m['B1'], nil)
+m = S.convert(C, 'codes')
+eq('codes: intro gets the next free letter', m['intro'], 'C1 intro')
+eq('codes: coded names untouched', m['AB'], nil)
+local cnt = 0; for _ in pairs(m) do cnt = cnt + 1 end
+eq('codes: aliases (same name) - one code', cnt, 1)
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

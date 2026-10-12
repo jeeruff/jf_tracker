@@ -1,6 +1,6 @@
 -- jf_tracker_sections.lua — коды паттернов и секции (12 окт). Без reaper.* — тест tests/test_sections.lua.
 --
--- Код паттерна — буква и номер в начале имени региона: «A1», «D12 verse» (как банки Elektron: буква —
+-- Код паттерна — буква и вариант в начале имени региона: «A1», «AF», «D12 verse» (как банки Elektron: буква —
 -- семейство вариантов, номер — вариант). Новый паттерн — следующая свободная буква с 1, клон — следующий
 -- номер той же буквы, алиас — тот же код.
 -- Секция — регион без кода, внутри которого лежит хотя бы один другой регион («verse» поверх A1 A2 A3).
@@ -11,12 +11,28 @@
 local S = {}
 local EPS = 1e-6
 
--- код в начале имени: 'A', 12, остаток имени ('verse' или '')
+-- 12 окт: вид кода новых вариантов: 'hex' (умолчание) — две буквы: A1 … A9, AA … AF (вариант — hex-цифра 1..F),
+-- после F — десятичный A16; 'dec' — A1 … A9, A10, A11. Распознаются оба: один знак после буквы — hex-цифра,
+-- несколько цифр — десятичное число (AB = A вариант 11, A12 = A вариант 12)
+S.style = 'hex'
+
+-- код в начале имени: 'A', номер варианта, остаток имени ('verse' или '')
 function S.code_of(name)
-  local l, n, rest = (name or ''):match('^(%u)(%d+)(.*)$')
+  local l, v, rest = (name or ''):match('^(%u)([%dA-F]+)(.*)$')
   if not l then return nil end
   if rest ~= '' and not rest:match('^%s') then return nil end   -- «A1b», «B52s» — не код
-  return l, tonumber(n), (rest:gsub('^%s+', ''))
+  local n
+  if #v == 1 then n = tonumber(v, 16)
+  elseif v:match('^%d+$') then n = tonumber(v)
+  else return nil end                                            -- «ADD», «FADE» — слово, не код
+  return l, n, (rest:gsub('^%s+', ''))
+end
+
+-- код буквы l и варианта n в виде style ('hex' | 'dec')
+function S.fmt(l, n, style)
+  style = style or S.style
+  if style == 'hex' and n >= 0 and n <= 15 then return l .. ('%X'):format(n) end
+  return l .. tostring(n)
 end
 
 local function codes(regions)
@@ -28,10 +44,10 @@ local function codes(regions)
   return used
 end
 
--- следующее семейство: первая буква A..Z без паттернов, номер 1; все заняты — первая с самым малым номером свободна
+-- следующее семейство: первая буква A..Z без паттернов, вариант 1; все заняты — следующий вариант Z
 function S.next_family(regions)
   local used = codes(regions)
-  for b = 65, 90 do local l = string.char(b); if not used[l] then return l .. '1' end end
+  for b = 65, 90 do local l = string.char(b); if not used[l] then return S.fmt(l, 1) end end
   return S.next_variant(regions, 'Z1')
 end
 
@@ -41,7 +57,32 @@ function S.next_variant(regions, name)
   if not l then return nil end
   local m = 0
   for n in pairs(codes(regions)[l] or {}) do if n > m then m = n end end
-  return l .. (m + 1) .. (rest ~= '' and (' ' .. rest) or '')
+  return S.fmt(l, m + 1) .. (rest ~= '' and (' ' .. rest) or '')
+end
+
+-- конвертер: новые имена паттернов. how = 'hex' | 'dec' — коды в этот вид (имя после кода остаётся);
+-- 'codes' — паттерны без кода получают код: одинаковые имена (алиасы) — один код, старое имя — остатком.
+-- → { [старое имя] = новое } (одинаковые имена — один раз)
+function S.convert(pats, how)
+  local map, taken = {}, {}
+  for _, r in ipairs(pats) do if S.code_of(r.name) then taken[#taken + 1] = { name = r.name } end end
+  for _, r in ipairs(pats) do
+    local nm = r.name
+    if nm ~= '' and not nm:match('^=') and map[nm] == nil and not r.lib and not r.session then
+      local l, n, rest = S.code_of(nm)
+      if how == 'codes' then
+        if not l then
+          local code = S.next_family(taken)
+          taken[#taken + 1] = { name = code }
+          map[nm] = code .. ' ' .. nm
+        end
+      elseif l then
+        local nn = S.fmt(l, n, how) .. (rest ~= '' and (' ' .. rest) or '')
+        if nn ~= nm then map[nm] = nn end
+      end
+    end
+  end
+  return map
 end
 
 local function inside(a, b) return a ~= b and a.pos >= b.pos - EPS and a.rgnend <= b.rgnend + EPS and a.rgnend - a.pos < b.rgnend - b.pos - EPS end

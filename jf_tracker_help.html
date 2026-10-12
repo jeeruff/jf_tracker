@@ -221,7 +221,10 @@ is a code, shown in the number box. The letter is a family of variants: a new pa
 (<code>C1</code>), a clone the next number of its letter (<code>A1</code> → <code>A3</code>), an alias the same code. A length
 typed on a free bar makes a pattern there. A region without a code over other regions is a <b>section</b>
 (<code>verse</code> over A1 A2): not a slot, its name stands in the ruler and a strip marks its slots; its edges follow its
-first and last pattern after every edit. Old names keep working as patterns.</p>
+first and last pattern after every edit. Old names keep working as patterns. Codes are two characters by default
+(<code>A1</code> … <code>A9</code>, <code>AA</code> … <code>AF</code>, the variant a hex digit); option <i>pattern codes</i> = dec makes
+<code>A10</code>, <code>A11</code>; both kinds are read. The matrix <b>menu</b> converts: <kbd>c</kbd> old names get codes,
+<kbd>h</kbd> / <kbd>d</kbd> codes to hex / decimal (<code>:codes codes|hex|dec</code>).</p>
 <table>
 <tr><td><kbd>Space</kbd> on a slot</td><td>queue it: it starts at the end of the playing one (live)</td></tr>
 <tr><td><kbd>o</kbd> <kbd>O</kbd> <kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd></td><td>new slot after / before, delete, copy, paste: slots edit like Vim lines</td></tr>

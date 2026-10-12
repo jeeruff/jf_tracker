@@ -581,7 +581,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     else
       U.text(xa, y + 1, '<', hot_prev and U.AMBER or U.GREY)
       -- 12 окт: код паттерна (A1, D12) вместо номера; без кода — номер как раньше
-      local num = cl and (cl .. cn) or ('%02d'):format((info.pat_num and info.pat_num(rg) or rg.idx) % 100)
+      local num = cl and rg.name:match('^%S+') or ('%02d'):format((info.pat_num and info.pat_num(rg) or rg.idx) % 100)   -- код как написан (AF / A15)
       U.text(xn + math.floor((U.measure('000') - U.measure(num)) / 2), y + 1, num, cl and lc or U.TEXT)
       U.text(xb, y + 1, '>', hot_next and U.AMBER or U.GREY)
       if hot_prev then hover.prev = ri elseif hot_next then hover.next = ri end

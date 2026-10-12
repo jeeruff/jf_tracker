@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'pattern codes two characters by default (A1 ... A9, AA ... AF), option pattern codes = dec (A10); both read; matrix menu c / h / d (:codes) - old names get codes, codes to hex / decimal',
     'pattern codes as Elektron banks: A1, D12 verse - shown in the matrix number box; new = next free letter, clone = next number of the letter, a length on a free bar makes a pattern; a region without a code over patterns is a section (not a slot, edges follow its patterns after each edit); item aim: the cut strip across the note in the tracker, the aim window shows sound left of the instrument',
     'item: 0-cross / t-snap / quant under spam - s cuts on a zero crossing / the nearest transient, quant puts the transient on the grid (swing too); matrix menu: patternize by bars / items / markers; listen line / step stop by the play position (they were silent while REAPER pre-renders)',
     'item: the aim follows the note under the tracker cursor ([ ] { } or drag to move it), s cuts only that note right there; the slice menu is S',

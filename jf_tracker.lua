@@ -257,6 +257,7 @@ local state = {
   hardedges = reaper.GetExtState(EXT, 'hardedges') ~= '0',
   escstop = reaper.GetExtState(EXT, 'escstop') == '1',
   escmode = reaper.GetExtState(EXT, 'escmode') == 'vim' and 'vim' or 'renoise',
+  patcode = reaper.GetExtState(EXT, 'patcode') == 'dec' and 'dec' or 'hex',   -- 12 окт: вид кодов паттернов (AF / A15)
   hidereaper = reaper.GetExtState(EXT, 'hidereaper') == '1',
   slicemk = reaper.GetExtState(EXT, 'slicemk') == 'click' and 'click' or 'double',
   edgezoom = reaper.GetExtState(EXT, 'edgezoom') ~= '0',
@@ -654,7 +655,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -9640,6 +9641,7 @@ ctx = {
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
+      { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
       { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on (default): after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, aliases copy exactly what is seen; off - a note started in a pattern rings on into the next one (as in Renoise); the matrix trim button still cuts by hand', get = function() return state.hardedges ~= false end, set = function(v) state.hardedges = v end },
       flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
@@ -11326,6 +11328,7 @@ ctx = {
 edit.init(model)
 ctx.AIM = dofile(DIR .. '/jf_tracker_aim.lua')   -- 12 окт: математика прицела (тест test_aim)
 ctx.SEC = model.SEC   -- 12 окт: коды паттернов / секции (матрица)
+model.SEC.style = state.patcode or 'hex'
 ctx.sections = function() return regions.sections or {} end
 -- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
 edit.start_at = function() if state.lock and vim and vim.cur then return edit.row_time(vim.cur.row, state.lpb, 0) end end
@@ -19080,7 +19083,7 @@ ctx.patternize = function(cuts, how)
   end
   local function covered(a, b) for _, s in ipairs(spans) do if a < s[2] - 1e-6 and b > s[1] + 1e-6 then return true end end end
   local k, n = 0, 0
-  local function next_name() repeat k = k + 1 until not used['A' .. k]; used['A' .. k] = true; return 'A' .. k end
+  local function next_name() local c; repeat k = k + 1; c = model.SEC.fmt('A', k) until not used[c]; used[c] = true; return c end
   local pts, seen = {}, {}
   for _, t in ipairs(cuts) do
     if t >= t0 - 1e-6 and t <= t1 + 1e-6 then local key = ('%.6f'):format(t); if not seen[key] then seen[key] = true; pts[#pts + 1] = t end end
@@ -19138,10 +19141,34 @@ ctx.mx_menu = function(pick)
       end
       ctx.patternize(cuts, 'by markers')
     end },
+    -- 12 окт: конвертер кодов паттернов
+    { key = 'c', label = 'codes: old names get codes (intro -> C1 intro)', fn = function() ctx.codes_convert('codes') end },
+    { key = 'h', label = 'codes: to hex (A12 -> AC)', fn = function() ctx.codes_convert('hex') end },
+    { key = 'd', label = 'codes: to decimal (AC -> A12)', fn = function() ctx.codes_convert('dec') end },
   }
   if pick then for _, it in ipairs(items) do if it.key == pick then it.fn(); return true end end; return false end
-  vim.open_hydra({ title = 'matrix menu - patternize: the empty parts of the project become patterns', items = items })
+  vim.open_hydra({ title = 'matrix menu - patternize the empty parts / convert pattern codes', items = items })
   state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
+-- 12 окт: переименовать паттерны по коду (все регионы с этим именем — алиасы — вместе), один undo
+ctx.codes_convert = function(how)
+  local map = model.SEC.convert(regions, how)
+  local n = 0
+  edit.run('pattern codes: ' .. how, function()
+    local i = 0
+    while true do
+      local ret, isr, pos, e, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isr and map[nm] then reaper.SetProjectMarkerByIndex(0, i, true, pos, e, idx, map[nm], col); n = n + 1 end
+      i = i + 1
+    end
+  end)
+  ctx.mx_refresh()
+  vim.msg = n > 0 and ('codes %s: %d region(s) renamed (Cmd+Z back)'):format(how, n) or ('codes %s: nothing to rename'):format(how)
+end
+ctx.codes_cmd = function(arg)
+  local a = (arg or ''):match('%S+') or ''
+  if a == 'codes' or a == 'hex' or a == 'dec' then ctx.codes_convert(a) else vim.msg = ':codes codes|hex|dec - old names get codes / codes to hex (AF) / to decimal (A15)' end
 end
 ctx.patternize_cmd = function(arg)
   local a = (arg or ''):match('%S+') or ''
