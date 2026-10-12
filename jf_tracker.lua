@@ -15065,6 +15065,8 @@ local function frame()
     delay = 'dl: delay inside the row, hex xx/256 of a row',
     fx = 'fx: effect command, two-char code + hex hex, as in Renoise: 0x effects (0Sxx offset, 0Pxx pan, 0Uxx 0Dxx pitch, 0Vxy vibrato), Sx sample (SIxx SOxx fades, SBxx beatsync, SFxx finetune cents), Zx song (ZTxx tempo, ZJxx jump); Enter - the list',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
+    inst = 'ins: instrument of the note - its number in the lib (01 02 ...); INSERT: two digits',
+    slc = 'slc: slice of the note (S03), 00 - the whole sample; INSERT: S and two hex digits, or just the digits',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
   elseif hover.ctrl == 'swing' then state.status = ctx.swing_text() .. ' - click: menu, wheel: +-1 %'
@@ -15127,7 +15129,7 @@ local function frame()
     local vs = w == 'vol' and (v > 1e-6 and ('%+.1f dB'):format(20 * math.log(v, 10)) or '-inf') or (w == 'width' and ('%d%%'):format(math.floor(v * 100 + 0.5))
       or (math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5))))
     state.status = ('%s %s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what, vs)
-  elseif hover.fxcolbtn then state.status = ('command columns of %s: %d - click - / + (0..4)'):format(hover.fxcolbtn.col and hover.fxcolbtn.col.name or 'the track', ctx.fx_cols_of(hover.fxcolbtn.col))
+  elseif hover.fxcolbtn then state.status = ('command columns of %s: %d - click - / + (0..4); keys z. / z, on the cursor track'):format(hover.fxcolbtn.col and hover.fxcolbtn.col.name or 'the track', ctx.fx_cols_of(hover.fxcolbtn.col))
   elseif hover.envpm then state.status = hover.envpm.d > 0 and 'add an automation lane: pick a parameter of the track or its fx'
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)

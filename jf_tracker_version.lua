@@ -5,6 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'column captions stand vertically in the normal font, one over each field, the instrument and slice fields too (note ins slc vol fx1 delay)',
+    'a note property (0S 0P SI ...) typed on a row inside a note is not written to the note row above any more - the tracker says where it goes; S on the slice field starts its two digits (S03)',
     'item tab: the zoom scroll strip sits in the button row after follow - the wave and the edge zoom keep their height (the edge zoom no longer vanishes when zoomed)',
     'item tab: the auto play button is called spam',
     'command field in two halves, as in Renoise: the code (D = 0D, U = 0U; S_ Z_ prefixes - SI, ZT) and the value (two hex digits); l / h step between them, the jump ruler counts both; digits on the value half alone keep the code there or take the dim one running from above (08 under 0D10 = 0D08)',

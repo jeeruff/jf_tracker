@@ -745,8 +745,9 @@ local function hex_entry(c, fld, heads)
         if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ fc.head }, lpb(), old:sub(1, 2), fc.off) end
         ctx.edit.set_fx({ fc.head }, lpb(), code, val, fc.off)
       else
-        ctx.edit.set_fx({ fc.head }, lpb(), code, val)
-        V.msg = ('%s is a property of the whole note - set at %04d'):format(buf, fc.head.row0 or 0)
+        -- 12 окт: не писать молча в первую строку ноты выше (пользователь: «вставляет команду в предыдущий ряд»)
+        V.msg = ('%s is a property of the whole note - type it on its row %04d (or on a new note here)'):format(buf, fc.head.row0 or 0)
+        return 'none'
       end
     else
       for _, h in ipairs(heads) do
@@ -1636,6 +1637,8 @@ function V.key_impl(c)
     if V.cur.sub == 'slc' and fld == 1 then
       -- 11 окт: поле слайса — две hex-цифры, номер слайса ноты (00 — весь сэмпл)
       local ch2 = (c < 256) and string.char(c):upper() or ''
+      -- 12 окт: S — как поле показывает (S03): приставка, дальше две цифры
+      if ch2 == 'S' and (V.hexbuf or '') == '' then V.msg = 'S__: slice - now two hex digits (00 - the whole sample)'; return end
       if ch2:match('^[0-9A-F]$') then
         local buf = (V.hexbuf or '') .. ch2
         if #buf < 2 then V.hexbuf = buf; return end

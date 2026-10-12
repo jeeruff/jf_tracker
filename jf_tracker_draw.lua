@@ -531,7 +531,9 @@ function D.layout(snap, state, nregions)
   -- 11 окт: +1 строка уголка — кнопка markers под регионом; кнопки лейнов
   -- (- + a+) — по-прежнему последняя строка шапки, прямо над номерами колонок
   L.lane_row = 3 + L.hr_vp + L.hr_in + L.hr_info
-  L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + (state.captions and 1 or 0)
+  -- 12 окт: подписи полей — вертикально обычным шрифтом (как имена дорожек): высота — самое длинное слово
+  L.cap_rows = state.captions and math.max(1, math.ceil((ms('delay') + 6) / L.rh)) or 0
+  L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
@@ -5060,18 +5062,11 @@ function D.frame(L, snap, rows, state, info)
     -- описание — в статус-баре при наведении (hover.caption)
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
       local cy3 = hy + (L.lane_row + 1) * L.rh + 2
-      local SHORT = { delay = 'del' }                  -- 12 окт: короткая форма до обрезки по буквам (de → del)
-      local function cap(x, w, txt, kind, last)
-        -- 11 окт: подписи полными словами мелким шрифтом (note / vol / fx1 / delay); не влезло — короче
-        -- 11 окт: подпись может занять половину отступа с каждой стороны поля (vol влезает целиком), соседние не слипаются
-        -- 12 окт: последнее поле подколонки — справа весь свой отступ до подписи соседней подколонки (зазор 1 px)
-        local hp = math.floor(L.pad / 2)
-        local room = last and (w + hp + 2 * L.pad - hp - 1) or (w + 2 * hp - 1)
-        local t = txt
-        if D.small_measure(t) > room and SHORT[t] then t = SHORT[t] end
-        while #t > 1 and D.small_measure(t) > room do t = t:sub(1, -2) end
-        D.small_text(x - hp, cy3 + math.max(0, math.floor((L.rh - math.floor((L.th or L.rh) * D.SMALL)) / 2) - D.SPACE), t, U.GREY)
-        if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + L.rh then hover.caption = kind end
+      local caph = L.cap_rows * L.rh - 4
+      local function cap(x, w, txt, kind)
+        -- 12 окт: подпись вертикально, снизу вверх, по центру поля (1x, не мелкий шрифт); ширина — высота строки
+        if w >= L.th then D.vtext(x + math.floor((w - L.th) / 2), cy3, caph, txt, U.GREY, rbg) end
+        if mx >= x and mx < x + w + L.pad and my >= cy3 and my < cy3 + caph then hover.caption = kind end
       end
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
@@ -5079,12 +5074,14 @@ function D.frame(L, snap, rows, state, info)
           local G = (L.flat[ln.f0 + si - 1] or {}).G or L
           if G.w_wave > 0 then cap(sx + G.x_wave, G.w_wave, 'wave', 'wave') end
           cap(sx + G.x_note, L.w_note, 'note', 'note')
+          if G.x_inst then cap(sx + G.x_inst, ms('00'), 'ins', 'inst') end        -- 12 окт: поле инструмента подписано
+          if G.x_slc and not G.notes_only then cap(sx + G.x_slc, G.w_slc or ms('S00'), 'slc', 'slc') end
           if not G.notes_only then cap(sx + G.x_vol, L.w_vol, 'vol', 'vol') end
           if not (G.narrow or G.notes_only) then
             -- 11 окт: поля — по раскладке самой подколонки (уровень зума), не по полной: за краем — нет подписей
             local sw = (L.flat[ln.f0 + si - 1] or {}).w or L.sub_w
             for k = 1, (G.nfx or L.nfx) do local fx = (G.x_fx or L.x_fx)[k]; if fx and fx < sw then cap(sx + fx, L.w_fx, 'fx' .. k, 'fx') end end
-            if (G.x_del or L.x_del) < sw then cap(sx + (G.x_del or L.x_del), L.w_del, 'delay', 'delay', true) end
+            if (G.x_del or L.x_del) < sw then cap(sx + (G.x_del or L.x_del), L.w_del, 'delay', 'delay') end
           end
         end
       end

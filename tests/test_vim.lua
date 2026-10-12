@@ -358,7 +358,7 @@ eq('d: still INSERT', V.mode, 'insert')
 V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
 -- 12 окт: строка внутри ноты (без своей ноты) — команда звучащей ноте
 V.cur.row = 1; keysin('0U14'); eq('0U14 on a row inside the note -> that row of the note (@ quarter)', last(), 'fx:kick:0U14@0.25')
-V.cur.row = 1; keysin('0p40'); eq('0P (a property of the note) on a row inside -> the whole note', last(), 'fx:kick:0P40')
+local np = #calls; V.cur.row = 1; keysin('0p40'); eq('0P on a row inside a note: not written to the note row above (12 окт)', #calls, np); eq('…says where', (V.msg or ''):find('type it on its row 0000', 1, true) ~= nil, true); V.hexbuf = nil; V.cur.sub = nil; V.fx_back = nil
 V.cur.row = 1; keysin('0D'); eq('0D: says what it is', (V.msg or ''):find('pitch down', 1, true) ~= nil, true); V.hexbuf = nil
 -- 12 окт: ` в колонке команд — стоп того, что действует со строк выше (по 00 на род)
 do
