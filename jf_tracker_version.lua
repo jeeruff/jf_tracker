@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'transport: the slow button under play is two - x0.5 and x2 (Ctrl+Cmd+Space / Opt+Cmd+Space; Shift+Space no longer plays slow)',
     'column captions stand vertically in the normal font, one over each field, the instrument and slice fields too (note ins slc vol fx1 delay)',
     'a note property (0S 0P SI ...) typed on a row inside a note is not written to the note row above any more - the tracker says where it goes; S on the slice field starts its two digits (S03)',
     'item tab: the zoom scroll strip sits in the button row after follow - the wave and the edge zoom keep their height (the edge zoom no longer vanishes when zoomed)',

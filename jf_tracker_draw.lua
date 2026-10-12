@@ -3150,7 +3150,9 @@ function D.transport_sub(c)
   local frz = c.frz and ('frz %s'):format(c.frz) or 'freeze'
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
-           { 'slowplay', 'slow', (c.halfplay and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },   -- включена — мигает, шрифт обычный
+           { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
+             { 'slowplay', 'x.5', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
+             { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
            { 'smartrec', 'smart', c.smartrec and U.RED or nil },
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
 end
@@ -3413,7 +3415,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local sub = D.transport_sub(c)
       local sx, sy = bx0, by + bh + 2
       for _, b in ipairs(sub) do
-        if b[1] then
+        if b.halves then
+          local hw = math.floor((tbw - 2) / 2)
+          for k, h in ipairs(b.halves) do
+            local hx = sx + (k - 1) * (hw + 2)
+            local w2 = k == 2 and (tbw - hw - 2) or hw
+            local hot = mx >= hx and mx < hx + w2 and my >= sy and my < sy + L.rh
+            local on = h[3] ~= nil
+            set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(h[3], 0.3) or U.BG)); gfx.rect(hx, sy, w2, L.rh, 1)
+            set(hot and U.AMBER or (on and h[3] or U.LINE)); gfx.rect(hx, sy, w2, L.rh, 0)
+            text(hx + math.floor((w2 - ms(h[2])) / 2), sy, fit(h[2], w2 - 2), hot and U.AMBER or (h[3] or U.GREY))
+            if hot then hover.ctrl = h[1] end
+            hint('ctrl', hx, sy, w2, L.rh, h[1])
+          end
+        elseif b[1] then
           local hot = mx >= sx and mx < sx + tbw and my >= sy and my < sy + L.rh
           local on = b[3] ~= nil
           set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tbw, L.rh, 1)

@@ -7465,12 +7465,14 @@ ctx = {
     vim.open_hydra({ title = 'dub - click repeats the chosen one', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   end,
-  half_play = function()
+  -- 12 окт: игра на скорости r (x0.5 / x2): кнопки под play, Ctrl+Cmd+Space / Opt+Cmd+Space; стоп — x1 назад
+  half_play = function(r)
+    r = r or 0.5
     if reaper.GetPlayState() & 1 == 1 then reaper.Main_OnCommand(1016, 0); return end   -- играет — стоп (скорость вернёт tick)
-    ctx.slowrec = { prev = reaper.Master_GetPlayRate(0), play = true }
-    reaper.CSurf_OnPlayRateChange(0.5)
+    ctx.slowrec = { prev = reaper.Master_GetPlayRate(0), play = true, rate = r }
+    reaper.CSurf_OnPlayRateChange(r)
     reaper.Main_OnCommand(1007, 0)
-    vim.msg = '-- PLAY /2 -- half speed; Space / Shift+Space stops, x1 comes back'
+    vim.msg = ('-- PLAY x%s -- Space or the same keys stop, x1 comes back'):format(r == 0.5 and '0.5' or tostring(r))
   end,
   slow_rec = function()
     if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(1016, 0); return end   -- идёт запись — стоп
@@ -7498,7 +7500,7 @@ ctx = {
       local was_play = ctx.slowrec.play
       reaper.CSurf_OnPlayRateChange(ctx.slowrec.prev or 1)
       ctx.slowrec = nil
-      vim.msg = was_play and 'play /2 stopped - x1' or 'slow rec done - x1; Enter fixes a note or value'
+      vim.msg = was_play and 'play x0.5 / x2 stopped - x1' or 'slow rec done - x1; Enter fixes a note or value'
     end
   end,
   -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
@@ -12967,7 +12969,8 @@ function ctrl_action(name, delta)
   elseif name == 'tp_end' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to end of project') or 40043, 0) end
   elseif name == 'freeze' then
     if delta ~= 0 then ctx.freeze_len(delta > 0 and 2 or 0.5) else ctx.freeze_toggle() end
-  elseif name == 'slowplay' then if delta == 0 then ctx.half_play() end
+  elseif name == 'slowplay' then if delta == 0 then ctx.half_play(0.5) end
+  elseif name == 'fastplay' then if delta == 0 then ctx.half_play(2) end
   elseif name == 'smartrec' then
     if delta == 0 then state.smartrec = not state.smartrec; vim.msg = 'smart rec ' .. (state.smartrec and 'on (being designed: a held note records in time, the frame shows where it ends)' or 'off') end
   elseif name == 'slowbtn' then
@@ -14137,7 +14140,7 @@ local function frame()
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
-      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play or nil, smartrec = state.smartrec, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
+      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, smartrec = state.smartrec, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -17792,8 +17795,9 @@ local function frame()
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
   -- 11 окт: Shift+Space — play / 2 (половинная скорость; стоп — скорость назад); медленная запись — кнопка slow
-  if c == 32 and ctx.mods().shift and not ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    ctx.half_play(); c = 0
+  -- 12 окт: Ctrl+Cmd+Space — игра x0.5, Opt+Cmd+Space — x2 (было Shift+Space = x0.5; одна функция — одна клавиша)
+  if c == 32 and ctx.mods().cmd and (ctx.mods().ctrl or ctx.mods().alt) and not ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    ctx.half_play(ctx.mods().ctrl and 0.5 or 2); c = 0
   end
   -- 12 окт: Enter без модификаторов — смарт-панель в любом режиме (дубль Ctrl+Enter убран); кроме конца
   -- набора числа и входа в INSERT при Esc mode = vim (NORMAL с клавиатурой)
