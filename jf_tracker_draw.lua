@@ -6133,7 +6133,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     if lvl then
-      D.dsp_meter(L, bx, mby, mw, mbh, lvl.src == 'in' and 'i' or 'p', lvl.inp, 'in', hover)
+      D.dsp_meter(L, bx, mby, mw, mbh, '', lvl.inp, 'in', hover)   -- 12 окт: без буквы — и так вход
       bx = bx + mw + L.pad
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
@@ -6151,7 +6151,9 @@ function D.frame(L, snap, rows, state, info)
     -- первым). Теперь: не влезает — одна колонка; цепочка длиннее панели —
     -- сдвиг так, чтобы выбранный блок был виден; по краям «<N» / «N>» —
     -- сколько блоков за краем (клик — выбрать ближний скрытый)
-    local right = DR - (lvl and (mw + L.pad) or 0)
+    -- 12 окт: справа — метр выхода и вертикальная кнопка compensate за ним (у правого края модуля)
+    local cvw = L.th + 6
+    local right = DR - (lvl and (mw + cvw + 2 * L.pad) or 0)
     local stubw = ms('99>') + 2 * L.pad
     -- 11 окт: под блоками — полоса прокрутки цепочки (вместо кнопок «<N» / «N>»)
     local sbh = (D.SBW or 3) + 4
@@ -6892,15 +6894,19 @@ function D.frame(L, snap, rows, state, info)
     ::dsp_router_done::
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)
     if lvl then
-      local cbh = L.rh
-      D.dsp_meter(L, bx, mby, mw, mbh - cbh - 2, 'o', lvl.out, 'out', hover)
-      local cy = mby + mbh - cbh
-      local hot = mx >= bx and mx < bx + mw and my >= cy and my < cy + cbh
+      -- 12 окт: метр выхода — у правого края модуля во всю высоту; compensate — вертикальной кнопкой за ним
+      -- (была буква c под метром, она ужимала метр)
+      local cx = DR - L.pad - cvw
+      local ox = cx - 2 - mw
+      D.dsp_meter(L, ox, mby, mw, mbh, 'o', lvl.out, 'out', hover)
+      local hot = mx >= cx and mx < cx + cvw and my >= mby and my < mby + mbh
       local on = lvl.comp_on
-      local lbl = 'c'                                    -- comp буквой (5 окт), значение — в статусе
-      set(on and U.tint(U.CYAN, 0.35) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(bx, cy, mw, cbh, 1)
-      set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(bx, cy, mw, cbh, 0)
-      text(bx + math.floor((mw - ms(lbl)) / 2), cy, fit(lbl, mw - 2), on and U.CYAN or (hot and U.AMBER or U.GREY))
+      local bg = on and U.tint(U.CYAN, 0.35) or (hot and U.tint(U.AMBER, 0.3) or U.BG)
+      set(bg); gfx.rect(cx, mby, cvw, mbh, 1)
+      set(on and U.CYAN or (hot and U.AMBER or U.LINE)); gfx.rect(cx, mby, cvw, mbh, 0)
+      local lbl = 'compensate'
+      local tl = math.min(ms(lbl), mbh - 4)
+      D.vtext(cx + math.floor((cvw - L.th) / 2), mby + math.floor((mbh - tl) / 2), tl, lbl, on and U.CYAN or (hot and U.AMBER or U.GREY), bg)
       if hot then hover.dspcomp = info.pool_col end
     end
     -- перетаскивание (блок или FX из списка): куда встанет — янтарная черта
