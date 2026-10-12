@@ -27,7 +27,7 @@ local function build()
   snap = { cols = {}, last_row = 40 }
   local a = { name = 'A', guid = 'A', track = 'trA', lanes = { { idx = 0, subs = { {}, {} } } },
               pool = { { item = 'depot1', name = 'd1' } } }
-  put(a.lanes[1].subs[1], head('audio', 0, 4, { name = 'kick', fx = { '9A0' } }))
+  put(a.lanes[1].subs[1], head('audio', 0, 4, { name = 'kick', fx = { '0PA0' } }))
   put(a.lanes[1].subs[1], head('audio', 8, 2, { name = 'snare' }))
   put(a.lanes[1].subs[1], head('audio', 16, 1, { name = 'hat' }))
   put(a.lanes[1].subs[2], head('audio', 2, 2, { name = 'ov' }))
@@ -100,7 +100,7 @@ local function reset()
   V.mode = 'normal'; V.cur = { fi = 1, row = 0, field = 1 }; V.count = nil; V.pending = nil; V.op = nil; V.hexbuf = nil
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
-    edit = E, state = state, piano = keys.piano,
+    edit = E, state = state, piano = keys.piano, SM = dofile(DIR .. '/jf_tracker_smart.lua'),
     esc_vim = function() return ESC_VIM end,   -- 10 окт: опция Esc mode
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
     slice_pick = function(n, k) if PICK then return PICK(n, k) end; return k end,  -- 10 окт: режим слайса
@@ -322,7 +322,7 @@ eq(':q quits', (function() keysin(':q'); return V.key(13) end)(), 'quit')
 -- ── поля: ^A/^X, hex-ввод, r ─────────────────────────────────────────────
 reset()
 keysin('l'); V.key(1);      eq('^A on vol → +1', last(), 'vol:kick:129')
-keysin('l'); V.key(1);      eq('^A on fx → 9A1 (visual order nt vl fx dl)', last(), 'fx:kick:9A1')
+keysin('l'); V.key(1);      eq('^A on fx → 0PA1 (visual order nt vl fx dl)', last(), 'fx:kick:0PA1')
 keysin('l'); keysin('3'); V.key(24); eq('3^X on delay', last(), 'delay:kick:-3')
 reset()
 keysin('li7f');             eq('insert hex vol 7F', last(), 'vol:kick:127'); eq('advance', V.cur.row, 1)
@@ -331,14 +331,20 @@ reset()
 keysin('llli80');           eq('insert delay 80', last(), 'delay:kick:128')
 V.key(27)
 reset()
--- 6 окт: в занятой колонке (у kick там 9A0) цифры меняют значение команды
-keysin('lli8f');            eq('digits on an occupied fx column change its value', last(), 'fx:kick:98F')
+-- 6 окт: в занятой колонке (у kick там 0PA0) цифры меняют значение команды
+keysin('lli8f');            eq('digits on an occupied fx column change its value', last(), 'fx:kick:0P8F')
 eq('status hexbuf clear', V.hexbuf, nil)
 V.cur.row = 0; keysin('S');  eq('a letter on an occupied column does not replace it', V.hexbuf, nil)
 keysin('k'); V.key(27)
 reset()
-keysin('lli'); V.key(8);    eq('backspace on fx clears', last(), 'clearfx:kick:9')
+keysin('lli'); V.key(8);    eq('backspace on fx clears', last(), 'clearfx:kick:0P')
 V.key(27)
+-- 12 окт: коды команд — два символа, как в Renoise (0U14, SF8E); неизвестный код не берётся
+reset(); state.fxcols = 2; V.cur = { fi = 1, row = 0, field = 5 }; keysin('i')
+keysin('0U14'); eq('empty fx column: 0U14 typed', last(), 'fx:kick:0U14')
+V.cur.row = 0; keysin('sf8e'); eq('SF8E typed (lower case too)', last(), 'fx:kick:SF8E')
+V.cur.row = 0; keysin('0X'); eq('unknown code 0X is not taken', V.hexbuf, nil)
+V.key(27); state.fxcols = 1; V.mode = 'normal'; V.hexbuf = nil
 reset()
 keysin('lr40');             eq('r on vol', last(), 'vol:kick:64'); eq('r no advance', V.cur.row, 0); eq('back to normal', V.mode, 'normal')
 reset()
@@ -483,11 +489,11 @@ eq(':ramp in V-LINE uses selection', last(), 'envramp:Volume@0-6:cur>0.00'); eq(
 -- vol-поле аудио: / \ = фейды за 1 бит (Ixx/Oxx, xx = LPB·16)
 reset()
 V.cur = { fi = 1, row = 0, field = 2 }
-keysin('i/');      eq('/ on vol → fade-in 1 beat', last(), 'fx:kick:I40')
-keysin('\\');      eq('\\ on vol → fade-out 1 beat', last(), 'fx:kick:O40')
+keysin('i/');      eq('/ on vol → fade-in 1 beat', last(), 'fx:kick:SI40')
+keysin('\\');      eq('\\ on vol → fade-out 1 beat', last(), 'fx:kick:SO40')
 V.key(27)
-keysin(':fade out 2'); V.key(13); eq(':fade out 2 rows', last(), 'fx:kick:O20')
-keysin(':fade in 1b'); V.key(13); eq(':fade in 1b', last(), 'fx:kick:I40')
+keysin(':fade out 2'); V.key(13); eq(':fade out 2 rows', last(), 'fx:kick:SO20')
+keysin(':fade in 1b'); V.key(13); eq(':fade in 1b', last(), 'fx:kick:SI40')
 
 
 
@@ -546,7 +552,7 @@ V.key(27)
 reset(); keysin('z'); eq('z hint', (V.pending_hint() or ''):match('^z:') ~= nil, true); V.key(27)
 reset(); keysin('i'); keysin('d'); eq('d from INSERT shows hint', (V.pending_hint() or ''):match('^d:') ~= nil, true)
 keysin('W'); eq('dW from INSERT', last(), 'delitem'); eq('back to INSERT', V.mode, 'insert'); V.key(27)
--- 11 окт: INSERT на поле команды — S / s не выделение, а буква команды (S80)
+-- 11 окт: INSERT на поле команды — S / s не выделение, а буква команды (SF80)
 reset(); V.cur = { fi = 1, row = 0, field = 4 }; keysin('i'); keysin('S')
 eq('INSERT S on the fx field is not VISUAL', V.mode, 'insert'); V.key(27); V.mode = 'normal'; V.hexbuf = nil
 reset(); V.cur = { fi = 1, row = 0, field = 1 }; keysin('i'); keysin('s')

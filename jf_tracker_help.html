@@ -274,7 +274,7 @@ one pattern. The keyboard on the left shows what the note keys play and hides wi
 <tr><td>lane column</td><td>a fixed item lane</td></tr>
 <tr><td>audio note</td><td>an item: the note is its pitch, volume is <code>D_VOL</code></td></tr>
 <tr><td>MIDI note</td><td>a note of the take; <code>OFF</code> is the note-off</td></tr>
-<tr><td>command column</td><td>item and take properties: offset, pan, volume, fades, loop, pitch, slice, beatsync</td></tr>
+<tr><td>command column</td><td>two-char code + two hex digits, as in Renoise: <code>0x</code> effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch slide, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), <code>Sx</code> sample properties (SI SO fades, SB beatsync, SF finetune in cents, 80 = 0, SL loop, SM channel mode), <code>Zx</code> song (ZT tempo, ZJ jump to a sequence slot); Ctrl+Enter on the field - the list</td></tr>
 <tr><td>sound (lib)</td><td>a distinct audio source; slices are times stored on the item</td></tr>
 <tr><td>pattern</td><td>a region; same name — the same pattern</td></tr>
 <tr><td>envelope column</td><td>a visible track envelope, in its theme colour</td></tr>

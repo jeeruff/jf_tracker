@@ -193,17 +193,21 @@ function SM.values(n, cur, hex, clear)
   return items, 16, sel
 end
 
--- буквы команд (описания — как в справке; порядок: часто нужные сперва)
+-- коды команд (12 окт: два символа, как в Renoise; описания — как в справке;
+-- порядок: часто нужные сперва). 0 — эффекты, S — свойства сэмпла (item),
+-- Z — песня. Единственный список кодов для ввода, меню и подсказок
 SM.FX = {
-  { 'S', 'slice xx / sample offset xx/256' }, { 'C', 'item volume xx/80' }, { '8', 'pan (80 = centre)' },
-  { 'I', 'fade in xx/16 row' }, { 'O', 'fade out xx/16 row' }, { 'T', 'beatsync to xx rows' },
-  { 'U', 'pitch up xx/16 semitone per row' }, { 'D', 'pitch down xx/16 semitone per row' },
-  { 'G', 'glide from the previous note in xx rows' }, { '4', 'vibrato: period 16/x rows, depth y/8 semitone' },
-  { '0', 'arpeggio 0, x, y semitones' }, { 'A', 'volume slide: up x/16, down y/16 per row' },
-  { 'R', 'retrigger every x/16 row, volume x(1 - y/16)' }, { 'P', 'probability xx/FF' },
-  { 'F', 'tempo: BPM = xx' }, { 'B', 'jump to sequence slot xx' }, { 'L', 'L00: loop source off' },
-  { 'M', 'channel mode 0..4' }, { '9', 'offset xx/FF (old, as S)' },
+  { '0S', 'slice xx / sample offset xx/256' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
+  { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
+  { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
+  { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0O', 'volume down xx/256 per row' },
+  { '0R', 'retrigger every y/16 row, volume falls by x/16 each' }, { '0Y', 'maybe: probability xx/FF' },
+  { 'SI', 'sample fade in xx/16 row' }, { 'SO', 'sample fade out xx/16 row' }, { 'SB', 'beatsync to xx rows' },
+  { 'SF', 'finetune in cents (80 = 0)' }, { 'SL', 'SL00: loop source off' }, { 'SM', 'channel mode 0..4' },
+  { 'ZT', 'tempo: BPM = xx' }, { 'ZJ', 'jump to sequence slot xx' },
 }
+SM.FX_DESC = {}
+for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 function SM.fx_letters()
   local items = {}
   for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1], v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end

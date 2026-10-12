@@ -22,7 +22,7 @@ SM.key(('k'):byte()); SM.key(('k'):byte()); eq(SM.p.sel, 2, 'k stops at the top'
 SM.key(('$'):byte()); eq(SM.p.sel, 16, '$ row end'); SM.key(('0'):byte()); eq(SM.p.sel, 1, '0 row start')
 SM.key(('G'):byte()); SM.key(13); eq(got, 255, 'G Enter picks the last'); eq(SM.p, nil, 'closed after pick')
 SM.open({ title = 'cmd', items = (SM.fx_letters()), cols = 8, on_pick = function(it) return { title = it.v .. 'xx', items = (SM.values(256)), cols = 16 } end }, { x = 5, y = 5 })
-SM.key(13); eq(SM.p and SM.p.title, 'Sxx', 'letter → its values'); eq(SM.p.anchor and SM.p.anchor.x, 5, 'second stage keeps the place')
+SM.key(13); eq(SM.p and SM.p.title, '0Sxx', 'code → its values'); eq(SM.p.anchor and SM.p.anchor.x, 5, 'second stage keeps the place')
 SM.key(27); eq(SM.p, nil, 'Esc closes')
 -- раскладка: в окне, над ячейкой, если снизу нет места
 local L = { pad = 2, rh = 14 }

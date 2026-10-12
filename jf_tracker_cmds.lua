@@ -1,30 +1,33 @@
 -- jf_tracker_cmds.lua — команды-огибающие и генераторы (этап 7).
 --
--- Команда хранится у item как текст в P_EXT:jf_cmds («U08,4A3,R42») и
+-- Команда хранится у item как текст в P_EXT:jf_cmds («0U08,0VA3,0R24») и
 -- ПЕРЕСОБИРАЕТСЯ целиком при каждой правке: take-огибающие (Pitch, Volume)
 -- внутри item очищаются и строятся заново, сгенерированные копии
 -- (P_EXT:jf_gen = guid родителя) удаляются и создаются снова. Всё
 -- нативное: точки take-огибающих, items, tempo-маркеры, MIDI pitchbend.
 -- Тиклесс: доли — от строки (xx/16 полутона на строку и т.п.).
+-- Коды — двухсимвольные, как в Renoise (12 окт: было по одной букве):
 --
---   Uxx / Dxx  питч вверх/вниз на xx/16 полутона за строку на всю длину
---              (аудио — take Pitch; MIDI — pitchbend ±2 полутона)
---   Gxx        glide: от высоты предыдущего события к своей за xx строк
---   4xy        vibrato: период 16/x строк (x=0 → 4), глубина y/8 полутона
---   0xy        arpeggio: 0, x, y полутонов по трети строки, ступенями
---   Axy        volume slide: +x/16 за строку вверх, −y/16 вниз (take Volume)
---   Rxy        retrigger: копии каждые x/16 строки (x=0 → 4/16), громкость
---              каждой ×(1 − y/16); копии — items с P_EXT:jf_gen
---   Pxx        вероятность: item заглушается с шансом 1 − xx/FF (бросок
---              при каждой пересборке)
---   Fxx        темп: tempo-маркер в строке события, BPM = xx (hex)
+--   0Uxx / 0Dxx питч вверх/вниз на xx/16 полутона за строку на всю длину
+--               (аудио — take Pitch; MIDI — pitchbend ±2 полутона)
+--   0Gxx        glide: от высоты предыдущего события к своей за xx строк
+--   0Vxy        vibrato: период 16/x строк (x=0 → 4), глубина y/8 полутона
+--   0Axy        arpeggio: 0, x, y полутонов по трети строки, ступенями
+--   0Ixx / 0Oxx громкость вверх / вниз на xx/256 за строку (take Volume)
+--   0Rxy        retrigger: копии каждые y/16 строки (y=0 → 4/16), громкость
+--               каждой ×(1 − x/16) — порядок x/y как в Renoise; копии —
+--               items с P_EXT:jf_gen
+--   0Yxx        вероятность: item заглушается с шансом 1 − xx/FF (бросок
+--               при каждой пересборке)
+--   ZTxx        темп: tempo-маркер в строке события, BPM = xx (hex)
 
 local C = {}
 local R = reaper
 local model
 
-C.LETTERS = { U = true, D = true, G = true, ['4'] = true, ['0'] = true, A = true, R = true, P = true, F = true, B = true }
--- Bxx — прыжок: когда плейхед доходит до строки события, трекер переводит
+C.CODES = { ['0U'] = true, ['0D'] = true, ['0G'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true,
+  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true }
+-- ZJxx — прыжок: когда плейхед доходит до строки события, трекер переводит
 -- воспроизведение в слот xx последовательности (матрица). Хранится как
 -- команда, огибающих не строит — исполняет main в кадре.
 
@@ -34,10 +37,10 @@ function C.init(m) model = m end
 function C.parse(str)
   local out = {}
   for tok in (str or ''):gmatch('[^,]+') do
-    local letter, hex = tok:match('^(%w)(%x%x)$')
-    if letter and C.LETTERS[letter] then
+    local code, hex = tok:match('^(%w%w)(%x%x)$')
+    if code and C.CODES[code] then
       local xx = tonumber(hex, 16)
-      out[#out + 1] = { cmd = letter, xx = xx, x = xx >> 4, y = xx & 15 }
+      out[#out + 1] = { cmd = code, xx = xx, x = xx >> 4, y = xx & 15 }
     end
   end
   return out
@@ -58,12 +61,12 @@ function C.set(it, list)
   R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', C.format(list), true)
 end
 
--- добавить/заменить команду letter со значением xx (nil — снять)
-function C.put(it, letter, xx)
+-- добавить/заменить команду code со значением xx (nil — снять)
+function C.put(it, code, xx)
   local list = C.get(it)
   local out = {}
-  for _, c in ipairs(list) do if c.cmd ~= letter then out[#out + 1] = c end end
-  if xx then out[#out + 1] = { cmd = letter, xx = xx, x = xx >> 4, y = xx & 15 } end
+  for _, c in ipairs(list) do if c.cmd ~= code then out[#out + 1] = c end end
+  if xx then out[#out + 1] = { cmd = code, xx = xx, x = xx >> 4, y = xx & 15 } end
   C.set(it, out)
   return out
 end
@@ -162,11 +165,11 @@ function C.rebuild(head, lpb, prev_semis)
   local tlen = len * rate                                           -- длина в секундах источника
   local need_pitch, need_vol = false, false
   for _, c in ipairs(list) do
-    if c.cmd == 'U' or c.cmd == 'D' or c.cmd == 'G' or c.cmd == '4' or c.cmd == '0' then need_pitch = true end
-    if c.cmd == 'A' then need_vol = true end
+    if c.cmd == '0U' or c.cmd == '0D' or c.cmd == '0G' or c.cmd == '0V' or c.cmd == '0A' then need_pitch = true end
+    if c.cmd == '0I' or c.cmd == '0O' then need_vol = true end
   end
   if is_midi then
-    -- MIDI: только U/D через pitchbend (±2 полутона = 8191)
+    -- MIDI: только 0U/0D через pitchbend (±2 полутона = 8191)
     local _, _, ncc = R.MIDI_CountEvts(take)
     for i = ncc - 1, 0, -1 do
       local _, _, _, ppq, typ = R.MIDI_GetCC(take, i)
@@ -176,8 +179,8 @@ function C.rebuild(head, lpb, prev_semis)
       end
     end
     for _, c in ipairs(list) do
-      if c.cmd == 'U' or c.cmd == 'D' then
-        local semis = (c.xx / 16) * rows * (c.cmd == 'U' and 1 or -1)
+      if c.cmd == '0U' or c.cmd == '0D' then
+        local semis = (c.xx / 16) * rows * (c.cmd == '0U' and 1 or -1)
         local bend = math.max(0, math.min(16383, math.floor(8192 + semis / 2 * 8191 + 0.5)))
         local p0 = R.MIDI_GetPPQPosFromProjTime(take, pos)
         local p1 = R.MIDI_GetPPQPosFromProjTime(take, pos + len)
@@ -204,14 +207,14 @@ function C.rebuild(head, lpb, prev_semis)
   local vol_mul = 1
   local muted = false
   for _, c in ipairs(list) do
-    if (c.cmd == 'U' or c.cmd == 'D') and penv then
-      local total = (c.xx / 16) * rows * (c.cmd == 'U' and 1 or -1)
+    if (c.cmd == '0U' or c.cmd == '0D') and penv then
+      local total = (c.xx / 16) * rows * (c.cmd == '0U' and 1 or -1)
       pt(penv, 0, 0); pt(penv, tlen, clampp(total))
-    elseif c.cmd == 'G' and penv then
+    elseif c.cmd == '0G' and penv then
       local from = (prev_semis or 0) - (head.semis or 0)
       local gl = math.min(tlen, math.max(1, c.xx) * row_sec * rate)
       pt(penv, 0, clampp(from)); pt(penv, gl, 0)
-    elseif c.cmd == '4' and penv then
+    elseif c.cmd == '0V' and penv then
       local period = (c.x > 0 and 16 / c.x or 4) * row_sec * rate
       local depth = c.y / 8
       local n = math.max(2, math.floor(tlen / period * 8))
@@ -219,18 +222,14 @@ function C.rebuild(head, lpb, prev_semis)
         local t = tlen * i / n
         pt(penv, t, clampp(depth * math.sin(2 * math.pi * t / period)))
       end
-    elseif c.cmd == '0' and penv then
+    elseif c.cmd == '0A' and penv then
       local step = row_sec * rate / 3
       local vals = { 0, c.x, c.y }
       local i, t = 0, 0
       while t < tlen do pt(penv, t, clampp(vals[i % 3 + 1]), 1); i = i + 1; t = t + step end
-    elseif c.cmd == 'A' and venv then
-      local v1 = 1 + (c.x - c.y) / 16 * rows
-      local vmin, vmax = env_range(venv, 0, 2)
-      pt(venv, 0, 1); pt(venv, tlen, math.max(vmin, math.min(vmax, v1)))
-    elseif c.cmd == 'R' then
-      local every = (c.x > 0 and c.x or 4) / 16 * row_sec
-      local decay = 1 - c.y / 16
+    elseif c.cmd == '0R' then
+      local every = (c.y > 0 and c.y or 4) / 16 * row_sec
+      local decay = 1 - c.x / 16
       local ok, chunk = R.GetItemStateChunk(it, '', false)
       if ok and every > 1e-4 then
         chunk = strip_guids(chunk)
@@ -249,18 +248,25 @@ function C.rebuild(head, lpb, prev_semis)
         R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_len', ('%.6f'):format(len), true)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(len, every))
       end
-    elseif c.cmd == 'P' then
+    elseif c.cmd == '0Y' then
       if math.random() > c.xx / 255 then muted = true end
-    elseif c.cmd == 'F' then
+    elseif c.cmd == 'ZT' then
       local bpm = c.xx > 0 and c.xx or 120
       R.SetTempoTimeSigMarker(0, -1, pos, -1, -1, bpm, 0, 0, false)
       R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_tempo', '1', true)
     end
   end
+  -- 0I / 0O — одна огибающая громкости из суммы (вверх − вниз)
+  local vs = 0
+  for _, c in ipairs(list) do if c.cmd == '0I' then vs = vs + c.xx elseif c.cmd == '0O' then vs = vs - c.xx end end
+  if venv and vs ~= 0 then
+    local vmin, vmax = env_range(venv, 0, 2)
+    pt(venv, 0, 1); pt(venv, tlen, math.max(vmin, math.min(vmax, 1 + vs / 256 * rows)))
+  end
   if penv then R.Envelope_SortPoints(penv) end
   if venv then R.Envelope_SortPoints(venv) end
   local has_p = false
-  for _, c in ipairs(list) do if c.cmd == 'P' then has_p = true end end
+  for _, c in ipairs(list) do if c.cmd == '0Y' then has_p = true end end
   if has_p then R.SetMediaItemInfo_Value(it, 'B_MUTE', muted and 1 or 0) end
 end
 

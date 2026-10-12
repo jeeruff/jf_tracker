@@ -34,7 +34,7 @@ local ok, err = pcall(function()
   for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do if sub[100] and sub[100].kind == 'audio' then head = sub[100] end end end
   log(('insert slice 3: items %d→%d head=%s fx=%s offs=%.3f len=%.3f'):format(n0, n1, tostring(head and head.name), head and table.concat(head.fx, ',') or '-', head and head.offs or -1, head and head.len or -1))
   if head then
-    edit.set_fx({ head }, 4, 'S', 5)
+    edit.set_fx({ head }, 4, '0S', 5)
     model.invalidate(); snap = model.build(4)
     for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do if sub[100] and sub[100].kind == 'audio' then head = sub[100] end end end
     log(('S05 → fx=%s offs=%.3f'):format(table.concat(head.fx, ','), head.offs))

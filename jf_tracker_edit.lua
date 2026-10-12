@@ -513,7 +513,7 @@ function E.set_delay(heads, lpb, d)
 end
 
 -- ── команды (этап 5) ──────────────────────────────────────────────────────
--- Буква + xx (0..255) → свойство item/take. Только аудио; MIDI-CC — потом.
+-- Код (два символа, как в Renoise) + xx (0..255) → свойство item/take. Только аудио.
 local function src_len(h)
   local src = h.take and R.GetMediaItemTake_Source(h.take)
   if not src then return 0 end
@@ -528,22 +528,24 @@ local function apply_fx(h, lpb, cmd, xx)
   local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
   local qn0 = R.TimeMap2_timeToQN(0, pos)
-  if cmd == '9' then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 255 * src_len(h)); E.note_modified(it)
-  elseif cmd == '8' then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', xx / 255 * 2 - 1)
-  elseif cmd == 'C' then R.SetMediaItemInfo_Value(it, 'D_VOL', xx / 128)
-  elseif cmd == 'I' then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', R.TimeMap2_QNToTime(0, qn0 + xx / 16 / lpb) - pos)
-  elseif cmd == 'O' then
+  if cmd == '0P' then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', xx / 255 * 2 - 1)
+  elseif cmd == '0M' then R.SetMediaItemInfo_Value(it, 'D_VOL', xx / 128)
+  elseif cmd == 'SI' then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', R.TimeMap2_QNToTime(0, qn0 + xx / 16 / lpb) - pos)
+  elseif cmd == 'SO' then
     local qn1 = R.TimeMap2_timeToQN(0, pos + len)
     R.SetMediaItemInfo_Value(it, 'D_FADEOUTLEN', pos + len - R.TimeMap2_QNToTime(0, qn1 - xx / 16 / lpb))
-  elseif cmd == 'L' then R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', xx > 0 and 1 or 0)
-  elseif cmd == 'M' then R.SetMediaItemTakeInfo_Value(tk, 'I_CHANMODE', math.max(0, math.min(4, xx)))
-  elseif cmd == 'P' then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', xx - 128)
-  elseif cmd == 'S' then
+  elseif cmd == 'SL' then R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', xx > 0 and 1 or 0)
+  elseif cmd == 'SM' then R.SetMediaItemTakeInfo_Value(tk, 'I_CHANMODE', math.max(0, math.min(4, xx)))
+  elseif cmd == 'SF' then
+    -- подстройка в центах (80 = 0): целые полутоны остаются у ноты
+    local p = R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
+    R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', math.floor(p + 0.5) + (xx - 128) / 100)
+  elseif cmd == '0S' then
     -- слайс xx нарезанного инструмента (P_EXT:jf_slices у item); без нарезки —
-    -- offset xx/256 источника (как Sxx в Renoise)
+    -- offset xx/256 источника (как 0Sxx в Renoise)
     local slices, base = E.item_slices(it)
     -- нота-слайс (3 окт): своей таблицы нет — берётся у исходника (та же метка
-    -- jf_iid до #), Sxx = слайс xx; исходник с маркерами — кусок без них
+    -- jf_iid до #), 0Sxx = слайс xx; исходник с маркерами — кусок без них
     local _, own_k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
     if #slices == 0 and tonumber(own_k) then
       for _, c in ipairs(E.items_with_iid(iid_base(E.get_iid(it)))) do
@@ -580,9 +582,9 @@ local function apply_fx(h, lpb, cmd, xx)
       if bs then E.bsync_fit(it, bs) end
     else
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
-      E.note_modified(it)                               -- смещение копии — видоизменение (как 9xx)
+      E.note_modified(it)                               -- смещение копии — видоизменение
     end
-  elseif cmd == 'T' then
+  elseif cmd == 'SB' then
     -- beatsync (как в Renoise): источник от offset растянут ровно на xx строк
     if xx > 0 then
       local target = R.TimeMap2_QNToTime(0, qn0 + xx / lpb) - pos
@@ -739,7 +741,7 @@ function E.scramble(heads, lpb, rnd)
         for i = #ks, 2, -1 do local j = rnd(i); ks[i], ks[j] = ks[j], ks[i] end
         for i, e in ipairs(t) do
           if ks[i] ~= e.k then
-            apply_fx(e.h, lpb, 'S', ks[i])
+            apply_fx(e.h, lpb, '0S', ks[i])
             if R.GetMediaItemInfo_Value(e.h.item, 'D_LENGTH') > e.len then R.SetMediaItemInfo_Value(e.h.item, 'D_LENGTH', e.len) end
             n = n + 1
           end
@@ -769,7 +771,7 @@ function E.set_fx(heads, lpb, cmd, xx)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
     for _, h in ipairs(heads) do
-      if E.cmds and E.cmds.LETTERS[cmd] then
+      if E.cmds and E.cmds.CODES[cmd] then
         if h.item then E.cmds.put(h.item, cmd, xx); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
       else
         apply_fx(h, lpb, cmd, xx)
@@ -779,13 +781,13 @@ function E.set_fx(heads, lpb, cmd, xx)
 end
 
 function E.clear_fx(heads, lpb, cmd)
-  if E.cmds and E.cmds.LETTERS[cmd] then
+  if E.cmds and E.cmds.CODES[cmd] then
     run('fx clear ' .. cmd, function()
       for _, h in ipairs(heads) do if h.item then E.cmds.put(h.item, cmd, nil); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end end
     end)
     return
   end
-  local defaults = { ['9'] = 0, ['8'] = 128, C = 128, I = 0, O = 0, L = 1, M = 0, S = 0, T = 0 }
+  local defaults = { ['0P'] = 128, ['0M'] = 128, SI = 0, SO = 0, SL = 1, SM = 0, ['0S'] = 0, SB = 0, SF = 128 }
   if defaults[cmd] then E.set_fx(heads, lpb, cmd, defaults[cmd]) end
 end
 

@@ -9210,7 +9210,7 @@ ctx = {
     end
     if what == 'off' then
       if #heads == 0 then vim.msg = 'no event under cursor'; return end
-      edit.set_fx(heads, state.lpb, 'L', 0); vim.msg = 'loop off'; return
+      edit.set_fx(heads, state.lpb, 'SL', 0); vim.msg = 'loop off'; return
     end
     if what == 'region' then
       local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
@@ -12982,7 +12982,7 @@ local function poll_gridkey()
   ctx.region_space(seq[ri])
 end
 
--- Bxx на строке плейхеда: прыжок в слот xx (один раз на строку)
+-- ZJxx на строке плейхеда: прыжок в слот xx (один раз на строку)
 local jump_row_done = nil
 -- Garden: тик Orca раз на строку при игре; выходы сажаются на строку вперёд
 -- (без undo, тег = регион строки-цели); при входе плейхеда в регион прежний
@@ -13162,10 +13162,10 @@ local function process_jumps(playpos)
     local c = f.sub and f.sub[row]
     if c and (c.kind == 'audio' or c.kind == 'midi') then
       for _, fx in ipairs(c.fx or {}) do
-        local xx = fx:match('^B(%x%x)$')
+        local xx = fx:match('^ZJ(%x%x)$')
         if xx then
           local slot = seq[tonumber(xx, 16)]
-          if slot then reaper.SetEditCurPos(slot.pos, false, true); MX.queued = nil; vim.msg = 'B' .. xx .. ' → ' .. slot.name; return end
+          if slot then reaper.SetEditCurPos(slot.pos, false, true); MX.queued = nil; vim.msg = 'ZJ' .. xx .. ' → ' .. slot.name; return end
         end
       end
     end
@@ -14828,7 +14828,7 @@ local function frame()
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
     vol = 'vl: volume / velocity, hex 00..FF (80 = unity)',
     delay = 'dl: delay inside the row, hex xx/256 of a row',
-    fx = 'fx: effect command, letter + hex hex (slices are notes: C-4 = slice 1; Sxx offset, Txx beatsync rows, 8xx pan, Ixx Oxx fades, Pxx pitch; 9xx offset also accepted)',
+    fx = 'fx: effect command, two-char code + hex hex, as in Renoise: 0x effects (0Sxx offset, 0Pxx pan, 0Uxx 0Dxx pitch, 0Vxy vibrato), Sx sample (SIxx SOxx fades, SBxx beatsync, SFxx finetune cents), Zx song (ZTxx tempo, ZJxx jump); Ctrl+Enter - the list',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'

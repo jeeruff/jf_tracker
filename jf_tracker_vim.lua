@@ -609,37 +609,48 @@ local function apply(op, f0, f1, r0, r1)
       -- k-я команда головы: xx ± d (если команды нет — ничего)
       for _, h in ipairs(heads) do
         local f = (h.fx or {})[fld - 3]
-        if f then E.set_fx({ h }, lpb(), f:sub(1, 1), tonumber(f:sub(2), 16) + d) end
+        if f then E.set_fx({ h }, lpb(), f:sub(1, 2), tonumber(f:sub(3), 16) + d) end
       end
     end
   end
   return edited
 end
 
--- hex-ввод: поле 2/3 — две цифры, поле команды — буква + две цифры.
--- Возвращает true, когда значение принято (буфер сброшен).
-local FX_LETTERS = { ['9'] = true, ['8'] = true, C = true, I = true, O = true, L = true, M = true, S = true, T = true,
-                     U = true, D = true, G = true, ['4'] = true, ['0'] = true, A = true, R = true, P = true, F = true, B = true }
+-- hex-ввод: поле 2/3 — две цифры, поле команды — код (два символа, как в
+-- Renoise: 0U, SF, ZT; 12 окт) + две цифры. Возвращает true, когда значение
+-- принято (буфер сброшен).
+local function fx_code_ok(code)
+  local d = ctx.SM and ctx.SM.FX_DESC
+  return d and d[code] ~= nil
+end
+local function fx_prefix_ok(ch)
+  for _, e in ipairs((ctx.SM and ctx.SM.FX) or {}) do if e[1]:sub(1, 1) == ch then return true end end
+  return false
+end
 local function hex_entry(c, fld, heads)
   local ch = (c < 256) and string.char(c):upper() or ''
   local buf = V.hexbuf or ''
   local is_hex = ch:match('^[0-9A-F]$') ~= nil
-  if fld >= 4 and buf == '' then
+  if fld >= 4 and #buf < 2 then
     -- 6 окт, как в трекерах: команды просто стоят в колонках fx1, fx2 … по
     -- порядку. Занятая колонка: цифры меняют ЗНАЧЕНИЕ её команды; другая
-    -- команда — только после удаления (BS). Пустая — буква + две цифры
+    -- команда — только после удаления (BS). Пустая — код + две цифры
     local f = heads[1] and (heads[1].fx or {})[fld - 3]
-    if f then
-      if is_hex then V.hexbuf = f:sub(1, 1) .. ch; return false end
+    if f and buf == '' then
+      if is_hex then V.hexbuf = f:sub(1, 2) .. ch; return false end
       if ch:match('^%a$') then V.msg = ('%s: digits change its value; BS deletes it, then type another effect'):format(f) end
       return false
     end
-    if not FX_LETTERS[ch] then return false end
-    V.hexbuf = ch; return false
+    if buf == '' then
+      if not fx_prefix_ok(ch) then return false end
+      V.hexbuf = ch; return false
+    end
+    if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Ctrl+Enter - the list)'):format(buf, ch); return false end
+    V.hexbuf = buf .. ch; return false
   end
   if not is_hex then return false end
   buf = buf .. ch
-  local need = fld >= 4 and 3 or 2
+  local need = fld >= 4 and 4 or 2
   if #buf < need then V.hexbuf = buf; return false end
   V.hexbuf = nil
   -- vol на строке продолжения аудио (5 окт): точка огибающей громкости take
@@ -650,7 +661,7 @@ local function hex_entry(c, fld, heads)
   if #heads == 0 then V.msg = 'no note in this row - type the note first (vol / delay / effects belong to a note)'; return 'none' end
   if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
-  else ctx.edit.set_fx(heads, lpb(), buf:sub(1, 1), tonumber(buf:sub(2), 16)) end
+  else ctx.edit.set_fx(heads, lpb(), buf:sub(1, 2), tonumber(buf:sub(3), 16)) end
   return true
 end
 
@@ -746,7 +757,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Cmd +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'off', '[all]', 'note off at the cursor row on the whole track (all - on every track); in INSERT ` subcolumn, ~ track, Ctrl+` all' }, { 'repeat', '[all]', 'repeat the part of the region above the cursor down to the region end (Ctrl+Opt+J; all - every track)' }, { 'mac', 'name', 'play a macro by name (saved, built-in or @a) at the cursor; \\ q - all of them in a menu' }, { 'macsave', 'a name', 'keep register a as a named macro (macros tab, Data/jf_tracker_macros.txt)' }, { 'tcolor', '#rrggbb', 'colour of the cursor track by its code (tc - the colour grid)' }, { 'transients', '', 'transient detector module in the item tab (= Opt+D): sensitivity, threshold, min gap, pre-attack, live; Enter slices' }, { 'arr', '[new [name]|name text|dup|clear|del|next|prev|N]', 'arrangements: named sets of the fixed lanes that play (\\ P a)' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'optsave', 'name', 'save all options as a profile' }, { 'optload', 'name', 'load an options profile' }, { 'optdel', 'name', 'delete an options profile' }, { 'redo', '', 'redo (also Cmd+Shift+Z; Ctrl+R is the rec tab)' }, { 'undo', '', 'undo (also u, Cmd+Z)' }, { 'sig', 'N/D [all|here]', 'time signature for the whole project or this pattern; a longer bar - fill the missing beats empty / with the last beat / keep' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '[big]', 'bottom DSP panel (track fx); big - the chain with its routing on the whole window (zz in DSP)' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'z', '<words>', 'zoxide: jump the browser to the most used / recent folder matching the words (last word - in the folder name)' }, { 'zi', '', 'zoxide: pick from the visited folders (fzf), best first' }, { 'pane', '<panel> left|right|top|bottom|with <p>|swap <p>|hide|show|zoom, reset, <layout>', 'panes (tmux / zellij): move, stack, hide, layouts; no argument - layout string' }, { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'fxa', '', 'store all parameters of the selected DSP fx as A' }, { 'fxb', '', 'store them as B' }, { 'morph', 'N', 'morph the selected fx from A (0) to B (100)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in ten points' }, { 'swing', 'N | on | off | 1/16', 'REAPER grid swing: amount -100..100 % (33 = triplet), division; no argument - the menu' }, { 'pm', '[big | grid | list | sort date|name|bpm|status | daw all|rpp|other]', 'jf_pm project cards in the browser (pm tab); big - over the whole window' }, { 'font', 'name | next | prev | off | <family> [px]', 'tracker font: off - the REAPER bitmap, any installed family by name (custom), or a terminal monospace font (bigblue, bb437, departure, gohu11, gohu14, terminess, proggy, profont, 3270, monocraft, iosevka, jetbrains, hack, plex ...); next / prev - step through them' }, { 'audio', 'dev <name> | bs N | sr N | sr off | bs off', 'audio device of REAPER (CoreAudio): device by name, buffer size, sample rate - applied at once (the audio restarts); options tab audio, zB - buffer menu' }, { 'jftop', '', 'what in the tracker takes the time: each part of the frame in ms (top module, rows, matrix, browser, keys ...); r - reset, t - performance view, Esc - close' }, { 'logo', '[name]', 'one of the jf_tracker artworks in the middle of the tracker; any key or click closes it' }, { 'session', '[big | stop | quant bar|beat|now | bars N | off]', 'clips over the whole window (zz in the matrix): launch clips and scenes on the quantize boundary into the =SESSION loop zone; stop - all clips; off - transport stop, zone cleared' }, { 'dev', '[on|off]', 'developer copy only: off shows the tracker as release users get it (no grid, orca, pm cards); takes effect after reopening the tracker' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'zoom out: a row is a beat (LPB 1); again - back to the previous LPB' }, { 'chord', '[Cm7 | off]', 'no argument - the cursor track as one chord lane (names from its notes, OFF ends); a symbol - write that chord at the cursor row (replaces the notes starting there). The chord lane track drives JS jf_tracker_chordfollow: put it on other tracks - their notes snap to the chord of the moment' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|0X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'fxa', '', 'store all parameters of the selected DSP fx as A' }, { 'fxb', '', 'store them as B' }, { 'morph', 'N', 'morph the selected fx from A (0) to B (100)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in ten points' }, { 'swing', 'N | on | off | 1/16', 'REAPER grid swing: amount -100..100 % (33 = triplet), division; no argument - the menu' }, { 'pm', '[big | grid | list | sort date|name|bpm|status | daw all|rpp|other]', 'jf_pm project cards in the browser (pm tab); big - over the whole window' }, { 'font', 'name | next | prev | off | <family> [px]', 'tracker font: off - the REAPER bitmap, any installed family by name (custom), or a terminal monospace font (bigblue, bb437, departure, gohu11, gohu14, terminess, proggy, profont, 3270, monocraft, iosevka, jetbrains, hack, plex ...); next / prev - step through them' }, { 'audio', 'dev <name> | bs N | sr N | sr off | bs off', 'audio device of REAPER (CoreAudio): device by name, buffer size, sample rate - applied at once (the audio restarts); options tab audio, zB - buffer menu' }, { 'jftop', '', 'what in the tracker takes the time: each part of the frame in ms (top module, rows, matrix, browser, keys ...); r - reset, t - performance view, Esc - close' }, { 'logo', '[name]', 'one of the jf_tracker artworks in the middle of the tracker; any key or click closes it' }, { 'session', '[big | stop | quant bar|beat|now | bars N | off]', 'clips over the whole window (zz in the matrix): launch clips and scenes on the quantize boundary into the =SESSION loop zone; stop - all clips; off - transport stop, zone cleared' }, { 'dev', '[on|off]', 'developer copy only: off shows the tracker as release users get it (no grid, orca, pm cards); takes effect after reopening the tracker' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'zoom out: a row is a beat (LPB 1); again - back to the previous LPB' }, { 'chord', '[Cm7 | off]', 'no argument - the cursor track as one chord lane (names from its notes, OFF ends); a symbol - write that chord at the cursor row (replaces the notes starting there). The chord lane track drives JS jf_tracker_chordfollow: put it on other tracks - their notes snap to the chord of the moment' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'start', '[bar[.beat]]', '=START marker of the sequence (empty = cursor row)' }, { 'end', '[bar[.beat]]', '=END marker of the sequence' },
   { 'cc', '[N]', 'CC lane: N - a MIDI-item CC column (events of the MIDI items of the track); empty - ReaControlMIDI on the track, its parameter as an envelope column' }, { 'pc', '', 'program change column of the MIDI items of the cursor track' }, { 'curvesave', 'name', 'save the open automation item curve (Data/jf_tracker_curves)' }, { 'curves', '', 'browser on the saved curves - Enter loads one into the open automation item' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (F11)' }, { 'preview', '', 'preview on input' },
@@ -816,7 +827,7 @@ local function run_cmd(line)
     else
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       local xx = math.min(255, len * 16)
-      for _, h in ipairs(heads) do if h.kind == 'audio' then ctx.edit.set_fx({ h }, lpb(), dir == 'in' and 'I' or 'O', xx) end end
+      for _, h in ipairs(heads) do if h.kind == 'audio' then ctx.edit.set_fx({ h }, lpb(), dir == 'in' and 'SI' or 'SO', xx) end end
     end
   elseif cmd == 'step' and arg == 'auto' then V.step_auto = not V.step_auto; V.step_next = false; V.msg = 'step: ' .. (V.step_auto and 'auto (to the end of the inserted item / slice)' or tostring(V.step))
   elseif cmd == 'step' and arg == 'next' then V.step_next = not V.step_next; V.step_auto = false; V.msg = 'step: ' .. (V.step_next and 'next (to the next note / item / command / envelope point of the track)' or tostring(V.step))
@@ -924,7 +935,7 @@ local function run_cmd(line)
     local x = tonumber(arg or '')
     if x and ctx.ab_morph_sel then ctx.ab_morph_sel(x / 100) else V.msg = 'morph: like :morph 50 (0 = A, 100 = B)' end
   elseif cmd == 'interp' then
-    -- :interp [vol|delay|note|буква команды] (4 окт, из Paketti — Esa Ruoho):
+    -- :interp [vol|delay|note|код команды] (4 окт, из Paketti — Esa Ruoho):
     -- в VISUAL у каждой колонки значения первого и последнего события тянутся
     -- линейно по строкам на события между ними; поле — по курсору или словом
     if not (V.cmd_from == 'visual' or V.cmd_from == 'vline') then V.msg = 'interp: select rows first (v / V)'; return end
@@ -940,15 +951,15 @@ local function run_cmd(line)
       if what == 'vol' then return tonumber(h.vol or '', 16)
       elseif what == 'delay' then return h.delay
       elseif what == 'note' then return h.pitch or (h.semis and BASE + math.floor(h.semis + 0.5))
-      else for _, fx in ipairs(h.fx or {}) do if fx:sub(1, 1) == letter then return tonumber(fx:sub(2), 16) end end end
+      else for _, fx in ipairs(h.fx or {}) do if fx:sub(1, 2) == letter then return tonumber(fx:sub(3), 16) end end end
     end
     local n = 0
     E.run('interpolate ' .. what, function()
       for fi = math.min(f0, f1), math.max(f0, f1) do
         local hs = V.heads_in(fi, fi, r0, r1)
         table.sort(hs, function(a, b) return a.row0 < b.row0 end)
-        local letter = (#what == 1) and what:upper() or nil
-        if what == 'cmd' and hs[1] then letter = ((hs[1].fx or {})[1] or ''):sub(1, 1) end
+        local letter = (#what == 2) and what:upper() or nil
+        if what == 'cmd' and hs[1] then letter = ((hs[1].fx or {})[1] or ''):sub(1, 2) end
         if #hs >= 3 then
           local a, b = get(hs[1], letter), get(hs[#hs], letter)
           local ra, rb = hs[1].row0, hs[#hs].row0
@@ -1510,10 +1521,10 @@ function V.key_impl(c)
       return env_normal(c)
     end
     if fld == 2 and (c == ('/'):byte() or c == ('\\'):byte()) then
-      -- vol аудио-события: / фейд-ин, \ фейд-аут за 1 бит (команды Ixx/Oxx, xx = 1/16 строки)
+      -- vol аудио-события: / фейд-ин, \ фейд-аут за 1 бит (команды SIxx/SOxx, xx = 1/16 строки)
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       local xx = math.min(255, lpb() * 16)
-      for _, h in ipairs(heads) do if h.kind == 'audio' then E.set_fx({ h }, lpb(), c == ('/'):byte() and 'I' or 'O', xx) end end
+      for _, h in ipairs(heads) do if h.kind == 'audio' then E.set_fx({ h }, lpb(), c == ('/'):byte() and 'SI' or 'SO', xx) end end
       V.hexbuf = nil; return
     end
     if c == BS or c == DEL then
@@ -1524,7 +1535,7 @@ function V.key_impl(c)
       else
         for _, h in ipairs(heads) do
           local f = (h.fx or {})[fld - 3]
-          if f then E.clear_fx({ h }, lpb(), f:sub(1, 1)) end
+          if f then E.clear_fx({ h }, lpb(), f:sub(1, 2)) end
         end
       end
       V.hexbuf = nil; return
@@ -1913,11 +1924,11 @@ function V.key_impl(c)
         if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range() end
         local heads = V.heads_in(f0, f1, r0, r1)
         local slc, rest = {}, {}
-        for _, h in ipairs(heads) do if h.kind == 'audio' and (h.fx or {})[1] and tostring(h.fx[1]):match('^S%x%x$') then slc[#slc + 1] = h else rest[#rest + 1] = h end end
+        for _, h in ipairs(heads) do if h.kind == 'audio' and (h.fx or {})[1] and tostring(h.fx[1]):match('^0S%x%x$') then slc[#slc + 1] = h else rest[#rest + 1] = h end end
         if #slc > 0 and rhow ~= 'whole' then
           if rhow == 'beside' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
           elseif pitch - V.slice_base() + 1 < 1 then V.msg = 'q is the whole sample - a slice note keeps its slice (; inserts the whole sample)'
-          else E.set_fx(slc, lpb(), 'S', pitch - V.slice_base() + 1) end
+          else E.set_fx(slc, lpb(), '0S', pitch - V.slice_base() + 1) end
         else for _, h in ipairs(slc) do rest[#rest + 1] = h end end
         if #rest > 0 then E.set_pitch(rest, lpb(), pitch) end
         V.mode = 'normal'; finish_edit()
@@ -2632,8 +2643,7 @@ function V.smart()
     local have = (h1.fx or {})[fld - 3]
     local function vals(letter, curx)
       local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx')
-      local desc = ''
-      for _, e in ipairs(SM.FX) do if e[1] == letter then desc = e[2] end end
+      local desc = SM.FX_DESC[letter] or ''
       return { title = ('%sxx  %s  %s'):format(letter, desc, where), items = its, cols = cs, sel = sl,
                on_pick = function(it)
                  local hs = heads()
@@ -2642,7 +2652,7 @@ function V.smart()
                end }
     end
     if have then
-      local p = vals(have:sub(1, 1), tonumber(have:sub(2), 16))
+      local p = vals(have:sub(1, 2), tonumber(have:sub(3), 16))
       return ctx.smart_open(p)
     end
     items, cols, sel = SM.fx_letters()

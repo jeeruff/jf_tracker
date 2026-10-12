@@ -180,7 +180,7 @@ do
   eq('hat head', hat and hat.kind, 'audio')
   eq('hat rows', hat and hat.rows, 1)
   eq('hat next free', la.subs[1][21], nil)
-  eq('hat fx', table.concat(hat and hat.fx or {}, ' '), '8BF L00 M02')
+  eq('hat fx', table.concat(hat and hat.fx or {}, ' '), '0PBF SL00 SM02')
   eq('kick fx (resample, no fx)', #(h and h.fx or {}), 0)
   local lb = snap.cols[2].lanes
   eq('B lanes', #lb, 2)
@@ -364,8 +364,8 @@ do
   for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do for _, c in pairs(sub) do if c.kind == 'audio' then head = c end end end end
   eq('slice note shows its pitch C-4', head and head.note, 'C-4')
   local hasS, hasT = nil, false
-  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 1) == 'S' then hasS = f elseif f:sub(1, 1) == 'T' then hasT = true end end
-  eq('slice number as S02', hasS, 'S02'); eq('no T on a slice note', hasT, false)
+  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 2) == '0S' then hasS = f elseif f:sub(1, 2) == 'SB' then hasT = true end end
+  eq('slice number as 0S02', hasS, '0S02'); eq('no SB on a slice note', hasT, false)
 end
 -- обратная карта stretch-маркеров (5 окт): шов лупа по маркерам
 do

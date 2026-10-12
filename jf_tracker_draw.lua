@@ -375,7 +375,7 @@ function D.layout(snap, state, nregions)
   L.w_note = ms('C#4')
   L.w_vol = ms('FF')
   L.w_del = ms('FF')
-  L.w_fx = ms('9FF')
+  L.w_fx = ms('0UFF')                -- 12 окт: код из двух символов, как в Renoise
   L.nfx = state.fxcols or 0
   -- колонка волны слева от ноты (:wave peaks|rect|spec|off) — нативные пики REAPER, вертикально
   -- колонка волны: всегда спектральные пики REAPER (цвет = частота) +
@@ -1551,7 +1551,11 @@ end
 -- ── ячейка ────────────────────────────────────────────────────────────────
 -- Пустые поля рисуются каждое на своём x — точки стоят ровно под текстом.
 local EMPTY = { '...', '..', '..' }
-local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '...' end
+-- группа кода команды → цвет (как в Renoise); Z… — глобальные, прочее — RN_OTHER
+local FXG = { ['0M'] = 'RN_VOL', ['0I'] = 'RN_VOL', ['0O'] = 'RN_VOL', SI = 'RN_VOL', SO = 'RN_VOL', ['0P'] = 'RN_PAN',
+  ['0U'] = 'RN_PITCH', ['0D'] = 'RN_PITCH', ['0G'] = 'RN_PITCH', ['0V'] = 'RN_PITCH', ['0A'] = 'RN_PITCH', SF = 'RN_PITCH', SB = 'RN_GLOBAL' }
+D.FX_COL = setmetatable({}, { __index = function(_, k) return FXG[k] and D[FXG[k]] end })
+local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '....' end
 
 local function draw_cell(L, cell, x, y, ty, inv)
   -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
@@ -1631,11 +1635,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
     for i = 1, L.nfx do
       if fx[i] then
         -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
-        local l1 = fx[i]:sub(1, 1)
-        local col = (l1 == 'I' or l1 == 'O' or l1 == 'V') and D.RN_VOL or (l1 == '8' and D.RN_PAN) or ((l1 == 'P' or l1 == 'U' or l1 == 'D' or l1 == 'G') and D.RN_PITCH)
-          or ((l1 == 'T' or l1 == 'F') and D.RN_GLOBAL) or D.RN_OTHER
+        local col = D.FX_COL[fx[i]:sub(1, 2)] or (fx[i]:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER
         text(x + L.x_fx[i], ty, fx[i], c(3 + i, muted and U.GREY or col))
-      else text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
+      else text(x + L.x_fx[i], ty, '....', c(3 + i, D.EMPTY)) end
     end
   elseif k == 'off' then
     text(x + L.x_note, ty, D.OFF_TXT or 'OFF', c(1, D.CONT))   -- 8 окт: опция note OFF glyph — «|» вместо OFF
@@ -1643,7 +1645,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if L.narrow or L.notes_only then
     elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
-    for i = 1, L.nfx do text(x + L.x_fx[i], ty, '...', c(3 + i, D.EMPTY)) end
+    for i = 1, L.nfx do text(x + L.x_fx[i], ty, '....', c(3 + i, D.EMPTY)) end
   elseif k == 'cont' then
     local head = cell.of
     if head.kind == 'audio' then

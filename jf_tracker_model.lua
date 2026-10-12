@@ -153,11 +153,12 @@ local function place(lane, r0, r1, head, cont, tail, e1)
 end
 M._place = place
 
--- Колонки команд аудио-item (этап 5, пока только показ): буквы PT2/Renoise,
--- значения из свойств item/take, доли — от строки. Только не-дефолтные.
---   9xx offset (доля длины источника)   8xx pan (80 = центр)
---   Ixx / Oxx fade in/out (строки × 16, >20 мс)  L00 loop source ВЫКЛ   M0x канал
---   Sxx слайс (P_EXT:jf_slice)  Txx beatsync на xx строк  Pxx дробный питч
+-- Колонки команд аудио-item (этап 5, пока только показ): двухсимвольные коды
+-- Renoise (12 окт), значения из свойств item/take, доли — от строки. Только
+-- не-дефолтные. Свойства самого сэмпла (в Renoise — настройки сэмпла) — на S:
+--   0Sxx слайс (P_EXT:jf_slice) / смещение xx/256 источника   0Pxx pan (80 = центр)
+--   SIxx / SOxx fade in/out (строки × 16, >20 мс)   SL00 loop source ВЫКЛ
+--   SM0x канал   SBxx beatsync на xx строк   SFxx подстройка в центах (80 = 0)
 function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local fx = {}
   if not take then return fx end
@@ -167,29 +168,29 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local _, slk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
   slk = tonumber(slk)
   -- слайс (4 окт, вечер): номер — командой Sxx (hex, как в Renoise); нота — высота
-  if slk then offs = 0; fx[#fx + 1] = 'S' .. M.hex2(slk) end
+  if slk then offs = 0; fx[#fx + 1] = '0S' .. M.hex2(slk) end
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
-    if slen and slen > 0 then fx[#fx + 1] = 'S' .. M.hex2(offs / slen * 256) end
+    if slen and slen > 0 then fx[#fx + 1] = '0S' .. M.hex2(offs / slen * 256) end
   end
   local pan = R.GetMediaItemTakeInfo_Value(take, 'D_PAN')
-  if math.abs(pan) > 1e-6 then fx[#fx + 1] = '8' .. M.hex2((pan + 1) / 2 * 255) end
+  if math.abs(pan) > 1e-6 then fx[#fx + 1] = '0P' .. M.hex2((pan + 1) / 2 * 255) end
   local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
   -- штатные фейды REAPER (10 мс) — не команда, а шум: порог 20 мс
   local fi = R.GetMediaItemInfo_Value(it, 'D_FADEINLEN')
-  if fi > 0.02 then fx[#fx + 1] = 'I' .. M.hex2((R.TimeMap2_timeToQN(0, pos + fi) - qn0) * lpb * 16) end
+  if fi > 0.02 then fx[#fx + 1] = 'SI' .. M.hex2((R.TimeMap2_timeToQN(0, pos + fi) - qn0) * lpb * 16) end
   local fo = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN')
-  if fo > 0.02 then fx[#fx + 1] = 'O' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
+  if fo > 0.02 then fx[#fx + 1] = 'SO' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
   -- loop source в REAPER включён по умолчанию — показываем только ВЫКЛЮЧЕННЫЙ
-  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'L00' end
+  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'SL00' end
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
-  if cm and cm ~= 0 then fx[#fx + 1] = 'M0' .. tostring(math.floor(cm)) end
+  if cm and cm ~= 0 then fx[#fx + 1] = 'SM' .. M.hex2(math.floor(cm)) end
   -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
   -- ячейка — нота и номер инструмента, а у каждого слайса свой номер в пуле
-  if not slk and ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'T' .. M.hex2((qn1 - qn0) * lpb) end
-  if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.01 then fx[#fx + 1] = 'P' .. M.hex2(128 + pitch) end
+  if not slk and ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'SB' .. M.hex2((qn1 - qn0) * lpb) end
+  if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.005 then fx[#fx + 1] = 'SF' .. M.hex2(128 + (pitch - math.floor(pitch + 0.5)) * 100) end
   -- команды-огибающие и генераторы (P_EXT:jf_cmds) — как записаны
   local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
   if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do fx[#fx + 1] = tok end end
