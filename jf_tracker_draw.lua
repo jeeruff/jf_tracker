@@ -1953,8 +1953,14 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
       set(U.DIM); gfx.rect(bxx, my0, bw, mh, 0)
       local hh = math.floor(fr * (mh - 2) + 0.5)
       if hh > 0 then
-        set(d > -0.1 and U.RED or (d > -9 and U.AMBER or U.GREEN))
-        gfx.rect(bxx + 1, my0 + mh - 1 - hh, bw - 2, hh, 1)
+        -- 12 окт: зоны, как у метров REAPER: зелёная до −9 дБ, янтарная до −0.1, красная — только верх
+        -- (раньше вся полоса цвета пика: удар нормализованного сэмпла в 0 дБ красил её целиком)
+        local function hz(db) return math.floor(math.max(0, math.min(1, (db + 60) / 60)) * (mh - 2) + 0.5) end
+        local y0 = my0 + mh - 1
+        local zones = { { 0, math.min(hh, hz(-9)), U.GREEN }, { hz(-9), math.min(hh, hz(-0.1)), U.AMBER }, { hz(-0.1), hh, U.RED } }
+        for _, z in ipairs(zones) do
+          if z[2] > z[1] then set(z[3]); gfx.rect(bxx + 1, y0 - z[2], bw - 2, z[2] - z[1], 1) end
+        end
       end
     end
   end
