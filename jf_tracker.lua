@@ -18968,6 +18968,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'fill' then MX.fill = not MX.fill
   elseif b == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
   elseif b == 'trim' then ctx.mx_trim()
+  elseif b == 'menu' then ctx.mx_menu()
   elseif b == 'rglen-' or b == 'rglen+' then ctx.region_len_step(b == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
   elseif b == 'ruler' then ctx.mx_ruler_toggle()
   elseif b == 'se' then
@@ -18994,6 +18995,91 @@ ctx.mx_btn_do = function(b)
     })
   elseif b == 'arrdel' then ctx.arr('del')
   elseif b == 'arrclips' then state.mxlaunch = not state.mxlaunch; vim.msg = 'matrix as clips (experimental): ' .. (state.mxlaunch and 'on - dblclick a cell launches it' or 'off') end
+end
+-- 12 окт: меню матрицы — patternize: перевести проект в паттерны (регионы) по тактам, item'ам трека курсора
+-- или маркерам. Только пустые места: существующие паттерны не трогаются; имена — коды A1 A2 …
+ctx.patternize = function(cuts, how)
+  table.sort(cuts)
+  local t0 = model.marker_pos(model.START_MARKER) or 0
+  local t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0)
+  local spans, used = {}, {}
+  local i = 0
+  while true do
+    local ret, isr, pos, e, nm = reaper.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if isr then spans[#spans + 1] = { pos, e } end
+    if nm then used[nm] = true end
+    i = i + 1
+  end
+  local function covered(a, b) for _, s in ipairs(spans) do if a < s[2] - 1e-6 and b > s[1] + 1e-6 then return true end end end
+  local k, n = 0, 0
+  local function next_name() repeat k = k + 1 until not used['A' .. k]; used['A' .. k] = true; return 'A' .. k end
+  local pts, seen = {}, {}
+  for _, t in ipairs(cuts) do
+    if t >= t0 - 1e-6 and t <= t1 + 1e-6 then local key = ('%.6f'):format(t); if not seen[key] then seen[key] = true; pts[#pts + 1] = t end end
+  end
+  if #pts == 0 or pts[1] > t0 + 1e-6 then table.insert(pts, 1, t0) end
+  if pts[#pts] < t1 - 1e-6 then pts[#pts + 1] = t1 end
+  edit.run('patternize ' .. how, function()
+    for j = 1, #pts - 1 do
+      local a, b = pts[j], pts[j + 1]
+      if b - a > 1e-3 and not covered(a, b) then reaper.AddProjectMarker2(0, true, a, b, next_name(), -1, 0); n = n + 1 end
+    end
+  end)
+  ctx.mx_refresh()
+  vim.msg = n > 0 and ('patternize %s: %d pattern(s) A1… (empty spans only; Cmd+Z back)'):format(how, n) or ('patternize %s: nothing to do - the project is already patterns'):format(how)
+end
+ctx.mx_menu = function(pick)
+  local function bars(nb)
+    return function()
+      local t0 = model.marker_pos(model.START_MARKER) or 0
+      local t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0)
+      local _, m0 = reaper.TimeMap2_timeToBeats(0, t0)
+      local cuts, m = {}, m0
+      while true do
+        local t = reaper.TimeMap2_beatsToTime(0, 0, m)
+        if t > t1 + 1e-6 then break end
+        cuts[#cuts + 1] = t; m = m + nb
+        if #cuts > 4096 then break end
+      end
+      ctx.patternize(cuts, nb .. ' bar(s)')
+    end
+  end
+  local items = {
+    { key = '1', label = 'patternize: every bar', fn = bars(1) },
+    { key = '2', label = 'patternize: every 2 bars', fn = bars(2) },
+    { key = '4', label = 'patternize: every 4 bars (a square)', fn = bars(4) },
+    { key = '8', label = 'patternize: every 8 bars', fn = bars(8) },
+    { key = '6', label = 'patternize: every 16 bars', fn = bars(16) },
+    { key = 'i', label = 'patternize: by the items of the cursor track', fn = function()
+      local col = cur_col(); if not (col and col.track) then vim.msg = 'patternize: put the cursor on a track'; return end
+      local cuts = {}
+      for k = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+        local it = reaper.GetTrackMediaItem(col.track, k)
+        local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        cuts[#cuts + 1] = p; cuts[#cuts + 1] = p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      end
+      ctx.patternize(cuts, 'by items of ' .. col.name)
+    end },
+    { key = 'm', label = 'patternize: by markers', fn = function()
+      local cuts, i = {}, 0
+      while true do
+        local ret, isr, pos, _, nm = reaper.EnumProjectMarkers3(0, i)
+        if not ret or ret == 0 then break end
+        if not isr and not (nm or ''):match('^=') and not (nm or ''):match('^v:') then cuts[#cuts + 1] = pos end
+        i = i + 1
+      end
+      ctx.patternize(cuts, 'by markers')
+    end },
+  }
+  if pick then for _, it in ipairs(items) do if it.key == pick then it.fn(); return true end end; return false end
+  vim.open_hydra({ title = 'matrix menu - patternize: the empty parts of the project become patterns', items = items })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
+ctx.patternize_cmd = function(arg)
+  local a = (arg or ''):match('%S+') or ''
+  local key = ({ ['1'] = '1', ['2'] = '2', ['4'] = '4', ['8'] = '8', ['16'] = '6', items = 'i', markers = 'm' })[a]
+  if not (key and ctx.mx_menu(key)) then vim.msg = ':patternize 1|2|4|8|16|items|markers' end
 end
 ctx.mx_more = function()
   local items = {}

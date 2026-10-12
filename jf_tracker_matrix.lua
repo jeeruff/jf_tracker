@@ -56,7 +56,8 @@ local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
-local BTNS = { { 'fold', 'sel' }, { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'se', 's/e' }, { 'loops', 'loops' }, { 'add', '+' } }
+local BTNS = { { 'menu', 'menu' }, { 'fold', 'sel' },   -- 12 окт: menu — patternize и прочее
+  { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'se', 's/e' }, { 'loops', 'loops' }, { 'add', '+' } }
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
