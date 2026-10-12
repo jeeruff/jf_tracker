@@ -4482,6 +4482,7 @@ ctx = {
       { key = 'c', label = 'Track colour (tc)', fn = function() ctx.track_colour() end },
       { key = 'e', label = 'Rename (tn)', fn = function() ctx.rename_track_prompt(col) end },
       { key = 'i', label = 'Input … (ti)', fn = function() ctx.input_picker(col) end },
+      { key = 'I', label = 'Smart input select: the most active input (tI)', fn = function() ctx.smart_input(col) end },   -- 12 окт: и в этом меню трека
       { key = 'x', label = 'Add FX … (tf)', fn = function() ctx.fx_picker() end },
       { key = 'R', label = 'Routing … (tR)', fn = function() ctx.route_menu(col) end },
       { key = 'b', label = 'Track timebase', sub = sub('timebase', {
