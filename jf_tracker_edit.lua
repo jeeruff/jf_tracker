@@ -2051,6 +2051,14 @@ function E.nmod_add(it, tr, key, label)
   end)
   return pool
 end
+-- MIDI-мост (12 окт): псевдо-слот trig — у каждой ноты take FX jf_tracker_trig (сверка ставит / снимает)
+function E.nmod_trig(it, on)
+  local slots, out = E.NM.slots(it), {}
+  for _, s in ipairs(slots) do if s.env ~= E.NM.TRIG then out[#out + 1] = s end end
+  if on then out[#out + 1] = { env = E.NM.TRIG, pool = 0, label = 'midi trig' } end
+  E.NM.mark()
+  run(on and 'note mod: midi trig on' or 'note mod: midi trig off', function() E.NM.write(it, out) end)
+end
 function E.nmod_update(it, slots, desc)
   run(desc or 'note mod', function() E.NM.write(it, slots) end)
 end

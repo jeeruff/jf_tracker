@@ -2178,7 +2178,9 @@ ctx = {
     local tr = reaper.GetMediaItem_Track(e.item)
     local pos = reaper.GetMediaItemInfo_Value(e.item, 'D_POSITION')
     local list = { name = e.name, slots = {} }
-    for _, sl in ipairs(NM.parse(raw)) do
+    for ri, sl in ipairs(NM.parse(raw)) do
+      sl.ri = ri                                      -- номер в сырых слотах (trig между ними не показывается)
+      if sl.env == NM.TRIG then list.trig = true; goto next_slot end
       local env = NM.env(tr, sl.env, false)
       local pts
       if env then
@@ -2200,6 +2202,7 @@ ctx = {
       end
       sl.pts = pts; sl.missing = env == nil
       list.slots[#list.slots + 1] = sl
+      ::next_slot::
     end
     ctx.nmod_cache = { snap = snap, item = e.item, raw = raw, list = list }
     return list
@@ -2227,11 +2230,24 @@ ctx = {
   end,
   nmod_change = function(i, fn, desc)
     local e = ctx.nmod_entry(); if not e then return end
+    local l = ctx.nmod_list()
+    local ri = l and l.slots[i] and l.slots[i].ri
     local slots = edit.NM.slots(e.item)
-    if not slots[i] then return end
+    if not (ri and slots[ri]) then return end
+    i = ri
     fn(slots, slots[i])
     edit.nmod_update(e.item, slots, desc)
     ctx.nmod_cache = nil
+  end,
+  -- 12 окт: MIDI-мост — каждая нота шлёт note-on в цепочку трека (шина 1, канал 16)
+  nmod_trig = function()
+    local e = ctx.nmod_entry()
+    if not e then vim.msg = 'note mod: select an instrument in the lib first'; return end
+    local on = not edit.NM.has_trig(edit.NM.get(e.item))
+    local ok, err = pcall(edit.nmod_trig, e.item, on)
+    ctx.nmod_cache = nil
+    if not ok then vim.msg = 'midi trig: ' .. tostring(err); return end
+    vim.msg = on and ('midi trig on: every note of ' .. (e.name or 'the instrument') .. ' sends a note-on to its track (bus 1, channel 16) - MIDI modulators there react to it') or 'midi trig off'
   end,
   nmod_flag = function(i, what)
     ctx.nmod_change(i, function(_, sl) sl[what] = not sl[what]; vim.msg = ('note mod %s: %s %s'):format(sl.label, what, sl[what] and 'on' or 'off') end, 'note mod ' .. what)
@@ -5817,7 +5833,7 @@ ctx = {
     if name == '' then vim.msg = ('visor: event deleted on row %04d (u - undo)'):format(row)
     else ctx.visor_apply_name(name, true); vim.msg = ('visor %04d: %s - playback switches to it here'):format(row, name) end
   end,
-  -- выбор сцены / пресета для строки — сетка превью (Ctrl+Enter / Enter на колонке visor)
+  -- выбор сцены / пресета для строки — сетка превью (Enter на колонке visor)
   visor_pick = function(row)
     local VZ = MX.VZ
     ctx.visor_env()                                     -- имена пресетов ReaVisor
@@ -7446,7 +7462,7 @@ ctx = {
       local was_play = ctx.slowrec.play
       reaper.CSurf_OnPlayRateChange(ctx.slowrec.prev or 1)
       ctx.slowrec = nil
-      vim.msg = was_play and 'play /2 stopped - x1' or 'slow rec done - x1; Ctrl+Enter fixes a note or value'
+      vim.msg = was_play and 'play /2 stopped - x1' or 'slow rec done - x1; Enter fixes a note or value'
     end
   end,
   -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
@@ -15009,7 +15025,7 @@ local function frame()
     note = 'nt: note - audio: pitch from C-4 (D_PITCH / playrate), MIDI: note; ` = note-off',
     vol = 'vl: volume / velocity, hex 00..FF (80 = unity)',
     delay = 'dl: delay inside the row, hex xx/256 of a row',
-    fx = 'fx: effect command, two-char code + hex hex, as in Renoise: 0x effects (0Sxx offset, 0Pxx pan, 0Uxx 0Dxx pitch, 0Vxy vibrato), Sx sample (SIxx SOxx fades, SBxx beatsync, SFxx finetune cents), Zx song (ZTxx tempo, ZJxx jump); Ctrl+Enter - the list',
+    fx = 'fx: effect command, two-char code + hex hex, as in Renoise: 0x effects (0Sxx offset, 0Pxx pan, 0Uxx 0Dxx pitch, 0Vxy vibrato), Sx sample (SIxx SOxx fades, SBxx beatsync, SFxx finetune cents), Zx song (ZTxx tempo, ZJxx jump); Enter - the list',
     env = 'env: envelope value at the row (bar + hex); INSERT edits points, :ramp / :fade',
   })[hover.caption] or hover.caption
   elseif hover.ctrl == 'metro' then state.status = 'metronome on / off (REAPER: Options > Metronome)'
@@ -17739,9 +17755,15 @@ local function frame()
   if c == 32 and ctx.mods().shift and not ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     ctx.half_play(); c = 0
   end
-  -- Ctrl+Enter (9 окт): смарт-панель в любом режиме трекера (в INSERT gs — ноты)
-  if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    vim.smart(); c = 0
+  -- 12 окт: Enter без модификаторов — смарт-панель в любом режиме (дубль Ctrl+Enter убран); кроме конца
+  -- набора числа и входа в INSERT при Esc mode = vim (NORMAL с клавиатурой)
+  do
+    local m = ctx.mods()
+    if c == 13 and not (m.ctrl or m.cmd or m.alt or m.shift) and state.focus == 'tracker' and not vim.picker and not vim.hydra
+       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.hexbuf and not vim.pending and not vim.op
+       and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') then
+      vim.smart(); c = 0
+    end
   end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
   -- соседа, Cmd+Shift+hjkl — перенести панель туда (как dwm), без режима

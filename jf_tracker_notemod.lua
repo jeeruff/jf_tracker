@@ -17,12 +17,20 @@
 -- удаляются, недостающие вставляются, длина / скорость / loop выставляются.
 -- Поэтому вставка, копия, сдвиг, растяжка, удаление и undo не требуют своих
 -- крючков. Только audio-ноты (MIDI-ноты внутри item — следующий этап).
+--
+-- MIDI-мост (слот trig): каждая нота несёт take FX jf_tracker_trig.jsfx — в
+-- начале item он шлёт note-on в цепочку трека (шина 1, канал 16), и обычные
+-- MIDI-модуляторы (счётчики, key tracker, огибающие в плагинах) видят ноты-
+-- сэмплы. Высоту (C-4 + полутоны ноты) и силу (громкость item) ставит сверка.
 
 local NM = {}
 local R = reaper
 local EXT = 'P_EXT:jf_nmod'
 local FLAG = 'nmod'                    -- ProjExtState jf_tracker/nmod = 1: в проекте есть слоты (иначе сверка не идёт)
 local DEL = 42086                      -- Envelope: Delete automation items
+NM.TRIG = 'trig'                       -- псевдо-слот: MIDI-мост (take FX), огибающей нет
+NM.TRIG_FX = 'jf_tracker_trig'         -- Effects/jf_tracker_trig.jsfx
+local TRIG_DESC = 'jf tracker note trigger'
 local E                                -- edit (inst_ref, inst_base, take semis)
 local model
 
@@ -103,11 +111,32 @@ function NM.census()
   end
   for _, l in ipairs(list) do
     local it = l[1]
-    out[it] = { tr = l[2], pos = R.GetMediaItemInfo_Value(it, 'D_POSITION'), len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), semis = rel_semis(it, base_of), raw = l[3] }
+    out[it] = { tr = l[2], pos = R.GetMediaItemInfo_Value(it, 'D_POSITION'), len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), semis = rel_semis(it, base_of), raw = l[3], vol = R.GetMediaItemInfo_Value(it, 'D_VOL') }
   end
   return out
 end
-local function sig(c) return tostring(c.tr) .. ' ' .. pkey(c.pos) .. ' ' .. pkey(c.len) .. ' ' .. ('%.3f'):format(c.semis) .. ' ' .. c.raw end
+local function sig(c) return tostring(c.tr) .. ' ' .. pkey(c.pos) .. ' ' .. pkey(c.len) .. ' ' .. ('%.3f'):format(c.semis) .. ' ' .. ('%.3f'):format(c.vol or 1) .. ' ' .. c.raw end
+
+function NM.has_trig(raw) for _, s in ipairs(NM.parse(raw)) do if s.env == NM.TRIG then return true end end; return false end
+local function trig_index(tk)
+  for f = 0, R.TakeFX_GetCount(tk) - 1 do
+    local _, n = R.TakeFX_GetFXName(tk, f, '')
+    if (n or ''):find(TRIG_DESC, 1, true) or (n or ''):find(NM.TRIG_FX, 1, true) then return f end
+  end
+  return -1
+end
+-- take FX триггера у ноты: on — поставить (если нет) и выставить высоту / силу, иначе снять
+local function trig_put(it, on, semis)
+  local tk = R.GetActiveTake(it)
+  if not tk or R.TakeIsMIDI(tk) then return end
+  local f = trig_index(tk)
+  if not on then if f >= 0 then R.TakeFX_Delete(tk, f) end; return end
+  if f < 0 then f = R.TakeFX_AddByName(tk, NM.TRIG_FX, -1) end
+  if f < 0 then return end
+  R.TakeFX_SetParam(tk, f, 0, math.max(0, math.min(127, 60 + math.floor((semis or 0) + 0.5))))
+  R.TakeFX_SetParam(tk, f, 1, math.max(1, math.min(127, math.floor(100 * R.GetMediaItemInfo_Value(it, 'D_VOL') + 0.5))))
+end
+NM.trig_index = trig_index
 
 -- AI пула pool на env, начинающиеся в pos
 local function ais_at(env, pool, pos)
@@ -137,6 +166,14 @@ function NM.sync(pre)
   for it, c in pairs(post) do
     local p = pre[it]
     if not p or sig(p) ~= sig(c) then for _, s in ipairs(NM.parse(c.raw)) do touch(c, s, true) end end
+  end
+  -- MIDI-мост: ноты, которые правка создала / изменила, — триггер с их высотой; снятый слот — триггер долой
+  for it, c in pairs(post) do
+    local p = pre[it]
+    if (not p or sig(p) ~= sig(c)) and (NM.has_trig(c.raw) or (p and NM.has_trig(p.raw))) then trig_put(it, NM.has_trig(c.raw), c.semis) end
+  end
+  for it, c in pairs(pre) do
+    if not post[it] and NM.has_trig(c.raw) and R.ValidatePtr and R.ValidatePtr(it, 'MediaItem*') then trig_put(it, false) end   -- слоты стёрты целиком
   end
   if #keys == 0 then return 0 end
   -- кто нужен на каждом затронутом ключе (все items, не только изменённые)

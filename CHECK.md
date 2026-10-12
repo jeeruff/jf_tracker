@@ -672,3 +672,10 @@
 - [ ] INSERT на колонке команд: `d`, `y`, `c`, `x` … не запускают NORMAL (which-key «d» не всплывает), в статусе «codes start with 0, S or Z»
 - [ ] `0X` — «no such effect», префикс `0` остаётся, `U20` дописывает `0U20`
 - [ ] Enter на строке без ноты в колонке команд — «commands belong to a note …»
+
+## 12 окт — Enter, команды на строке ноты, midi trig
+- [ ] Enter в NORMAL и в INSERT — смарт-выпадашка поля; в колонке команд — список «0U pitch up …»; Ctrl+Enter больше ничего не делает
+- [ ] на строке внутри ноты (не её первой) `0D10` — команда записывается ноте, показывается у неё; статус после `0D` — «0D pitch down … two hex digits»
+- [ ] строка, где ничего не звучит: первая же клавиша кода — «commands belong to a note …»
+- [ ] note mod: `t` — midi trig; у нот сэмпла take FX `jf tracker note trigger`; поставь на трек Saxmand Counter (или любой MIDI-модулятор) — он реагирует на ноты-сэмплы; `t` ещё раз — FX снят со всех нот
+- [ ] help: раздел Automation and modulation и правила в Why

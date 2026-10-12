@@ -396,7 +396,7 @@ MIDI-ноте, `yy`+`p` (+1 item), `s` (+1), `2^A` → D_PITCH 2.0, `m`, `iz` �
 ## Версия и установка
 
 Текущая версия — в `jf_tracker_version.lua` (Options → about показывает список изменений).
-Папка `Scripts/jf_tracker/` целиком, плюс `effects/jf_tracker_scope.jsfx` и `effects/jf_tracker_chordfollow.jsfx` → `REAPER/Effects/`
+Папка `Scripts/jf_tracker/` целиком, плюс `effects/jf_tracker_scope.jsfx`, `effects/jf_tracker_chordfollow.jsfx` и `effects/jf_tracker_trig.jsfx` (MIDI-мост note mod) → `REAPER/Effects/`
 (мост осциллоскопа, метка присутствия для модуля грида). Тесты без REAPER:
 `lua tests/test_vim.lua`, `lua tests/test_model.lua`, `lua tests/test_orca.lua`, `lua tests/test_garden.lua`.
 Смоуки (`tests/smoke_*.lua`) запускаются только во вкладке-песочнице с треками «A drums» / «B lanes».

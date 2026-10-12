@@ -69,7 +69,7 @@
   <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
   <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
-  <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
+  <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
 
 <h2 id="why">Why</h2>
@@ -82,6 +82,17 @@ the project is exactly as it was, and every edit is one REAPER undo step.</p>
 <p>The grammar is Vim: modes, operators with motions (<code>d3j</code>, <code>dw</code>, <code>yy</code>), counts,
 registers, the <kbd>.</kbd> repeat, macros, the <kbd>:</kbd> command line. Every control is a letter, never an icon: when a
 sign is needed, it comes from another alphabet (<code>Δ</code> delta solo, <code>ø</code> phase).</p>
+
+<p>A few rules hold everywhere, and changes keep to them:</p>
+<ul>
+<li><b>Nothing of its own.</b> A feature writes what REAPER already has (items, envelopes, automation items, take FX,
+routing) instead of inventing new objects. If REAPER can store it, the tracker only shows and edits it.</li>
+<li><b>One function, one key.</b> No second way to the same thing; keys are mnemonic (<kbd>t</kbd> theme, <kbd>s</kbd> slice).</li>
+<li><b>Two states toggle, more open a list.</b> A button flips on / off; three or more values open a dropdown with the current one marked.</li>
+<li><b><kbd>z</kbd> is how you look, <kbd>g</kbd> is where you go, the menu is what you do.</b> <kbd>Enter</kbd> opens the smart
+dropdown of the field under the cursor.</li>
+<li><b>Letters, not icons.</b> Every control is a word or a letter.</li>
+</ul>
 
 <h2 id="start">First steps</h2>
 <table>
@@ -233,6 +244,24 @@ the item tab edits.</p>
 <tr><td>properties</td><td>volume, pan, transpose, rate, beatsync, keep pitch, stretch, loop, fades: <kbd>J</kbd> <kbd>K</kbd> row, <kbd>H</kbd> <kbd>L</kbd> value</td></tr>
 </table>
 
+<h2 id="mod">Automation and modulation</h2>
+<p>Three different things, three places:</p>
+<table>
+<tr><td>automation</td><td>a value over time, the same every play: REAPER envelopes and automation items, shown as envelope
+columns. <kbd>Opt</kbd>+<kbd>A</kbd> turns the last touched knob into a column. <kbd>z</kbd><kbd>e</kbd> picks how a column
+looks: curve, values, or steps (a small fader on every row, as on a 303)</td></tr>
+<tr><td>modulation</td><td>a parameter moved by a source while it plays: REAPER's own LFO / audio follower / parameter link
+(the modulation tab)</td></tr>
+<tr><td>note mod</td><td>modulation started by every note of a sample (the note mod module next to the properties). A slot is a
+parameter and a curve: each note gets a pooled automation item from its start, its length. One curve for all the notes; rate - higher
+notes run it faster; loop - it repeats to the end of the note. Insert, move, copy or delete a note - its automation item follows</td></tr>
+</table>
+<p><b>MIDI from sample notes.</b> Sample notes are audio items and send no MIDI, so MIDI modulators (counters, key trackers,
+envelopes inside plugins) cannot see them. <code>midi trig</code> in note mod puts a tiny take FX on the sample and its notes:
+each note sends a note-on to its own track, with its pitch and its volume as the velocity. No hidden track, no new routing:
+whatever MIDI modulator already sits on the track reacts. The notes go on bus 1, channel 16, because ordinary plugins hear
+only bus 1; a track that also has a MIDI instrument will hear them too.</p>
+
 <h2 id="browser">Browser</h2>
 <p>Files, Media Explorer databases, projects and track-template kits. <kbd>j</kbd> <kbd>k</kbd> move, <kbd>Enter</kbd> /
 double click — into the lib of the cursor track, <kbd>Cmd</kbd>+<kbd>Enter</kbd> — replace the sample of the selected sound
@@ -274,7 +303,7 @@ one pattern. The keyboard on the left shows what the note keys play and hides wi
 <tr><td>lane column</td><td>a fixed item lane</td></tr>
 <tr><td>audio note</td><td>an item: the note is its pitch, volume is <code>D_VOL</code></td></tr>
 <tr><td>MIDI note</td><td>a note of the take; <code>OFF</code> is the note-off</td></tr>
-<tr><td>command column</td><td>two-char code + two hex digits, as in Renoise: <code>0x</code> effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch slide, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), <code>Sx</code> sample properties (SI SO fades, SB beatsync, SF finetune in cents, 80 = 0, SL loop, SM channel mode), <code>Zx</code> song (ZT tempo, ZJ jump to a sequence slot); Ctrl+Enter on the field - the list</td></tr>
+<tr><td>command column</td><td>two-char code + two hex digits, as in Renoise: <code>0x</code> effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch slide, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), <code>Sx</code> sample properties (SI SO fades, SB beatsync, SF finetune in cents, 80 = 0, SL loop, SM channel mode), <code>Zx</code> song (ZT tempo, ZJ jump to a sequence slot); Enter on the field - the list (code and name)</td></tr>
 <tr><td>sound (lib)</td><td>a distinct audio source; slices are times stored on the item</td></tr>
 <tr><td>pattern</td><td>a region; same name — the same pattern</td></tr>
 <tr><td>envelope column</td><td>a visible track envelope, in its theme colour</td></tr>

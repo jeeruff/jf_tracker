@@ -21,9 +21,15 @@ reaper = {
   SetProjExtState = function(_, s, k, v) projext[s .. k] = v end,
   CountTracks = function() return 1 end, GetTrack = function() return tr end, GetMasterTrack = function() return { items = {}, envs = {} } end,
   CountTrackMediaItems = function(t) return #(t.items or {}) end, GetTrackMediaItem = function(t, i) return t.items[i + 1] end,
-  GetMediaItemInfo_Value = function(it, k) if k == 'D_POSITION' then return it.pos elseif k == 'D_LENGTH' then return it.len end; return 0 end,
+  GetMediaItemInfo_Value = function(it, k) if k == 'D_POSITION' then return it.pos elseif k == 'D_LENGTH' then return it.len elseif k == 'D_VOL' then return it.vol or 1 end; return 0 end,
   GetSetMediaItemInfo_String = function(it, k, v, set) if set then it.ext[k] = v end; return true, it.ext[k] or '' end,
   GetActiveTake = function(it) return it.take end, TakeIsMIDI = function() return false end,
+  ValidatePtr = function() return true end,
+  TakeFX_GetCount = function(tk) return #(tk.fx or {}) end,
+  TakeFX_GetFXName = function(tk, f) return true, (tk.fx[f + 1] or {}).name or '' end,
+  TakeFX_AddByName = function(tk, n) tk.fx = tk.fx or {}; tk.fx[#tk.fx + 1] = { name = 'JS: jf tracker note trigger (take FX)', p = {} }; return #tk.fx - 1 end,
+  TakeFX_Delete = function(tk, f) table.remove(tk.fx, f + 1) end,
+  TakeFX_SetParam = function(tk, f, p, v) tk.fx[f + 1].p[p] = v end,
   GetMediaItemTakeInfo_Value = function(tk, k) if k == 'D_PITCH' then return tk.pitch elseif k == 'D_PLAYRATE' then return 1 end; return 0 end,
   TrackFX_GetCount = function(t) return #t.fx end, TrackFX_GetFXGUID = function(t, i) return t.fx[i + 1] end,
   GetFXEnvelope = function(_, fx, p) if fx == 0 and p == 3 then return env end end,
@@ -113,6 +119,22 @@ eq('no change: no delete action', #cmd_log, ncmd)
 -- слот снят: все AI пула уходят
 pre = NM.census(); for _, it in ipairs(tr.items) do NM.set(it, '') end; NM.sync(pre)
 eq('slot off: no AIs', #env.ais, 0)
+
+-- ── MIDI-мост: псевдо-слот trig ───────────────────────────────────────────
+mother.take.fx = nil
+local t1 = new_item(10, 1, 7); t1.vol = 0.5
+pre = NM.census()
+for _, it in ipairs(tr.items) do NM.set(it, 'trig|0||midi trig') end
+NM.sync(pre)
+eq('trig: take FX on the note', #(t1.take.fx or {}), 1)
+eq('trig: note = C-4 + 7', t1.take.fx[1].p[0], 67)
+eq('trig: velocity from the item volume', t1.take.fx[1].p[1], 50)
+eq('trig: no automation items for it', #env.ais, 0)
+pre = NM.census(); t1.take.pitch = 12; NM.sync(pre)
+eq('trig: transposed note follows', t1.take.fx[1].p[0], 72)
+eq('trig: not added twice', #t1.take.fx, 1)
+pre = NM.census(); for _, it in ipairs(tr.items) do NM.set(it, '') end; NM.sync(pre)
+eq('trig off: take FX removed', #t1.take.fx, 0)
 
 print(('%d checks, %d failed'):format(n, fails))
 if fails > 0 then os.exit(1) end

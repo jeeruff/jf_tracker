@@ -5,6 +5,9 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'Enter opens the smart dropdown of the field under the cursor in any mode (Ctrl+Enter is gone; Enter no longer moves the REAPER edit cursor); the command list reads as words: 0U pitch up, SI fade in ...',
+    'a command typed on a row inside a note goes to that sounding note (as in Renoise); 0D says what it is and waits for two digits; no note - said at the first key',
+    'note mod: midi trig (t) - every note of the sample sends a note-on to its track (take FX jf_tracker_trig, bus 1 ch 16) so MIDI modulators already on the track react to sample notes; help: rules and the automation / modulation / note mod page',
     'I is the Vim one: INSERT from the start of the row (it used to insert a time row - that is Insert / :instime); INSERT on a command column: letters are the code, a wrong one never runs a NORMAL command (d no longer deletes there)',
     'note mod (stage 1): modulation started by the notes - a module next to properties (item tab); a adds the last touched fx parameter of the instrument track, every note of the instrument gets a pooled automation item on its envelope (from the note start, the note length) that follows insert / move / copy / delete; one curve for all (Enter edits the pool), rate - faster for higher notes, loop',
     'smart panel: a middle click on a value picks it too (open with the middle button - pick with it)',

@@ -206,12 +206,14 @@ SM.FX = {
   { 'SF', 'finetune in cents (80 = 0)' }, { 'SL', 'SL00: loop source off' }, { 'SM', 'channel mode 0..4' },
   { 'ZT', 'tempo: BPM = xx' }, { 'ZJ', 'jump to sequence slot xx' },
 }
+-- 12 окт: короткие имена — список команд читается словами (0U pitch up), не только кодами
+SM.FX_NAME = { ['0S'] = 'slice', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 function SM.fx_letters()
   local items = {}
-  for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1], v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end
-  return items, 8, 1
+  for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1] .. ' ' .. (SM.FX_NAME[e[1]] or ''), v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end
+  return items, 4, 1
 end
 
 return SM

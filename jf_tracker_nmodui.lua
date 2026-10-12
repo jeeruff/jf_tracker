@@ -3,7 +3,7 @@
 -- Строка на слот: номер, параметр, превью кривой пула, rate (скорость по высоте
 -- ноты), loop. Последняя строка — «+ add»: слот из последнего тронутого
 -- параметра FX трека инструмента. Клавиши (фокус в модуле): j k строка,
--- a — добавить, Enter — кривая в редакторе (вкладка automation), r — rate,
+-- a — добавить, t — midi trig, Enter — кривая в редакторе (вкладка automation), r — rate,
 -- l — loop, d — удалить слот, Esc — трекер. Мышь: щелчок — строка, двойной —
 -- кривая, щелчок по r / l — переключить.
 -- Без reaper.*: данные (list) и действия — через ctx (main).
@@ -36,7 +36,8 @@ local function curve(x, y, w, h, pts, col)
   if px and px < x + w - 1 then gfx.line(px, py, x + w - 1, py) end
 end
 
--- list = { name = инструмент, slots = { { label, rate, loop, pts, missing } } }
+-- list = { name = инструмент, trig = bool, slots = { { label, rate, loop, pts, missing } } }
+-- строки: 1 — midi trig, 2..n+1 — слоты, последняя — + add
 function N.draw(L, x, y, w, h, list, focused)
   N.hover = nil
   local mx, my, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
@@ -47,7 +48,7 @@ function N.draw(L, x, y, w, h, list, focused)
     return
   end
   U.text(x + L.pad, y, ctx.fit('note mod - ' .. (list.name or 'instrument'), w - L.pad), U.AMBER)
-  local n = #list.slots + 1
+  local n = #list.slots + 2
   if N.sel > n then N.sel = n end
   local per = math.max(1, math.floor((h - L.rh) / L.rh))
   N.scroll = math.max(0, math.min(N.scroll or 0, n - per))
@@ -59,14 +60,20 @@ function N.draw(L, x, y, w, h, list, focused)
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1)
     elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
-    local s = list.slots[i]
+    local si = i - 1
+    local s = list.slots[si]
     local what
-    if not s then
+    if i == 1 then
+      local tw = U.measure('trig') + 2 * L.pad
+      toggle(L, x + w - tw, ry, 'trig', list.trig, hot)
+      U.text(x + L.pad, ry, ctx.fit('midi: every note sends a note-on to the track', w - tw - 2 * L.pad), (sel or hot) and U.AMBER or U.TEXT)
+      what = 'trig'
+    elseif not s then
       U.text(x + L.pad, ry, ctx.fit('+ add: the last touched parameter of an fx on this track', w - L.pad), (sel or hot) and U.AMBER or U.GREY)
       what = 'add'
     else
-      U.text(x + L.pad, ry, tostring(i), U.GREY)
-      -- справа налево: l, r, кривая; имя — что осталось
+      U.text(x + L.pad, ry, tostring(si), U.GREY)
+      -- справа налево: loop, rate, кривая; имя — что осталось
       local bx = x + w
       local lw = U.measure('loop') + 2 * L.pad
       bx = bx - lw
@@ -84,16 +91,18 @@ function N.draw(L, x, y, w, h, list, focused)
     if hot then
       N.hover = { i = i, what = what }
       if ctx.status then ctx.status(what == 'add' and 'note mod: a - add the last touched parameter (move a knob first)'
+        or (what == 'trig' and 'midi trig (t): every note of this sample sends a note-on to its track (bus 1, channel 16) - counters, key trackers, envelopes in plugins react'
         or (what == 'rate' and 'rate (r): the curve runs faster for higher notes - C-4 = x1, an octave up = x2')
         or (what == 'loop' and 'loop (l): the curve repeats to the end of the note; off - once, then holds')
-        or 'note mod: Enter / double click - edit the curve, d - delete, j k - row') end
+        or 'note mod: Enter / double click - edit the curve, d - delete, j k - row')) end
       if press then
         N.sel = i
         if ctx.nmod_focus then ctx.nmod_focus() end
         local now = reaper and reaper.time_precise and reaper.time_precise() or os.clock()
-        if what == 'rate' or what == 'loop' then ctx.nmod_flag(i, what)
+        if what == 'trig' then ctx.nmod_trig()
+        elseif what == 'rate' or what == 'loop' then ctx.nmod_flag(si, what)
         elseif what == 'add' then ctx.nmod_add()
-        elseif now - N.last.t < 0.35 and N.last.i == i then ctx.nmod_edit(i) end
+        elseif now - N.last.t < 0.35 and N.last.i == i then ctx.nmod_edit(si) end
         N.last = { t = now, i = i }
       end
     end
@@ -102,14 +111,17 @@ end
 
 function N.key(c, list)
   local ch = c < 256 and string.char(c) or ''
-  local n = list and (#list.slots + 1) or 1
+  local n = list and (#list.slots + 2) or 1
+  local si = N.sel - 1
+  local s = list and list.slots[si]
   if ch == 'j' or ch == 'J' then N.sel = math.min(n, N.sel + 1)
   elseif ch == 'k' or ch == 'K' then N.sel = math.max(1, N.sel - 1)
   elseif ch == 'a' then ctx.nmod_add()
-  elseif c == 13 then if list and list.slots[N.sel] then ctx.nmod_edit(N.sel) else ctx.nmod_add() end
-  elseif ch == 'r' then if list and list.slots[N.sel] then ctx.nmod_flag(N.sel, 'rate') end
-  elseif ch == 'l' then if list and list.slots[N.sel] then ctx.nmod_flag(N.sel, 'loop') end
-  elseif ch == 'd' then if list and list.slots[N.sel] then ctx.nmod_del(N.sel) end
+  elseif ch == 't' then ctx.nmod_trig()
+  elseif c == 13 then if N.sel == 1 then ctx.nmod_trig() elseif s then ctx.nmod_edit(si) else ctx.nmod_add() end
+  elseif ch == 'r' then if s then ctx.nmod_flag(si, 'rate') end
+  elseif ch == 'l' then if s then ctx.nmod_flag(si, 'loop') end
+  elseif ch == 'd' then if s then ctx.nmod_del(si) end
   else return false end
   return true
 end

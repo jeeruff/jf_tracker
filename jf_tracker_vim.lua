@@ -643,10 +643,15 @@ local function hex_entry(c, fld, heads)
     end
     if buf == '' then
       if not fx_prefix_ok(ch) then return false end
+      -- 12 окт: команде нужна нота — нет ни своей, ни звучащей: сказать на первой клавише
+      if #heads == 0 then V.msg = 'commands belong to a note: no note sounds in this row - put the cursor on a note (or its rows)'; return 'none' end
       V.hexbuf = ch; return false
     end
-    if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Ctrl+Enter - the list)'):format(buf, ch); return false end
-    V.hexbuf = buf .. ch; return false
+    if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Enter - the list)'):format(buf, ch); return false end
+    V.hexbuf = buf .. ch
+    -- 12 окт: что за код и что дальше — сразу (раньше [0D_] молча ждал)
+    V.msg = ('%s %s - now two hex digits'):format(buf .. ch, (ctx.SM and ctx.SM.FX_DESC and ctx.SM.FX_DESC[buf .. ch]) or '')
+    return false
   end
   if not is_hex then return false end
   buf = buf .. ch
@@ -1483,7 +1488,7 @@ function V.key_impl(c)
     local env = env_of(V.cur.fi)
     if (c == 62 or c == 60) and fld == 1 and not env then ctx.loop(c == 62 and 'item' or 'region'); return end
     -- 11 окт: огибающая в INSERT — как Vim: цифры — значение, остальное — команды NORMAL
-    -- (dd x yy p w } счётчики …), после них снова INSERT; форма точки — Ctrl+Opt+1..6 / Ctrl+Enter
+    -- (dd x yy p w } счётчики …), после них снова INSERT; форма точки — Ctrl+Opt+1..6 / Enter
     local function env_normal(c2)
       V.mode = 'normal'
       local r = V.key_impl(c2)
@@ -1584,6 +1589,9 @@ function V.key_impl(c)
     if fld > 1 then
       -- поля vol / delay / команд: hex-ввод, потом шаг вниз; не-hex → управление KEYS
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
+      -- 12 окт: команда на строке без ноты — звучащей ноте (как в Renoise: команда действует на играющую ноту;
+      -- у нас команды хранятся в ноте, и показываются у неё)
+      if fld >= 4 and #heads == 0 then heads = V.covering(V.cur.fi, V.cur.row) end
       local b0, m0 = V.hexbuf, V.msg
       local he = hex_entry(c, fld, heads)
       if he == 'none' then return end
@@ -1782,7 +1790,7 @@ function V.key_impl(c)
       return
     end
     if V.piano then
-      if V.mode == 'normal' and (c == 13 or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i
+      if V.mode == 'normal' and ((c == 13 and ctx.esc_vim and ctx.esc_vim()) or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i (12 окт: иначе Enter — смарт-панель)
       V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
       if c == ('z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
       if c == ('x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
@@ -2119,6 +2127,7 @@ function V.key_impl(c)
   -- NORMAL команды
   local ch = (c < 256) and string.char(c) or ''
   if ch == 'i' then V.mode = 'insert'; V.count = nil; return
+  elseif c == 13 then V.count = nil; finish_move(); V.smart(); return   -- 12 окт: Enter — смарт-панель значений поля (была gs / Ctrl+Enter)
   elseif ch == 'I' and not env_of(V.cur.fi) then
     -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
     -- (было «вставить время» — пустая строка со сдвигом; это Insert и :instime)
@@ -2213,7 +2222,6 @@ function V.key_impl(c)
     local cell = f and f.sub and f.sub[V.cur.row]
     if cell and cell.kind == 'cont' then cell = cell.of end
     V.msg = ctx.describe_cell(cell)
-  elseif c == ENTER then E.cursor_to(ctx.row_time(V.cur.row))
   elseif c == TAB then ctx.toggle_focus()
   elseif c == ESC then
     -- Esc (4 окт, как Edit mode в Renoise): из NORMAL — в INSERT; набранный
@@ -2652,8 +2660,13 @@ function V.smart()
       done()
     end
   else
-    local h1 = heads()[1]
-    if not h1 then V.msg = 'commands belong to a note: this row has none - put the cursor on a row with a note'; return false end
+    local hs0 = heads()
+    if #hs0 == 0 and not vis then
+      local cov = V.covering(fi, row)                  -- 12 окт: строка внутри ноты — её команды
+      if #cov > 0 then heads = function() return cov end; hs0 = cov end
+    end
+    local h1 = hs0[1]
+    if not h1 then V.msg = 'commands belong to a note: no note sounds in this row - put the cursor on a note (or its rows)'; return false end
     local have = (h1.fx or {})[fld - 3]
     local function vals(letter, curx)
       local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx')

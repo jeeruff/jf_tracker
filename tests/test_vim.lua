@@ -352,6 +352,9 @@ keysin('U20'); eq('…then U20 completes 0U20', last(), 'fx:kick:0U20')
 V.cur.row = 0; keysin('d'); eq('d on the fx field in INSERT: no operator', V.pending, nil); eq('d: hint', (V.msg or ''):find('start with 0, S or Z', 1, true) ~= nil, true)
 eq('d: still INSERT', V.mode, 'insert')
 V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
+-- 12 окт: строка внутри ноты (без своей ноты) — команда звучащей ноте
+V.cur.row = 1; keysin('0U14'); eq('0U14 on a row inside the note -> that note', last(), 'fx:kick:0U14')
+V.cur.row = 1; keysin('0D'); eq('0D: says what it is', (V.msg or ''):find('pitch down', 1, true) ~= nil, true); V.hexbuf = nil
 V.key(27); V.mode = 'normal'; V.hexbuf = nil
 -- 12 окт: I — как в Vim: INSERT с начала строки (поле ноты), без вставки времени
 local nI = #calls
@@ -457,7 +460,7 @@ V.key(14); V.key(27); eq('esc closes', V.picker, nil)
 -- ── прочее ────────────────────────────────────────────────────────────────
 reset()
 keysin(' '); eq('space plays', last(), 'play')
-V.key(13);   eq('enter → cursor', last(), 'cursor:0.0')
+V.key(13);   eq('enter → smart panel (12 окт)', (last() or ''):match('^smart:') ~= nil, true)
 V.key(9);    eq('tab → focus', last(), 'focus')
 keysin('F'); eq('F follow', state.follow, false)
 
