@@ -3153,7 +3153,7 @@ function D.transport_sub(c)
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
              { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
-           { 'smartrec', 'smart', c.smartrec and U.RED or nil },
+           { 'shiftrec', 'shift', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
 end
 function D.transport_groups(c)

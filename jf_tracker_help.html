@@ -189,6 +189,7 @@ z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar
 <table>
 <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>F12</kbd></td><td>the <code>rec</code> tab (the jf_rec ring of the track)</td></tr>
 <tr><td><kbd>Option</kbd>+<kbd>R</kbd></td><td>record into the tracker: the cursor track is armed, recording starts at the cursor row</td></tr>
+<tr><td><b>shift</b> (under rec), <code>:shiftrec</code></td><td>shift rec: waits for a MIDI note - that note starts the recording from the cursor row, at the project rate (set x0.5 and play: it plays back twice as fast); the first note lands on the row, automation records as REAPER writes it (envelopes in latch / write); REAPER pre-roll is skipped for it; again - cancel, <kbd>Space</kbd> stops</td></tr>
 <tr><td><kbd>Cmd</kbd>+<kbd>R</kbd></td><td>record a new sound: the take goes into the lib of the cursor track as its own instrument</td></tr>
 <tr><td>while recording</td><td><kbd>Space</kbd> — keep, the cursor stays where it stopped; <kbd>Enter</kbd> — keep and the cursor goes back to the start; <kbd>Esc</kbd> — delete the take (asks first; option <code>ask before deleting a take</code>)</td></tr>
 </table>

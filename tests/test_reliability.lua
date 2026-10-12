@@ -127,15 +127,16 @@ end
 do
   local ids = {}
   for _, b in ipairs(D.transport_sub({})) do ids[#ids + 1] = b[1] or '-' end
-  eq(table.concat(ids, ' '), 'tp_start freeze slowplay smartrec tp_end dub', 'transport sub row: under rew pause play rec ff loop')
+  eq(table.concat(ids, ' '), 'tp_start freeze slowplay shiftrec tp_end dub', 'transport sub row: under rew pause play rec ff loop')
   local function slow(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'slowplay' then return b end end end
   local function half(c, k) return slow(c).halves[k] end   -- 12 окт: x0.5 | x2
   NOW = 0.1; eq(half({ halfplay = 0.5 }, 1)[3], TEXT, 'x0.5 on: lit in the first half second'); eq(half({ halfplay = 0.5 }, 2)[3], nil, 'x2 off meanwhile')
   NOW = 0.1; eq(half({ halfplay = 2 }, 2)[3], TEXT, 'x2 on: lit')
   NOW = 0.6; eq(half({ halfplay = 0.5 }, 1)[3], nil, 'x0.5 on: dark in the second half (blinks)')
   eq(slow({})[4], nil, 'slow: no fixed bright text colour')
-  local function smart(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'smartrec' then return b end end end
-  eq(smart({ smartrec = true })[3], RED, 'smart on: red')
+  local function smart(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'shiftrec' then return b end end end
+  eq(smart({ shiftrec = 'rec' })[3], RED, 'shift rec recording: red')
+  eq(smart({ shiftrec = 'rec' })[2], 'shift', 'shift rec: the button says shift (was smart)')
   eq(smart({})[3], nil, 'smart off: plain')
 end
 

@@ -7503,6 +7503,84 @@ ctx = {
       vim.msg = was_play and 'play x0.5 / x2 stopped - x1' or 'slow rec done - x1; Enter fixes a note or value'
     end
   end,
+  -- 12 окт: shift rec (кнопка shift под rec): ждёт первую MIDI-ноту; она запускает запись с шага курсора
+  -- на текущей скорости проекта (rate x0.5 — пишется вдвое медленнее, на x1 звучит быстро). Сама первая
+  -- нота прозвучала до старта записи — трекер дописывает её на шаг курсора. Автоматизацию пишет REAPER
+  -- (огибающие в latch / write). Второй щелчок — отмена ожидания / стоп
+  shift_rec = function()
+    if ctx.shiftrec then
+      if reaper.GetPlayState() & 4 == 4 then reaper.Main_OnCommand(1016, 0) else ctx.shiftrec = nil; vim.msg = 'shift rec off' end
+      return
+    end
+    if reaper.GetPlayState() & 1 == 1 then vim.msg = 'shift rec: stop the transport first'; return end
+    local arm, narm, naudio = {}, 0, 0
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, i)
+      if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 then
+        narm = narm + 1; arm[#arm + 1] = tr
+        if reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT') < 4096 then naudio = naudio + 1 end
+      end
+    end
+    if narm == 0 then vim.msg = 'shift rec: arm a track (R) with a MIDI input first'; return end
+    local rate = reaper.Master_GetPlayRate(0)
+    if naudio > 0 and math.abs(rate - 1) > 1e-3 then vim.msg = ('shift rec: %d armed track(s) record audio - audio at x%.2f records wrong; MIDI inputs only'):format(naudio, rate); return end
+    ctx.shiftrec = { wait = true, t0 = edit.row_time(vim.cur.row, state.lpb, 0), row = vim.cur.row, arm = arm }
+    vim.msg = ('-- SHIFT REC -- waiting: play a MIDI note - it records from row %04d at x%.2f; shift again - cancel, Space stops'):format(vim.cur.row, rate)
+  end,
+  -- события MIDI-входа, пока shift rec: первая нота — старт; её отпускание — конец этой ноты
+  shift_rec_note = function(st, d1, d2)
+    local s = ctx.shiftrec
+    local on, off = (st & 0xF0) == 0x90 and d2 > 0, (st & 0xF0) == 0x80 or ((st & 0xF0) == 0x90 and d2 == 0)
+    if s.wait and on then
+      s.wait = nil; s.pitch, s.vel, s.chan = d1, d2, st & 15
+      s.real0 = reaper.time_precise()
+      -- pre-roll перед записью сдвинул бы старт на такт раньше шага: выключить на эту запись, потом вернуть
+      if reaper.GetToggleCommandState(41819) == 1 then reaper.Main_OnCommand(41819, 0); s.preroll = true end
+      reaper.SetEditCurPos(s.t0, false, false)
+      reaper.Main_OnCommand(1013, 0)                              -- Transport: Record
+      vim.msg = ('-- SHIFT REC -- recording from row %04d at x%.2f; Space stops'):format(s.row, reaper.Master_GetPlayRate(0))
+    elseif s.real0 and not s.off and off and d1 == s.pitch then
+      s.off = math.max(s.t0, reaper.GetPlayPosition())
+    end
+  end,
+  shift_rec_tick = function()
+    local s = ctx.shiftrec
+    if not (s and s.real0) then return end
+    if reaper.GetPlayState() & 4 == 4 then s.seen = true; s.last = reaper.GetPlayPosition(); return end
+    if not s.seen and reaper.time_precise() - s.real0 < 1.5 then return end   -- запись ещё не началась
+    ctx.shiftrec = nil
+    if s.preroll and reaper.GetToggleCommandState(41819) == 0 then reaper.Main_OnCommand(41819, 0) end   -- pre-roll назад
+    if not s.seen then vim.msg = 'shift rec: the recording did not start'; return end
+    local tend = s.off or s.last or (s.t0 + 0.25)
+    local n = 0
+    edit.run('shift rec: the first note', function()
+      for _, tr in ipairs(s.arm) do
+        if reaper.ValidatePtr(tr, 'MediaTrack*') then
+          for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+            local it = reaper.GetTrackMediaItem(tr, i)
+            local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+            local tk = reaper.GetActiveTake(it)
+            if tk and reaper.TakeIsMIDI(tk) and pos <= s.t0 + 1e-3 and pos + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > s.t0 then
+              local p0 = reaper.MIDI_GetPPQPosFromProjTime(tk, s.t0)
+              local dup = false
+              local _, nn = reaper.MIDI_CountEvts(tk)
+              for k = 0, nn - 1 do
+                local _, _, _, sp, _, _, pp = reaper.MIDI_GetNote(tk, k)
+                if pp == s.pitch and math.abs(sp - p0) < 30 then dup = true; break end
+              end
+              if not dup then
+                reaper.MIDI_InsertNote(tk, false, false, p0, reaper.MIDI_GetPPQPosFromProjTime(tk, math.max(tend, s.t0 + 0.01)), s.chan, s.pitch, s.vel, false)
+                reaper.MIDI_Sort(tk); n = n + 1
+              end
+              break
+            end
+          end
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('shift rec done%s'):format(n > 0 and ' - the first note put on its row' or '')
+  end,
   -- 11 окт: режим VU мастера REAPER — свойство трека I_VUMODE (&30: 0 peaks, 4 RMS, 8 combined RMS,
   -- 12 LUFS-M, 16 LUFS-S max, 20 LUFS-S current); метр трекера читает тот же VU — без JSFX
   MM_MODES = { { 0, 'peak', 'peak (stereo)' }, { 2, 'peak', 'peaks (multichannel)' }, { 4, 'RMS', 'RMS (stereo)' }, { 8, 'RMS', 'RMS (combined)' },
@@ -12317,6 +12395,18 @@ local function poll_midi_in()
     fresh = rest
     if #fresh == 0 then return end
   end
+  -- 12 окт: shift rec — ноты входа его (старт записи, конец первой ноты), не ввод в трекер
+  if ctx.shiftrec then
+    local rest = {}
+    for k = #fresh, 1, -1 do
+      local b = fresh[k].buf
+      local st = b:byte(1) or 0
+      if (st & 0xF0) == 0x90 or (st & 0xF0) == 0x80 then ctx.shift_rec_note(st, b:byte(2) or 0, b:byte(3) or 0)
+      else table.insert(rest, 1, fresh[k]) end
+    end
+    fresh = rest
+    if #fresh == 0 then return end
+  end
   -- MIDI learn: привязанные CC / ноты (и learn) — не дальше (2 окт)
   do
     local rest = {}
@@ -12971,8 +13061,8 @@ function ctrl_action(name, delta)
     if delta ~= 0 then ctx.freeze_len(delta > 0 and 2 or 0.5) else ctx.freeze_toggle() end
   elseif name == 'slowplay' then if delta == 0 then ctx.half_play(0.5) end
   elseif name == 'fastplay' then if delta == 0 then ctx.half_play(2) end
-  elseif name == 'smartrec' then
-    if delta == 0 then state.smartrec = not state.smartrec; vim.msg = 'smart rec ' .. (state.smartrec and 'on (being designed: a held note records in time, the frame shows where it ends)' or 'off') end
+  elseif name == 'shiftrec' then
+    if delta == 0 then ctx.shift_rec() end
   elseif name == 'slowbtn' then
     if delta == 0 then
       if not state.slowrate then state.slowrate = 0.5 end
@@ -14140,7 +14230,7 @@ local function frame()
       end)() or nil,
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
-      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, smartrec = state.smartrec, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
+      frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -17768,6 +17858,7 @@ local function frame()
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
   do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end
+  if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
