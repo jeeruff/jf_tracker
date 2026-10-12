@@ -1293,8 +1293,15 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     else U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
     -- 11 окт: до нулевого сэмпла item и после его конца — пустота (не звук файла за краями item)
-    if t0 < 0 then U.set(U.BG); gfx.rect(x, zy, math.min(w, math.floor(-t0 / (2 * W2) * w)), ZH, 1) end
-    if t0 + 2 * W2 > len then
+    -- 12 окт: прицел ноты из другого куска файла — край item не граница, звук файла там есть (zoom_samples читает
+    -- его напрямую); пустота только до начала файла (маска по краям item затирала всё окно: «не видно»)
+    local aimz = S.cross and zlab and zlab:match('^cursor') and S.zr and S.zr.file
+    if aimz then
+      local rate = (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
+      local fr0 = (e.offs or 0) + t0 * rate
+      if fr0 < 0 then U.set(U.BG); gfx.rect(x, zy, math.min(w, math.floor(-fr0 / (2 * W2 * rate) * w)), ZH, 1) end
+    elseif t0 < 0 then U.set(U.BG); gfx.rect(x, zy, math.min(w, math.floor(-t0 / (2 * W2) * w)), ZH, 1) end
+    if not aimz and t0 + 2 * W2 > len then
       local ex = x + math.max(0, math.floor((len - t0) / (2 * W2) * w))
       U.set(U.BG); gfx.rect(ex, zy, x + w - ex, ZH, 1)
     end
