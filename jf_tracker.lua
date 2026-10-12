@@ -3404,6 +3404,28 @@ ctx = {
       model.invalidate(); regions = model.regions(state.lpb)
     end
   end,
+  -- 12 окт: номер паттерна цифрами на точках номера в матрице: слот — сменить паттерн, свободный такт —
+  -- поставить туда повтор паттерна (пустой такт уступает место, такт с items остаётся после)
+  pattern_count = function() local list = model.patterns(regions); local m = 0; for _, q in ipairs(list) do m = math.max(m, q.num or 0) end; return m end,
+  slot_pattern_num = function(n)
+    local seq = ctx.sequence()
+    local slot = seq[MX.cur.ri]
+    if not (slot and n) then return end
+    if not slot.gap then return ctx.slot_set_pattern(n) end
+    local p
+    for _, q in ipairs(model.patterns(regions)) do if q.num == n then p = q end end
+    if not (p and p.src) then vim.msg = ('no pattern %02d'):format(n); return end
+    local empty = true
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      if #alias.items_over(reaper.GetTrack(0, ti), slot.pos, slot.rgnend) > 0 then empty = false; break end
+    end
+    local len = p.src.rgnend - p.src.pos
+    ctx.slot_op('matrix ' .. p.name .. ' into a free bar', function()
+      alias.put_alias(p.src, slot.pos)
+      if empty then alias.delete_slot({ gap = true, pos = slot.pos + len, rgnend = slot.rgnend + len }) end
+    end)
+    vim.msg = ('bar %d → %02d %s%s'):format(MX.cur.ri, p.num, p.name, empty and '' or ' (the bar had items - it stays after)')
+  end,
   slot_cycle = function(ri, dir)
     local seq = ctx.sequence()
     local slot = seq[ri]

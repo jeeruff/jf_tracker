@@ -848,8 +848,21 @@ function MX.key(c, regions, snap)
   -- 9 окт: курсор на имени (ci 0) — Enter / i / r переименовать; на номере
   -- (ci −1) — Enter: номер паттерна цифрами (10 окт; < > — листать)
   if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
+  if MX.cur.ci == -1 and c == 13 and MX.numbuf then local n = tonumber(MX.numbuf); MX.numbuf = nil; ctx.slot_pattern_num(n); return true end
   if MX.cur.ci == -1 and c == 13 then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() else ctx.slot_cycle(MX.cur.ri, 1) end; return true end
   if MX.cur.ci < 1 and (ch == 'm' or ch == 'M' or ch == 'x' or c == 22 or c == 3 or c == 24) then ctx.msg('on the region name / number - move to a track cell (l)'); return true end
+  -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
+  -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
+  if MX.cur.ci == -1 and ch:match('^%d$') and not MX.count and ctx.slot_pattern_num then
+    local buf = (MX.numbuf or '') .. ch
+    local n, maxn = tonumber(buf), (ctx.pattern_count and ctx.pattern_count()) or 99
+    if #buf < 2 and n * 10 <= maxn then MX.numbuf = buf; ctx.msg(('pattern %s_ (the next digit, or Enter)'):format(buf)); return true end
+    MX.numbuf = nil
+    ctx.slot_pattern_num(n)
+    return true
+  end
+  if MX.cur.ci == -1 and c == 13 and MX.numbuf then local n = tonumber(MX.numbuf); MX.numbuf = nil; ctx.slot_pattern_num(n); return true end
+  MX.numbuf = nil
   -- слой лупов: цифры+Enter, > < + - = — лупы ячейки (вместо паттерна / длины)
   if MX.loops and ctx.mx_loop_key and ctx.mx_loop_key(c) then return true end
   -- счётчик (2 окт): 4+ — четыре региона одним шагом
