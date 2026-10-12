@@ -6440,30 +6440,40 @@ ctx = {
   cursor_cross = function(e)
     if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then return nil end
     local h = (vim.covering(vim.cur.fi, vim.cur.row) or {})[1]
+    -- 12 окт: прицел — верхняя кромка строки курсора (там курсор REAPER); короткая нота строкой выше
+    -- кончается ровно на ней — прицел на её конце (раньше без ноты под курсором прицел уходил в начало)
+    if not (h and h.kind == 'audio') and vim.cur.row > 0 then
+      local hp = (vim.covering(vim.cur.fi, vim.cur.row - 1) or {})[1]
+      if hp and hp.kind == 'audio' and hp.item and reaper.ValidatePtr(hp.item, 'MediaItem*') then
+        local tr0 = edit.row_time(vim.cur.row, state.lpb, 0)
+        local hn = { pos = reaper.GetMediaItemInfo_Value(hp.item, 'D_POSITION'), len = reaper.GetMediaItemInfo_Value(hp.item, 'D_LENGTH') }
+        if ctx.AIM.ends_at(hn, tr0) then h = hp end
+      end
+    end
     if not (h and h.kind == 'audio' and h.item and reaper.ValidatePtr(h.item, 'MediaItem*')) then return nil end
     local tk, etk = reaper.GetActiveTake(h.item), reaper.GetActiveTake(e.item)
     if not (tk and etk) or reaper.TakeIsMIDI(tk) then return nil end
     local fp = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '')
     local efp = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(etk), '')
     if not fp or fp == '' or fp ~= efp then return nil end
-    local c = { item = h.item, npos = reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION'),
+    local c = { item = h.item, nlen = reaper.GetMediaItemInfo_Value(h.item, 'D_LENGTH'), npos = reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION'),
       noffs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'), nrate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'),
       eoffs = reaper.GetMediaItemTakeInfo_Value(etk, 'D_STARTOFFS'), erate = reaper.GetMediaItemTakeInfo_Value(etk, 'D_PLAYRATE') }
     if c.nrate <= 0 or c.erate <= 0 then return nil end
     local tr = edit.row_time(vim.cur.row, state.lpb, 0)
-    c.t = (c.noffs + (tr - c.npos) * c.nrate - c.eoffs) / c.erate
-    -- 12 окт: тот же файл, но другой кусок (короткие слайсы-инструменты): точка вне показанного инструмента — прицела нет
-    local elen = reaper.GetMediaItemInfo_Value(e.item, 'D_LENGTH')
-    if c.t < -1e-3 or c.t > elen + 1e-3 then return nil end
+    c.n = { pos = c.npos, offs = c.noffs, rate = c.nrate, len = c.nlen }
+    c.e = { offs = c.eoffs, rate = c.erate }
+    c.t = ctx.AIM.e_time(c.n, c.e, tr)
+    -- 12 окт: точка может быть вне показанного инструмента (тот же файл, другой кусок) — окно прицела читает файл
+    -- там напрямую, прицел всё равно на звуке строки курсора
     c.key = tostring(h.item) .. ':' .. vim.cur.row
     return c
   end,
   -- 12 окт: разрезать ноту в точке прицела (секунды e) — не по строке; правая часть без метки слайса
   cut_at = function(c, te, quant)
     if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
-    local t = c.npos + (c.eoffs + te * c.erate - c.noffs) / c.nrate
-    local len = reaper.GetMediaItemInfo_Value(c.item, 'D_LENGTH')
-    if t <= c.npos + 1e-4 or t >= c.npos + len - 1e-4 then vim.msg = 'cut point is outside the note'; return end
+    local t = ctx.AIM.proj_of(c.n, c.e, te)
+    if not ctx.AIM.inside(c.n, t) then vim.msg = 'cut point is outside the note'; return end
     local qt
     edit.run('cut the note at the aim point', function()
       local right = reaper.SplitMediaItem(c.item, t)
@@ -11302,6 +11312,7 @@ ctx = {
 }
 
 edit.init(model)
+ctx.AIM = dofile(DIR .. '/jf_tracker_aim.lua')   -- 12 окт: математика прицела (тест test_aim)
 -- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
 edit.start_at = function() if state.lock and vim and vim.cur then return edit.row_time(vim.cur.row, state.lpb, 0) end end
 alias.init(model, edit)

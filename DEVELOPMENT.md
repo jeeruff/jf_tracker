@@ -44,6 +44,7 @@
 | `jf_tracker_edit.lua` | ВСЕ записи в проект: delete / mute / transpose / split / note-off / yank-paste / insert / mute_span |
 | `jf_tracker_matrix.lua` | матрица паттернов: регионы × треки, фокус по Tab, mute ячейки, y/p паттерна |
 | `jf_tracker_alias.lua` | алиасы: синхронизация одноимённых регионов, повтор паттерна |
+| `jf_tracker_aim.lua` | прицел: место файла на строке курсора, точка реза, привязки (тест test_aim, живой smoke_aim) |
 | `jf_tracker_slicer.lua` | виртуальная нарезка инструмента во вкладке sample (`S.draw_in` в прямоугольник), ровная/по транзиентам, P_EXT:jf_slices |
 | `jf_tracker_cmds.lua` | команды-огибающие и генераторы: U D G 4 0 A R P F, хранение P_EXT:jf_cmds, пересборка take-огибающих и копий |
 | `daemon_tracker.lua` | модуль демона jf_grid (monome): грид = матрица, обмен через ExtState mx/gridkey |

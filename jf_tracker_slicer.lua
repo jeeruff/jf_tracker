@@ -706,8 +706,7 @@ function S.cut_point(te)
   local e = S.cross and S.cross.e
   if st.cutsnap then
     if #(S.trans or {}) == 0 and S.detect then S.detect() end
-    local best
-    for _, t in ipairs(S.trans or {}) do if not best or math.abs(t - te) < math.abs(best - te) then best = t end end
+    local best = ctx.AIM and ctx.AIM.nearest(S.trans, te)
     if best then te = best end
   end
   if st.cut0x and e and S.zero_cross then te = S.zero_cross(e, te) or te end
@@ -755,6 +754,12 @@ local function zoom_samples(e, t0, span)
   -- 11 окт: окно левее начала item — слева нули, звук с 0 встаёт на своё место
   -- (раньше читался с 0 и растягивался на всё окно: волна съезжала влево от линии)
   local pad = t0 < 0 and math.min(n, math.floor(-t0 / span * n + 0.5)) or 0
+  -- 12 окт: файл читается напрямую — левее начала item звук файла есть (прицел ноты из другого куска); нули — только до начала файла
+  if zr.file and t0 < 0 then
+    local fr = (e.offs or 0) + t0 * rate
+    ft = math.max(0, fr)
+    pad = fr < 0 and math.min(n, math.floor(-fr / (span * rate) * n + 0.5)) or 0
+  end
   local s = zr.fn(ft, n - pad)
   if pad > 0 and s then
     local s2 = {}
@@ -770,13 +775,8 @@ function S.zero_cross(e, te)
   local span = 0.02
   local s, n = zoom_samples(e, te - span / 2, span)
   if not s or n < 4 then return nil end
-  local c = math.floor(n / 2) + 1
-  for d = 0, math.floor(n / 2) - 1 do
-    for _, i in ipairs({ c + d, c - d }) do
-      if i > 1 and i <= n and (s[i - 1] or 0) * (s[i] or 0) <= 0 then return te - span / 2 + (i - 1) / n * span end
-    end
-  end
-  return nil
+  local i = ctx.AIM and ctx.AIM.zero_index(s, n)
+  return i and (te - span / 2 + (i - 1) / n * span) or nil
 end
 
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
