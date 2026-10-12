@@ -864,7 +864,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { 'sens-', 'sens-' }, { 'sens+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { '-', 'sens-' }, { '+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       local lim = brow == 0 and (x + hint_w) or (x + w)
@@ -880,6 +880,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.text(bx + L.pad, by + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
       if hot then hover_sbtn = b[2] end
       if ctx.hint then ctx.hint('slicebtn', bx, by, bw, rh, b[2]) end
+      -- 12 окт: transients - + — одна группа: общая линия снизу (чувствительность — к детектору)
+      if b[2] == 'trans' then S.grp = { x0 = bx, y = by + rh } elseif b[2] == 'sens+' and S.grp and S.grp.y == by + rh then
+        U.set(U.mix(U.AMBER, U.PANEL, 0.35)); gfx.rect(S.grp.x0, by + rh, bx + bw - S.grp.x0, 1, 1)
+      end
       bx = bx + bw + 2
     end
     if editing and #S.trans > 0 then
