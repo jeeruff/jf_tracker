@@ -294,6 +294,21 @@ do
   eq('midi sub 2 is not audio', lane.audio_sub and lane.audio_sub[2] or false, false)
   eq('audio sub 3 flagged', lane.audio_sub and lane.audio_sub[3], true)
 end
+-- 12 окт: действующие команды на строках продолжения (бледно), 00 — стоп, своя строка — без дубля
+do
+  local lane = { subs = { {} } }
+  local h = { kind = 'audio', fx = { '0U10', '0S03' }, rowfx = { [2] = { '0V44' }, [4] = { '0U00' }, [5] = { '0D08' } } }
+  local sub = M._place(lane, 0, 7, h)
+  local function j(t) return t and table.concat(t, ',') or '-' end
+  eq('run row 1: slide from the head', j(sub[1].run), '0U10')
+  eq('run row 2: own vibrato not repeated, slide still runs', j(sub[2].run), '0U10')
+  eq('run row 3: slide + vibrato', j(sub[3].run), '0U10,0V44')
+  eq('run row 4: own 0U00 - slide stopped, vibrato runs', j(sub[4].run), '0V44')
+  eq('run row 5: own 0D - same kind as 0U, not dim', j(sub[5].run), '0V44')
+  eq('run row 6: 0D runs', j(sub[6].run), '0D08,0V44')
+  local plain = M._place({ subs = { {} } }, 0, 3, { kind = 'audio', fx = { '0S03' } })
+  eq('item property is not a running command', plain[1].run, nil)
+end
 -- цвета огибающих как в аранжировке (2 окт): ключи из пар «Envelope: …»
 do
   eq('env key volume', M.env_key('Volume', 0), 'col_env2')

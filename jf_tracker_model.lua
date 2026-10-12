@@ -126,6 +126,30 @@ local function sub_free(sub, r0, r1, d0, e1)
   return true
 end
 
+-- 12 окт: команды «до отмены» (как в Furnace) — род: до следующей того же рода, 00 — стоп.
+-- run = { [род] = токен }; на строке — то, что действует, кроме родов, записанных в ней самой
+M.RUN_KIND = { ['0U'] = 1, ['0D'] = 1, ['0V'] = 2, ['0A'] = 3, ['0I'] = 4, ['0O'] = 4, ['0R'] = 5 }
+local function run_put(run, list)
+  for _, t in ipairs(list or {}) do
+    local k = M.RUN_KIND[t:sub(1, 2)]
+    if k then if t:sub(3, 4) == '00' then run[k] = nil else run[k] = t end end
+  end
+end
+function M.run_start(fx, rf)
+  if not rf and (not fx or #fx == 0) then return nil end
+  local run = {}
+  run_put(run, fx)
+  return run
+end
+function M.run_step(run, own)
+  local mine = {}
+  for _, t in ipairs(own or {}) do local k = M.RUN_KIND[t:sub(1, 2)]; if k then mine[k] = true end end
+  run_put(run, own)
+  local out
+  for k = 1, 5 do if run[k] and not mine[k] then out = out or {}; out[#out + 1] = run[k] end end
+  return out
+end
+
 local function place(lane, r0, r1, head, cont, tail, e1)
   if r1 < r0 then r1 = r0; e1 = nil end
   local sub
@@ -135,9 +159,11 @@ local function place(lane, r0, r1, head, cont, tail, e1)
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
   sub[r0] = head
   local rf = head.rowfx                -- 12 окт: команды своих строк внутри ноты
-  for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0, fx = rf and rf[r - r0] } end
+  local run = M.run_start(head.fx, rf) -- 12 окт: действующие команды (бледно на строках, где своей нет)
+  for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0, fx = rf and rf[r - r0] }; if run then sub[r].run = M.run_step(run, sub[r].fx) end end
   if r1 > r0 and not (sub[r1] and sub[r1].kind ~= 'cont') then
     sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0, fx = rf and rf[r1 - r0] }
+    if run and sub[r1].kind == 'cont' then sub[r1].run = M.run_step(run, sub[r1].fx) end
     if e1 then sub[r1].end_d = e1 end
   end
   head.rows = r1 - r0 + 1

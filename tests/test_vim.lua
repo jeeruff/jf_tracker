@@ -359,6 +359,18 @@ V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
 V.cur.row = 1; keysin('0U14'); eq('0U14 on a row inside the note -> that row of the note (@ quarter)', last(), 'fx:kick:0U14@0.25')
 V.cur.row = 1; keysin('0p40'); eq('0P (a property of the note) on a row inside -> the whole note', last(), 'fx:kick:0P40')
 V.cur.row = 1; keysin('0D'); eq('0D: says what it is', (V.msg or ''):find('pitch down', 1, true) ~= nil, true); V.hexbuf = nil
+-- 12 окт: ` в колонке команд — стоп того, что действует со строк выше (по 00 на род)
+do
+  local cell = snap.cols[1].lanes[1].subs[1][2]
+  cell.run = { '0U14', '0V44' }
+  V.cur.row = 2; keysin('`')
+  eq('` stops the running slide', calls[#calls - 1], 'fx:kick:0U00@0.5'); eq('…and the running vibrato', last(), 'fx:kick:0V00@0.5')
+  eq('`: steps down', V.cur.row, 3)
+  cell.run = nil
+  local n0 = #calls
+  V.cur.row = 1; keysin('`'); eq('` with nothing running writes nothing', #calls, n0)
+  eq('…and says so', (V.msg or ''):find('nothing runs here', 1, true) ~= nil, true)
+end
 V.key(27); V.mode = 'normal'; V.hexbuf = nil
 -- 12 окт: I — как в Vim: INSERT с начала строки (поле ноты), без вставки времени
 local nI = #calls

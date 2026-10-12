@@ -1554,6 +1554,7 @@ local EMPTY = { '...', '..', '..' }
 -- группа кода команды → цвет (как в Renoise); Z… — глобальные, прочее — RN_OTHER
 local FXG = { ['0M'] = 'RN_VOL', ['0I'] = 'RN_VOL', ['0O'] = 'RN_VOL', SI = 'RN_VOL', SO = 'RN_VOL', ['0P'] = 'RN_PAN',
   ['0U'] = 'RN_PITCH', ['0D'] = 'RN_PITCH', ['0G'] = 'RN_PITCH', ['0V'] = 'RN_PITCH', ['0A'] = 'RN_PITCH', SF = 'RN_PITCH', SB = 'RN_GLOBAL' }
+D.fx_slots, D.fx_dim = {}, {}   -- 12 окт: слоты команд строки продолжения (переиспользуются, без аллокаций в кадре)
 D.FX_COL = setmetatable({}, { __index = function(_, k) return FXG[k] and D[FXG[k]] end })
 local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '....' end
 
@@ -1653,8 +1654,18 @@ local function draw_cell(L, cell, x, y, ty, inv)
       -- в полях, где ничего не написано
       local named = D.itemnames and cell.i == 1 and head.name ~= ''
       local fxv = head.fx or {}
+      -- 12 окт: что стоит в слотах команд строки: свои — ярко, действующие с прошлых строк — бледно
+      local slot = D.fx_slots
+      for i = 1, L.nfx do slot[i] = false end
+      if not L.narrow and not L.notes_only then
+        local own, run, j = cell.fx, cell.run, 1
+        for i = 1, L.nfx do
+          if own and own[i] then slot[i] = own[i]; D.fx_dim[i] = false
+          elseif run and run[j] then slot[i] = run[j]; D.fx_dim[i] = true; j = j + 1 end
+        end
+      end
       for fld = named and (nf + 1) or 1, nf do      -- строка имени: без точек под текстом
-        local skip = fld == 2 and cell.vol ~= nil
+        local skip = (fld == 2 and cell.vol ~= nil) or (fld >= 4 and slot[fld - 3])
         if not skip then
           local fx = D.field_rect(L, fld)
           text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
@@ -1669,10 +1680,11 @@ local function draw_cell(L, cell, x, y, ty, inv)
         else text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), U.GREY) end
       end
       -- 12 окт: у строки внутри ноты — свои команды (действуют с этой строки до следующей того же рода)
-      if cell.fx and not L.narrow and not L.notes_only then
-        for i = 1, L.nfx do
-          local f = cell.fx[i]
-          if f then text(x + L.x_fx[i], ty, f, c(3 + i, head.muted and U.GREY or (D.FX_COL[f:sub(1, 2)] or (f:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER))) end
+      for i = 1, L.nfx do
+        local f = slot[i]
+        if f then
+          local col = head.muted and U.GREY or (D.FX_COL[f:sub(1, 2)] or (f:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER)
+          text(x + L.x_fx[i], ty, f, c(3 + i, D.fx_dim[i] and U.mix(U.BG, col, 0.38) or col))
         end
       end
       -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько

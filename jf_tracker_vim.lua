@@ -256,10 +256,25 @@ function V.fx_cell(fi, row)
     if c and c.kind == 'cont' and c.of then
       local h = c.of
       if h.kind == 'midi' then return { head = h, off = 0, fx = h.fx or {}, midi = true } end
-      return { head = h, off = (row - (h.row0 or row)) / lpb(), fx = c.fx or {} }
+      return { head = h, off = (row - (h.row0 or row)) / lpb(), fx = c.fx or {}, run = c.run }
     end
   end
   return nil
+end
+-- 12 окт: стоп действующих команд строки — по 00 на каждый род (одна отмена)
+function V.fx_stop(fi, row)
+  local fc = V.fx_cell(fi, row)
+  if not fc or fc.midi or not fc.run or #fc.run == 0 then
+    V.msg = 'nothing runs here to stop (` stops a command that goes on from the rows above)'
+    return false
+  end
+  local E = ctx.edit
+  local codes = {}
+  for _, t in ipairs(fc.run) do codes[#codes + 1] = t:sub(1, 2) end
+  local function put() for _, code in ipairs(codes) do E.set_fx({ fc.head }, lpb(), code, 0, fc.off) end end
+  if E.run then E.run('fx stop', put) else put() end
+  V.msg = 'stop: ' .. table.concat(codes, '00 ') .. '00'
+  return true
 end
 -- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
 function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
@@ -1637,6 +1652,12 @@ function V.key_impl(c)
       -- 12 окт: команда на строке без ноты — звучащей ноте (как в Renoise: команда действует на играющую ноту;
       -- у нас команды хранятся в ноте, и показываются у неё)
       if fld >= 4 and #heads == 0 then heads = V.covering(V.cur.fi, V.cur.row) end
+      -- 12 окт: ` в колонке команд — стоп того, что здесь действует (0D… → 0D00), как note-off у ноты
+      if fld >= 4 and c == ('`'):byte() then
+        V.hexbuf = nil
+        V.fx_stop(V.cur.fi, V.cur.row)
+        V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+      end
       local b0, m0 = V.hexbuf, V.msg
       local he = hex_entry(c, fld, heads)
       if he == 'none' then return end
