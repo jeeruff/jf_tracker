@@ -2148,6 +2148,32 @@ ctx = {
       { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
     } })
   end,
+  -- 12 окт: gt — вкладки модулей выпадашкой (буква панели, как Ctrl+W g), Ngt — сразу N-я
+  tab_menu = function(n)
+    local PN = draw.panes
+    local tabs, cur = {}, ctx.pane_cur()
+    for _, id in ipairs(ctx.top_tabs()) do if PN.BY[id] then tabs[#tabs + 1] = id end end
+    if n then local id = tabs[n]; if id then ctx.pane_focus(id); vim.msg = 'tab ' .. n .. ': ' .. PN.BY[id].label else vim.msg = ('gt: %d tabs'):format(#tabs) end; return end
+    local items = {}
+    for i, id in ipairs(tabs) do
+      items[#items + 1] = { key = PN.BY[id].key, label = (id == cur and '* ' or '') .. i .. ' ' .. PN.BY[id].label, fn = function() ctx.pane_focus(id) end }
+    end
+    vim.open_hydra({ title = 'module tab (Ngt - the Nth)', items = items })
+  end,
+  -- 12 окт: gT — вкладки проектов REAPER выпадашкой (* — текущая, + — несохранённые правки), NgT — сразу N-я
+  project_menu = function(n)
+    local cur = reaper.EnumProjects(-1)
+    local projs = {}
+    for i = 0, 99 do local p = reaper.EnumProjects(i); if not p then break end; projs[#projs + 1] = p end
+    local function go(p, i) reaper.SelectProjectInstance(p); vim.msg = 'project tab ' .. i .. ': ' .. (reaper.GetProjectName(p, '') ~= '' and reaper.GetProjectName(p, '') or 'untitled') end
+    if n then if projs[n] then go(projs[n], n) else vim.msg = ('gT: %d project tabs'):format(#projs) end; return end
+    local items = {}
+    for i, p in ipairs(projs) do
+      local name = reaper.GetProjectName(p, ''); if name == '' then name = 'untitled' end
+      items[#items + 1] = { key = i <= 9 and tostring(i) or string.char(96 + i - 9), label = (p == cur and '* ' or '') .. name .. (reaper.IsProjectDirty(p) ~= 0 and ' +' or ''), fn = function() go(p, i) end }
+    end
+    vim.open_hydra({ title = 'project tab (NgT - the Nth)', items = items })
+  end,
   toggle_envs = function() state.envs = not state.envs; state.trackenvs = {}; vim.msg = 'envelopes ' .. (state.envs and 'on' or 'off') .. ' (all tracks)' end,
   -- кнопка A в шапке — только этот трек
   toggle_track_envs = function(col)
@@ -4783,25 +4809,11 @@ ctx = {
     items[#items + 1] = { label = 'sample rate', kind = 'cycle', values = srv, desc = 'request this sample rate (off - the device decides); projects may still override it (REAPER preference)',
       get = function() return w.sruse and w.sr or 'off' end, set = function(v) if v == 'off' then w.sruse = false else w.sruse, w.sr = true, v end end }
     local bsv = { 'off' }; for _, v in ipairs(A.BS) do bsv[#bsv + 1] = v end
-    items[#items + 1] = { label = 'buffer', kind = 'cycle', values = bsv, desc = 'request this block size in samples (off - the device decides); smaller - less latency, more CPU; zB - the same as a menu',
+    items[#items + 1] = { label = 'buffer', kind = 'cycle', values = bsv, desc = 'request this block size in samples (off - the device decides); smaller - less latency, more CPU',
       get = function() return w.bsuse and w.bs or 'off' end, set = function(v) if v == 'off' then w.bsuse = false else w.bsuse, w.bs = true, v end end }
     items[#items + 1] = { label = 'apply', kind = 'action', value = changed() and 'restart audio' or 'no changes', desc = 'write the settings to REAPER and restart the audio device (a short dropout); Preferences show the same values',
       fn = function() ctx.audio_set(w); OPT.close() end }
     return items
-  end,
-  audio_bs_menu = function()
-    local A = ctx.audio()
-    local cur = A.read()
-    if not cur then vim.msg = 'audio: only CoreAudio (macOS) settings are supported'; return end
-    local l = A.live()
-    local items = {}
-    for k, v in ipairs(A.BS) do
-      local on = (l.bs == v)
-      items[#items + 1] = { key = tostring(k), label = ('%4d samples  %5.1f ms'):format(v, 1000 * v / math.max(1, l.sr or cur.sr or 48000)) .. (on and '  *' or ''),
-        fn = function() ctx.audio_set({ bs = v, bsuse = true }) end }
-    end
-    items[#items + 1] = { key = 'o', label = 'off - the device decides' .. ((not cur.bsuse) and '  *' or ''), fn = function() ctx.audio_set({ bsuse = false }) end }
-    vim.open_hydra({ title = ('buffer - now %s smp, %s'):format(tostring(l.bs or '?'), l.dev or '?'), items = items })
   end,
   audio_cmd = function(arg)
     local A = ctx.audio()
@@ -4811,6 +4823,7 @@ ctx = {
     elseif what == 'bs' and tonumber(rest) then ctx.audio_set({ bs = math.floor(tonumber(rest)), bsuse = true })
     elseif what == 'sr' and rest == 'off' then ctx.audio_set({ sruse = false })
     elseif what == 'sr' and tonumber(rest) then ctx.audio_set({ sr = math.floor(tonumber(rest)), sruse = true })
+    elseif what == '' then state.opt_tab = 'audio'; ctx.options()   -- 12 окт: без аргумента — опции, вкладка audio
     else
       local l = A.live()
       vim.msg = ('audio: %s  %s Hz  %s smp - :audio dev <name> | bs N | sr N | bs off | sr off'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'))
@@ -11298,10 +11311,7 @@ function event_actions(hover)
     add('Delete ' .. what .. ' (x)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0); edit.delete(heads, lpb) end, 'x')
     add('Copy ' .. what .. ' (y)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0) end, 'y')
     add('Mute ' .. what .. ' (M)', function() edit.mute(heads, lpb) end, 'm')
-    add('Transpose +1 (^A)', function() edit.transpose(heads, lpb, 1) end, 't')
-    add('Transpose -1 (^X)', function() edit.transpose(heads, lpb, -1) end, 'T')
-    add('Transpose +12', function() edit.transpose(heads, lpb, 12) end, 'o')
-    add('Transpose -12', function() edit.transpose(heads, lpb, -12) end, 'O')
+    add('Transpose ... (Opt+F1 F2, F11 F12)', function() vim.transpose_smart() end, 't')   -- 12 окт: одна выпадашка вместо четырёх пунктов
   end
   add('Split at row (s)', function()
     local cov = {}

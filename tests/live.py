@@ -334,6 +334,54 @@ def insert_midi(t):
 
 
 @scenario
+def inst_index(t):
+    """поле inst: две hex-цифры — номер инструмента lib; аудио-нота остаётся аудио, MIDI-нота → аудио того сэмпла (11 окт)"""
+    track(1)                                   # A drums, строка 0 = amen
+    before = Dump(dump())
+    a = ack_fields(keys('l'))                  # подполе inst
+    t.ok('l = inst subfield', 'inst' in str(a.get('field')), str(a))
+    keys('i'); b = ack_fields(keys('01'))      # 01 = первый сэмпл lib
+    t.note('after 01: ' + str(b))
+    keys('<esc>')
+    mid = Dump(dump())
+    t.ok('A drums: same item count', len(mid.items('A drums')) == len(before.items('A drums')), f"{len(before.items('A drums'))} -> {len(mid.items('A drums'))}")
+    t.ok('msg = instrument 01', 'instrument 01' in (b.get('msg') or ''), b.get('msg'))
+    undo_one(before)
+    # MIDI-нота M synth (строка 16, C-4) → инструмент 01 (аудио): нота становится items
+    track(3); reset_row = 0
+    for _ in range(16): keys('j')
+    a = ack_fields(keys('l'))
+    t.ok('M: inst subfield', 'inst' in str(a.get('field')), str(a))
+    keys('i'); b = ack_fields(keys('01')); keys('<esc>')
+    after = Dump(dump())
+    nn0, nn1 = len(before.notes('M synth')), len(after.notes('M synth'))
+    au = [l for l in after.items('M synth') if l.endswith('AUDIO')]
+    t.note(f'M synth MIDI notes {nn0} -> {nn1}, audio items {len(au)}; msg={b.get("msg")}')
+    t.ok('MIDI note -> audio item of instrument 01', nn1 == nn0 - 1 and len(au) == 1)
+    undo_one(before)
+    back = Dump(dump())
+    t.ok('u restores M', back.items('M synth') == before.items('M synth') and back.notes('M synth') == before.notes('M synth'))
+
+
+@scenario
+def slice_index(t):
+    """поле slc (если показано): hex-номер слайса; без слайсов у сэмпла — сообщение, проект цел (11 окт)"""
+    track(1)
+    before = Dump(dump())
+    a = ack_fields(keys('l'))
+    f = str(a.get('field'))
+    if 'slc' not in f:
+        a = ack_fields(keys('l')); f = str(a.get('field'))
+    if 'slc' not in f:
+        t.note('no slc subfield in this layout (field ' + f + ') - slice column hidden; skipped'); keys('h'); keys('h'); return
+    keys('i'); b = ack_fields(keys('01')); keys('<esc>')
+    t.note('after S01: ' + str(b.get('msg')))
+    after = Dump(dump())
+    t.ok('project intact or slice set (no junk)', len(after.items('A drums')) >= len(before.items('A drums')))
+    undo_one(before)
+
+
+@scenario
 def tracks(t):
     """tt — новый трек после курсора; dd на нём"""
     reset()

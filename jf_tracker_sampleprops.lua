@@ -225,7 +225,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
   local zw = zoom_button(L, x, y, w)
   local pm = ctx.state and ctx.state.slicepick
-  U.text(x + L.pad, y, ctx.fit(('slices %d'):format(math.max(0, #rows - 1)) .. ((pm == 'random' and '  random') or (pm == 'seq' and '  sequence') or ''), w - L.pad - zw), U.AMBER)
+  U.text(x + L.pad, y, ctx.fit(('%d$'):format(math.max(0, #rows - 1)) .. ((pm == 'random' and '  random') or (pm == 'seq' and '  sequence') or ''), w - L.pad - zw), U.AMBER)
   local RH = L.rh * SP.szoom
   -- подсказка клавиш (4 окт): только с опцией hints, нижней строкой
   local hints = ctx.state and ctx.state.hints
