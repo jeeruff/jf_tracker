@@ -6405,8 +6405,14 @@ ctx = {
     local only = type(tr) == 'table' and tr or { [tr] = true }
     if not ctx.mx_solo then
       local sv = {}
-      for i = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i); sv[#sv + 1] = { t, reaper.GetMediaTrackInfo_Value(t, 'I_SOLO') } end
+      local keep = {}
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local t = reaper.GetTrack(0, i); local v = reaper.GetMediaTrackInfo_Value(t, 'I_SOLO')
+        sv[#sv + 1] = { t, v }; keep[#keep + 1] = reaper.GetTrackGUID(t) .. '=' .. math.floor(v)
+      end
       ctx.mx_solo = sv
+      -- 12 окт: прежние соло — и в ExtState проекта: перезапуск трекера посреди прослушки их вернёт (соло залипало)
+      reaper.SetProjExtState(0, EXT, 'solo_restore', table.concat(keep, ' '))
     end
     for _, o in ipairs(ctx.mx_solo) do reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', only[o[1]] and 2 or 0) end
     PV.midi(t0, math.min(t1, t0 + 8))
@@ -6416,6 +6422,7 @@ ctx = {
     PV.stop()
     for _, o in ipairs(ctx.mx_solo) do if reaper.ValidatePtr(o[1], 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', o[2]) end end
     ctx.mx_solo = nil
+    reaper.SetProjExtState(0, EXT, 'solo_restore', '')
   end,
   -- 12 окт: автогромкость: фейдер трека так, чтобы удержанный пик выхода (сыгранное) стал target дБ
   auto_peak = function(col, target)
@@ -6473,6 +6480,18 @@ ctx = {
     model.invalidate()
     if qt then vim.msg = ('note cut on the transient at %.3fs, moved to the grid %.3fs (%+.1f ms) - Cmd+Z back'):format(t, qt, (qt - t) * 1000); return end
     vim.msg = ('note cut at %.3fs (%+.1f ms from its row) - Cmd+Z back'):format(t, c.dt and c.dt * c.erate / c.nrate * 1000 or 0)
+  end,
+  -- 12 окт: соло, оставленные прослушкой (трекер закрылся посреди неё), — вернуть
+  solo_restore_pending = function()
+    local _, s = reaper.GetProjExtState(0, EXT, 'solo_restore')
+    if not s or s == '' then return end
+    local by = {}
+    for g, v in s:gmatch('(%b{})=(%-?%d+)') do by[g] = tonumber(v) end
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i); local v = by[reaper.GetTrackGUID(t)]
+      if v then reaper.SetMediaTrackInfo_Value(t, 'I_SOLO', v) end
+    end
+    reaper.SetProjExtState(0, EXT, 'solo_restore', '')
   end,
   mx_refresh = function()
     model.invalidate()
@@ -18123,6 +18142,10 @@ local function frame()
       if next(trs) then ctx.mx_cell_preview(trs, edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0), 'sel') end
     end
   else ctx.sel_key = nil end
+  do   -- 12 окт: соло, залипшие от прослушки (трекер закрылся посреди неё), — вернуть при запуске / смене проекта
+    local pj = reaper.EnumProjects(-1)
+    if ctx.solo_proj ~= pj and not ctx.mx_solo then ctx.solo_proj = pj; pcall(ctx.solo_restore_pending) end
+  end
   if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры

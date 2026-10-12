@@ -1317,9 +1317,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
-    -- 10 окт: кнопка auto play справа — сдвинул линию и отпустил: слайс играет сам
+    -- 10 окт: кнопка spam (была auto play) справа вверху прицела — сдвинул линию и отпустил: слайс играет сам
     local ap_on = ctx.state and ctx.state.sliceaudition
-    local apl = 'spam'   -- 12 окт: было auto play (пользователь: auto play -> spam)
+    local apl = 'spam'
     local apw = U.measure(apl) + 2 * L.pad
     local apx, apy = x + w - apw - 2, zy + 1
     local aphot = mx2 >= apx and mx2 < apx + apw and my2 >= apy and my2 < apy + rh
@@ -1331,31 +1331,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       ctx.state.sliceaudition = not ctx.state.sliceaudition
       S.msg = 'spam ' .. (ctx.state.sliceaudition and 'on: a moved slice line plays its slice' or 'off')
     end
-    -- 12 окт: под spam — точка реза s (прицел ноты курсора): 0-cross — на переход через ноль, t-snap — на
-    -- ближайший транзиент, quant (только с t-snap) — правая часть так, чтобы транзиент встал на строку (со свингом)
-    local tg_hot = false
-    do
-      local st = ctx.state or {}
-      local ty = apy + rh + 1
-      for _, b in ipairs({ { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }) do
-        local bw2 = U.measure(b[2]) + 2 * L.pad
-        local bx2 = x + w - bw2 - 2
-        if ty + rh <= zy + ZH then
-          local on = st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
-          local hot2 = mx2 >= bx2 and mx2 < bx2 + bw2 and my2 >= ty and my2 < ty + rh
-          if hot2 then tg_hot = true; S.cut_hot = b[1] end
-          U.set(on and U.tint(U.AMBER, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx2, ty, bw2, rh - 1, 1)
-          U.set(on and U.AMBER or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx2, ty, bw2, rh - 1, 0)
-          U.text(bx2 + L.pad, ty, b[2], on and U.AMBER or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))
-          if hot2 and down and not S.zd_prev and ctx.state then
-            st[b[1]] = not st[b[1]]
-            S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
-          end
-          ty = ty + rh
-        end
-      end
-    end
-    if not tg_hot then S.cut_hot = nil end
+    local tg_hot = false   -- 12 окт: 0-cross / t-snap / quant — строкой под прицелом
     local inz = not aphot and not tg_hot and mx2 >= x and mx2 < x + w and my2 >= zy and my2 < zy + ZH
     if inz then S.zoom_hot = true end
     if down and inz and not S.zd_prev and zk and S.active and S.entry and S.entry.item == e.item and S.slices[zk] then
@@ -1419,7 +1395,35 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       S.va, S.vb = nva, nva + span
     end
   end
-  U.text(x, wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2, ctx.fit(foot, w), U.GREY)   -- 10 окт: подсказка — приглушённо
+  -- 12 окт: строка под прицелом — слева подсказка, справа в линию spam / 0-cross / t-snap / quant
+  do
+    local fy = wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2
+    local st = ctx.state or {}
+    local mx2, my2 = gfx.mouse_x, gfx.mouse_y
+    local down = (gfx.mouse_cap & 1) == 1
+    local press = down and not S.cb_prev
+    S.cb_prev = down
+    local BT = { { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
+    local bx = x + w
+    S.cut_hot = nil
+    for k = #BT, 1, -1 do
+      local b = BT[k]
+      local bw2 = U.measure(b[2]) + 2 * L.pad
+      bx = bx - bw2 - (k < #BT and 2 or 0)
+      local on = st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
+      local col = b[3] or U.AMBER
+      local hot2 = mx2 >= bx and mx2 < bx + bw2 and my2 >= fy and my2 < fy + rh
+      if hot2 then S.cut_hot = b[1] end
+      U.set(on and U.tint(col, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx, fy, bw2, rh - 1, 1)
+      U.set(on and col or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx, fy, bw2, rh - 1, 0)
+      U.text(bx + L.pad, fy, b[2], on and col or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))
+      if hot2 and press and ctx.state then
+        st[b[1]] = not st[b[1]]
+        S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
+      end
+    end
+    U.text(x, fy, ctx.fit(foot, math.max(0, bx - x - L.pad)), U.GREY)   -- 10 окт: подсказка — приглушённо
+  end
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
   if hover_vol then return { e = e, vol = true } end
