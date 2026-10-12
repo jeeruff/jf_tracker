@@ -13963,7 +13963,7 @@ local function frame()
   -- 8 окт: фокус в клипах — свой режим SESSION (клавиатура запускает клипы),
   -- не KEYS: слой пианино тут не действует
   if state.focus == 'session' and state.clipsview then left = '-- SESSION --'
-  elseif state.focus ~= 'tracker' then left = left .. (left ~= '' and ' ' or '') .. state.focus:upper() .. (state.focus == 'top' and (':' .. state.toptab) or '') end
+  elseif state.focus ~= 'tracker' then left = state.focus:upper() .. (state.focus == 'top' and (':' .. state.toptab) or '') end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then

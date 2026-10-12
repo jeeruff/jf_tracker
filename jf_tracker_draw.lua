@@ -3542,7 +3542,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
     mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
     while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
-    local col = (p and p.ins) and D.FOCUS_INS or U.AMBER
+    local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
     local dx = sx0
     if mode ~= '' then D.big_text(sx0, sy, mode, col, 2); dx = sx0 + D.big_measure(mode, 2) + 3 * L.pad end
     local small = ((rest or ''):gsub('^%s+', ''))
