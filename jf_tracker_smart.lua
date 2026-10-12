@@ -44,11 +44,13 @@ end
 local function type_char(p, ch)
   local b = (SM.typed or '') .. ch:upper()
   local best, bd, exact
+  local longer = false
   local s0 = SM.typed_from or p.sel
   for i, it in ipairs(p.items) do
     local t = typed_of(it)
     if t ~= '' and t:sub(1, #b) == b then
       if t == b and not exact then exact = i end
+      if #t > #b then longer = true end
       local d = math.abs(i - s0)
       if not bd or d < bd then best, bd = i, d end
     end
@@ -57,6 +59,12 @@ local function type_char(p, ch)
   if not SM.typed then SM.typed_from = p.sel end
   SM.typed = b
   p.sel = exact or best
+  -- 12 окт: набор однозначен (ровно это значение, длиннее с тем же началом нет) — выбрано сразу, без Enter:
+  -- 0V в списке команд — его значения, 9E — записано (просьба: «начал вводить — пусть вводится»)
+  if exact and not longer and not SM.no_auto then
+    SM.typed, SM.typed_from = nil, nil
+    SM.pick(p.sel)
+  end
   return true
 end
 SM.type_char = type_char
@@ -68,6 +76,7 @@ local function pick(i)
   local nxt = p.on_pick and p.on_pick(it)
   if type(nxt) == 'table' then SM.open(nxt) else SM.close() end
 end
+SM.pick = pick
 
 -- клавиши; true — съели
 local ESC, ENTER, UP, DOWN, LEFT, RIGHT = 27, 13, 30064, 1685026670, 1818584692, 1919379572

@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'smart dropdown: what is typed goes in at once when it can only be one value - 0V opens its values, 9E writes 0V9E, no Enter in between (Enter only when ambiguous, e.g. c in the notes)',
     'every smart dropdown takes typing: 9E, C#4, 0U select the cell, Enter picks, BS steps back; hex cells show the decimal (9E 158), the tip says what the value means (0U 08 = +0.5 semitone per row, 80 vol = 0 dB, SF 8E = +14 cents)',
     'zw - wave view dropdown (column / note / back / off, wave only, text only); zZ - fixed cursor; both in the view menu too',
     'the - + command column buttons in a track header change that track (they changed a global setting the track did not follow); the delay caption reads del, not de',
