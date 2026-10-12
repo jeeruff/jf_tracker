@@ -17,7 +17,10 @@ local R = reaper
 local EPS = 1e-6
 local model
 
-function E.init(m) model = m end
+-- 12 окт: модуляция по нотам — сверка automation items после каждой правки (jf_tracker_notemod.lua)
+local DIR = (debug.getinfo(1, 'S').source:sub(2):match('(.*)/') or '.')
+E.NM = dofile(DIR .. '/jf_tracker_notemod.lua')
+function E.init(m) model = m; E.NM.init(E, m) end
 
 -- ── связь копий с инструментом (3 окт): метка P_EXT:jf_iid ─────────────
 -- Все вставки трекера — копии item-инструмента с его меткой: модель считает
@@ -207,10 +210,17 @@ local function run(desc, fn)
       end
     end
     if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
+    E.nm_pre = nil
+    if E.NM.on() then local okn, c = pcall(E.NM.census); if okn then E.nm_pre = c end end
   end
   R.Undo_BeginBlock2(0)
   R.PreventUIRefresh(1)
   local ok, err = pcall(fn)
+  -- 12 окт: ноты с модуляцией — их automation items за ними (вставка, сдвиг, копия, удаление)
+  if ok and depth == 1 and (E.nm_pre or E.NM.on()) then
+    local okn, en = pcall(E.NM.sync, E.nm_pre or {})
+    if not okn then E.nm_err = en end
+  end
   if ok and E.after and not E.in_after then
     E.in_after = true
     local ok2, err2 = pcall(E.after, desc)
@@ -219,7 +229,7 @@ local function run(desc, fn)
   end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil end
+  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()
@@ -2021,6 +2031,30 @@ function E.env_clear(env)
   if model then model.invalidate() end
 end
 -- automation item на огибающей в [pos, pos + len) (только огибающие трека)
+-- ── модуляция по нотам (12 окт): слоты инструмента ──────────────────────
+-- it — item инструмента (lib); slot = { env = 'fx:GUID:N', pool, rate, loop, label }.
+-- Слоты пишутся всем items инструмента, сверка в run расставляет AI по нотам.
+function E.nmod_add(it, tr, key, label)
+  local slots = E.NM.slots(it)
+  for _, s in ipairs(slots) do if s.env == key then return nil, 'already a slot' end end
+  E.NM.mark()
+  local pool
+  run('note mod: ' .. (label or key), function()
+    local env = E.NM.env(tr, key, true)
+    if not env then error('no envelope for ' .. key, 0) end
+    R.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true)
+    R.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true)
+    pool = E.NM.new_pool(env, R.GetMediaItemInfo_Value(it, 'D_POSITION'))
+    if not pool then error('REAPER did not make the automation item', 0) end
+    slots[#slots + 1] = { env = key, pool = pool, rate = false, loop = false, label = label }
+    E.NM.write(it, slots)
+  end)
+  return pool
+end
+function E.nmod_update(it, slots, desc)
+  run(desc or 'note mod', function() E.NM.write(it, slots) end)
+end
+
 function E.auto_item(env, pos, len)
   local idx
   run('insert automation item', function() idx = R.InsertAutomationItem(env, -1, pos, len) end)

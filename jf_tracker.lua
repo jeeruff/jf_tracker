@@ -338,6 +338,15 @@ end
 if state.panes and draw.panes.visible(state.panes, 'sample') and draw.panes.visible(state.panes, 'sprops') then
   draw.panes.set_active(state.panes, 'sample'); state.toptab = 'sample'
 end
+-- 12 окт: note mod — один раз вкладкой в стопку properties (активной остаётся properties)
+if state.panes and reaper.GetExtState(EXT, 'nmod_init') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'nmod') and PNm.visible(state.panes, 'sprops') then
+    local cur = PNm.active_of(state.panes, 'sprops')
+    if PNm.stack(state.panes, 'nmod', 'sprops') and cur then PNm.set_active(state.panes, cur) end
+  end
+  reaper.SetExtState(EXT, 'nmod_init', '1', true)
+end
 -- 11 окт: микшер — свой модуль; один раз поставить его под трекер (дальше — как пользователь разложит)
 if state.panes and reaper.GetExtState(EXT, 'mixer_init') ~= '1' then
   local PNm = draw.panes
@@ -2147,6 +2156,95 @@ ctx = {
       { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values (as a command column)', fn = set('vals', 'values') },
       { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
     } })
+  end,
+  -- ── note mod (12 окт): модуляция, которую запускает нота ──────────────
+  -- инструмент — выбранный в lib (корень, если слайс); слоты — edit.NM
+  nmod_entry = function()
+    local e = ctx.sp_sel
+    if not e or e.file then local col = cur_col(); e = col and (col.pool or {})[vim.inst] end
+    if e and e.parent then e = e.parent end
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then return nil end
+    return e
+  end,
+  status = function(s) state.status = s end,
+  nmod_focus = function() ctx.pane_focus('nmod') end,
+  nmod_list = function()
+    local e = ctx.nmod_entry()
+    if not e then return nil end
+    local NM = edit.NM
+    local raw = NM.get(e.item)
+    local c = ctx.nmod_cache
+    if c and c.snap == snap and c.item == e.item and c.raw == raw then return c.list end
+    local tr = reaper.GetMediaItem_Track(e.item)
+    local pos = reaper.GetMediaItemInfo_Value(e.item, 'D_POSITION')
+    local list = { name = e.name, slots = {} }
+    for _, sl in ipairs(NM.parse(raw)) do
+      local env = NM.env(tr, sl.env, false)
+      local pts
+      if env then
+        for k = 0, reaper.CountAutomationItems(env) - 1 do
+          if math.floor(reaper.GetSetAutomationItemInfo(env, k, 'D_POOL_ID', 0, false) + 0.5) == sl.pool and math.abs(reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false) - pos) < 1e-4 then
+            -- один проход пула (флаг 0x10000000), значения в 0..1 шкалы огибающей
+            local FI, mode = k | 0x10000000, reaper.GetEnvelopeScalingMode(env)
+            local p0 = reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false)
+            local plen = reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, p0) + (reaper.GetSetAutomationItemInfo(env, k, 'D_POOL_QNLEN', 0, false) or 1)) - p0
+            pts = {}
+            for q = 0, reaper.CountEnvelopePointsEx(env, FI) - 1 do
+              local _, t, v = reaper.GetEnvelopePointEx(env, FI, q)
+              pts[#pts + 1] = { math.max(0, math.min(1, (t - p0) / math.max(1e-6, plen))), math.max(0, math.min(1, reaper.ScaleFromEnvelopeMode(mode, v))) }
+            end
+            sl.ai = { env = env, idx = k, pos = p0, len = plen, pool = sl.pool, label = sl.label, min = 0, max = 1 }
+            break
+          end
+        end
+      end
+      sl.pts = pts; sl.missing = env == nil
+      list.slots[#list.slots + 1] = sl
+    end
+    ctx.nmod_cache = { snap = snap, item = e.item, raw = raw, list = list }
+    return list
+  end,
+  nmod_add = function()
+    local e = ctx.nmod_entry()
+    if not e then vim.msg = 'note mod: select an instrument in the lib first'; return end
+    local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+    if not ok then vim.msg = 'note mod: move a knob of an fx on the track of ' .. (e.name or 'the instrument') .. ' first, then a'; return end
+    local tr = reaper.GetMediaItem_Track(e.item)
+    local ti = tn & 0xFFFF
+    if (tn >> 16) > 0 or fxn & 0x1000000 ~= 0 or ti == 0 or reaper.GetTrack(0, ti - 1) ~= tr then
+      vim.msg = 'note mod: the last touched parameter is not an fx of the track of ' .. (e.name or 'the instrument') .. ' (take / input fx and other tracks - not yet)'; return
+    end
+    local _, pname = reaper.TrackFX_GetParamName(tr, fxn, pn, '')
+    local _, fname = reaper.TrackFX_GetFXName(tr, fxn, '')
+    fname = (fname or ''):gsub('^%w+:%s*', ''):gsub('%s*%(.-%)$', '')
+    local label = ((pname and pname ~= '') and pname or ('param ' .. pn)) .. ' (' .. fname .. ')'
+    local okr, pool, why = pcall(edit.nmod_add, e.item, tr, 'fx:' .. reaper.TrackFX_GetFXGUID(tr, fxn) .. ':' .. pn, label)
+    if not okr then vim.msg = 'note mod: ' .. tostring(pool); return end
+    if not pool then vim.msg = 'note mod: ' .. tostring(why); return end
+    ctx.nmod_cache = nil; ctx.NMUI.sel = #edit.NM.slots(e.item)
+    state.trackenvs[reaper.GetTrackGUID(tr)] = true
+    vim.msg = 'note mod: ' .. label .. ' - every note of ' .. (e.name or 'the instrument') .. ' starts this curve; Enter - edit it, r - rate by pitch, l - loop'
+  end,
+  nmod_change = function(i, fn, desc)
+    local e = ctx.nmod_entry(); if not e then return end
+    local slots = edit.NM.slots(e.item)
+    if not slots[i] then return end
+    fn(slots, slots[i])
+    edit.nmod_update(e.item, slots, desc)
+    ctx.nmod_cache = nil
+  end,
+  nmod_flag = function(i, what)
+    ctx.nmod_change(i, function(_, sl) sl[what] = not sl[what]; vim.msg = ('note mod %s: %s %s'):format(sl.label, what, sl[what] and 'on' or 'off') end, 'note mod ' .. what)
+  end,
+  nmod_del = function(i)
+    ctx.nmod_change(i, function(slots, sl) table.remove(slots, i); vim.msg = 'note mod: ' .. sl.label .. ' removed - the automation items of its notes too' end, 'note mod delete')
+  end,
+  nmod_edit = function(i)
+    local l = ctx.nmod_list()
+    local sl = l and l.slots[i]
+    if not (sl and sl.ai) then vim.msg = 'note mod: the curve of this slot is gone (its fx was removed?) - d deletes the slot'; return end
+    ctx.ai_edit_open(sl.ai)
+    vim.msg = 'note mod ' .. sl.label .. ': the curve of every note - edit the points (Esc - back)'
   end,
   -- 12 окт: gt — вкладки модулей выпадашкой (буква панели, как Ctrl+W g), Ngt — сразу N-я
   tab_menu = function(n)
@@ -11062,6 +11160,7 @@ edit.inst_ref = function(it)
   return e and e.item or nil
 end
 SPROP.init(U, ctx)
+ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
@@ -14317,6 +14416,7 @@ local function frame()
         ctx.sp_in_pane = true
       end
     end,
+    nmod_draw = function(Lx, x, y, w, h) ctx.NMUI.draw(Lx, x, y, w, h, ctx.nmod_list(), state.focus == 'nmod') end,   -- 12 окт
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
@@ -18150,6 +18250,10 @@ local function frame()
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
+      elseif state.focus == 'nmod' then
+        -- 12 окт: note mod — j k строка, a добавить, Enter кривая, r rate, l loop, d удалить
+        if c == 27 then ctx.set_focus('tracker')
+        elseif not ctx.NMUI.key(c, ctx.nmod_list()) then vim.key(c) end
       elseif state.focus == 'sprops' then
         -- 10 окт: модуль props — J K строка, H L значение, R сброс (как во вкладке item); остальное — vim
         local se = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])

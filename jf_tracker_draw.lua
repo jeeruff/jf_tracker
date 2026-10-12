@@ -4161,6 +4161,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if hs ~= nil then hover.slices = hs end
       elseif id == 'sprops' and info.sprops_draw then
         info.sprops_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
+      elseif id == 'nmod' and info.nmod_draw then
+        info.nmod_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
       elseif id == 'fxb' and info.fxb_draw then
         local hv = info.fxb_draw(L, ct.x, ct.y, ct.w, ct.h)
         if hv ~= nil then hover.fxb = hv end

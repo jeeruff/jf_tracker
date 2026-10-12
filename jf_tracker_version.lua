@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'note mod (stage 1): modulation started by the notes - a module next to properties (item tab); a adds the last touched fx parameter of the instrument track, every note of the instrument gets a pooled automation item on its envelope (from the note start, the note length) that follows insert / move / copy / delete; one curve for all (Enter edits the pool), rate - faster for higher notes, loop',
     'smart panel: a middle click on a value picks it too (open with the middle button - pick with it)',
     'z is only the view now: zt is the Vim one again (the cursor row to the top), zB is gone (:audio opens the options tab audio); gt - module tab menu, gT - REAPER project tab menu (Ngt / NgT - the Nth); transpose: Opt / Shift / Ctrl + F1 F2 F11 F12 as in Renoise, the popup in the right-click menu and :transpose',
     'Opt+A from anywhere: the last touched parameter becomes an envelope column on its track and the cursor goes there (a take FX parameter - its take envelope in the automation tab); ze on an envelope column - its view: curve, values (like commands) or steps (a fader on every row, as a 303 step sequencer; square points; drag with the mouse); the automation tab (params, curve, LFO generator, automation items) and the new modulation tab (REAPER LFO / audio control / link matrix) are separate',

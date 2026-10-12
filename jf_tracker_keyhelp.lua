@@ -377,6 +377,17 @@ KH.PAGES = {
     { k = 'v', d = 'fit: the pane grows until every row fits' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
+  nmod = { title = 'note mod: modulation started by every note of the instrument', e = {
+    { k = 'a', d = 'add a slot: move a knob of an fx on the track of the instrument first - its parameter gets a curve that starts with every note' },
+    { k = 'Enter', d = 'edit the curve (automation tab, the editor of its pool): one curve for all the notes; on the + row - add' },
+    { k = 'r', d = 'rate: the curve runs faster for higher notes (C-4 = x1, an octave up = x2)' },
+    { k = 'l', d = 'loop: the curve repeats to the end of the note; off - once, then holds its last value' },
+    { k = 'd', d = 'delete the slot: the automation items of its notes go too' },
+    { k = 'j k', d = 'row' },
+    { k = 'mouse', d = 'click - row, double click - edit the curve, click on rate / loop - toggle' },
+    { k = 'Esc', d = 'back to the tracker' },
+    { k = 'how', d = 'every note of the instrument gets a pooled automation item on the envelope of the parameter: from the note start, the note length; insert, move, copy, delete a note - its automation item follows (audio notes; MIDI notes - later)' },
+  } },
   visor = { title = 'visor: ReaVisor shaders from the tracker (page localhost:8080/isf)', e = {
     { k = 'p', d = 'on / off: send the picture state to the visualizer page (close reavisor.lua - two drivers fight)' },
     { k = 'o', d = 'open the page in the browser (F fullscreen, H hides its HUD); turns sending on' },
@@ -552,6 +563,7 @@ KH.BARS = {
              { 'b', 'bypass' }, { 'd', 'delete' }, { 'za', 'fold' }, { 'o', 'window' }, { 'zz Esc', 'back' } },
   notes = { { 'type', 'write' }, { 'Esc', 'leave' }, { 'project', 'notes' }, { 'context', 'item' } },
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
+  nmod = { { 'a', 'add (last touched)' }, { 'Enter', 'curve' }, { 'r', 'rate' }, { 'l', 'loop' }, { 'd', 'delete' }, { 'Esc', 'tracker' } },
   sprops = { { 'J K', 'row' }, { 'H L', 'value' }, { 'Shift', 'fine' }, { 'R', 'reset' }, { 'v', 'fit all rows' }, { 'Esc', 'tracker' } },
   visor = { { 'p', 'on' }, { 'o', 'page' }, { 'a e', 'add' }, { 'j k', 'row' }, { 'J K', 'param' }, { 'H L', 'value' }, { 'h l', 'level' }, { 'm', 'mod' }, { 's', 'scene' }, { 'i', 'presets' }, { 'n N', 'preset' }, { 'zz', 'big' }, { '?', 'help' } },
   sample = { { 's', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
@@ -568,7 +580,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'nmod', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
