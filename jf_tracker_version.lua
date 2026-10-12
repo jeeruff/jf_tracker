@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'every row has its own command: inside a note a command works from its row to the next one of the same kind (or the note end), 00 stops it (as in Furnace) - pitch slides, vibrato, arpeggio, volume slides, retrigger, tempo, jump; stored on the note with an offset in quarters (0D12@2), so LPB changes keep it in place',
     'command column in INSERT: typing is always a whole command (code + two digits) - one already there is replaced (it used to change only its value: 0D20 silently became 0U0D); the first key right after a write is no longer lost; a command on a row inside a note says which note it went to',
     'smart dropdown: what is typed goes in at once when it can only be one value - 0V opens its values, 9E writes 0V9E, no Enter in between (Enter only when ambiguous, e.g. c in the notes)',
     'every smart dropdown takes typing: 9E, C#4, 0U select the cell, Enter picks, BS steps back; hex cells show the decimal (9E 158), the tip says what the value means (0U 08 = +0.5 semitone per row, 80 vol = 0 dB, SF 8E = +14 cents)',

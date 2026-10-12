@@ -245,6 +245,25 @@ function V.covering(fi, row)
   return out
 end
 
+-- 12 окт: команды строки — у каждой строки свои. Голова ноты, смещение строки от её начала
+-- (четверти) и команды этой строки: первая строка — head.fx, строка внутри — fx ячейки продолжения
+function V.fx_cell(fi, row)
+  local f = flat()[fi]
+  if not f then return nil end
+  for _, sub in ipairs(subs_of(f)) do
+    local c = sub[row]
+    if c and (c.kind == 'audio' or c.kind == 'midi') then return { head = c, off = 0, fx = c.fx or {} } end
+    if c and c.kind == 'cont' and c.of then
+      local h = c.of
+      if h.kind == 'midi' then return { head = h, off = 0, fx = h.fx or {}, midi = true } end
+      return { head = h, off = (row - (h.row0 or row)) / lpb(), fx = c.fx or {} }
+    end
+  end
+  return nil
+end
+-- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
+function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
+
 -- swap (4 окт): событие под курсором ↔ k-е событие ниже в той же колонке
 function V.swap_forward(k)
   local fi, row = V.cur.fi, V.cur.row
@@ -606,7 +625,12 @@ local function apply(op, f0, f1, r0, r1)
     elseif fld == 2 then for _, h in ipairs(heads) do E.set_vol({ h }, lpb(), tonumber(h.vol, 16) + d) end
     elseif fld == 3 then for _, h in ipairs(heads) do E.set_delay({ h }, lpb(), h.delay + d) end
     else
-      -- k-я команда головы: xx ± d (если команды нет — ничего)
+      -- k-я команда строки: xx ± d (если команды нет — ничего); 12 окт: строка внутри ноты — её команда
+      local fc = #heads == 0 and V.fx_cell(V.cur.fi, V.cur.row)
+      if fc then
+        local f = fc.fx[fld - 3]
+        if f then E.set_fx({ fc.head }, lpb(), f:sub(1, 2), tonumber(f:sub(3), 16) + d, V.fx_rowable(f:sub(1, 2)) and fc.off or nil) end
+      end
       for _, h in ipairs(heads) do
         local f = (h.fx or {})[fld - 3]
         if f then E.set_fx({ h }, lpb(), f:sub(1, 2), tonumber(f:sub(3), 16) + d) end
@@ -661,16 +685,27 @@ local function hex_entry(c, fld, heads)
   if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
   else
-    -- 12 окт: в этой колонке стояла другая команда — она уступает место новой
-    local code = buf:sub(1, 2)
-    for _, h in ipairs(heads) do
-      local old = (h.fx or {})[fld - 3]
-      if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ h }, lpb(), old:sub(1, 2)) end
+    -- 12 окт: у каждой строки своя команда. В колонке строки стояла другая — уступает место новой.
+    -- Свойство item (0S 0M 0P SI …) — у всей ноты: на строке внутри ноты уходит в её первую строку
+    local code, val = buf:sub(1, 2), tonumber(buf:sub(3), 16)
+    local fc = V.fx_cell(V.cur.fi, V.cur.row)
+    local rowable = V.fx_rowable(code)
+    if fc and fc.off > 0 and not fc.midi then
+      local old = fc.fx[fld - 3]
+      if rowable then
+        if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ fc.head }, lpb(), old:sub(1, 2), fc.off) end
+        ctx.edit.set_fx({ fc.head }, lpb(), code, val, fc.off)
+      else
+        ctx.edit.set_fx({ fc.head }, lpb(), code, val)
+        V.msg = ('%s is a property of the whole note - set at %04d'):format(buf, fc.head.row0 or 0)
+      end
+    else
+      for _, h in ipairs(heads) do
+        local old = (h.fx or {})[fld - 3]
+        if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ h }, lpb(), old:sub(1, 2)) end
+      end
+      ctx.edit.set_fx(heads, lpb(), code, val)
     end
-    ctx.edit.set_fx(heads, lpb(), code, tonumber(buf:sub(3), 16))
-    local h1 = heads[1]
-    local hr = h1 and h1.row0
-    if hr and hr ~= V.cur.row then V.msg = ('%s -> the note at %04d (commands belong to the sounding note)'):format(buf, hr) end
   end
   return true
 end
@@ -1537,6 +1572,11 @@ function V.key_impl(c)
       elseif fld == 2 then E.set_vol(heads, lpb(), 128)
       elseif fld == 3 then E.set_delay(heads, lpb(), 0)
       else
+        local fc = #heads == 0 and V.fx_cell(V.cur.fi, V.cur.row)   -- 12 окт: строка внутри ноты — её команда
+        if fc and fc.off > 0 then
+          local f = fc.fx[fld - 3]
+          if f then E.clear_fx({ fc.head }, lpb(), f:sub(1, 2), fc.off) end
+        end
         for _, h in ipairs(heads) do
           local f = (h.fx or {})[fld - 3]
           if f then E.clear_fx({ h }, lpb(), f:sub(1, 2)) end
@@ -2672,20 +2712,20 @@ function V.smart()
     end
   else
     local hs0 = heads()
-    if #hs0 == 0 and not vis then
-      local cov = V.covering(fi, row)                  -- 12 окт: строка внутри ноты — её команды
-      if #cov > 0 then heads = function() return cov end; hs0 = cov end
-    end
+    local fc = (#hs0 == 0 and not vis) and V.fx_cell(fi, row) or nil   -- 12 окт: строка внутри ноты — её команды
+    if fc then hs0 = { fc.head } end
     local h1 = hs0[1]
     if not h1 then V.msg = 'commands belong to a note: no note sounds in this row - put the cursor on a note (or its rows)'; return false end
-    local have = (h1.fx or {})[fld - 3]
+    local have = (fc and fc.fx or h1.fx or {})[fld - 3]
     local function vals(letter, curx)
       local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx', SM.FX_MEAN and SM.FX_MEAN[letter])
       local desc = SM.FX_DESC[letter] or ''
       return { title = ('%sxx  %s  %s'):format(letter, desc, where), items = its, cols = cs, sel = sl,
                on_pick = function(it)
-                 local hs = heads()
-                 if it.v == 'clear' then E.clear_fx(hs, lpb(), letter) else E.set_fx(hs, lpb(), letter, it.v) end
+                 local hs = fc and { fc.head } or heads()
+                 local off = (fc and fc.off > 0 and V.fx_rowable(letter)) and fc.off or nil
+                 if have and have:sub(1, 2) ~= letter then E.clear_fx(hs, lpb(), have:sub(1, 2), (fc and fc.off > 0 and V.fx_rowable(have:sub(1, 2))) and fc.off or nil) end
+                 if it.v == 'clear' then E.clear_fx(hs, lpb(), letter, off) else E.set_fx(hs, lpb(), letter, it.v, off) end
                  done()
                end }
     end

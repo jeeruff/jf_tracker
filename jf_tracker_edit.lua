@@ -777,12 +777,14 @@ function E.swap_events(a, b)
   return true
 end
 
-function E.set_fx(heads, lpb, cmd, xx)
+-- off (12 окт) — строка внутри ноты, четверти от её начала (команды-огибающие / генераторы /
+-- песня); свойства item (0S 0M 0P SI …) — у всей ноты, off не нужен
+function E.set_fx(heads, lpb, cmd, xx, off)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
     for _, h in ipairs(heads) do
       if E.cmds and E.cmds.CODES[cmd] then
-        if h.item then E.cmds.put(h.item, cmd, xx); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
+        if h.item then E.cmds.put(h.item, cmd, xx, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
       else
         apply_fx(h, lpb, cmd, xx)
       end
@@ -790,10 +792,10 @@ function E.set_fx(heads, lpb, cmd, xx)
   end)
 end
 
-function E.clear_fx(heads, lpb, cmd)
+function E.clear_fx(heads, lpb, cmd, off)
   if E.cmds and E.cmds.CODES[cmd] then
     run('fx clear ' .. cmd, function()
-      for _, h in ipairs(heads) do if h.item then E.cmds.put(h.item, cmd, nil); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end end
+      for _, h in ipairs(heads) do if h.item then E.cmds.put(h.item, cmd, nil, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end end
     end)
     return
   end

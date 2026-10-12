@@ -77,8 +77,10 @@ function E.insert_note(track, lane, lpb, row, pitch, vel, len, depot) calls[#cal
 function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
 function E.run(_, fn) fn() end
 function E.set_delay(heads, lpb, d) calls[#calls + 1] = ('delay:%s:%d'):format(names(heads), d) end
-function E.set_fx(heads, lpb, cmd, xx) calls[#calls + 1] = ('fx:%s:%s%02X'):format(names(heads), cmd, xx) end
-function E.clear_fx(heads, lpb, cmd) calls[#calls + 1] = ('clearfx:%s:%s'):format(names(heads), cmd) end
+E.cmds = { CODES = { ['0U'] = true, ['0D'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true, ['0R'] = true, ZT = true, ZJ = true, ['0G'] = true, ['0Y'] = true } }
+local function offs(o) return (o and o > 0) and ('@%g'):format(o) or '' end
+function E.set_fx(heads, lpb, cmd, xx, off) calls[#calls + 1] = ('fx:%s:%s%02X%s'):format(names(heads), cmd, xx, offs(off)) end
+function E.clear_fx(heads, lpb, cmd, off) calls[#calls + 1] = ('clearfx:%s:%s%s'):format(names(heads), cmd, offs(off)) end
 function E.undo() calls[#calls + 1] = 'undo' end
 function E.redo() calls[#calls + 1] = 'redo' end
 function E.save() calls[#calls + 1] = 'save' end
@@ -354,7 +356,8 @@ V.cur.row = 0; keysin('d'); eq('d on the fx field in INSERT: no operator', V.pen
 eq('d: still INSERT', V.mode, 'insert')
 V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
 -- 12 окт: строка внутри ноты (без своей ноты) — команда звучащей ноте
-V.cur.row = 1; keysin('0U14'); eq('0U14 on a row inside the note -> that note', last(), 'fx:kick:0U14')
+V.cur.row = 1; keysin('0U14'); eq('0U14 on a row inside the note -> that row of the note (@ quarter)', last(), 'fx:kick:0U14@0.25')
+V.cur.row = 1; keysin('0p40'); eq('0P (a property of the note) on a row inside -> the whole note', last(), 'fx:kick:0P40')
 V.cur.row = 1; keysin('0D'); eq('0D: says what it is', (V.msg or ''):find('pitch down', 1, true) ~= nil, true); V.hexbuf = nil
 V.key(27); V.mode = 'normal'; V.hexbuf = nil
 -- 12 окт: I — как в Vim: INSERT с начала строки (поле ноты), без вставки времени

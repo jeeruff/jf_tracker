@@ -1668,6 +1668,13 @@ local function draw_cell(L, cell, x, y, ty, inv)
         if inv == 1 then text(x + L.x_note, ty, fit(head.name, L.w_note), U.BG)
         else text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), U.GREY) end
       end
+      -- 12 окт: у строки внутри ноты — свои команды (действуют с этой строки до следующей того же рода)
+      if cell.fx and not L.narrow and not L.notes_only then
+        for i = 1, L.nfx do
+          local f = cell.fx[i]
+          if f then text(x + L.x_fx[i], ty, f, c(3 + i, head.muted and U.GREY or (D.FX_COL[f:sub(1, 2)] or (f:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER))) end
+        end
+      end
       -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько
       -- колонок fx (−+ в шапке); остальные скрыты, как в трекерах
     else

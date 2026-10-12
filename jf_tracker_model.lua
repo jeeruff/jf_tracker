@@ -134,9 +134,10 @@ local function place(lane, r0, r1, head, cont, tail, e1)
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
   sub[r0] = head
-  for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0 } end
+  local rf = head.rowfx                -- 12 окт: команды своих строк внутри ноты
+  for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0, fx = rf and rf[r - r0] } end
   if r1 > r0 and not (sub[r1] and sub[r1].kind ~= 'cont') then
-    sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0 }
+    sub[r1] = tail or { kind = 'cont', of = head, i = r1 - r0, fx = rf and rf[r1 - r0] }
     if e1 then sub[r1].end_d = e1 end
   end
   head.rows = r1 - r0 + 1
@@ -192,9 +193,20 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   if not slk and ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'SB' .. M.hex2((qn1 - qn0) * lpb) end
   if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.005 then fx[#fx + 1] = 'SF' .. M.hex2(128 + (pitch - math.floor(pitch + 0.5)) * 100) end
   -- команды-огибающие и генераторы (P_EXT:jf_cmds) — как записаны
+  -- 12 окт: токен со смещением (0U08@0.75, четверти от начала ноты) — команда своей строки: rowfx[строка от головы]
   local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
-  if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do fx[#fx + 1] = tok end end
-  return fx
+  local rowfx
+  if cm and cm ~= '' then
+    for tok in cm:gmatch('[^,]+') do
+      local t0, off = tok:match('^(%w%w%x%x)@([%d%.]+)$')
+      if t0 then
+        local r = math.floor(tonumber(off) * lpb + 0.5)
+        if r <= 0 then fx[#fx + 1] = t0
+        else rowfx = rowfx or {}; rowfx[r] = rowfx[r] or {}; table.insert(rowfx[r], t0) end
+      else fx[#fx + 1] = tok end
+    end
+  end
+  return fx, rowfx
 end
 
 -- Аудио-item: голова в строке старта, «|» до предпоследней строки конца.
@@ -241,7 +253,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     smap = nil, smap_sig = nil,          -- карта маркеров для волны (ниже)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
-  head.fx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
+  head.fx, head.rowfx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   do local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); head.slice = tonumber(sk) end   -- 11 окт: номер слайса — поле в ячейке
   head.rgb = M.item_rgb(it)
   -- видео-лейн (9 окт): видео-item — событие как аудио (фейды Ixx / Oxx
@@ -332,7 +344,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   local midi_fx = {}
   do
     local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
-    if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do midi_fx[#midi_fx + 1] = tok end end
+    if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do if not tok:find('@', 1, true) then midi_fx[#midi_fx + 1] = tok end end end   -- 12 окт: строки внутри — только у аудио-нот
   end
   for k = 0, reps - 1 do
     local shift = k * period
