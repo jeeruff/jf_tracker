@@ -261,6 +261,17 @@ function V.fx_cell(fi, row)
   end
   return nil
 end
+-- 12 окт: что стоит в слоте i команд строки — своя команда или бледная (действует со строк выше);
+-- бледные встают в пустые слоты по порядку, как их рисует draw
+function V.fx_slot(fi, row, i)
+  local fc = V.fx_cell(fi, row)
+  if not fc then return nil end
+  if fc.fx[i] then return fc.fx[i], false, fc end
+  local j = 1
+  for k = 1, i - 1 do if not fc.fx[k] then j = j + 1 end end
+  local r = fc.run and fc.run[j]
+  return r, r ~= nil, fc
+end
 -- 12 окт: стоп действующих команд строки — по 00 на каждый род (одна отмена)
 function V.fx_stop(fi, row)
   local fc = V.fx_cell(fi, row)
@@ -441,6 +452,11 @@ function motion(c, n, op)
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'inst' }
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'inst' then
     return { fi = cur.fi, row = cur.row, field = 1 }
+  -- 12 окт: поле команды — две половины, как в Renoise: слева код (0D), справа значение (12); l / h — по ним
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and (cur.field or 1) >= 4 and cur.sub ~= 'val' then
+    return { fi = cur.fi, row = cur.row, field = cur.field, sub = 'val' }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and (cur.field or 1) >= 4 and cur.sub == 'val' then
+    return { fi = cur.fi, row = cur.row, field = cur.field }
   elseif (c == ('h'):byte() or c == LEFT or c == ('l'):byte() or c == RIGHT) and n > 1 then
     -- 10 окт: Nl / Nh = N одиночных шагов — каждая ячейка, куда встаёт l (и подполе
     -- инструмента), — шаг, как на линейке прыжков
@@ -454,7 +470,7 @@ function motion(c, n, op)
     end
     V.cur = save
     return t
-  elseif c == ('h'):byte() or c == LEFT then local fi, fld = step_field(-1, n); return { fi = fi, row = cur.row, field = fld }
+  elseif c == ('h'):byte() or c == LEFT then local fi, fld = step_field(-1, n); return { fi = fi, row = cur.row, field = fld, sub = (fld or 1) >= 4 and 'val' or nil }
   elseif c == ('l'):byte() or c == RIGHT then local fi, fld = step_field(1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('H'):byte() or c == ('L'):byte() then
     local F = flat(); local f = F[cur.fi]; if not f then return nil end
@@ -670,27 +686,45 @@ local function hex_entry(c, fld, heads)
   local ch = (c < 256) and string.char(c):upper() or ''
   local buf = V.hexbuf or ''
   local is_hex = ch:match('^[0-9A-F]$') ~= nil
-  if fld >= 4 and #buf < 2 then
-    -- 12 окт: в колонке команд набор — всегда команда целиком (код + две цифры), как в трекерах;
-    -- стоит другая — заменяется. Только значение — Enter (выпадашка) или + / -
-    -- (было 6 окт: в занятой колонке цифры меняли значение — 0D20 молча становился 0U0D)
+  if fld >= 4 and V.cur.sub ~= 'val' then
+    -- 12 окт: левая половина — код. Буква — сразу код 0x (D = 0D), S и Z — приставки (SI, ZT),
+    -- 0 — по привычке (0D). Код готов — курсор на значение, ждёт две цифры
+    -- (h j k l — не коды, они ходят; ZJ — J после Z, это код)
+    local code
     if buf == '' then
-      if not fx_prefix_ok(ch) then return false end
-      -- 12 окт: набор копится всегда — нота ищется в момент записи (сразу после прошлой записи снимок
-      -- ещё не пересобран и строка кажется пустой: первая клавиша следующей команды терялась)
-      V.hexbuf = ch; return false
+      if ch == '0' or ch == 'S' or ch == 'Z' then
+        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ' or '0D 0U 0V ...')) .. ')'
+        return false
+      end
+      if not (ch:match('^%a$') and fx_code_ok('0' .. ch)) then return false end
+      code = '0' .. ch
+    else
+      if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Enter - the list)'):format(buf, ch); return false end
+      code = buf .. ch
     end
-    if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Enter - the list)'):format(buf, ch); return false end
-    V.hexbuf = buf .. ch
-    -- 12 окт: что за код и что дальше — сразу (раньше [0D_] молча ждал)
-    V.msg = ('%s %s - now two hex digits'):format(buf .. ch, (ctx.SM and ctx.SM.FX_DESC and ctx.SM.FX_DESC[buf .. ch]) or '')
+    V.hexbuf = code; V.cur.sub = 'val'; V.fx_back = true
+    V.msg = ('%s %s - now two hex digits'):format(code, (ctx.SM and ctx.SM.FX_DESC and ctx.SM.FX_DESC[code]) or '')
     return false
   end
-  if not is_hex then return false end
-  buf = buf .. ch
-  local need = fld >= 4 and 4 or 2
-  if #buf < need then V.hexbuf = buf; return false end
-  V.hexbuf = nil
+  if fld >= 4 then
+    -- 12 окт: правая половина — значение. Код — только что набранный, иначе своей команды слота,
+    -- иначе бледной (действующей со строк выше): 08 под бледной 0D10 пишет 0D08
+    if not is_hex then return false end
+    if #buf < 2 then
+      local cur = V.fx_slot(V.cur.fi, V.cur.row, fld - 3)
+      if not cur then V.msg = 'no command here - type its code on the left half first (h; D = 0D, SI, ZT ...)'; return 'none' end
+      buf = cur:sub(1, 2)
+    end
+    buf = buf .. ch
+    if #buf < 4 then V.hexbuf = buf; return false end
+    V.hexbuf = nil
+    if V.fx_back then V.cur.sub = nil; V.fx_back = nil end   -- набирали с кода — следующая строка тоже с кода
+  else
+    if not is_hex then return false end
+    buf = buf .. ch
+    if #buf < 2 then V.hexbuf = buf; return false end
+    V.hexbuf = nil
+  end
   -- vol на строке продолжения аудио (5 окт): точка огибающей громкости take
   if fld == 2 and #heads == 0 then
     local h = V.covering(V.cur.fi, V.cur.row)[1]
@@ -1667,11 +1701,12 @@ function V.key_impl(c)
       -- d / y / c … здесь не удаляют и не копируют. Движение (h j k l) — как было
       if fld >= 4 and c < 256 and string.char(c):match('^%w$') and not string.char(c):match('^[hjklHJKL]$') then
         if V.msg == m0 then   -- hex_entry сам не объяснил
-          V.msg = (V.hexbuf and (V.hexbuf .. string.char(c):upper() .. ': no such effect') or (string.char(c) .. ': effect codes start with 0, S or Z (0U 0D 0V SI ZT ...)')) .. ' - Enter: the list'
+          V.msg = (V.hexbuf and (V.hexbuf .. string.char(c):upper() .. ': no such effect') or (V.cur.sub == 'val' and (string.char(c) .. ': the value is two hex digits (h - the code half)') or (string.char(c) .. ': no effect code - D = 0D, U = 0U, S_ / Z_ - SI ZT ...'))) .. ' - Enter: the list'
         end
         return
       end
       V.hexbuf = nil                                   -- 11 окт: чужая клавиша обрывает набор и работает
+      if V.fx_back then V.cur.sub = nil; V.fx_back = nil end   -- 12 окт: брошенный код — курсор обратно на код
       if not V.piano then return as_normal(c) end
       keys_control(c); return
     end

@@ -160,7 +160,7 @@ KH.PAGES = {
     { k = 'F', d = 'follow playhead on / off' },
     { k = 'o', d = 'reveal item in REAPER' },
     { k = 'BS Ins', d = 'delete / insert time in region (Shift: all tracks); no Insert key (Mac) - :instime N, :deltime N' },
-    { k = 'fx field', d = 'INSERT on a command column: letters and digits are the code (0U14, SI40, ZT80), never NORMAL commands; a wrong letter only says so; Enter - the list of codes' },
+    { k = 'fx field', d = 'two halves, as in Renoise (l / h step between them): the left one is the code - one letter is 0x (D = 0D, U = 0U), S_ and Z_ are prefixes (SI, ZT), 0D works too; then the right one - two hex digits write it. On the value half alone the digits keep the code there (or the dim one running from above: 08 under 0D10 = 0D08). h j k l start no code, so they still move; Enter - the list of codes' },
     { k = 'Tab S-Tab', d = 'focus next / previous module; Option-Tab: dock tabs' },
     { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
     { k = ':cc', t = {}, d = 'CC lane: ReaControlMIDI on the cursor track (its window opens the first time - set the CC numbers there), pick its parameter - the envelope becomes a column: hex per row, curves, automation items' },

@@ -200,7 +200,8 @@ keysin('e');   eq('e → boundary after kick', V.cur.row, 4)
 keysin('2j');  eq('2j', V.cur.row, 6)
 keysin('k');   eq('k', V.cur.row, 5)
 keysin('l');   eq('l → vol field', V.cur.field, 2); eq('l same sub', V.cur.fi, 1)
-keysin('lll'); eq('4 fields then next sub', V.cur.fi, 2); eq('field wraps to 1', V.cur.field, 1)
+keysin('l'); eq('l on fx: the code half, then the value half (12 окт)', V.cur.field >= 4 and V.cur.sub == nil, true); keysin('l'); eq('…value half', V.cur.sub, 'val')
+keysin('ll'); eq('4 fields then next sub', V.cur.fi, 2); eq('field wraps to 1', V.cur.field, 1)
 keysin('h');   eq('h back → delay field of sub1 (visual order nt vl fx dl)', V.cur.fi, 1); eq('h field', V.cur.field, 3)
 -- 5 окт: треки — Option+h / l (Shift+hjkl — выделение)
 alt_down = true; V.key(172); alt_down = false; eq('Option+l → track M', V.cur.fi, 3)
@@ -287,7 +288,7 @@ keysin('v'); alt_down = true; V.key(172); V.key(172); alt_down = false; keysin('
 reset()
 keysin('Vjjjjd');  eq('V-line all cols', last(), 'delete:kick,n60,ov')
 reset()
-keysin('vllll4jy'); eq('vy', last(), 'yank:kick,ov')
+keysin('vlllll4jy'); eq('vy', last(), 'yank:kick,ov')
 reset()
 keysin('4j'); alt_down = true; V.key(172); V.key(172); alt_down = false; keysin('vjM'); eq('visual M mutes', last(), 'mute:n60')
 reset()
@@ -326,12 +327,12 @@ eq(':q quits', (function() keysin(':q'); return V.key(13) end)(), 'quit')
 reset()
 keysin('l'); V.key(1);      eq('^A on vol → +1', last(), 'vol:kick:129')
 keysin('l'); V.key(1);      eq('^A on fx → 0PA1 (visual order nt vl fx dl)', last(), 'fx:kick:0PA1')
-keysin('l'); keysin('3'); V.key(24); eq('3^X on delay', last(), 'delay:kick:-3')
+keysin('ll'); keysin('3'); V.key(24); eq('3^X on delay', last(), 'delay:kick:-3')
 reset()
 keysin('li7f');             eq('insert hex vol 7F', last(), 'vol:kick:127'); eq('advance', V.cur.row, 1)
 V.key(27)
 reset()
-keysin('llli80');           eq('insert delay 80', last(), 'delay:kick:128')
+keysin('lllli80');           eq('insert delay 80', last(), 'delay:kick:128')
 V.key(27)
 reset()
 -- 12 окт: в занятой колонке (у kick там 0PA0) набор — новая команда целиком, старая уступает
@@ -352,7 +353,7 @@ V.cur.row = 0; keysin('0X'); eq('unknown code 0X is not taken', #calls, nc); eq(
 eq('0X: says so', (V.msg or ''):find('no such effect', 1, true) ~= nil, true); eq('0X: still INSERT', V.mode, 'insert')
 keysin('U20'); eq('…then U20 completes 0U20', last(), 'fx:kick:0U20')
 -- 12 окт: буква, которой код не начинается, в колонке команд — не команда NORMAL (d не удаляет)
-V.cur.row = 0; keysin('d'); eq('d on the fx field in INSERT: no operator', V.pending, nil); eq('d: hint', (V.msg or ''):find('start with 0, S or Z', 1, true) ~= nil, true)
+V.cur.row = 0; keysin('d'); eq('d on the fx field in INSERT: no operator', V.pending, nil); eq('d: the code 0D (one letter, 12 окт)', V.hexbuf, '0D'); eq('…cursor on the value half', V.cur.sub, 'val')
 eq('d: still INSERT', V.mode, 'insert')
 V.cur.row = 0; keysin('j'); eq('j still moves on the fx field', V.cur.row, 1)
 -- 12 окт: строка внутри ноты (без своей ноты) — команда звучащей ноте
@@ -370,6 +371,30 @@ do
   local n0 = #calls
   V.cur.row = 1; keysin('`'); eq('` with nothing running writes nothing', #calls, n0)
   eq('…and says so', (V.msg or ''):find('nothing runs here', 1, true) ~= nil, true)
+end
+-- 12 окт: поле команды — две половины: слева код (буква = 0x, S_ Z_), справа значение
+do
+  V.cur = { fi = 1, row = 0, field = 5 }; V.hexbuf = nil
+  keysin('U'); eq('U on the code half -> 0U, cursor on the value', V.hexbuf .. (V.cur.sub or ''), '0Uval')
+  keysin('14'); eq('…14 writes 0U14', last(), 'fx:kick:0U14'); eq('…back to the code half', V.cur.sub, nil); eq('…a step down', V.cur.row, 1)
+  V.cur.row = 0; keysin('si'); eq('S then I -> SI', V.hexbuf, 'SI'); keysin('08'); eq('SI08', last(), 'fx:kick:SI08')
+  V.cur.row = 0; keysin('zj'); eq('Z then J -> ZJ (j is the code here, not a move)', V.hexbuf, 'ZJ'); V.hexbuf = nil; V.cur.sub = nil; V.fx_back = nil
+  -- значение без кода: код своей команды слота (kick: 0PA0 в слоте 1)
+  V.cur = { fi = 1, row = 0, field = 4, sub = 'val' }
+  keysin('3c'); eq('value half on 0PA0: 3C -> 0P3C', last(), 'fx:kick:0P3C'); eq('…stays on the value half', V.cur.sub, 'val')
+  -- …или бледной: строка 2 внутри kick, где идёт 0D10
+  local cell = snap.cols[1].lanes[1].subs[1][2]
+  cell.run = { '0D10' }
+  V.cur = { fi = 1, row = 2, field = 4, sub = 'val' }
+  keysin('08'); eq('value under a dim 0D10 -> 0D08 at that row', last(), 'fx:kick:0D08@0.5')
+  cell.run = nil
+  local n0 = #calls
+  V.cur = { fi = 1, row = 3, field = 4, sub = 'val' }
+  keysin('5'); eq('value with no command here: nothing written', #calls, n0); eq('…says so', (V.msg or ''):find('no command here', 1, true) ~= nil, true)
+  V.hexbuf = nil
+  -- брошенный код (j) — курсор обратно на код
+  V.cur = { fi = 1, row = 0, field = 4 }; keysin('d'); keysin('j'); eq('code dropped by j: the code half again', V.cur.sub, nil); eq('…buffer cleared', V.hexbuf, nil)
+  V.hexbuf = nil; V.cur.sub = nil
 end
 V.key(27); V.mode = 'normal'; V.hexbuf = nil
 -- 12 окт: I — как в Vim: INSERT с начала строки (поле ноты), без вставки времени

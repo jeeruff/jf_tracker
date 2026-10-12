@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    'command field in two halves, as in Renoise: the code (D = 0D, U = 0U; S_ Z_ prefixes - SI, ZT) and the value (two hex digits); l / h step between them, the jump ruler counts both; digits on the value half alone keep the code there or take the dim one running from above (08 under 0D10 = 0D08)',
     'command column: a command that still runs (slide, vibrato, arpeggio, volume slide, retrigger) shows dim on the rows below until it is replaced or stopped; ` on the command field writes its stop (0D.. -> 0D00), like note-off for a note',
     'every row has its own command: inside a note a command works from its row to the next one of the same kind (or the note end), 00 stops it (as in Furnace) - pitch slides, vibrato, arpeggio, volume slides, retrigger, tempo, jump; stored on the note with an offset in quarters (0D12@2), so LPB changes keep it in place',
     'command column in INSERT: typing is always a whole command (code + two digits) - one already there is replaced (it used to change only its value: 0D20 silently became 0U0D); the first key right after a write is no longer lost; a command on a row inside a note says which note it went to',

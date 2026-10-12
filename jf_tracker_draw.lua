@@ -1568,10 +1568,18 @@ local function draw_cell(L, cell, x, y, ty, inv)
     else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
     return
   end
-  local function c(fld, col) return (inv == fld) and U.BG or col end
+  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or col end
   -- инверсное поле: текст с непрозрачной подложкой цвета заливки
   local text_ = text
+  -- 12 окт: курсор на половине поля команды (код | значение): инверсна только эта половина
+  local hx = D.fx_half and type(inv) == 'number' and inv >= 4 and L.x_fx and L.x_fx[inv - 3] and (x + L.x_fx[inv - 3])
   local function text(tx, tyy, str, col)
+    if hx and tx == hx and #str == 4 then
+      local w2, a, b = ms('00'), str:sub(1, 2), str:sub(3, 4)
+      if D.fx_half == 'val' then text_(tx, tyy, a, col); text_(tx + w2, tyy, b, U.BG, D.inv_bg or U.TEXT)
+      else text_(tx, tyy, a, U.BG, D.inv_bg or U.TEXT); text_(tx + w2, tyy, b, col) end
+      return
+    end
     if inv and col == U.BG then text_(tx, tyy, str, col, D.inv_bg or U.TEXT) else text_(tx, tyy, str, col) end
   end
   local nf = L.notes_only and 1 or (L.narrow and 2 or (3 + L.nfx))
@@ -5108,8 +5116,14 @@ function D.frame(L, snap, rows, state, info)
         local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst and true or false   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
         for _, fld in ipairs(vo(fi)) do
           idx = idx + 1
-          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' then cur_i = idx end
-          if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld } end
+          local half = type(fld) == 'number' and fld >= 4 and not (f.env or f.compact or f.folded)   -- 12 окт: поле команды — два шага (код | значение)
+          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and not (half and vc.sub == 'val') then cur_i = idx end
+          if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = half and 'code' or nil } end
+          if half then
+            idx = idx + 1
+            if fi == vc.fi and fld == vc.field and vc.sub == 'val' then cur_i = idx end
+            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = 'val' } end
+          end
           if fld == 1 and inst_ok then          -- подполе инструмента — тоже шаг (10 окт)
             idx = idx + 1
             if fi == vc.fi and vc.sub == 'inst' then cur_i = idx end
@@ -5127,6 +5141,7 @@ function D.frame(L, snap, rows, state, info)
         local d = cur_i and (p.i - cur_i) or nil
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
+          if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
           local cx = p.f.x + (fx or 0)
           local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
           local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
@@ -5533,14 +5548,18 @@ function D.frame(L, snap, rows, state, info)
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
             if inv == 1 and vc.sub == 'slc' and (f.G or L).x_slc then inv = 'slc' end     -- 11 окт: курсор на слайсе
+            D.fx_half = (type(inv) == 'number' and inv >= 4 and not c.folded and not f.env) and (vc.sub == 'val' and 'val' or 'code') or nil   -- 12 окт
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
               D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
-              local G, folded, inv_f, fw0 = f.G or L, c.folded, inv, f.w
+              local G, folded, inv_f, fw0, half = f.G or L, c.folded, inv, f.w, D.fx_half
               D.cur_box = function()
                 set(D.inv_bg)
                 if folded then gfx.rect(x, y, fw0, L.rh, 1)
+                elseif half then   -- 12 окт: половина поля команды
+                  local fx = D.field_rect(G, inv_f); local w2 = ms('00')
+                  if half == 'val' then gfx.rect(x + fx + w2 - 1, y, w2 + 2, L.rh, 1) else gfx.rect(x + fx - 1, y, w2 + 1, L.rh, 1) end
                 else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
               end
               if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
@@ -5558,7 +5577,7 @@ function D.frame(L, snap, rows, state, info)
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
-            D.cur_box = nil
+            D.cur_box = nil; D.fx_half = nil
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
               for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
