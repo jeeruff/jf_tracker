@@ -2807,7 +2807,7 @@ ctx = {
     if t1 > limit then t1 = limit end
     local trs = {}
     if all then for _, c in ipairs(snap.cols) do trs[#trs + 1] = c.track end else trs[1] = f.col.track end
-    if what == 'delete' then edit.time_delete(trs, t0, t1, limit) else edit.time_insert(trs, t0, t1 - t0, limit) end
+    if what == 'delete' then edit.time_delete(trs, t0, t1, limit, true) else edit.time_insert(trs, t0, t1 - t0, limit, true) end   -- 12 окт: ноты не режутся
     vim.msg = ('%s time: %d row(s) %s%s'):format(what, n or 1, all and 'all tracks' or f.col.name, rg and (' in ' .. (rg.name ~= '' and rg.name or 'region')) or ' (no region: to project end)')
   end,
   -- блок матрицы: mute / cut / copy / paste (буфер — state.mx_clip)

@@ -3151,7 +3151,7 @@ function D.transport_sub(c)
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
-             { 'slowplay', 'x.5', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
+             { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
            { 'smartrec', 'smart', c.smartrec and U.RED or nil },
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }

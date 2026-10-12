@@ -5,7 +5,8 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
-    'transport: the slow button under play is two - x0.5 and x2 (Ctrl+Cmd+Space / Opt+Cmd+Space; Shift+Space no longer plays slow)',
+    'Backspace / Insert of rows (Shift - all tracks): a note that runs through the rows gets shorter / longer, it is no longer cut into a second note (0Sxx); a note starting on a deleted row goes away; MIDI as before',
+    'transport: the slow button under play is two - /2 and x2 (Ctrl+Cmd+Space / Opt+Cmd+Space; Shift+Space no longer plays slow)',
     'column captions stand vertically in the normal font, one over each field, the instrument and slice fields too (note ins slc vol fx1 delay)',
     'a note property (0S 0P SI ...) typed on a row inside a note is not written to the note row above any more - the tracker says where it goes; S on the slice field starts its two digits (S03)',
     'item tab: the zoom scroll strip sits in the button row after follow - the wave and the edge zoom keep their height (the edge zoom no longer vanishes when zoomed)',

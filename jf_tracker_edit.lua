@@ -2603,7 +2603,7 @@ end
 -- ── время внутри региона: удалить / вставить (Backspace / Insert) ────────
 -- Всё, что начинается в [t1, limit), едет на dt влево (delete) или вправо
 -- (insert); дальше limit (конец региона) ничего не трогаем — паттерны жёсткие.
--- Items, попавшие под нож, режутся; автоматизация — точки и automation items
+-- MIDI-items под ножом режутся, аудио-ноты укорачиваются / удаляются (12 окт); автоматизация — точки и automation items
 -- всех огибающих трека. tracks — список MediaTrack.
 local function env_shift(tr, t0, t1, dt, limit, mode)
   if not R.CountTrackEnvelopes then return end
@@ -2637,7 +2637,7 @@ local function env_shift(tr, t0, t1, dt, limit, mode)
   end
 end
 
-function E.time_delete(tracks, t0, t1, limit)
+function E.time_delete(tracks, t0, t1, limit, notes)
   local dt = t1 - t0
   if dt <= 0 then return end
   run(('delete time %.3fs'):format(dt), function()
@@ -2646,8 +2646,15 @@ function E.time_delete(tracks, t0, t1, limit)
         local it = R.GetTrackMediaItem(tr, i)
         local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
         local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        -- 12 окт: аудио-нота — одно событие, как в Renoise: проходит через удаляемые строки — короче на них
+        -- (раньше резалась: хвост с новым смещением становился лишней нотой 0Sxx), начинается в них — удаляется.
+        -- MIDI-item — контейнер нот: режется, как раньше (ноты после ножа едут вверх)
+        local tk = R.GetActiveTake(it)
+        local audio = notes and not (tk and R.TakeIsMIDI(tk))   -- notes: строки трекера (Backspace), не длина региона
         if pos < limit - EPS and fin > t0 + EPS then
           if pos >= t1 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos - dt)
+          elseif audio and pos < t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(t0 - pos, (fin - pos) - math.min(dt, fin - t0)))
+          elseif audio then R.DeleteTrackMediaItem(tr, it)
           elseif pos < t0 - EPS and fin > t1 + EPS then
             local right = R.SplitMediaItem(it, t1)
             local mid = R.SplitMediaItem(it, t0)
@@ -2666,7 +2673,7 @@ function E.time_delete(tracks, t0, t1, limit)
   end)
 end
 
-function E.time_insert(tracks, t0, dt, limit)
+function E.time_insert(tracks, t0, dt, limit, notes)
   if dt <= 0 then return end
   run(('insert time %.3fs'):format(dt), function()
     for _, tr in ipairs(tracks) do
@@ -2674,7 +2681,12 @@ function E.time_insert(tracks, t0, dt, limit)
         local it = R.GetTrackMediaItem(tr, i)
         local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
         local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-        if pos < limit - EPS and fin > t0 + EPS then
+        local tk = R.GetActiveTake(it)
+        local audio = notes and not (tk and R.TakeIsMIDI(tk))
+        if audio and pos < t0 - EPS and fin > t0 + EPS and pos < limit - EPS then
+          -- 12 окт: аудио-нота через вставленные строки — длиннее на них, не разрез на две ноты
+          R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(fin + dt, limit) - pos)
+        elseif pos < limit - EPS and fin > t0 + EPS then
           local target = it
           if pos < t0 - EPS then target = R.SplitMediaItem(it, t0) end   -- правая часть едет
           if target then
