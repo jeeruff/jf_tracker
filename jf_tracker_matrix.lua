@@ -580,13 +580,17 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local rgn = rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)))
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
-    if MX.cur.ri == ri and MX.cur.ci == 0 then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя
+    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
     do
       -- длина в шагах по LPB (просьба 1 окт: без тактов и секунд)
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local dx = L.mx_label_w - L.mx_dur_w
+      -- 12 окт: длина — ячейка ввода: курсор встаёт (l с имени), цифры — набор шагов
+      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len'
+      if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
+      if oncur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(dx + 1, y, L.mx_dur_w - 2, L.rh, 0) end
       local hot_dur = hover.ri == ri and mx >= dx and mx < L.mx_label_w
       U.text(L.mx_label_w - L.pad - U.measure(ds), y + 1, ds, hot_dur and U.AMBER or U.GREY)
       if hot_dur then hover.dur = ri end
@@ -755,6 +759,7 @@ MX.queued = nil
 
 function MX.goto_cell(regions, snap, ri, ci)
   if ci == 0 and MX.fold then ci = MX.cur.ci > 0 and -1 or 1 end   -- свёрнута: имени нет — через него
+  if ci ~= MX.cur.ci then MX.cur.sub = nil; MX.lenbuf = nil end
   MX.cur.ri, MX.cur.ci = ri, ci
   clamp(regions, #snap.cols)
   local rg = regions[MX.cur.ri]
@@ -836,6 +841,28 @@ function MX.key(c, regions, snap)
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
+  -- 12 окт: длина слота — ячейка между именем и клетками: l с имени — на неё, ещё l — в клетки, h — назад;
+  -- цифры — шаги (Enter или третья цифра пишет; другая клавиша — сброс)
+  if MX.cur.ci == 0 and not MX.fold then
+    local right, left = ch == 'l' or c == 1919379572, ch == 'h' or c == 1818584692
+    if MX.cur.sub ~= 'len' and right then MX.cur.sub = 'len'; MX.lenbuf = nil; return true end
+    if MX.cur.sub == 'len' then
+      if right then MX.lenbuf = nil; MX.goto_cell(regions, snap, MX.cur.ri, 1); return true end
+      if left then MX.cur.sub = nil; MX.lenbuf = nil; return true end
+      if ch:match('^%d$') then
+        MX.lenbuf = (MX.lenbuf or '') .. ch
+        if #MX.lenbuf >= 3 then local b = MX.lenbuf; MX.lenbuf = nil; ctx.mx_len(b) else ctx.msg(('length %s_ steps - Enter, or a third digit'):format(MX.lenbuf)) end
+        return true
+      end
+      if c == 13 then
+        if MX.lenbuf then local b = MX.lenbuf; MX.lenbuf = nil; ctx.mx_len(b) else ctx.mx_len_prompt() end
+        return true
+      end
+      if c == 8 and MX.lenbuf then MX.lenbuf = #MX.lenbuf > 1 and MX.lenbuf:sub(1, -2) or nil; return true end
+      MX.lenbuf = nil
+    end
+  end
+  if MX.cur.ci == 1 and (ch == 'h' or c == 1818584692) and not MX.fold and not MX.count then MX.goto_cell(regions, snap, MX.cur.ri, 0); MX.cur.sub = 'len'; return true end
   -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
   -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
   if MX.cur.ci == -1 and ch:match('^%d$') and ctx.slot_pattern_num then
