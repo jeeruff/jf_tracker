@@ -3180,9 +3180,9 @@ function D.transport_groups(c)
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   local lsn = { { 'ls_ins', 'insert', c.hear and U.CYAN or U.GREY }, { 'ls_step', 'step', c.trklisten and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } }
-  g[#g + 1] = { boxed = true, { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
+  g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
-                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
+                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   if c.tpfull then table.insert(g[#g], lsn)
@@ -3274,7 +3274,18 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
     text(x + L.pad, ly + L.rh, zx, U.GREY)
     local kx = x + lw
-    if cc.tpfull then text(kx, ly + 2 * L.rh + 2, 'listen', U.GREY) end   -- 12 окт: подпись группы listen — под клавиатурой
+    -- 12 окт: velocity — под клавиатурой, третьей строкой (c - тише, C - громче, как z x для октавы)
+    if cc.tpfull then
+      local vy = ly + 2 * L.rh + 2
+      local vl = ('vel %d'):format(cc.vel or 100)
+      local vw = math.max(ms(vl), ms('vel 127'))
+      local vhot = mx >= x + L.pad - 2 and mx < x + L.pad + vw + 2 and my >= vy and my < vy + L.rh
+      if vhot then set(D.CURROW); gfx.rect(x + L.pad - 2, vy, vw + 4, L.rh, 1); hover.ctrl = 'vel' end
+      text(x + L.pad, vy, vl, vhot and U.AMBER or U.TEXT)
+      hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
+      D.strip_cell.vel = { x + L.pad, vy, vw }
+      text(math.max(kx, x + L.pad + vw + 2 * L.pad), vy, 'c- C+', U.GREY)   -- не на подпись vel (без наложений)
+    end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
     local kw0 = (D.PIANO_SMALL and 0 or ms('W')) + ms('W') + 4
@@ -3332,8 +3343,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function cw_of(it) return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
   local function gap_of(g) return g.boxed and (gap + 6) or gap end
+  -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
+  local function br_l(g) return g.bracket and (L.th + 12) or 0 end
   local function group_w(g)
-    local gw = 0
+    local gw = br_l(g) + (g.bracket and 8 or 0)
     local gp = gap_of(g)
     for _, row in ipairs(g) do
       local rw = 0
@@ -3344,6 +3357,17 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   local function draw_group(g, gx, gw, y0)
     local gap = gap_of(g)
+    if g.bracket then
+      local by0, bh = (y0 or ly) - 1, #g * L.rh + 1
+      local bx = gx + L.th + 4
+      local tl = math.min(ms(g.bracket), bh)
+      D.vtext(gx, by0 + math.floor((bh - tl) / 2), tl, g.bracket, U.GREY, U.PANEL)
+      local bc = U.mix(U.LINE, U.PANEL, 0.2)
+      set(bc); gfx.rect(bx, by0, 1, bh, 1); gfx.rect(bx, by0, 4, 1, 1); gfx.rect(bx, by0 + bh - 1, 4, 1, 1)
+      local rx = gx + gw - 1
+      gfx.rect(rx, by0, 1, bh, 1); gfx.rect(rx - 3, by0, 4, 1, 1); gfx.rect(rx - 3, by0 + bh - 1, 4, 1, 1)
+      gx = gx + br_l(g)
+    end
     for ri, row in ipairs(g) do
       local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh
       for _, it in ipairs(row) do
