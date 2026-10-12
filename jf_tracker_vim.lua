@@ -1520,13 +1520,6 @@ function V.key_impl(c)
       end
       return env_normal(c)
     end
-    if fld == 2 and (c == ('/'):byte() or c == ('\\'):byte()) then
-      -- vol аудио-события: / фейд-ин, \ фейд-аут за 1 бит (команды SIxx/SOxx, xx = 1/16 строки)
-      local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
-      local xx = math.min(255, lpb() * 16)
-      for _, h in ipairs(heads) do if h.kind == 'audio' then E.set_fx({ h }, lpb(), c == ('/'):byte() and 'SI' or 'SO', xx) end end
-      V.hexbuf = nil; return
-    end
     if c == BS or c == DEL then
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       if fld == 1 then E.delete(heads, lpb())

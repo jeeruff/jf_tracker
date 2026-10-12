@@ -5,6 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
+    '/ and \\ on the volume field no longer make fades (fades: SIxx / SOxx or :fade in|out)',
     'effect commands are two-char codes + two hex digits, as in Renoise: 0x effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), Sx sample properties (SI SO fades, SB beatsync, SF finetune in cents, SL loop, SM channel mode), Zx song (ZT tempo, ZJ jump to a sequence slot); the old one-letter commands are gone (P was both pitch and probability)',
     'browser: zoxide - every folder you open is remembered (often + recently); :z drums kick jumps to the best match, :zi lists them',
     'panes (tmux / zellij): the window is a tree of splits, every module a pane, stacks = tabs; titles in the pane border; Cmd+h j k l focus, Cmd+Shift+h j k l move, Ctrl+W pane mode (split, stack, swap, size, zoom, hide, layouts, undo), :pane; drag the line between panes; key hints in one line at the bottom; the layout lives in screensets; the old position options are gone (Options - panes off brings the old layout back)',

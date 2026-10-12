@@ -486,11 +486,10 @@ keysin(':ramp 40 2b'); V.key(13); eq(':ramp 40 2b → 8 rows', last(), 'envramp:
 keysin(':ramp ff 3'); V.key(13); eq(':ramp ff 3 → 3 rows', last(), 'envramp:Volume@13-16:cur>1.00')
 V.cur.row = 0; keysin('V'); keysin('6j'); keysin(':ramp 00'); V.key(13)
 eq(':ramp in V-LINE uses selection', last(), 'envramp:Volume@0-6:cur>0.00'); eq('back to normal', V.mode, 'normal')
--- vol-поле аудио: / \ = фейды за 1 бит (Ixx/Oxx, xx = LPB·16)
+-- 12 окт: / \ на vol-поле больше не фейды (фейды — SIxx / SOxx, :fade)
 reset()
 V.cur = { fi = 1, row = 0, field = 2 }
-keysin('i/');      eq('/ on vol → fade-in 1 beat', last(), 'fx:kick:SI40')
-keysin('\\');      eq('\\ on vol → fade-out 1 beat', last(), 'fx:kick:SO40')
+keysin('i/');      eq('/ on vol is not a fade', (last() or ''):match('^fx:') == nil, true)
 V.key(27)
 keysin(':fade out 2'); V.key(13); eq(':fade out 2 rows', last(), 'fx:kick:SO20')
 keysin(':fade in 1b'); V.key(13); eq(':fade in 1b', last(), 'fx:kick:SI40')
