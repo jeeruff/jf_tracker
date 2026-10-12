@@ -3181,7 +3181,10 @@ function D.transport_groups(c)
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   g[#g + 1] = { { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
-                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'hear', 'hear', c.hear and U.CYAN or U.GREY, res = 'hear' } } }   -- 12 окт: hear — слышать вставленную ноту (была insert в lib)
+                { { 'vel', ('vel %d'):format(c.vel or 100), res = 'vel 127' }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
+  -- 12 окт: listen — что звучит при правке: step (вставленная нота), sel (выделение), line (шаг под курсором)
+  g[#g + 1] = { { { 'listen', 'listen', U.GREY } },
+                { { 'ls_step', 'step', c.hear and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } } }
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
   -- punch, pre-roll, rec>lib
@@ -3521,6 +3524,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local order = {}
   local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   addg('step')
+  addg('listen')   -- 12 окт: step / sel / line
   order[#order + 1] = { w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
