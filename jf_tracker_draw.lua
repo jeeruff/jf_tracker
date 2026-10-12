@@ -3179,7 +3179,7 @@ function D.transport_groups(c)
   -- 9 окт: LPB — к step / inst (настройки ввода); swing — самым правым блоком со слайдером
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
-  local lsn = { { 'ls_ins', 'insert', c.hear and U.CYAN or U.GREY }, { 'ls_step', 'step', c.trklisten and U.CYAN or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.CYAN or U.GREY }, { 'ls_line', 'line', c.steplisten and U.CYAN or U.GREY } }
+  local lsn = { { 'ls_ins', 'insert', c.hear and U.AMBER or U.GREY }, { 'ls_step', 'step', c.trklisten and U.AMBER or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.AMBER or U.GREY }, { 'ls_line', 'line', c.steplisten and U.AMBER or U.GREY } }   -- включённые — янтарём (ярче голубого)
   g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
                 { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
@@ -3344,9 +3344,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
   local function gap_of(g) return g.boxed and (gap + 6) or gap end
   -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
-  local function br_l(g) return g.bracket and (L.th + 12) or 0 end
+  local function br_l(g) return g.bracket and (L.th + 8) or 0 end
   local function group_w(g)
-    local gw = br_l(g) + (g.bracket and 8 or 0)
+    local gw = br_l(g)
     local gp = gap_of(g)
     for _, row in ipairs(g) do
       local rw = 0
@@ -3359,13 +3359,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local gap = gap_of(g)
     if g.bracket then
       local by0, bh = (y0 or ly) - 1, #g * L.rh + 1
-      local bx = gx + L.th + 4
       local tl = math.min(ms(g.bracket), bh)
       D.vtext(gx, by0 + math.floor((bh - tl) / 2), tl, g.bracket, U.GREY, U.PANEL)
-      local bc = U.mix(U.LINE, U.PANEL, 0.2)
-      set(bc); gfx.rect(bx, by0, 1, bh, 1); gfx.rect(bx, by0, 4, 1, 1); gfx.rect(bx, by0 + bh - 1, 4, 1, 1)
-      local rx = gx + gw - 1
-      gfx.rect(rx, by0, 1, bh, 1); gfx.rect(rx - 3, by0, 4, 1, 1); gfx.rect(rx - 3, by0 + bh - 1, 4, 1, 1)
+      -- 12 окт: без рамок и скобок (в Big Blue наезжали) — только буквы
       gx = gx + br_l(g)
     end
     for ri, row in ipairs(g) do
@@ -3374,7 +3370,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         local iw = cw_of(it)
         local hot = cell_hot(cx, cy, iw, L.rh)
         if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, L.rh, 1); hover.ctrl = it[1] end
-        if g.boxed then set(hot and U.AMBER or U.mix(U.LINE, U.PANEL, 0.4)); gfx.rect(cx - 3, cy, iw + 6, L.rh - 1, 0) end
         text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
         if it.beats then
           local bs = math.max(4, L.rh - 6)
