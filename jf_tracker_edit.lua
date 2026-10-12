@@ -813,7 +813,12 @@ function E.split(heads, lpb, row)
       if h.kind == 'audio' then
         local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
         local len = R.GetMediaItemInfo_Value(h.item, 'D_LENGTH')
-        if t > pos + 1e-6 and t < pos + len - 1e-6 then R.SplitMediaItem(h.item, t) end
+        if t > pos + 1e-6 and t < pos + len - 1e-6 then
+          local right = R.SplitMediaItem(h.item, t)
+          -- 12 окт: правая часть играет с середины слайса — метка слайса не её (показывалась та же S02,
+          -- три одинаковые ноты подряд); без метки модель покажет смещение 0Sxx
+          if right then R.GetSetMediaItemInfo_String(right, 'P_EXT:jf_slice', '', true) end
+        end
       elseif h.kind == 'midi' then
         local i, n = midi_note(h, lpb)
         if i then
