@@ -65,7 +65,7 @@ TRACE = []
 def key(code, cap=0, timeout=3.0):
     """одна клавиша; возвращает хвост ack («ok normal tracker row3 fi1 fld… msg=…»)"""
     _n[0] += 1
-    tok = f'{code},{cap}#{_n[0]}'
+    tok = f'{code},{cap}#{_n[0]}.{os.getpid()}'   # 12 окт: pid — токен уникален между запусками (повтор той же клавиши терялся)
     setext('inject', tok)
     TRACE.append(tok)
     t0 = time.time()

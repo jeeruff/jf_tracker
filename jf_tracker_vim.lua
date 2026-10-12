@@ -632,19 +632,13 @@ local function hex_entry(c, fld, heads)
   local buf = V.hexbuf or ''
   local is_hex = ch:match('^[0-9A-F]$') ~= nil
   if fld >= 4 and #buf < 2 then
-    -- 6 окт, как в трекерах: команды просто стоят в колонках fx1, fx2 … по
-    -- порядку. Занятая колонка: цифры меняют ЗНАЧЕНИЕ её команды; другая
-    -- команда — только после удаления (BS). Пустая — код + две цифры
-    local f = heads[1] and (heads[1].fx or {})[fld - 3]
-    if f and buf == '' then
-      if is_hex then V.hexbuf = f:sub(1, 2) .. ch; return false end
-      if ch:match('^%a$') then V.msg = ('%s: digits change its value; BS deletes it, then type another effect'):format(f) end
-      return false
-    end
+    -- 12 окт: в колонке команд набор — всегда команда целиком (код + две цифры), как в трекерах;
+    -- стоит другая — заменяется. Только значение — Enter (выпадашка) или + / -
+    -- (было 6 окт: в занятой колонке цифры меняли значение — 0D20 молча становился 0U0D)
     if buf == '' then
       if not fx_prefix_ok(ch) then return false end
-      -- 12 окт: команде нужна нота — нет ни своей, ни звучащей: сказать на первой клавише
-      if #heads == 0 then V.msg = 'commands belong to a note: no note sounds in this row - put the cursor on a note (or its rows)'; return 'none' end
+      -- 12 окт: набор копится всегда — нота ищется в момент записи (сразу после прошлой записи снимок
+      -- ещё не пересобран и строка кажется пустой: первая клавиша следующей команды терялась)
       V.hexbuf = ch; return false
     end
     if not fx_code_ok(buf .. ch) then V.msg = ('%s%s: no such effect (0x effects, Sx sample, Zx song; Enter - the list)'):format(buf, ch); return false end
@@ -666,7 +660,18 @@ local function hex_entry(c, fld, heads)
   if #heads == 0 then V.msg = 'no note in this row - type the note first (vol / delay / effects belong to a note)'; return 'none' end
   if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
-  else ctx.edit.set_fx(heads, lpb(), buf:sub(1, 2), tonumber(buf:sub(3), 16)) end
+  else
+    -- 12 окт: в этой колонке стояла другая команда — она уступает место новой
+    local code = buf:sub(1, 2)
+    for _, h in ipairs(heads) do
+      local old = (h.fx or {})[fld - 3]
+      if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ h }, lpb(), old:sub(1, 2)) end
+    end
+    ctx.edit.set_fx(heads, lpb(), code, tonumber(buf:sub(3), 16))
+    local h1 = heads[1]
+    local hr = h1 and h1.row0
+    if hr and hr ~= V.cur.row then V.msg = ('%s -> the note at %04d (commands belong to the sounding note)'):format(buf, hr) end
+  end
   return true
 end
 
