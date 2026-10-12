@@ -15196,7 +15196,8 @@ local function frame()
     local mdown = gfx.mouse_cap & 64 == 64
     local mclick = mdown and not ctx.smart_mdown
     ctx.smart_mdown = mdown
-    if (U.click or U.rclick) and MX.SMART.p then
+    if (U.click or U.rclick or mclick) and MX.SMART.p then
+      -- 12 окт: средний щелчок по открытой панели — тоже выбор (открыл средним — выбрал средним)
       MX.SMART.click(gfx.mouse_x, gfx.mouse_y, U.rclick); U.click, U.rclick = false, false
     elseif mclick and hover.row and hover.fi and not hover.row.clip and not OPT.active and not (vim.hydra or vim.picker) then
       ctx.set_focus('tracker')

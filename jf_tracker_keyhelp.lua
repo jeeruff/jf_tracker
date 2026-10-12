@@ -75,7 +75,7 @@ KH.PAGES = {
     { k = "` Ctrl+O / Ctrl+I", d = "jumps: back / forward to where you were before a jump (f label, harpoon); ` - back without Control (in INSERT ` stays note-off)" },
     { k = "'a '1..'9 '' 'd", d = "harpoon: pin the place under the cursor - a track row (tracker), a cell (matrix) or a parameter (DSP); jump to pin 1..9 (the focus goes to its module), list the pins by module (fzf), unpin; works in the tracker, the matrix and DSP; per project" },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
-    { k = 'gs  Ctrl+Enter  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with the mouse or h j k l + Enter; VISUAL - the whole block' },
+    { k = 'gs  Ctrl+Enter  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with a left or middle click or h j k l + Enter; VISUAL - the whole block' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
