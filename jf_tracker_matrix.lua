@@ -269,6 +269,12 @@ end
 -- события), микровид — штрихи по позициям; заглушено — X поверх.
 -- Возвращает hover = { ri=, ci=, prev=, next=, btn= }.
 
+-- 12 окт: рамка клетки со срезанными углами (по пикселю), внутри своей клетки с отступом 1 —
+-- между соседями 2 px пустоты: видно, за чей край взялся
+function MX.box(x, y, w, h)
+  gfx.rect(x + 1, y, w - 2, 1, 1); gfx.rect(x + 1, y + h - 1, w - 2, 1, 1)
+  gfx.rect(x, y + 1, 1, h - 2, 1); gfx.rect(x + w - 1, y + 1, 1, h - 2, 1)
+end
 function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   do   -- 9 окт: ширина имени региона на следующий кадр (MX.width) — по всем регионам, не по видимым
     local w = 0
@@ -603,7 +609,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if ci > MX.hs then
       local g = grid[ri][ci]
       local col = snap.cols[ci]
-      U.set(U.DIM); gfx.rect(x, y, L.mx_cell_w, rh, 0)
+      U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
       local iw = L.mx_cell_w - 4
       if MX.fill then
         if MX.zoom == 'detail' then
@@ -683,8 +689,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
       if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
       if MX.cur.ri == ri and MX.cur.ci == ci then
-        U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x, y, L.mx_cell_w, rh, 0)
-        gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 2, 0)
+        U.set(MX.focus and U.AMBER or U.LINE); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+        gfx.rect(x + 2, y + 2, L.mx_cell_w - 4, rh - 4, 0)
       end
       if hover.ri == ri and mx >= x and mx < x + L.mx_cell_w then
         hover.ci = ci
@@ -712,10 +718,17 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- 9 окт, как в Renoise: край клетки (верх / низ, 3 px) — потянуть, и клетка
   -- повторится в следующих слотах (алиасы; Option — уникальные копии)
   do
+    -- 12 окт: край, за который взялся (наведение или идёт протяжка), — полоса 3 px и подсвеченная четверть клетки
     local e = hover.cellrep
+    local d = ctx.mx_rep
+    if d and not e then e = { ri = d.ri, ci = d.ci, edge = d.dir < 0 and 'top' or 'bottom', x = L.mx_label_w + (d.ci - 1 - MX.hs) * L.mx_cell_w } end
     if e and MX.row_y[e.ri] then
-      local ey = MX.row_y[e.ri] + (e.edge == 'top' and 0 or rh - 2)
-      U.set(U.AMBER); gfx.rect(e.x, ey, L.mx_cell_w, 2, 1)
+      local y0, w = MX.row_y[e.ri] + 1, L.mx_cell_w - 2
+      local q = math.max(3, math.floor((rh - 2) / 4))
+      local ty = e.edge == 'top' and y0 or (y0 + rh - 2 - q)
+      U.set(U.AMBER); gfx.a = 0.18; gfx.rect(e.x + 2, ty, w - 2, q, 1); gfx.a = 1
+      local ey = e.edge == 'top' and y0 or (y0 + rh - 2 - 3)
+      gfx.rect(e.x + 2, ey, w - 2, 3, 1)
     end
   end
   do
@@ -823,6 +836,17 @@ function MX.key(c, regions, snap)
     if c == 8 then dx = -1 elseif c == 12 then dx = 1 elseif c == 10 then dy = 1 else dy = -1 end
     MX.goto_cell(regions, snap, MX.cur.ri + dy, MX.cur.ci + dx); return true
   end
+  -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
+  -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
+  if MX.cur.ci == -1 and ch:match('^%d$') and ctx.slot_pattern_num then
+    local buf = (MX.numbuf or '') .. ch
+    local n, maxn = tonumber(buf), (ctx.pattern_count and ctx.pattern_count()) or 99
+    if #buf < 2 and n * 10 <= maxn then MX.numbuf = buf; ctx.msg(('pattern %s_ (the next digit, or Enter)'):format(buf)); return true end
+    MX.numbuf = nil
+    ctx.slot_pattern_num(n)
+    return true
+  end
+  if MX.cur.ci == -1 and c == 13 and MX.numbuf then local n = tonumber(MX.numbuf); MX.numbuf = nil; ctx.slot_pattern_num(n); return true end
   -- 10 окт: D / Backspace / Del — на номере или имени слота удалить слот, на
   -- ячейке вырезать её (раньше Backspace уходил в трекер и удалял там строку)
   if ch == 'D' or ((c == 8 or c == 6579564) and not mods.ctrl) then
@@ -848,20 +872,8 @@ function MX.key(c, regions, snap)
   -- 9 окт: курсор на имени (ci 0) — Enter / i / r переименовать; на номере
   -- (ci −1) — Enter: номер паттерна цифрами (10 окт; < > — листать)
   if MX.cur.ci == 0 and (c == 13 or ch == 'i' or ch == 'r') then ctx.mx_name_prompt(); return true end
-  if MX.cur.ci == -1 and c == 13 and MX.numbuf then local n = tonumber(MX.numbuf); MX.numbuf = nil; ctx.slot_pattern_num(n); return true end
   if MX.cur.ci == -1 and c == 13 then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() else ctx.slot_cycle(MX.cur.ri, 1) end; return true end
   if MX.cur.ci < 1 and (ch == 'm' or ch == 'M' or ch == 'x' or c == 22 or c == 3 or c == 24) then ctx.msg('on the region name / number - move to a track cell (l)'); return true end
-  -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
-  -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
-  if MX.cur.ci == -1 and ch:match('^%d$') and not MX.count and ctx.slot_pattern_num then
-    local buf = (MX.numbuf or '') .. ch
-    local n, maxn = tonumber(buf), (ctx.pattern_count and ctx.pattern_count()) or 99
-    if #buf < 2 and n * 10 <= maxn then MX.numbuf = buf; ctx.msg(('pattern %s_ (the next digit, or Enter)'):format(buf)); return true end
-    MX.numbuf = nil
-    ctx.slot_pattern_num(n)
-    return true
-  end
-  if MX.cur.ci == -1 and c == 13 and MX.numbuf then local n = tonumber(MX.numbuf); MX.numbuf = nil; ctx.slot_pattern_num(n); return true end
   MX.numbuf = nil
   -- слой лупов: цифры+Enter, > < + - = — лупы ячейки (вместо паттерна / длины)
   if MX.loops and ctx.mx_loop_key and ctx.mx_loop_key(c) then return true end

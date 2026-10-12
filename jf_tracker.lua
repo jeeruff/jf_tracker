@@ -7382,6 +7382,37 @@ ctx = {
     vim.open_hydra({ title = 'metronome', items = items, how = 'click metro in the transport, or f + its label, then the letter' })
     state.popup_at = { kind = 'strip', id = 'metro' }
   end,
+  -- 12 окт: подсказки транспорта в статусе — что это и зачем, не только «click / wheel»
+  CTRL_TIP = {
+    pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
+    lpb = 'LPB, lines per beat: how many rows make one beat (4 - a row is a 16th note, 8 - a 32nd). More rows = finer grid. Click / wheel - change',
+    inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; a , . in INSERT do the same',
+    oct = 'octave of the note keys (q w e ... = C D E ...): z - lower, x - higher; wheel changes it too',
+    sig = 'time signature: beats per bar / beat length (4/4, 3/4, 7/8 ...). Click - type it',
+    metro = 'metronome on / off; click - the menu (pattern, pre-roll, settings)',
+    beats = 'where the play position is: bar and beat; the squares are the beats of this bar',
+    rate = 'project play rate (speed x tempo, pitch too): x1 - normal. Click - the list, wheel - +-0.05',
+    ratebar = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2',
+    swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
+    swingbar = 'swing amount: drag left / right from the middle',
+    bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
+    tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
+    tp_play = 'play / stop (Space) - starts at the tracker cursor row',
+    rec = 'record (Option+R): the cursor track, from the cursor row',
+    loop = 'loop on / off: playback repeats the time selection (the loop)',
+    tp_start = 'to the project start', tp_end = 'to the project end',
+    freeze = 'freeze: a short loop around the play position (wheel - its length 1/32 .. 2 bars, shown on the button); again - back as it was',
+    slowplay = 'play at /2 - half speed (Ctrl+Cmd+Space); again or Space - stop, x1 back',
+    fastplay = 'play at x2 - double speed (Opt+Cmd+Space); again or Space - stop, x1 back',
+    shiftrec = 'shift rec: waits for a MIDI note, then records from the cursor row at the project rate (record slow at x0.5 - it plays back fast); again - cancel',
+    dub = 'dub: copy the loop forward and keep going (rclick - copy / move / random mutes)',
+    punch = 'punch: records only inside the time selection (cursor region)',
+    preroll = 'pre-roll: playback / recording starts a bit earlier (count-in)',
+    reclib = 'rec -> lib: every recorded take also becomes a lib instrument',
+    follow = 'follow: the view scrolls with the play position (F)',
+    lock = 'lock: the tracker cursor and the REAPER edit cursor (and the selected track) are one; play starts at the tracker row',
+    fixed = 'fixed cursor: the cursor row stays in the middle, the rows move (zZ)',
+  },
   -- 11 окт: подписи кнопок
   frz_label = function(len)
     local t = { [0.125] = '1/32', [0.25] = '1/16', [0.5] = '1/8', [1] = '1/4', [2] = '1/2', [4] = '1 bar', [8] = '2 bar' }
@@ -15270,6 +15301,7 @@ local function frame()
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
   elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_mixup = 'mixer above the tracker, in the headers', q_mixdn = 'mixer under the tracker', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
+  elseif hover.ctrl and ctx.CTRL_TIP[hover.ctrl] then state.status = ctx.CTRL_TIP[hover.ctrl]   -- 12 окт: что делает ячейка транспорта, коротко
   elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}

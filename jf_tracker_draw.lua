@@ -3403,13 +3403,22 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function draw_text_buttons(bx0)
     local bx = bx0
     local by, bh = ly, 2 * L.rh - 1
-    for _, b in ipairs(blist) do
+    -- 12 окт: срезанный угол — только у крайних кнопок блока (фон в угол, рамка по диагонали, 2 px)
+    local function cut(cx, cy, dx, dy, frame)
+      set(U.PANEL); gfx.rect(cx, cy, 1, 1, 1); gfx.rect(cx + dx, cy, 1, 1, 1); gfx.rect(cx, cy + dy, 1, 1, 1)
+      set(frame); gfx.rect(cx + dx, cy + dy, 1, 1, 1)
+    end
+    local sub_on = c.tpfull
+    for bi, b in ipairs(blist) do
       local bw = tbw
       local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] ~= nil
       local tc = hot and U.AMBER or (b[4] or b[3] or U.TEXT)
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
-      set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(bx, by, bw, bh, 0)
+      local fr = hot and U.AMBER or (on and b[3] or U.LINE)
+      set(fr); gfx.rect(bx, by, bw, bh, 0)
+      if bi == 1 then cut(bx, by, 1, 1, fr); if not sub_on then cut(bx, by + bh - 1, 1, -1, fr) end end
+      if bi == #blist then cut(bx + bw - 1, by, -1, 1, fr); if not sub_on then cut(bx + bw - 1, by + bh - 1, -1, -1, fr) end end
       local sym = b[5] or ''
       -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
       local gap2 = math.max(0, math.floor((bh - 2 * L.th - 3) / 2))
@@ -3423,7 +3432,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if c.tpfull then
       local sub = D.transport_sub(c)
       local sx, sy = bx0, by + bh + 2
-      for _, b in ipairs(sub) do
+      for si, b in ipairs(sub) do
         if b.halves then
           local hw = math.floor((tbw - 2) / 2)
           for k, h in ipairs(b.halves) do
@@ -3441,7 +3450,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local hot = mx >= sx and mx < sx + tbw and my >= sy and my < sy + L.rh
           local on = b[3] ~= nil
           set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tbw, L.rh, 1)
-          set(hot and U.AMBER or (on and b[3] or U.LINE)); gfx.rect(sx, sy, tbw, L.rh, 0)
+          local fr2 = hot and U.AMBER or (on and b[3] or U.LINE)
+          set(fr2); gfx.rect(sx, sy, tbw, L.rh, 0)
+          if si == 1 then cut(sx, sy + L.rh - 1, 1, -1, fr2) end
+          if si == #sub then cut(sx + tbw - 1, sy + L.rh - 1, -1, -1, fr2) end
           text(sx + math.floor((tbw - ms(b[2])) / 2), sy, fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY))
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tbw, L.rh, b[1])
