@@ -233,7 +233,7 @@ function MX.width(L, nregions, ncols)
   L.mx_arrow_w = U.measure('<')
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
   L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4) or 0
-  L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('00') + L.pad
+  L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
   L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
   L.mx_sig_w = (MX.fold or MX.sig_same) and 0 or (U.measure('15/16') + L.pad)
@@ -504,6 +504,18 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   MX.scroll = math.max(0, math.min(MX.scroll, math.max(0, #regions - nvis)))
   local aw = U.measure('<')
+  -- 12 окт: секции (регион без кода поверх паттернов): полоса слева у их слотов, имя — вместо такта
+  -- на первой строке секции
+  local sec_of, sec_first = {}, {}
+  for _, sc in ipairs(ctx.sections and ctx.sections() or {}) do
+    local first = true
+    for ri2, rg2 in ipairs(regions) do
+      if not rg2.gap and rg2.pos >= sc.pos - 1e-6 and rg2.rgnend <= sc.rgnend + 1e-6 then
+        sec_of[ri2] = sc
+        if first then sec_first[ri2] = sc; first = false end
+      end
+    end
+  end
   for i = 1, nvis do
     local ri = MX.scroll + i
     local rg = regions[ri]
@@ -539,7 +551,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     -- линейка: черта начала слота, «такт.доля», риски тактов (длинные) и долей
     if RW > 0 then
       U.set(U.LINE); gfx.rect(0, y, RW - 2, 1, 1)
-      if info.bar_label then U.text(L.pad, y + 1, info.bar_label(rg.pos), U.GREY) end
+      local sc = sec_first[ri]
+      local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)
+      if sc then U.text(L.pad, y + 1, ctx.fit(sc.name, RW - L.pad - 9), scc)
+      elseif info.bar_label then U.text(L.pad, y + 1, info.bar_label(rg.pos), U.GREY) end
+      if scc then U.set(scc); gfx.rect(2, y, 2, rh, 1) end   -- x 0..1 — под рамкой модуля
       if info.ticks then
         for _, tk in ipairs(info.ticks(rg)) do
           local ty = y + math.floor(tk.f * rh)
@@ -553,7 +569,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local lc = playing and U.AMBER or (queued and U.CYAN or U.TEXT)
     local xa = RW + L.pad                              -- '<'
     local xn = xa + aw + 3                             -- номер
-    local xb = xn + U.measure('00') + 3                -- '>'
+    local xb = xn + U.measure('000') + 3               -- '>'
+    local SEC = ctx.SEC
+    local cl, cn, crest
+    if SEC and not rg.gap then cl, cn, crest = SEC.code_of(rg.name) end
     local hot_prev = hover.ri == ri and mx >= xa and mx < xn
     local hot_next = hover.ri == ri and mx >= xb and mx < xb + aw + 3
     if rg.gap then
@@ -561,7 +580,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.text(xn, y + 1, '..', U.DIM)
     else
       U.text(xa, y + 1, '<', hot_prev and U.AMBER or U.GREY)
-      U.text(xn, y + 1, ('%02d'):format((info.pat_num and info.pat_num(rg) or rg.idx) % 100), U.TEXT)
+      -- 12 окт: код паттерна (A1, D12) вместо номера; без кода — номер как раньше
+      local num = cl and (cl .. cn) or ('%02d'):format((info.pat_num and info.pat_num(rg) or rg.idx) % 100)
+      U.text(xn + math.floor((U.measure('000') - U.measure(num)) / 2), y + 1, num, cl and lc or U.TEXT)
       U.text(xb, y + 1, '>', hot_next and U.AMBER or U.GREY)
       if hot_prev then hover.prev = ri elseif hot_next then hover.next = ri end
     end
@@ -578,7 +599,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
-    local rgn = rg.gap and 'bar' or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)))
+    local rgn = rg.gap and 'bar' or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
     if hot_name then hover.name = ri end
     if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя

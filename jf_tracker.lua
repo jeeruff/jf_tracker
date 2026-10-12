@@ -22,6 +22,7 @@ local EXT = 'jf_tracker'
 
 local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия (5 окт, релиз: без внешних зависимостей)
 local model = dofile(DIR .. '/jf_tracker_model.lua')
+model.SEC = dofile(DIR .. '/jf_tracker_sections.lua')   -- 12 окт: коды паттернов, секции
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
 draw.arr = dofile(DIR .. '/jf_tracker_arr.lua')           -- аранжировки = наборы играющих лейнов (9 окт)
 draw.llm = dofile(DIR .. '/jf_tracker_llm.lua')         -- 10 окт: мост к модели / MCP (ExtState llm_in → файл ответа)
@@ -6531,10 +6532,10 @@ ctx = {
     for _, r in ipairs(regions) do used[r.name] = true end
     for k = 1, count do
       local nm = (name and name ~= '') and (count > 1 and (name .. ' ' .. k) or name) or nil
-      if not nm then
-        local j = n0 + k
-        while used[('%02d'):format(j)] do j = j + 1 end
-        nm = ('%02d'):format(j)
+      if not nm then   -- 12 окт: код как у Elektron — следующая свободная буква с номером 1 (C1)
+        local taken = {}
+        for u in pairs(used) do taken[#taken + 1] = { name = u } end
+        nm = model.SEC.next_family(taken)
       end
       used[nm] = true
       names[k] = nm
@@ -7360,11 +7361,13 @@ ctx = {
       if not rg.gap then alias.set_end(rg, t1) end
       if dt > 0 then edit.time_insert(tracks, rg.rgnend, dt, math.huge)
       else edit.time_delete(tracks, t1, rg.rgnend, math.huge) end
+      -- 12 окт: длина свободного такта создаёт паттерн (следующая буква с 1): у такта появляется код
+      if rg.gap then rg.code = model.SEC.next_family(regions); reaper.AddProjectMarker2(0, true, rg.pos, t1, rg.code, -1, 0) end
     end)
     edit.after = hook
     ctx.mx_refresh()
     local steps = (reaper.TimeMap2_timeToQN(0, t1) - (rg.qn0 or reaper.TimeMap2_timeToQN(0, rg.pos))) * state.lpb
-    vim.msg = ('%s: %d steps (%+.3fs; later regions and items moved)'):format(rg.gap and 'free bar' or ('region ' .. rg.name), math.floor(steps + 0.5), dt)
+    vim.msg = ('%s: %d steps (%+.3fs; later regions and items moved)'):format(rg.gap and ('new pattern ' .. (rg.code or '')) or ('region ' .. rg.name), math.floor(steps + 0.5), dt)
   end,
   -- ── панель свойств сэмпла (2 окт) ───────────────────────────────────
   pitch_mode_name = function(m)
@@ -11322,6 +11325,8 @@ ctx = {
 
 edit.init(model)
 ctx.AIM = dofile(DIR .. '/jf_tracker_aim.lua')   -- 12 окт: математика прицела (тест test_aim)
+ctx.SEC = model.SEC   -- 12 окт: коды паттернов / секции (матрица)
+ctx.sections = function() return regions.sections or {} end
 -- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
 edit.start_at = function() if state.lock and vim and vim.cur then return edit.row_time(vim.cur.row, state.lpb, 0) end end
 alias.init(model, edit)
@@ -11372,8 +11377,9 @@ edit.after = function(desc)
       if next_pos and t1 > next_pos then t1 = next_pos end
       if s1 and t1 > s1 then t1 = s1 end
       if t1 > t0 + 1e-4 then
-        reaper.AddProjectMarker2(0, true, t0, t1, '', -1, 0)
-        vim.msg = 'new pattern: region created for this bar'
+        local code = model.SEC.next_family(regions)   -- 12 окт: новый паттерн сразу с кодом
+        reaper.AddProjectMarker2(0, true, t0, t1, code, -1, 0)
+        vim.msg = 'new pattern ' .. code .. ': region created for this bar'
         model.invalidate()
       end
     end

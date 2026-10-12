@@ -774,6 +774,10 @@ function A.free_name(regions, name)
   local used = {}
   for _, r in ipairs(regions) do used[r.name] = true end
   if name == '' then return '' end
+  -- 12 окт: код (A1, D12 verse) — следующий номер той же буквы: вариант того же семейства
+  local SEC = model and model.SEC
+  local cv = SEC and SEC.next_variant(regions, name)
+  if cv then return cv end
   local num = tonumber(name)
   if num then
     local k = num + 1

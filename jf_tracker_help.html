@@ -216,6 +216,12 @@ such as <code>:interp vol</code> (a ramp), <code>:arp up 2</code>, <code>:scramb
 <p>The song is a list of patterns. A pattern is a REAPER region; regions with the same name are copies of one pattern
 (aliases), and an edit in one copy goes into all of them (<code>autosync</code>). Each slot row shows the name, the time
 signature and the length; a click on them edits. Cells are pattern × track.</p>
+<p>Pattern codes, as Elektron banks: a name that starts with a letter and a number (<code>A1</code>, <code>D12 verse</code>)
+is a code, shown in the number box. The letter is a family of variants: a new pattern takes the next free letter
+(<code>C1</code>), a clone the next number of its letter (<code>A1</code> → <code>A3</code>), an alias the same code. A length
+typed on a free bar makes a pattern there. A region without a code over other regions is a <b>section</b>
+(<code>verse</code> over A1 A2): not a slot, its name stands in the ruler and a strip marks its slots; its edges follow its
+first and last pattern after every edit. Old names keep working as patterns.</p>
 <table>
 <tr><td><kbd>Space</kbd> on a slot</td><td>queue it: it starts at the end of the playing one (live)</td></tr>
 <tr><td><kbd>o</kbd> <kbd>O</kbd> <kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd></td><td>new slot after / before, delete, copy, paste: slots edit like Vim lines</td></tr>
@@ -307,6 +313,7 @@ one pattern. The keyboard on the left shows what the note keys play and hides wi
 <tr><td>command column</td><td>two-char code + two hex digits, as in Renoise: <code>0x</code> effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch slide, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), <code>Sx</code> sample properties (SI SO fades, SB beatsync, SF finetune in cents, 80 = 0, SL loop, SM channel mode), <code>Zx</code> song (ZT tempo, ZJ jump to a sequence slot); the field has two halves, as in Renoise: the code on the left (one letter is 0x - D = 0D; S and Z are prefixes - SI, ZT), the value on the right (two hex digits; typed alone they keep the code there or the dim one from above); typing a code and its value replaces the command in that column; only the value - Enter (the list with the current one) or + -; every row has its own command: on a row inside a note it works from that row to the next command of the same kind (or the note end), 00 stops it - as in Furnace; rows where a command still runs show it dim, <code>`</code> there writes its stop (the same key as note-off); item properties (0S 0M 0P SI SO SL SM SB SF) belong to the whole note and are typed on its first row - on a row inside the note the tracker says so and writes nothing (it used to put them into the row above silently); Enter on the field - the list (code and name)</td></tr>
 <tr><td>sound (lib)</td><td>a distinct audio source; slices are times stored on the item</td></tr>
 <tr><td>pattern</td><td>a region; same name — the same pattern</td></tr>
+<tr><td>section</td><td>a region without a code over patterns; follows them</td></tr>
 <tr><td>envelope column</td><td>a visible track envelope, in its theme colour</td></tr>
 <tr><td>undo</td><td>one REAPER undo step per edit, named <code>jf_tracker: …</code></td></tr>
 </table>

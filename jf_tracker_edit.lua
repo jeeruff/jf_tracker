@@ -188,6 +188,39 @@ local function rescue(pre)
   if #saved > 0 then E.rescued = saved end
 end
 
+-- 12 окт: секции (регион без кода поверх паттернов) держатся за свои паттерны: снимок до правки,
+-- после — края от первого до последнего (паттерн вырос / сдвинулся / удалён — секция за ним)
+local function region_list()
+  local out, i = {}, 0
+  if not R.EnumProjectMarkers3 then return out end
+  while true do
+    local ret, isrgn, pos, rgnend, name, idx, color = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if isrgn then out[#out + 1] = { i = i, idx = idx, name = name or '', pos = pos, rgnend = rgnend, color = color or 0, session = name == '=SESSION' } end
+    i = i + 1
+  end
+  table.sort(out, function(a, b) return a.pos < b.pos end)
+  return out
+end
+local function sections_pre()
+  local SEC = model and model.SEC
+  if not SEC then return nil end
+  local pats, secs = SEC.split(region_list())
+  if #secs == 0 then return nil end
+  return SEC.census(pats, secs)
+end
+local function sections_post(c)
+  local SEC = model.SEC
+  local list = region_list()
+  local pats, secs = SEC.split(list)
+  local by = {}
+  for _, r in ipairs(list) do by[r.idx] = r end
+  for _, f in ipairs(SEC.resync(c, pats, secs)) do
+    local r = by[f.idx]
+    if r then R.SetProjectMarkerByIndex(0, r.i, true, f.pos, f.rgnend, r.idx, r.name, r.color) end
+  end
+end
+
 E.last_ms, E.last_desc = 0, ''     -- длительность последней внешней правки (пульс hb)
 local function run(desc, fn)
   depth = depth + 1
@@ -212,6 +245,7 @@ local function run(desc, fn)
     if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
     E.nm_pre = nil
     if E.NM.on() then local okn, c = pcall(E.NM.census); if okn then E.nm_pre = c end end
+    local oks, sc = pcall(sections_pre); E.sec_pre = oks and sc or nil
   end
   R.Undo_BeginBlock2(0)
   R.PreventUIRefresh(1)
@@ -221,6 +255,7 @@ local function run(desc, fn)
     local okn, en = pcall(E.NM.sync, E.nm_pre or {})
     if not okn then E.nm_err = en end
   end
+  if ok and depth == 1 and E.sec_pre then pcall(sections_post, E.sec_pre) end
   if ok and E.after and not E.in_after then
     E.in_after = true
     local ok2, err2 = pcall(E.after, desc)
@@ -229,7 +264,7 @@ local function run(desc, fn)
   end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil end
+  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()

@@ -1689,6 +1689,14 @@ function M.regions(lpb)
     i = i + 1
   end
   table.sort(out, function(a, b) return a.pos < b.pos end)
+  -- 12 окт: секции (регион без кода поверх паттернов) — не слоты: отдельным списком out.sections
+  local secs = {}
+  if M.SEC then
+    local pats
+    pats, secs = M.SEC.split(out)
+    out = pats
+  end
+  out.sections = secs
   out.lib_pos = lib_pos
   out.end_pos, out.start_pos = end_pos, start_pos   -- для последовательности без перебора маркеров каждый кадр
   out.markers = markers
