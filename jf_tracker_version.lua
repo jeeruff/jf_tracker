@@ -5,7 +5,7 @@ V.VERSION = '0.8.0'
 V.DATE = '2026-10-06'
 V.CHANGES = {
   { v = '0.8.0', d = '2026-10-06', items = {
-    'Opt+A from anywhere: the last touched parameter becomes an envelope column on its track and the cursor goes there (a take FX parameter - its take envelope in the automation tab); ze on an envelope column - view as values (like commands) or as a curve; the automation tab (params, curve, LFO generator, automation items) and the new modulation tab (REAPER LFO / audio control / link matrix) are separate',
+    'Opt+A from anywhere: the last touched parameter becomes an envelope column on its track and the cursor goes there (a take FX parameter - its take envelope in the automation tab); ze on an envelope column - its view: curve, values (like commands) or steps (a fader on every row, as a 303 step sequencer; square points; drag with the mouse); the automation tab (params, curve, LFO generator, automation items) and the new modulation tab (REAPER LFO / audio control / link matrix) are separate',
     '/ and \\ on the volume field no longer make fades (fades: SIxx / SOxx or :fade in|out)',
     'effect commands are two-char codes + two hex digits, as in Renoise: 0x effects (0S slice / offset, 0M volume, 0P pan, 0U 0D pitch, 0G glide, 0V vibrato, 0A arpeggio, 0I 0O volume slide, 0R retrigger, 0Y maybe), Sx sample properties (SI SO fades, SB beatsync, SF finetune in cents, SL loop, SM channel mode), Zx song (ZT tempo, ZJ jump to a sequence slot); the old one-letter commands are gone (P was both pitch and probability)',
     'browser: zoxide - every folder you open is remembered (often + recently); :z drums kick jumps to the best match, :zi lists them',

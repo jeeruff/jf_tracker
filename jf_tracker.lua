@@ -106,8 +106,9 @@ local state = {
   fixed = flag('fixed', false),                   -- курсор всегда в центре экрана (Impulse Tracker)
   fxcols = math.max(1, tonumber(ext('fxcols', 1)) or 1),   -- стандартные колонки: хотя бы одна fx (1 окт)
   envs = flag('envs', true),
-  -- 12 окт: колонки огибающих видом «значения» (как команды, без кривой): guid/имя → true; ze
-  envvals = (function() local t = {}; for k in (reaper.GetExtState(EXT, 'envvals') or ''):gmatch('[^|]+') do t[k] = true end; return t end)(),
+  -- 12 окт: вид колонок огибающих (ze): guid/имя → 'vals' (числа, как команды) | 'steps'
+  -- (фейдер на строку, как степпер 303); нет записи — кривая
+  envvals = (function() local t = {}; for k, m in (reaper.GetExtState(EXT, 'envvals') or ''):gmatch('([^|]+)=(%a+)') do t[k] = m end; return t end)(),
   trackenvs = (function()                       -- огибающие по трекам: guid → true/false (nil = как envs)
     local t = {}
     for g, v in (reaper.GetExtState(EXT, 'trackenvs') or ''):gmatch('([^=,]+)=(%d)') do t[g] = v == '1' end
@@ -639,7 +640,7 @@ local function save_win()
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
-  do local t = {}; for k in pairs(state.envvals or {}) do t[#t + 1] = k end; S('envvals', table.concat(t, '|')) end
+  do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
   S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
@@ -2128,13 +2129,24 @@ ctx = {
   end,
   peaks = model.peaks,
   -- `a` — все треки разом (сбрасывает поканальные переключения кнопкой A)
-  -- 12 окт: ze на колонке огибающей — вид «значения по строкам» (как команды) / «кривая»
+  -- 12 окт: ze на колонке огибающей — вид: кривая / значения (как команды) / шаги
+  -- (фейдер на каждую строку, как степпер 303: точки квадратные, мышь — в любом режиме)
+  env_mode = function(e)
+    for _, f in ipairs(L and L.flat or {}) do
+      if f.env == e and f.col then return state.envvals[(f.col.guid or '') .. '/' .. (e.name or '')] end
+    end
+  end,
   env_view = function()
     local f = L and L.flat and L.flat[vim.cur.fi]
     if not (f and f.env and f.col) then vim.msg = 'ze: put the cursor on an envelope column'; return end
     local k = (f.col.guid or '') .. '/' .. (f.env.name or '')
-    state.envvals[k] = not state.envvals[k] or nil
-    vim.msg = (f.env.name or 'envelope') .. (state.envvals[k] and ': values (as commands) - ze: curve' or ': curve - ze: values')
+    local cur = state.envvals[k]
+    local function set(m, what) return function() state.envvals[k] = m; vim.msg = (f.env.name or 'envelope') .. ': ' .. what end end
+    vim.open_hydra({ title = 'view of ' .. (f.env.name or 'the envelope'), items = {
+      { key = 'c', label = (cur == nil and '* ' or '') .. 'curve (as in REAPER)', fn = set(nil, 'curve') },
+      { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values (as a command column)', fn = set('vals', 'values') },
+      { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
+    } })
   end,
   toggle_envs = function() state.envs = not state.envs; state.trackenvs = {}; vim.msg = 'envelopes ' .. (state.envs and 'on' or 'off') .. ' (all tracks)' end,
   -- кнопка A в шапке — только этот трек
@@ -2879,7 +2891,7 @@ ctx = {
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
   env_set = function(e, row, v)
     local t = edit.swing_time(row, state.lpb)                 -- свинг и для точек (6 окт)
-    edit.env_set(e, t, v, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
+    edit.env_set(e, t, v, (edit.row_time(row + 1, state.lpb, 0) - t) / 2, ctx.env_mode(e) == 'steps' and 1 or nil)   -- шаги — квадратные точки
   end,
   env_ramp = function(e, r0, r1, v0, v1)
     local t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1, state.lpb, 0)
@@ -16856,9 +16868,9 @@ local function frame()
       if hover.field == 2 then
         -- поле формы: только курсор туда (правка — буквами в INSERT, ^A ^X)
         if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 2 end
-      elseif vim.mode ~= 'insert' then
+      elseif vim.mode ~= 'insert' and ctx.env_mode(hover.env) ~= 'steps' then
         -- NORMAL / VISUAL: клик только ставит курсор на строку огибающей (2 окт);
-        -- точку от мыши пишет только INSERT
+        -- точку от мыши пишет только INSERT (12 окт: вид «шаги» — фейдеры, мышь пишет всегда)
         if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
       else
         local key = tostring(hover.env.env) .. ':' .. hover.row.row .. ':' .. math.floor(hover.envx * 255)

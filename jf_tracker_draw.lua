@@ -1769,6 +1769,18 @@ D.env_colour = function(e) return env_colour(e) end   -- для матрицы (
 D.ENV_SHAPES = { [0] = 'lin', [1] = 'sqr', [2] = 'slo', [3] = 'fas', [4] = 'fae', [5] = 'bez' }
 local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if not ev then return end
+  if vals == 'steps' then
+    -- 12 окт: шаги (ze s) — фейдер на строку, как степпер 303: дорожка во всю полосу,
+    -- заливка до значения строки; число — у строк с точкой
+    local bw = L.env_bar_w
+    local h = math.max(2, L.rh - 3)
+    set(U.tint(U.CYAN, 0.12)); gfx.rect(x + L.env_bx, y + 1, bw, h, 1)
+    set(U.CYAN); gfx.rect(x + L.env_bx, y + 1, math.max(1, math.floor(ev.v * bw + 0.5)), h, 1)
+    if ev.pt then
+      text(x + L.env_bx + bw + L.pad, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)), U.TEXT)
+    end
+    return
+  end
   if vals then
     -- 12 окт: вид «значения» (ze) — как колонка команд: число в строке точки, иначе точки
     if ev.pt then

@@ -1946,13 +1946,13 @@ local function env_point_at(env, t, tol)
   return nil
 end
 
-function E.env_set(e, t, v, tol)
+function E.env_set(e, t, v, tol, shape)
   v = math.max(0, math.min(1, v))
   local raw = e.min + v * (e.max - e.min)
   run('envelope ' .. e.name, function()
     local idx = env_point_at(e.env, t, tol or 0.001)
-    if idx then R.SetEnvelopePoint(e.env, idx, t, raw, nil, nil, nil, true)
-    else R.InsertEnvelopePoint(e.env, t, raw, 0, 0, false, true) end
+    if idx then R.SetEnvelopePoint(e.env, idx, t, raw, shape, nil, nil, true)       -- shape nil — форма точки остаётся
+    else R.InsertEnvelopePoint(e.env, t, raw, shape or 0, 0, false, true) end
     R.Envelope_SortPoints(e.env)
   end)
 end

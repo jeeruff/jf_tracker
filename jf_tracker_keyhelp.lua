@@ -114,7 +114,7 @@ KH.PAGES = {
     { k = 'a', d = 'envelope columns of all tracks on / off' },
     { k = 'A', d = 'automate: pick any parameter of the track (fzf) - envelope column, or a take envelope of the note' },
     { k = 'Opt+A', d = 'the last touched parameter (a knob you just moved, any track) - its envelope column, cursor there' },
-    { k = 'ze', d = 'on an envelope column: view as values (like a command column, a number where a point is) / as a curve' },
+    { k = 'ze', d = 'on an envelope column: its view - c curve, v values (like a command column), s steps (a fader on every row, as a 303 step sequencer: square points, drag across the rows with the mouse in any mode)' },
     { k = '> < N>', d = 'loop: item to region / region to item / N rows', t = { '>', '<' } },
     { k = '[ ] ( )', d = 'octave down / up, instrument previous / next' },
     { k = '/', d = 'commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)' },
