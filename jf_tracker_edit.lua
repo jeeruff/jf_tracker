@@ -1363,18 +1363,21 @@ local function nat_of(it, tk)
   if l then return tonumber(l), tonumber(r), tonumber(p) end
   return R.GetMediaItemInfo_Value(it, 'D_LENGTH'), R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH')
 end
-function E.legato(track, lane_idx, t0, t1, off)
+-- fill (13 окт, :legato fill) — дотянуть без растяжки: длина до следующей ноты, скорость своя
+-- (кусок за концом звучит по лупу инструмента: whole / sustain; без лупа — тишина)
+function E.legato(track, lane_idx, t0, t1, off, fill)
   local list = {}
   for i = 0, R.CountTrackMediaItems(track) - 1 do
     local it = R.GetTrackMediaItem(track, i)
     local tk = R.GetActiveTake(it)
-    if tk and not R.TakeIsMIDI(tk) and (lane_idx == nil or math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) == lane_idx) then
+    if tk and not R.TakeIsMIDI(tk) and (lane_idx == nil or math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) == lane_idx)
+       and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) == '' then   -- хвост лупа удержания — производное, его пересоберут
       list[#list + 1] = { it = it, tk = tk, pos = R.GetMediaItemInfo_Value(it, 'D_POSITION') }
     end
   end
   table.sort(list, function(a, b) return a.pos < b.pos end)
   local n = 0
-  run(off and 'legato off' or 'legato', function()
+  run(off and 'legato off' or (fill and 'legato fill' or 'legato'), function()
     for k, e in ipairs(list) do
       if (not t0 or e.pos >= t0 - 1e-6) and (not t1 or e.pos < t1 - 1e-6) then
         local nl, nr, np = nat_of(e.it, e.tk)
@@ -1390,8 +1393,11 @@ function E.legato(track, lane_idx, t0, t1, off)
           if had == '' then R.GetSetMediaItemInfo_String(e.it, NAT, ('%.9f;%.9f;%d'):format(nl, nr, math.floor(np)), true) end
           local len = nxt - e.pos
           R.SetMediaItemInfo_Value(e.it, 'D_LENGTH', len)
-          R.SetMediaItemTakeInfo_Value(e.tk, 'D_PLAYRATE', nr * nl / len)
-          if math.abs(len - nl) > 1e-6 then R.SetMediaItemTakeInfo_Value(e.tk, 'B_PPITCH', 1) end
+          if fill then R.SetMediaItemTakeInfo_Value(e.tk, 'D_PLAYRATE', nr); R.SetMediaItemTakeInfo_Value(e.tk, 'B_PPITCH', np)
+          else
+            R.SetMediaItemTakeInfo_Value(e.tk, 'D_PLAYRATE', nr * nl / len)
+            if math.abs(len - nl) > 1e-6 then R.SetMediaItemTakeInfo_Value(e.tk, 'B_PPITCH', 1) end
+          end
         end
         n = n + 1
       end
@@ -1462,6 +1468,20 @@ local function finish_insert(track, lane_idx, it)
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
   if E.legato_auto(track) then E.legato(track, lane_idx) end   -- трек в легато: держится при вставке
+  -- 13 окт: шаг legato (кнопка в блоке step) — новая нота и та, что перед ней, дотягиваются
+  -- до следующей без растяжки (дальше звучит луп инструмента)
+  if E.step_legato then
+    local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local best
+    for i = 0, R.CountTrackMediaItems(track) - 1 do
+      local o = R.GetTrackMediaItem(track, i)
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      local tk = R.GetActiveTake(o)
+      if o ~= it and tk and not R.TakeIsMIDI(tk) and op < p - 1e-4 and same_lane(track, o, lane_idx)
+         and select(2, R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_susof', '', false)) == '' and (not best or op > best) then best = op end
+    end
+    E.legato(track, lane_idx, best or p, p + 1e-4, false, true)
+  end
 end
 
 -- вставить слайс k инструмента inst_item на трек: копия chunk, offs/len по таблице

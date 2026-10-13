@@ -44,18 +44,22 @@ function S.parse(tag)
   while true do
     local key, v, r2 = (rest or ''):match('^(%a)=(%S+)%s*(.*)$')
     if not key then break end
-    if key == 'c' and S.CURVES_BY[v] then lp.curve = v elseif key == 'f' then lp.flat = v ~= '0' end
+    if key == 'c' and S.CURVES_BY[v] then lp.curve = v elseif key == 'f' then lp.flat = v ~= '0'
+    elseif key == 'b' then local p1, p2 = v:match('^([^,]+),([^,]+)$'); lp.bls, lp.ble = tonumber(p1), tonumber(p2) end
     rest = r2
   end
   local bo, path = (rest or ''):match('^(%S+)%s+(.+)$')
-  if tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
+  -- 13 окт: файл годен, только если запечён при этих же точках (b=ls,le): иначе шов файла
+  -- кончается не там, где луп начинается (щелчок на S) — файла нет, запечётся заново
+  local fresh = lp.bls and lp.ble and math.abs(lp.bls - lp.ls) < 2e-6 and math.abs(lp.ble - lp.le) < 2e-6
+  if fresh and tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
   return lp
 end
 function S.tag(lp)
   local t = ('%d %.6f %.6f %.6f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
   if lp.curve and lp.curve ~= 'auto' then t = t .. ' c=' .. lp.curve end
   if lp.flat == false then t = t .. ' f=0' end
-  if lp.file and lp.boff then t = t .. (' %.6f %s'):format(lp.boff, lp.file) end
+  if lp.file and lp.boff and lp.bls and lp.ble then t = t .. (' b=%.6f,%.6f %.6f %s'):format(lp.bls, lp.ble, lp.boff, lp.file) end   -- bls / ble — точки, при которых запечён (ставит запекание)
   return t
 end
 

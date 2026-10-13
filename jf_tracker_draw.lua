@@ -3336,7 +3336,7 @@ function D.transport_groups(c)
   local lsn = { { 'ls_ins', 'insert', c.hear and U.AMBER or U.GREY }, { 'ls_step', 'step', c.trklisten and U.AMBER or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.AMBER or U.GREY }, { 'ls_line', 'line', c.steplisten and U.AMBER or U.GREY } }   -- включённые — янтарём (ярче голубого)
   g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
-                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' } } }
+                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY } } }   -- 13 окт: шаг legato — нота дотягивается до следующей
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   if c.tpfull then table.insert(g[#g], lsn)
@@ -3371,6 +3371,7 @@ local STRIP_HINTS = {
   play = { { 'dblclick', 'type BPM' } },
   lpb = { { 'wheel', 'LPB' }, { 'click', 'sig' } },
   step = { { 'wheel', 'value' }, { 'c C', 'vel' } },
+  legato = { { 'click', 'toggle' }, { ':legato fill', 'the track' } },
   punch = { { 'click', 'toggle' }, { 'Opt+R', 'rec' } },
   follow = { { 'F', 'follow' }, { 'click', 'toggle' } },
 }

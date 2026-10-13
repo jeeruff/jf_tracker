@@ -9492,6 +9492,7 @@ ctx = {
     if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
     PV.forget(out)
     lp.file, lp.boff = out, X / w.sr
+    lp.ls = ls / w.sr; lp.bls, lp.ble = lp.ls, lp.le       -- 13 окт: файл помнит свои точки (S.parse отбросит его, если они ушли)
     edit.sus_set(ctx.inst_group(e), lp, 'sustain loop crossfade')
     model.invalidate()
   end,
@@ -11743,8 +11744,14 @@ ctx = {
     for _, k in ipairs(K) do items[#items + 1] = { key = k[1], label = k[2] } end
     return { title = 'keys (Esc)', items = items }
   end,
-  preview = function(track, pitch, inst_item, row, step, lp)   -- lp — луп удержания (13 окт: только удержания, звучит до PV.stop)
+  preview = function(track, pitch, inst_item, row, step, lp, key)   -- lp — луп удержания (13 окт: только удержания, звучит до PV.stop)
     if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
+    -- 13 окт: нота с клавиатуры (key — её буква) у инструмента с лупом удержания — луп звучит,
+    -- пока клавиша держится; отпустили — стоп (кадр следит за ctx.keyhold)
+    if key and key ~= "" and not lp and inst_item and reaper.JS_VKeys_GetState and reaper.ValidatePtr(inst_item, 'MediaItem*') then
+      local l2 = ctx.sus_get({ item = inst_item })
+      if l2 and l2.on then lp = l2; ctx.keyhold = { vk = keys.vk(key), t0 = reaper.time_precise() } end
+    end
     -- 9 окт: сэмпл (аудио-item lib) звучит сам всегда — раньше MIDI-ноты на
     -- треке (от плагина-инструмента) переводили превью в play транспорта (q = весь сэмпл)
     if inst_item and PV.available() and reaper.ValidatePtr(inst_item, 'MediaItem*') then
@@ -12041,11 +12048,12 @@ SPROP.init(U, ctx)
 ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 окт: модуль looploom
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
+edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 SL.loop_ov = function(e)
   local lp = e and e.item and ctx.sus_get(e)
   if not (lp and lp.on) then return nil end
-  return { ls = lp.ls, le = lp.le, xf = lp.xf, offs = e.offs or 0, rate = e.rate or 1, cands = ctx.LL.cands_of(e) }
+  return { ls = lp.ls, le = lp.le, xf = lp.xf, offs = e.offs or 0, rate = e.rate or 1, cands = ctx.LL.cands_of(e), cur = ctx.LL.cur_cand(lp) }
 end
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
@@ -13784,6 +13792,9 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
+  elseif name == 'legato' then
+    edit.step_legato = not edit.step_legato; reaper.SetExtState(EXT, 'steplegato', edit.step_legato and '1' or '0', true)
+    vim.msg = 'legato ' .. (edit.step_legato and 'on: an inserted note and the one before it last to the next note, not stretched (the instrument loop plays on)' or 'off')
   elseif name == 'inst' then pool_select(vim.inst + (delta ~= 0 and delta or 1))
   elseif name == 'follow' then state.follow = not state.follow
   elseif name == 'lock' then state.lock = not state.lock; lock_sync = {}; vim.msg = 'lock to REAPER cursor: ' .. (state.lock and 'on' or 'off')
@@ -14380,6 +14391,11 @@ local function frame()
   if MX.SS.rec then ctx.ss_rec_tick() end                                -- запись в клип: стоп за концом слота
   SL.sg.tick(0.006)                                     -- спектрограммы: досчитать кусочек (5 окт)
   -- нота с удержанием: длина растёт в темпе; клавиша отпущена — запись
+  if ctx.keyhold and not state.hold then                  -- 13 окт: нота KEYS с лупом удержания — до отпускания
+    local h = ctx.keyhold
+    local ks = reaper.JS_VKeys_GetState(h.t0 - 0.5)
+    if not (h.vk and h.vk > 0 and ks and ks:byte(h.vk) ~= 0) and reaper.time_precise() - h.t0 > 0.08 then ctx.keyhold = nil; PV.stop() end
+  end
   if state.hold then
     local h = state.hold
     local now = reaper.time_precise()
@@ -15012,7 +15028,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
-      insmode = state.insmode, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      insmode = state.insmode, legato = edit.step_legato, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,

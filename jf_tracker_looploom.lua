@@ -41,13 +41,20 @@ local function wave(path, key, upto)
 end
 
 -- кандидаты лупа для инструмента (раз на инструмент / его кусок файла)
+-- 13 окт: ключ — только инструмент (+ R): выбор кандидата правит item, и прежний ключ по куску
+-- файла менялся — список искался заново и пропадал на первом же щелчке
 local function cands(e)
-  local a, b = ctx.sus_span(e)
-  local key = tostring(e.item) .. ('%.4f %.4f'):format(a, b)
+  local key = tostring(e.item) .. '|' .. (LL.gen or 0)
   if LL.cands_key ~= key then
     LL.cands_key = key
     local f = ctx.sus_find(e)
-    LL.cands = f and f.cands or {}
+    -- 13 окт: почти одинаковые (точки ближе 10 мс) — один раз: список короткий, каждый номер — другой луп
+    LL.cands = {}
+    for _, c in ipairs(f and f.cands or {}) do
+      local dup = false
+      for _, o in ipairs(LL.cands) do if math.abs(o.ls - c.ls) < 0.01 and math.abs(o.le - c.le) < 0.01 then dup = true; break end end
+      if not dup then LL.cands[#LL.cands + 1] = c end
+    end
   end
   return LL.cands
 end
@@ -59,9 +66,16 @@ local function apply(e, c)
   lp.ls, lp.le = c.ls, c.le
   lp.file, lp.boff = nil, nil
   ctx.sus_points(e, lp)
-  ctx.msg(('looploom: candidate %.3f - %.3f s, the seam matches %d %%'):format(c.ls, c.le, math.floor(c.match * 100 + 0.5)))
+  for i, c2 in ipairs(LL.cands or {}) do if c2 == c then LL.ci = i end end
+  ctx.msg(('looploom: candidate %d  %.3f - %.3f s, the seam matches %d %%  (1..9 / n N - the others)'):format(LL.ci or 0, c.ls, c.le, math.floor(c.match * 100 + 0.5)))
 end
 LL.apply = apply
+-- кандидат, на котором стоит луп (точки совпали до 1 мс)
+local function cur_cand(lp)
+  if not lp then return nil end
+  for i, c in ipairs(LL.cands or {}) do if math.abs(c.ls - lp.ls) < 1e-3 and math.abs(c.le - lp.le) < 2.5e-2 then return i end end
+end
+LL.cur_cand = cur_cand
 
 local function seam(e, lp, x, y, w, h, ps_path)
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
@@ -142,6 +156,26 @@ function LL.draw(L, x, y, w, h, e, focused)
       r.bar = { x = bx, w = bw }
     else r.bar = nil end
   end
+  -- 13 окт: кандидаты списком под параметрами — номер, точки, совпадение шва; щелчок / 1..9 — луп на нём
+  local hot_cand
+  if mode == 'sus' and lp then
+    local cs = cands(e)
+    local y0 = y + (#LL.ROWS) * L.rh
+    if #cs > 0 and y0 + 2 * L.rh <= y + h then
+      U.text(rx + L.pad, y0, ctx.fit('candidates  1..9  n N', rw - 2 * L.pad), U.DIM)
+      local ci = cur_cand(lp)
+      for i, c in ipairs(cs) do
+        local ry = y0 + i * L.rh
+        if ry + L.rh > y + h or i > 9 then break end
+        local hot = inside and mx >= rx and my >= ry and my < ry + L.rh
+        if hot then hot_cand = i end
+        if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(rx, ry, rw, L.rh, 1) end
+        local t = ('%d %s %.3f - %.3f  %d%%'):format(i, i == ci and '>' or ' ', c.ls, c.le, math.floor(c.match * 100 + 0.5))
+        U.text(rx + L.pad, ry, ctx.fit(t, rw - 2 * L.pad), i == ci and U.AMBER or U.mix(U.GREY, U.GREEN, math.max(0, math.min(1, (c.match - 0.5) * 2))))
+      end
+    end
+  end
+  if hot_cand then LL.status = ('looploom candidate %d: click or %d - the loop takes these points (the list stays, compare by ear)'):format(hot_cand, hot_cand) end
   if hot_row then LL.status = 'looploom ' .. LL.ROWS[hot_row].label .. ': ' .. (TIP[LL.ROWS[hot_row].k] or '') end
   -- шов (спектрограмма и точки — на волне вкладки item)
   local vw = rw < w and (rx - x - L.pad) or 0
@@ -162,7 +196,8 @@ function LL.draw(L, x, y, w, h, e, focused)
     else LL.drag = nil end
   elseif down and inside then
     ctx.set_focus('looploom')
-    if hot_row then
+    if hot_cand then apply(e, LL.cands[hot_cand])
+    elseif hot_row then
       local r = LL.ROWS[hot_row]
       local now = reaper.time_precise()
       local dbl = LL.click and LL.click.k == r.k and now - LL.click.t < 0.35
@@ -171,7 +206,7 @@ function LL.draw(L, x, y, w, h, e, focused)
       if dbl then ctx.sp_reset(e, r.k)
       elseif r.bar and mx >= r.bar.x then LL.drag = { k = r.k, x = r.bar.x, w = r.bar.w, lx = mx }; ctx.sp_set_frac(e, r.k, (mx - r.bar.x) / math.max(1, r.bar.w))
       elseif MENU[r.k] then ctx.sp_menu(e, r.k)
-      elseif ACT[r.k] then ctx.sp_adjust(e, r.k, 1) end
+      elseif ACT[r.k] then if r.k == 'susr' then LL.gen = (LL.gen or 0) + 1 end; ctx.sp_adjust(e, r.k, 1) end
     end
   end
   if inside and gfx.mouse_wheel ~= 0 then
@@ -182,7 +217,7 @@ function LL.draw(L, x, y, w, h, e, focused)
   end
 end
 
--- клавиши: j k строка, h l значение, Enter — список / действие, R сброс, n N — кандидаты, + - шов
+-- клавиши: j k строка, h l значение, Enter — список / действие, R сброс, n N / 1..9 — кандидаты, + - шов
 function LL.key(c, e)
   local ch = c < 256 and string.char(c) or ''
   local r = LL.ROWS[LL.sel]
@@ -192,8 +227,12 @@ function LL.key(c, e)
   elseif ch == 'G' then LL.sel = #LL.ROWS
   elseif ch == 'h' or ch == 'H' then if e then ctx.sp_adjust(e, r.k, -1) end
   elseif ch == 'l' or ch == 'L' then if e then ctx.sp_adjust(e, r.k, 1) end
-  elseif c == 13 then if e then if MENU[r.k] then ctx.sp_menu(e, r.k) else ctx.sp_adjust(e, r.k, 1) end end
-  elseif ch == 'R' then if e then ctx.sp_reset(e, r.k) end
+  elseif c == 13 then if e then if MENU[r.k] then ctx.sp_menu(e, r.k) else if r.k == 'susr' then LL.gen = (LL.gen or 0) + 1 end; ctx.sp_adjust(e, r.k, 1) end end
+  elseif ch == 'R' then if e then if r.k == 'susa' or r.k == 'susb' or r.k == 'susr' then LL.gen = (LL.gen or 0) + 1 end; ctx.sp_reset(e, r.k) end
+  elseif ch:match('^[1-9]$') then
+    if not e then return true end
+    local cs = cands(e); local i = tonumber(ch)
+    if cs[i] then apply(e, cs[i]) else ctx.msg('looploom: ' .. #cs .. ' candidate(s)') end
   elseif ch == 'n' or ch == 'N' then
     if not e then return true end
     local cs = cands(e)

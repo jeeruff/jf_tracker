@@ -103,8 +103,12 @@ do
   ok('wav read back', w and w.sr == sr and #w.ch == 2 and w.n == #o and math.abs(w.ch[2][100] - o[100]) < 1e-6)
   os.remove(path)
   -- метка с файлом
-  local t2 = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.03, boff = 0.03, file = '/a b/c d.wav' }))
+  local t2 = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.03, boff = 0.03, file = '/a b/c d.wav', bls = 0.3, ble = 0.6 }))
   ok('tag with the baked file', t2 and t2.file == '/a b/c d.wav' and math.abs(t2.boff - 0.03) < 1e-9)
+  local t3 = S.parse(S.tag({ on = true, ls = 0.31, le = 0.6, xf = 0.03, boff = 0.03, file = '/a.wav', bls = 0.3, ble = 0.6 }))
+  ok('13 окт: the file baked at other points is dropped (click on S)', t3 and t3.file == nil and t3.boff == nil)
+  local t4 = S.parse('1 0.300000 0.600000 0.030000 0.030000 /old.wav')
+  ok('  an old tag without b= - baked again', t4 and t4.file == nil)
 end
 
 -- 11. выравнивание громкости (13 окт): спад 808 — в запечённом лупе уровень ровный, конец ≈ начало
@@ -136,7 +140,7 @@ do
   ok('align: within 20 ms', math.abs(nle - le) <= 0.02 * sr)
   local _, _, le2 = S.bake({ x }, ls, le, X, sr, { flat = false })
   ok('bake returns the aligned end', le2 == nle)
-  local t = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.2, curve = 's', flat = false, boff = 0.2, file = '/x y.wav' }))
+  local t = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.2, curve = 's', flat = false, boff = 0.2, file = '/x y.wav', bls = 0.3, ble = 0.6 }))
   ok('tag with curve / level / file', t and t.curve == 's' and t.flat == false and t.file == '/x y.wav' and math.abs(t.boff - 0.2) < 1e-9)
   t = S.parse('1 0.3 0.6 0.01')
   ok('old tag: auto curve, level on', t and t.curve == 'auto' and t.flat == true)

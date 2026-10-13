@@ -1179,7 +1179,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
     local cs = lo.cands or {}
-    local rows = math.min(#cs, math.max(0, math.floor((wh - 20) / 5)), 8)
+    local rows = math.min(#cs, math.max(0, math.floor((wh - 20) / 5)), 9)
     for i = 1, rows do
       local c = cs[i]
       local cy = wy + wh - 4 - (i - 1) * 5
@@ -1187,7 +1187,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       if c1 >= x and c0 < x + w then
         local hot = inw and not S.loop_hot and myw >= cy - 2 and myw <= cy + 2 and mxw >= c0 and mxw <= c1
         if hot then S.loop_hot = { cand = c, i = i } end
-        U.set(hot and U.TEXT or U.mix(U.GREY, U.GREEN, math.max(0, math.min(1, (c.match - 0.5) * 2))))
+        U.set(hot and U.TEXT or (i == lo.cur and U.AMBER) or U.mix(U.GREY, U.GREEN, math.max(0, math.min(1, (c.match - 0.5) * 2))))   -- янтарь — луп на нём (looploom: тот же номер)
         gfx.rect(clip(c0), cy, math.max(1, clip(c1) - clip(c0)), 1, 1)
         if c0 >= x then gfx.rect(c0, cy - 2, 1, 3, 1) end
         if c1 < x + w then gfx.rect(c1, cy - 2, 1, 3, 1) end
