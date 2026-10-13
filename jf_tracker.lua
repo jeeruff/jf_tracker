@@ -9255,7 +9255,42 @@ ctx = {
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
   -- ── луп удержания (13 окт, jf_tracker_sustain.lua): точки — секунды файла инструмента ──
-  sus_get = function(e) return e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.SU.parse(edit.sus_ext(e.item, 'P_EXT:jf_loop')) or nil end,
+  sus_get = function(e)
+    local lp = e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.SU.parse(edit.sus_ext(e.item, 'P_EXT:jf_loop')) or nil
+    -- 13 окт: луп без запечённого файла (старая метка, только что найден / сдвинут) — запечь, когда правки утихнут
+    if lp and lp.on and not lp.file and not ctx.sus_bake_req and not (ctx.sus_bake_no or {})[e.item] then ctx.sus_bake_req = { e = e, t = reaper.time_precise() } end
+    return lp
+  end,
+  -- 13 окт: запечь кроссфейд шва в WAV (jf_tracker_sustain S.bake) — файл в <папка проекта>/jf_loops,
+  -- кадры [ls - X, le) с кроссфейдом конца в то, что перед ls; метка получает файл и boff = X
+  sus_bake = function(e)
+    local lp = ctx.sus_get(e)
+    if not (lp and lp.on) or lp.file then return end
+    local _, _, ps = ctx.sus_span(e)
+    local path = ps and reaper.GetMediaSourceFileName(ps, '') or ''
+    ctx.sus_bake_no = ctx.sus_bake_no or {}
+    if not path:lower():match('%.wav$') then ctx.sus_bake_no[e.item] = true; return end
+    local SU = edit.SU
+    local w = SU.wav_read(path, math.ceil(lp.le * 192000) + 2)
+    if not w then ctx.sus_bake_no[e.item] = true; return end
+    local ls, le = math.floor(lp.ls * w.sr + 0.5), math.floor(lp.le * w.sr + 0.5)
+    if le > w.n then le = w.n end
+    if le - ls < 16 then ctx.sus_bake_no[e.item] = true; return end
+    local X0 = math.floor((lp.xf or 0) * w.sr + 0.5)
+    local dir = reaper.GetProjectPath('') .. '/jf_loops'
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local base = (path:match('([^/]+)%.[Ww][Aa][Vv]$') or 'loop'):gsub('[^%w%-_ ]', '_')
+    local out = ('%s/%s_%d_%d_%d.wav'):format(dir, base, ls, le, X0)
+    local X = math.max(0, math.min(X0, ls, (le - ls) // 2))
+    if not reaper.file_exists(out) then
+      local chs
+      chs, X = SU.bake(w.ch, ls, le, X0)
+      if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
+    end
+    lp.file, lp.boff = out, X / w.sr
+    edit.sus_set(ctx.inst_group(e), lp, 'sustain loop crossfade')
+    model.invalidate()
+  end,
   -- кусок файла, который играет инструмент: [a, b) секунд; источник — файл (у головы с лупом — родитель секции)
   sus_span = function(e)
     local r = (e.rate and e.rate > 0) and e.rate or 1
@@ -9297,8 +9332,10 @@ ctx = {
       if k == 'susa' then lp.ls = math.max(a, math.min(lp.le - 0.01, lp.ls + st))
       elseif k == 'susb' then lp.le = math.min(b, math.max(lp.ls + 0.01, lp.le + st))
       else lp.xf = math.max(0, math.min((lp.le - lp.ls) / 2, 0.25, lp.xf + d * (fine and 0.001 or 0.005))) end
+      lp.file, lp.boff = nil, nil                         -- 13 окт: точки другие — запечётся заново, когда утихнет
     end
     edit.sus_set(items or ctx.inst_group(e), lp)
+    ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
     vim.msg = msg or ('sustain loop %s  %.3f - %.3f s, x-fade %d ms'):format(lp.on and 'on' or 'off', lp.ls, lp.le, math.floor(lp.xf * 1000 + 0.5))
     model.invalidate()
   end,
@@ -9535,7 +9572,7 @@ ctx = {
     elseif k == 'chan' then P('take:I_CHANMODE', 0, 'abs', 'channel mode reset')
     elseif k == 'len' then return
     elseif k == 'sus' or k == 'susa' or k == 'susb' then ctx.sus_adjust(e, 'sus', 0, items, false, true); return   -- найти заново
-    elseif k == 'susx' then local lp = ctx.sus_get(e); if lp then lp.xf = 0.01; edit.sus_set(items, lp) end
+    elseif k == 'susx' then local lp = ctx.sus_get(e); if lp then lp.xf = 0.01; lp.file, lp.boff = nil, nil; edit.sus_set(items, lp); ctx.sus_bake_req = { e = e, t = reaper.time_precise() } end
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
   end,
@@ -12795,6 +12832,13 @@ end
 
 -- отложенные правки ручек: через 0.5 с тишины — одна правка в проект
 local function mm_settle(now)
+  -- 13 окт: запекание лупа удержания — через 0.4 с после последней правки точек
+  local br = ctx.sus_bake_req
+  if br and now - br.t >= 0.4 then
+    ctx.sus_bake_req = nil
+    local ok, err = pcall(ctx.sus_bake, br.e)
+    if not ok then vim.msg = 'sustain loop bake: ' .. tostring(err):match('[^\n]*$') end
+  end
   if not mm_pend.t or now - mm_pend.t < 0.5 then return end
   local z, v = mm_pend.zone, mm_pend.vol
   local retrans = mm_pend.retrans
@@ -19385,6 +19429,7 @@ ctx.sus_cmd = function(arg)
     s0, s1 = tonumber(s0), tonumber(s1)
     if not (s0 and s1 and s1 > s0 + 0.005) then vim.msg = ':sus [find|on|off|<start> <end> [x-fade ms]] - the sustain loop of the lib sample'; return end
     edit.sus_set(items, { on = true, ls = s0, le = s1, xf = (tonumber(xf) or (lp and lp.xf * 1000) or 10) / 1000 })
+    ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
     vim.msg = ('sustain loop on  %.3f - %.3f s'):format(s0, s1)
   end
   model.invalidate()

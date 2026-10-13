@@ -64,6 +64,30 @@ local ok, err = pcall(function()
     local hsil = rd(tk, ls + 0.05, 512); local e = 0; for i = 1, 512 do e = e + math.abs(hsil[i]) end
     check('the head is silent after ls', e < 1e-6, ('%.6f'):format(e))
   end
+  -- 2b. 13 окт: запечённый луп — хвост играет файл с кроссфейдом, шов без скачка
+  do
+    local SU = edit.SU
+    local w = SU.wav_read(PAD, math.ceil(le * sr) + 2)
+    local lsf, lef, X0 = math.floor(ls * sr + 0.5), math.floor(le * sr + 0.5), math.floor(0.03 * sr)
+    local chs, X = SU.bake(w.ch, lsf, lef, X0)
+    local out = R.GetResourcePath() .. '/jf_tracker_smoke_baked.wav'
+    check('bake written', SU.wav_write(out, sr, chs))
+    edit.sus_set({ it }, { on = true, ls = ls, le = le, xf = 0.03, file = out, boff = X / sr })
+    local t = tails()[1]
+    local src = t and R.GetMediaItemTake_Source(R.GetActiveTake(t))
+    local par = src and (R.GetMediaSourceParent(src) or src)
+    check('baked: the tail plays the baked file', par and R.GetMediaSourceFileName(par, '') == out, par and R.GetMediaSourceFileName(par, '') or 'no tail')
+    if t then
+      local per = (lef - lsf) / sr
+      local acc = R.CreateTakeAudioAccessor(R.GetActiveTake(t)); local a = R.new_array(64); a.clear()
+      R.GetAudioAccessorSamples(acc, sr, 1, per - 32 / sr, 64, a); R.DestroyAudioAccessor(acc)
+      local v = a.table()
+      local jump, step = math.abs(v[33] - v[32]), 0
+      for i = 2, 31 do step = math.max(step, math.abs(v[i] - v[i - 1])) end
+      check('baked: the seam is like a normal step', jump <= step * 1.5 + 1e-4, ('jump %.4f step %.4f'):format(jump, step))
+    end
+    edit.sus_set({ it }, { on = true, ls = ls, le = le, xf = 0.01 })
+  end
   -- 3. модель: одна нота на всю длину, хвоста в колонке нет
   model.invalidate()
   local snap = model.build(4)

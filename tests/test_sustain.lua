@@ -76,5 +76,36 @@ if r then ok('find 808: the seam matches (> 0.9)', r.match > 0.9, ('%.3f'):forma
 ok('find: silence', S.find((function() local z = {}; for i = 1, sr do z[i] = 0 end; return z end)(), sr, 1, sr) == nil)
 ok('find: too short', S.find(pad(0.1, 220), sr) == nil)
 
+-- 10. запечённый луп (13 окт): 808 со спадом и уходом высоты — точки наугад, шов всё равно непрерывен
+do
+  local x = {}
+  local ph = 0
+  for i = 1, math.floor(1.0 * sr) do
+    local tt = (i - 1) / sr
+    ph = ph + 2 * math.pi * (60 + 40 * math.exp(-tt * 6)) / sr      -- высота плывёт вниз
+    x[i] = math.exp(-tt * 3) * math.sin(ph)
+  end
+  local ls, le, X = math.floor(0.31 * sr), math.floor(0.57 * sr), math.floor(0.03 * sr)
+  -- без запекания: скачок на шве (x[le] → x[ls+1]) против обычного шага соседей
+  local step = 0
+  for i = ls, le - 2 do step = math.max(step, math.abs(x[i + 1] - x[i])) end
+  local o, X2 = S.bake({ x }, ls, le, X)
+  o = o[1]
+  ok('bake: the loop starts after X frames of pre-roll', X2 == X and #o == le - ls + X, #o .. ' ' .. X2)
+  ok('bake: the loop end ends as the frame before ls', math.abs(o[#o] - x[ls]) < 1e-9)
+  local jump = math.abs(o[X + 1] - o[#o])
+  ok('bake: the wrap jump is like a normal step', jump <= step * 1.01, ('%.4f vs step %.4f'):format(jump, step))
+  ok('bake: before the fade the loop is the file', math.abs(o[X + 1] - x[ls + 1]) < 1e-12 and math.abs(o[X + 10] - x[ls + 10]) < 1e-12)
+  -- WAV туда-обратно
+  local path = os.tmpname() .. '.wav'
+  ok('wav write', S.wav_write(path, sr, { o, o }))
+  local w = S.wav_read(path)
+  ok('wav read back', w and w.sr == sr and #w.ch == 2 and w.n == #o and math.abs(w.ch[2][100] - o[100]) < 1e-6)
+  os.remove(path)
+  -- метка с файлом
+  local t2 = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.03, boff = 0.03, file = '/a b/c d.wav' }))
+  ok('tag with the baked file', t2 and t2.file == '/a b/c d.wav' and math.abs(t2.boff - 0.03) < 1e-9)
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

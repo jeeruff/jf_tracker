@@ -29,13 +29,108 @@ function S.plan(n, lp)
 end
 
 -- метка инструмента «on ls le xf» (P_EXT:jf_loop) ↔ таблица; off — точки помнятся
+-- 13 окт: «on ls le xf boff путь» — запечённый луп: файл с кроссфейдом, луп в нём с boff секунд
 function S.parse(tag)
-  local on, a, b, x = (tag or ''):match('^(%d)%s+(%S+)%s+(%S+)%s+(%S+)')
+  local on, a, b, x, rest = (tag or ''):match('^(%d)%s+(%S+)%s+(%S+)%s+(%S+)%s*(.*)$')
   a, b, x = tonumber(a), tonumber(b), tonumber(x)
   if not (a and b and x) or b <= a then return nil end
-  return { on = on == '1', ls = a, le = b, xf = x }
+  local lp = { on = on == '1', ls = a, le = b, xf = x }
+  local bo, path = (rest or ''):match('^(%S+)%s+(.+)$')
+  if tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
+  return lp
 end
-function S.tag(lp) return ('%d %.6f %.6f %.6f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0) end
+function S.tag(lp)
+  local t = ('%d %.6f %.6f %.6f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
+  if lp.file and lp.boff then t = t .. (' %.6f %s'):format(lp.boff, lp.file) end
+  return t
+end
+
+-- ── запечённый луп (13 окт) ─────────────────────────────────────────────
+-- Кроссфейд шва не на лету, а в файле (как сэмплеры): последние X отсчётов лупа плавно
+-- переходят в X отсчётов ПЕРЕД его началом. Тогда за последним отсчётом лупа звучит то,
+-- что в файле шло перед ls, — а следом ls: шов непрерывен при любых точках (щелчка нет,
+-- разница громкости / фазы размазана по X). chs — каналы (1-based, отсчёт k = кадр k-1),
+-- ls, le — кадры (0-based), X — длина кроссфейда в кадрах.
+-- → каналы кадров [ls - X, le) (луп в них начинается с X), X
+function S.bake(chs, ls, le, X)
+  X = math.max(0, math.min(X, ls, (le - ls) // 2))
+  -- закон: похожие куски (корреляция > 0.5) — линейный (без горба громкости), иначе равной мощности
+  local sab, saa, sbb = 0, 0, 0
+  for _, x in ipairs(chs) do
+    for k = 0, X - 1 do
+      local u, v = x[le - X + k + 1] or 0, x[ls - X + k + 1] or 0
+      sab = sab + u * v; saa = saa + u * u; sbb = sbb + v * v
+    end
+  end
+  local lin = saa > 1e-12 and sbb > 1e-12 and sab / math.sqrt(saa * sbb) > 0.5
+  local out = {}
+  for c, x in ipairs(chs) do
+    local o = {}
+    for f = ls - X, le - 1 do o[#o + 1] = x[f + 1] or 0 end
+    for k = 0, X - 1 do
+      local t = (k + 1) / X
+      local gi, go
+      if lin then gi, go = t, 1 - t else gi, go = math.sin(t * math.pi / 2), math.cos(t * math.pi / 2) end
+      local i = (le - X + k) - (ls - X) + 1
+      o[i] = (x[le - X + k + 1] or 0) * go + (x[ls - X + k + 1] or 0) * gi
+    end
+    out[c] = o
+  end
+  return out, X
+end
+
+-- WAV PCM 16 / 24 / 32, float 32 → { sr, ch = { канал = отсчёты } } (кадры [0, nmax)), или nil
+function S.wav_read(path, nmax)
+  local f = io.open(path, 'rb')
+  if not f then return nil end
+  local hdr = f:read(12)
+  if not hdr or hdr:sub(1, 4) ~= 'RIFF' or hdr:sub(9, 12) ~= 'WAVE' then f:close(); return nil end
+  local fmt, nch, sr, bits, at, len
+  while true do
+    local h = f:read(8)
+    if not h or #h < 8 then break end
+    local id, sz = h:sub(1, 4), string.unpack('<I4', h, 5)
+    if id == 'fmt ' then
+      local b = f:read(sz)
+      fmt, nch, sr = string.unpack('<I2I2I4', b); bits = string.unpack('<I2', b, 15)
+      if fmt == 0xFFFE and #b >= 26 then fmt = string.unpack('<I2', b, 25) end
+      if sz % 2 == 1 then f:read(1) end
+    elseif id == 'data' then at, len = f:seek(), sz; break
+    else f:seek('cur', sz + sz % 2) end
+  end
+  if not (at and fmt and nch and sr and bits) then f:close(); return nil end
+  local bps = bits // 8
+  local code = (fmt == 3 and bits == 32) and '<f' or (bits == 16 and '<i2' or (bits == 24 and '<i3' or (bits == 32 and '<i4' or nil)))
+  if not code then f:close(); return nil end
+  local scale = fmt == 3 and 1 or 2 ^ (bits - 1)
+  local n = math.min(len // (bps * nch), nmax or math.huge)
+  local raw = f:read(n * bps * nch) or ''
+  f:close()
+  local ch = {}
+  for c = 1, nch do ch[c] = {} end
+  local p = 1
+  for k = 1, n do
+    for c = 1, nch do ch[c][k] = string.unpack(code, raw, p) / scale; p = p + bps end
+  end
+  return { sr = sr, ch = ch, n = n }
+end
+
+-- каналы → WAV float 32
+function S.wav_write(path, sr, chs)
+  local nch, n = #chs, #chs[1]
+  local f = io.open(path, 'wb')
+  if not f then return false end
+  local data = n * nch * 4
+  f:write('RIFF', string.pack('<I4', 36 + data), 'WAVE', 'fmt ', string.pack('<I4I2I2I4I4I2I2', 16, 3, nch, sr, sr * nch * 4, nch * 4, 32), 'data', string.pack('<I4', data))
+  local buf, K = {}, 4096
+  for k0 = 1, n, K do
+    local t = {}
+    for k = k0, math.min(n, k0 + K - 1) do for c = 1, nch do t[#t + 1] = chs[c][k] end end
+    buf[#buf + 1] = string.pack(('<' .. ('f'):rep(#t)), table.unpack(t))
+  end
+  f:write(table.concat(buf)); f:close()
+  return true
+end
 
 -- ── БПФ (радикс-2, на месте) ────────────────────────────────────────────
 local function fft(re, im, n)

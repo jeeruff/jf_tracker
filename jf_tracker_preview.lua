@@ -104,7 +104,7 @@ local function voice(track, item, semis, lp, gain)
   local file = R.GetMediaSourceParent(src) or src
   local path = R.GetMediaSourceFileName(file, '')
   local per = lp.le - lp.ls
-  local tail = section(path, lp.ls, per, lp.xf)
+  local tail = (lp.file and lp.boff and R.file_exists(lp.file)) and section(lp.file, lp.boff, per, 0) or section(path, lp.ls, per, lp.xf)   -- 13 окт: запечённый луп
   if not tail then local pv = one(src, offs); return pv and { pv } or nil, offs, rate end
   if offs >= lp.ls - 1e-4 then local pv = one(tail, (offs - lp.ls) % per, true); return pv and { pv } or nil, offs, rate end
   local head = section(path, offs, lp.ls - offs, 0)

@@ -3412,9 +3412,17 @@ local function sus_tail(tr, head, plan, lp, sig)
   chunk = strip_guids(chunk)
   local sb = source_block(chunk)
   if not sb then R.DeleteTrackMediaItem(tr, it); return end
+  -- 13 окт: запечённый луп (кроссфейд в файле) — источник хвоста этот файл, луп в нём с boff, без OVERLAP
+  local baked = lp.file and lp.boff and R.file_exists(lp.file)
+  if baked then
+    local n
+    chunk, n = chunk:gsub('(\n%s*FILE )"[^"\n]*"', function(pre) return pre .. '"' .. lp.file .. '"' end, 1)
+    if n ~= 1 then baked = false end
+  end
   R.SetItemStateChunk(it, chunk, false)
   -- секция головы [0, ls) → [ls, le): STARTPOS складывается с началом её секции (0)
-  E.set_section(it, lp.ls, lp.le - lp.ls, lp.xf)
+  if baked then E.set_section(it, lp.boff, lp.le - lp.ls, 0)
+  else E.set_section(it, lp.ls, lp.le - lp.ls, lp.xf) end
   local tk = R.GetActiveTake(it)
   R.SetMediaItemInfo_Value(it, 'D_POSITION', plan.pos)
   R.SetMediaItemInfo_Value(it, 'D_LENGTH', plan.len)
