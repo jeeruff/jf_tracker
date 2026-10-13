@@ -215,7 +215,7 @@ local function xfade_view(L, e, lp, src, wv, x, y, w, h, mx, my, inside)
   local hy2, hy3 = bands[2].y + 3, bands[3].y + bands[3].h - 4
   if LL.xdrag then hot = LL.xdrag.k elseif near(p0, hy2) or near(p0, hy3) or (inside and math.abs(mx - p0) <= 3 and my >= bands[2].y) then hot = 'x'
   elseif inside and mx > p0 + 3 and mx < pS and my >= bands[2].y and my < y + h then hot = 'curve' end   -- 13 окт: щелчок по кривой — её форма
-  local dr = math.max(5, math.floor(L.rh * 0.45))
+  local dr = math.max(4, math.floor(L.rh * 0.3))
   U.diamond(p0, hy2 + dr, dr, U.AMBER, hot == 'x')                                  -- 13 окт: ромбики-ручки
   U.diamond(p0, hy3 - dr, dr, U.GREEN, hot == 'x')
   U.set(hot == 'x' and U.TEXT or U.GREY, 0.7); gfx.rect(p0, bands[2].y, 1, h - hb, 1)

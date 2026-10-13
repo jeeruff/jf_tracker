@@ -1180,7 +1180,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     for _, hd in ipairs(hx) do
       local hot = (inw and not S.drag and not S.loop_hot and math.abs(mxw - hd[1]) <= math.max(6, L.rh * 0.5) and math.abs(myw - hd[2]) <= math.max(8, L.rh)) or (xd and S.loop_drag.side == hd[3])
       if hot and not S.loop_hot then S.loop_hot = { k = 'susx', side = hd[3] } end
-      local dr = math.max(5, math.floor(L.rh * 0.45))
+      local dr = math.max(4, math.floor(L.rh * 0.3))
       if hd[1] >= x and hd[1] < x + w then U.diamond(hd[1], hd[2] + (hd[3] == 'e' and dr or -dr), dr, hd[3] == 'e' and U.AMBER or U.GREEN, hot) end
     end
     slant(xe - fxw, xe, false, U.AMBER)
@@ -1193,7 +1193,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         if hot and not S.loop_hot then S.loop_hot = { k = it[1] } end
         -- 13 окт: тонкая линия + ромбик сверху (ручка, видна в любой теме), подпись рядом
         U.set(it[3], hot and 1 or 0.7); gfx.rect(px, wy, 1, wh, 1)
-        local dr = math.max(6, math.floor(L.rh * 0.55))
+        local dr = math.max(4, math.floor(L.rh * 0.36))
         U.diamond(px, wy + 3 * dr, dr, it[3], hot)
         if px + dr + 4 + U.measure(it[4]) < x + w then U.text(px + dr + 3, wy + 2 * dr, it[4], it[3]) end
       end

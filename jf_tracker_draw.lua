@@ -2385,7 +2385,8 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     set(hot and U.AMBER or U.TEXT)
     if centered then
       local mid, px = wx0 + math.floor(ww / 2), wx0 + math.floor(frac * ww + 0.5)
-      gfx.rect(math.min(mid, px), sy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
+      set(U.LINE); gfx.rect(mid, sy + 3, 1, L.rh - 6, 1)                         -- 13 окт: ромбик, как в шапке трека
+      U.diamond(px, cy, math.max(3, math.floor((L.rh - 6) / 2)), hot and U.AMBER or U.TEXT, hot)
     else gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1) end
     text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY)
     if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww } end
@@ -4798,8 +4799,10 @@ function D.frame(L, snap, rows, state, info)
         if centered then
           local mid = wx0 + math.floor(ww / 2)
           local px = wx0 + math.floor(frac * ww + 0.5)
-          set(acc); gfx.rect(math.min(mid, px), sy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
+          -- 13 окт: панорама — ромбик на дорожке (видно положение издалека), тонкая полоса от центра
           set(U.LINE); gfx.rect(mid, sy + 3, 1, L.rh - 6, 1)
+          set(acc, 0.5); gfx.rect(math.min(mid, px), cy - 1, math.max(1, math.abs(px - mid)), 2, 1)
+          U.diamond(px, cy, math.max(3, math.floor((L.rh - 6) / 2)), acc, hot)
         else
           set(acc); gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1)
         end
