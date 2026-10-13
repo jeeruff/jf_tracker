@@ -330,12 +330,14 @@ function D.panes_layout(state, L, nregions, ncols)
   local it = 0
   do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
   if state.sp_none then it = 0 end                      -- 11 окт: сэмпла нет — нечего показывать
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
+  local lo = state.loop_on and 1 or 0
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.lo == lo and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
   s.ab = state.tababc and 1 or 0
   s.it = it
+  s.lo = lo
   s.mxa = mxa
   s.hi = (state.hints and state.hintpos ~= 'status') and 1 or 0
   if state.tababc then D.panes.sort_stacks(m) end
@@ -352,6 +354,7 @@ function D.panes_layout(state, L, nregions, ncols)
     local p = D.panes.BY[id]
     local a = p and p.avail
     if a == 'itemtab' then return it == 1 end
+    if a == 'loopon' then return it == 1 and lo == 1 end   -- 13 окт: looploom — у сэмпла луп удержания
     if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
     if a == 'mixer' then return mxa == 1 end            -- 11 окт: модуль mixer — когда микшер включён и он снизу
     return true
@@ -4270,6 +4273,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if hs ~= nil then hover.slices = hs end
       elseif id == 'sprops' and info.sprops_draw then
         info.sprops_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
+      elseif id == 'looploom' and info.looploom_draw then
+        info.looploom_draw(L, ct.x + 1, ct.y + 2, ct.w - 2, ct.h - 4)
       elseif id == 'nmod' and info.nmod_draw then
         info.nmod_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
       elseif id == 'fxb' and info.fxb_draw then

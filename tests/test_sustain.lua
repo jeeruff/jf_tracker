@@ -123,5 +123,24 @@ do
   ok('flatten: the loop start is untouched (joins the head)', math.abs(o[X + 1] - x[ls + 1]) < 0.02 * f0 * 1.5, ('%.4f vs %.4f'):format(o[X + 1], x[ls + 1]))
 end
 
+-- 12. фаза кроссфейда (13 окт): точка конца сдвигается к лучшей фазе; метка с кривой и уровнем
+do
+  local x, ph = {}, 0
+  for i = 1, math.floor(1.0 * sr) do ph = ph + 2 * math.pi * 110 / sr; x[i] = math.sin(ph) end
+  local ls, X = math.floor(0.3 * sr), math.floor(0.1 * sr)
+  local le = ls + math.floor(0.5 * sr) + 37                       -- не кратно периоду
+  local nle = S.align({ x }, ls, le, X, sr)
+  local per = sr / 110
+  local off = ((nle - ls) / per) % 1
+  ok('align: the new loop length is a whole number of periods', math.min(off, 1 - off) < 0.03, ('%.3f periods off, moved %d'):format(math.min(off, 1 - off), nle - le))
+  ok('align: within 20 ms', math.abs(nle - le) <= 0.02 * sr)
+  local _, _, le2 = S.bake({ x }, ls, le, X, sr, { flat = false })
+  ok('bake returns the aligned end', le2 == nle)
+  local t = S.parse(S.tag({ on = true, ls = 0.3, le = 0.6, xf = 0.2, curve = 's', flat = false, boff = 0.2, file = '/x y.wav' }))
+  ok('tag with curve / level / file', t and t.curve == 's' and t.flat == false and t.file == '/x y.wav' and math.abs(t.boff - 0.2) < 1e-9)
+  t = S.parse('1 0.3 0.6 0.01')
+  ok('old tag: auto curve, level on', t and t.curve == 'auto' and t.flat == true)
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

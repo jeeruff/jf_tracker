@@ -41,7 +41,7 @@ KH.PAGES = {
     { k = 'Opt+1..0', d = 'instrument 1..10 of the lib' },
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back); in INSERT Cmd+digit is a note' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto off' },
-    { k = '` c', d = 'metronome: m on / off, speed, accents, pre-roll (:metro toggles)' },
+    { k = 'gm', d = 'metronome menu: m on / off, speed, accents, pre-roll (:metro toggles)' },
     { k = 'Ctrl - +', d = 'step down / up by one, in any mode (as in Renoise); - + alone - LPB (NORMAL, INSERT on the note field); Cmd - + - font size' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
@@ -562,6 +562,7 @@ KH.BARS = {
   session = { { 'Tab', 'clip mode' }, { 'click >', 'launch' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
+  looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
   tracks = { { 'j k', 'track' }, { 'h l', 'column' }, { 'Space', 'toggle' }, { 'a', 'column all' }, { 'Enter', 'go' }, { 'z', 'fold' }, { '/', 'filter' }, { 'Esc', 'tracker' } },   -- 11 окт: Track Manager
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },

@@ -28,19 +28,33 @@ function S.plan(n, lp)
   return { pos = pos, len = len, offs = offs }
 end
 
+-- кривые кроссфейда шва: auto — линейная для похожих кусков, иначе равной мощности
+S.CURVES = { { 'auto', 'auto' }, { 'lin', 'linear' }, { 'eq', 'equal power' }, { 's', 's-curve' } }
+S.CURVES_BY = {}
+for _, c in ipairs(S.CURVES) do S.CURVES_BY[c[1]] = c[2] end
+
 -- метка инструмента «on ls le xf» (P_EXT:jf_loop) ↔ таблица; off — точки помнятся
 -- 13 окт: «on ls le xf boff путь» — запечённый луп: файл с кроссфейдом, луп в нём с boff секунд
 function S.parse(tag)
   local on, a, b, x, rest = (tag or ''):match('^(%d)%s+(%S+)%s+(%S+)%s+(%S+)%s*(.*)$')
   a, b, x = tonumber(a), tonumber(b), tonumber(x)
   if not (a and b and x) or b <= a then return nil end
-  local lp = { on = on == '1', ls = a, le = b, xf = x }
+  local lp = { on = on == '1', ls = a, le = b, xf = x, curve = 'auto', flat = true }
+  -- 13 окт: c=<кривая кроссфейда> f=<выравнивание громкости 1 / 0> — до файла
+  while true do
+    local key, v, r2 = (rest or ''):match('^(%a)=(%S+)%s*(.*)$')
+    if not key then break end
+    if key == 'c' and S.CURVES_BY[v] then lp.curve = v elseif key == 'f' then lp.flat = v ~= '0' end
+    rest = r2
+  end
   local bo, path = (rest or ''):match('^(%S+)%s+(.+)$')
   if tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
   return lp
 end
 function S.tag(lp)
   local t = ('%d %.6f %.6f %.6f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
+  if lp.curve and lp.curve ~= 'auto' then t = t .. ' c=' .. lp.curve end
+  if lp.flat == false then t = t .. ' f=0' end
   if lp.file and lp.boff then t = t .. (' %.6f %s'):format(lp.boff, lp.file) end
   return t
 end
@@ -55,9 +69,16 @@ end
 -- весь луп звучит громкостью точки ls (там голова передаёт хвосту — стык непрерывен), шов сходится
 -- и по уровню. nil — без выравнивания.
 -- → каналы кадров [ls - X, le) (луп в них начинается с X), X
-function S.bake(chs, ls, le, X, sr)
+function S.bake(chs, ls, le, X, sr, opt)
+  opt = opt or {}
   X = math.max(0, math.min(X, ls, (le - ls) // 2))
-  if sr then chs = S.flatten(chs, ls - X, le, ls, sr) end
+  if sr and opt.flat ~= false then chs = S.flatten(chs, ls - X, le, ls, sr) end
+  -- 13 окт: фаза — конец лупа сдвигается (до ±20 мс), чтобы X кадров перед le совпали по фазе
+  -- с X кадрами перед ls: долгий кроссфейд не складывает две копии в разной фазе (гребёнка, «широко»)
+  if sr and opt.align ~= false and X > 0 then
+    local nle = S.align(chs, ls, le, X, sr)
+    if nle ~= le then le = nle; X = math.max(0, math.min(X, ls, (le - ls) // 2)) end
+  end
   -- закон: похожие куски (корреляция > 0.5) — линейный (без горба громкости), иначе равной мощности
   local sab, saa, sbb = 0, 0, 0
   for _, x in ipairs(chs) do
@@ -67,6 +88,8 @@ function S.bake(chs, ls, le, X, sr)
     end
   end
   local lin = saa > 1e-12 and sbb > 1e-12 and sab / math.sqrt(saa * sbb) > 0.5
+  local cv = opt.curve or 'auto'
+  if cv == 'lin' then lin = true elseif cv == 'eq' then lin = false end
   local out = {}
   for c, x in ipairs(chs) do
     local o = {}
@@ -74,13 +97,51 @@ function S.bake(chs, ls, le, X, sr)
     for k = 0, X - 1 do
       local t = (k + 1) / X
       local gi, go
-      if lin then gi, go = t, 1 - t else gi, go = math.sin(t * math.pi / 2), math.cos(t * math.pi / 2) end
+      if cv == 's' then gi = t * t * (3 - 2 * t); go = 1 - gi
+      elseif lin then gi, go = t, 1 - t else gi, go = math.sin(t * math.pi / 2), math.cos(t * math.pi / 2) end
       local i = (le - X + k) - (ls - X) + 1
       o[i] = (x[le - X + k + 1] or 0) * go + (x[ls - X + k + 1] or 0) * gi
     end
     out[c] = o
   end
-  return out, X
+  return out, X, le
+end
+
+-- конец лупа с лучшей фазой: le' в [le - D, le + D] (D — 20 мс, не за ls + X), где окно
+-- перед le' сильнее всего похоже на окно перед ls (нормированная корреляция, каналы вместе,
+-- окно до 4096 кадров, через отсчёт — быстро)
+function S.align(chs, ls, le, X, sr)
+  local W = math.min(X, 4096)
+  local D = math.floor(0.02 * sr)
+  local n = math.huge
+  for _, x in ipairs(chs) do n = math.min(n, #x) end
+  local lo, hi = math.max(ls + 2 * W, le - D), math.min(n, le + D)
+  if hi <= lo then return le end
+  local saa = 0
+  for _, x in ipairs(chs) do for k = ls - W, ls - 1, 2 do local v = x[k + 1] or 0; saa = saa + v * v end end
+  if saa < 1e-12 then return le end
+  local function corr(e, st)
+    local sab, sbb = 0, 0
+    for _, x in ipairs(chs) do
+      for k = 0, W - 1, st do
+        local u, v = x[e - W + k + 1] or 0, x[ls - W + k + 1] or 0
+        sab = sab + u * v; sbb = sbb + u * u
+      end
+    end
+    return sbb > 1e-12 and sab / math.sqrt(saa * sbb * (st == 4 and 0.5 or 1)) or -1
+  end
+  -- грубо (шаг 4 по сдвигу и окну), потом точно рядом с лучшим
+  local best, bc = le, -2
+  local function scan(a, b, st, wst)
+    for e = a, b, st do
+      local c = corr(e, wst)
+      if c > bc + 1e-9 or (math.abs(c - bc) <= 1e-9 and math.abs(e - le) < math.abs(best - le)) then bc, best = c, e end
+    end
+  end
+  scan(lo, hi, 4, 4)
+  bc = -2
+  scan(math.max(lo, best - 4), math.min(hi, best + 4), 1, 2)
+  return best
 end
 
 -- выравнивание громкости кадров [a, b): огибающая — RMS окон по 50 мс (шаг 25 мс, все каналы),
@@ -313,6 +374,7 @@ function S.find(x, sr, a, b, opt)
   local h = math.floor(sr * 0.012)
   local w = math.floor(sr * 0.015)
   local best
+  local cands = {}                                   -- 13 окт: все доведённые кандидаты (looploom рисует их)
   for k = 1, math.min(8, #pairs_) do
     local pr = pairs_[k]
     local ls = rising_zero(x, pr.a, math.floor(sr * 0.003))
@@ -328,9 +390,12 @@ function S.find(x, sr, a, b, opt)
     end
     le = rising_zero(x, le, math.floor(sr * 0.0005))
     local m = ncc(x, ls, le, h)
+    cands[#cands + 1] = { ls = ls, le = le, match = math.max(0, m), spec = pr.sc }
     if not best or m - 0.01 * k > best.m then best = { ls = ls, le = le, match = math.max(0, m), m = m - 0.01 * k } end
   end
   best.m = nil
+  table.sort(cands, function(p, q) return p.match > q.match end)
+  best.cands = cands
   return best
 end
 

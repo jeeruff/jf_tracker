@@ -32,6 +32,7 @@ PN.PANELS = {
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
   { id = 'sprops',     label = 'properties', key = 'e', hint = 'sprops',  side = 'right', avail = 'itemtab' },   -- 10 окт: свойства item / слайса — свой модуль (был справа во вкладке item)
+  { id = 'looploom',   label = 'looploom',   key = 'L', hint = 'looploom', side = 'right', avail = 'loopon' },   -- 13 окт: луп удержания — свой модуль, вкладкой у properties
   { id = 'nmod',       label = 'note mod',   key = 'N', hint = 'nmod',    side = 'right', avail = 'itemtab' },   -- 12 окт: модуляция, которую запускает нота (слоты инструмента)
   { id = 'mixer',      label = 'mixer',      key = 'x', hint = 'tracker', side = 'bottom', avail = 'mixer' },   -- 11 окт: нижний микшер — свой модуль (полоски под колонками треков)
   { id = 'tracks',     label = 'tracks',     key = 'k', hint = 'tracks',  side = 'left' },    -- 11 окт: Track Manager (как в REAPER): видимость и M S R матрицей
@@ -547,11 +548,21 @@ local function stack_keep(m, id, into)
   if cur then PN.set_active(m, cur) end
   return true
 end
+-- 13 окт: панель id — вкладкой в стек панели into (активная вкладка не меняется); уже там — ничего
+function PN.keep_in(m, id, into)
+  if not PN.visible(m, into) then return false end
+  local a, b = PN.find(m, id), PN.find(m, into)
+  if a and a == b then return false end
+  if a then detach(m, id) end
+  m.hidden[id] = true
+  return stack_keep(m, id, into)
+end
 PN.LATE = {
   { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
   { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },
   -- 12 окт: note mod — вкладкой в стеке properties (item = волна / свойства / модуляция)
   { 'nmod', function(m) return PN.visible(m, 'sprops') and stack_keep(m, 'nmod', 'sprops') end },
+  { 'looploom', function(m) return PN.visible(m, 'sprops') and stack_keep(m, 'looploom', 'sprops') end },
   { 'visor', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'visor', 'matrix') end },
   -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
   { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },

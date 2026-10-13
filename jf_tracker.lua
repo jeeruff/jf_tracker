@@ -324,7 +324,7 @@ state.panes = (function()
   local s = reaper.GetExtState(EXT, 'panes')
   -- 9 окт: миграция v2 (main — левый верх, над матрицей) — один раз поверх первой
   if reaper.GetExtState(EXT, 'panes_mig') ~= '2' then s = ''; reaper.SetExtState(EXT, 'panes_mig', '2', true) end
-  if s ~= '' then return draw.panes.decode(s) end
+  if s ~= '' then local m = draw.panes.decode(s); draw.panes.add_new(m, s); return m end   -- 13 окт: и при запуске — новые модули на свои места   -- 13 окт: и при запуске — новые модули (looploom) на свои места
   return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
     browserleft = state.browserleft, side = state.side, dsp = state.dsp, fxb = state.fxb, khelp = state.khelp,
     notes_open = state.notes_open, mx_hidden = state.mx_hidden, toptab = state.toptab, mxfold = state.mxfold,
@@ -9263,6 +9263,40 @@ ctx = {
   end,
   -- 13 окт: запечь кроссфейд шва в WAV (jf_tracker_sustain S.bake) — файл <исходник>_loop.wav рядом с ним,
   -- кадры [ls - X, le) с кроссфейдом конца в то, что перед ls; метка получает файл и boff = X
+  -- 13 окт: режим лупа инструмента — off / whole (B_LOOPSRC) / sus (луп удержания); одно из трёх
+  loop_mode = function(e)
+    local lp = ctx.sus_get(e)
+    if lp and lp.on then return 'sus' end
+    local it = e and e.item
+    if it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1 then return 'whole' end
+    return 'off'
+  end,
+  loop_set_mode = function(e, m, items)
+    items = items or ctx.inst_group(e)
+    local cur = ctx.loop_mode(e)
+    if m == cur then return end
+    if m == 'sus' then
+      ctx.sus_adjust(e, 'sus', 1, items)
+      state.loop_on = true; relayout()                -- вкладка looploom появляется рядом с properties
+      return
+    end
+    local lp = ctx.sus_get(e)
+    if lp and lp.on then lp.on = false; edit.sus_set(items, lp) end
+    edit.inst_prop(items, e.item, 'B_LOOPSRC', m == 'whole' and 1 or 0, 'abs', 'sample loop')
+    model.invalidate()
+    vim.msg = m == 'whole' and 'loop: whole sample - the file repeats' or 'loop off'
+  end,
+  -- 13 окт: для модуля looploom (jf_tracker_looploom.lua)
+  SU = function() return edit.SU end,
+  file_exists = function(p) return reaper.file_exists(p) end,
+  src_path = function(ps) return reaper.GetMediaSourceFileName(ps, '') end,
+  FOCUS = function() return draw.FOCUS end,
+  msg = function(t) vim.msg = t end,
+  sus_points = function(e, lp)
+    edit.sus_set(ctx.inst_group(e), lp)
+    ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
+    model.invalidate()
+  end,
   sus_bake = function(e)
     local lp = ctx.sus_get(e)
     if not (lp and lp.on) or lp.file then return end
@@ -9271,7 +9305,7 @@ ctx = {
     ctx.sus_bake_no = ctx.sus_bake_no or {}
     if not path:lower():match('%.wav$') then ctx.sus_bake_no[e.item] = true; return end
     local SU = edit.SU
-    local w = SU.wav_read(path, math.ceil(lp.le * 192000) + 2)
+    local w = SU.wav_read(path, math.ceil((lp.le + 0.03) * 192000) + 2)   -- + запас для сдвига фазы конца
     if not w then ctx.sus_bake_no[e.item] = true; return end
     local ls, le = math.floor(lp.ls * w.sr + 0.5), math.floor(lp.le * w.sr + 0.5)
     if le > w.n then le = w.n end
@@ -9279,7 +9313,9 @@ ctx = {
     local X0 = math.floor((lp.xf or 0) * w.sr + 0.5)
     -- 13 окт: рядом с исходником, имя + _loop (без своей папки); точки другие — тот же файл переписывается
     local out = path:gsub('%.[Ww][Aa][Vv]$', '') .. '_loop.wav'
-    local chs, X = SU.bake(w.ch, ls, le, X0, w.sr)          -- с выравниванием громкости спада
+    -- выравнивание громкости спада, кривая кроссфейда, конец — к лучшей фазе (13 окт)
+    local chs, X, le2 = SU.bake(w.ch, ls, le, X0, w.sr, { curve = lp.curve, flat = lp.flat })
+    if le2 and le2 ~= le then lp.le = le2 / w.sr end
     if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
     PV.forget(out)
     lp.file, lp.boff = out, X / w.sr
@@ -9304,7 +9340,9 @@ ctx = {
     local x = fr(a, math.floor(math.min(b - a, 30) * sr))
     local r, why = edit.SU.find(x, sr, 1, #x)
     if not r then return nil, why end
-    return { ls = a + (r.ls - 1) / sr, le = a + (r.le - 1) / sr, xf = 0.01, match = r.match }
+    local cands = {}
+    for _, c in ipairs(r.cands or {}) do cands[#cands + 1] = { ls = a + (c.ls - 1) / sr, le = a + (c.le - 1) / sr, match = c.match } end
+    return { ls = a + (r.ls - 1) / sr, le = a + (r.le - 1) / sr, xf = 0.01, match = r.match, cands = cands }
   end,
   -- sus — вкл / выкл (первый раз — найти точки), susa / susb / susx — начало, конец, кроссфейд шва;
   -- refind — найти заново (R / двойной щелчок)
@@ -9391,6 +9429,24 @@ ctx = {
       edit.set_playthru(it, items, on)
       vim.msg = 'slice playthru ' .. (on and 'on: each slice plays on to the end of the sample (the next note cuts it)' or 'off: each slice stops at the next slice')
     elseif k == 'sus' or k == 'susa' or k == 'susb' or k == 'susx' then ctx.sus_adjust(e, k, d, items, fine)
+    elseif k == 'loopm' then   -- 13 окт: режим лупа одной строкой: off / whole / sustain (looploom)
+      local M = { 'off', 'whole', 'sus' }
+      local i = 1; for n, m in ipairs(M) do if m == ctx.loop_mode(e) then i = n end end
+      ctx.loop_set_mode(e, M[math.max(1, math.min(3, i + (d >= 0 and 1 or -1)))], items)
+    elseif k == 'susc' or k == 'susl' then
+      local lp = ctx.sus_get(e)
+      if not (lp and lp.on) then vim.msg = 'looploom: the loop is not sustain (loop row)'; return end
+      if k == 'susc' then
+        local C, i = edit.SU.CURVES, 1
+        for n, c in ipairs(C) do if c[1] == lp.curve then i = n end end
+        lp.curve = C[(i - 1 + (d >= 0 and 1 or -1)) % #C + 1][1]
+      else lp.flat = not lp.flat end
+      lp.file, lp.boff = nil, nil
+      edit.sus_set(items, lp)
+      ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
+      vim.msg = k == 'susc' and ('loop x-fade curve: ' .. edit.SU.CURVES_BY[lp.curve]) or ('loop level: ' .. (lp.flat and 'flat - the decay is evened out to the level at the loop start' or 'natural - as in the file'))
+      model.invalidate()
+    elseif k == 'susr' then ctx.sus_adjust(e, 'sus', 0, items, false, true)
     elseif k == 'swing' then
       local on = not edit.item_swing(it)
       edit.run('instrument swing', function() for _, x in ipairs(items) do edit.set_item_swing(x, on) end end)
@@ -9427,6 +9483,10 @@ ctx = {
     if k == 'lock' then return reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 'on' or 'off' end
     if k == 'swing' then return edit.item_swing(it) and ('on - ' .. ctx.swing_label()) or 'off - straight' end
     if k == 'pthru' then return edit.playthru(it) and 'on - slices play to the end of the sample' or 'off - to the next slice' end
+    if k == 'loopm' then local m = ctx.loop_mode(e); return m == 'sus' and 'sustain - looploom' or (m == 'whole' and 'whole sample' or 'off') end
+    if k == 'susc' then local lp = ctx.sus_get(e); return lp and edit.SU.CURVES_BY[lp.curve or 'auto'] or '-' end
+    if k == 'susl' then local lp = ctx.sus_get(e); return lp and (lp.flat ~= false and 'flat' or 'natural') or '-' end
+    if k == 'susr' then return 'R / click - find the points again' end
     if k == 'sus' or k == 'susa' or k == 'susb' or k == 'susx' then
       local lp = ctx.sus_get(e)
       if k == 'sus' then return lp and lp.on and ('on %.3f - %.3f s'):format(lp.ls, lp.le) or 'off' end
@@ -9546,6 +9606,22 @@ ctx = {
       for i, nm in ipairs({ 'linear', 'fast start', 'fast end', 'fast start steep', 'fast end steep', 'slow start/end', 'slow start/end steep' }) do
         add(nm, function() P(key, i - 1, 'fade shape') end, cur == i - 1)
       end
+    elseif k == 'loopm' then
+      title = 'loop'
+      local m = ctx.loop_mode(e)
+      add('off', function() ctx.loop_set_mode(e, 'off', items) end, m == 'off')
+      add('whole sample - the file repeats', function() ctx.loop_set_mode(e, 'whole', items) end, m == 'whole')
+      add('sustain - attack once, the loop while the note lasts (looploom)', function() ctx.loop_set_mode(e, 'sus', items) end, m == 'sus')
+    elseif k == 'susc' then
+      title = 'loop x-fade curve'
+      local lp = ctx.sus_get(e)
+      if not (lp and lp.on) then return false end
+      for _, c in ipairs(edit.SU.CURVES) do
+        add(c[2], function()
+          lp.curve = c[1]; lp.file, lp.boff = nil, nil
+          edit.sus_set(items, lp); ctx.sus_bake_req = { e = e, t = reaper.time_precise() }; model.invalidate()
+        end, (lp.curve or 'auto') == c[1])
+      end
     elseif k == 'chan' then
       title = 'channels'
       local cur = math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE'))
@@ -9576,7 +9652,8 @@ ctx = {
     elseif k == 'foutshape' then P('C_FADEOUTSHAPE', 0, 'abs', 'fade shape reset')
     elseif k == 'chan' then P('take:I_CHANMODE', 0, 'abs', 'channel mode reset')
     elseif k == 'len' then return
-    elseif k == 'sus' or k == 'susa' or k == 'susb' then ctx.sus_adjust(e, 'sus', 0, items, false, true); return   -- найти заново
+    elseif k == 'sus' or k == 'susa' or k == 'susb' or k == 'susr' then ctx.sus_adjust(e, 'sus', 0, items, false, true); return   -- найти заново
+    elseif k == 'loopm' then ctx.loop_set_mode(e, 'off', items); return
     elseif k == 'susx' then local lp = ctx.sus_get(e); if lp then lp.xf = 0.01; lp.file, lp.boff = nil, nil; edit.sus_set(items, lp); ctx.sus_bake_req = { e = e, t = reaper.time_precise() } end
     else ctx.sp_adjust(e, k, 1); return end
     model.invalidate()
@@ -11432,7 +11509,6 @@ ctx = {
           it[#it + 1] = { key = 's', label = 'slice current instrument …', fn = function() ctx.open_slicer() end }
           return { title = 'instrument', items = it }
         end },
-      { key = 'c', label = 'click: metronome (m on / off, speed, accents, pre-roll) …', fn = function() ctx.metro_menu() end },   -- 13 окт: метроном с клавиатуры
       { key = 'f', label = 'add FX (fzf by all installed) …', fn = ctx.fx_picker },
       { key = 'a', label = 'REAPER actions (all, fzf) … (:!)', fn = function() ctx.reaper_actions() end },
       { key = 'l', label = 'loop in region (polymeter)', sub = function() return { title = 'loop', items = {
@@ -11780,6 +11856,7 @@ edit.inst_ref = function(it)
   return e and e.item or nil
 end
 SPROP.init(U, ctx)
+ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 окт: модуль looploom
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
 
@@ -15064,6 +15141,11 @@ local function frame()
       end
       ctx.sp_sel = sel_e
       state.sp_none = sel_e == nil   -- 11 окт: нет сэмпла — панели properties нет (раскладка прячет)
+      state.loop_on = sel_e ~= nil and ctx.loop_mode(sel_e) == 'sus'   -- 13 окт: вкладка looploom — пока у сэмпла луп удержания
+      if state.loop_on ~= ctx.ll_was then                -- луп включили — вкладка looploom встаёт в стек properties (скрытая — тоже)
+        ctx.ll_was = state.loop_on
+        if state.loop_on and state.panes and draw.panes.keep_in(state.panes, 'looploom', 'sprops') then relayout() end
+      end
       if state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops') then
         SPROP.hover_tab = nil
         return SL.draw_in(U, L, x, y, w, h, e, col and col.track, zone)
@@ -15104,6 +15186,7 @@ local function frame()
         ctx.sp_in_pane = true
       end
     end,
+    looploom_draw = function(Lx, x, y, w, h) ctx.LL.draw(Lx, x, y, w, h, ctx.sp_sel, state.focus == 'looploom') end,
     nmod_draw = function(Lx, x, y, w, h) ctx.NMUI.draw(Lx, x, y, w, h, ctx.nmod_list(), state.focus == 'nmod') end,   -- 12 окт
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
@@ -15746,6 +15829,7 @@ local function frame()
     state.status = 'convert slices: l - every slice its own lib instrument, s - an RS5K per slice on the cursor track (slice note)'
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
+  elseif ctx.LL.status then state.status = ctx.LL.status
   elseif SPROP.hover and SPROP.hover.scope then state.status = 'what the properties change: sample (all its notes) / slice (the selected slice and its notes) / note (only the note under the cursor) - click: the list'
   elseif SPROP.hover and SPROP.hover.fit then state.status = 'v: open the top panel so that all the sample properties fit'
   elseif SPROP.hover and not SPROP.hover.title and ctx.sp_live() then
@@ -16777,7 +16861,7 @@ local function frame()
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
-      elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
+      elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape' or SPROP.hover.k == 'loopm') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
       elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'swing' or SPROP.hover.k == 'pthru' or SPROP.hover.k == 'sus') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
@@ -18975,6 +19059,9 @@ local function frame()
         -- 12 окт: note mod — j k строка, a добавить, Enter кривая, r rate, l loop, d удалить
         if c == 27 then ctx.set_focus('tracker')
         elseif not ctx.NMUI.key(c, ctx.nmod_list()) then vim.key(c) end
+      elseif state.focus == 'looploom' then           -- 13 окт: j k строка, h l значение, Enter список, R сброс, n N кандидаты, + - шов
+        if c == 27 then ctx.set_focus('tracker')
+        elseif not ctx.LL.key(c, ctx.sp_sel) then vim.key(c) end
       elseif state.focus == 'sprops' then
         -- 10 окт: модуль props — J K строка, H L значение, R сброс (как во вкладке item); остальное — vim
         local se = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])

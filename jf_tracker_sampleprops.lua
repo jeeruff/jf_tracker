@@ -17,9 +17,9 @@ SP.ROWS = {
   { k = 'vol', label = 'volume' }, { k = 'pan', label = 'pan' },
   { k = 'st', label = 'transpose' }, { k = 'cent', label = 'finetune' },
   { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'ppitch', label = 'keep pitch' },
-  { k = 'mode', label = 'stretch' }, { k = 'loop', label = 'loop' },
-  -- 13 окт: луп удержания — нота держится, пока не отпустят (точки сам или руками, кроссфейд шва)
-  { k = 'sus', label = 'sustain loop' }, { k = 'susa', label = 'sus start' }, { k = 'susb', label = 'sus end' }, { k = 'susx', label = 'sus x-fade' },
+  { k = 'mode', label = 'stretch' },
+  -- 13 окт: луп одной строкой — off / whole / sustain; точки, кроссфейд, кривая — модуль looploom
+  { k = 'loopm', label = 'loop' },
   { k = 'fin', label = 'fade in' }, { k = 'fout', label = 'fade out' },
   -- 5 окт: остальное из окна свойств item REAPER (позиция у сэмпла lib не нужна)
   { k = 'finshape', label = 'fade in shape' }, { k = 'foutshape', label = 'fade out shape' },

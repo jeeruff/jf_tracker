@@ -2004,6 +2004,10 @@ function V.key_impl(c)
         if c == ('t'):byte() then if ctx.tab_menu then ctx.tab_menu(k) end elseif ctx.project_menu then ctx.project_menu(k) end
         return
       end
+      if c == ('m'):byte() and not V.op then
+        -- 13 окт: gm — меню метронома (вкл / выкл, скорость, акценты, пре-ролл)
+        V.count = nil; finish_move(); if ctx.metro_menu then ctx.metro_menu() end; return
+      end
       if c == ('s'):byte() and not V.op then
         -- gs (9 окт): смарт-панель — сетка значений поля курсора (мышью / h j k l + Enter)
         V.count = nil; finish_move(); V.smart(); return
@@ -2608,7 +2612,7 @@ local PENDING_HINT = {
   d = 'd: d delete track | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
-  g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | Esc',
+  g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
   z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom | s clips (session)',
   r = 'r: note key sets pitch | hex digits set field | Esc',
