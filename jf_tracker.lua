@@ -330,7 +330,8 @@ state.panes = (function()
     -- 13 окт: tracks — дерево трек → инструменты → automation — встаёт туда, где lib (вкладкой рядом), один раз
     if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
     -- 13 окт: модуль slices спрятан — слайсы и их клавиши в дереве tracks внутри инструмента (показать: Ctrl+W s / :pane slices show)
-    if reaper.GetExtState(EXT, 'tl_in_lib') ~= '1' then draw.panes.hide(m, 'tracks'); reaper.SetExtState(EXT, 'tl_in_lib', '1', true) end   -- 13 окт: дерево — во вкладке lib
+    -- 13 окт: lib и tracks — две вкладки одного места (lib — вся база сэмплов, tracks — дерево треков), один раз
+    if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
   end
@@ -4024,7 +4025,6 @@ ctx = {
   end,
   pane_focus = function(id)
     local PN = draw.panes
-    if id == 'tracks' and state.libtree ~= false then id = 'inst' end   -- 13 окт: дерево tracks живёт во вкладке lib
     if not (id and PN.BY[id]) then return end
     ctx.pn_prev = ctx.pane_cur()
     if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
@@ -4521,7 +4521,11 @@ ctx = {
   tl_row_do = function(r, listen)
     if not r then return end
     local TL = draw.TL
-    if r.k == 'i' or r.k == 'c' then
+    if r.k == 'p' then                                     -- 13 окт: плагин-инструмент — выбрать (ноты — MIDI в него), Space дважды — окно
+      if r.ci then ctx.tl_cursor(r.ci) end
+      local col = snap and snap.cols[r.ci]
+      if col then ctx.inst_fx_pick(col, r.fx, listen, true) end
+    elseif r.k == 'i' or r.k == 'c' then
       if r.ci then ctx.tl_cursor(r.ci) end
       pool_select(r.i)
       if listen then ctx.inst_listen() end
@@ -11982,6 +11986,7 @@ edit.inst_ref = function(it)
 end
 SPROP.init(U, ctx)
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
+draw.tl_insts = ctx.track_insts                           -- 13 окт: плагины-инструменты в дереве
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
@@ -19292,7 +19297,7 @@ local function frame()
       elseif state.focus == 'inst' and (state.top or state.side) then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         -- 13 окт: вид tracks в lib — клавиши дерева (как в lf), остальное — прежние клавиши lib
-        if state.libtree ~= false and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
+        if state.libtree == true and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
         local col = cur_col()
         local n = #(col and col.pool or {})
         local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))

@@ -1279,10 +1279,13 @@ function D.tl_tree(state, snap)
     local n, ais = 0, 0
     for i, e in ipairs(pool) do if not e.parent and used_on(e, col.name) then n = n + 1 end end
     for _, en in ipairs(col.envs or {}) do ais = ais + #(en.ais or {}) end
+    n = n + #(D.tl_insts and D.tl_insts(col) or {})
     out[#out + 1] = { k = 't', ci = ci, d = d, n = n + ais }
     if not filt and not TL.closed[col.guid] then
       for i, e in ipairs(pool) do if not e.parent and used_on(e, col.name) then inst_rows(ci, i, d + 1) end end
       -- 13 окт: MIDI-клипы трека — папкой (раньше — в модуле slices при выбранном midi)
+      -- 13 окт: плагины-инструменты трека (RS5K, VSTi, киты) — строками, выбор как в lib
+      for _, fi in ipairs(D.tl_insts and D.tl_insts(col) or {}) do out[#out + 1] = { k = 'p', ci = ci, d = d + 1, fx = fi.fx, name = fi.name, kind = fi.kind } end
       local mcs = D.tl_midi and D.tl_midi(col) or {}
       if #mcs > 0 then
         local key = 'm:' .. col.guid
@@ -1466,6 +1469,10 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
         end
         colr = on and U.AMBER or (rw.k == 'c' and U.GREY or U.TEXT)
       elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~~ automation  %d'):format(rw.n); colr = U.GREY
+      elseif rw.k == 'p' then
+        local sel = info.inst_fx and info.inst_fx(cols[rw.ci]) == rw.fx
+        lbl = '~ ' .. (rw.name or 'instrument'); colr = sel and U.AMBER or U.CYAN
+        if sel then set(U.tint(U.AMBER, 0.3)); gfx.rect(x, ry, w, rhh, 1) end
       elseif rw.k == 'ai' then lbl = '~ ' .. (rw.env.name or '') .. ((rw.ai.label or '') ~= '' and ('  ' .. rw.ai.label) or ''); colr = U.CYAN
       else lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('lib/  %d not used'):format(rw.n); colr = U.GREY end
       -- превью справа: инструмент — весь сэмпл (выбранный кусок инверсией), слайс — его кусок
@@ -4510,7 +4517,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         hover.browser = info.browser_draw(L, ct.x, ct.y, ct.w, ct.h)
         if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end   -- 9 окт: вкладка fx браузера (router big) — щелчки
       elseif id == 'inst' then
-        info.lib_tree = state.libtree ~= false and function(tx, ty, tw, th) D.track_list(L, state, snap, info, hover, tx, ty, tw, th, foc == 'inst') end or nil
+        info.lib_tree = state.libtree == true and function(tx, ty, tw, th) D.track_list(L, state, snap, info, hover, tx, ty, tw, th, foc == 'inst') end or nil
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'slices' and info.slices_draw then
         local hs = info.slices_draw(L, ct.x + 3, ct.y + 2, ct.w - 5, ct.h - 4)
