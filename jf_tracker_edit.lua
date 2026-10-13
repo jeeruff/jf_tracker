@@ -3366,7 +3366,15 @@ function E.sus_set(items, lp, desc)
   run(desc or ('sustain loop ' .. (lp.on and 'on' or 'off')), function()
     R.SetProjExtState(0, 'jf_tracker', 'sus', '1')
     local tag = E.SU.tag(lp)
-    for _, it in ipairs(items) do if R.ValidatePtr(it, 'MediaItem*') then set_ext(it, SUS, tag) end end
+    for _, it in ipairs(items) do
+      if R.ValidatePtr(it, 'MediaItem*') then
+        set_ext(it, SUS, tag)
+        -- 13 окт: либо sustain, либо loop — включённый sustain гасит loop (и после выключения он остаётся off)
+        if lp.on then
+          if ext(it, SUSHEAD) ~= '' then set_ext(it, SUSHEAD, 'L0') else R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 0) end
+        end
+      end
+    end
   end)
 end
 

@@ -9261,7 +9261,7 @@ ctx = {
     if lp and lp.on and not lp.file and not ctx.sus_bake_req and not (ctx.sus_bake_no or {})[e.item] then ctx.sus_bake_req = { e = e, t = reaper.time_precise() } end
     return lp
   end,
-  -- 13 окт: запечь кроссфейд шва в WAV (jf_tracker_sustain S.bake) — файл в <папка проекта>/jf_loops,
+  -- 13 окт: запечь кроссфейд шва в WAV (jf_tracker_sustain S.bake) — файл <исходник>_loop.wav рядом с ним,
   -- кадры [ls - X, le) с кроссфейдом конца в то, что перед ls; метка получает файл и boff = X
   sus_bake = function(e)
     local lp = ctx.sus_get(e)
@@ -9277,16 +9277,11 @@ ctx = {
     if le > w.n then le = w.n end
     if le - ls < 16 then ctx.sus_bake_no[e.item] = true; return end
     local X0 = math.floor((lp.xf or 0) * w.sr + 0.5)
-    local dir = reaper.GetProjectPath('') .. '/jf_loops'
-    reaper.RecursiveCreateDirectory(dir, 0)
-    local base = (path:match('([^/]+)%.[Ww][Aa][Vv]$') or 'loop'):gsub('[^%w%-_ ]', '_')
-    local out = ('%s/%s_%d_%d_%d.wav'):format(dir, base, ls, le, X0)
-    local X = math.max(0, math.min(X0, ls, (le - ls) // 2))
-    if not reaper.file_exists(out) then
-      local chs
-      chs, X = SU.bake(w.ch, ls, le, X0)
-      if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
-    end
+    -- 13 окт: рядом с исходником, имя + _loop (без своей папки); точки другие — тот же файл переписывается
+    local out = path:gsub('%.[Ww][Aa][Vv]$', '') .. '_loop.wav'
+    local chs, X = SU.bake(w.ch, ls, le, X0)
+    if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
+    PV.forget(out)
     lp.file, lp.boff = out, X / w.sr
     edit.sus_set(ctx.inst_group(e), lp, 'sustain loop crossfade')
     model.invalidate()
@@ -9337,6 +9332,7 @@ ctx = {
     edit.sus_set(items or ctx.inst_group(e), lp)
     ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
     vim.msg = msg or ('sustain loop %s  %.3f - %.3f s, x-fade %d ms'):format(lp.on and 'on' or 'off', lp.ls, lp.le, math.floor(lp.xf * 1000 + 0.5))
+    if lp.on and e.loop then vim.msg = vim.msg .. '  - loop off (one or the other)' end
     model.invalidate()
   end,
   sp_adjust = function(e, k, d)
@@ -9364,7 +9360,12 @@ ctx = {
       local k0 = 1
       for i, m in ipairs(modes) do if m == cur or (m >= 0 and cur >= 0 and (m >> 16) == (math.floor(cur) >> 16)) then k0 = i end end
       P('take:I_PITCHMODE', modes[(k0 - 1 + d) % #modes + 1], 'abs', 'sample stretch mode')
-    elseif k == 'loop' then P('B_LOOPSRC', e.loop and 0 or 1, 'abs', 'sample loop')
+    elseif k == 'loop' then
+      -- 13 окт: либо loop, либо sustain loop — loop on выключает sustain
+      local lp = not e.loop and ctx.sus_get(e)
+      if lp and lp.on then lp.on = false; edit.sus_set(items, lp) end
+      P('B_LOOPSRC', e.loop and 0 or 1, 'abs', 'sample loop')
+      vim.msg = e.loop and 'loop off' or ('loop on: the whole sample repeats' .. (lp and ' - sustain loop off (one or the other)' or ''))
     elseif k == 'fin' or k == 'fout' then
       local key = k == 'fin' and 'D_FADEINLEN' or 'D_FADEOUTLEN'
       P(key, math.max(0, reaper.GetMediaItemInfo_Value(it, key) + d * (fine and 0.001 or 0.005)), 'abs', 'sample fade')

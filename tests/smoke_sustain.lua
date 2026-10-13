@@ -113,7 +113,7 @@ local ok, err = pcall(function()
   edit.run('short', function() R.SetMediaItemInfo_Value(it, 'D_LENGTH', ls * 0.5) end)
   tk = R.GetActiveTake(it)
   local st2 = R.GetMediaSourceType(R.GetMediaItemTake_Source(tk), '')
-  check('short note: tail gone, head plays the file again', #tails() == 1 and st2 ~= 'SECTION' and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1, #tails() .. ' ' .. st2)
+  check('short note: tail gone, head plays the file again, loop stays off (sustain or loop)', #tails() == 1 and st2 ~= 'SECTION' and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 0, #tails() .. ' ' .. st2)
   -- 7. удалить правую голову — её хвост тоже
   edit.run('del', function() if right then R.DeleteTrackMediaItem(tr, right) end end)
   check('delete: orphan tail removed', #tails() == 0)

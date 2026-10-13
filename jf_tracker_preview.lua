@@ -77,6 +77,8 @@ local function section(path, a, len, xf)
   sections[k] = sec
   return sec
 end
+-- файл переписан (запечённый луп с другими точками) — его секции собрать заново
+P.forget = function(path) for k in pairs(sections) do if k:sub(1, #path + 1) == path .. '|' then sections[k] = nil end end end
 P.sus_ok = function(lp) return lp and lp.on and lp.le - lp.ls > 1e-3 and R.CF_PCM_Source_SetSectionInfo ~= nil end
 
 -- → список превью (ещё не запущены) или nil; gain — множитель громкости (скорость MIDI)
