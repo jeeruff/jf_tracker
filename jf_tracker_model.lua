@@ -211,7 +211,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local fo = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN')
   if fo > 0.02 then fx[#fx + 1] = 'SO' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
   -- loop source в REAPER включён по умолчанию — показываем только ВЫКЛЮЧЕННЫЙ
-  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'SL00' end
+  -- 13 окт: голова ноты с лупом удержания — B_LOOPSRC снят нарочно (P_EXT:jf_sushead), не показываем
+  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_sushead', '', false)) == '' then fx[#fx + 1] = 'SL00' end
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
   if cm and cm ~= 0 then fx[#fx + 1] = 'SM' .. M.hex2(math.floor(cm)) end
   -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
@@ -310,6 +311,21 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     end
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
+  -- 13 окт: луп удержания — шов лупа отметками, как у B_LOOPSRC (хвост — отдельный item, его не видно)
+  if M.SU and take then
+    local _, sh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_sushead', '', false)
+    local lp = sh ~= '' and M.SU.parse((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_loop', '', false))))
+    if lp and lp.on then
+      local r = rate > 0 and rate or 1
+      local first, per = (lp.ls - head.offs) / r, (lp.le - lp.ls) / r
+      if first > 0 and per > 1e-4 and first < head.len then
+        local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        head.loop_first = (R.TimeMap2_timeToQN(0, pos + first) - qn0) * lpb
+        head.loop_rows = (R.TimeMap2_timeToQN(0, pos + first + per) - qn0) * lpb - head.loop_first
+        head.sus = lp
+      end
+    end
+  end
   local _, si = place(lane, r0, r1, head, nil, nil, d1 > 0 and d1 or nil)
   -- огибающая громкости take (5 окт): точки — значениями в колонке vol на
   -- строках продолжения (кроссфейд и ручные рампы видны числами, как в Renoise)
@@ -513,6 +529,8 @@ function M.build(lpb)
           local in_zone = M.SHOW_ZONE and snap.zone and ip >= snap.zone[1] - 1e-6 and ip < snap.zone[2] - 1e-6
           if ip >= snap.end_pos - 1e-6 and not in_zone then lane = nil end
         end
+        -- 13 окт: хвост лупа удержания — часть ноты-головы, своей ячейки нет
+        if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then lane = nil end
         if lane then
           local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
           local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
@@ -532,13 +550,13 @@ function M.build(lpb)
             end
           else
             si, ahead = place_audio(lane, lpb, it, take, qn0, qn1)
-            loop_rows = ahead and ahead.loop_rows
+            loop_rows = ahead and not ahead.sus and ahead.loop_rows      -- шов лупа удержания не тянется (13 окт)
           end
           -- рамка item в колонке: дробные строки начала/конца; аудио — в
           -- своей подколонке (si), MIDI — на всю lane (ноты внутри)
           lane.items[#lane.items + 1] = {
             item = it, r0 = qn0 * lpb, r1 = qn1 * lpb, midi = midi, si = si, loop_rows = loop_rows,
-            loop_first = (not midi) and ahead and ahead.loop_first or nil,      -- первый стык от начала item (строки)
+            loop_first = (not midi) and ahead and not ahead.sus and ahead.loop_first or nil,      -- первый стык от начала item (строки)
             rgb = M.item_rgb(it),
             sel = R.IsMediaItemSelected and R.IsMediaItemSelected(it) or false,
             muted = R.GetMediaItemInfo_Value(it, 'B_MUTE_ACTUAL') == 1,
@@ -805,6 +823,7 @@ M.pool_key = pool_key
 local function pool_add(pool, seen, it, from_depot)
   local take = R.GetActiveTake(it)
   if not take then return end
+  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then return end   -- хвост лупа удержания (13 окт)
   -- MIDI-клипы (9 окт): только из зоны lib / трека LIB — MIDI-item песни это
   -- контейнеры нот трекера, не инструменты; каждый клип — свой (без склейки)
   local midi = R.TakeIsMIDI(take)

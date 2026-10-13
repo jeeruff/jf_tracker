@@ -262,6 +262,8 @@ local function run(desc, fn)
     E.in_after = false
     if not ok2 then err = err2; ok = false end
   end
+  -- 13 окт: луп удержания — хвосты нот за головами (после всех правок, в том же undo)
+  if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
@@ -1417,9 +1419,38 @@ local function mono_cut(track, t, keep)
     end
   end
 end
+-- 13 окт: нота инструмента с лупом удержания звучит, пока её не оборвут: до следующей ноты
+-- колонки, иначе до конца паттерна (региона) под ней
+local function sus_extend(track, lane_idx, it)
+  if not E.SU then return end
+  local lp = E.SU.parse((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_loop', '', false))))
+  if not (lp and lp.on) or select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)) ~= '' then return end
+  local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local stop
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local o = R.GetTrackMediaItem(track, i)
+    if o ~= it and same_lane(track, o, lane_idx) and select(2, R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_susof', '', false)) == '' then
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      if op > p + 1e-4 and (not stop or op < stop) then stop = op end
+    end
+  end
+  if not stop then
+    local i = 0
+    while true do
+      local ret, isrgn, rp, re, nm = R.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isrgn and nm ~= '=SESSION' and rp <= p + 1e-6 and re > p + 1e-4 and (not stop or re < stop) then stop = re end
+      i = i + 1
+    end
+  end
+  if stop and stop > p + R.GetMediaItemInfo_Value(it, 'D_LENGTH') + 1e-6 then R.SetMediaItemInfo_Value(it, 'D_LENGTH', stop - p) end
+end
+E.sus_extend = sus_extend
+
 local function finish_insert(track, lane_idx, it)
   if not it then return end
   E.bsync_fit(it)                                     -- beatsync инструмента: под темп в этом месте
+  sus_extend(track, lane_idx, it)
   -- 11 окт: следующее событие подколонки курсора (E.cap_row, ставит vim) обрывает новую ноту —
   -- иначе длинный слайс налезал на MIDI-ноту ниже и уезжал в новую подколонку
   if E.cap_row and E.cap_lpb then
@@ -1962,8 +1993,8 @@ function E.hold_insert(spec)
         R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
         R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur)
         E.make_unique(it)
-      elseif dur > 0 and dur < len then
-        R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur)
+      elseif dur > 0 and (dur < len or (E.SU and (E.SU.parse((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_loop', '', false)))) or {}).on)) then
+        R.SetMediaItemInfo_Value(it, 'D_LENGTH', dur)    -- 13 окт: луп удержания — нота длиной в удержание клавиши
       end
       made = it
     end
@@ -3275,14 +3306,17 @@ function E.loop_period(item, mode, v)
   return ok
 end
 
-function E.set_section(item, start, len)
+-- overlap (13 окт, луп удержания) — кроссфейд шва секции-лупа (OVERLAP в чанке)
+function E.set_section(item, start, len, overlap, chunk)
   if R.CountTakes(item) > 1 then return false, 'multi-take item' end
-  local ok, chunk = R.GetItemStateChunk(item, '', false)
+  local ok = chunk ~= nil
+  if not ok then ok, chunk = R.GetItemStateChunk(item, '', false) end
   if not ok then return false, 'no chunk' end
   local sb = source_block(chunk)
   if not sb or not sb.inner then return false, 'no source block' end
   local base = sb.kind == 'SECTION' and sb.startpos or 0
-  local new = ('<SOURCE SECTION\n  LENGTH %.10f\n  STARTPOS %.10f\n%s\n>'):format(len, base + start, sb.inner)
+  local ov = (overlap and overlap > 0) and ('  OVERLAP %.10f\n'):format(overlap) or ''
+  local new = ('<SOURCE SECTION\n  LENGTH %.10f\n  STARTPOS %.10f\n%s%s\n>'):format(len, base + start, ov, sb.inner)
   local out = {}
   for i = 1, sb.s - 1 do out[#out + 1] = sb.lines[i] end
   out[#out + 1] = new
@@ -3290,6 +3324,162 @@ function E.set_section(item, start, len)
   R.SetItemStateChunk(item, table.concat(out, '\n'), false)
   R.UpdateItemInProject(item)
   return true
+end
+
+-- секция → снова весь файл (вложенный источник), смещение take — в секундах файла
+function E.unsection(item)
+  local ok, chunk = R.GetItemStateChunk(item, '', false)
+  if not ok then return false end
+  local sb = source_block(chunk)
+  if not sb or sb.kind ~= 'SECTION' or not sb.inner then return false end
+  local tk = R.GetActiveTake(item)
+  local offs = tk and R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0
+  local out = {}
+  for i = 1, sb.s - 1 do out[#out + 1] = sb.lines[i] end
+  out[#out + 1] = sb.inner
+  for i = sb.e + 1, #sb.lines do out[#out + 1] = sb.lines[i] end
+  R.SetItemStateChunk(item, table.concat(out, '\n'), false)
+  tk = R.GetActiveTake(item)
+  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', sb.startpos + offs) end
+  return true
+end
+
+-- ── луп удержания (13 окт, jf_tracker_sustain.lua) ───────────────────────
+-- Метка инструмента P_EXT:jf_loop «on ls le xf» (секунды файла) — на корне и всех копиях; новые
+-- ноты наследуют её с чанком. После каждой правки (run, глубина 1) E.sus_sync приводит проект
+-- в соответствие: нота с меткой длиннее начала лупа — голова (источник — секция [0, ls) файла,
+-- без лупа: P_EXT:jf_sushead хранит её прежний B_LOOPSRC) + хвост (item-секция [ls, le) с лупом
+-- и OVERLAP, P_EXT:jf_susof = GUID головы, P_EXT:jf_sussig — по чему хвост собран). Хвост без
+-- головы удаляется, у короткой ноты голова снова играет файл. Трекер хвост не показывает.
+E.SU = dofile(DIR .. '/jf_tracker_sustain.lua')
+local SUS, SUSOF, SUSHEAD, SUSSIG = 'P_EXT:jf_loop', 'P_EXT:jf_susof', 'P_EXT:jf_sushead', 'P_EXT:jf_sussig'
+local function ext(it, k) local _, v = R.GetSetMediaItemInfo_String(it, k, '', false); return v or '' end
+local function set_ext(it, k, v) R.GetSetMediaItemInfo_String(it, k, v, true) end
+local function item_guid(it) local _, g = R.GetSetMediaItemInfo_String(it, 'GUID', '', false); return g or '' end
+E.sus_ext = ext
+
+-- есть ли в проекте лупы удержания (метка проекта — чтобы не обходить items на каждой правке)
+function E.sus_used() local _, v = R.GetProjExtState(0, 'jf_tracker', 'sus'); return v == '1' end
+
+-- поставить / снять луп у нот инструмента (items — корень и копии); lp = { on, ls, le, xf }
+function E.sus_set(items, lp, desc)
+  run(desc or ('sustain loop ' .. (lp.on and 'on' or 'off')), function()
+    R.SetProjExtState(0, 'jf_tracker', 'sus', '1')
+    local tag = E.SU.tag(lp)
+    for _, it in ipairs(items) do if R.ValidatePtr(it, 'MediaItem*') then set_ext(it, SUS, tag) end end
+  end)
+end
+
+local function sus_sig(it, tk, plan, tag)
+  local V, T = R.GetMediaItemInfo_Value, R.GetMediaItemTakeInfo_Value
+  return ('%.6f %.6f %.6f %.6f %.4f %.4f %.4f %.4f %d %d %d %d %d %.4f %d %s'):format(plan.pos, plan.len, plan.offs,
+    T(tk, 'D_PLAYRATE'), T(tk, 'D_PITCH'), V(it, 'D_VOL'), T(tk, 'D_VOL'), T(tk, 'D_PAN'), V(it, 'B_MUTE'),
+    T(tk, 'B_PPITCH'), T(tk, 'I_PITCHMODE'), T(tk, 'I_CHANMODE'), V(it, 'I_FIXEDLANE'), V(it, 'D_FADEOUTLEN'),
+    R.TakeFX_GetCount and R.TakeFX_GetCount(tk) or 0, tag)
+end
+
+-- голова: источник — секция [0, ls) файла без лупа (уже такая — ничего)
+local function sus_head(it, tk, ls)
+  local src = R.GetMediaItemTake_Source(tk)
+  local was = ext(it, SUSHEAD)
+  if was ~= '' then
+    local ok, so, sl = R.PCM_Source_GetSectionInfo(src)
+    if ok and math.abs((so or 0)) < 1e-7 and math.abs((sl or 0) - ls) < 1e-7 then return true end
+  else
+    -- чужая секция (луп на регион, F1) — не трогаем
+    local ok, chunk = R.GetItemStateChunk(it, '', false)
+    local sb = ok and source_block(chunk)
+    if not sb or sb.kind == 'SECTION' then return false end
+    set_ext(it, SUSHEAD, 'L' .. math.floor(R.GetMediaItemInfo_Value(it, 'B_LOOPSRC')))
+  end
+  if not E.set_section(it, 0, ls) then return false end
+  R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 0)
+  return true
+end
+local function sus_unhead(it)
+  local was = ext(it, SUSHEAD)
+  if was == '' then return end
+  E.unsection(it)
+  R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', tonumber(was:match('L(%d)')) or 1)
+  set_ext(it, SUSHEAD, '')
+end
+
+-- хвост: копия головы (take FX, громкость, питч), источник — секция-луп [ls, le)
+local function sus_tail(tr, head, plan, lp, sig)
+  local ok, chunk = R.GetItemStateChunk(head, '', false)
+  if not ok then return end
+  local it = R.AddMediaItemToTrack(tr)
+  chunk = strip_guids(chunk)
+  local sb = source_block(chunk)
+  if not sb then R.DeleteTrackMediaItem(tr, it); return end
+  R.SetItemStateChunk(it, chunk, false)
+  -- секция головы [0, ls) → [ls, le): STARTPOS складывается с началом её секции (0)
+  E.set_section(it, lp.ls, lp.le - lp.ls, lp.xf)
+  local tk = R.GetActiveTake(it)
+  R.SetMediaItemInfo_Value(it, 'D_POSITION', plan.pos)
+  R.SetMediaItemInfo_Value(it, 'D_LENGTH', plan.len)
+  R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 1)
+  R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', 0)
+  R.SetMediaItemInfo_Value(it, 'D_FADEINLEN_AUTO', 0)
+  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', plan.offs) end
+  R.SetMediaItemSelected(it, false)
+  for _, k in ipairs({ SUS, SUSHEAD, IID, 'P_EXT:jf_slice', 'P_EXT:jf_slices', 'P_EXT:jf_cmds', 'P_EXT:jf_gen', 'P_EXT:jf_ord' }) do
+    if ext(it, k) ~= '' then set_ext(it, k, '') end
+  end
+  set_ext(it, SUSOF, item_guid(head))
+  set_ext(it, SUSSIG, sig)
+end
+
+function E.sus_sync()
+  if not E.sus_used() then return end
+  local endp = model and model.marker_pos(model.END_MARKER)
+  local heads, tails = {}, {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    local _, tname = R.GetTrackName(tr)
+    if not (model and model.is_lib_name(tname)) then
+      for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, ii)
+        local own = ext(it, SUSOF)
+        if own ~= '' then tails[own] = tails[own] or {}; table.insert(tails[own], it)
+        else
+          local tag = ext(it, SUS)
+          if tag ~= '' then heads[#heads + 1] = { it = it, tr = tr, tag = tag } end
+        end
+      end
+    end
+  end
+  for _, h in ipairs(heads) do
+    local it, tag = h.it, h.tag
+    local lp = E.SU.parse(tag)
+    local tk = R.GetActiveTake(it)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local plan
+    if lp and lp.on and tk and not R.TakeIsMIDI(tk) and R.CountTakes(it) == 1 and not (endp and pos >= endp - 1e-6)
+       and ext(it, 'P_EXT:jf_slice') == '' and (R.GetTakeNumStretchMarkers(tk) or 0) == 0 then
+      plan = E.SU.plan({ pos = pos, len = R.GetMediaItemInfo_Value(it, 'D_LENGTH'),
+        offs = R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'), rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') }, lp)
+    end
+    local g = item_guid(it)
+    local mine = tails[g] or {}
+    tails[g] = nil
+    if plan and sus_head(it, tk, lp.ls) then
+      tk = R.GetActiveTake(it)
+      local sig = sus_sig(it, tk, plan, tag)
+      local kept
+      for _, t in ipairs(mine) do
+        if not kept and ext(t, SUSSIG) == sig and R.GetMediaItem_Track(t) == h.tr then kept = t
+        else R.DeleteTrackMediaItem(R.GetMediaItem_Track(t), t) end
+      end
+      if not kept then sus_tail(h.tr, it, plan, lp, sig) end
+    else
+      for _, t in ipairs(mine) do R.DeleteTrackMediaItem(R.GetMediaItem_Track(t), t) end
+      sus_unhead(it)
+    end
+  end
+  for _, list in pairs(tails) do                 -- хвосты без головы
+    for _, t in ipairs(list) do R.DeleteTrackMediaItem(R.GetMediaItem_Track(t), t) end
+  end
 end
 
 -- Луп items до конца региона rgnend; nsteps = период ровно N шагов

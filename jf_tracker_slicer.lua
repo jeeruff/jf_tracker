@@ -1021,6 +1021,21 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
   end
+  -- 13 окт: луп удержания инструмента — полоса [ls, le) голубым, края линиями, «sus» внизу полосы
+  local lp = e.item and ctx.sus_get and ctx.sus_get(e)
+  if lp and lp.on then
+    local r = (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
+    local a = tx((lp.ls - (e.offs or 0)) / r)
+    local b = tx((lp.le - (e.offs or 0)) / r)
+    local a1, b1 = math.max(x, a), math.min(x + w, b)
+    if b1 > a1 then
+      U.set(U.CYAN); gfx.a = 0.10; gfx.rect(a1, wy, b1 - a1, wh, 1); gfx.a = 1
+      if a >= x and a < x + w then gfx.rect(a, wy, 1, wh, 1) end
+      if b > x and b <= x + w then gfx.rect(b - 1, wy, 1, wh, 1) end
+      local tw, th = gfx.measurestr('sus')
+      if b1 - a1 > tw + 6 and wh > 2 * th + 10 then gfx.x, gfx.y = a1 + 3, wy + wh - th - 8; gfx.drawstr('sus') end
+    end
+  end
   -- транзиенты (только в правке) и слайсы с буквами
   if editing then
     U.set(U.GREY)
