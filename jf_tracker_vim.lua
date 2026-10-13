@@ -296,6 +296,31 @@ function V.fx_stop(fi, row)
   V.msg = 'stop: ' .. table.concat(codes, '00 ') .. '00'
   return true
 end
+-- 13 окт: продолжение команды (Ctrl+Option + / -): ближайшая своя команда выше в этом слоте —
+-- в строку курсора та же команда со значением ±1 (громкость — поле громкости ±1), курсор на шаг
+function V.fx_continue(d)
+  local fi, fld = V.cur.fi, V.cur.field or 1
+  local E = ctx.edit
+  if fld == 2 then
+    local hs = V.heads_in(fi, fi, V.cur.row, V.cur.row)
+    local prev
+    for r = V.cur.row - 1, math.max(0, V.cur.row - 512), -1 do local h = V.heads_in(fi, fi, r, r)[1]; if h and h.vol and tonumber(h.vol, 16) then prev = tonumber(h.vol, 16); break end end
+    if not (prev and #hs > 0) then V.msg = 'continue: a note on this row and one with a volume above'; return end
+    E.set_vol(hs, lpb(), math.max(0, math.min(255, prev + d))); V.msg = ('continue: vol %02X'):format(math.max(0, math.min(255, prev + d)))
+  elseif fld >= 4 then
+    local code, xx
+    for r = V.cur.row - 1, math.max(0, V.cur.row - 512), -1 do
+      local t, pale = V.fx_slot(fi, r, fld - 3)
+      if t and not pale then code, xx = t:sub(1, 2), tonumber(t:sub(3), 16); break end
+    end
+    local fc = V.fx_cell(fi, V.cur.row)
+    if not (code and xx and fc) then V.msg = 'continue: a command above in this column and a note sounding here'; return end
+    local nx = math.max(0, math.min(255, xx + d))
+    E.set_fx({ fc.head }, lpb(), code, nx, V.fx_rowable(code) and fc.off > 0 and fc.off or nil)
+    V.msg = ('continue: %s%02X'):format(code, nx)
+  else V.msg = 'continue (Ctrl+Option + -): on the volume or a command column'; return end
+  V.cur.row = V.cur.row + step_rows(); ensure_visible()
+end
 -- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
 function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
 

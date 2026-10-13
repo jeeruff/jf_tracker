@@ -19216,6 +19216,10 @@ local function frame()
   -- (на Mac Ctrl+минус может прийти кодом 31 = ^_ ; плюс — 61 '=' или 43 '+')
   -- масштаб шрифта: Cmd + = / - (5 окт: как привычно на маке); 10 окт: Ctrl + = / -
   -- — шаг ±1 в любом режиме, как в Renoise (Ctrl+цифра — шаг 0..9); LPB — - + без модификаторов
+  -- 13 окт: Ctrl+Option + / - — продолжить предыдущую команду колонки со значением ±1 (на следующий шаг)
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211) and ctx.mods().ctrl and ctx.mods().alt and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    vim.fx_continue((c == 45 or c == 95 or c == 31 or c == 8211) and -1 or 1); model.invalidate(); c = 0
+  end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     -- из next / auto — сразу на число (13 окт: раньше число менялось, а шаг оставался next)
     vim.step = math.max(0, math.min(64, (vim.step or 1) + ((c == 45 or c == 95 or c == 31) and -1 or 1))); vim.step_auto = false; vim.step_next = false

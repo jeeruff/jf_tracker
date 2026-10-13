@@ -1299,7 +1299,7 @@ E.beside = false
 local function cut_covering(track, lane_idx, t, keep)
   for i = R.CountTrackMediaItems(track) - 1, 0, -1 do
     local o = R.GetTrackMediaItem(track, i)
-    if o ~= keep and same_lane(track, o, lane_idx) and xf_ok(o) then
+    if o ~= keep and not (E.paste_set and E.paste_set[o]) and same_lane(track, o, lane_idx) and xf_ok(o) then
       local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
       local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
       if op < t - 1e-4 and oe > t + 1e-4 then R.SetMediaItemInfo_Value(o, 'D_LENGTH', t - op) end
@@ -1462,7 +1462,7 @@ E.mono = true
 local function mono_cut(track, t, keep)
   for i = R.CountTrackMediaItems(track) - 1, 0, -1 do
     local o = R.GetTrackMediaItem(track, i)
-    if o ~= keep then
+    if o ~= keep and not (E.paste_set and E.paste_set[o]) then   -- 13 окт: вставленные одной p — как в регистре, друг друга не режут
       local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
       local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
       local tk = R.GetActiveTake(o)
@@ -1829,6 +1829,7 @@ end
 -- (аудио той же лейн, что начинается в этой строке), если не включён x-fade
 function E.paste(reg, lpb, row, targets, beside)
   if not reg or #reg.cells == 0 then return end
+  E.paste_set = {}
   run('paste', function()
     for _, c in ipairs(reg.cells) do
       local tg = targets(c.dfi)
@@ -1847,6 +1848,7 @@ function E.paste(reg, lpb, row, targets, beside)
           -- 9 окт: как ввод ноты — звучащее на строке вставки обрезается (mono —
           -- на всём треке), иначе копии перекрывались и уезжали в соседнюю подколонку
           local it = insert_chunk(tg.track, tg.lane_idx, t, c.chunk)
+          if it then E.paste_set[it] = true end
           finish_insert(tg.track, tg.lane_idx, it)
         elseif c.kind == 'midi' then
           local qn = R.TimeMap2_timeToQN(0, t)
@@ -1856,6 +1858,7 @@ function E.paste(reg, lpb, row, targets, beside)
       end
     end
   end)
+  E.paste_set = nil
 end
 
 -- ── вставка ноты (insert mode) ────────────────────────────────────────────
