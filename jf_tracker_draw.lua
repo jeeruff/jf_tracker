@@ -1256,16 +1256,25 @@ function D.tl_tree(state, snap)
       for _, j in ipairs(other) do out[#out + 1] = { k = 'c', ci = ci, i = j, d = d + 1 } end
     end
   end
+  -- 13 окт: корень используется на треке, если там лежит он сам или любой его кусок / слайс / вариант
+  -- (нота — отдельная запись того же файла, дочерняя корню из lib: раньше корень числился «not used»)
+  local uses = {}
+  for _, e in ipairs(pool) do
+    local r, n = e, 0
+    while r.parent and n < 16 do r = r.parent; n = n + 1 end
+    for nm in pairs(e.track_set or {}) do uses[r] = uses[r] or {}; uses[r][nm] = true end
+  end
+  local function used_on(e, nm) return uses[e] and uses[e][nm] end
   local filt = (TL.filter or '') ~= ''
   for _, ci in ipairs(tl) do
     local col = cols[ci]
     local d = col.depth or 0
     local n, ais = 0, 0
-    for i, e in ipairs(pool) do if not e.parent and e.track_set and e.track_set[col.name] then n = n + 1 end end
+    for i, e in ipairs(pool) do if not e.parent and used_on(e, col.name) then n = n + 1 end end
     for _, en in ipairs(col.envs or {}) do ais = ais + #(en.ais or {}) end
     out[#out + 1] = { k = 't', ci = ci, d = d, n = n + ais }
     if not filt and not TL.closed[col.guid] then
-      for i, e in ipairs(pool) do if not e.parent and e.track_set and e.track_set[col.name] then inst_rows(ci, i, d + 1) end end
+      for i, e in ipairs(pool) do if not e.parent and used_on(e, col.name) then inst_rows(ci, i, d + 1) end end
       -- 13 окт: MIDI-клипы трека — папкой (раньше — в модуле slices при выбранном midi)
       local mcs = D.tl_midi and D.tl_midi(col) or {}
       if #mcs > 0 then
@@ -1284,7 +1293,7 @@ function D.tl_tree(state, snap)
   end
   if not filt then
     local un = {}
-    for i, e in ipairs(pool) do if not e.parent and not (e.tracks and e.tracks[1]) then un[#un + 1] = i end end
+    for i, e in ipairs(pool) do if not e.parent and not (uses[e] and next(uses[e])) then un[#un + 1] = i end end
     if #un > 0 then
       out[#out + 1] = { k = 'lib', n = #un, d = 0, key = 'lib' }
       if TL.open.lib then for _, i in ipairs(un) do inst_rows(nil, i, 1) end end

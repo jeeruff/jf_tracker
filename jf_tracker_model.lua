@@ -597,7 +597,8 @@ function M.build(lpb)
     for _, e in ipairs(col.pool or {}) do
       local g = seen[e.gkey]
       if not g then g = e; g.tracks = {}; g.track_set = {}; g.home = col.name; seen[e.gkey] = g; all[#all + 1] = g end
-      if not e.depot and not g.track_set[col.name] then g.track_set[col.name] = true; g.tracks[#g.tracks + 1] = col.name end
+      -- 13 окт: here — нота на треке (представитель мог стать сэмплом из lib)
+      if (e.here or not e.depot) and not g.track_set[col.name] then g.track_set[col.name] = true; g.tracks[#g.tracks + 1] = col.name end
     end
   end
   -- родитель: более длинный инструмент того же файла, покрывающий этот
@@ -843,17 +844,20 @@ local function pool_add(pool, seen, it, from_depot)
     if not cur.ord then local _, o = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ord', '', false); cur.ord = tonumber(o) end
     -- представитель: библиотека, затем самый длинный (не обрезанная копия)
     local better = (from_depot and not cur.depot) or ((not from_depot) == (not cur.depot) and len > cur.len + 1e-6)
-    if not better then return end
+    local here = cur.here or not from_depot          -- 13 окт: нота этого инструмента лежит на треке
+    if not better then cur.here = here; return end
     local n = cur.n
     local ord = cur.ord
     pool[at] = nil
     pool_add_entry(pool, at, it, take, name, key, from_depot)
     pool[at].n = n
     pool[at].ord = pool[at].ord or ord
+    pool[at].here = here
     return
   end
   seen[key] = #pool + 1
   pool_add_entry(pool, #pool + 1, it, take, name, key, from_depot)
+  pool[#pool].here = not from_depot
 end
 
 -- 11 окт: запись lib по одному item (панель properties на уровне note — значения самой ноты)
