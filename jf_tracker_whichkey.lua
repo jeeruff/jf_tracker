@@ -15,7 +15,7 @@ local MOTIONS = {
 }
 
 local T = {
-  d = { title = 'd - delete', items = { { 'd', 'row (3dd)' }, { 'W', 'whole item' }, { 'p', 'up to the pause' }, { 'P', 'all of sel. tracks' },
+  d = { title = 'd - delete', items = { { 'd', 'row (3dd)' }, { 'c', 'automation column' }, { 'W', 'whole item' }, { 'p', 'up to the pause' }, { 'P', 'all of sel. tracks' },
         { 't', 'time select' }, { 'r', 'track in rgn' }, { 'a w', 'all items' } } },
   y = { title = 'y - copy', items = { { 'y', 'row (3yy)' } } },
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },

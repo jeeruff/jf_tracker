@@ -2242,6 +2242,13 @@ function V.key_impl(c)
       if c == ('g'):byte() then V.op = p; V.pending = 'g'; return end
       -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
       -- курсора в регионе (вне региона — до =END). Просьба 2 окт.
+      -- 13 окт: dc — колонка огибающей курсора целиком: точки, automation items, сама колонка
+      if p == 'd' and c == ('c'):byte() then
+        local f = flat()[V.cur.fi]
+        if f and f.env and ctx.env_remove then ctx.env_remove(f) ; V.count = nil; finish_edit()
+        else V.msg = 'dc: put the cursor on an automation column' end
+        return
+      end
       -- 13 окт: dw / dW внутри пустого MIDI-клипа (#) — удалить клип, как item
       if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
         local em = V.empty_midi_at(V.cur.fi, V.cur.row)
@@ -2707,7 +2714,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d delete track | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d delete track | c automation column | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',

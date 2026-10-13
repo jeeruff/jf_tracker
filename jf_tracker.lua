@@ -9561,6 +9561,25 @@ ctx = {
   msg = function(t) vim.msg = t end,
   -- 13 окт: zx — нативный редактор кроссфейдов REAPER (41827) для ноты под курсором и тех нот
   -- трека, что перекрывают её (выделение items — его вход)
+  env_remove = function(f)
+    local env = f.env and f.env.env
+    if not (env and reaper.ValidatePtr(env, 'TrackEnvelope*')) then return end
+    local nm = f.env.name or 'envelope'
+    edit.run('delete automation column', function()
+      reaper.DeleteEnvelopePointRangeEx(env, -1, -1e9, 1e12)
+      for k = reaper.CountAutomationItems(env) - 1, 0, -1 do reaper.GetSetAutomationItemInfo(env, k, 'D_UISEL', 1, true) end
+      if reaper.CountAutomationItems(env) > 0 then reaper.SetCursorContext(2, env); reaper.Main_OnCommand(42086, 0) end   -- Envelope: Delete automation items
+      reaper.Envelope_SortPoints(env)
+      if reaper.BR_EnvAlloc then
+        local be = reaper.BR_EnvAlloc(env, false)
+        local _, _, armed, inLane, laneH, defShape, _, _, _, _, faderS = reaper.BR_EnvGetProperties(be)
+        reaper.BR_EnvSetProperties(be, false, false, armed, inLane, laneH, defShape, faderS)
+        reaper.BR_EnvFree(be, true)
+      end
+    end)
+    model.invalidate()
+    vim.msg = nm .. ': column deleted (points, automation items; Cmd+Z back)'
+  end,
   delete_item = function(it)
     if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then return end
     edit.run('delete empty clip', function() reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(it), it) end)
