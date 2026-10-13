@@ -1224,16 +1224,67 @@ function D.tl_rows(state, snap)
   end
   return list
 end
+-- 13 окт: дерево как в lf — трек (папка) → его инструменты (папки: слайсы, варианты лупа) → его
+-- automation; неиспользуемые инструменты — папка lib в конце. Строки:
+-- { k = 't', ci } трек · { k = 'i', ci, i } инструмент (i — номер в пуле) · { k = 'c', ci, i } его ребёнок ·
+-- { k = 'a', ci, n } папка automation трека · { k = 'ai', ci, env, ai } item автоматизации · { k = 'lib', n } папка lib.
+-- Открыто: трек — пока не TL.closed[guid]; инструмент / automation / lib — TL.open[ключ]. С фильтром — только треки.
+function D.tl_tree(state, snap)
+  local TL = D.TL
+  TL.open, TL.closed = TL.open or {}, TL.closed or {}
+  local cols = snap and snap.cols or {}
+  local out = {}
+  local tl = D.tl_rows(state, snap)
+  local pool = (cols[1] and cols[1].pool) or {}
+  local kids = {}
+  for j, e in ipairs(pool) do if e.parent then kids[e.parent] = kids[e.parent] or {}; table.insert(kids[e.parent], j) end end
+  local function inst_rows(ci, i, d)
+    local e = pool[i]
+    local key = 'i:' .. (e.gkey or tostring(i))
+    out[#out + 1] = { k = 'i', ci = ci, i = i, d = d, key = key, nk = kids[e] and #kids[e] or 0 }
+    if TL.open[key] then for _, j in ipairs(kids[e] or {}) do out[#out + 1] = { k = 'c', ci = ci, i = j, d = d + 1 } end end
+  end
+  local filt = (TL.filter or '') ~= ''
+  for _, ci in ipairs(tl) do
+    local col = cols[ci]
+    local d = col.depth or 0
+    local n, ais = 0, 0
+    for i, e in ipairs(pool) do if not e.parent and e.track_set and e.track_set[col.name] then n = n + 1 end end
+    for _, en in ipairs(col.envs or {}) do ais = ais + #(en.ais or {}) end
+    out[#out + 1] = { k = 't', ci = ci, d = d, n = n + ais }
+    if not filt and not TL.closed[col.guid] then
+      for i, e in ipairs(pool) do if not e.parent and e.track_set and e.track_set[col.name] then inst_rows(ci, i, d + 1) end end
+      if ais > 0 then
+        local key = 'a:' .. col.guid
+        out[#out + 1] = { k = 'a', ci = ci, d = d + 1, n = ais, key = key }
+        if TL.open[key] then
+          for _, en in ipairs(col.envs or {}) do for _, ai in ipairs(en.ais or {}) do out[#out + 1] = { k = 'ai', ci = ci, d = d + 2, env = en, ai = ai } end end
+        end
+      end
+    end
+  end
+  if not filt then
+    local un = {}
+    for i, e in ipairs(pool) do if not e.parent and not (e.tracks and e.tracks[1]) then un[#un + 1] = i end end
+    if #un > 0 then
+      out[#out + 1] = { k = 'lib', n = #un, d = 0, key = 'lib' }
+      if TL.open.lib then for _, i in ipairs(un) do inst_rows(nil, i, 1) end end
+    end
+  end
+  return out
+end
+
 function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local TL = D.TL
   local mx, my = gfx.mouse_x, gfx.mouse_y
   D.TL_COLS = state.tlrp and D.TL_ALL or D.TL_SHORT
   set(U.PANEL); gfx.rect(x, y, w, h, 1)             -- 13 окт: фон панели темы, как у соседей (был чёрный BG)
   local cols = snap and snap.cols or {}
-  local list = D.tl_rows(state, snap)
+  local list = D.tl_tree(state, snap)                   -- 13 окт: дерево (треки, инструменты, automation)
+  TL.rows = list
   TL.n = #list
   if TL.follow then                                      -- 13 окт: после правки дерева — курсор на тот же трек
-    for li, ci in ipairs(list) do if cols[ci] and cols[ci].guid == TL.follow then TL.cur = li; TL.follow = nil; break end end
+    for li, r in ipairs(list) do if r.k == 't' and cols[r.ci] and cols[r.ci].guid == TL.follow then TL.cur = li; TL.follow = nil; break end end
   end
   TL.cur = math.max(1, math.min(TL.cur, math.max(1, #list)))
   TL.col = math.max(1, math.min(TL.col, #D.TL_COLS))
@@ -1271,12 +1322,38 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local cf = info.vcur and L.flat and L.flat[info.vcur.fi]
   local cg = cf and cf.col and cf.col.guid
   local get = info.tl_get
+  local pool = (cols[1] and cols[1].pool) or {}
   for i = 1, nvis do
     local li = TL.scroll + i
-    local ci = list[li]
-    if not ci then break end
-    local col = cols[ci]
+    local rw = list[li]
+    if not rw then break end
     local ry = y + i * L.rh
+    if rw.k ~= 't' then
+      -- 13 окт: строка внутри трека: инструмент (номер, цвет, имя; + / - — его слайсы и варианты), automation, lib
+      local hot = inside and my >= ry and my < ry + L.rh
+      local kc = foc and li == TL.cur
+      local e = rw.i and pool[rw.i]
+      local on = e and info.inst_cur and info.inst_cur() == rw.i
+      if on or hot or kc then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
+      if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end
+      local ix = x + L.pad + (rw.d or 0) * math.floor(L.cw / 2) + 5
+      local lbl, colr
+      if rw.k == 'i' or rw.k == 'c' then
+        if e and e.rgb then rawset_col(e.rgb); gfx.rect(ix - 5, ry + 2, 2, L.rh - 4, 1) end
+        local mk = rw.k == 'i' and (rw.nk > 0 and ((TL.open[rw.key] and '- ') or '+ ') or '  ') or ''
+        local nm = e and e.name or '?'
+        if rw.k == 'c' and e then nm = (e.lvar_n and ('L' .. e.lvar_n)) or (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k)) or 'cut' end
+        lbl = ('%s%02d %s'):format(mk, rw.i, nm)
+        colr = on and U.AMBER or (rw.k == 'c' and U.GREY or U.TEXT)
+      elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~~ automation  %d'):format(rw.n); colr = U.GREY
+      elseif rw.k == 'ai' then lbl = '~ ' .. (rw.env.name or '') .. ((rw.ai.label or '') ~= '' and ('  ' .. rw.ai.label) or ''); colr = U.CYAN
+      else lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('lib/  %d not used'):format(rw.n); colr = U.GREY end
+      text(ix, ry, fit(lbl, x + w - ix - L.pad), colr)
+      if hot then hover.tlist = { ci = rw.ci, what = 'row', li = li } end
+      goto tl_next
+    end
+    local ci = rw.ci
+    local col = cols[ci]
     local hid = state.thide and state.thide[col.guid]
     local on = cg and col.guid == cg
     local kc = foc and li == TL.cur
@@ -1295,7 +1372,9 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       text(ix, ry, fl, fh and U.AMBER or U.CYAN)
       if fh then hover.tlist = { ci = ci, what = 'fold' } end
     end
-    text(ix + fw, ry, fit(col.name ~= '' and col.name or ('Track ' .. ci), gx - ix - fw - L.pad), on and U.AMBER or (hid and U.DIM or U.TEXT))
+    local tnm = col.name ~= '' and col.name or ('Track ' .. ci)
+    if TL.closed and TL.closed[col.guid] and (rw.n or 0) > 0 then tnm = tnm .. '  +' .. rw.n end   -- 13 окт: закрыт — сколько внутри
+    text(ix + fw, ry, fit(tnm, gx - ix - fw - L.pad), on and U.AMBER or (hid and U.DIM or U.TEXT))
     if hot and not hover.tlist and mx < gx then hover.tlist = { ci = ci, what = 'go', li = li } end
     hint('tlist', x, ry, gx - x, L.rh, { ci = ci, what = 'go' })
     -- матрица флажков: включено — буква столбца на подложке, выключено — точка
@@ -1312,6 +1391,7 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       if ch then hover.tlist = { ci = ci, what = 'cell', key = c.k, li = li } end
       cx = cx + cw[k]
     end
+    ::tl_next::
   end
   if #list > nvis and D.vbar then D.vbar('tlist', x + w - 3, y + L.rh, 3, nvis * L.rh, TL.scroll, nvis, #list) end
   if inside and hover.tlist_hdr then

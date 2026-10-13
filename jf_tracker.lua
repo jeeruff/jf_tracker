@@ -324,7 +324,12 @@ state.panes = (function()
   local s = reaper.GetExtState(EXT, 'panes')
   -- 9 окт: миграция v2 (main — левый верх, над матрицей) — один раз поверх первой
   if reaper.GetExtState(EXT, 'panes_mig') ~= '2' then s = ''; reaper.SetExtState(EXT, 'panes_mig', '2', true) end
-  if s ~= '' then local m = draw.panes.decode(s); draw.panes.add_new(m, s); return m end   -- 13 окт: и при запуске — новые модули на свои места   -- 13 окт: и при запуске — новые модули (looploom) на свои места
+  if s ~= '' then
+    local m = draw.panes.decode(s); draw.panes.add_new(m, s)   -- 13 окт: и при запуске — новые модули на свои места
+    -- 13 окт: tracks — дерево трек → инструменты → automation — встаёт туда, где lib (вкладкой рядом), один раз
+    if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
+    return m
+  end   -- 13 окт: и при запуске — новые модули (looploom) на свои места
   return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
     browserleft = state.browserleft, side = state.side, dsp = state.dsp, fxb = state.fxb, khelp = state.khelp,
     notes_open = state.notes_open, mx_hidden = state.mx_hidden, toptab = state.toptab, mxfold = state.mxfold,
@@ -4013,7 +4018,7 @@ ctx = {
     if not (id and PN.BY[id]) then return end
     ctx.pn_prev = ctx.pane_cur()
     if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
-    else ctx.set_focus(id) end
+    else PN.set_active(state.panes, id); ctx.set_focus(id) end   -- 13 окт: и в стеке без tab (tracks у lib) — вкладка активна
     relayout()
   end,
   -- операция над деревом: снимок для u (20 шагов), пересчёт раскладки
@@ -4462,6 +4467,33 @@ ctx = {
     ctx.set_focus('tracker')
     vim.msg = 'track: ' .. (col.name or '')
   end,
+  -- 13 окт: курсор трекера — на трек ci (фокус не меняется; скрытый — показать)
+  tl_cursor = function(ci)
+    local col = snap and snap.cols[ci]
+    if not col then return end
+    if state.thide and state.thide[col.guid] then state.thide[col.guid] = nil; relayout() end
+    local hit
+    for i, f in ipairs(L.flat or {}) do if f.ci == ci then vim.cur.fi = i; hit = true; break end end
+    if not hit then state.hscroll = ci; relayout(); for i, f in ipairs(L.flat or {}) do if f.ci == ci then vim.cur.fi = i; break end end end
+  end,
+  -- 13 окт: строка дерева tracks (не трек): инструмент / его ребёнок — выбрать (курсор на его трек),
+  -- listen — и послушать; item автоматизации — automation этого трека и этот item; папка — открыть / закрыть
+  tl_row_do = function(r, listen)
+    if not r then return end
+    local TL = draw.TL
+    if r.k == 'i' or r.k == 'c' then
+      if r.ci then ctx.tl_cursor(r.ci) end
+      pool_select(r.i)
+      if listen then ctx.inst_listen() end
+      local e = cur_col() and (cur_col().pool or {})[r.i]
+      vim.msg = ('inst %02d: %s'):format(r.i, e and e.name or '') .. (listen and '' or '  (Space - listen, Enter / l - pick)')
+    elseif r.k == 'ai' then
+      ctx.tl_cursor(r.ci)
+      ctx.auto_select()
+      for k, a in ipairs(ctx.ai_list()) do if a.env == r.env.env and a.idx == r.ai.idx then ctx.ai_sel = k end end
+      vim.msg = 'automation: ' .. (r.env.name or '') .. ' - a note key inserts it'
+    elseif r.key then TL.open[r.key] = (not TL.open[r.key]) or nil end
+  end,
   -- 11 окт: меню трека (как ПКМ по треку в REAPER): вставка / шаблоны / удаление,
   -- папки, freeze, lock, лейны, авто-arm, цвет, timebase, автоматизация, производительность,
   -- огибающие, Track Manager. Действия REAPER — по тексту (cmd_by_text), без зашитых номеров
@@ -4667,61 +4699,74 @@ ctx = {
       elseif c >= 32 and c < 127 then TL.filter = TL.filter .. ch; TL.cur = 1 end
       return true
     end
-    -- 13 окт: как файловый менеджер lf — папки h / l, отметки Space, dd yy p P, >> <<, J K, o O, F, r;
-    -- флажки — своими буквами T M S R (на отмеченных или на курсоре)
-    local list = draw.tl_rows(state, snap)
-    local ci = list[TL.cur]
+    -- 13 окт: как файловый менеджер lf — дерево трек → инструменты → слайсы / варианты, automation, lib.
+    -- Треки: Space отметка, T M S R, dd yy p P, >> <<, J K, o O, F, r; инструменты: Enter выбрать,
+    -- Space слушать, dd yy p — как в lib; h / l — закрыть / открыть папку, к родителю / внутрь
+    local rows = draw.tl_tree(state, snap)
+    TL.cur = math.max(1, math.min(TL.cur, math.max(1, #rows)))
+    local r = rows[TL.cur]
+    local ci = r and r.k == 't' and r.ci or nil
     local col = ci and snap.cols[ci]
     TL.marks = TL.marks or {}
     local pend = TL.pend; TL.pend = nil
     local function ids()
       local t = {}
-      for _, li in ipairs(list) do local c = snap.cols[li]; if c and TL.marks[c.guid] then t[#t + 1] = c.guid end end
+      for _, rr in ipairs(rows) do local c2 = rr.k == 't' and snap.cols[rr.ci]; if c2 and TL.marks[c2.guid] then t[#t + 1] = c2.guid end end
       if #t == 0 and col then t[1] = col.guid end
       return t
     end
     local function cis()
       local t = {}
-      for _, li in ipairs(list) do local c = snap.cols[li]; if c and TL.marks[c.guid] then t[#t + 1] = li end end
+      for _, rr in ipairs(rows) do local c2 = rr.k == 't' and snap.cols[rr.ci]; if c2 and TL.marks[c2.guid] then t[#t + 1] = rr.ci end end
       if #t == 0 and ci then t[1] = ci end
       return t
     end
     local function op(what)
-      if not col then return end
+      if not col then vim.msg = 'tracks: on a track row'; return end
       local msg, follow = edit.tree_op(what, ids(), col.guid)
       if what ~= 'copy' then TL.marks = {} end
       TL.follow = follow
       model.invalidate(); relayout()
       vim.msg = 'tracks: ' .. (msg or '')
     end
-    local function row_of(guid) for li, c2 in ipairs(list) do if snap.cols[c2].guid == guid then return li end end end
-    if (pend == 'd' and ch == 'd') then op('cut')
-    elseif (pend == 'y' and ch == 'y') then op('copy')
-    elseif (pend == '>' and ch == '>') then op('indent')
-    elseif (pend == '<' and ch == '<') then op('outdent')
+    local function parent_row()
+      for li = TL.cur - 1, 1, -1 do if (rows[li].d or 0) < (r.d or 0) then TL.cur = li; return end end
+    end
+    local inst = r and (r.k == 'i' or r.k == 'c')
+    if pend == 'd' and ch == 'd' then if inst then ctx.inst_cut(r.i, r.i) else op('cut') end
+    elseif pend == 'y' and ch == 'y' then if inst then ctx.inst_yank(r.i, r.i) else op('copy') end
+    elseif pend == '>' and ch == '>' then op('indent')
+    elseif pend == '<' and ch == '<' then op('outdent')
     elseif ch == 'd' or ch == 'y' or ch == '>' or ch == '<' then TL.pend = ch
-    elseif ch == 'j' or c == keys.down then TL.cur = math.min(#list, TL.cur + 1)
+    elseif ch == 'j' or c == keys.down then TL.cur = math.min(#rows, TL.cur + 1)
     elseif ch == 'k' or c == keys.up then TL.cur = math.max(1, TL.cur - 1)
     elseif ch == 'g' then TL.cur = 1
-    elseif ch == 'G' then TL.cur = math.max(1, #list)
+    elseif ch == 'G' then TL.cur = math.max(1, #rows)
     elseif ch == 'h' or c == keys.left then
-      -- раскрытая папка — свернуть; иначе — к папке-родителю
-      if col and col.folder and not state.fcollapse[col.guid] then state.fcollapse[col.guid] = true; relayout()
-      elseif col then
-        for li = TL.cur - 1, 1, -1 do local c2 = snap.cols[list[li]]; if c2.folder and (c2.depth or 0) < (col.depth or 0) then TL.cur = li; break end end
-      end
+      -- открытое — закрыть (трек: его содержимое, потом папку REAPER); иначе — к родителю
+      if not r then
+      elseif r.k == 't' and not TL.closed[col.guid] and (r.n or 0) > 0 then TL.closed[col.guid] = true
+      elseif r.k == 't' and col.folder and not state.fcollapse[col.guid] then state.fcollapse[col.guid] = true; relayout()
+      elseif r.key and TL.open[r.key] then TL.open[r.key] = nil
+      else parent_row() end
     elseif ch == 'l' or c == keys.right then
-      -- свёрнутая папка — раскрыть; раскрытая — в первого ребёнка; трек — к нему в трекере
-      if col and col.folder and state.fcollapse[col.guid] then state.fcollapse[col.guid] = nil; relayout()
-      elseif col and col.folder then TL.cur = math.min(#list, TL.cur + 1)
-      elseif ci then ctx.tlist_do(ci, 'go') end
-    elseif c == 13 then if ci then ctx.tlist_do(ci, 'go') end
+      -- закрытое — открыть; открытое — внутрь; инструмент без детей / item — выбрать
+      if not r then
+      elseif r.k == 't' and TL.closed[col.guid] then TL.closed[col.guid] = nil
+      elseif r.k == 't' and col.folder and state.fcollapse[col.guid] then state.fcollapse[col.guid] = nil; relayout()
+      elseif r.k == 't' then if rows[TL.cur + 1] and (rows[TL.cur + 1].d or 0) > (r.d or 0) then TL.cur = TL.cur + 1 end
+      elseif r.key and not TL.open[r.key] and (r.k ~= 'i' or r.nk > 0) then TL.open[r.key] = true
+      elseif r.key and TL.open[r.key] and rows[TL.cur + 1] and (rows[TL.cur + 1].d or 0) > (r.d or 0) then TL.cur = TL.cur + 1
+      else ctx.tl_row_do(r) end
+    elseif c == 13 then if r then if r.k == 't' then ctx.tlist_do(r.ci, 'go') elseif r.key and r.k ~= 'i' then TL.open[r.key] = (not TL.open[r.key]) or nil else ctx.tl_row_do(r) end end
     elseif ch == ' ' then
-      if col then TL.marks[col.guid] = (not TL.marks[col.guid]) or nil; TL.cur = math.min(#list, TL.cur + 1) end
-    elseif ch == 'v' then for _, li in ipairs(list) do local g = snap.cols[li].guid; TL.marks[g] = (not TL.marks[g]) or nil end
+      if inst then ctx.tl_row_do(r, true)
+      elseif col then TL.marks[col.guid] = (not TL.marks[col.guid]) or nil; TL.cur = math.min(#rows, TL.cur + 1) end
+    elseif ch == 'v' then for _, rr in ipairs(rows) do if rr.k == 't' then local g = snap.cols[rr.ci].guid; TL.marks[g] = (not TL.marks[g]) or nil end end
     elseif ch == 'u' then TL.marks = {}; vim.msg = 'tracks: marks cleared'
     elseif ch == 'T' or ch == 'M' or ch == 'S' or ch == 'R' then
       local t = cis()
+      if #t == 0 then vim.msg = 'tracks: on a track row'; return true end
       local all = true
       for _, i2 in ipairs(t) do if not ctx.tlist_get(snap.cols[i2], ch) then all = false end end
       ctx.tlist_set(t, ch, not all)
@@ -4731,9 +4776,9 @@ ctx = {
     elseif ch == 'o' then op('new_after')
     elseif ch == 'O' then op('new_before')
     elseif ch == 'F' then op('folder')
-    elseif ch == 'p' then op('paste_after')
-    elseif ch == 'P' then op('paste_before')
-    elseif ch == 'r' then if col then ctx.rename_track_prompt(col) end
+    elseif ch == 'p' then if inst then ctx.tl_row_do(r); ctx.inst_put(false) else op('paste_after') end
+    elseif ch == 'P' then if inst then ctx.tl_row_do(r); ctx.inst_put(true) else op('paste_before') end
+    elseif ch == 'r' then if col then ctx.rename_track_prompt(col) elseif inst then ctx.tl_row_do(r); ctx.rename_inst_prompt() end
     elseif ch == 'z' then if col and col.folder then ctx.tlist_do(ci, 'fold') end
     elseif ch == '/' then TL.typing = true; TL.filter = ''; TL.cur = 1
     elseif c == 27 then
@@ -11427,7 +11472,8 @@ ctx = {
       if f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and not draw.panes.visible(state.panes, id) then
         if not draw.panes.show(state.panes, id) then f = 'tracker' end
       end
-      if f == 'top' then draw.panes.set_active(state.panes, state.toptab); state.top = true end
+      if f == 'top' then draw.panes.set_active(state.panes, state.toptab); state.top = true
+      elseif f ~= 'tracker' and f ~= 'session' and draw.panes.BY[id] and draw.panes.set_active(state.panes, id) then relayout() end   -- 13 окт: фокус — вкладка в стеке видна
     else
     if f == 'browser' and not state.side then f = 'tracker' end
     if f == 'top' and not state.top then f = 'tracker' end
@@ -14964,7 +15010,7 @@ local function frame()
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
-    keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get,
+    keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -16900,6 +16946,10 @@ local function frame()
       if hover.tlist.li then draw.TL.cur = hover.tlist.li end
       for i, c in ipairs(draw.TL_COLS) do if c.k == hover.tlist.key then draw.TL.col = i end end
       ctx.tl_paint = { key = hover.tlist.key, v = v, done = { [hover.tlist.ci] = true } }
+      click = { t = now2, zone = 'tlist' }
+    elseif hover.tlist and hover.tlist.what == 'row' then   -- 13 окт: строка дерева (инструмент, automation, lib)
+      draw.TL.cur = hover.tlist.li
+      ctx.tl_row_do((draw.TL.rows or {})[hover.tlist.li], dbl)
       click = { t = now2, zone = 'tlist' }
     elseif hover.tlist then ctx.tlist_do(hover.tlist.ci, hover.tlist.what); click = { t = now2, zone = 'tlist' }   -- 11 окт: track list
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
@@ -19191,14 +19241,17 @@ local function frame()
         if not B.key(c) then return vim.key(c) end
       elseif state.focus == 'nmod' then
         -- 12 окт: note mod — j k строка, a добавить, Enter кривая, r rate, l loop, d удалить
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if c == 27 then ctx.set_focus('tracker')
         elseif not ctx.NMUI.key(c, ctx.nmod_list()) then vim.key(c) end
       elseif state.focus == 'looploom' then           -- 13 окт: j k строка, h l значение, Enter список, R сброс, n N кандидаты, + - шов
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end   -- 13 окт: строка : — не клавиши модуля
         if c == 27 then ctx.set_focus('tracker')
         elseif not ctx.LL.key(c, ctx.sp_sel) then vim.key(c) end
       elseif state.focus == 'sprops' then
         -- 10 окт: модуль props — J K строка, H L значение, R сброс (как во вкладке item); остальное — vim
         local se = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end   -- 13 окт: строка : ела h j k l
         if c == 27 then ctx.set_focus('tracker')
         elseif c == 118 then ctx.sprops_fit()            -- v — лист растёт, пока все свойства не влезут
         elseif not SPROP.key(c, se) then vim.key(c) end
