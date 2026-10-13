@@ -11857,6 +11857,12 @@ edit.inst_ref = function(it)
 end
 SPROP.init(U, ctx)
 ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 окт: модуль looploom
+-- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
+SL.loop_ov = function(e)
+  local lp = e and e.item and ctx.sus_get(e)
+  if not (lp and lp.on) then return nil end
+  return { ls = lp.ls, le = lp.le, xf = lp.xf, offs = e.offs or 0, rate = e.rate or 1, cands = ctx.LL.cands_of(e) }
+end
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
 
@@ -15889,6 +15895,10 @@ local function frame()
     else
       state.status = ('slot %d: %s - click: cursor to pattern, Space: queue'):format(hover.matrix.ri, pname)
     end
+  elseif hover.sample and SL.loop_hot then
+    local h = SL.loop_hot
+    state.status = h.cand and ('loop candidate %d: %.3f - %.3f s, the seam matches %d %% - click: take it (looploom n N)'):format(h.i, h.cand.ls, h.cand.le, math.floor(h.cand.match * 100 + 0.5))
+      or ('loop %s - drag (snaps like cuts); looploom tab: the values, x-fade, curve'):format(h.k == 'susa' and 'start (S)' or 'end (E)')
   elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then state.status = ({ a = 'clip start - drag (offset of the clip item)', b = 'clip end - drag (its length)', move = 'clip - drag the strip: the whole clip in the source', la = 'loop start L - drag: the part the session loops', lb = 'loop end L - drag', xf = 'loop crossfade at the seam - click: 0 / 10 / 30 / 60 / 120 ms (default off)' })[SL.zone_hot] or ''
   elseif hover.sample and SL.item_hot then state.status = SL.item_hot == 'ia' and 'item start - drag: trim (inside) or extend (past the left edge, up to the file start); all notes of the instrument, one undo'
       or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
@@ -16717,6 +16727,12 @@ local function frame()
       local hi = slen and math.max(e.len, (slen - (e.offs or 0)) / rate) or e.len
       SL.item_drag = { edge = SL.item_hot, e = e, t = SL.item_hot == 'ia' and 0 or e.len, lo = -(e.offs or 0) / rate, hi = hi }
       click = { t = now2, zone = 'itemedge' }
+    elseif hover.sample and SL.loop_hot and SL.loop_e then
+      -- 13 окт: луп удержания на волне: линия — протяжка, скобка кандидата — взять его
+      ctx.set_focus('top')
+      if SL.loop_hot.cand then ctx.LL.apply(SL.loop_e, SL.loop_hot.cand)
+      else SL.loop_drag = { k = SL.loop_hot.k, e = SL.loop_e } end
+      click = { t = now2, zone = 'susline' }
     elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then
       -- клип сессии (6 окт): начало / конец / перенос / метки лупа L / xf
       ctx.set_focus('top')
@@ -17865,6 +17881,24 @@ local function frame()
   end
   -- сэмпл-модуль: протяжка выделения / вынос выделения на колонку трекера
   -- край зоны слайса: тянется, на отпускании правит item-инструмент (один undo)
+  if SL.loop_drag then   -- 13 окт: протяжка точки лупа удержания по волне (по окну зума, липнет как срезы)
+    local ld, wv = SL.loop_drag, SL.wave
+    if gfx.mouse_cap & 1 == 1 then
+      if wv and wv.w > 0 and gfx.mouse_x ~= ld.lx then
+        ld.lx = gfx.mouse_x
+        local t = SL.snap_t(math.max(0, math.min(wv.len, SL.x_to_t(gfx.mouse_x))))
+        local e = ld.e
+        local lp = ctx.sus_get(e)
+        if lp then
+          local f = (e.offs or 0) + t * ((e.rate and e.rate ~= 0) and e.rate or 1)
+          if ld.k == 'susa' then lp.ls = math.min(lp.le - 0.01, f) else lp.le = math.max(lp.ls + 0.01, f) end
+          lp.file, lp.boff = nil, nil
+          ctx.sus_points(e, lp)
+          vim.msg = ('loop %s %.3f s'):format(ld.k == 'susa' and 'start' or 'end', f)
+        end
+      end
+    else SL.loop_drag = nil end
+  end
   if SL.zone_drag then
     local zd, wv = SL.zone_drag, SL.wave
     if gfx.mouse_cap & 1 == 1 then

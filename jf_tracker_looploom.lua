@@ -1,9 +1,8 @@
 -- jf_tracker_looploom.lua — looploom (13 окт): модуль лупа удержания инструмента.
--- Вкладка рядом с properties и note mod. Слева — спектрограмма инструмента с лупом
--- (начало — зелёная линия, конец — янтарная, кроссфейд — полосы перед ними) и
--- кандидатами: спектрально похожие пары точек скобками внизу (ярче — шов совпадает лучше);
--- под ней — шов крупно: что луп играет до конца (слева) и с начала (справа), тусклым —
--- как файл шёл бы дальше (видно, совпала ли фаза). Справа — параметры (те же ключи, что
+-- Вкладка рядом с properties и note mod. Точки, кроссфейд и кандидаты рисуются на волне /
+-- спектрограмме вкладки item (одно место для резки и лупа, с её зумом) — здесь своей нет.
+-- Слева — шов крупно: что луп играет до конца (янтарь) и с начала (зелень), серым — как
+-- файл шёл бы дальше (видно, совпала ли фаза). Справа — параметры (те же ключи, что
 -- в properties: ctx.sp_adjust / sp_set_frac / sp_menu / sp_reset).
 -- Мышь — сам модуль (щелчок, протяжка, колесо), клавиши — LL.key. Без reaper.* в логике
 -- рисования: всё через ctx.
@@ -52,6 +51,7 @@ local function cands(e)
   return LL.cands
 end
 
+LL.cands_of = function(e) return cands(e) end
 local function apply(e, c)
   local lp = ctx.sus_get(e)
   if not (lp and lp.on) then return end
@@ -60,6 +60,7 @@ local function apply(e, c)
   ctx.sus_points(e, lp)
   ctx.msg(('looploom: candidate %.3f - %.3f s, the seam matches %d %%'):format(c.ls, c.le, math.floor(c.match * 100 + 0.5)))
 end
+LL.apply = apply
 
 local function seam(e, lp, x, y, w, h, ps_path)
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
@@ -141,52 +142,16 @@ function LL.draw(L, x, y, w, h, e, focused)
     else r.bar = nil end
   end
   if hot_row then LL.status = 'looploom ' .. LL.ROWS[hot_row].label .. ': ' .. (TIP[LL.ROWS[hot_row].k] or '') end
-  -- виды
+  -- шов (спектрограмма и точки — на волне вкладки item)
   local vw = rw < w and (rx - x - L.pad) or 0
-  local a, b = ctx.sus_span(e)
-  local span = math.max(1e-6, b - a)
-  local function X(t) return x + math.floor((t - a) / span * vw) end
-  local hov_line, hov_cand
   local vy, vh = y, 0
   if vw > L.cw * 10 then
-    vh = math.floor(h * 0.6)
-    local job = ctx.sgram(e)
-    U.set(U.BG); gfx.rect(x, vy, vw, vh, 1)
-    if job then gfx.blit(job.img, 1, 0, 0, 0, job.cols, job.rows, x, vy, vw, vh) end
     if mode == 'sus' and lp then
-      local xs, xe = X(lp.ls), X(lp.le)
-      U.set(U.AMBER, 0.12); gfx.rect(xs, vy, math.max(1, xe - xs), vh, 1)
-      local fx = math.floor((lp.xf or 0) / span * vw)
-      U.set(U.AMBER, 0.35); gfx.rect(xe - fx, vy, fx, 4, 1)            -- кроссфейд: конец лупа уходит …
-      U.set(U.CYAN, 0.35); gfx.rect(xs - fx, vy, fx, 4, 1)             -- … в то, что было перед началом
-      local near_s = inside and math.abs(mx - xs) <= 4 and my >= vy and my < vy + vh
-      local near_e = inside and math.abs(mx - xe) <= 4 and my >= vy and my < vy + vh and not near_s
-      U.set(near_s and U.TEXT or U.GREEN); gfx.rect(xs, vy, near_s and 2 or 1, vh, 1)
-      U.set(near_e and U.TEXT or U.AMBER); gfx.rect(xe, vy, near_e and 2 or 1, vh, 1)
-      if near_s then hov_line = 'susa' elseif near_e then hov_line = 'susb' end
-      -- кандидаты: скобки снизу, по строке на кандидата (не больше, чем влезает)
-      local cs = cands(e)
-      local rows = math.min(#cs, math.max(0, math.floor((vh - 8) / 5)))
-      for i = 1, rows do
-        local c = cs[i]
-        local cy = vy + vh - 3 - (i - 1) * 5
-        local c0, c1 = X(c.ls), X(c.le)
-        local hot = inside and not hov_line and my >= cy - 2 and my <= cy + 2 and mx >= c0 and mx <= c1
-        local col = U.mix(U.GREY, U.GREEN, math.max(0, math.min(1, (c.match - 0.5) * 2)))
-        U.set(hot and U.TEXT or col, hot and 1 or 0.85)
-        gfx.rect(c0, cy, math.max(1, c1 - c0), 1, 1); gfx.rect(c0, cy - 2, 1, 3, 1); gfx.rect(c1, cy - 2, 1, 3, 1)
-        if hot then hov_cand = c; LL.status = ('looploom candidate %d: %.3f - %.3f s, the seam matches %d %% - click: take it'):format(i, c.ls, c.le, math.floor(c.match * 100 + 0.5)) end
-      end
-      if hov_line then LL.status = 'looploom: drag the loop ' .. (hov_line == 'susa' and 'start' or 'end') end
-    elseif mode ~= 'sus' then
-      U.text(x + L.pad, vy, ctx.fit('loop: ' .. mode .. ' - set loop = sustain to weave a loop', vw - 2 * L.pad), U.GREY)
-    end
-    -- шов
-    local sy = vy + vh + 2
-    if mode == 'sus' and lp and y + h - sy >= 2 * L.rh then
       local _, _, ps = ctx.sus_span(e)
-      seam(e, lp, x, sy, vw, y + h - sy, ps and ctx.src_path(ps))
-      if inside and mx < x + vw and my >= sy then LL.status = ('looploom seam: left - the loop end, right - its start (amber / green), grey - how the file went on; wheel: %d ms'):format(LL.seam_ms) end
+      seam(e, lp, x, y, vw, h, ps and ctx.src_path(ps))
+      if inside and mx < x + vw then LL.status = ('looploom seam: left - the loop end, right - its start (amber / green), grey - how the file went on; wheel / + -: %d ms. The points and the candidates are on the item wave'):format(LL.seam_ms) end
+    else
+      U.text(x + L.pad, y, ctx.fit('loop: ' .. mode .. ' - set loop = sustain to weave a loop', vw - 2 * L.pad), U.GREY)
     end
   end
   -- мышь
@@ -206,13 +171,12 @@ function LL.draw(L, x, y, w, h, e, focused)
       elseif r.bar and mx >= r.bar.x then LL.drag = { k = r.k, x = r.bar.x, w = r.bar.w, lx = mx }; ctx.sp_set_frac(e, r.k, (mx - r.bar.x) / math.max(1, r.bar.w))
       elseif MENU[r.k] then ctx.sp_menu(e, r.k)
       elseif ACT[r.k] then ctx.sp_adjust(e, r.k, 1) end
-    elseif hov_line then LL.drag = { k = hov_line, x = x, w = vw, lx = mx }
-    elseif hov_cand then apply(e, hov_cand) end
+    end
   end
   if inside and gfx.mouse_wheel ~= 0 then
     local d = gfx.mouse_wheel > 0 and 1 or -1
     if hot_row then ctx.sp_adjust(e, LL.ROWS[hot_row].k, d)
-    elseif my > vy + vh then LL.seam_ms = math.max(2, math.min(500, math.floor(LL.seam_ms * (d > 0 and 0.8 or 1.25) + 0.5))) end
+    elseif mx < x + vw then LL.seam_ms = math.max(2, math.min(500, math.floor(LL.seam_ms * (d > 0 and 0.8 or 1.25) + 0.5))) end
     gfx.mouse_wheel = 0
   end
 end

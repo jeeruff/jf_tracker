@@ -1021,21 +1021,6 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
   end
-  -- 13 окт: луп удержания инструмента — полоса [ls, le) голубым, края линиями, «sus» внизу полосы
-  local lp = e.item and ctx.sus_get and ctx.sus_get(e)
-  if lp and lp.on then
-    local r = (e.rate and e.rate ~= 0) and math.abs(e.rate) or 1
-    local a = tx((lp.ls - (e.offs or 0)) / r)
-    local b = tx((lp.le - (e.offs or 0)) / r)
-    local a1, b1 = math.max(x, a), math.min(x + w, b)
-    if b1 > a1 then
-      U.set(U.CYAN); gfx.a = 0.10; gfx.rect(a1, wy, b1 - a1, wh, 1); gfx.a = 1
-      if a >= x and a < x + w then gfx.rect(a, wy, 1, wh, 1) end
-      if b > x and b <= x + w then gfx.rect(b - 1, wy, 1, wh, 1) end
-      local tw, th = gfx.measurestr('sus')
-      if b1 - a1 > tw + 6 and wh > 2 * th + 10 then gfx.x, gfx.y = a1 + 3, wy + wh - th - 8; gfx.drawstr('sus') end
-    end
-  end
   -- транзиенты (только в правке) и слайсы с буквами
   if editing then
     U.set(U.GREY)
@@ -1164,6 +1149,49 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
       U.set((zone.xf or 0) > 0 and U.CYAN or U.LINE); gfx.rect(bx, by, bw, rh, 0)
       U.text(bx + L.pad, by + 1, lbl, (zone.xf or 0) > 0 and U.CYAN or U.GREY)
+    end
+  end
+  -- 13 окт: луп удержания инструмента (looploom) — прямо на этой волне / спектрограмме, с её зумом:
+  -- зелёная — начало, янтарная — конец (тянутся), полосы сверху — кроссфейд (конец уходит в то,
+  -- что было перед началом); снизу скобки — кандидаты (похожие по спектру пары), щелчок берёт
+  S.loop_hot, S.loop_e = nil, nil
+  local lo = S.loop_ov and not editing and S.loop_ov(e)
+  if lo then
+    S.loop_e = e
+    local mxw, myw = gfx.mouse_x, gfx.mouse_y
+    local inw = mxw >= x and mxw < x + w and myw >= wy and myw < wy + wh
+    local r = (lo.rate and lo.rate ~= 0) and lo.rate or 1
+    local function ft(f) return (f - (lo.offs or 0)) / r end
+    local function clip(px) return math.max(x, math.min(x + w, px)) end
+    local xs, xe = tx(ft(lo.ls)), tx(ft(lo.le))
+    local fxw = math.floor((lo.xf or 0) / r / span * w)
+    gfx.set(0.92, 0.52, 0.22, 0.10); gfx.rect(clip(xs), wy, clip(xe) - clip(xs), wh, 1); gfx.a = 1
+    U.set(U.AMBER, 0.45); gfx.rect(clip(xe - fxw), wy, clip(xe) - clip(xe - fxw), 4, 1)
+    U.set(U.CYAN, 0.45); gfx.rect(clip(xs - fxw), wy, clip(xs) - clip(xs - fxw), 4, 1)
+    local drag = S.loop_drag and S.loop_drag.k
+    for _, it in ipairs({ { 'susa', xs, U.GREEN, 'S' }, { 'susb', xe, U.AMBER, 'E' } }) do
+      local px = it[2]
+      if px >= x and px < x + w then
+        local hot = (inw and not S.drag and not S.zone_hot and math.abs(mxw - px) <= 4 and myw >= wy + 10) or drag == it[1]
+        if hot and not S.loop_hot then S.loop_hot = { k = it[1] } end
+        U.set(hot and U.TEXT or it[3]); gfx.rect(hot and px - 1 or px, wy, hot and 3 or 1, wh, 1)
+        if px + 3 + U.measure(it[4]) < x + w then U.text(px + 3, wy + 5, it[4], it[3]) end
+      end
+    end
+    local cs = lo.cands or {}
+    local rows = math.min(#cs, math.max(0, math.floor((wh - 20) / 5)), 8)
+    for i = 1, rows do
+      local c = cs[i]
+      local cy = wy + wh - 4 - (i - 1) * 5
+      local c0, c1 = tx(ft(c.ls)), tx(ft(c.le))
+      if c1 >= x and c0 < x + w then
+        local hot = inw and not S.loop_hot and myw >= cy - 2 and myw <= cy + 2 and mxw >= c0 and mxw <= c1
+        if hot then S.loop_hot = { cand = c, i = i } end
+        U.set(hot and U.TEXT or U.mix(U.GREY, U.GREEN, math.max(0, math.min(1, (c.match - 0.5) * 2))))
+        gfx.rect(clip(c0), cy, math.max(1, clip(c1) - clip(c0)), 1, 1)
+        if c0 >= x then gfx.rect(c0, cy - 2, 1, 3, 1) end
+        if c1 < x + w then gfx.rect(c1, cy - 2, 1, 3, 1) end
+      end
     end
   end
   local slices = editing and S.slices or (e.slices or {})
