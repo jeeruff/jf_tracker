@@ -516,6 +516,8 @@ function M.build(lpb)
         end
         -- 13 окт: хвост лупа удержания — часть ноты-головы, своей ячейки нет
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then lane = nil end
+        -- 13 окт: копии ретриггера (0Rxy, P_EXT:jf_gen) — часть своей ноты: своих ячеек и подколонок нет
+        if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false)) ~= '' then lane = nil end
         if lane then
           local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
           local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
