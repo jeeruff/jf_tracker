@@ -383,6 +383,8 @@ KH.PAGES = {
     { k = 'h l', d = 'h - close (a track: its contents, then its REAPER folder) / to the parent row; l - open / into it; on an instrument without children, a slice, an automation item - pick it' },
     { k = 'Enter', d = 'track - go to it in the tracker; instrument - pick it (the cursor goes to its track); automation item - the automation instrument with this item' },
     { k = 'Space on an instrument', d = 'pick and listen' },
+    { k = 'slices', d = 'inside a sliced instrument: key  Sxx  length - the key of the octave at the cursor plays the slice (C-4 = whole, shown at the instrument); Enter / l - select it and hear it. The slices module is hidden: :pane slices show brings it back' },
+    { k = '## midi clips', d = 'the MIDI clips of the track - Enter on a clip: the midi instrument with this clip, a note key inserts it' },
     { k = 'dd yy p P on an instrument', d = 'as in the lib: cut / yank the instrument, put a copy after / before' },
     { k = 'Space  v  u', d = 'mark the track (and down) / invert the marks / clear them; the commands below work on the marked tracks, else on the cursor' },
     { k = 'T M S R', d = 'shown in the tracker / mute / solo / record arm' },

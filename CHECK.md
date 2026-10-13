@@ -846,3 +846,6 @@
 - [ ] tracks: Enter на инструменте — выбрать (курсор на его трек), Space — выбрать и послушать, на item автоматизации — automation с этим item; dd yy p P на инструменте — как в lib
 - [ ] строка : при фокусе properties / looploom / note mod больше не теряет h j k l
 - [ ] фокус на панель в стеке (tracks у lib, Cmd+hjkl, :pane x show) делает её вкладку видимой
+- [ ] модуль slices спрятан; в дереве tracks внутри нарезанного инструмента — строки «клавиша  Sxx  длина», у инструмента «q whole»; Enter / l — слайс выбран и звучит; :pane slices show — вернуть модуль
+- [ ] tracks: ## midi clips трека — папкой; Enter на клипе — инструмент midi с этим клипом
+- [ ] Cmd+Enter на automation item при спрятанном slices — фокус в дерево tracks

@@ -328,6 +328,8 @@ state.panes = (function()
     local m = draw.panes.decode(s); draw.panes.add_new(m, s)   -- 13 окт: и при запуске — новые модули на свои места
     -- 13 окт: tracks — дерево трек → инструменты → automation — встаёт туда, где lib (вкладкой рядом), один раз
     if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
+    -- 13 окт: модуль slices спрятан — слайсы и их клавиши в дереве tracks внутри инструмента (показать: Ctrl+W s / :pane slices show)
+    if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
   end   -- 13 окт: и при запуске — новые модули (looploom) на свои места
   return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
@@ -4467,6 +4469,36 @@ ctx = {
     ctx.set_focus('tracker')
     vim.msg = 'track: ' .. (col.name or '')
   end,
+  -- 13 окт: клавиша, что играет слайс k (как подписи модуля slices: октава курсора, C-4 + k)
+  slice_key = function(k)
+    local c = ctx.slk_cache
+    if not (c and c.oct == vim.octave) then
+      c = { oct = vim.octave, t = {} }
+      for code, off in pairs(keys.piano) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
+      ctx.slk_cache = c
+    end
+    return c.t[k]
+  end,
+  -- MIDI-клипы трека для дерева tracks (кэш на снимок)
+  tl_midi = function(col)
+    local c = ctx.tlm_cache
+    if not (c and c.snap == snap) then c = { snap = snap, t = {} }; ctx.tlm_cache = c end
+    if c.t[col] then return c.t[col] end
+    local out = {}
+    local tr = col.track
+    if tr and reaper.ValidatePtr(tr, 'MediaTrack*') and not model.is_lib_name(col.name or '') then
+      for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local tk = reaper.GetActiveTake(it)
+        if tk and reaper.TakeIsMIDI(tk) and #out < 200 then
+          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          out[#out + 1] = { item = it, label = reaper.GetTakeName(tk) or '', row = math.floor(reaper.TimeMap2_timeToQN(0, pos) * (state.lpb or 4) + 1e-6) }
+        end
+      end
+    end
+    c.t[col] = out
+    return out
+  end,
   -- 13 окт: курсор трекера — на трек ci (фокус не меняется; скрытый — показать)
   tl_cursor = function(ci)
     local col = snap and snap.cols[ci]
@@ -4487,6 +4519,18 @@ ctx = {
       if listen then ctx.inst_listen() end
       local e = cur_col() and (cur_col().pool or {})[r.i]
       vim.msg = ('inst %02d: %s'):format(r.i, e and e.name or '') .. (listen and '' or '  (Space - listen, Enter / l - pick)')
+    elseif r.k == 's' then                                -- слайс: инструмент — его исходник, слайс выбран и звучит
+      if r.ci then ctx.tl_cursor(r.ci) end
+      pool_select(r.i)
+      local root = cur_col() and (cur_col().pool or {})[r.i]
+      if root then ctx.ssel = { item = root.item, k = 0 }; ctx.slice_step(r.sk) end
+      vim.msg = ('S%02X of %s  - key %s plays it'):format(r.sk, root and root.name or '', ctx.slice_key(r.sk) or '?')
+    elseif r.k == 'mc' then                               -- MIDI-клип трека: инструмент midi, этот клип
+      ctx.tl_cursor(r.ci)
+      ctx.mc_scope = 'track'
+      ctx.midi_select()
+      for k, a in ipairs(ctx.mc_list()) do if a.item == r.mc.item then ctx.mc_sel = k end end
+      vim.msg = 'midi clip: ' .. (r.mc.label ~= '' and r.mc.label or 'clip') .. ' - a note key inserts it'
     elseif r.k == 'ai' then
       ctx.tl_cursor(r.ci)
       ctx.auto_select()
@@ -4733,6 +4777,7 @@ ctx = {
       for li = TL.cur - 1, 1, -1 do if (rows[li].d or 0) < (r.d or 0) then TL.cur = li; return end end
     end
     local inst = r and (r.k == 'i' or r.k == 'c')
+    draw.tl_midi = draw.tl_midi or ctx.tl_midi
     if pend == 'd' and ch == 'd' then if inst then ctx.inst_cut(r.i, r.i) else op('cut') end
     elseif pend == 'y' and ch == 'y' then if inst then ctx.inst_yank(r.i, r.i) else op('copy') end
     elseif pend == '>' and ch == '>' then op('indent')
@@ -11986,6 +12031,7 @@ edit.inst_ref = function(it)
 end
 SPROP.init(U, ctx)
 ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 окт: модуль looploom
+draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 SL.loop_ov = function(e)
   local lp = e and e.item and ctx.sus_get(e)
@@ -15011,6 +15057,7 @@ local function frame()
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
+    slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -18893,7 +18940,7 @@ local function frame()
     local m = ctx.mods()
     if c == 13 and state.focus == 'tracker' and (vim.mode == 'normal' or vim.mode == 'insert') and not vim.picker and not vim.hydra and (m.cmd or m.alt) and not m.ctrl then
       if ctx.ai_pick_at(vim.cur.fi, vim.cur.row) then
-        if m.cmd then ctx.set_focus('slices') end
+        if m.cmd then if state.panes and draw.panes.visible(state.panes, 'slices') then ctx.set_focus('slices') else ctx.pane_focus('tracks') end end   -- 13 окт: slices спрятан — дерево
       elseif m.cmd then ctx.set_focus('inst'); vim.msg = 'instruments'
       else
         local f = L and L.flat[vim.cur.fi]

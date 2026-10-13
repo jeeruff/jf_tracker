@@ -1238,11 +1238,19 @@ function D.tl_tree(state, snap)
   local pool = (cols[1] and cols[1].pool) or {}
   local kids = {}
   for j, e in ipairs(pool) do if e.parent then kids[e.parent] = kids[e.parent] or {}; table.insert(kids[e.parent], j) end end
+  -- 13 окт: внутри инструмента — его слайсы (S01 … с клавишей, что их играет; вместо модуля slices),
+  -- варианты лупа L1 … и куски, что не слайсы
   local function inst_rows(ci, i, d)
     local e = pool[i]
     local key = 'i:' .. (e.gkey or tostring(i))
-    out[#out + 1] = { k = 'i', ci = ci, i = i, d = d, key = key, nk = kids[e] and #kids[e] or 0 }
-    if TL.open[key] then for _, j in ipairs(kids[e] or {}) do out[#out + 1] = { k = 'c', ci = ci, i = j, d = d + 1 } end end
+    local other = {}
+    for _, j in ipairs(kids[e] or {}) do if not (e.slices and pool[j].slice_k and pool[j].slice_k > 0) then other[#other + 1] = j end end
+    local ns = e.slices and #e.slices or 0
+    out[#out + 1] = { k = 'i', ci = ci, i = i, d = d, key = key, nk = ns + #other, ns = ns }
+    if TL.open[key] then
+      for sk = 1, ns do out[#out + 1] = { k = 's', ci = ci, i = i, sk = sk, d = d + 1 } end
+      for _, j in ipairs(other) do out[#out + 1] = { k = 'c', ci = ci, i = j, d = d + 1 } end
+    end
   end
   local filt = (TL.filter or '') ~= ''
   for _, ci in ipairs(tl) do
@@ -1254,6 +1262,13 @@ function D.tl_tree(state, snap)
     out[#out + 1] = { k = 't', ci = ci, d = d, n = n + ais }
     if not filt and not TL.closed[col.guid] then
       for i, e in ipairs(pool) do if not e.parent and e.track_set and e.track_set[col.name] then inst_rows(ci, i, d + 1) end end
+      -- 13 окт: MIDI-клипы трека — папкой (раньше — в модуле slices при выбранном midi)
+      local mcs = D.tl_midi and D.tl_midi(col) or {}
+      if #mcs > 0 then
+        local key = 'm:' .. col.guid
+        out[#out + 1] = { k = 'm', ci = ci, d = d + 1, n = #mcs, key = key }
+        if TL.open[key] then for _, mc in ipairs(mcs) do out[#out + 1] = { k = 'mc', ci = ci, d = d + 2, mc = mc } end end
+      end
       if ais > 0 then
         local key = 'a:' .. col.guid
         out[#out + 1] = { k = 'a', ci = ci, d = d + 1, n = ais, key = key }
@@ -1338,12 +1353,28 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end
       local ix = x + L.pad + (rw.d or 0) * math.floor(L.cw / 2) + 5
       local lbl, colr
-      if rw.k == 'i' or rw.k == 'c' then
+      if rw.k == 's' then
+        -- слайс: клавиша, что его играет (раскладка октавы курсора), Sxx — команда в трекере, имя / длина
+        local kl = info.slice_key and info.slice_key(rw.sk) or nil
+        local t0 = e and e.slices and e.slices[rw.sk] or 0
+        local t1 = e and e.slices and (e.slices[rw.sk + 1] or e.len) or t0
+        local ss = info.ssel and info.ssel()
+        local son = ss and e and ss.item == e.item and ss.k == rw.sk
+        lbl = ('%s  S%02X  %.2fs'):format(kl or ' ', rw.sk, math.max(0, t1 - t0))
+        colr = son and U.AMBER or U.TEXT
+        if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
+      elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('## midi clips  %d'):format(rw.n); colr = U.GREY
+      elseif rw.k == 'mc' then lbl = '# ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
+      elseif rw.k == 'i' or rw.k == 'c' then
         if e and e.rgb then rawset_col(e.rgb); gfx.rect(ix - 5, ry + 2, 2, L.rh - 4, 1) end
         local mk = rw.k == 'i' and (rw.nk > 0 and ((TL.open[rw.key] and '- ') or '+ ') or '  ') or ''
         local nm = e and e.name or '?'
         if rw.k == 'c' and e then nm = (e.lvar_n and ('L' .. e.lvar_n)) or (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k)) or 'cut' end
         lbl = ('%s%02d %s'):format(mk, rw.i, nm)
+        if rw.k == 'i' and (rw.ns or 0) > 0 and info.slice_key then   -- нарезан: клавиша целого сэмпла (S00)
+          local kl = info.slice_key(0)
+          if kl then lbl = lbl .. '  ' .. kl .. ' whole' end
+        end
         colr = on and U.AMBER or (rw.k == 'c' and U.GREY or U.TEXT)
       elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~~ automation  %d'):format(rw.n); colr = U.GREY
       elseif rw.k == 'ai' then lbl = '~ ' .. (rw.env.name or '') .. ((rw.ai.label or '') ~= '' and ('  ' .. rw.ai.label) or ''); colr = U.CYAN
