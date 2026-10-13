@@ -4187,8 +4187,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local pre = ('%02d '):format(e.num or i)
       local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or '') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ((e.kit and ms('& ')) or 0))) end
-      local lbl = pre .. body .. suf
-      text(ix + 6, y + 1, fit(lbl, label_w - 6), sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY)))
+      -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
+      local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
+      local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf)))
+      text(ix + 6, y + 1, head, lcol)
+      if suf ~= '' then text(ix + 6 + ms(head), y + 1, suf, lcol) end
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
       local dw = ms('88.88s') + L.pad
       local len = e.len or 0
