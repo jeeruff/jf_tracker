@@ -72,7 +72,7 @@ local ok, err = pcall(function()
     local chs, X = SU.bake(w.ch, lsf, lef, X0)
     local out = R.GetResourcePath() .. '/jf_tracker_smoke_baked.wav'
     check('bake written', SU.wav_write(out, sr, chs))
-    edit.sus_set({ it }, { on = true, ls = ls, le = le, xf = 0.03, file = out, boff = X / sr, bls = ls, ble = le })   -- bls / ble: файл запечён при этих точках
+    edit.sus_set({ it }, { on = true, ls = ls, le = le, xf = 0.03, file = out, boff = X / sr, bls = ls, ble = le, hc = ls })   -- bls / ble: файл запечён при этих точках
     local t = tails()[1]
     local src = t and R.GetMediaItemTake_Source(R.GetActiveTake(t))
     local par = src and (R.GetMediaSourceParent(src) or src)

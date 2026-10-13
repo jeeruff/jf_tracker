@@ -85,7 +85,7 @@ local function seam(e, lp, x, y, w, h, ps_path)
   local wv, i_end, i_start, ghost
   if lp.file and lp.boff and ctx.file_exists(lp.file) then
     wv = wave(lp.file, ctx.SU().tag(lp), math.huge)
-    if wv then i_start = math.floor(lp.boff * wv.sr + 0.5); i_end = wv.n - (ctx.SU().PAD or 0) end   -- без запаса за концом
+    if wv then i_start = math.floor(lp.boff * wv.sr + 0.5); i_end = math.floor((lp.boff + lp.le - lp.ls) * wv.sr + 0.5) end   -- без запаса за концом
   end
   local src = ps_path and wave(ps_path, 'src', math.ceil((b + 0.1) * 192000))
   if not wv then

@@ -107,14 +107,18 @@ local function voice(track, item, semis, lp, gain)
   local file = R.GetMediaSourceParent(src) or src
   local path = R.GetMediaSourceFileName(file, '')
   local per = lp.le - lp.ls
-  local tail = (lp.file and lp.boff and R.file_exists(lp.file)) and section(lp.file, lp.boff, per, 0) or section(path, lp.ls, per, lp.xf)   -- 13 окт: запечённый луп
+  local baked = lp.file and lp.boff and R.file_exists(lp.file)
+  local tail = baked and section(lp.file, lp.boff, per, 0) or section(path, lp.ls, per, lp.xf)   -- 13 окт: запечённый луп
   if not tail then local pv = one(src, offs); return pv and { pv } or nil, offs, rate, pv and { plain = pv } end
   if offs >= lp.ls - 1e-4 then local pv = one(tail, (offs - lp.ls) % per, true); return pv and { pv } or nil, offs, rate, pv and { tail = pv, ls = lp.ls, per = per } end
-  local head = section(path, offs, lp.ls - offs, 0)
+  -- 13 окт: стык в тихом месте: голова до hc, хвост — та же петля, повёрнутая на hc - ls (запас в файле)
+  local hc = (baked and lp.hc and lp.hc >= lp.ls and lp.hc < lp.le) and lp.hc or lp.ls
+  if hc > lp.ls then tail = section(lp.file, lp.boff + (hc - lp.ls), per, 0) or tail end
+  local head = section(path, offs, hc - offs, 0)
   local h = head and one(head, 0)
-  local t = h and one(tail, -(lp.ls - offs), true)
+  local t = h and one(tail, -(hc - offs), true)
   if not t then if h then pcall(R.CF_Preview_Stop, h) end; return nil end
-  return { h, t }, offs, rate, { head = h, tail = t, offs = offs, ls = lp.ls, per = per }
+  return { h, t }, offs, rate, { head = h, tail = t, offs = offs, ls = lp.ls, rot = hc - lp.ls, per = per }
 end
 
 -- 13 окт: где в файле звучит голос (секунды файла): у ноты с лупом D_POSITION головы / хвоста —
@@ -124,7 +128,7 @@ local function geo_pos(g)
   if g.plain then local ok, ok2, p = pcall(R.CF_Preview_GetValue, g.plain, 'D_POSITION'); return (ok and ok2) and p or nil end
   if g.tail then
     local ok, ok2, tp = pcall(R.CF_Preview_GetValue, g.tail, 'D_POSITION')
-    if ok and ok2 and tp >= 0 then return g.ls + tp % g.per end
+    if ok and ok2 and tp >= 0 then return g.ls + (tp + (g.rot or 0)) % g.per end
   end
   if g.head then local ok, ok2, hp = pcall(R.CF_Preview_GetValue, g.head, 'D_POSITION'); if ok and ok2 then return g.offs + hp end end
   return nil

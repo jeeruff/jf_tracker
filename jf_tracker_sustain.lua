@@ -15,13 +15,17 @@ local S = {}
 -- ── хвост ноты ──────────────────────────────────────────────────────────
 -- n = { pos, len, offs, rate } — нота (голова); lp = { ls, le } — секунды файла.
 -- → { pos, len, offs } хвоста (offs — внутри секции [ls, le)) или nil — нота кончается до лупа
+-- 13 окт: lp.hc — точка стыка головы и хвоста (секунды файла, в [ls, le)): тихое место обоих
+-- каналов, иначе обрыв головы на громком отсчёте звенит в ресэмплере (щелчок на S)
+function S.cut(lp) return (lp.hc and lp.hc >= lp.ls and lp.hc < lp.le) and lp.hc or lp.ls end
 function S.plan(n, lp)
   local per = lp.le - lp.ls
   if per <= 1e-4 then return nil end
   local r = (n.rate and n.rate > 0) and n.rate or 1
-  local t_ls = n.pos + (lp.ls - n.offs) / r            -- где голова доходит до начала лупа
+  local hc = S.cut(lp)
+  local t_ls = n.pos + (hc - n.offs) / r               -- где голова доходит до стыка
   local pos, offs
-  if t_ls >= n.pos then pos, offs = t_ls, 0
+  if t_ls >= n.pos then pos, offs = t_ls, hc - lp.ls
   else pos, offs = n.pos, (n.offs - lp.ls) % per end    -- нота начинается внутри лупа (правая часть реза)
   local len = n.pos + n.len - pos
   if len <= 1e-3 then return nil end
@@ -45,13 +49,14 @@ function S.parse(tag)
     local key, v, r2 = (rest or ''):match('^(%a)=(%S+)%s*(.*)$')
     if not key then break end
     if key == 'c' and S.CURVES_BY[v] then lp.curve = v elseif key == 'f' then lp.flat = v ~= '0'
+    elseif key == 'h' then lp.hc = tonumber(v)
     elseif key == 'b' then local p1, p2 = v:match('^([^,]+),([^,]+)$'); lp.bls, lp.ble = tonumber(p1), tonumber(p2); lp.b9 = #((p1 or ''):match('%.(%d+)$') or '') >= 9 end
     rest = r2
   end
   local bo, path = (rest or ''):match('^(%S+)%s+(.+)$')
   -- 13 окт: файл годен, только если запечён при этих же точках (b=ls,le): иначе шов файла
   -- кончается не там, где луп начинается (щелчок на S) — файла нет, запечётся заново
-  local fresh = lp.bls and lp.ble and math.abs(lp.bls - lp.ls) < 2e-6 and math.abs(lp.ble - lp.le) < 2e-6 and lp.b9   -- 13 окт: старые (6 знаков, файл без запаса) — запечь заново
+  local fresh = lp.bls and lp.ble and math.abs(lp.bls - lp.ls) < 2e-6 and math.abs(lp.ble - lp.le) < 2e-6 and lp.b9 and lp.hc   -- 13 окт: без стыка h= — запечь заново (запас и тихий стык): старые (6 знаков, файл без запаса) — запечь заново
   if fresh and tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
   return lp
 end
@@ -59,6 +64,7 @@ function S.tag(lp)
   local t = ('%d %.9f %.9f %.9f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
   if lp.curve and lp.curve ~= 'auto' then t = t .. ' c=' .. lp.curve end
   if lp.flat == false then t = t .. ' f=0' end
+  if lp.hc and lp.file then t = t .. (' h=%.9f'):format(lp.hc) end
   if lp.file and lp.boff and lp.bls and lp.ble then t = t .. (' b=%.9f,%.9f %.9f %s'):format(lp.bls, lp.ble, lp.boff, lp.file) end   -- bls / ble — точки, при которых запечён (ставит запекание)
   return t
 end
@@ -109,12 +115,24 @@ function S.bake(chs, ls, le, X, sr, opt)
     -- 13 окт: запас за концом — начало лупа ещё раз (S.PAD кадров): секция лупа, чуть длиннее
     -- файла из-за округления секунд, читала тишину за концом — щелчок на каждом круге
     local L0 = #o
-    for k = 1, S.PAD do o[L0 + k] = o[X + 1 + ((k - 1) % math.max(1, L0 - X))] or 0 end
+    local pad = S.PAD + (sr and math.ceil(0.031 * sr) or 0)   -- + окно стыка: секция, сдвинутая на стык, тоже не выходит за файл
+    for k = 1, pad do o[L0 + k] = o[X + 1 + ((k - 1) % math.max(1, L0 - X))] or 0 end
     out[c] = o
   end
   return out, X, le
 end
 S.PAD = 256
+-- точка стыка: кадр в [ls, ls + W) с наименьшей суммой |отсчёт| + |шаг| по каналам → кадр
+function S.quiet(chs, ls, le, sr)
+  local W = math.min(le - ls - 1, math.floor(0.03 * sr))
+  local best, bs = ls, math.huge
+  for k = ls, ls + math.max(0, W) do
+    local sc = 0
+    for _, x in ipairs(chs) do local v, p = x[k + 1] or 0, x[k] or 0; sc = sc + math.abs(v) + 0.5 * math.abs(v - p) end
+    if sc < bs then bs, best = sc, k end
+  end
+  return best
+end
 
 -- конец лупа с лучшей фазой: le' в [le - D, le + D] (D — 20 мс, не за ls + X), где окно
 -- перед le' сильнее всего похоже на окно перед ls (нормированная корреляция, каналы вместе,

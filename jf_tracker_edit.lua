@@ -3653,7 +3653,7 @@ function E.sus_sync()
     local g = item_guid(it)
     local mine = tails[g] or {}
     tails[g] = nil
-    if plan and sus_head(it, tk, lp.ls) then
+    if plan and sus_head(it, tk, E.SU.cut(lp)) then
       tk = R.GetActiveTake(it)
       local sig = sus_sig(it, tk, plan, tag)
       local kept

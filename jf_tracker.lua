@@ -9564,7 +9564,8 @@ ctx = {
     if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
     PV.forget(out)
     lp.file, lp.boff = out, X / w.sr
-    lp.ls = ls / w.sr; lp.bls, lp.ble = lp.ls, lp.le       -- 13 окт: файл помнит свои точки (S.parse отбросит его, если они ушли)
+    lp.ls = ls / w.sr; lp.bls, lp.ble = lp.ls, lp.le
+    lp.hc = SU.quiet(w.ch, ls, le2 or le, w.sr) / w.sr   -- 13 окт: стык головы и хвоста — в тихом месте (без щелчка ресэмплера)       -- 13 окт: файл помнит свои точки (S.parse отбросит его, если они ушли)
     edit.sus_set(ctx.inst_group(e), lp, 'sustain loop crossfade')
     model.invalidate()
   end,
