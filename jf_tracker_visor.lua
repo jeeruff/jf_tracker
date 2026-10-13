@@ -604,8 +604,8 @@ function VZ.mx_params(e)
   for i, r in ipairs(e and e.rows or {}) do if r.ty == 'f' then out[#out + 1] = { row = r, i = i } end end
   return out
 end
--- клавиши матрицы: h j k l — курсор, + - — сила (Shift / fine — мелко), 1..9 — 0.1..0.9,
--- 0 / x — убрать, ~ — знак; на подписи LFO: + - частота, w форма; J K — слой, M / Esc — назад
+-- клавиши матрицы: h j k l — курсор, + - — сила (Shift / fine — мелко), цифры — .N, две подряд — .NN,
+-- x — убрать, ~ — знак; на подписи LFO: + - частота, w форма; J K — слой, M / Esc — назад
 function VZ.mx_key(c, fine, env)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local e = VZ.cur()
@@ -614,6 +614,7 @@ function VZ.mx_key(c, fine, env)
   VZ.mc = math.max(0, math.min(#pars, VZ.mc))
   local src = srcs[VZ.mr]
   if c == 27 or ch == 'M' then VZ.mxv = false; return true end
+  if ch:match('^[jklh]$') then VZ.mxbuf = nil end
   if ch == 'j' then VZ.mr = math.min(#srcs, VZ.mr + 1); return true end
   if ch == 'k' then VZ.mr = math.max(1, VZ.mr - 1); return true end
   if ch == 'l' then VZ.mc = math.min(#pars, VZ.mc + 1); return true end
@@ -633,11 +634,23 @@ function VZ.mx_key(c, fine, env)
   p.mods = type(p.mods) == 'table' and p.mods or {}
   local a = p.mods[src.id] or 0
   local d = tonumber(ch)
-  if ch == '+' or ch == '=' or ch == '-' then a = a + (ch == '-' and -1 or 1) * (fine and 0.01 or 0.05)
-  elseif ch == '~' then a = -a
-  elseif ch == 'x' or ch == '0' then a = 0
-  elseif d then a = d / 10
-  else return nil end
+  -- 13 окт: цифры как в трекере: первая — десятые (5 → .50), вторая — сотые (5 7 → .57);
+  -- знак сохраняется (~ меняет), x — убрать; другая клавиша или ячейка — набор закрыт
+  if d and #ch == 1 then
+    local now = reaper.time_precise()
+    local cell = VZ.mr .. ':' .. VZ.mc
+    if VZ.mxbuf and VZ.mxcell == cell and #VZ.mxbuf == 1 and now - (VZ.mxt or 0) < 2 then
+      VZ.mxbuf = VZ.mxbuf .. ch; a = (a < 0 and -1 or 1) * tonumber(VZ.mxbuf) / 100; VZ.mxbuf = nil
+    else
+      VZ.mxbuf, VZ.mxcell, VZ.mxt = ch, cell, now; a = (a < 0 and -1 or 1) * d / 10
+    end
+  else
+    VZ.mxbuf = nil
+    if ch == '+' or ch == '=' or ch == '-' then a = a + (ch == '-' and -1 or 1) * (fine and 0.01 or 0.05)
+    elseif ch == '~' then a = -a
+    elseif ch == 'x' then a = 0
+    else return nil end
+  end
   a = math.max(-2, math.min(2, math.floor(a * 100 + 0.5) / 100))
   p.mods[src.id] = a ~= 0 and a or nil
   VZ.dirty = true
@@ -657,7 +670,10 @@ function VZ.draw_matrix(L, U, x, y, w, h, focused, env, fit, hint)
   VZ.mr = math.max(1, math.min(#srcs, VZ.mr))
   VZ.mc = math.max(0, math.min(#pars, VZ.mc))
   local lw = math.min(ms('W') * 16, math.floor(w * 0.35))
-  local cw = ms('-0.00') + 2 * pad
+  -- 13 окт: подписи колонок — вертикально (как имена треков в матрице): колонки узкие, влезает больше
+  local vt = VZ.vtext
+  local cw = vt and (ms('-.00') + pad) or (ms('-0.00') + 2 * pad)
+  local hh = vt and math.min(ms('W') * 8, math.max(rh, math.floor(h * 0.4))) or rh
   local ncv = math.max(1, math.floor((w - lw) / cw))
   if VZ.mc > VZ.mcs + ncv then VZ.mcs = VZ.mc - ncv end
   if VZ.mc >= 1 and VZ.mc <= VZ.mcs then VZ.mcs = VZ.mc - 1 end
@@ -669,10 +685,11 @@ function VZ.draw_matrix(L, U, x, y, w, h, focused, env, fit, hint)
     local cx = x + lw + (k - 1) * cw
     local nm = pc.row.name .. (pc.row.axis and (pc.row.axis == 1 and '.x' or '.y') or '')
     local on = VZ.mcs + k == VZ.mc
-    U.text(cx + pad, y, fit(nm, cw - pad), on and U.AMBER or U.GREY)
-    if mx >= cx and mx < cx + cw and my >= y and my < y + rh then hover = { kind = 'mxh', tip = 'parameter ' .. nm } end
+    if vt then vt(cx + math.floor((cw - rh) / 2), y, hh, nm, on and U.AMBER or U.GREY, U.PANEL)
+    else U.text(cx + pad, y, fit(nm, cw - pad), on and U.AMBER or U.GREY) end
+    if mx >= cx and mx < cx + cw and my >= y and my < y + hh then hover = { kind = 'mxh', tip = 'parameter ' .. nm } end
   end
-  local ty = y + rh + 2
+  local ty = y + hh + 2
   local nrv = math.max(1, math.floor((y + h - ty) / rh))
   VZ.mrs = VZ.mrs or 0
   if VZ.mr > VZ.mrs + nrv then VZ.mrs = VZ.mr - nrv end
@@ -700,7 +717,9 @@ function VZ.draw_matrix(L, U, x, y, w, h, focused, env, fit, hint)
       local p = VZ.param(e.slot, pc.row)
       local a = type(p.mods) == 'table' and p.mods[src.id] or nil
       local on = si == VZ.mr and pi == VZ.mc
-      U.set(U.DIM); gfx.rect(cx, ry, cw - 1, rh, 0)
+      -- 13 окт: пустая ячейка — точки (место ввода, как в трекере); набор цифр — VZ.mxbuf
+      local typing = on and VZ.mxbuf
+      if not a and not typing then U.text(cx + math.floor((cw - ms('..')) / 2), ry, '..', U.DIM) end
       if a then
         local mid = cx + math.floor(cw / 2)
         local len = math.floor(math.min(1, math.abs(a)) * (cw / 2 - 2) + 0.5)
@@ -709,10 +728,11 @@ function VZ.draw_matrix(L, U, x, y, w, h, focused, env, fit, hint)
       end
       if on then
         U.set(focused and U.AMBER or U.LINE); gfx.rect(cx, ry, cw - 1, rh, 0)
-        if a then U.text(cx + pad, ry, fit(('%.2f'):format(a), cw - pad), U.TEXT, U.BG) end
+        if typing then U.text(cx + 1, ry, fit(VZ.mxbuf .. '_', cw - 1), U.AMBER, U.BG)
+        elseif a then U.text(cx + 1, ry, fit(('%.2f'):format(a):gsub('^0', ''):gsub('^%-0', '-'), cw - 1), U.TEXT, U.BG) end
       end
       if mx >= cx and mx < cx + cw and my >= ry and my < ry + rh then
-        hover = { kind = 'mxcell', si = si, pc = pi, tip = ('%s -> %s: %s - click: select, wheel: depth, 1..9 0.1..0.9, ~ sign, x clear'):format(src.name, pc.row.name, a and ('%.2f'):format(a) or 'off') }
+        hover = { kind = 'mxcell', si = si, pc = pi, tip = ('%s -> %s: %s - click: select, wheel: depth, digits: 5 = .50, 5 7 = .57, ~ sign, x clear'):format(src.name, pc.row.name, a and ('%.2f'):format(a) or 'off') }
       end
       if hint then hint('visor', cx, ry, cw - 1, rh, { kind = 'mxcell', si = si, pc = pi }) end
     end
@@ -1074,7 +1094,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   local mx0 = x + lw + pad
   if y + h - top >= 12 * rh then
     local nsrc = #VZ.sources(env)
-    local mhh = math.min((nsrc + 1) * rh + 2, (y + h - top) * 45 // 100)
+    local mhh = math.min((nsrc + 1) * rh + 2 + (VZ.vtext and U.measure('WWWWWWW') or 0), (y + h - top) * 45 // 100)   -- 13 окт: + вертикальные подписи
     mhh = math.max(mhh, 4 * rh)
     local mtop = y + h - mhh - pad                -- отступ от дна: последний ряд не на границе
     U.set(U.LINE); gfx.rect(mx0 - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)

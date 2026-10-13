@@ -59,6 +59,7 @@ MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
 MX.VZ = dofile(DIR .. '/jf_tracker_visor.lua')          -- 10 окт: панель visor — шейдеры ReaVisor (страница isf в браузере) из трекера
+MX.VZ.vtext = draw.vtext                                -- 13 окт: вертикальные подписи колонок матрицы модуляций
 MX.VZ.WEB = reaper.GetResourcePath() .. '/reaper_www_root/isf'
 MX.MR = dofile(DIR .. '/jf_tracker_macros.lua')         -- вкладка macros (9 окт)
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
