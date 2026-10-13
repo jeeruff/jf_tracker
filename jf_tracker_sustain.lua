@@ -45,21 +45,21 @@ function S.parse(tag)
     local key, v, r2 = (rest or ''):match('^(%a)=(%S+)%s*(.*)$')
     if not key then break end
     if key == 'c' and S.CURVES_BY[v] then lp.curve = v elseif key == 'f' then lp.flat = v ~= '0'
-    elseif key == 'b' then local p1, p2 = v:match('^([^,]+),([^,]+)$'); lp.bls, lp.ble = tonumber(p1), tonumber(p2) end
+    elseif key == 'b' then local p1, p2 = v:match('^([^,]+),([^,]+)$'); lp.bls, lp.ble = tonumber(p1), tonumber(p2); lp.b9 = #((p1 or ''):match('%.(%d+)$') or '') >= 9 end
     rest = r2
   end
   local bo, path = (rest or ''):match('^(%S+)%s+(.+)$')
   -- 13 окт: файл годен, только если запечён при этих же точках (b=ls,le): иначе шов файла
   -- кончается не там, где луп начинается (щелчок на S) — файла нет, запечётся заново
-  local fresh = lp.bls and lp.ble and math.abs(lp.bls - lp.ls) < 2e-6 and math.abs(lp.ble - lp.le) < 2e-6
+  local fresh = lp.bls and lp.ble and math.abs(lp.bls - lp.ls) < 2e-6 and math.abs(lp.ble - lp.le) < 2e-6 and lp.b9   -- 13 окт: старые (6 знаков, файл без запаса) — запечь заново
   if fresh and tonumber(bo) and path and path ~= '' then lp.boff, lp.file = tonumber(bo), path end
   return lp
 end
 function S.tag(lp)
-  local t = ('%d %.6f %.6f %.6f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
+  local t = ('%d %.9f %.9f %.9f'):format(lp.on and 1 or 0, lp.ls, lp.le, lp.xf or 0)
   if lp.curve and lp.curve ~= 'auto' then t = t .. ' c=' .. lp.curve end
   if lp.flat == false then t = t .. ' f=0' end
-  if lp.file and lp.boff and lp.bls and lp.ble then t = t .. (' b=%.6f,%.6f %.6f %s'):format(lp.bls, lp.ble, lp.boff, lp.file) end   -- bls / ble — точки, при которых запечён (ставит запекание)
+  if lp.file and lp.boff and lp.bls and lp.ble then t = t .. (' b=%.9f,%.9f %.9f %s'):format(lp.bls, lp.ble, lp.boff, lp.file) end   -- bls / ble — точки, при которых запечён (ставит запекание)
   return t
 end
 
@@ -75,13 +75,13 @@ end
 -- → каналы кадров [ls - X, le) (луп в них начинается с X), X
 function S.bake(chs, ls, le, X, sr, opt)
   opt = opt or {}
-  X = math.max(0, math.min(X, ls, (le - ls) // 2))
+  X = math.max(0, math.min(X, ls, le - ls))   -- 13 окт: до целого лупа (материал перед ls), не до половины
   if sr and opt.flat ~= false then chs = S.flatten(chs, ls - X, le, ls, sr) end
   -- 13 окт: фаза — конец лупа сдвигается (до ±20 мс), чтобы X кадров перед le совпали по фазе
   -- с X кадрами перед ls: долгий кроссфейд не складывает две копии в разной фазе (гребёнка, «широко»)
   if sr and opt.align ~= false and X > 0 then
     local nle = S.align(chs, ls, le, X, sr)
-    if nle ~= le then le = nle; X = math.max(0, math.min(X, ls, (le - ls) // 2)) end
+    if nle ~= le then le = nle; X = math.max(0, math.min(X, ls, le - ls)) end
   end
   -- закон: похожие куски (корреляция > 0.5) — линейный (без горба громкости), иначе равной мощности
   local sab, saa, sbb = 0, 0, 0
@@ -106,10 +106,15 @@ function S.bake(chs, ls, le, X, sr, opt)
       local i = (le - X + k) - (ls - X) + 1
       o[i] = (x[le - X + k + 1] or 0) * go + (x[ls - X + k + 1] or 0) * gi
     end
+    -- 13 окт: запас за концом — начало лупа ещё раз (S.PAD кадров): секция лупа, чуть длиннее
+    -- файла из-за округления секунд, читала тишину за концом — щелчок на каждом круге
+    local L0 = #o
+    for k = 1, S.PAD do o[L0 + k] = o[X + 1 + ((k - 1) % math.max(1, L0 - X))] or 0 end
     out[c] = o
   end
   return out, X, le
 end
+S.PAD = 256
 
 -- конец лупа с лучшей фазой: le' в [le - D, le + D] (D — 20 мс, не за ls + X), где окно
 -- перед le' сильнее всего похоже на окно перед ls (нормированная корреляция, каналы вместе,

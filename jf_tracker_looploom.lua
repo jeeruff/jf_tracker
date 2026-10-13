@@ -85,7 +85,7 @@ local function seam(e, lp, x, y, w, h, ps_path)
   local wv, i_end, i_start, ghost
   if lp.file and lp.boff and ctx.file_exists(lp.file) then
     wv = wave(lp.file, ctx.SU().tag(lp), math.huge)
-    if wv then i_start = math.floor(lp.boff * wv.sr + 0.5); i_end = wv.n end
+    if wv then i_start = math.floor(lp.boff * wv.sr + 0.5); i_end = wv.n - (ctx.SU().PAD or 0) end   -- без запаса за концом
   end
   local src = ps_path and wave(ps_path, 'src', math.ceil((b + 0.1) * 192000))
   if not wv then
@@ -116,6 +116,110 @@ local function seam(e, lp, x, y, w, h, ps_path)
   bars(c1, i_start, mid + 1, U.GREEN, 1)
   local lab = ('end | start  %d ms  + -'):format(LL.seam_ms)
   U.text(x + 2, y, ctx.fit(lab, w - 4), U.DIM)
+end
+
+-- 13 окт: кроссфейд по горизонтали — кусок файла от (S - x-fade) до E: луп подсвечен, янтарная
+-- рампа — конец лупа затухает, зелёная — перед S нарастает (то, во что он переходит); ручки:
+-- квадрат на рампе — длина кроссфейда, линии S / E — точки. Тянуть мышью; колонки пиков — в кэше
+local xcache = {}
+local function shape(t, cv)
+  if cv == 's' then return t * t * (3 - 2 * t) elseif cv == 'eq' then return math.sin(t * math.pi / 2) end
+  return t
+end
+-- 13 окт: редактор кроссфейда шва — как в REAPER (Crossfade editor), по горизонтали; ось — время
+-- от шва (0 — конец лупа = его начало S): сверху то, что звучит (запечённый файл, если есть),
+-- посередине уходящий конец лупа с кривой затухания «\», снизу то, во что он переходит (перед S)
+-- с кривой нарастания «/». Ручки на краю рампы — длина кроссфейда (тянуть); тусклым — что не звучит.
+local function xfade_view(L, e, lp, src, wv, x, y, w, h, mx, my, inside)
+  U.set(U.BG); gfx.rect(x, y, w, h, 1)
+  if not src then return end
+  local a = ctx.sus_span(e)
+  local per = lp.le - lp.ls
+  local xmax = math.max(0, math.min(per, lp.ls - a, 2))
+  local X = math.min(lp.xf or 0, xmax)
+  local rng = LL.xdrag and LL.xdrag.rng or math.max(X * 1.35, 0.02)
+  local u0, u1 = -rng, rng * 0.3
+  local sr = src.sr
+  local function ux(u) return x + math.floor((u - u0) / (u1 - u0) * (w - 1) + 0.5) end
+  local function xu(px) return u0 + (px - x) / math.max(1, w - 1) * (u1 - u0) end
+  local cv = lp.curve or 'auto'
+  if cv == 'auto' then cv = 'eq' end
+  local function gin(t) if cv == 's' then return t * t * (3 - 2 * t) elseif cv == 'eq' then return math.sin(t * math.pi / 2) end; return t end
+  local function gout(t) if cv == 'eq' then return math.cos(t * math.pi / 2) end; return 1 - gin(t) end
+  -- три полосы: результат, уходящий, приходящий
+  local hb = math.floor(h / 3)
+  local bands = { { y = y, h = hb }, { y = y + hb, h = hb }, { y = y + 2 * hb, h = h - 2 * hb } }
+  local c1 = src.ch[1]
+  local Lb = wv and lp.boff and math.floor(lp.boff * wv.sr + 0.5)
+  local key = ('%s|%s|%.6f|%.6f|%.6f|%.6f|%d|%s'):format(tostring(src), tostring(wv), lp.ls, lp.le, X, rng, w, cv)
+  local cols = xcache.key == key and xcache.cols
+  if not cols then
+    cols = {}
+    local fl, fs = math.floor(lp.le * sr + 0.5), math.floor(lp.ls * sr + 0.5)
+    local Xf = math.floor(X * sr + 0.5)
+    for p = 0, w - 1 do
+      local k0 = math.floor((u0 + p / w * (u1 - u0)) * sr)
+      local k1 = math.max(k0, math.floor((u0 + (p + 1) / w * (u1 - u0)) * sr) - 1)
+      local st = math.max(1, (k1 - k0) // 48)
+      local r = { 0, 0, 0, 0, 0, 0 }
+      for k = k0, k1, st do
+        local vo, vi = c1[fl + k + 1] or 0, c1[fs + k + 1] or 0
+        local vm
+        if k < -Xf then vm = vo
+        elseif k < 0 then
+          if Lb and wv then vm = wv.ch[1][(Lb + (fl - fs) + k) + 1] or 0          -- запечённое: как прозвучит
+          else local t = (k + Xf + 1) / math.max(1, Xf); vm = vo * gout(t) + vi * gin(t) end
+        else vm = (Lb and wv) and (wv.ch[1][Lb + k + 1] or vi) or vi end
+        if vm < r[1] then r[1] = vm end; if vm > r[2] then r[2] = vm end
+        if vo < r[3] then r[3] = vo end; if vo > r[4] then r[4] = vo end
+        if vi < r[5] then r[5] = vi end; if vi > r[6] then r[6] = vi end
+      end
+      cols[p] = r
+    end
+    xcache.key, xcache.cols = key, cols
+  end
+  local pk = 1e-6
+  for p = 0, w - 1 do for q = 1, 6 do pk = math.max(pk, math.abs(cols[p][q])) end end
+  local p0, pS = ux(-X), ux(0)
+  for bi, b in ipairs(bands) do
+    local cy, sc = b.y + b.h / 2, (b.h / 2 - 2) / pk
+    if bi == 2 then U.set(U.tint(U.AMBER, 0.14)); gfx.rect(x, b.y, math.max(0, pS - x), b.h, 1) end
+    if bi == 3 then U.set(U.tint(U.GREEN, 0.14)); gfx.rect(p0, b.y, math.max(0, x + w - p0), b.h, 1) end
+    for p = 0, w - 1 do
+      local px = x + p
+      local lo, hi = cols[p][bi * 2 - 1], cols[p][bi * 2]
+      local live = bi == 1 or (bi == 2 and px < pS) or (bi == 3 and px >= p0)
+      U.set(bi == 1 and U.TEXT or (bi == 2 and U.AMBER or U.GREEN), live and 0.9 or 0.25)
+      gfx.rect(px, math.floor(cy - hi * sc), 1, math.max(1, math.floor((hi - lo) * sc)), 1)
+    end
+    U.set(U.LINE); gfx.rect(x, b.y + b.h - 1, w, 1, 1)
+  end
+  -- кривые: «\» на уходящем, «/» на приходящем
+  local function curve(b, g, col)
+    if pS - p0 < 1 then return end
+    U.set(col)
+    local ly
+    for px = p0, pS do
+      local t = (px - p0) / math.max(1, pS - p0)
+      local yy = math.floor(b.y + b.h - 2 - g(t) * (b.h - 4))
+      if ly then gfx.line(px - 1, ly, px, yy); gfx.line(px - 1, ly + 1, px, yy + 1) end
+      ly = yy
+    end
+  end
+  curve(bands[2], gout, U.AMBER)
+  curve(bands[3], gin, U.GREEN)
+  U.set(U.TEXT, 0.6); gfx.rect(pS, y, 1, h, 1)                                     -- шов
+  -- ручки длины
+  local hot
+  local function near(px, py) return inside and math.abs(mx - px) <= 5 and math.abs(my - py) <= 7 end
+  local hy2, hy3 = bands[2].y + 3, bands[3].y + bands[3].h - 4
+  if LL.xdrag then hot = LL.xdrag.k elseif near(p0, hy2) or near(p0, hy3) or (inside and math.abs(mx - p0) <= 3 and my >= bands[2].y) then hot = 'x' end
+  U.set(hot == 'x' and U.TEXT or U.AMBER); gfx.rect(p0 - 3, hy2 - 3, 7, 7, 1)
+  U.set(hot == 'x' and U.TEXT or U.GREEN); gfx.rect(p0 - 3, hy3 - 3, 7, 7, 1)
+  U.set(hot == 'x' and U.TEXT or U.GREY, 0.7); gfx.rect(p0, bands[2].y, 1, h - hb, 1)
+  U.text(x + 2, y, ctx.fit(('x-fade %d ms  (up to %d)  %s'):format(math.floor(X * 1000 + 0.5), math.floor(xmax * 1000 + 0.5), (ctx.SU().CURVES_BY[lp.curve or 'auto'] or '')), w - 4), U.DIM)
+  if hot then LL.status = 'crossfade: drag the handle left / right - longer / shorter; top - what plays, middle - the loop end fading out, bottom - what is before S fading in' end
+  return hot, function(px) return -xu(px) end, xmax, rng
 end
 
 function LL.draw(L, x, y, w, h, e, focused)
@@ -182,9 +286,24 @@ function LL.draw(L, x, y, w, h, e, focused)
   local vy, vh = y, 0
   if vw > L.cw * 10 then
     if mode == 'sus' and lp then
-      local _, _, ps = ctx.sus_span(e)
-      seam(e, lp, x, y, vw, h, ps and ctx.src_path(ps))
-      if inside and mx < x + vw then LL.status = ('looploom seam: left - the loop end, right - its start (amber / green), grey - how the file went on; wheel / + -: %d ms. The points and the candidates are on the item wave'):format(LL.seam_ms) end
+      local a, b, ps = ctx.sus_span(e)
+      local path = ps and ctx.src_path(ps)
+      local src = path and wave(path, 'src', math.ceil((b + 0.1) * 192000))
+      local xh = math.floor(h * 0.55)
+      local bk = (lp.file and lp.boff and ctx.file_exists(lp.file)) and wave(lp.file, ctx.SU().tag(lp), math.huge) or nil
+      local hot, xlen, xmax, rng = xfade_view(L, e, lp, src or nil, bk or nil, x, y, vw, xh, mx, my, inside)
+      -- протяжка ручки: длина кроссфейда (масштаб держится, пока тянут)
+      if LL.xdrag then
+        if cap == 1 then
+          if xlen and mx ~= LL.xdrag.lx then
+            LL.xdrag.lx = mx
+            ctx.sp_set_frac(e, 'susx', math.sqrt(math.max(0, math.min(xmax, xlen(mx))) / 2))
+          end
+        else LL.xdrag = nil end
+      elseif down and hot then LL.xdrag = { k = hot, lx = mx, rng = rng }; LL.xdrag_now = true end
+      seam(e, lp, x, y + xh + 2, vw, h - xh - 2, path)
+      if not hot and inside and mx < x + vw and my > y + xh then LL.status = ('crossfade seam: left - the loop end, right - its start (amber / green), grey - how the file went on; wheel / + -: %d ms'):format(LL.seam_ms) end
+
     else
       U.text(x + L.pad, y, ctx.fit('loop: ' .. mode .. ' - set loop = sustain to weave a loop', vw - 2 * L.pad), U.GREY)
     end
@@ -196,7 +315,8 @@ function LL.draw(L, x, y, w, h, e, focused)
     else LL.drag = nil end
   elseif down and inside then
     ctx.set_focus('looploom')
-    if hot_cand then apply(e, LL.cands[hot_cand])
+    if LL.xdrag_now then LL.xdrag_now = nil
+    elseif hot_cand then apply(e, LL.cands[hot_cand])
     elseif hot_row then
       local r = LL.ROWS[hot_row]
       local now = reaper.time_precise()

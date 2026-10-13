@@ -9540,7 +9540,7 @@ ctx = {
       elseif k == 'susb' then lp.le = math.min(b, math.max(lp.ls + 0.01, lp.le + st))
       else   -- 13 окт: x-fade до 2 с (не больше половины лупа и того, что есть перед ls); шаг растёт с длиной
         local xs = fine and 0.001 or (lp.xf < 0.1 and 0.005 or (lp.xf < 0.5 and 0.02 or 0.05))
-        lp.xf = math.max(0, math.min((lp.le - lp.ls) / 2, lp.ls - a, 2, lp.xf + d * xs)) end
+        lp.xf = math.max(0, math.min(lp.le - lp.ls, lp.ls - a, 2, lp.xf + d * xs)) end
       lp.file, lp.boff = nil, nil                         -- 13 окт: точки другие — запечётся заново, когда утихнет
     end
     edit.sus_set(items or ctx.inst_group(e), lp)
@@ -9737,7 +9737,7 @@ ctx = {
       local lp = ctx.sus_get(e)
       if lp then
         local a, b = ctx.sus_span(e)
-        if k == 'susx' then lp.xf = math.min((lp.le - lp.ls) / 2, lp.ls - a, 2 * fr * fr)
+        if k == 'susx' then lp.xf = math.min(lp.le - lp.ls, lp.ls - a, 2 * fr * fr)
         elseif k == 'susa' then lp.ls = math.min(lp.le - 0.01, a + fr * (b - a))
         else lp.le = math.max(lp.ls + 0.01, a + fr * (b - a)) end
         lp.file, lp.boff = nil, nil                       -- 13 окт: протяжка тоже перезапекает

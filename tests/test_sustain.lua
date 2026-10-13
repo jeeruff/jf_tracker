@@ -91,9 +91,11 @@ do
   for i = ls, le - 2 do step = math.max(step, math.abs(x[i + 1] - x[i])) end
   local o, X2 = S.bake({ x }, ls, le, X)
   o = o[1]
-  ok('bake: the loop starts after X frames of pre-roll', X2 == X and #o == le - ls + X, #o .. ' ' .. X2)
-  ok('bake: the loop end ends as the frame before ls', math.abs(o[#o] - x[ls]) < 1e-9)
-  local jump = math.abs(o[X + 1] - o[#o])
+  local n = #o - S.PAD                                  -- 13 окт: за концом лупа — запас (начало лупа ещё раз)
+  ok('bake: the loop starts after X frames of pre-roll', X2 == X and n == le - ls + X, #o .. ' ' .. X2)
+  ok('bake: the loop end ends as the frame before ls', math.abs(o[n] - x[ls]) < 1e-9)
+  ok('bake: the pad after the end is the loop start again (no silence past the end)', math.abs(o[n + 1] - o[X + 1]) < 1e-12 and math.abs(o[n + 5] - o[X + 5]) < 1e-12)
+  local jump = math.abs(o[X + 1] - o[n])
   ok('bake: the wrap jump is like a normal step', jump <= step * 1.01, ('%.4f vs step %.4f'):format(jump, step))
   ok('bake: before the fade the loop is the file', math.abs(o[X + 1] - x[ls + 1]) < 1e-12 and math.abs(o[X + 10] - x[ls + 10]) < 1e-12)
   -- WAV туда-обратно

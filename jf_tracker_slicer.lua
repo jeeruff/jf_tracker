@@ -1166,8 +1166,16 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local xs, xe = tx(ft(lo.ls)), tx(ft(lo.le))
     local fxw = math.floor((lo.xf or 0) / r / span * w)
     gfx.set(0.92, 0.52, 0.22, 0.10); gfx.rect(clip(xs), wy, clip(xe) - clip(xs), wh, 1); gfx.a = 1
-    U.set(U.AMBER, 0.45); gfx.rect(clip(xe - fxw), wy, clip(xe) - clip(xe - fxw), 4, 1)
-    U.set(U.CYAN, 0.45); gfx.rect(clip(xs - fxw), wy, clip(xs) - clip(xs - fxw), 4, 1)
+    -- 13 окт: кроссфейд — наклонными линиями, как в REAPER: «\» — конец лупа гаснет, «/» — перед S нарастает
+    local function slant(p0, p1, up, col)
+      if p1 - p0 < 1 then return end
+      U.set(col, 0.9)
+      local a0, a1 = clip(p0), clip(p1)
+      local function yy(px) local t = (px - p0) / (p1 - p0); if not up then t = 1 - t end; return math.floor(wy + wh - 2 - t * (wh - 4)) end
+      if a1 > a0 then gfx.line(a0, yy(a0), a1, yy(a1)); gfx.line(a0, yy(a0) + 1, a1, yy(a1) + 1) end
+    end
+    slant(xe - fxw, xe, false, U.AMBER)
+    slant(xs - fxw, xs, true, U.GREEN)
     local drag = S.loop_drag and S.loop_drag.k
     for _, it in ipairs({ { 'susa', xs, U.GREEN, 'S' }, { 'susb', xe, U.AMBER, 'E' } }) do
       local px = it[2]
