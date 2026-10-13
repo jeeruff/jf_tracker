@@ -1710,6 +1710,12 @@ function V.key_impl(c)
       end
       return env_normal(c)
     end
+    -- 13 окт: Backspace на поле ноты — удалить строку: всё ниже поднимается (трек; Shift — все треки),
+    -- как в NORMAL; Delete — только событие под курсором
+    if c == BS and fld == 1 and ctx.time_edit then
+      ctx.time_edit('delete', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false)
+      V.hexbuf = nil; return
+    end
     if c == BS or c == DEL then
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       if fld == 1 then E.delete(heads, lpb())
