@@ -67,7 +67,7 @@
 <p class="sub">a tracker shell over the REAPER project, with Vim keys</p>
 <div class="nav">
   <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
-  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
+  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
   <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
@@ -183,6 +183,50 @@ z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar
 <tr><td><kbd>Ctrl</kbd>+note</td><td>a held note: its length is as long as you hold the key</td></tr>
 <tr><td>sliced sound</td><td><kbd>q</kbd> writes the whole sample, the next keys its slices: <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> <kbd>e</kbd> … = slices 1 2 3 4 … (as in Renoise); <kbd>Option</kbd>+key — the selected slice at that pitch, <kbd>Cmd</kbd>+key — the whole sample at that pitch</td></tr>
 <tr><td>MIDI keyboard</td><td>writes into the cursor column the same way</td></tr>
+</table>
+
+<h2 id="edits">Edits, drawn</h2>
+<p>What each key does to the rows and to the note (the item in REAPER). <code>|</code> — the note sounding, <code>OFF</code> — where it stops, <code>&gt;</code> — the cursor row.</p>
+<h3>Rows</h3>
+<div class="rows"><span class="g">before          Backspace         Option+Backspace   Ctrl+Opt+Cmd+J</span>
+C-4 01           C-4 01            C-4 01             C-4 01
+ |                |               &gt;...    <span class="g">new row</span>    |
+&gt;|  <span class="g">cursor</span>       &gt;OFF  <span class="g">moved up</span>    |                 &gt;|
+ |                D-4 01            |                 ...    <span class="g">new row</span>
+OFF                                OFF                |
+D-4 01                             D-4 01            OFF</div>
+<table>
+<tr><td><kbd>Backspace</kbd></td><td>delete the cursor row of the track: everything below moves up; a note through the row is a row shorter (its OFF moves up); a note starting on it is deleted. In a MIDI clip the clip is not cut. <kbd>Shift</kbd> — all tracks</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>Backspace</kbd></td><td>insert an empty row at the cursor; below moves down; a note through it gets longer. <kbd>Ctrl+Option+Cmd+J</kbd> — under the cursor, <kbd>K</kbd> — above it; <kbd>Shift</kbd> — all tracks; a count — N rows</td></tr>
+<tr><td><kbd>Delete</kbd> / <kbd>x</kbd></td><td>only the event under the cursor, nothing moves</td></tr>
+</table>
+<h3>One note (NORMAL)</h3>
+<div class="rows"><span class="g">the note        Opt+Shift+J     Opt+Shift+L      Shift+Opt+Cmd+J (slip)</span>
+C-4  <span class="g">[ab]</span>        C-4  <span class="g">[ab]</span>       ...               C-4  <span class="g">[.a]</span>
+ |   <span class="g">[cd]</span>         |   <span class="g">[cd]</span>      C-4  <span class="g">[cd]</span>         |   <span class="g">[bc]</span>
+OFF               |   <span class="g">[ef]</span>      OFF               OFF
+                 OFF  <span class="g">end a row later</span>  <span class="g">start a row later, the sound starts later in the file</span>   <span class="g">the note stays, the sound moves</span></div>
+<table>
+<tr><td><kbd>Option+Shift+J</kbd> / <kbd>K</kbd></td><td>the end of the note a row later / earlier (not stretched; past the sample — the loop of the instrument, else silence)</td></tr>
+<tr><td><kbd>Option+Shift+H</kbd> / <kbd>L</kbd></td><td>the start a row earlier / later; the place in the file moves with it (as trim in REAPER)</td></tr>
+<tr><td><kbd>Shift+Option+Cmd+J</kbd> / <kbd>K</kbd></td><td>slip: the note stays, the sound inside it moves a row down / up</td></tr>
+<tr><td><kbd>Ctrl+Enter</kbd></td><td>all the properties of this one note in a box (volume, pan, transpose, rate, fades, offset …): <kbd>j k</kbd> row, <kbd>h l</kbd> value, <kbd>Enter</kbd> list, <kbd>R</kbd> reset, <kbd>Esc</kbd> close</td></tr>
+<tr><td><kbd>:legato fill</kbd> / the <code>legato</code> button</td><td>each note lasts to the next one, not stretched (the plain <code>:legato</code> stretches)</td></tr>
+</table>
+<h3>Slices are pooled</h3>
+<p>All notes of one slice play the same piece of the sample. Move the start of a slice in the item tab — every note of that slice (transposed ones too) starts its sound at the new place; the notes themselves stay where they are and keep their length.</p>
+<h3>Copy and paste</h3>
+<table>
+<tr><td><kbd>yy</kbd> <kbd>V</kbd>…<kbd>y</kbd></td><td>copy rows (V — on every track); the clipboard tab keeps the history</td></tr>
+<tr><td><kbd>p</kbd></td><td>paste at the cursor: a note already on that row is replaced (with x-fade on — kept); the pasted notes keep their lengths</td></tr>
+<tr><td><kbd>P</kbd></td><td>paste beside, into a new subcolumn</td></tr>
+</table>
+<h3>Commands</h3>
+<table>
+<tr><td>typing</td><td>the code shows in the cell (<code>0R__</code>), the cursor waits for the digits</td></tr>
+<tr><td><kbd>`</kbd> on a command column</td><td>stop what runs there from the rows above (<code>0D..</code> → <code>0D00</code>), like a note-off for commands</td></tr>
+<tr><td><kbd>Ctrl+Option</kbd> + <kbd>+</kbd> / <kbd>-</kbd></td><td>the command above in this column again, value +1 / -1, on this row; the cursor goes a step on (the volume column too)</td></tr>
+<tr><td><code>0Rxy</code></td><td>retrigger inside the note: a copy every y/16 row, each x/16 quieter; the copies have no cells of their own</td></tr>
 </table>
 
 <h2 id="rec">Recording</h2>
