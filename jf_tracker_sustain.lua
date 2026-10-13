@@ -51,9 +51,13 @@ end
 -- что в файле шло перед ls, — а следом ls: шов непрерывен при любых точках (щелчка нет,
 -- разница громкости / фазы размазана по X). chs — каналы (1-based, отсчёт k = кадр k-1),
 -- ls, le — кадры (0-based), X — длина кроссфейда в кадрах.
+-- sr (13 окт) — выровнять громкость участка: спад (808, пэд с затуханием) делится на свою огибающую,
+-- весь луп звучит громкостью точки ls (там голова передаёт хвосту — стык непрерывен), шов сходится
+-- и по уровню. nil — без выравнивания.
 -- → каналы кадров [ls - X, le) (луп в них начинается с X), X
-function S.bake(chs, ls, le, X)
+function S.bake(chs, ls, le, X, sr)
   X = math.max(0, math.min(X, ls, (le - ls) // 2))
+  if sr then chs = S.flatten(chs, ls - X, le, ls, sr) end
   -- закон: похожие куски (корреляция > 0.5) — линейный (без горба громкости), иначе равной мощности
   local sab, saa, sbb = 0, 0, 0
   for _, x in ipairs(chs) do
@@ -77,6 +81,40 @@ function S.bake(chs, ls, le, X)
     out[c] = o
   end
   return out, X
+end
+
+-- выравнивание громкости кадров [a, b): огибающая — RMS окон по 50 мс (шаг 25 мс, все каналы),
+-- между центрами окон — линейно; усиление = огибающая в ref / огибающая (±24 дБ, тишина ниже −60 дБ не тянется).
+-- → новые каналы той же длины (вне [a, b) — как были)
+function S.flatten(chs, a, b, ref, sr)
+  local W = math.max(64, math.floor(0.05 * sr)); local hop = W // 2
+  local cs, ev = {}, {}
+  for c0 = a, math.max(a, b - W), hop do
+    local e = 0
+    for _, x in ipairs(chs) do for f = c0, c0 + W - 1 do local v = x[f + 1] or 0; e = e + v * v end end
+    cs[#cs + 1] = c0 + W / 2; ev[#ev + 1] = math.sqrt(e / (W * #chs))
+  end
+  if #cs == 0 then return chs end
+  local function env(f)
+    if f <= cs[1] then return ev[1] end
+    if f >= cs[#cs] then return ev[#cs] end
+    local i = math.floor((f - cs[1]) / hop) + 1
+    local t = (f - cs[i]) / hop
+    return ev[i] + (ev[i + 1] - ev[i]) * t
+  end
+  local r = env(ref)
+  if r < 1e-6 then return chs end
+  local out = {}
+  for c, x in ipairs(chs) do
+    local o = {}
+    for f = a, b - 1 do
+      local e = env(f)
+      local g = e > r * 1e-3 and math.max(1 / 16, math.min(16, r / e)) or 1   -- до ±24 дБ; ниже −60 дБ от ls — тишина, не тянуть
+      o[f + 1] = (x[f + 1] or 0) * g
+    end
+    out[c] = setmetatable(o, { __index = x })
+  end
+  return out
 end
 
 -- WAV PCM 16 / 24 / 32, float 32 → { sr, ch = { канал = отсчёты } } (кадры [0, nmax)), или nil

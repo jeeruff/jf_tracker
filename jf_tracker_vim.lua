@@ -2146,7 +2146,7 @@ function V.key_impl(c)
         return
       end
       if c >= ('0'):byte() and c <= ('9'):byte() and not (c == ('0'):byte() and not V.count) then
-        V.count = (V.count or 0) * 10 + (c - 48); V.pending = p; return
+        V.count = math.floor((V.count or 0) * 10 + (c - 48)); V.pending = p; return
       end
       if c == ('g'):byte() then V.op = p; V.pending = 'g'; return end
       -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
@@ -2219,7 +2219,7 @@ function V.key_impl(c)
 
   -- счётчик
   if c >= ('0'):byte() and c <= ('9'):byte() and not (c == ('0'):byte() and not V.count) then
-    V.count = (V.count or 0) * 10 + (c - 48); return
+    V.count = math.floor((V.count or 0) * 10 + (c - 48)); return
   end
 
   -- VISUAL: операторы на выделении

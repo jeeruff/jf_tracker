@@ -9279,7 +9279,7 @@ ctx = {
     local X0 = math.floor((lp.xf or 0) * w.sr + 0.5)
     -- 13 окт: рядом с исходником, имя + _loop (без своей папки); точки другие — тот же файл переписывается
     local out = path:gsub('%.[Ww][Aa][Vv]$', '') .. '_loop.wav'
-    local chs, X = SU.bake(w.ch, ls, le, X0)
+    local chs, X = SU.bake(w.ch, ls, le, X0, w.sr)          -- с выравниванием громкости спада
     if not SU.wav_write(out, w.sr, chs) then ctx.sus_bake_no[e.item] = true; vim.msg = 'sustain loop: can not write ' .. out; return end
     PV.forget(out)
     lp.file, lp.boff = out, X / w.sr
@@ -9326,12 +9326,14 @@ ctx = {
       local st = d * (fine and 0.001 or 0.01)
       if k == 'susa' then lp.ls = math.max(a, math.min(lp.le - 0.01, lp.ls + st))
       elseif k == 'susb' then lp.le = math.min(b, math.max(lp.ls + 0.01, lp.le + st))
-      else lp.xf = math.max(0, math.min((lp.le - lp.ls) / 2, 0.25, lp.xf + d * (fine and 0.001 or 0.005))) end
+      else   -- 13 окт: x-fade до 2 с (не больше половины лупа и того, что есть перед ls); шаг растёт с длиной
+        local xs = fine and 0.001 or (lp.xf < 0.1 and 0.005 or (lp.xf < 0.5 and 0.02 or 0.05))
+        lp.xf = math.max(0, math.min((lp.le - lp.ls) / 2, lp.ls - a, 2, lp.xf + d * xs)) end
       lp.file, lp.boff = nil, nil                         -- 13 окт: точки другие — запечётся заново, когда утихнет
     end
     edit.sus_set(items or ctx.inst_group(e), lp)
     ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
-    vim.msg = msg or ('sustain loop %s  %.3f - %.3f s, x-fade %d ms'):format(lp.on and 'on' or 'off', lp.ls, lp.le, math.floor(lp.xf * 1000 + 0.5))
+    vim.msg = msg or ('sustain loop %s  %.3f - %.3f s, x-fade %d ms, level flattened'):format(lp.on and 'on' or 'off', lp.ls, lp.le, math.floor(lp.xf * 1000 + 0.5))
     if lp.on and e.loop then vim.msg = vim.msg .. '  - loop off (one or the other)' end
     model.invalidate()
   end,
@@ -9431,7 +9433,7 @@ ctx = {
       if not lp then return '-' end
       if k == 'susa' then return ('%.3f s'):format(lp.ls) end
       if k == 'susb' then return ('%.3f s'):format(lp.le) end
-      return ('%d ms'):format(math.floor(lp.xf * 1000 + 0.5))
+      return lp.xf >= 1 and ('%.2f s'):format(lp.xf) or ('%d ms'):format(math.floor(lp.xf * 1000 + 0.5))
     end
     return ''
   end,
@@ -9455,7 +9457,7 @@ ctx = {
       local lp = ctx.sus_get(e)
       if not lp then return nil end
       local a, b = ctx.sus_span(e)
-      if k == 'susx' then return math.min(1, lp.xf / 0.1) end
+      if k == 'susx' then return math.min(1, math.sqrt(lp.xf / 2)) end   -- 13 окт: до 2 с, квадратично (короткие — точнее)
       return ((k == 'susa' and lp.ls or lp.le) - a) / math.max(1e-6, b - a)
     end
     if k == 'offs' then
@@ -9495,9 +9497,11 @@ ctx = {
       local lp = ctx.sus_get(e)
       if lp then
         local a, b = ctx.sus_span(e)
-        if k == 'susx' then lp.xf = math.min((lp.le - lp.ls) / 2, fr * 0.1)
+        if k == 'susx' then lp.xf = math.min((lp.le - lp.ls) / 2, lp.ls - a, 2 * fr * fr)
         elseif k == 'susa' then lp.ls = math.min(lp.le - 0.01, a + fr * (b - a))
         else lp.le = math.max(lp.ls + 0.01, a + fr * (b - a)) end
+        lp.file, lp.boff = nil, nil                       -- 13 окт: протяжка тоже перезапекает
+        ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
         edit.sus_set(items, lp)
       end
     elseif k == 'offs' then

@@ -107,5 +107,21 @@ do
   ok('tag with the baked file', t2 and t2.file == '/a b/c d.wav' and math.abs(t2.boff - 0.03) < 1e-9)
 end
 
+-- 11. выравнивание громкости (13 окт): спад 808 — в запечённом лупе уровень ровный, конец ≈ начало
+do
+  local x = {}
+  for i = 1, math.floor(1.2 * sr) do local tt = (i - 1) / sr; x[i] = math.exp(-tt * 3) * math.sin(2 * math.pi * 55 * tt) end
+  local ls, le, X = math.floor(0.3 * sr), math.floor(1.0 * sr), math.floor(0.1 * sr)
+  local function rms(o, a, n) local e = 0; for i = a, a + n - 1 do e = e + o[i] ^ 2 end; return math.sqrt(e / n) end
+  local n = math.floor(0.1 * sr)
+  local raw = S.bake({ x }, ls, le, X)[1]
+  local o = S.bake({ x }, ls, le, X, sr)[1]
+  local r0, r1 = rms(raw, X + 1, n), rms(raw, #raw - X - n, n)
+  local f0, f1 = rms(o, X + 1, n), rms(o, #o - X - n, n)
+  ok('flatten: raw loop decays', r1 / r0 < 0.25, ('%.3f'):format(r1 / r0))
+  ok('flatten: the flattened loop keeps its level', f1 / f0 > 0.9 and f1 / f0 < 1.1, ('%.3f'):format(f1 / f0))
+  ok('flatten: the loop start is untouched (joins the head)', math.abs(o[X + 1] - x[ls + 1]) < 0.02 * f0 * 1.5, ('%.4f vs %.4f'):format(o[X + 1], x[ls + 1]))
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

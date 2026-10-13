@@ -22,6 +22,7 @@ local cur2                    -- 13 окт: хвост лупа удержани
 local function stop_audio()
   if cur then pcall(R.CF_Preview_Stop, cur); cur = nil end
   if cur2 then pcall(R.CF_Preview_Stop, cur2); cur2 = nil end
+  P.geo = nil
   P.stop_pos = nil
   P.cur_path = nil
   P.cur_item = nil
@@ -42,8 +43,8 @@ end
 
 -- 10 окт: плейхед слайсера — где сейчас превью этого item, в секундах от начала item (nil — не играет)
 function P.item_pos(item)
-  if not (cur and P.cur_item and P.cur_item == item) then return nil end
-  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ((cur or P.geo) and P.cur_item and P.cur_item == item) then return nil end
+  local ok, pos = P.cur_pos()
   if not ok then return nil end
   return (pos - (P.cur_offs or 0)) / math.max(1e-6, P.cur_rate or 1), P.cur_t0 or 0
 end
@@ -101,19 +102,32 @@ local function voice(track, item, semis, lp, gain)
     if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
     return pv
   end
-  if not P.sus_ok(lp) then local pv = one(src, offs); return pv and { pv } or nil, offs, rate end
+  if not P.sus_ok(lp) then local pv = one(src, offs); return pv and { pv } or nil, offs, rate, pv and { plain = pv } end
   -- у головы ноты с лупом источник уже секция [0, ls) — файл берём у родителя
   local file = R.GetMediaSourceParent(src) or src
   local path = R.GetMediaSourceFileName(file, '')
   local per = lp.le - lp.ls
   local tail = (lp.file and lp.boff and R.file_exists(lp.file)) and section(lp.file, lp.boff, per, 0) or section(path, lp.ls, per, lp.xf)   -- 13 окт: запечённый луп
-  if not tail then local pv = one(src, offs); return pv and { pv } or nil, offs, rate end
-  if offs >= lp.ls - 1e-4 then local pv = one(tail, (offs - lp.ls) % per, true); return pv and { pv } or nil, offs, rate end
+  if not tail then local pv = one(src, offs); return pv and { pv } or nil, offs, rate, pv and { plain = pv } end
+  if offs >= lp.ls - 1e-4 then local pv = one(tail, (offs - lp.ls) % per, true); return pv and { pv } or nil, offs, rate, pv and { tail = pv, ls = lp.ls, per = per } end
   local head = section(path, offs, lp.ls - offs, 0)
   local h = head and one(head, 0)
   local t = h and one(tail, -(lp.ls - offs), true)
   if not t then if h then pcall(R.CF_Preview_Stop, h) end; return nil end
-  return { h, t }, offs, rate
+  return { h, t }, offs, rate, { head = h, tail = t, offs = offs, ls = lp.ls, per = per }
+end
+
+-- 13 окт: где в файле звучит голос (секунды файла): у ноты с лупом D_POSITION головы / хвоста —
+-- от начала их секций; хвост до вступления — отрицательный (звучит голова)
+local function geo_pos(g)
+  if not g then return nil end
+  if g.plain then local ok, ok2, p = pcall(R.CF_Preview_GetValue, g.plain, 'D_POSITION'); return (ok and ok2) and p or nil end
+  if g.tail then
+    local ok, ok2, tp = pcall(R.CF_Preview_GetValue, g.tail, 'D_POSITION')
+    if ok and ok2 and tp >= 0 then return g.ls + tp % g.per end
+  end
+  if g.head then local ok, ok2, hp = pcall(R.CF_Preview_GetValue, g.head, 'D_POSITION'); if ok and ok2 then return g.offs + hp end end
+  return nil
 end
 
 -- аудио: source образца через трек с питчем (полутоны); max_sec — лимит; lp — луп удержания
@@ -122,11 +136,12 @@ function P.audio(track, depot_item, semis, max_sec, lp)
   if not P.available() or not depot_item then return false end
   stop_audio()
   audio_stop_at = max_sec and (R.time_precise() + max_sec) or nil
-  local pvs, offs, rate = voice(track, depot_item, semis, lp, P.gain or 1)   -- 11 окт: P.gain — разовая громкость (смарт: прослушать vol)
+  local pvs, offs, rate, geo = voice(track, depot_item, semis, lp, P.gain or 1)   -- 11 окт: P.gain — разовая громкость (смарт: прослушать vol)
   P.gain = nil
   if not pvs then return false end
   for _, pv in ipairs(pvs) do R.CF_Preview_Play(pv) end
   cur, cur2 = pvs[1], pvs[2]
+  P.geo = geo
   P.cur_item, P.cur_offs, P.cur_rate = depot_item, offs, rate   -- плейхед в модуле item (Shift+нота, MIDI)
   P.cur_t0 = 0
   P.cur_semis_add = semis or 0                                   -- нота поверх питча take
@@ -142,10 +157,12 @@ function P.note_off(key)
   local v = P.voices[key]
   if not v or not v.sus then return end
   for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end
+  if P.geo == v.geo then P.geo = nil end
   P.voices[key] = nil
 end
 local function voices_stop()
   for k, v in pairs(P.voices) do for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end; P.voices[k] = nil end
+  P.geo = nil
 end
 function P.note_on(key, track, item, semis, lp, gain)
   if not P.available() then return false end
@@ -154,12 +171,13 @@ function P.note_on(key, track, item, semis, lp, gain)
   local n, old = 0, nil
   for k, o in pairs(P.voices) do n = n + 1; if not old or o.t < P.voices[old].t then old = k end end
   if n >= VMAX and old then for _, pv in ipairs(P.voices[old].pvs) do pcall(R.CF_Preview_Stop, pv) end; P.voices[old] = nil end
-  local pvs, offs, rate = voice(track, item, semis, lp, gain)
+  local pvs, offs, rate, geo = voice(track, item, semis, lp, gain)
   if not pvs then return false end
+  P.geo = geo                                                    -- плейхед — последней ноты
   for _, pv in ipairs(pvs) do R.CF_Preview_Play(pv) end
   local sus = P.sus_ok(lp) and true or false
   local now = R.time_precise()
-  P.voices[key] = { pvs = pvs, sus = sus, t = now,
+  P.voices[key] = { pvs = pvs, sus = sus, t = now, geo = geo,
     stop_at = (not sus) and now + R.GetMediaItemInfo_Value(item, 'D_LENGTH') + 0.05 or nil }
   P.cur_item, P.cur_offs, P.cur_rate, P.cur_t0, P.cur_semis_add = item, offs, rate, 0, semis or 0
   return true
@@ -220,17 +238,23 @@ function P.live(items)
 end
 -- секунды от начала item, который играет (nil — не играет инструмент)
 function P.inst_position(item)
-  if not (cur and P.cur_item) or (item and item ~= P.cur_item) then return nil end
-  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ((cur or P.geo) and P.cur_item) or (item and item ~= P.cur_item) then return nil end
+  local ok, pos = P.cur_pos()
   if not ok then return nil end
   return (pos - P.cur_offs) / P.cur_rate
 end
 function P.playing() return cur ~= nil or stop_at ~= nil end
+-- позиция звучащего инструмента в файле: голос с лупом (P.geo) или превью cur → ok, секунды
+function P.cur_pos()
+  if P.geo then local p = geo_pos(P.geo); return p ~= nil, p end
+  if not cur then return false end
+  return R.CF_Preview_GetValue(cur, 'D_POSITION')
+end
 -- позиция в источнике (секунды файла) и путь файла звучащего инструмента /
 -- слайса — плейхед на любой записи lib того же файла (родитель или слайс)
 function P.src_position()
-  if not (cur and P.cur_item and R.ValidatePtr(P.cur_item, 'MediaItem*')) then return nil end
-  local ok, pos = R.CF_Preview_GetValue(cur, 'D_POSITION')
+  if not ((cur or P.geo) and P.cur_item and R.ValidatePtr(P.cur_item, 'MediaItem*')) then return nil end
+  local ok, pos = P.cur_pos()
   if not ok then return nil end
   local tk = R.GetActiveTake(P.cur_item)
   local src = tk and R.GetMediaItemTake_Source(tk)
@@ -324,7 +348,7 @@ function P.tick()
   end
   if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio() end
   for k, v in pairs(P.voices) do
-    if v.stop_at and now >= v.stop_at then for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end; P.voices[k] = nil end
+    if v.stop_at and now >= v.stop_at then for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end; if P.geo == v.geo then P.geo = nil end; P.voices[k] = nil end
   end
   if stop_at and P.stop_pos and R.GetPlayState() & 1 == 1 and R.GetPlayPosition() >= P.stop_pos - 0.002 then stop_at = R.time_precise() end
   if stop_at and R.time_precise() >= stop_at then
