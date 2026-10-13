@@ -604,6 +604,10 @@ function M.build(lpb)
       end
     end
     e.parent = best
+    -- 13 окт: нота-слайс (iid «корень#k») — ребёнок корня всегда, даже во всю длину (playthru):
+    -- иначе она становилась отдельным инструментом «без слайсов»
+    local rb = type(e.gkey) == 'string' and e.gkey:match('^(iid:[^#@~]+)#')
+    if rb then for _, p in ipairs(all) do if p ~= e and p.gkey == rb then e.parent = p; break end end end
     if e.lvar then                                          -- вариант лупа: родитель — его корень
       e.parent = nil
       for _, p in ipairs(all) do if p ~= e and p.guid == e.lvar then e.parent = p end end

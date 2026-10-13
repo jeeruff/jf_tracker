@@ -14378,6 +14378,7 @@ local function frame()
   end
   edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
+  if edit.msg then vim.msg = edit.msg; edit.msg = nil end   -- 13 окт: сообщение правки (пустой слот и т.п.)
   if edit.rescued then
     vim.msg = 'last item of ' .. table.concat(edit.rescued, ', ') .. ' deleted - sample kept in track library (=LIB)'
     edit.rescued = nil

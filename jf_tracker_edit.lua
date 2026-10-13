@@ -1861,6 +1861,8 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
     -- 11 окт: force_audio — смена инструмента ноты на сэмпл; MIDI-клип в этой строке
     -- её не перехватывает (раньше нота молча становилась MIDI-нотой клипа)
     local mit = not (force_audio and depot_item) and midi_item_at(track, lane_idx, t0) or nil
+    -- 13 окт: пустой слот lib (ни сэмпла, ни плагина) — не создавать пустой MIDI-клип на треке
+    if not depot_item and not force_midi and not mit then E.msg = 'empty instrument slot - pick a sample or a plugin in the lib'; return end
     if mit and not E.item_swing(mit) then t0 = row_time(row, lpb, 0) end   -- у MIDI item свинг выключен (6 окт)
     local has_audio = false
     if not mit then
