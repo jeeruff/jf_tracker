@@ -2093,6 +2093,7 @@ function V.key_impl(c)
       -- 10 окт: zz везде — модуль в фокусе на всё окно (и трекер; центровка строки Vim заменена)
       if c == ('z'):byte() and ctx.zz_zoom and ctx.zz_zoom() then
       elseif c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
+      elseif c == ('x'):byte() then if ctx.xfade_native then ctx.xfade_native(V.covering(V.cur.fi, V.cur.row)) end   -- 13 окт: zx — редактор кроссфейдов REAPER
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)

@@ -9572,6 +9572,26 @@ ctx = {
     ctx.sus_points(e, lp)
     vim.msg = ('sustain loop = the selection %.3f - %.3f s'):format(ss[1], ss[2])
   end,
+  -- 13 окт: zx — нативный редактор кроссфейдов REAPER (41827) для ноты под курсором и тех нот
+  -- трека, что перекрывают её (выделение items — его вход)
+  xfade_native = function(heads)
+    local it = heads and heads[1] and heads[1].item
+    if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'zx: no audio note under the cursor'; return end
+    local tr = reaper.GetMediaItem_Track(it)
+    local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local p1 = p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    reaper.SelectAllMediaItems(0, false)
+    local n = 0
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local o = reaper.GetTrackMediaItem(tr, i)
+      local a = reaper.GetMediaItemInfo_Value(o, 'D_POSITION')
+      local b = a + reaper.GetMediaItemInfo_Value(o, 'D_LENGTH')
+      if o == it or (a < p1 - 1e-6 and b > p0 + 1e-6) then reaper.SetMediaItemSelected(o, true); n = n + 1 end
+    end
+    reaper.UpdateArrange()
+    reaper.Main_OnCommand(41827, 0)
+    vim.msg = n > 1 and ('crossfade editor (REAPER): %d overlapping notes selected'):format(n) or 'crossfade editor (REAPER): this note has no overlap - its fades'
+  end,
   sus_points = function(e, lp)
     edit.sus_set(ctx.inst_group(e), lp)
     ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
