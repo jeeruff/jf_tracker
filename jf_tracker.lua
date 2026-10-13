@@ -2123,7 +2123,7 @@ ctx = {
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'looploom' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -4667,21 +4667,79 @@ ctx = {
       elseif c >= 32 and c < 127 then TL.filter = TL.filter .. ch; TL.cur = 1 end
       return true
     end
+    -- 13 окт: как файловый менеджер lf — папки h / l, отметки Space, dd yy p P, >> <<, J K, o O, F, r;
+    -- флажки — своими буквами T M S R (на отмеченных или на курсоре)
     local list = draw.tl_rows(state, snap)
     local ci = list[TL.cur]
-    local K = draw.TL_COLS[TL.col]
-    if ch == 'j' or c == keys.down then TL.cur = math.min(#list, TL.cur + 1)
+    local col = ci and snap.cols[ci]
+    TL.marks = TL.marks or {}
+    local pend = TL.pend; TL.pend = nil
+    local function ids()
+      local t = {}
+      for _, li in ipairs(list) do local c = snap.cols[li]; if c and TL.marks[c.guid] then t[#t + 1] = c.guid end end
+      if #t == 0 and col then t[1] = col.guid end
+      return t
+    end
+    local function cis()
+      local t = {}
+      for _, li in ipairs(list) do local c = snap.cols[li]; if c and TL.marks[c.guid] then t[#t + 1] = li end end
+      if #t == 0 and ci then t[1] = ci end
+      return t
+    end
+    local function op(what)
+      if not col then return end
+      local msg, follow = edit.tree_op(what, ids(), col.guid)
+      if what ~= 'copy' then TL.marks = {} end
+      TL.follow = follow
+      model.invalidate(); relayout()
+      vim.msg = 'tracks: ' .. (msg or '')
+    end
+    local function row_of(guid) for li, c2 in ipairs(list) do if snap.cols[c2].guid == guid then return li end end end
+    if (pend == 'd' and ch == 'd') then op('cut')
+    elseif (pend == 'y' and ch == 'y') then op('copy')
+    elseif (pend == '>' and ch == '>') then op('indent')
+    elseif (pend == '<' and ch == '<') then op('outdent')
+    elseif ch == 'd' or ch == 'y' or ch == '>' or ch == '<' then TL.pend = ch
+    elseif ch == 'j' or c == keys.down then TL.cur = math.min(#list, TL.cur + 1)
     elseif ch == 'k' or c == keys.up then TL.cur = math.max(1, TL.cur - 1)
-    elseif ch == 'h' or c == keys.left then TL.col = math.max(1, TL.col - 1)
-    elseif ch == 'l' or c == keys.right then TL.col = math.min(#draw.TL_COLS, TL.col + 1)
     elseif ch == 'g' then TL.cur = 1
     elseif ch == 'G' then TL.cur = math.max(1, #list)
-    elseif ch == ' ' or ch == 'x' then if ci and K then ctx.tlist_toggle(ci, K.k) end
-    elseif ch == 'a' then if K then ctx.tlist_column(K.k) end
+    elseif ch == 'h' or c == keys.left then
+      -- раскрытая папка — свернуть; иначе — к папке-родителю
+      if col and col.folder and not state.fcollapse[col.guid] then state.fcollapse[col.guid] = true; relayout()
+      elseif col then
+        for li = TL.cur - 1, 1, -1 do local c2 = snap.cols[list[li]]; if c2.folder and (c2.depth or 0) < (col.depth or 0) then TL.cur = li; break end end
+      end
+    elseif ch == 'l' or c == keys.right then
+      -- свёрнутая папка — раскрыть; раскрытая — в первого ребёнка; трек — к нему в трекере
+      if col and col.folder and state.fcollapse[col.guid] then state.fcollapse[col.guid] = nil; relayout()
+      elseif col and col.folder then TL.cur = math.min(#list, TL.cur + 1)
+      elseif ci then ctx.tlist_do(ci, 'go') end
     elseif c == 13 then if ci then ctx.tlist_do(ci, 'go') end
-    elseif ch == 'z' then if ci and snap.cols[ci].folder then ctx.tlist_do(ci, 'fold') end
+    elseif ch == ' ' then
+      if col then TL.marks[col.guid] = (not TL.marks[col.guid]) or nil; TL.cur = math.min(#list, TL.cur + 1) end
+    elseif ch == 'v' then for _, li in ipairs(list) do local g = snap.cols[li].guid; TL.marks[g] = (not TL.marks[g]) or nil end
+    elseif ch == 'u' then TL.marks = {}; vim.msg = 'tracks: marks cleared'
+    elseif ch == 'T' or ch == 'M' or ch == 'S' or ch == 'R' then
+      local t = cis()
+      local all = true
+      for _, i2 in ipairs(t) do if not ctx.tlist_get(snap.cols[i2], ch) then all = false end end
+      ctx.tlist_set(t, ch, not all)
+      vim.msg = ('tracks %s: %s (%d)'):format(ch, all and 'off' or 'on', #t)
+    elseif ch == 'J' then op('down')
+    elseif ch == 'K' then op('up')
+    elseif ch == 'o' then op('new_after')
+    elseif ch == 'O' then op('new_before')
+    elseif ch == 'F' then op('folder')
+    elseif ch == 'p' then op('paste_after')
+    elseif ch == 'P' then op('paste_before')
+    elseif ch == 'r' then if col then ctx.rename_track_prompt(col) end
+    elseif ch == 'z' then if col and col.folder then ctx.tlist_do(ci, 'fold') end
     elseif ch == '/' then TL.typing = true; TL.filter = ''; TL.cur = 1
-    elseif c == 27 then if TL.filter ~= '' then TL.filter = '' else ctx.set_focus('tracker') end
+    elseif c == 27 then
+      if TL.filter ~= '' then TL.filter = ''
+      elseif next(TL.marks) then TL.marks = {}
+      else ctx.set_focus('tracker') end
     else return false end
     return true
   end,

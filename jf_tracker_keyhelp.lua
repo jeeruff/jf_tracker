@@ -378,6 +378,26 @@ KH.PAGES = {
     { k = 'zz', d = 'the slices list on the whole window, again - back', t = { 'z' } },
     { k = 'Esc', d = 'back to the tracker' },
   } },
+  tracks = { title = 'tracks: a track manager like the lf file manager', e = {
+    { k = 'j k  g G', d = 'track down / up, first / last' },
+    { k = 'h l', d = 'h - collapse the folder / to its parent folder; l - open the folder / into it, on a track - go to it in the tracker (Enter too)' },
+    { k = 'Space  v  u', d = 'mark the track (and down) / invert the marks / clear them; the commands below work on the marked tracks, else on the cursor' },
+    { k = 'T M S R', d = 'shown in the tracker / mute / solo / record arm' },
+    { k = 'dd  yy  p P', d = 'cut / copy the track with its children; paste after / before the cursor (at its level)' },
+    { k = '>>  <<', d = 'into the folder above (the track above becomes one) / out of the folder' },
+    { k = 'J K', d = 'move down / up among the tracks of the same folder (a folder moves whole)' },
+    { k = 'o O  F', d = 'new track after / before; F - a new folder around the marked tracks' },
+    { k = 'r  z  /', d = 'rename; fold the folder; filter by name (Esc clears)' },
+    { k = 'Esc', d = 'clear the filter, then the marks, then back to the tracker' },
+  } },
+  looploom = { title = 'looploom: the sustain loop of the instrument (points and candidates are on the item wave)', e = {
+    { k = 'j k  h l', d = 'row; value less / more (Shift - fine)' },
+    { k = 'Enter', d = 'the list (loop mode, curve) or the action of the row' },
+    { k = 'R', d = 'reset the row / find the points again' },
+    { k = 'n N', d = 'next / previous candidate (spectrally similar pairs, brackets on the item wave)' },
+    { k = 's', d = 'save this loop as a variant - a row Ln in the slices, its own instrument' },
+    { k = '+ -', d = 'seam view zoom (also the wheel)' },
+  } },
   sprops = { title = 'properties of the item / slice', e = {
     { k = 'J K', d = 'property row down / up' },
     { k = 'H L', d = 'value less / more (Shift - fine)' },
@@ -564,7 +584,7 @@ KH.BARS = {
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
   looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { 's', 'save variant' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
-  tracks = { { 'j k', 'track' }, { 'h l', 'column' }, { 'Space', 'toggle' }, { 'a', 'column all' }, { 'Enter', 'go' }, { 'z', 'fold' }, { '/', 'filter' }, { 'Esc', 'tracker' } },   -- 11 окт: Track Manager
+  tracks = { { 'h l', 'folders' }, { 'Space', 'mark' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },

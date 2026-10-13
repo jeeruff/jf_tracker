@@ -102,6 +102,9 @@ local function take(list, ids)
   return rest, blocks
 end
 
+-- без блоков ids → новый список, вынутые блоки ({ d0, items = { id, d от 0 } })
+function T.remove(list, ids) return take(list, T.roots(list, ids)) end
+
 -- >> : блоки ids — в предыдущего брата (он становится папкой, блок — его последним ребёнком)
 function T.indent(list, ids)
   local out = copy(list)

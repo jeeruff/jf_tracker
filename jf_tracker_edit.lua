@@ -2959,6 +2959,111 @@ function E.loop_variant(root, lp, n, name)
   return new
 end
 
+-- ── дерево треков (13 окт, модуль tracks как lf; jf_tracker_tracks.lua) ─────
+E.TT = dofile(DIR .. '/jf_tracker_tracks.lua')
+-- проект → { { id = GUID, d = глубина } }, GUID → трек
+function E.tree_read()
+  local fd, list, map = {}, {}, {}
+  for i = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, i)
+    local g = R.GetTrackGUID(tr)
+    fd[#fd + 1] = R.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH')
+    list[#list + 1] = { id = g }; map[g] = tr
+  end
+  local ds = E.TT.depths(fd)
+  for i, e in ipairs(list) do e.d = ds[i] end
+  return list, map
+end
+-- список → проект: порядок (ReorderSelectedTracks по одному), потом папки (I_FOLDERDEPTH);
+-- выделение треков REAPER возвращается. Звать внутри run
+function E.tree_apply(list, map)
+  local sel = {}
+  for i = 0, R.CountSelectedTracks(0) - 1 do sel[#sel + 1] = R.GetSelectedTrack(0, i) end
+  for k, e in ipairs(list) do
+    local tr = map[e.id]
+    if tr and R.ValidatePtr(tr, 'MediaTrack*') and math.floor(R.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')) - 1 ~= k - 1 then
+      R.SetOnlyTrackSelected(tr)
+      R.ReorderSelectedTracks(k - 1, 0)
+    end
+  end
+  local fd = E.TT.folderdepths(list)
+  for k, e in ipairs(list) do
+    local tr = map[e.id]
+    if tr and R.ValidatePtr(tr, 'MediaTrack*') then R.SetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH', fd[k]) end
+  end
+  for i = R.CountSelectedTracks(0) - 1, 0, -1 do R.SetTrackSelected(R.GetSelectedTrack(0, i), false) end
+  for _, tr in ipairs(sel) do if R.ValidatePtr(tr, 'MediaTrack*') then R.SetTrackSelected(tr, true) end end
+  R.TrackList_AdjustWindows(false)
+end
+-- выделить в REAPER треки блоков ids (дерево list), → число треков
+local function tree_select(list, map, ids)
+  for i = R.CountSelectedTracks(0) - 1, 0, -1 do R.SetTrackSelected(R.GetSelectedTrack(0, i), false) end
+  local n = 0
+  for _, id in ipairs(E.TT.roots(list, ids)) do
+    for k, e in ipairs(list) do
+      if e.id == id then
+        local a, b = E.TT.block(list, k)
+        for q = a, b do local tr = map[list[q].id]; if tr then R.SetTrackSelected(tr, true); n = n + 1 end end
+      end
+    end
+  end
+  return n
+end
+-- операции дерева: what = indent | outdent | down | up | new_after | new_before | folder | cut | copy | paste_after | paste_before;
+-- ids — GUID отмеченных (или курсора), at — GUID курсора. → сообщение, GUID, за которым идти
+E.tree_clip = nil                                        -- что лежит в буфере REAPER от cut / copy: { блоки }
+function E.tree_op(what, ids, at)
+  local msg, follow = '', at
+  run('tracks: ' .. what, function()
+    local list, map = E.tree_read()
+    local TT = E.TT
+    if what == 'indent' or what == 'outdent' then
+      local out, n = TT[what](list, ids)
+      E.tree_apply(out, map); msg = n > 0 and (('%d track(s) %s'):format(n, what == 'indent' and 'into the folder above' or 'out of the folder')) or (what == 'indent' and 'no track above at this level to become the folder' or 'not in a folder')
+    elseif what == 'down' or what == 'up' then
+      local out, n = TT.move(list, ids, what == 'down' and 1 or -1)
+      E.tree_apply(out, map); msg = n > 0 and ('moved ' .. what) or ('nothing to swap with ' .. (what == 'down' and 'below' or 'above') .. ' in this folder')
+    elseif what == 'new_after' or what == 'new_before' or what == 'folder' then
+      R.InsertTrackAtIndex(R.CountTracks(0), true)
+      local tr = R.GetTrack(0, R.CountTracks(0) - 1)
+      local g = R.GetTrackGUID(tr); map[g] = tr
+      local out
+      if what == 'folder' then out = TT.wrap(list, ids, g); R.GetSetMediaTrackInfo_String(tr, 'P_NAME', 'folder', true)
+      else out = TT.insert(list, { { id = g, d = 0 } }, at, what == 'new_after') end
+      E.tree_apply(out, map); follow = g
+      msg = what == 'folder' and 'new folder around the marked tracks (r renames it)' or 'new track (r renames it)'
+    elseif what == 'cut' or what == 'copy' then
+      local n = tree_select(list, map, ids)
+      if n == 0 then msg = 'nothing to ' .. what; return end
+      local _, blocks = TT.remove(list, ids)
+      E.tree_clip = blocks
+      if what == 'cut' then
+        local rest = TT.remove(list, ids)
+        R.Main_OnCommand(40337, 0)                     -- Track: Cut tracks (в буфер REAPER)
+        local _, map2 = E.tree_read()
+        E.tree_apply(rest, map2)
+      else R.Main_OnCommand(40210, 0) end              -- Track: Copy tracks
+      msg = ('%d track(s) %s - p / P puts them after / before the cursor'):format(n, what == 'cut' and 'cut' or 'copied')
+    elseif what == 'paste_after' or what == 'paste_before' then
+      local have = {}
+      for _, e in ipairs(list) do have[e.id] = true end
+      local i = 0; for k, e in ipairs(list) do if e.id == at then i = k end end
+      if i > 0 then local _, j = TT.block(list, i); R.SetOnlyTrackSelected(map[list[j].id]) end
+      R.Main_OnCommand(40058, 0)                       -- Item: Paste items/tracks
+      local post, map2 = E.tree_read()
+      local items, nn = {}, 0
+      local rel = {}
+      for _, b in ipairs(E.tree_clip or {}) do for _, e in ipairs(b.items) do rel[#rel + 1] = e.d end end
+      for _, e in ipairs(post) do if not have[e.id] then nn = nn + 1; items[#items + 1] = { id = e.id, d = rel[nn] or 0 } end end
+      if #items == 0 then msg = 'nothing to paste (dd / yy first)'; return end
+      local out = TT.insert(list, items, i > 0 and at or nil, what == 'paste_after')
+      E.tree_apply(out, map2); follow = items[1].id
+      msg = ('%d track(s) pasted'):format(#items)
+    end
+  end)
+  return msg, follow
+end
+
 -- место под новый инструмент: трек LIB, свободный лейн (первый пустой или
 -- новый в конце); возвращает трек, номер лейна, позицию 0
 function E.lib_slot()

@@ -1232,6 +1232,9 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local cols = snap and snap.cols or {}
   local list = D.tl_rows(state, snap)
   TL.n = #list
+  if TL.follow then                                      -- 13 окт: после правки дерева — курсор на тот же трек
+    for li, ci in ipairs(list) do if cols[ci] and cols[ci].guid == TL.follow then TL.cur = li; TL.follow = nil; break end end
+  end
   TL.cur = math.max(1, math.min(TL.cur, math.max(1, #list)))
   TL.col = math.max(1, math.min(TL.col, #D.TL_COLS))
   -- ширина столбцов матрицы; не влезает с именем (меньше 6 знаков) — столбцы справа отпадают
@@ -1280,6 +1283,7 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
     local hot = inside and my >= ry and my < ry + L.rh
     if on or hot or kc then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
     if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end
+    if TL.marks and TL.marks[col.guid] then set(U.tint(U.CYAN, 0.3)); gfx.rect(x + 2, ry, w - 2, L.rh, 1); set(U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end   -- 13 окт: отмечен (Space)
     local ix = x + L.pad + (TL.filter ~= '' and 0 or (col.depth or 0) * math.floor(L.cw / 2))
     if col.rgb then rawset_col(col.rgb); gfx.rect(ix, ry + 2, 3, L.rh - 4, 1) end
     ix = ix + 5
