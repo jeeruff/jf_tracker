@@ -44,6 +44,7 @@ KH.PAGES = {
     { k = 'Opt+Shift+J K', d = 'NORMAL: the note under the cursor: its end a row later / earlier (not stretched; past the sample the instrument loop plays)' },
     { k = 'Shift+Opt+Cmd+J K', d = 'NORMAL: slip: the sound inside the note under the cursor a row down / up (the note stays; looped - wraps)' },
     { k = 'Opt+Shift+H L', d = 'NORMAL: the note under the cursor: its start a row earlier / later (the source offset follows, as trim)' },
+    { k = 'Ctrl+Enter', d = 'the note under the cursor: all its properties in a box (only this note): j k row, h l value, Enter list, R reset, Esc close' },
     { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
     { k = 'keys: renoise', d = 'option: two octaves at once - z s x d c v g b h n j m , l . ; / the cursor octave, q 2 w 3 e ... an octave higher; then in INSERT the octave is [ ], moving - the arrows' },

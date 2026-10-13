@@ -380,7 +380,7 @@ do
   eq('slice note shows its pitch C-4', head and head.note, 'C-4')
   local hasS, hasT = nil, false
   for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 2) == '0S' then hasS = f elseif f:sub(1, 2) == 'SB' then hasT = true end end
-  eq('slice number as 0S02', hasS, '0S02'); eq('no SB on a slice note', hasT, false)
+  eq('13 окт: slice number in its own field, no 0S command', hasS == nil and head.slice == 2, true); eq('no SB on a slice note', hasT, false)
 end
 -- обратная карта stretch-маркеров (5 окт): шов лупа по маркерам
 do

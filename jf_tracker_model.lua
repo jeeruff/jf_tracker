@@ -195,7 +195,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local _, slk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
   slk = tonumber(slk)
   -- слайс (4 окт, вечер): номер — командой Sxx (hex, как в Renoise); нота — высота
-  if slk then offs = 0; fx[#fx + 1] = '0S' .. M.hex2(slk) end
+  -- 13 окт: номер слайса — своё поле ячейки (Sxx); командой 0S не дублируется
+  if slk then offs = 0 end
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
@@ -212,13 +213,13 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   if fo > 0.02 then fx[#fx + 1] = 'SO' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
   -- loop source в REAPER включён по умолчанию — показываем только ВЫКЛЮЧЕННЫЙ
   -- 13 окт: голова ноты с лупом удержания — B_LOOPSRC снят нарочно (P_EXT:jf_sushead), не показываем
-  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_sushead', '', false)) == '' then fx[#fx + 1] = 'SL00' end
+  if not slk and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'SL00' end   -- 13 окт: у слайса луп выкл — норма, не показывать
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
   if cm and cm ~= 0 then fx[#fx + 1] = 'SM' .. M.hex2(math.floor(cm)) end
   -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
   -- ячейка — нота и номер инструмента, а у каждого слайса свой номер в пуле
   if not slk and ppitch and rate and math.abs(rate - 1) > 1e-9 then fx[#fx + 1] = 'SB' .. M.hex2((qn1 - qn0) * lpb) end
-  if pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.005 then fx[#fx + 1] = 'SF' .. M.hex2(128 + (pitch - math.floor(pitch + 0.5)) * 100) end
+  if not slk and pitch and math.abs(pitch - math.floor(pitch + 0.5)) > 0.005 then fx[#fx + 1] = 'SF' .. M.hex2(128 + (pitch - math.floor(pitch + 0.5)) * 100) end
   -- команды-огибающие и генераторы (P_EXT:jf_cmds) — как записаны
   -- 12 окт: токен со смещением (0U08@0.75, четверти от начала ноты) — команда своей строки: rowfx[строка от головы]
   local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)

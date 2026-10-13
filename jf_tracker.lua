@@ -9751,7 +9751,7 @@ ctx = {
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
     fr = math.max(0, math.min(1, fr))
-    local items = ctx.inst_group(e)
+    local items = e.note_scope and { e.item } or ctx.inst_group(e)   -- 13 окт: уровень note
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
     if k == 'vol' or k == 'tvol' then
@@ -9794,7 +9794,7 @@ ctx = {
   sp_menu = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return false end
-    local items = ctx.inst_group(e)
+    local items = e.note_scope and { e.item } or ctx.inst_group(e)
     local function P(key, v, desc) edit.inst_prop(items, it, key, v, 'abs', desc); model.invalidate() end
     local list, title = {}, k
     local KEYS = '123456789abcdefghijklmnopqrstuvwxyz'
@@ -9828,7 +9828,7 @@ ctx = {
   sp_reset = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
-    local items = ctx.inst_group(e)
+    local items = e.note_scope and { e.item } or ctx.inst_group(e)
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     if k == 'vol' then P('D_VOL', 1, 'mul', 'sample volume reset')
     elseif k == 'pan' then P('take:D_PAN', 0, 'add', 'sample pan reset')
@@ -12051,6 +12051,70 @@ end
 SPROP.init(U, ctx)
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 draw.tl_insts = ctx.track_insts                           -- 13 окт: плагины-инструменты в дереве
+-- 13 окт: свойства одной ноты (Ctrl+Enter на ноте) — выпадашка у курсора: строки properties
+-- уровня note (правка только этой ноты); j k строка, h l значение (Shift — мелко), Enter — список /
+-- действие, R сброс, Esc закрыть. Ячейка трекера остаётся чистой — детали тут
+ctx.NP = nil
+ctx.np_open = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  local cell = f and f.sub and f.sub[vim.cur.row]
+  if cell and cell.kind == 'cont' then cell = cell.of end
+  if not (cell and cell.kind == 'audio' and cell.item and reaper.ValidatePtr(cell.item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
+  ctx.NP = { item = cell.item, sel = (ctx.NP and ctx.NP.sel) or 1, at = ctx.cursor_anchor() }
+end
+ctx.np_entry = function()
+  local NP = ctx.NP
+  if not (NP and reaper.ValidatePtr(NP.item, 'MediaItem*')) then ctx.NP = nil; return nil end
+  local key = tostring(NP.item) .. ':' .. reaper.GetProjectStateChangeCount(0)
+  if NP.key ~= key then NP.key = key; NP.e = model.entry_of(NP.item); if NP.e then NP.e.note_scope = true end end
+  return NP.e
+end
+ctx.np_key = function(c)
+  local NP = ctx.NP
+  local e = ctx.np_entry()
+  if not e then return end
+  local R2 = SPROP.ROWS
+  local ch = c < 256 and string.char(c) or ''
+  local r = R2[NP.sel]
+  if c == 27 or (c == 13 and ctx.mods().ctrl) then ctx.NP = nil
+  elseif ch == 'j' or c == keys.down then NP.sel = math.min(#R2, NP.sel + 1)
+  elseif ch == 'k' or c == keys.up then NP.sel = math.max(1, NP.sel - 1)
+  elseif ch == 'g' then NP.sel = 1 elseif ch == 'G' then NP.sel = #R2
+  elseif ch == 'h' or ch == 'H' or c == keys.left then ctx.sp_adjust(e, r.k, -1); NP.key = nil
+  elseif ch == 'l' or ch == 'L' or c == keys.right then ctx.sp_adjust(e, r.k, 1); NP.key = nil
+  elseif c == 13 then if not ctx.sp_menu(e, r.k) then ctx.sp_adjust(e, r.k, 1) end; NP.key = nil
+  elseif ch == 'R' then ctx.sp_reset(e, r.k); NP.key = nil
+  end
+  model.invalidate()
+end
+ctx.np_draw = function()
+  local NP = ctx.NP
+  local e = NP and ctx.np_entry()
+  if not e then return end
+  local R2 = SPROP.ROWS
+  local lw, vw = 0, U.measure('W') * 18
+  for _, r in ipairs(R2) do lw = math.max(lw, U.measure(r.label)) end
+  lw = lw + 2 * L.pad
+  local w = lw + vw + 2 * L.pad
+  local h = (#R2 + 1) * L.rh + 2 * L.pad
+  local x = math.max(2, math.min(gfx.w - w - 2, (NP.at and NP.at.x) or 40))
+  local y = (NP.at and NP.at.y) or 40
+  if y + h > gfx.h - 2 then y = math.max(2, y - h - L.rh) end
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  U.set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
+  U.text(x + L.pad, y + L.pad, ctx.fit('note: ' .. (e.name or ''), w - 2 * L.pad), U.AMBER)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  for i, r in ipairs(R2) do
+    local ry = y + L.pad + i * L.rh
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if i == NP.sel or hot then U.set(U.tint(U.AMBER, i == NP.sel and 0.3 or 0.15)); gfx.rect(x + 2, ry, w - 4, L.rh, 1) end
+    U.text(x + L.pad, ry, r.label, (i == NP.sel) and U.AMBER or U.GREY)
+    U.text(x + lw, ry, ctx.fit(SPROP.value(e, r.k) or '', vw), U.TEXT)
+    if hot and U.click then NP.sel = i; U.click = false end
+    if hot and gfx.mouse_wheel ~= 0 then ctx.sp_adjust(e, r.k, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0; NP.key = nil end
+  end
+  if (U.click or U.rclick) and not (mx >= x and mx < x + w and my >= y and my < y + h) then ctx.NP = nil end
+end
 -- 13 окт: clipboard — история yank (панель clipboard, клавиша y в PANE)
 ctx.CB = { hist = {}, sel = 1 }
 ctx.clip_label = function(r)
@@ -15828,6 +15892,7 @@ local function frame()
     end
   elseif not pop then ctx.pop_seen, ctx.pop_xy = nil, nil end
   draw.popup(L, pop, anchor)
+  if ctx.NP then ctx.np_draw() end   -- 13 окт: свойства ноты
   -- 10 окт: «Automation envelope (in the tracker)» — курсор на колонку огибающей, когда она появилась
   if ctx.env_jump and L and L.flat then
     for i, f in ipairs(L.flat) do
@@ -18814,7 +18879,10 @@ local function frame()
   end
   ctx.ctrlj_t = reaper.time_precise()
   -- 13 окт: Ctrl+M — метроном вкл / выкл из любого модуля (как в FL Studio; меню настроек — gm)
-  if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not ctx.mods().shift and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+  -- Ctrl+M и Ctrl+Enter дают один код 13 — метроном, только если физически нажата M (иначе Ctrl+Enter — свойства ноты)
+  local mdown = false
+  if c == 13 and reaper.JS_VKeys_GetState then local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5); mdown = ks and ks:byte(77) ~= 0 end
+  if c == 13 and mdown and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not ctx.mods().shift and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     reaper.Main_OnCommand(40364, 0)
     vim.msg = 'metronome ' .. (reaper.GetToggleCommandState(40364) == 1 and 'on' or 'off') .. '  (Ctrl+M; gm - its menu)'
     c = 0
@@ -18828,6 +18896,9 @@ local function frame()
   end
   -- 12 окт: Enter без модификаторов — смарт-панель в любом режиме (дубль Ctrl+Enter убран); кроме конца
   -- набора числа и входа в INSERT при Esc mode = vim (NORMAL с клавиатурой)
+  -- 13 окт: свойства ноты — Ctrl+Enter на ноте, пока открыта — клавиши её
+  if ctx.NP and c > 0 and not vim.picker and not vim.hydra then ctx.np_key(c); c = 0 end
+  if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then ctx.np_open(); c = 0 end
   do
     local m = ctx.mods()
     if c == 13 and not (m.ctrl or m.cmd or m.alt or m.shift) and state.focus == 'tracker' and not vim.picker and not vim.hydra

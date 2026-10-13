@@ -2212,7 +2212,7 @@ function V.key_impl(c)
         if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range() end
         local heads = V.heads_in(f0, f1, r0, r1)
         local slc, rest = {}, {}
-        for _, h in ipairs(heads) do if h.kind == 'audio' and (h.fx or {})[1] and tostring(h.fx[1]):match('^0S%x%x$') then slc[#slc + 1] = h else rest[#rest + 1] = h end end
+        for _, h in ipairs(heads) do if h.kind == 'audio' and h.slice then slc[#slc + 1] = h else rest[#rest + 1] = h end end
         if #slc > 0 and rhow ~= 'whole' then
           if rhow == 'beside' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
           elseif pitch - V.slice_base() + 1 < 1 then V.msg = 'q is the whole sample - a slice note keeps its slice (; inserts the whole sample)'
