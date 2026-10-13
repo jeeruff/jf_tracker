@@ -9286,6 +9286,25 @@ ctx = {
     model.invalidate()
     vim.msg = m == 'whole' and 'loop: whole sample - the file repeats' or 'loop off'
   end,
+  -- 13 окт: вариант лупа — копия инструмента со своими точками, в slices строкой Ln (looploom: s)
+  loop_save_variant = function(e)
+    local lp = e and ctx.sus_get(e)
+    if not (lp and lp.on) then vim.msg = 'looploom: the loop is not sustain - nothing to save'; return end
+    local root = (e.lvar and e.parent) or e
+    local col = cur_col()
+    local n = 0
+    for _, c in ipairs(col and col.pool or {}) do if c.parent == root and c.lvar_n and c.lvar_n > n then n = c.lvar_n end end
+    n = n + 1
+    local it = edit.loop_variant(root.item, lp, n, (root.name or 'loop') .. ' L' .. n)
+    model.invalidate()
+    vim.msg = it and ('looploom: variant L%d saved to the slices (%.3f - %.3f s) - click it there to play / edit'):format(n, lp.ls, lp.le) or 'looploom: could not save'
+  end,
+  loop_variant_pick = function(root, n)
+    local col = cur_col()
+    for i, c in ipairs(col and col.pool or {}) do
+      if c.parent == root and c.lvar_n == n then pool_select(i); ctx.inst_listen(); vim.msg = ('loop variant L%d: %s'):format(n, c.name or ''); return end
+    end
+  end,
   -- 13 окт: для модуля looploom (jf_tracker_looploom.lua)
   SU = function() return edit.SU end,
   file_exists = function(p) return reaper.file_exists(p) end,
@@ -9312,7 +9331,7 @@ ctx = {
     if le - ls < 16 then ctx.sus_bake_no[e.item] = true; return end
     local X0 = math.floor((lp.xf or 0) * w.sr + 0.5)
     -- 13 окт: рядом с исходником, имя + _loop (без своей папки); точки другие — тот же файл переписывается
-    local out = path:gsub('%.[Ww][Aa][Vv]$', '') .. '_loop.wav'
+    local out = path:gsub('%.[Ww][Aa][Vv]$', '') .. '_loop' .. (e.lvar_n and tostring(e.lvar_n) or '') .. '.wav'   -- вариант лупа n — свой файл
     -- выравнивание громкости спада, кривая кроссфейда, конец — к лучшей фазе (13 окт)
     local chs, X, le2 = SU.bake(w.ch, ls, le, X0, w.sr, { curve = lp.curve, flat = lp.flat })
     if le2 and le2 ~= le then lp.le = le2 / w.sr end
@@ -9447,6 +9466,7 @@ ctx = {
       vim.msg = k == 'susc' and ('loop x-fade curve: ' .. edit.SU.CURVES_BY[lp.curve]) or ('loop level: ' .. (lp.flat and 'flat - the decay is evened out to the level at the loop start' or 'natural - as in the file'))
       model.invalidate()
     elseif k == 'susr' then ctx.sus_adjust(e, 'sus', 0, items, false, true)
+    elseif k == 'susv' then ctx.loop_save_variant(e)
     elseif k == 'swing' then
       local on = not edit.item_swing(it)
       edit.run('instrument swing', function() for _, x in ipairs(items) do edit.set_item_swing(x, on) end end)
@@ -9487,6 +9507,11 @@ ctx = {
     if k == 'susc' then local lp = ctx.sus_get(e); return lp and edit.SU.CURVES_BY[lp.curve or 'auto'] or '-' end
     if k == 'susl' then local lp = ctx.sus_get(e); return lp and (lp.flat ~= false and 'flat' or 'natural') or '-' end
     if k == 'susr' then return 'R / click - find the points again' end
+    if k == 'susv' then
+      local root, n = (e.lvar and e.parent) or e, 0
+      for _, c in ipairs(cur_col() and cur_col().pool or {}) do if c.parent == root and c.lvar_n then n = n + 1 end end
+      return ('s / click - save to the slices (%d saved)'):format(n)
+    end
     if k == 'sus' or k == 'susa' or k == 'susb' or k == 'susx' then
       local lp = ctx.sus_get(e)
       if k == 'sus' then return lp and lp.on and ('on %.3f - %.3f s'):format(lp.ls, lp.le) or 'off' end
@@ -12412,7 +12437,7 @@ function ctx.context_items(hover)
     radio('full', 'full - to the end of the item (Esc stops)')
     radio('hold', 'hold - while the mouse button is held on the row')
     radio('sec', 'first second')
-  elseif type(hover.slices) == 'number' and not state.midi_inst and not state.auto_inst then
+  elseif type(hover.slices) == 'number' and hover.slices >= 0 and not state.midi_inst and not state.auto_inst then
     -- 10 окт: своё меню списка слайсов (те же действия, что клавиши модуля)
     local root = ctx.slice_root()
     local k = hover.slices
@@ -15300,6 +15325,7 @@ local function frame()
         return nil
       end
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
+      do local ce = col and (col.pool or {})[vim.inst]; if ce and ce.lvar_n and ce.parent == root then k = -ce.lvar_n end end   -- 13 окт: выбран вариант лупа
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
       for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
@@ -15307,6 +15333,14 @@ local function frame()
       for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
         rows[#rows + 1] = { k = kk, t0 = t0, len = (root.slices[kk + 1] or root.len or t0) - t0, key = key_of[kk], has = child ~= nil, fx = child and ctx.inst_has_fx(child), name = child and child.name ~= root.name and child.name or nil }
+      end
+      -- 13 окт: варианты лупа (looploom: s) — строками L1, L2 … под слайсами; щелчок — этот инструмент
+      for _, c in ipairs(col and col.pool or {}) do
+        if c.parent == root and c.lvar_n then
+          local lp = ctx.sus_get(c)
+          rows[#rows + 1] = { k = -c.lvar_n, tag = 'L' .. c.lvar_n, t0 = 0, len = c.len or 0, has = true,
+            name = lp and ('loop %.2f-%.2f'):format(lp.ls, lp.le) or c.name }
+        end
       end
       local hv = SPROP.draw_slices(Lx, x, y, w - 5, h, rows, k, root)
       local nvis = SPROP.slice_nvis or math.max(1, math.floor((h - Lx.rh) / Lx.rh))
@@ -16863,6 +16897,7 @@ local function frame()
         vim.msg = a and ('automation %s: a note key inserts it, double click edits it'):format(a.label) or ''
         if dbl and same and a then ctx.ai_edit_open(a) end
         click = { t = now2, zone = 'slicelist', row = hover.slices }; goto ai_click_done
+      elseif root and hover.slices < 0 then ctx.loop_variant_pick(root, -hover.slices)   -- 13 окт: вариант лупа
       elseif root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(hover.slices) end
       click = { t = now2, zone = 'slicelist' }
       ::ai_click_done::

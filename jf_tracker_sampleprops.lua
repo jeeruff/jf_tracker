@@ -270,7 +270,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
     local kx = x + L.pad
     U.text(kx, ry, r.key or ' ', on and U.AMBER or U.GREY)
     local sx = kx + U.measure('W') + L.pad
-    local sxx = ('S%02X'):format(r.k)
+    local sxx = r.tag or ('S%02X'):format(r.k)   -- 13 окт: вариант лупа — L1, L2 …
     U.text(sx, ry, sxx, on and U.AMBER or U.CYAN)
     local nx = sx + U.measure('S00') + L.pad
     local nm = (r.name and r.name ~= '' and r.name ~= sxx) and r.name or (r.k == 0 and 'whole' or '')

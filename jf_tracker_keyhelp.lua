@@ -563,7 +563,7 @@ KH.BARS = {
   session = { { 'Tab', 'clip mode' }, { 'click >', 'launch' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
-  looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
+  looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { 's', 'save variant' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
   tracks = { { 'j k', 'track' }, { 'h l', 'column' }, { 'Space', 'toggle' }, { 'a', 'column all' }, { 'Enter', 'go' }, { 'z', 'fold' }, { '/', 'filter' }, { 'Esc', 'tracker' } },   -- 11 окт: Track Manager
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },

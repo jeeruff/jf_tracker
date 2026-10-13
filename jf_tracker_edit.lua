@@ -2934,6 +2934,31 @@ function E.lib_track(create)
   R.TrackList_AdjustWindows(false)
   return tr
 end
+-- 13 окт: вариант лупа удержания (looploom): копия инструмента root в LIB, свой iid (отдельный
+-- инструмент), P_EXT:jf_lvar = «GUID корня|n», своё имя и метка лупа lp. → новый item
+function E.loop_variant(root, lp, n, name)
+  local new
+  run('loop variant', function()
+    local ok, chunk = R.GetItemStateChunk(root, '', false)
+    if not ok then return end
+    chunk = chunk:gsub('\n%s*IGUID [^\n]*', ''):gsub('\n%s*GUID [^\n]*', '')   -- REAPER выдаст свои
+    local tr, lane = E.lib_slot()
+    new = insert_chunk(tr, lane, 0, chunk)
+    E.make_unique(new)
+    local g = R.BR_GetMediaItemGUID and R.BR_GetMediaItemGUID(root) or ''
+    R.GetSetMediaItemInfo_String(new, 'P_EXT:jf_lvar', g .. '|' .. n, true)
+    R.GetSetMediaItemInfo_String(new, 'P_EXT:jf_ord', '', true)
+    local tk = R.GetActiveTake(new)
+    if tk then R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', name, true) end
+    local c = {}; for k, v in pairs(lp) do c[k] = v end
+    c.file, c.boff = nil, nil                                   -- запечётся своим файлом (<имя>_loop<n>.wav)
+    R.GetSetMediaItemInfo_String(new, 'P_EXT:jf_loop', E.SU.tag(c), true)
+    R.SetProjExtState(0, 'jf_tracker', 'sus', '1')
+    E.lib_mark(new, nil, lane)
+  end)
+  return new
+end
+
 -- место под новый инструмент: трек LIB, свободный лейн (первый пустой или
 -- новый в конце); возвращает трек, номер лейна, позицию 0
 function E.lib_slot()

@@ -12,10 +12,10 @@ local U, ctx
 LL.ROWS = {
   { k = 'loopm', label = 'loop' }, { k = 'susa', label = 'start' }, { k = 'susb', label = 'end' },
   { k = 'susx', label = 'x-fade' }, { k = 'susc', label = 'curve' }, { k = 'susl', label = 'level' },
-  { k = 'susr', label = 'find' },
+  { k = 'susr', label = 'find' }, { k = 'susv', label = 'save' },
 }
 local MENU = { loopm = true, susc = true }
-local ACT = { susl = true, susr = true }
+local ACT = { susl = true, susr = true, susv = true }
 local TIP = {
   loopm = 'loop mode: off / whole sample / sustain - Enter or click: the list',
   susa = 'loop start - h l, drag the green line or the slider; R finds the points again',
@@ -24,6 +24,7 @@ local TIP = {
   susc = 'crossfade curve: auto / linear / equal power / s-curve - Enter: the list',
   susl = 'level: flat - the decay inside the loop is evened out to the level at the start; natural - as in the file',
   susr = 'find the points again (spectrum + seam phase); n N - next / previous candidate',
+  susv = 'save this loop as a variant: a new instrument row Ln in the slices (same sample, its own points)',
 }
 
 function LL.init(u, c) U, ctx = u, c end
@@ -199,6 +200,7 @@ function LL.key(c, e)
     if #cs == 0 then ctx.msg('looploom: no candidates'); return true end
     LL.ci = ((LL.ci or 0) + (ch == 'n' and 1 or -1) - 1) % #cs + 1
     apply(e, cs[LL.ci])
+  elseif ch == 's' then if e then ctx.sp_adjust(e, 'susv', 1) end
   elseif ch == '+' or ch == '=' then LL.seam_ms = math.max(2, math.floor(LL.seam_ms * 0.8 + 0.5))
   elseif ch == '-' then LL.seam_ms = math.min(500, math.floor(LL.seam_ms * 1.25 + 0.5))
   else return false end

@@ -608,7 +608,7 @@ function M.build(lpb)
     local best, blen
     local e0, e1 = e.offs, e.offs + e.len * e.rate
     for _, p in ipairs(all) do
-      if p ~= e and p.fpath ~= '' and p.fpath == e.fpath then
+      if p ~= e and not p.lvar and p.fpath ~= '' and p.fpath == e.fpath then   -- вариант лупа — не родитель кусков
         local p0, p1 = p.offs, p.offs + p.len * p.rate
         if p0 <= e0 + 1e-4 and p1 >= e1 - 1e-4 and (p1 - p0) > (e1 - e0) + 1e-3 then
           local better = not best or ((p.slices ~= nil) and (best.slices == nil)) or (((p.slices ~= nil) == (best.slices ~= nil)) and (p1 - p0) > blen)
@@ -617,6 +617,10 @@ function M.build(lpb)
       end
     end
     e.parent = best
+    if e.lvar then                                          -- вариант лупа: родитель — его корень
+      e.parent = nil
+      for _, p in ipairs(all) do if p ~= e and p.guid == e.lvar then e.parent = p end end
+    end
   end
   for _, e in ipairs(all) do
     local p = e.parent
@@ -638,7 +642,7 @@ function M.build(lpb)
   end
   for _, list in pairs(kids) do
     table.sort(list, function(x, y)
-      local kx, ky = x.slice_k or 1e9, y.slice_k or 1e9
+      local kx, ky = x.slice_k or (x.lvar_n and 1e6 + x.lvar_n) or 1e9, y.slice_k or (y.lvar_n and 1e6 + y.lvar_n) or 1e9   -- варианты лупа — после слайсов
       if kx ~= ky then return kx < ky end
       if x.offs ~= y.offs then return x.offs < y.offs end
       return x._i < y._i
@@ -896,6 +900,12 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     fpath = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }
+  -- 13 окт: вариант лупа (looploom → slices): «GUID корня|номер» — ребёнок корня, не кусок по диапазону
+  do
+    local _, lv = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lvar', '', false)
+    local g, n = (lv or ''):match('^(.-)|(%d+)$')
+    if g and g ~= '' then pool[at].lvar, pool[at].lvar_n = g, tonumber(n) end
+  end
   -- мини-пиано-ролл MIDI-клипа в lib (9 окт): ноты долями длины item
   if pool[at].stype == 'midi' and R.MIDI_CountEvts then
     local _, nn = R.MIDI_CountEvts(take)

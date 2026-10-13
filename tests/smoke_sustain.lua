@@ -132,6 +132,40 @@ local ok, err = pcall(function()
   local want = math.min(P0 + 3, nx or math.huge)
   check('a sustained note lasts to the next note / the region end', math.abs(R.GetMediaItemInfo_Value(n2, 'D_POSITION') + R.GetMediaItemInfo_Value(n2, 'D_LENGTH') - want) < 1e-6,
     ('end %.3f want %.3f'):format(R.GetMediaItemInfo_Value(n2, 'D_POSITION') + R.GetMediaItemInfo_Value(n2, 'D_LENGTH'), want))
+  -- 9. 13 окт: вариант лупа — копия инструмента в LIB, ребёнок корня с номером, своя метка
+  local root
+  edit.run('lib inst', function()
+    local ltr, lane = edit.lib_slot()
+    root = R.AddMediaItemToTrack(ltr); local kr = R.AddTakeToMediaItem(root)
+    R.SetMediaItemTake_Source(kr, R.PCM_Source_CreateFromFile(PAD))
+    R.SetMediaItemInfo_Value(root, 'D_LENGTH', 3.5); R.SetMediaItemInfo_Value(root, 'I_FIXEDLANE', lane)
+    R.GetSetMediaItemTakeInfo_String(kr, 'P_NAME', 'VPAD', true)
+    edit.lib_mark(root, tr, lane)
+  end)
+  edit.sus_set({ root }, { on = true, ls = ls, le = le, xf = 0.02 })
+  local var = edit.loop_variant(root, { on = true, ls = ls + 0.05, le = le, xf = 0.02, curve = 's' }, 1, 'VPAD L1')
+  check('variant created', var ~= nil and R.ValidatePtr(var, 'MediaItem*'))
+  model.invalidate()
+  local snap2 = model.build(4)
+  local rootE, varE
+  for _, c in ipairs(snap2.cols) do for _, pe in ipairs(c.pool or {}) do
+    if pe.item == root then rootE = pe end
+    if pe.item == var then varE = pe end
+  end end
+  check('variant: its own instrument, a child of the root, number 1', varE and rootE and varE ~= rootE and varE.parent == rootE and varE.lvar_n == 1,
+    varE and ('parent %s n %s'):format(tostring(varE.parent and varE.parent.name), tostring(varE.lvar_n)) or 'no entry')
+  local vt = var and edit.SU.parse(edit.sus_ext(var, 'P_EXT:jf_loop'))
+  check('variant: its own loop tag (start, curve)', vt and math.abs(vt.ls - (ls + 0.05)) < 1e-6 and vt.curve == 's')
+  local rt = edit.SU.parse(edit.sus_ext(root, 'P_EXT:jf_loop'))
+  check('root keeps its loop', rt and math.abs(rt.ls - ls) < 1e-6)
+  edit.run('cleanup lib', function()
+    local ltr = R.GetMediaItem_Track(root)
+    for i = R.CountTrackMediaItems(ltr) - 1, 0, -1 do
+      local o = R.GetTrackMediaItem(ltr, i)
+      local g = edit.sus_ext(o, 'P_EXT:jf_susof')
+      if o == root or o == var or g ~= '' then R.DeleteTrackMediaItem(ltr, o) end
+    end
+  end)
   -- уборка
   edit.run('cleanup', function()
     for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
