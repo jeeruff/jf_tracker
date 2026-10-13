@@ -4883,9 +4883,11 @@ ctx = {
   slices_render = function(how)
     local root, col = ctx.slice_root()
     local sl = root and root.slices or {}
-    if not (root and col and root.item and #sl > 0) then vim.msg = 'convert: no slices on the selected instrument'; return end
+    -- 13 окт: не нарезан — в сэмплер целиком (один RS5K на весь сэмпл)
+    if not (root and col and root.item and (#sl > 0 or how == 'rs5k')) then vim.msg = 'convert: no slices on the selected instrument'; return end
     local spans = {}
     for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end
+    if #spans == 0 then spans[1] = { 0, root.len } end
     if how == 'lib' then
       local n = 0
       edit.run('convert slices to the lib', function()
