@@ -1313,7 +1313,19 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local inside = mx >= x and mx < x + w and my >= y and my < y + h
   -- строка 0: «tracks N» или фильтр, заголовки столбцов
   local ttl = (TL.typing or TL.filter ~= '') and ('/' .. TL.filter .. (TL.typing and '_' or '')) or ('tracks %d'):format(#cols)
-  text(x + L.pad, y, fit(ttl, gx - x - 2 * L.pad), (TL.typing or TL.filter ~= '') and U.CYAN or U.GREY)
+  -- 13 окт: кнопка zoom — слайсы строками с волной (+ - в модуле: x1..x3; щелчок: x1 / x2)
+  local zl = (TL.zoom or 1) > 1 and ('zoom x' .. TL.zoom) or 'zoom'
+  local zbw = ms(zl) + 2 * L.pad
+  local zbx = gx - zbw - L.pad
+  local zroom = zbx > x + L.pad + ms('tracks 99') + L.pad
+  if zroom then
+    local zh = inside and my >= y and my < y + L.rh and mx >= zbx and mx < zbx + zbw
+    set((TL.zoom or 1) > 1 and U.tint(U.AMBER, 0.3) or (zh and D.CURROW or U.BG)); gfx.rect(zbx, y, zbw, L.rh, 1)
+    set((zh or (TL.zoom or 1) > 1) and U.AMBER or U.LINE); gfx.rect(zbx, y, zbw, L.rh, 0)
+    text(zbx + L.pad, y, zl, (zh or (TL.zoom or 1) > 1) and U.AMBER or U.GREY)
+    if zh then hover.tlist_zoom = true end
+  end
+  text(x + L.pad, y, fit(ttl, (zroom and zbx or gx) - x - 2 * L.pad), (TL.typing or TL.filter ~= '') and U.CYAN or U.GREY)
   local cx = gx
   for i = 1, ncol do
     local c = D.TL_COLS[i]
@@ -1326,10 +1338,17 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   end
   local nvis = math.max(1, math.floor((h - L.rh) / L.rh))
   TL.nvis = nvis
+  -- 13 окт: высота строки — слайс с волной при зуме выше
+  local function rowh(r) return (r and r.k == 's' and (TL.zoom or 1) > 1) and L.rh * TL.zoom or L.rh end
+  local function fit_from(s0)
+    local hh, n = h - L.rh, 0
+    while list[s0 + n + 1] and hh - rowh(list[s0 + n + 1]) >= 0 do hh = hh - rowh(list[s0 + n + 1]); n = n + 1 end
+    return math.max(1, n)
+  end
   -- клавиатурный курсор — в видимых строках
   if foc then
     if TL.cur <= TL.scroll then TL.scroll = TL.cur - 1 end
-    if TL.cur > TL.scroll + nvis then TL.scroll = TL.cur - nvis end
+    while TL.cur > TL.scroll + fit_from(TL.scroll) do TL.scroll = TL.scroll + 1 end
   end
   TL.scroll = math.max(0, math.min(TL.scroll, math.max(0, #list - nvis)))
   D.tl_scroll = TL.scroll
@@ -1338,19 +1357,23 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local cg = cf and cf.col and cf.col.guid
   local get = info.tl_get
   local pool = (cols[1] and cols[1].pool) or {}
-  for i = 1, nvis do
-    local li = TL.scroll + i
+  local ry0, li = y + L.rh, TL.scroll
+  while true do
+    li = li + 1
     local rw = list[li]
     if not rw then break end
-    local ry = y + i * L.rh
+    local rhh = rowh(rw)
+    if ry0 + rhh > y + h then break end
+    local ry = ry0
+    ry0 = ry0 + rhh
     if rw.k ~= 't' then
       -- 13 окт: строка внутри трека: инструмент (номер, цвет, имя; + / - — его слайсы и варианты), automation, lib
-      local hot = inside and my >= ry and my < ry + L.rh
+      local hot = inside and my >= ry and my < ry + rhh
       local kc = foc and li == TL.cur
       local e = rw.i and pool[rw.i]
       local on = e and info.inst_cur and info.inst_cur() == rw.i
-      if on or hot or kc then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, L.rh, 1) end
-      if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, L.rh, 1) end
+      if on or hot or kc then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(x, ry, w, rhh, 1) end
+      if kc then set(D.FOCUS or U.CYAN); gfx.rect(x, ry, 2, rhh, 1) end
       local ix = x + L.pad + (rw.d or 0) * math.floor(L.cw / 2) + 5
       local lbl, colr
       if rw.k == 's' then
@@ -1362,7 +1385,9 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
         local son = ss and e and ss.item == e.item and ss.k == rw.sk
         lbl = ('%s  S%02X  %.2fs'):format(kl or ' ', rw.sk, math.max(0, t1 - t0))
         colr = son and U.AMBER or U.TEXT
-        if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1) end
+        if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, rhh, 1) end
+        -- зум: волна куска строкой ниже подписи (как было в модуле slices)
+        if rhh > L.rh and info.mini_wave and e then info.mini_wave(e, t0, t1, ix, ry + L.rh, x + w - ix - L.pad - 3, rhh - L.rh - 2, son and U.AMBER or U.mix(U.TEXT, U.BG, 0.3)) end
       elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('## midi clips  %d'):format(rw.n); colr = U.GREY
       elseif rw.k == 'mc' then lbl = '# ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
       elseif rw.k == 'i' or rw.k == 'c' then

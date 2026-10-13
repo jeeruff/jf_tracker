@@ -221,6 +221,7 @@ local function mini_wave(e, a, b, x, y, w, h, col)
   end
 end
 
+SP.mini_wave = mini_wave                                 -- 13 окт: и дерево tracks (слайсы с волной)
 function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   SP.slice_hover = nil
   local mx, my = gfx.mouse_x, gfx.mouse_y

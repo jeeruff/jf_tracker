@@ -4826,6 +4826,11 @@ ctx = {
     elseif ch == 'P' then if inst then ctx.tl_row_do(r); ctx.inst_put(true) else op('paste_before') end
     elseif ch == 'r' then if col then ctx.rename_track_prompt(col) elseif inst then ctx.tl_row_do(r); ctx.rename_inst_prompt() end
     elseif ch == 'z' then if col and col.folder then ctx.tlist_do(ci, 'fold') end
+    elseif ch == '+' or ch == '=' then TL.zoom = math.min(3, (TL.zoom or 1) + 1); vim.msg = 'tracks: slices zoom x' .. TL.zoom
+    elseif ch == '-' then TL.zoom = math.max(1, (TL.zoom or 1) - 1); vim.msg = 'tracks: slices zoom x' .. TL.zoom
+    elseif ch == 'c' then                          -- 13 окт: convert слайсов (как кнопка модуля slices): в lib / в RS5K
+      if r and (r.k == 'i' or r.k == 's') then ctx.tl_row_do({ k = 'i', ci = r.ci, i = r.i }); ctx.slices_render_menu()
+      else vim.msg = 'tracks: c - on a sliced instrument or a slice' end
     elseif ch == '/' then TL.typing = true; TL.filter = ''; TL.cur = 1
     elseif c == 27 then
       if TL.filter ~= '' then TL.filter = ''
@@ -15061,7 +15066,7 @@ local function frame()
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
-    slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end,
+    slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
@@ -16998,6 +17003,7 @@ local function frame()
       for i, c in ipairs(draw.TL_COLS) do if c.k == hover.tlist.key then draw.TL.col = i end end
       ctx.tl_paint = { key = hover.tlist.key, v = v, done = { [hover.tlist.ci] = true } }
       click = { t = now2, zone = 'tlist' }
+    elseif hover.tlist_zoom then draw.TL.zoom = (draw.TL.zoom or 1) > 1 and 1 or 2; click = { t = now2, zone = 'tlzoom' }   -- 13 окт: зум слайсов дерева
     elseif hover.tlist and hover.tlist.what == 'row' then   -- 13 окт: строка дерева (инструмент, automation, lib)
       draw.TL.cur = hover.tlist.li
       ctx.tl_row_do((draw.TL.rows or {})[hover.tlist.li], dbl)

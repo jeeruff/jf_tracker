@@ -385,6 +385,7 @@ KH.PAGES = {
     { k = 'Enter', d = 'track - go to it in the tracker; instrument - pick it (the cursor goes to its track); automation item - the automation instrument with this item' },
     { k = 'Space on an instrument', d = 'pick and listen' },
     { k = 'slices', d = 'inside a sliced instrument: key  Sxx  length - the key of the octave at the cursor plays the slice (C-4 = whole, shown at the instrument); Enter / l - select it and hear it. The slices module is hidden: :pane slices show brings it back' },
+    { k = '+ -  zoom  c', d = 'slices taller with their wave (x1..x3; the zoom button - x1 / x2); c on a sliced instrument or a slice - convert: every slice its own lib instrument / an RS5K per slice' },
     { k = '## midi clips', d = 'the MIDI clips of the track - Enter on a clip: the midi instrument with this clip, a note key inserts it' },
     { k = 'dd yy p P on an instrument', d = 'as in the lib: cut / yank the instrument, put a copy after / before' },
     { k = 'Space  v  u', d = 'mark the track (and down) / invert the marks / clear them; the commands below work on the marked tracks, else on the cursor' },
@@ -590,7 +591,7 @@ KH.BARS = {
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
   looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { 's', 'save variant' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
-  tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
+  tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { '?', 'help' } },
