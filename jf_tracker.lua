@@ -4937,6 +4937,7 @@ ctx = {
     local spans = {}
     if not whole then for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end end
     if #spans == 0 then spans[1] = { 0, root.len } end
+    if #spans == 1 then whole = true end   -- 13 окт: один кусок — по высоте на всей клавиатуре (одна нота C#4 молчала на остальных)
     if how == 'lib' then
       local n = 0
       edit.run('convert slices to the lib', function()
