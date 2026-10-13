@@ -384,6 +384,7 @@ end
 -- пресет ReaVisor (ExtState ISFVIZ/preset:<имя>, JSON) → сцена трекера
 function VZ.from_reavisor(ps)
   if type(ps) ~= 'table' then return nil end
+  if type(ps.jf) == 'table' and type(ps.jf.layers) == 'table' then return copy(ps.jf) end   -- 13 окт: сохранён трекером — снимок целиком
   local function conv(params, rows)
     local out = {}
     if type(params) ~= 'table' then return out end
@@ -427,6 +428,85 @@ function VZ.from_reavisor(ps)
     end
   end
   return sc
+end
+
+-- 13 окт: сцена трекера → пресет ReaVisor (ExtState ISFVIZ/preset:<имя>): слои, значения, LFO
+-- и маршрут трека первого источника — в его полях (страница / reavisor.lua поймут), плюс jf —
+-- снимок целиком (эффекты, master, матрица): трекер берёт его без перевода
+function VZ.to_reavisor()
+  local sc = VZ.scene_take()
+  local function conv(slot, rows)
+    local out = {}
+    for _, row in ipairs(rows) do
+      local p = slot.p and slot.p[row.key]
+      if p then
+        local v = p.v
+        if row.ty == 'l' and row.values then v = row.values[math.floor(v)] end
+        local sp = { static = copy(v) }
+        if row.ty == 'f' and p.m and p.m.k == 'lfo' then sp.lfo, sp.lfo_hz, sp.lfo_amt = (p.m.sh or 0) + 1, p.m.hz, p.m.amt
+        elseif row.ty == 'f' and p.m and p.m.k == 'trk' then
+          sp.routes = { 'T:' .. p.m.g }; sp.out_min = p.v; sp.out_max = p.v + (p.m.amt or 0) * (row.max - row.min)
+        end
+        if row.axis then
+          out[row.name] = out[row.name] or { axes = {} }
+          out[row.name].axes[row.axis] = sp
+        else out[row.name] = sp end
+      end
+    end
+    return out
+  end
+  local ps = { tabs = {}, fades = {}, decks = {}, fxchain = {}, fxparams = {}, blend = sc.blend, jf = sc }
+  for _, l in ipairs(sc.layers) do
+    ps.tabs[#ps.tabs + 1] = l.fn; ps.fades[l.fn] = l.fade or 1
+    ps.decks[l.fn] = conv(l, VZ.rows('layer', l.fn))
+  end
+  for _, e in ipairs(sc.fx) do
+    if e.on ~= false then ps.fxchain[#ps.fxchain + 1] = e.fn; ps.fxparams[e.fn] = conv(e, VZ.rows('fx', e.fn)) end
+  end
+  ps.shader = ps.tabs[1]; ps.params = ps.tabs[1] and ps.decks[ps.tabs[1]] or {}
+  return ps
+end
+
+-- 13 окт: значение под курсором текстом (для ввода =) и ввод числа: матрица (M) — сила связи,
+-- иначе выбранный параметр (число — в его диапазоне, список — номер, вкл — 0 / 1)
+function VZ.value_text(env)
+  local e = VZ.cur()
+  if VZ.mxv then
+    local srcs, pars = VZ.sources(env), VZ.mx_params(e)
+    local src, pc = srcs[VZ.mr], pars[VZ.mc]
+    if not (src and pc and e and e.slot) then return nil end
+    local p = VZ.param(e.slot, pc.row)
+    return ('%.2f'):format(type(p.mods) == 'table' and p.mods[src.id] or 0), src.name .. ' -> ' .. pc.row.name, '-2 .. 2'
+  end
+  local row = e and e.rows and e.rows[VZ.psel]
+  if not (row and e.slot) then return nil end
+  local p = VZ.param(e.slot, row)
+  if row.ty == 'f' then return ('%.3f'):format(p.v), row.name, ('%.3f .. %.3f'):format(row.min, row.max) end
+  if row.ty == 'l' or row.ty == 'b' then return tostring(math.floor(p.v)), row.name, ('%d .. %d'):format(row.min or 0, row.max or 1) end
+  return nil
+end
+function VZ.set_value(v, env)
+  v = tonumber(v)
+  if not v then return false end
+  local e = VZ.cur()
+  if VZ.mxv then
+    local srcs, pars = VZ.sources(env), VZ.mx_params(e)
+    local src, pc = srcs[VZ.mr], pars[VZ.mc]
+    if not (src and pc and e and e.slot) then return false end
+    local p = VZ.param(e.slot, pc.row)
+    p.mods = type(p.mods) == 'table' and p.mods or {}
+    v = math.max(-2, math.min(2, v))
+    p.mods[src.id] = v ~= 0 and v or nil
+  else
+    local row = e and e.rows and e.rows[VZ.psel]
+    if not (row and e.slot) or row.ty == 'c' then return false end
+    local p = VZ.param(e.slot, row)
+    if row.ty == 'f' then p.v = math.max(row.min, math.min(row.max, v))
+    elseif row.ty == 'b' then p.v = v >= 0.5 and 1 or 0
+    else p.v = math.max(row.min, math.min(row.max, math.floor(v + 0.5))) end
+  end
+  VZ.dirty = true
+  return true
 end
 
 -- ── левый список: слои, эффекты, master ─────────────────────────────────
@@ -672,6 +752,7 @@ function VZ.key(c, fine)
     elseif ch == 'k' then VZ.gsel = math.max(1, VZ.gsel - cols); return true
     end
   end
+  if ch == '=' then return { kind = 'input' } end         -- 13 окт: ввести число с клавиатуры (:vzset)
   if VZ.mxv then
     local r = VZ.mx_key(c, fine, VZ.last_env)
     if r ~= nil then return r end
@@ -905,6 +986,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
     end
     bx = bx + 2 * aw + tw + pad
   end
+  b('save', false, 'psave', 'save the look as a preset (:vzsave name): layers, effects, values, LFOs, the matrix - ReaVisor sees it too')
   b(st.blend == 'add' and 'add' or 'mix', st.blend == 'add', 'blend', 'how layers stack (b): mix - by fade, add - light adds up')
   b('scene', env.scene_has, 'scene_save', 'save everything as the scene of the cursor slot ' .. (env.scene or '') .. ' (s); with follow it comes back when the playhead enters the slot')
   b('follow', st.follow, 'follow', 'scenes follow the slot under the playhead (S)')
@@ -919,17 +1001,31 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   VZ.sel = math.max(1, math.min(#list, VZ.sel))
   local lw = math.max(ms('W') * 18, math.min(math.floor(w * 0.36), ms('W') * 34))
   local fw = ms('W') * 5
-  local nrow = math.max(1, math.floor((y + h - top) / rh))
+  -- 13 окт: живая картинка страницы — внизу левой колонки, всегда (env.live рисует кадр)
+  -- во всю ширину колонки, без рамки — часть панели; от дна отступ pad (не налезает на границу)
+  local lvw = lw - 1
+  local lvh = lvw * 9 // 16
+  local lbot = y + h
+  if env.live and y + h - top >= lvh + 4 * rh then
+    local lx, lyy = x + 1, y + h - lvh - pad
+    lbot = lyy - pad
+    U.set(U.mix(U.BG, U.TEXT, 0.04)); gfx.rect(lx, lyy, lvw, lvh, 1)
+    if not env.live(lx, lyy, lvw, lvh) then
+      U.text(lx + pad, lyy + (lvh - rh) // 2, fit(env.on and 'waiting for the page (o opens it)' or 'off - p sends the picture', lvw - 2 * pad), U.DIM)
+    end
+    if mx >= lx and mx < lx + lvw and my >= lyy and my < lyy + lvh then hover = { kind = 'open', tip = 'the picture of the page now - click opens the page (o)' } end
+  end
+  local nrow = math.max(1, math.floor((lbot - top) / rh))
   local ly = top
   local last_kind
   for i, e in ipairs(list) do
     -- заголовки групп — по строке перед первой строкой группы
     local grp = (e.kind == 'layer' or e.kind == 'addl') and 'layers' or (e.kind == 'fx' or e.kind == 'addfx') and 'effects' or nil
     if grp and grp ~= last_kind then
-      if ly + rh > y + h then break end
+      if ly + rh > lbot then break end
       U.text(x + pad, ly, grp, U.GREY); ly = ly + rh; last_kind = grp
     elseif e.kind == 'master' then last_kind = 'master' end
-    if ly + rh > y + h then break end
+    if ly + rh > lbot then break end
     local hot = mx >= x and mx < x + lw and my >= ly and my < ly + rh
     local sel = i == VZ.sel
     if sel then U.set(focused and U.mix(U.BG, U.TEXT, 0.14) or U.mix(U.BG, U.TEXT, 0.07)); gfx.rect(x + 1, ly, lw - 2, rh, 1) end
@@ -974,9 +1070,20 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
     if not wide then return hover end
     w = w - gw
   end
-  -- 11 окт: матрица модуляций вместо параметров (M)
-  if VZ.mxv then
-    local mx0 = x + lw + pad
+  -- 13 окт: матрица модуляций всегда видна — под параметрами (M — клавиши в неё и обратно)
+  local mx0 = x + lw + pad
+  if y + h - top >= 12 * rh then
+    local nsrc = #VZ.sources(env)
+    local mhh = math.min((nsrc + 1) * rh + 2, (y + h - top) * 45 // 100)
+    mhh = math.max(mhh, 4 * rh)
+    local mtop = y + h - mhh - pad                -- отступ от дна: последний ряд не на границе
+    U.set(U.LINE); gfx.rect(mx0 - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)
+    gfx.rect(mx0 - math.floor(pad / 2) - 1, mtop - pad // 2 - 1, x + w - mx0 + math.floor(pad / 2) + 1, 1, 1)
+    local mh = VZ.draw_matrix(L, U, mx0, mtop, x + w - mx0 - pad, mhh, focused and VZ.mxv, env, fit, hint)
+    if mh then hover = mh end
+    h = mtop - pad - y
+    focused = focused and not VZ.mxv
+  elseif VZ.mxv then
     U.set(U.LINE); gfx.rect(mx0 - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)
     local mh = VZ.draw_matrix(L, U, mx0, top, x + w - mx0 - pad, y + h - top, focused, env, fit, hint)
     return mh or hover

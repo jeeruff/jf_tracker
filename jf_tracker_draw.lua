@@ -1193,7 +1193,7 @@ end
 -- a — весь столбец, z — папка, / — фильтр по имени
 D.TL = { cur = 1, col = 1, scroll = 0, filter = '', typing = false }
 D.tl_scroll = 0
-D.TL_COLS = {
+D.TL_ALL = {
   { k = 'T',   h = 'T',   d = 'shown in the tracker (and its mixer strip)' },
   { k = 'tcp', h = 'tcp', d = 'REAPER: shown in the arrange view (TCP)' },
   { k = 'mcp', h = 'mcp', d = 'REAPER: shown in the mixer (MCP)' },
@@ -1201,6 +1201,9 @@ D.TL_COLS = {
   { k = 'S',   h = 'S',   d = 'solo' },
   { k = 'R',   h = 'R',   d = 'record arm' },
 }
+-- 13 окт: tcp / mcp — только с опцией tracks: tcp / mcp (state.tlrp); D.TL_COLS — видимые (кадр ставит)
+D.TL_SHORT = { D.TL_ALL[1], D.TL_ALL[4], D.TL_ALL[5], D.TL_ALL[6] }
+D.TL_COLS = D.TL_SHORT
 -- строки списка: индексы snap.cols; свёрнутые папки прячут детей, фильтр — по имени
 -- (с фильтром видны и треки из свёрнутых папок)
 function D.tl_rows(state, snap)
@@ -1221,7 +1224,8 @@ end
 function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local TL = D.TL
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  set(U.BG); gfx.rect(x, y, w, h, 1)
+  D.TL_COLS = state.tlrp and D.TL_ALL or D.TL_SHORT
+  set(U.PANEL); gfx.rect(x, y, w, h, 1)             -- 13 окт: фон панели темы, как у соседей (был чёрный BG)
   local cols = snap and snap.cols or {}
   local list = D.tl_rows(state, snap)
   TL.n = #list
@@ -1386,7 +1390,7 @@ end
 -- масштабом. Кеш по строке+цвету, картинки 1000..1022 (сброс по кругу).
 -- вертикальный текст: картинки 800..935 (136 подписей: имена в матрице,
 -- регионы и маркеры линейки), 1023 — черновик поворота
-local VFIRST, VLAST = 800, 935   -- 11 окт: 936..959 — превью визора (кольцо картинок ReaVisor)
+local VFIRST, VLAST = 800, 934   -- 11 окт: 936..959 — превью визора (кольцо картинок ReaVisor); 13 окт: 935 — живая картинка визора
 local vcache, vnext = {}, VFIRST
 D.reset_vcache = function() vcache, vnext = {}, VFIRST end
 -- top = true — прижать к верху отведённой высоты (имена на линейке, 2 окт),

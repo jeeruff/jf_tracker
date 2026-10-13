@@ -266,6 +266,7 @@ local state = {
   waveinv = reaper.GetExtState(EXT, 'waveinv') == '1',
   tababc = reaper.GetExtState(EXT, 'tababc') == '1',
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
+  tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
   autoinst = reaper.GetExtState(EXT, 'autoinst') ~= '0',
@@ -656,7 +657,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'panes'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('statpos', state.statpos or 'bottom'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -5794,11 +5795,92 @@ ctx = {
       end
     end
     trs = ctx.vz_trks
-    return { on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb,
+    return { on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb, live = ctx.visor_live,
              tracks = trs, macros = ctx.visor_macros and ctx.visor_macros() or 0,
              scene = sl, scene_has = sl and VZ.st.scenes[sl] ~= nil }
   end,
   -- файлы шейдеров / эффектов (один раз за сессию)
+  -- 13 окт: base64 → байты (кадр страницы для живой картинки)
+  b64dec = function(s)
+    local T = ctx.b64t
+    if not T then
+      T = {}; ctx.b64t = T
+      local B = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      for i = 1, 64 do T[B:byte(i)] = i - 1 end
+    end
+    s = s:gsub('[^%w%+/]', '')
+    local out, n = {}, #s
+    for i = 1, n - 3, 4 do
+      local a, b, c, d = T[s:byte(i)], T[s:byte(i + 1)], T[s:byte(i + 2)], T[s:byte(i + 3)]
+      local v = ((a * 64 + b) * 64 + c) * 64 + d
+      out[#out + 1] = string.char(v >> 16, (v >> 8) & 255, v & 255)
+    end
+    local r = n % 4
+    if r >= 2 then
+      local a, b = T[s:byte(n - r + 1)], T[s:byte(n - r + 2)]
+      local c = r == 3 and T[s:byte(n)] or 0
+      local v = ((a * 64 + b) * 64 + c) * 64
+      out[#out + 1] = string.char(v >> 16) .. (r == 3 and string.char((v >> 8) & 255) or '')
+    end
+    return table.concat(out)
+  end,
+  -- 13 окт: живая картинка визора: пока панель видна, раз в 0.5 с просим у страницы кадр
+  -- (ISFVIZ/live_req = токен); она отвечает JPEG 160×90 кусками lv_<n> и lvreq = «токен|частей».
+  -- Кадр — файл в папке ресурсов REAPER (два по очереди) → картинка gfx 935
+  visor_live = function(x, y, w, h)
+    local VZ = MX.VZ
+    local Lv = ctx.vz_live or { n = 0 }; ctx.vz_live = Lv
+    local now = reaper.time_precise()
+    local tok, parts = reaper.GetExtState(VZ.SECTION, 'lvreq'):match('^(.-)|(%d+)$')
+    if tok and Lv.tok and tok == Lv.tok then
+      Lv.tok = nil
+      local t = {}
+      for i = 0, tonumber(parts) - 1 do t[#t + 1] = reaper.GetExtState(VZ.SECTION, 'lv_' .. i) end
+      local data = ctx.b64dec(table.concat(t))
+      if #data > 64 and data:byte(1) == 0xFF and data:byte(2) == 0xD8 then
+        Lv.n = Lv.n + 1
+        local path = reaper.GetResourcePath() .. '/jf_tracker_visor_live' .. (Lv.n % 2) .. '.jpg'
+        local f = io.open(path, 'wb')
+        if f then
+          f:write(data); f:close()
+          if gfx.loadimg(935, path) >= 0 then
+            local iw, ih = gfx.getimgdim(935)
+            if iw > 0 and ih > 0 then Lv.w, Lv.h, Lv.t = iw, ih, now end
+          end
+        end
+      end
+    end
+    if (not Lv.tok and now - (Lv.ask or 0) >= 0.5) or now - (Lv.ask or 0) > 2 then
+      Lv.ask = now; Lv.tok = ('%d'):format(math.floor(now * 1000) % 100000000)
+      reaper.SetExtState(VZ.SECTION, 'live_req', Lv.tok, false)
+    end
+    if not Lv.w or now - (Lv.t or 0) > 5 then return false end
+    ctx.visor_blit({ slot = 935, w = Lv.w, h = Lv.h }, x, y, w, h, true)
+    return true
+  end,
+  -- 13 окт: сохранить вид как пресет ReaVisor (имя — в списке preset_names, превью — первый шейдер)
+  visor_save = function(name)
+    local VZ = MX.VZ
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if name == '' then vim.msg = 'vzsave: a name, like :vzsave night drive'; return end
+    if #VZ.st.layers == 0 then vim.msg = 'visor: nothing to save - add a shader layer (a)'; return end
+    reaper.SetExtState(VZ.SECTION, 'preset:' .. name, VZ.json.encode(VZ.to_reavisor()), true)
+    local names = VZ.json.decode(reaper.GetExtState(VZ.SECTION, 'preset_names'))
+    names = type(names) == 'table' and names or {}
+    local have = false
+    for _, n in ipairs(names) do if n == name then have = true end end
+    if not have then names[#names + 1] = name; reaper.SetExtState(VZ.SECTION, 'preset_names', VZ.json.encode(names), true) end
+    VZ.pnames = names; ctx.vz_pnames_t = reaper.time_precise()
+    if ctx.vz_pfirst then ctx.vz_pfirst[name] = nil end
+    VZ.st.preset = name; VZ.dirty = true
+    for i, n in ipairs(names) do if n == name then VZ.gsel = i end end
+    vim.msg = 'visor: preset ' .. name .. (have and ' updated' or ' saved') .. ' - n N / i to switch'
+  end,
+  visor_set = function(arg)
+    local VZ = MX.VZ
+    if VZ.set_value(arg, VZ.last_env) then vim.msg = 'visor: ' .. tostring(arg)
+    else vim.msg = 'vzset: a number for the selected parameter / matrix cell (= opens it)' end
+  end,
   visor_files = function(kind)
     ctx.vz_files = ctx.vz_files or {}
     local F = ctx.vz_files[kind]
@@ -6062,6 +6144,12 @@ ctx = {
       for i, nm in ipairs(names) do if nm == st.preset then cur = i end end
       local nx = cur == 0 and (a.dir > 0 and 1 or #names) or ((cur - 1 + a.dir) % #names + 1)
       ctx.visor_do({ kind = 'preset', name = names[nx] })
+    elseif k == 'psave' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'vzsave ' .. (st.preset or '')
+    elseif k == 'input' then
+      local v, what, range = VZ.value_text(VZ.last_env)
+      if not v then vim.msg = 'visor: pick a parameter (J K) or a matrix cell (M, h j k l) first'; return end
+      vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'vzset ' .. v
+      vim.msg = ('%s: %s (%s), Enter'):format(what, v, range)
     elseif k == 'drag' or k == 'drag_fade' then ctx.vz_drag = a
     end
   end,
@@ -9627,6 +9715,7 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'keyboard', 'bottom' }, desc = 'status line in the keyboard strip (the mode big) or at the window bottom (m shows it)', get = function() return state.statpos or 'keyboard' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
@@ -9738,7 +9827,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -11301,6 +11390,7 @@ ctx = {
           it[#it + 1] = { key = 's', label = 'slice current instrument …', fn = function() ctx.open_slicer() end }
           return { title = 'instrument', items = it }
         end },
+      { key = 'c', label = 'click: metronome (m on / off, speed, accents, pre-roll) …', fn = function() ctx.metro_menu() end },   -- 13 окт: метроном с клавиатуры
       { key = 'f', label = 'add FX (fzf by all installed) …', fn = ctx.fx_picker },
       { key = 'a', label = 'REAPER actions (all, fzf) … (:!)', fn = function() ctx.reaper_actions() end },
       { key = 'l', label = 'loop in region (polymeter)', sub = function() return { title = 'loop', items = {
@@ -14716,8 +14806,9 @@ local function frame()
       local hv = VZ.draw(Lx, U, x, y, w, h, state.focus == 'top' and state.toptab == 'visor', ctx.visor_env(), ctx.fit, ctx.hint)
       -- 11 окт: мышь в панели, но не на строке — всё равно визор (ПКМ — его меню, не общее)
       if not hv and gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= y and gfx.mouse_y < y + h then hv = { kind = 'sel', tip = 'visor - rclick / \\ menu, i presets, zz whole window' } end
-      if hv and gfx.mouse_wheel ~= 0 and (hv.kind == 'param' or hv.kind == 'row') then
-        VZ.wheel(hv, gfx.mouse_wheel > 0 and 1 or -1, gfx.mouse_cap & 8 == 8)
+      -- 13 окт: колесо над панелью — всегда визору (над матрицей и пустым местом уходило в трекер)
+      if hv and gfx.mouse_wheel ~= 0 then
+        if hv.kind == 'param' or hv.kind == 'row' or hv.kind == 'mxcell' then VZ.wheel(hv, gfx.mouse_wheel > 0 and 1 or -1, gfx.mouse_cap & 8 == 8) end
         gfx.mouse_wheel = 0
       end
       return hv
