@@ -4924,8 +4924,10 @@ ctx = {
       reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
       reaper.TrackFX_SetNamedConfigParm(tr, fx, 'renamed_name', ('list %d'):format(#paths))
       reaper.TrackFX_Show(tr, fx, 2)
+      ctx.list_fx = fx
     end)
     model.invalidate()
+    if ctx.list_fx then ctx.ti_cache = nil; pcall(ctx.inst_fx_pick, col, ctx.list_fx, false, true); ctx.list_fx = nil end
     vim.msg = ('sampler list: %d sample(s) in one RS5K on %s (notes pick the file)'):format(#paths, col.name or 'track')
   end,
   slices_render = function(how)
@@ -5007,6 +5009,8 @@ ctx = {
     end)
     if not packed then for f2 = i0, i0 + n - 1 do reaper.TrackFX_Show(tr, f2, 2) end end
     model.invalidate()
+    -- 13 окт: сразу на новый сэмплер — ноты пишутся в него (MIDI), DSP на нём
+    if n > 0 then ctx.ti_cache = nil; pcall(ctx.inst_fx_pick, col, i0, false, true) end
     vim.msg = ('convert: %d RS5K%s on %s, slice S01 = note %d (a key each)'):format(n, packed and ' in a container' or '', col.name or 'track', base)
   end,
   slq_menu = function()
