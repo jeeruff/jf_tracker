@@ -20,8 +20,31 @@ local keys = {}
 -- f следующее fx-поле, m mute, ` note-off, > < лупы; Esc → NORMAL.
 local high = { q = 0, ['2'] = 1, w = 2, ['3'] = 3, e = 4, r = 5, ['5'] = 6, t = 7, ['6'] = 8,
                y = 9, ['7'] = 10, u = 11, i = 12, ['9'] = 13, o = 14, ['0'] = 15, p = 16 }
+-- 13 окт: опция keys: renoise — две октавы сразу, как в Renoise: нижний ряд z s x d c v g b h n j m , l . ; / —
+-- октава курсора, верхний q 2 w 3 e … — на октаву выше (z x c / , . h j … в INSERT — ноты; октава — [ ],
+-- движение — стрелки). Без опции — один верхний ряд (Ableton), нижние — управление.
+local low = { z = 0, s = 1, x = 2, d = 3, c = 4, v = 5, g = 6, b = 7, h = 8, n = 9, j = 10, m = 11,
+              [','] = 12, l = 13, ['.'] = 14, [';'] = 15, ['/'] = 16 }
 keys.piano = {}
-for k, v in pairs(high) do keys.piano[k:byte()] = v end
+keys.renoise = false
+-- подпись смещения: в Renoise до B — нижний ряд, выше — верхний (q = C октавы +1)
+keys.plabel = {}
+function keys.set_renoise(on)
+  keys.renoise = on and true or false
+  for k in pairs(keys.piano) do keys.piano[k] = nil end      -- та же таблица (её держат vim и main)
+  for k in pairs(keys.plabel) do keys.plabel[k] = nil end
+  for k, v in pairs(high) do keys.piano[k:byte()] = v + (keys.renoise and 12 or 0) end
+  if keys.renoise then for k, v in pairs(low) do keys.piano[k:byte()] = v end end
+  for code, off in pairs(keys.piano) do
+    local ch = string.char(code)
+    local hi = high[ch] ~= nil
+    if not keys.plabel[off] or (keys.renoise and ((off >= 12) == hi)) then keys.plabel[off] = ch end
+  end
+end
+keys.set_renoise(false)
+-- код виртуальной клавиши (JS_VKeys) символа: буквы и цифры — как есть, знаки — свои коды
+local VK = { [','] = 0xBC, ['.'] = 0xBE, [';'] = 0xBA, ['/'] = 0xBF }
+function keys.vk(ch) return VK[ch] or ch:upper():byte() end
 
 -- ── раскладки: русская ЙЦУКЕН → QWERTY по положению клавиш ───────────────
 -- gfx.getchar отдаёт код символа, а не клавиши: в русской раскладке вместо

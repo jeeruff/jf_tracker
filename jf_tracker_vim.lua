@@ -1225,6 +1225,7 @@ end
 -- Возвращает true, если клавиша съедена. Пианино — верхний ряд, сюда не попадает.
 local function keys_control(c)
   local ch = (c < 256) and string.char(c) or ''
+  if ctx.keys_renoise and ctx.keys_renoise() and ctx.piano[c] then return false end   -- 13 окт: renoise — нижний ряд играет ноты
   local function heads() return V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) end
   if ch == 'h' or ch == 'j' or ch == 'k' or ch == 'l' or ch == 'H' or ch == 'L' or ch == 'G' then
     local m = motion(c, V.count or 1)
@@ -1931,8 +1932,9 @@ function V.key_impl(c)
     if V.piano then
       if V.mode == 'normal' and ((c == 13 and ctx.esc_vim and ctx.esc_vim()) or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i (12 окт: иначе Enter — смарт-панель)
       V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
-      if c == ('z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
-      if c == ('x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
+      local rn = ctx.keys_renoise and ctx.keys_renoise()   -- 13 окт: renoise — z x ноты, октава [ ]
+      if c == (rn and '[' or 'z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
+      if c == (rn and ']' or 'x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
       if ctx.piano and ctx.piano[base] then

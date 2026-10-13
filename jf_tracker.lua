@@ -856,6 +856,7 @@ local track_actions, region_actions, event_actions, view_actions, mono_request, 
 local MONO_ID = 9             -- id мода трекера на шине jf_mono
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
+  keys_renoise = function() return keys.renoise end,   -- 13 окт: опция keys: renoise (две октавы, нижний ряд — ноты)
   peaks = function(e, n, spec) return model.peaks(e, n, spec) end,
   spec_colour = function(sp) return draw.spec_colour(sp) end,
   snap = function() return snap end,
@@ -4472,9 +4473,9 @@ ctx = {
   -- 13 окт: клавиша, что играет слайс k (как подписи модуля slices: октава курсора, C-4 + k)
   slice_key = function(k)
     local c = ctx.slk_cache
-    if not (c and c.oct == vim.octave) then
-      c = { oct = vim.octave, t = {} }
-      for code, off in pairs(keys.piano) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
+    if not (c and c.oct == vim.octave and c.rn == keys.renoise) then
+      c = { oct = vim.octave, t = {}, rn = keys.renoise }
+      for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(ch) end
       ctx.slk_cache = c
     end
     return c.t[k]
@@ -10007,6 +10008,8 @@ ctx = {
       { key = 'statpos', label = 'status bar', kind = 'cycle', values = { 'keyboard', 'bottom' }, desc = 'status line in the keyboard strip (the mode big) or at the window bottom (m shows it)', get = function() return state.statpos or 'keyboard' end, set = function(v) state.statpos = v end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      { key = 'keysrenoise', label = 'keys: renoise', kind = 'toggle', desc = 'note keys as in Renoise: two octaves at once - the bottom row z s x d c ... is the cursor octave, the top row q 2 w 3 e ... an octave higher; in INSERT those letters are notes (octave - [ ], move - arrows). Off - one top row (Ableton), the bottom rows control',
+        get = function() return keys.renoise end, set = function(v) keys.set_renoise(v); reaper.SetExtState(EXT, 'keysrenoise', v and '1' or '0', true); draw.piano_layout(keys.renoise) end },
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
@@ -12032,6 +12035,7 @@ end
 SPROP.init(U, ctx)
 ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 окт: модуль looploom
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
+if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 SL.loop_ov = function(e)
   local lp = e and e.item and ctx.sus_get(e)
@@ -15479,7 +15483,7 @@ local function frame()
       do local ce = col and (col.pool or {})[vim.inst]; if ce and ce.lvar_n and ce.parent == root then k = -ce.lvar_n end end   -- 13 окт: выбран вариант лупа
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
-      for code, off in pairs(keys.piano) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(string.char(code)) end
+      for off, ch in pairs(keys.plabel) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(ch) end
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
@@ -18993,7 +18997,7 @@ local function frame()
   if c > 0 and keys.piano[c] and reaper.JS_VKeys_GetUp and not ctx.mods().cmd
      and (vim.mode == 'insert' or vim.piano or (state.focus == 'top' and state.toptab == 'sample')) then
     local nk, now = ctx.note_key_last, reaper.time_precise()
-    local vk = string.char(c):upper():byte()
+    local vk = keys.vk(string.char(c))                -- 13 окт: , . ; / — свои коды (раскладка renoise)
     -- 5 окт: быстрые нажатия терялись — отпускание случалось ДО обработки
     -- прошлого нажатия (медленный кадр) и не попадало в окно. Окно отпусканий
     -- начинается за длительность того кадра (+20 мс) до обработки

@@ -102,6 +102,7 @@ local function reset()
   V.mode = 'normal'; V.cur = { fi = 1, row = 0, field = 1 }; V.count = nil; V.pending = nil; V.op = nil; V.hexbuf = nil
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
+    keys_renoise = function() return RENOISE end,
     edit = E, state = state, piano = keys.piano, SM = dofile(DIR .. '/jf_tracker_smart.lua'),
     esc_vim = function() return ESC_VIM end,   -- 10 окт: опция Esc mode
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
@@ -888,6 +889,16 @@ eq('slq_snap: nearest beat', V.slq_snap(9.3, 4, 0), 8)
 eq('slq_snap: never on or before the cursor', V.slq_snap(1.2, 4, 0), 4)
 eq('slq_snap: bar grid', V.slq_snap(10, 12, 0), 12)
 eq('slq_snap: row grid keeps the row', V.slq_snap(5.0, 1, 2), 5)
+
+-- 13 окт: keys: renoise — две октавы: нижний ряд — октава курсора, верхний — +1; h j в INSERT — ноты, октава [ ]
+do
+  reset(); RENOISE = true; keys.set_renoise(true)
+  keysin('iz'); eq('renoise: z -> C-4', last(), 'ins:trA@0:60:1')
+  V.cur.row = 2; keysin('q'); eq('renoise: q -> C-5 (octave higher)', last(), 'ins:trA@2:72:1')
+  V.cur.row = 4; keysin('h'); eq('renoise: h is G#4, not a move', last(), 'ins:trA@4:68:1')
+  keysin('['); V.cur.row = 6; keysin('z'); eq('renoise: [ - octave down', last(), 'ins:trA@6:48:1')
+  V.key(27); RENOISE = false; keys.set_renoise(false)
+end
 
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

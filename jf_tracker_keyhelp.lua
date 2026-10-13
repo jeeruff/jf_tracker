@@ -42,6 +42,7 @@ KH.PAGES = {
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back); in INSERT Cmd+digit is a note' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto off' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
+    { k = 'keys: renoise', d = 'option: two octaves at once - z s x d c v g b h n j m , l . ; / the cursor octave, q 2 w 3 e ... an octave higher; then in INSERT the octave is [ ], moving - the arrows' },
     { k = 'gm', d = 'metronome menu: m on / off, speed, accents, pre-roll (:metro toggles too)' },
     { k = 'Ctrl - +', d = 'step down / up by one, in any mode (as in Renoise); - + alone - LPB (NORMAL, INSERT on the note field); Cmd - + - font size' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
