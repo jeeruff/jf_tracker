@@ -486,8 +486,8 @@ function D.layout(snap, state, nregions)
     or (tlr == 'both' and ms('999.4') + ms('0:00.000') + 2 * L.pad) or 0
   L.num_w = ms('0000') + 2 * L.pad
   -- 13 окт: линейка (регионы / маркеры, прыжки) — слева от номеров или справа, у мастера (опция ruler side)
-  L.ruler_right = state.rulerside == 'right' and L.ruler_w > 0
-  L.rl = L.ruler_right and 0 or L.ruler_w            -- что слева от номеров строк
+  L.ruler_right = state.rulerside == 'right' and L.rg_w > 0
+  L.rl = L.ruler_right and L.jl_w or L.ruler_w   -- 13 окт: линейка прыжков всегда слева, у номеров;           -- что слева от номеров строк
   L.label_w = L.rl + L.num_w + L.tl_w
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
@@ -682,7 +682,7 @@ function D.layout(snap, state, nregions)
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
-  L.mstrip_w = L.label_w + (L.ruler_right and L.ruler_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
+  L.mstrip_w = L.label_w + (L.ruler_right and L.rg_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
   L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.mstrip_w >= 6 * L.cw or false
   L.master_w = L.master_right and math.min(L.mstrip_w, 10 * L.cw + 2 * L.pad) or 0   -- 13 окт: полоса мастера экономнее (дальше — по его колонкам)
   -- 11 окт: колонка мастера (как show master track в REAPER, по умолчанию вкл) — его огибающие; нет огибающих — пустая дорожка
@@ -702,7 +702,7 @@ function D.layout(snap, state, nregions)
     if #(snap.master.envs or {}) == 0 then ew = L.env_w + 1 end
     L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
   end
-  L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.ruler_w or 0)
+  L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.rg_w or 0)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
   L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
@@ -6122,17 +6122,17 @@ function D.frame(L, snap, rows, state, info)
     for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
-  local rx0 = L.ruler_right and (L.win_w - L.ruler_w) or tx0   -- 13 окт: справа — у мастера
-  if L.ruler_right then set(U.LINE); gfx.rect(rx0, L.body_y, 1, L.body_h, 1) end
+  local rx0 = L.ruler_right and (L.win_w - L.rg_w - L.jl_w) or tx0   -- 13 окт: справа — у мастера (без линейки прыжков)
+  if L.ruler_right then set(U.LINE); gfx.rect(rx0 + L.jl_w, L.body_y, 1, L.body_h, 1) end
   if L.jl_w > 0 and #rows > 0 then
     local cr = info.vcur and info.vcur.row          -- курсор трекера (cur_row — edit-курсор REAPER)
     -- 10 окт: как верхняя линейка — подложка опцией jump ruler background, 0 у курсора, цифры приглушены
-    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(rx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
+    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
     for i, r in ipairs(rows) do
       local d = cr and (r.row - cr)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
-        text(rx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
+        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
   end
