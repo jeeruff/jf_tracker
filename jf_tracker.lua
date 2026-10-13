@@ -9489,7 +9489,7 @@ ctx = {
   -- 13 окт: вариант лупа — копия инструмента со своими точками, в slices строкой Ln (looploom: s)
   loop_save_variant = function(e)
     local lp = e and ctx.sus_get(e)
-    if not (lp and lp.on) then vim.msg = 'looploom: the loop is not sustain - nothing to save'; return end
+    if not (lp and lp.on) then vim.msg = 'sustain: the loop is not sustain - nothing to save'; return end
     local root = (e.lvar and e.parent) or e
     local col = cur_col()
     local n = 0
@@ -9497,7 +9497,7 @@ ctx = {
     n = n + 1
     local it = edit.loop_variant(root.item, lp, n, (root.name or 'loop') .. ' L' .. n)
     model.invalidate()
-    vim.msg = it and ('looploom: variant L%d saved to the slices (%.3f - %.3f s) - click it there to play / edit'):format(n, lp.ls, lp.le) or 'looploom: could not save'
+    vim.msg = it and ('sustain: variant L%d saved to the slices (%.3f - %.3f s) - click it there to play / edit'):format(n, lp.ls, lp.le) or 'sustain: could not save'
   end,
   loop_variant_pick = function(root, n)
     local col = cur_col()
@@ -9655,7 +9655,7 @@ ctx = {
       ctx.loop_set_mode(e, M[math.max(1, math.min(3, i + (d >= 0 and 1 or -1)))], items)
     elseif k == 'susc' or k == 'susl' then
       local lp = ctx.sus_get(e)
-      if not (lp and lp.on) then vim.msg = 'looploom: the loop is not sustain (loop row)'; return end
+      if not (lp and lp.on) then vim.msg = 'sustain: the loop is not sustain (loop row)'; return end
       if k == 'susc' then
         local C, i = edit.SU.CURVES, 1
         for n, c in ipairs(C) do if c[1] == lp.curve then i = n end end
@@ -9704,7 +9704,7 @@ ctx = {
     if k == 'lock' then return reaper.GetMediaItemInfo_Value(it, 'C_LOCK') >= 0.5 and 'on' or 'off' end
     if k == 'swing' then return edit.item_swing(it) and ('on - ' .. ctx.swing_label()) or 'off - straight' end
     if k == 'pthru' then return edit.playthru(it) and 'on - slices play to the end of the sample' or 'off - to the next slice' end
-    if k == 'loopm' then local m = ctx.loop_mode(e); return m == 'sus' and 'sustain - looploom' or (m == 'whole' and 'whole sample' or 'off') end
+    if k == 'loopm' then local m = ctx.loop_mode(e); return m == 'sus' and 'sustain' or (m == 'whole' and 'whole sample' or 'off') end
     if k == 'susc' then local lp = ctx.sus_get(e); return lp and edit.SU.CURVES_BY[lp.curve or 'auto'] or '-' end
     if k == 'susl' then local lp = ctx.sus_get(e); return lp and (lp.flat ~= false and 'flat' or 'natural') or '-' end
     if k == 'susr' then return 'R / click - find the points again' end
@@ -9837,7 +9837,7 @@ ctx = {
       local m = ctx.loop_mode(e)
       add('off', function() ctx.loop_set_mode(e, 'off', items) end, m == 'off')
       add('whole sample - the file repeats', function() ctx.loop_set_mode(e, 'whole', items) end, m == 'whole')
-      add('sustain - attack once, the loop while the note lasts (looploom)', function() ctx.loop_set_mode(e, 'sus', items) end, m == 'sus')
+      add('sustain - attack once, the loop while the note lasts (sustain tab)', function() ctx.loop_set_mode(e, 'sus', items) end, m == 'sus')
     elseif k == 'susc' then
       title = 'loop x-fade curve'
       local lp = ctx.sus_get(e)
@@ -16177,8 +16177,9 @@ local function frame()
     end
   elseif hover.sample and SL.loop_hot then
     local h = SL.loop_hot
-    state.status = h.cand and ('loop candidate %d: %.3f - %.3f s, the seam matches %d %% - click: take it (looploom n N)'):format(h.i, h.cand.ls, h.cand.le, math.floor(h.cand.match * 100 + 0.5))
-      or ('loop %s - drag (snaps like cuts); looploom tab: the values, x-fade, curve'):format(h.k == 'susa' and 'start (S)' or 'end (E)')
+    state.status = h.cand and ('loop candidate %d: %.3f - %.3f s, the seam matches %d %% - click: take it (sustain tab: n N, 1..9)'):format(h.i, h.cand.ls, h.cand.le, math.floor(h.cand.match * 100 + 0.5))
+      or (h.k == 'susx' and 'loop x-fade - drag: longer / shorter (the square on the slant line)')
+      or ('loop %s - drag (snaps like cuts); sustain tab: the values, x-fade, curve'):format(h.k == 'susa' and 'start (S)' or 'end (E)')
   elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then state.status = ({ a = 'clip start - drag (offset of the clip item)', b = 'clip end - drag (its length)', move = 'clip - drag the strip: the whole clip in the source', la = 'loop start L - drag: the part the session loops', lb = 'loop end L - drag', xf = 'loop crossfade at the seam - click: 0 / 10 / 30 / 60 / 120 ms (default off)' })[SL.zone_hot] or ''
   elseif hover.sample and SL.item_hot then state.status = SL.item_hot == 'ia' and 'item start - drag: trim (inside) or extend (past the left edge, up to the file start); all notes of the instrument, one undo'
       or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
@@ -17011,7 +17012,7 @@ local function frame()
       -- 13 окт: луп удержания на волне: линия — протяжка, скобка кандидата — взять его
       ctx.set_focus('top')
       if SL.loop_hot.cand then ctx.LL.apply(SL.loop_e, SL.loop_hot.cand)
-      else SL.loop_drag = { k = SL.loop_hot.k, e = SL.loop_e } end
+      else SL.loop_drag = { k = SL.loop_hot.k, side = SL.loop_hot.side, e = SL.loop_e } end
       click = { t = now2, zone = 'susline' }
     elseif hover.sample and SL.zone_hot and state.ss_zone and state.ss_zone.clip then
       -- клип сессии (6 окт): начало / конец / перенос / метки лупа L / xf
@@ -18180,10 +18181,15 @@ local function frame()
         local lp = ctx.sus_get(e)
         if lp then
           local f = (e.offs or 0) + t * ((e.rate and e.rate ~= 0) and e.rate or 1)
-          if ld.k == 'susa' then lp.ls = math.min(lp.le - 0.01, f) else lp.le = math.max(lp.ls + 0.01, f) end
+          if ld.k == 'susx' then
+            -- 13 окт: ручка кроссфейда на волне: длина = от ручки до E (верх) или до S (низ)
+            local a = ctx.sus_span(e)
+            local xmax = math.max(0, math.min(lp.le - lp.ls, lp.ls - a, 2))
+            lp.xf = math.max(0, math.min(xmax, (ld.side == 'e' and lp.le or lp.ls) - f))
+          elseif ld.k == 'susa' then lp.ls = math.min(lp.le - 0.01, f) else lp.le = math.max(lp.ls + 0.01, f) end
           lp.file, lp.boff = nil, nil
           ctx.sus_points(e, lp)
-          vim.msg = ('loop %s %.3f s'):format(ld.k == 'susa' and 'start' or 'end', f)
+          vim.msg = ld.k == 'susx' and ('loop x-fade %d ms'):format(math.floor(lp.xf * 1000 + 0.5)) or ('loop %s %.3f s'):format(ld.k == 'susa' and 'start' or 'end', f)
         end
       end
     else SL.loop_drag = nil end

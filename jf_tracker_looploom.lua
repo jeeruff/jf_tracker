@@ -67,7 +67,7 @@ local function apply(e, c)
   lp.file, lp.boff = nil, nil
   ctx.sus_points(e, lp)
   for i, c2 in ipairs(LL.cands or {}) do if c2 == c then LL.ci = i end end
-  ctx.msg(('looploom: candidate %d  %.3f - %.3f s, the seam matches %d %%  (1..9 / n N - the others)'):format(LL.ci or 0, c.ls, c.le, math.floor(c.match * 100 + 0.5)))
+  ctx.msg(('sustain: candidate %d  %.3f - %.3f s, the seam matches %d %%  (1..9 / n N - the others)'):format(LL.ci or 0, c.ls, c.le, math.floor(c.match * 100 + 0.5)))
 end
 LL.apply = apply
 -- кандидат, на котором стоит луп (точки совпали до 1 мс)
@@ -92,7 +92,7 @@ local function seam(e, lp, x, y, w, h, ps_path)
     wv = src
     if wv then i_start = math.floor(lp.ls * wv.sr + 0.5); i_end = math.floor(lp.le * wv.sr + 0.5) end
   end
-  if not wv then U.text(x + 4, y, ctx.fit('looploom: the seam view reads WAV files', w - 8), U.GREY); return end
+  if not wv then U.text(x + 4, y, ctx.fit('sustain: the seam view reads WAV files', w - 8), U.GREY); return end
   local N = math.max(8, math.floor(LL.seam_ms / 1000 * wv.sr))
   local c1 = wv.ch[1]
   local hw = mid - x
@@ -211,14 +211,17 @@ local function xfade_view(L, e, lp, src, wv, x, y, w, h, mx, my, inside)
   U.set(U.TEXT, 0.6); gfx.rect(pS, y, 1, h, 1)                                     -- шов
   -- ручки длины
   local hot
-  local function near(px, py) return inside and math.abs(mx - px) <= 5 and math.abs(my - py) <= 7 end
+  local function near(px, py) return inside and math.abs(mx - px) <= math.max(6, L.rh * 0.5) and math.abs(my - py) <= math.max(8, L.rh) end
   local hy2, hy3 = bands[2].y + 3, bands[3].y + bands[3].h - 4
-  if LL.xdrag then hot = LL.xdrag.k elseif near(p0, hy2) or near(p0, hy3) or (inside and math.abs(mx - p0) <= 3 and my >= bands[2].y) then hot = 'x' end
-  U.set(hot == 'x' and U.TEXT or U.AMBER); gfx.rect(p0 - 3, hy2 - 3, 7, 7, 1)
-  U.set(hot == 'x' and U.TEXT or U.GREEN); gfx.rect(p0 - 3, hy3 - 3, 7, 7, 1)
+  if LL.xdrag then hot = LL.xdrag.k elseif near(p0, hy2) or near(p0, hy3) or (inside and math.abs(mx - p0) <= 3 and my >= bands[2].y) then hot = 'x'
+  elseif inside and mx > p0 + 3 and mx < pS and my >= bands[2].y and my < y + h then hot = 'curve' end   -- 13 окт: щелчок по кривой — её форма
+  local dr = math.max(5, math.floor(L.rh * 0.45))
+  U.diamond(p0, hy2 + dr, dr, U.AMBER, hot == 'x')                                  -- 13 окт: ромбики-ручки
+  U.diamond(p0, hy3 - dr, dr, U.GREEN, hot == 'x')
   U.set(hot == 'x' and U.TEXT or U.GREY, 0.7); gfx.rect(p0, bands[2].y, 1, h - hb, 1)
   U.text(x + 2, y, ctx.fit(('x-fade %d ms  (up to %d)  %s'):format(math.floor(X * 1000 + 0.5), math.floor(xmax * 1000 + 0.5), (ctx.SU().CURVES_BY[lp.curve or 'auto'] or '')), w - 4), U.DIM)
-  if hot then LL.status = 'crossfade: drag the handle left / right - longer / shorter; top - what plays, middle - the loop end fading out, bottom - what is before S fading in' end
+  if hot == 'curve' then LL.status = 'crossfade curve: click - linear / equal power / s-curve (the shape is drawn)'
+  elseif hot then LL.status = 'crossfade: drag the handle left / right - longer / shorter; top - what plays, middle - the loop end fading out, bottom - what is before S fading in' end
   return hot, function(px) return -xu(px) end, xmax, rng
 end
 
@@ -229,7 +232,7 @@ function LL.draw(L, x, y, w, h, e, focused)
   local down, inside = cap == 1 and LL.prev_cap == 0, mx >= x and mx < x + w and my >= y and my < y + h
   LL.prev_cap = cap
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  if not (e and e.item) then U.text(x + L.pad, y, ctx.fit('looploom: select an instrument', w - L.pad), U.GREY); return end
+  if not (e and e.item) then U.text(x + L.pad, y, ctx.fit('sustain: select an instrument', w - L.pad), U.GREY); return end
   local lp = ctx.sus_get(e)
   local mode = ctx.loop_mode(e)
   -- справа — параметры; слева — спектрограмма и шов
@@ -279,8 +282,8 @@ function LL.draw(L, x, y, w, h, e, focused)
       end
     end
   end
-  if hot_cand then LL.status = ('looploom candidate %d: click or %d - the loop takes these points (the list stays, compare by ear)'):format(hot_cand, hot_cand) end
-  if hot_row then LL.status = 'looploom ' .. LL.ROWS[hot_row].label .. ': ' .. (TIP[LL.ROWS[hot_row].k] or '') end
+  if hot_cand then LL.status = ('sustain candidate %d: click or %d - the loop takes these points (the list stays, compare by ear)'):format(hot_cand, hot_cand) end
+  if hot_row then LL.status = 'sustain ' .. LL.ROWS[hot_row].label .. ': ' .. (TIP[LL.ROWS[hot_row].k] or '') end
   -- шов (спектрограмма и точки — на волне вкладки item)
   local vw = rw < w and (rx - x - L.pad) or 0
   local vy, vh = y, 0
@@ -300,6 +303,7 @@ function LL.draw(L, x, y, w, h, e, focused)
             ctx.sp_set_frac(e, 'susx', math.sqrt(math.max(0, math.min(xmax, xlen(mx))) / 2))
           end
         else LL.xdrag = nil end
+      elseif down and hot == 'curve' then ctx.sp_menu(e, 'susc'); LL.xdrag_now = true
       elseif down and hot then LL.xdrag = { k = hot, lx = mx, rng = rng }; LL.xdrag_now = true end
       seam(e, lp, x, y + xh + 2, vw, h - xh - 2, path)
       if not hot and inside and mx < x + vw and my > y + xh then LL.status = ('crossfade seam: left - the loop end, right - its start (amber / green), grey - how the file went on; wheel / + -: %d ms'):format(LL.seam_ms) end
@@ -352,11 +356,11 @@ function LL.key(c, e)
   elseif ch:match('^[1-9]$') then
     if not e then return true end
     local cs = cands(e); local i = tonumber(ch)
-    if cs[i] then apply(e, cs[i]) else ctx.msg('looploom: ' .. #cs .. ' candidate(s)') end
+    if cs[i] then apply(e, cs[i]) else ctx.msg('sustain: ' .. #cs .. ' candidate(s)') end
   elseif ch == 'n' or ch == 'N' then
     if not e then return true end
     local cs = cands(e)
-    if #cs == 0 then ctx.msg('looploom: no candidates'); return true end
+    if #cs == 0 then ctx.msg('sustain: no candidates'); return true end
     LL.ci = ((LL.ci or 0) + (ch == 'n' and 1 or -1) - 1) % #cs + 1
     apply(e, cs[LL.ci])
   elseif ch == 's' then if e then ctx.sp_adjust(e, 'susv', 1) end

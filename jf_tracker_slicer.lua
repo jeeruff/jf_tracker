@@ -1155,7 +1155,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- зелёная — начало, янтарная — конец (тянутся), полосы сверху — кроссфейд (конец уходит в то,
   -- что было перед началом); снизу скобки — кандидаты (похожие по спектру пары), щелчок берёт
   S.loop_hot, S.loop_e = nil, nil
-  local lo = S.loop_ov and not editing and S.loop_ov(e)
+  local lo = S.loop_ov and S.loop_ov(e)   -- 13 окт: и при выделении / правке срезов, и на спектрограмме — луп не пропадает
   if lo then
     S.loop_e = e
     local mxw, myw = gfx.mouse_x, gfx.mouse_y
@@ -1174,16 +1174,28 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local function yy(px) local t = (px - p0) / (p1 - p0); if not up then t = 1 - t end; return math.floor(wy + wh - 2 - t * (wh - 4)) end
       if a1 > a0 then gfx.line(a0, yy(a0), a1, yy(a1)); gfx.line(a0, yy(a0) + 1, a1, yy(a1) + 1) end
     end
+    -- ручки кроссфейда: верх «\» (начало затухания) и низ «/» (начало нарастания) — тянуть = длина
+    local hx = { { xe - fxw, wy + 3, 'e' }, { xs - fxw, wy + wh - 4, 's' } }   -- ромбики (U.diamond)
+    local xd = S.loop_drag and S.loop_drag.k == 'susx'
+    for _, hd in ipairs(hx) do
+      local hot = (inw and not S.drag and not S.loop_hot and math.abs(mxw - hd[1]) <= math.max(6, L.rh * 0.5) and math.abs(myw - hd[2]) <= math.max(8, L.rh)) or (xd and S.loop_drag.side == hd[3])
+      if hot and not S.loop_hot then S.loop_hot = { k = 'susx', side = hd[3] } end
+      local dr = math.max(5, math.floor(L.rh * 0.45))
+      if hd[1] >= x and hd[1] < x + w then U.diamond(hd[1], hd[2] + (hd[3] == 'e' and dr or -dr), dr, hd[3] == 'e' and U.AMBER or U.GREEN, hot) end
+    end
     slant(xe - fxw, xe, false, U.AMBER)
     slant(xs - fxw, xs, true, U.GREEN)
     local drag = S.loop_drag and S.loop_drag.k
     for _, it in ipairs({ { 'susa', xs, U.GREEN, 'S' }, { 'susb', xe, U.AMBER, 'E' } }) do
       local px = it[2]
       if px >= x and px < x + w then
-        local hot = (inw and not S.drag and not S.zone_hot and math.abs(mxw - px) <= 4 and myw >= wy + 10) or drag == it[1]
+        local hot = (inw and not S.drag and not S.zone_hot and math.abs(mxw - px) <= math.max(6, L.rh * 0.55) and myw >= wy + 6) or drag == it[1]
         if hot and not S.loop_hot then S.loop_hot = { k = it[1] } end
-        U.set(hot and U.TEXT or it[3]); gfx.rect(hot and px - 1 or px, wy, hot and 3 or 1, wh, 1)
-        if px + 3 + U.measure(it[4]) < x + w then U.text(px + 3, wy + 5, it[4], it[3]) end
+        -- 13 окт: тонкая линия + ромбик сверху (ручка, видна в любой теме), подпись рядом
+        U.set(it[3], hot and 1 or 0.7); gfx.rect(px, wy, 1, wh, 1)
+        local dr = math.max(6, math.floor(L.rh * 0.55))
+        U.diamond(px, wy + 3 * dr, dr, it[3], hot)
+        if px + dr + 4 + U.measure(it[4]) < x + w then U.text(px + dr + 3, wy + 2 * dr, it[4], it[3]) end
       end
     end
     local cs = lo.cands or {}

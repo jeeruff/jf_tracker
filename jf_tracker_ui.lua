@@ -84,6 +84,16 @@ end
 local function set(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 U.set = set
 
+-- 13 окт: ручка-ромбик (квадрат на угол): заливка цветом, обводка фоном и контуром текста —
+-- видна издалека в любой теме. cx, cy — центр, r — полудиагональ
+function U.diamond(cx, cy, r, col, hot)
+  r = r or 5
+  set(U.BG); gfx.triangle(cx, cy - r - 2, cx + r + 2, cy, cx, cy + r + 2, cx - r - 2, cy)
+  set(hot and U.TEXT or col); gfx.triangle(cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy)
+  set(hot and col or U.TEXT, 0.9)
+  gfx.line(cx, cy - r - 1, cx + r + 1, cy); gfx.line(cx + r + 1, cy, cx, cy + r + 1); gfx.line(cx, cy + r + 1, cx - r - 1, cy); gfx.line(cx - r - 1, cy, cx, cy - r - 1)
+end
+
 -- Прямоугольник: прямые углы, линия в 1 px. Параметр r остался в сигнатуре
 -- ради старых вызовов, но игнорируется — скруглений больше нет.
 function U.frame(x, y, w, h, col, fill, r)

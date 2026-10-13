@@ -637,7 +637,7 @@ function VZ.mx_key(c, fine, env)
   -- 13 окт: цифры как в трекере: первая — десятые (5 → .50), вторая — сотые (5 7 → .57);
   -- знак сохраняется (~ меняет), x — убрать; другая клавиша или ячейка — набор закрыт
   if d and #ch == 1 then
-    local now = reaper.time_precise()
+    local now = (reaper and reaper.time_precise or os.clock)()
     local cell = VZ.mr .. ':' .. VZ.mc
     if VZ.mxbuf and VZ.mxcell == cell and #VZ.mxbuf == 1 and now - (VZ.mxt or 0) < 2 then
       VZ.mxbuf = VZ.mxbuf .. ch; a = (a < 0 and -1 or 1) * tonumber(VZ.mxbuf) / 100; VZ.mxbuf = nil

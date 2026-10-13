@@ -400,7 +400,7 @@ KH.PAGES = {
     { k = 'r  z  /', d = 'rename; fold the folder; filter by name (Esc clears)' },
     { k = 'Esc', d = 'clear the filter, then the marks, then back to the tracker' },
   } },
-  looploom = { title = 'crossfade: the sustain loop of the instrument and its seam crossfade (points and candidates are on the item wave)', e = {
+  looploom = { title = 'sustain: the sustain loop of the instrument and its seam crossfade (points and candidates are on the item wave)', e = {
     { k = 'j k  h l', d = 'row; value less / more (Shift - fine)' },
     { k = 'Enter', d = 'the list (loop mode, curve) or the action of the row' },
     { k = 'R', d = 'reset the row / find the points again' },
