@@ -15366,13 +15366,18 @@ local function frame()
       if SL.entry and SL.entry.file then e = SL.entry end
       -- слайсы вложены (3 окт): курсор на ноте-слайсе этого исходника — его зона
       local zi = vim.inst
-      if e and not e.parent and not e.file and snap and snap.inst_of then
+      -- 13 окт: и наоборот — выбран слайс, курсор на ноте всего сэмпла (того же файла) — сэмпл:
+      -- properties сами берут то, что под курсором
+      if e and not e.file and snap and snap.inst_of then
         local f = L and L.flat[vim.cur.fi]
         local cell = f and f.sub and f.sub[vim.cur.row]
         if cell and cell.kind == 'cont' then cell = cell.of end
         local ci = cell and cell.item and snap.inst_of[cell.item]
         local ce = ci and col.pool[ci]
-        if ce and ce.parent == e then e, zi = ce, ci end
+        local root = e.parent or e
+        if ce and (ce.parent or ce) == root then
+          e, zi = ce, ci
+        end
       end
       -- слайс / кусок: показываем исходник (родителя) с подсветкой играемой зоны
       local sel_e = e
