@@ -1578,6 +1578,8 @@ function M.track_envs(tr, lpb)
         local active, visible, _, _, _, _, a, b = R.BR_EnvGetProperties(be)
         R.BR_EnvFree(be, false)
         vis = active and visible
+        -- 13 окт: темп мастера — колонка всегда (REAPER прячет огибающую темпа, когда маркеры темпа ставят из API)
+        if active and (name or ''):lower():find('tempo') then vis = true end
         if a and b and b > a then mn, mx = a, b end
       end
     end
