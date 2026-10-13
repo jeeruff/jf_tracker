@@ -41,6 +41,8 @@ KH.PAGES = {
     { k = 'Opt+1..0', d = 'instrument 1..10 of the lib' },
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back); in INSERT Cmd+digit is a note' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto / next off' },
+    { k = 'Opt+Shift+J K', d = 'the note under the cursor: its end a row later / earlier (not stretched; past the sample the instrument loop plays)' },
+    { k = 'Opt+Shift+H L', d = 'the note under the cursor: its start a row earlier / later (the source offset follows, as trim)' },
     { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
     { k = 'keys: renoise', d = 'option: two octaves at once - z s x d c v g b h n j m , l . ; / the cursor octave, q 2 w 3 e ... an octave higher; then in INSERT the octave is [ ], moving - the arrows' },

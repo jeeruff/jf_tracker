@@ -819,6 +819,31 @@ function V.note_off_scope(scope)
   V.msg = ('note off (%s): %d'):format(scope == 'all' and 'all tracks' or (scope == 'track' and 'track' or 'subcolumn'), #heads)
   return #heads
 end
+-- 13 окт: край ноты под курсором на строку (Option+Shift: J / K — конец позже / раньше,
+-- H / L — начало раньше / позже; начало тянет и offset источника, как trim). Без растяжки;
+-- что звучит за концом сэмпла — по лупу инструмента. По сетке строк, один undo
+function V.note_edge(edge, d)
+  local hs = V.covering(V.cur.fi, V.cur.row)
+  local n = 0
+  local L = lpb()
+  for _, h in ipairs(hs) do
+    local it = h.item
+    if h.kind == 'audio' and it and reaper.ValidatePtr(it, 'MediaItem*') then
+      local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local r = math.floor(ctx.model.row_of_time(edge == 'end' and pos + len or pos, L) + 0.5) + d
+      local t = ctx.row_time(r)
+      if (edge == 'end' and t > pos + 1e-4) or (edge == 'start' and t < pos + len - 1e-4 and t >= 0) then
+        ctx.edit.item_drag_begin('note ' .. edge)
+        ctx.edit.item_drag_to(it, edge, t)
+        n = n + 1
+      end
+    end
+  end
+  ctx.edit.item_drag_end()
+  V.msg = n > 0 and ('note %s %s a row (Opt+Shift+J K - the end, H L - the start)'):format(edge, d > 0 and 'later by' or 'earlier by')
+          or 'note edge: no audio note under the cursor (MIDI notes: drag)'
+end
 function V.play_keys(keys, n)
   V.cmdbuf = {}
   for _ = 1, n or 1 do replay(keys) end

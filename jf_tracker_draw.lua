@@ -2521,7 +2521,11 @@ function D.pane_badge(L, c, h)
   local ns = tostring(c.num)
   local nx = c.x + c.w - ms(ns) - L.pad - 2
   set(U.AMBER); gfx.rect(nx - 2, c.y, ms(ns) + 4, h, 1)
+  -- 13 окт: обрезка — своего листа (от прошлого листа оставалась чужая — цифру срезало, плашка пустая)
+  local keep = D.clip
+  D.clip = { c.x, c.x + c.w, c.y, c.y + h }
   text(nx, c.y + 1, ns, U.BG)
+  D.clip = keep
 end
 -- 11 окт: у трекера нет строки вкладок, и его тело рисуется после рамок —
 -- номер ставится в проходе post (поверх шапки), иначе его не видно

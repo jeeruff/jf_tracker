@@ -10109,7 +10109,6 @@ ctx = {
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
       { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on (default): after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, aliases copy exactly what is seen; off - a note started in a pattern rings on into the next one (as in Renoise); the matrix trim button still cuts by hand', get = function() return state.hardedges ~= false end, set = function(v) state.hardedges = v end },
-      flag('keepsamples', 'keep deleted samples', 'deleting the last item of a file keeps the sample in the lib (=LIB)'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
     }
@@ -10132,7 +10131,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -12343,7 +12342,6 @@ function view_actions()
         local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
         if rg then reaper.GetSet_LoopTimeRange(true, true, rg.pos, rg.rgnend, false); reaper.GetSetRepeat(1) end
       end },
-    { (state.side and '!' or '') .. 'Browser sidebar (:side)', key = 'b', fn = function() state.side = not state.side end },
     { (state.envs and '!' or '') .. 'Envelopes (:env)', key = 'e', fn = function() state.envs = not state.envs end },
     { 'FX columns +1', key = 'x', fn = function() state.fxcols = math.min(4, state.fxcols + 1) end },
     { 'FX columns -1', key = 'X', fn = function() state.fxcols = math.max(0, state.fxcols - 1) end },
@@ -12437,6 +12435,7 @@ local function context_menu(hover, anchor)
   local own = hover.prevbtn and 'preview' or (hover.header_env and (hover.header_env.e.name or 'envelope')) or (pmcard and pmcard.name) or nil
   local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
+  local groups, gorder = nil, {}
   if P then
     for _, e in ipairs(P.e) do
       local toks = {}
@@ -12447,16 +12446,36 @@ local function context_menu(hover, anchor)
       local codes = first and ctx.tok_codes(first)
       if codes and not nav and not have[first] then
         have[first] = true
-        local k = pick_key(#first == 1 and first or nil, e.d)
         local foc = ctx.CTX_FOCUS[page]
         -- 10 окт: в меню — короткая подпись (e.m или начало описания), полное — в справке ?
         local lbl = e.m or e.d:gsub(' %(.*$', ''):gsub('; .*$', '')
         if not e.m and #lbl > 48 then lbl = lbl:gsub(' %- .*$', '') end
-        if k then hitems[#hitems + 1] = { key = k, label = lbl, hk = (e.k ~= k) and e.k or nil, fn = function()
+        local function run_it()
           if foc and state.focus ~= foc then ctx.set_focus(foc) end
           for _, cd in ipairs(codes) do ctx.keyq[#ctx.keyq + 1] = cd end
-        end } end
+        end
+        -- 13 окт: клавиша из двух букв (zt, ts) — в подменю своей первой буквы, внутри вторая:
+        -- в меню те же клавиши, что в трекере (раньше — подставные цифры 1..9)
+        if #first == 2 and first:match('^%a%a$') then
+          local p1 = first:sub(1, 1)
+          groups = groups or {}
+          if not groups[p1] then groups[p1] = {}; gorder[#gorder + 1] = p1 end
+          table.insert(groups[p1], { key = first:sub(2), label = lbl, fn = run_it })
+        else
+          local k = pick_key(#first == 1 and first or nil, e.d)
+          if k then hitems[#hitems + 1] = { key = k, label = lbl, hk = (e.k ~= k) and e.k or nil, fn = run_it } end
+        end
       end
+    end
+  end
+  for _, p1 in ipairs(gorder) do
+    local list = groups[p1]
+    local k = (not used[p1] and p1) or pick_key(nil, 'menu ' .. p1)   -- буква занята одиночной командой — другая
+    if k then
+      used[k] = true
+      local names = {}
+      for i = 1, math.min(3, #list) do names[#names + 1] = list[i].label:match('^(%S+)') end
+      hitems[#hitems + 1] = { key = k, label = p1 .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return { title = p1 .. ' …', items = list } end }
     end
   end
   -- 10 окт: быстрое меню модуля (\ в модуле) — последним пунктом \ главное меню
@@ -14363,7 +14382,7 @@ local function frame()
     if on_fx and not sp_on_fx then state.dsp_take = true; dsp_sel.fx, dsp_sel.param = 1, 1; DK.anchor, DK.pending = nil, nil end
     sp_on_fx = on_fx
   end
-  edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
+  edit.keep_samples, edit.copy_media = true, state.copymedia   -- 13 окт: страховка всегда (сэмпл трека всегда в lib), опции нет
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
   if edit.rescued then
     vim.msg = 'last item of ' .. table.concat(edit.rescued, ', ') .. ' deleted - sample kept in track library (=LIB)'
@@ -18983,7 +19002,14 @@ local function frame()
   -- не «˙»), поэтому смотрим физическую клавишу; код — как от Option+h в US
   if c > 0 and reaper.JS_VKeys_GetState then
     local m = ctx.mods()
-    if m.alt and not m.cmd and not m.ctrl then
+    -- 13 окт: Option+Shift+H J K L — край ноты под курсором (vim.note_edge), физические клавиши
+    if m.alt and m.shift and not m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then
+      local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
+      for vk, a in pairs({ [72] = { 'start', -1 }, [76] = { 'start', 1 }, [74] = { 'end', 1 }, [75] = { 'end', -1 } }) do
+        if ks and ks:byte(vk) ~= 0 then vim.note_edge(a[1], a[2]); c = 0; break end
+      end
+    end
+    if c ~= 0 and m.alt and not m.cmd and not m.ctrl then
       local OPT_HJKL = { [729] = true, [8710] = true, [730] = true, [172] = true }
       if not OPT_HJKL[c] then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)

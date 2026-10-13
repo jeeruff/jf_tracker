@@ -145,8 +145,10 @@ local function root_file(src)
   if rf_cache and key then rf_cache[key] = fn end
   return fn
 end
-local function census()
-  local out = {}
+-- 13 окт: и самый длинный item каждого файла (мать с нарезкой, лупом, метками) — его chunk:
+-- пропал файл — в lib встаёт он, а не голый файл (best[tr][fn] = chunk)
+local function census(with_chunks)
+  local out, best = {}, with_chunks and {} or nil
   local lib = model and model.lib_pos and model.lib_pos()
   local endp = model and model.marker_pos and model.marker_pos(model.END_MARKER)
   for ti = 0, R.CountTracks(0) - 1 do
@@ -164,23 +166,44 @@ local function census()
             local in_lib = lib ~= nil and pos >= lib - 1e-6 and (endp == nil or pos >= endp - 1e-6)
             set = set or {}
             set[fn] = set[fn] or false
-            if not in_lib then set[fn] = true end
+            if not in_lib then
+              set[fn] = true
+              if best and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) == '' then   -- хвост лупа — не мать
+                local b = best[tr] or {}; best[tr] = b
+                local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+                if not b[fn] or len > b[fn].len then b[fn] = { it = it, len = len } end
+              end
+            end
           end
         end
       end
       if set then out[tr] = set end
     end
   end
+  if best then
+    for _, b in pairs(best) do for _, x in pairs(b) do local okc, ch = R.GetItemStateChunk(x.it, '', false); x.chunk = okc and ch or nil; x.it = nil end end
+    E.census_best = best
+  end
   return out
 end
 local function rescue(pre)
   local post = census()
   local saved = {}
+  local best = E.census_best or {}
   for tr, set in pairs(pre) do
     if R.ValidatePtr(tr, 'MediaTrack*') then
       for fn, in_seq in pairs(set) do
         if in_seq and not (post[tr] and post[tr][fn] ~= nil) and not E.lib_has(fn, tr) then
-          if E.depot_add(fn, tr) then saved[#saved + 1] = fn:match('[^/]+$') or fn end
+          local b = best[tr] and best[tr][fn]
+          local done = false
+          if b and b.chunk then          -- инструмент целиком: chunk без GUID, на свой лейн LIB
+            local ltr, lane = E.lib_slot()
+            local it = R.AddMediaItemToTrack(ltr)
+            if it and R.SetItemStateChunk(it, E.strip_guids(b.chunk), false) then E.lib_mark(it, tr, lane); done = true
+            elseif it then R.DeleteTrackMediaItem(ltr, it) end
+          end
+          if not done then done = E.depot_add(fn, tr) ~= nil end
+          if done then saved[#saved + 1] = fn:match('[^/]+$') or fn end
         end
       end
     end
@@ -242,7 +265,7 @@ local function run(desc, fn)
         end
       end
     end
-    if E.keep_samples and not E.no_rescue then local okc, c = pcall(census); if okc then pre = c end end
+    if E.keep_samples and not E.no_rescue then E.census_best = nil; local okc, c = pcall(census, true); if okc then pre = c end end
     E.nm_pre = nil
     if E.NM.on() then local okn, c = pcall(E.NM.census); if okn then E.nm_pre = c end end
     local oks, sc = pcall(sections_pre); E.sec_pre = oks and sc or nil
@@ -266,7 +289,7 @@ local function run(desc, fn)
   if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
+  if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()
@@ -897,6 +920,7 @@ end
 local function strip_guids(chunk)
   return (chunk:gsub('\n%s*GUID %b{}', ''):gsub('\n%s*IGUID %b{}', ''))
 end
+E.strip_guids = strip_guids                 -- 13 окт: страховка сэмплов (выше по файлу)
 
 function E.yank(heads, lpb, origin_row, origin_fi)
   local reg = { rows = 1, cells = {} }
