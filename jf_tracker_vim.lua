@@ -847,7 +847,7 @@ end
 -- Таблица команд: исполнение, подсказка (список снизу при наборе) и Tab.
 V.COMMANDS = {
   { 'q', '', 'close window' }, { 'w', '', 'save project' }, { 'wq', '', 'save and close' },
-  { 'lpb', 'N', 'rows per beat (1..64)' }, { 'metro', '[menu]', 'metronome on / off; menu - speed, accents, pre-roll' }, { 'vzsave', 'name', 'visor: save the look as a preset' }, { 'vzset', 'N', 'visor: the selected parameter / matrix cell = N' }, { 'step', 'N|auto|next', 'step after input: rows / to the end of the item / to the next object' },
+  { 'lpb', 'N', 'rows per beat (1..64)' }, { 'metro', '[menu]', 'metronome on / off; menu - speed, accents, pre-roll' }, { 'vis', 'scene', 'visor event on the cursor row = scene / preset (empty - delete)' }, { 'vzsave', 'name', 'visor: save the look as a preset' }, { 'vzset', 'N', 'visor: the selected parameter / matrix cell = N' }, { 'step', 'N|auto|next', 'step after input: rows / to the end of the item / to the next object' },
   { 'oct', 'N', 'input octave' }, { 'inst', 'N', 'instrument slot' },
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'scale', 'N', 'bitmap scale x1..3 (Cmd +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'off', '[all]', 'note off at the cursor row on the whole track (all - on every track); in INSERT ` subcolumn, ~ track, Ctrl+` all' }, { 'repeat', '[all]', 'repeat the part of the region above the cursor down to the region end (Ctrl+Opt+J; all - every track)' }, { 'mac', 'name', 'play a macro by name (saved, built-in or @a) at the cursor; \\ q - all of them in a menu' }, { 'macsave', 'a name', 'keep register a as a named macro (macros tab, Data/jf_tracker_macros.txt)' }, { 'tcolor', '#rrggbb', 'colour of the cursor track by its code (tc - the colour grid)' }, { 'transients', '', 'transient detector module in the item tab (= Opt+D): sensitivity, threshold, min gap, pre-attack, live; Enter slices' }, { 'arr', '[new [name]|name text|dup|clear|del|next|prev|N]', 'arrangements: named sets of the fixed lanes that play (\\ P a)' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | gruvbox | catppuccin | mono' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|modulate|midi|grid|retro|orca|master', 'top panel tab' }, { 'optsave', 'name', 'save all options as a profile' }, { 'optload', 'name', 'load an options profile' }, { 'optdel', 'name', 'delete an options profile' }, { 'redo', '', 'redo (also Cmd+Shift+Z; Ctrl+R is the rec tab)' }, { 'undo', '', 'undo (also u, Cmd+Z)' }, { 'sig', 'N/D [all|here]', 'time signature for the whole project or this pattern; a longer bar - fill the missing beats empty / with the last beat / keep' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '[big]', 'bottom DSP panel (track fx); big - the chain with its routing on the whole window (zz in DSP)' }, { 'patternize', '1|2|4|8|16|items|markers', 'the empty parts of the project become patterns (regions A1 A2 …): every N bars, by the items of the cursor track, or by markers; existing patterns stay (matrix menu)' }, { 'sus', '[find|on|off|start end [ms]]', 'sustain loop of the lib sample: a long note holds by looping a steady part (found by the spectrum, or by hand), the seam crossfaded' }, { 'shiftrec', '', 'shift rec (the shift button under rec): waits for a MIDI note, then records from the cursor row at the project rate (x0.5 - slow, plays back fast); again - cancel / stop' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
@@ -1126,6 +1126,7 @@ local function run_cmd(line)
   elseif cmd == 'logo' then if ctx.logo_show then ctx.logo_show(arg) end
   elseif cmd == 'dev' then if ctx.dev_set then ctx.dev_set(arg) end
   elseif cmd == 'tutorial' or cmd == 'tutor' then if ctx.tutorial then ctx.tutorial(arg == 'text') end
+  elseif cmd == 'vis' then if ctx.vis_set then ctx.vis_set(V.cur.row, arg) end   -- 13 окт: событие visor текстом в строке курсора
   elseif cmd == 'mcmd' then if ctx.mcmd_set then ctx.mcmd_set(V.cur.row, arg) end   -- 11 окт: команда мастера (маркер) в строке курсора
   elseif cmd == 'metro' then                                 -- 13 окт: :metro — вкл / выкл, :metro menu — выпадашка
     if arg == 'menu' then ctx.metro_menu() else reaper.Main_OnCommand(40364, 0); V.msg = 'metronome ' .. (reaper.GetToggleCommandState(40364) == 1 and 'on' or 'off') end
@@ -1525,7 +1526,7 @@ function V.key_impl(c)
   do
     local cf = flat()[V.cur.fi]
     -- 13 окт: колонки visor и cmd мастера — Vim-правка событий: dd вырезать, yy копировать, p вставить
-    -- в строку курсора (перенос = dd j p), c / r — заменить (visor: выбор с превью, cmd: строка :)
+    -- в строку курсора (перенос = dd j p), c / r — правка текста строкой : (visor: Enter — выбор с превью)
     if cf and cf.ml and (cf.ml.kind == 'vis' or cf.ml.kind == 'cmd') and V.mode == 'normal' then
       local kind, ch = cf.ml.kind, (c > 0 and c < 256) and string.char(c) or ''
       local set = kind == 'vis' and ctx.vis_set or ctx.mcmd_set
@@ -1546,8 +1547,7 @@ function V.key_impl(c)
         return
       end
       if ch == 'c' or ch == 'r' then
-        if kind == 'vis' and ctx.visor_pick then ctx.visor_pick(V.cur.row)
-        else V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd ' .. (e and e.text or '') end
+        V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = (kind == 'vis' and 'vis ' or 'mcmd ') .. (e and e.text or '')
         return
       end
     end

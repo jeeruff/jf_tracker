@@ -5728,40 +5728,25 @@ function D.frame(L, snap, rows, state, info)
               set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
             end
           end
-          if ml.kind == 'vis' then
-            -- 11 окт: событие visor — превью сцены на строки до следующего (до 4), рисуется после строк
-            if e then
-              local nxt
-              for _, rr in ipairs(ml.rows) do if rr > r.row then nxt = rr; break end end
-              local span = math.max(1, math.min(4, (nxt or (r.row + 4)) - r.row))
-              D.vis_thumbs = D.vis_thumbs or {}
-              D.vis_thumbs[#D.vis_thumbs + 1] = { name = e.text, x = m.x + 1, y = y + 1, w = m.w - 2, h = span * L.rh - 2, foc = foc, many = e.n > 1 }
-              D.vis_span = r.row + span
-            elseif not (D.vis_span and r.row < D.vis_span) then text(m.x + L.pad, ty, '....', D.EMPTY) end
-            if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
-            goto ml_next
-          end
           if e then
-            local t = (ml.kind == 'tx' or ml.kind == 'cmd') and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
-            text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN)
-          else text(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd') and '....' or '..', D.EMPTY) end
+            local txt = ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis'
+            local t = txt and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
+            -- 13 окт: visor / cmd — текст команды строкой (без картинок поверх строк), секции через пробел:
+            -- первое слово (сцена / команда) ярко, аргументы тусклее
+            local head, rest = t:match('^(%S+)(%s.*)$')
+            if (ml.kind == 'vis' or ml.kind == 'cmd') and head then
+              local hc = e.n > 1 and U.AMBER or U.CYAN
+              local hw = gfx.measurestr(head)
+              text(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
+              if hw < m.w - L.pad - L.cw then text(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
+            else text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN) end
+          else text(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
         ::ml_next::
       end
     end
   end
-  -- 11 окт: превью событий visor (поверх строк): картинка сцены, имя внизу на подложке
-  local vbot = (L.body_y or 0) + (L.body_h or gfx.h)
-  for _, t in ipairs(D.vis_thumbs or {}) do
-    t.h = math.max(L.rh - 2, math.min(t.h, vbot - t.y))
-    set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(t.x, t.y, t.w, t.h, 1)
-    local drawn = info.visor_namethumb and t.h >= 4 and info.visor_namethumb(t.name, t.x, t.y, t.w, t.h)
-    local ny = t.y + math.max(0, t.h - L.rh)
-    text(t.x + 1, ny, fit(t.name, t.w - 2), drawn and U.TEXT or (t.many and U.AMBER or U.CYAN), drawn and U.BG or nil)
-    if t.foc then set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(t.x - 1, t.y - 1, t.w + 2, L.rh, 0) end
-  end
-  D.vis_thumbs, D.vis_span = nil, nil
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil

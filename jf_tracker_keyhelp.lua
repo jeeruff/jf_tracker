@@ -108,7 +108,7 @@ KH.PAGES = {
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
     { k = 'z. z,', d = 'the cursor track wider / narrower (its own width)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
-    { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r / Enter change, x delete', t = {} },
+    { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r edit the text (:vis / :mcmd), Enter - visor: pick with previews, x delete', t = {} },
     { k = 'env: field 2', d = 'segment shape: INSERT letters sqr slo fas fae bez, ^A ^X cycle, :shape fas' },
     { k = 'env: Ctrl+Opt+1..6', d = 'segment shape of the point on the row, in any field and mode: 1 lin 2 sqr 3 slo 4 fas 5 fae 6 bez' },
     { k = 'i', d = 'INSERT: keyboard plays notes (Ableton layout)' },
