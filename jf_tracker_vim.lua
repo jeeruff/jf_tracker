@@ -1026,6 +1026,7 @@ local function run_cmd(line)
   elseif cmd == 'len' then ctx.mx_len(arg)
   elseif cmd == 'pat' then if ctx.slot_set_pattern then ctx.slot_set_pattern(tonumber(arg)) end   -- 10 окт: :pat N — паттерн N в слот курсора матрицы
   elseif cmd == 'sig' then ctx.sig_cmd(arg)
+  elseif cmd == 'rgbpm' then if ctx.region_bpm then ctx.region_bpm(arg) end   -- 13 окт: окно BPM паттерна (колонка матрицы)
   elseif cmd == 'add' then local b, nm = arg:match('^(%d*)%s*(.*)$'); ctx.mx_add(tonumber(b) or 1, nm)
   elseif cmd == 'beatsync' or cmd == 'bs' then
     local heads

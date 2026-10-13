@@ -56,8 +56,10 @@ local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
-local BTNS = { { 'menu', 'menu' }, { 'fold', 'sel' },   -- 12 окт: menu — patternize и прочее
-  { 'zoom', 'detail' }, { 'fill', 'fill' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'ruler', 'ruler' }, { 'se', 's/e' }, { 'loops', 'loops' }, { 'add', '+' } }
+-- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
+local BTNS = { { 'menu', 'menu' }, { 'fold', 'cell' },   -- 12 окт: menu — patternize и прочее
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'add', '+' } }
+MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
@@ -239,7 +241,8 @@ function MX.width(L, nregions, ncols)
   L.mx_sig_w = (MX.fold or MX.sig_same) and 0 or (U.measure('15/16') + L.pad)
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
-  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_sig_w + L.mx_dur_w)
+  L.mx_bpm_w = (MX.fold or not MX.bpm) and 0 or (U.measure('999.9') + L.pad)
+  L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_bpm_w + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
   L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
@@ -331,7 +334,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fill' and MX.fill) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -544,7 +547,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if not rg.gap and info.region_rgb then
       local c = info.region_rgb(rg.color)
       if c then
-        U.set(U.tint(c, 0.22)); gfx.rect(RW + 3, y + 1, L.mx_label_w - L.mx_dur_w - L.mx_sig_w - 3 - RW, L.rh - 1, 1)
+        U.set(U.tint(c, 0.22)); gfx.rect(RW + 3, y + 1, L.mx_label_w - L.mx_dur_w - L.mx_sig_w - (L.mx_bpm_w or 0) - 3 - RW, L.rh - 1, 1)
         U.set(c); gfx.rect(RW + 1, y + 1, 2, rh - 1, 1)
       end
     end
@@ -595,7 +598,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
     -- имя и длина — интерактивные (1 окт): dblclick имени → :name, клик по
     -- длине → :len; hover.name / hover.dur = ri
-    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - L.mx_sig_w - 2 - L.pad   -- mx_idx_w уже с линейкой
+    local nx, nw = L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - L.mx_sig_w - (L.mx_bpm_w or 0) - 2 - L.pad   -- mx_idx_w уже с линейкой
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
@@ -626,6 +629,17 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         U.text(dx - L.pad - U.measure(ss), y + 1, ss, hot_sig and U.AMBER or U.DIM)
         if hot_sig then hover.sig = ri end
         if ctx.hint then ctx.hint('mxsig', sx, y, L.mx_sig_w, L.rh, ri) end
+      end
+      -- 13 окт: BPM в начале региона; щелчок — ввести темп этого паттерна (маркер темпа в его начале)
+      if (L.mx_bpm_w or 0) > 0 and ctx.bpm_at and not rg.gap then
+        local bpm = ctx.bpm_at(rg.pos)
+        local bs = (math.abs(bpm - math.floor(bpm + 0.5)) < 0.05) and tostring(math.floor(bpm + 0.5)) or ('%.1f'):format(bpm)
+        local bx1 = dx - L.mx_sig_w
+        local bx0 = bx1 - L.mx_bpm_w
+        local hot_bpm = hover.ri == ri and mx >= bx0 and mx < bx1
+        U.text(bx1 - L.pad - U.measure(bs), y + 1, bs, hot_bpm and U.AMBER or (MX.bpm_diff and U.TEXT or U.DIM))
+        if hot_bpm then hover.bpm = ri end
+        if ctx.hint then ctx.hint('mxbpm', bx0, y, L.mx_bpm_w, L.rh, ri) end
       end
     end
     end
@@ -816,10 +830,10 @@ local MX_HINT = {
   y = 'y: y yank slot | Esc',
   c = 'c: c / w rename region | Esc',
   g = 'g: g first slot | Esc',
-  z = 'z: z session - clips over the whole window | i zoom detail | Esc',
+  z = 'z: the view menu',
 }
 function MX.pending_hint() return MX.pending and MX_HINT[MX.pending] or nil end
-local OPS = { d = true, y = true, g = true, z = true }
+local OPS = { d = true, y = true, g = true }   -- 13 окт: z — меню вида (ctx.mx_view_menu)
 
 function MX.key(c, regions, snap)
   local ch = c < 256 and string.char(c) or ''
@@ -937,6 +951,7 @@ function MX.key(c, regions, snap)
   end
   local count = MX.count
   MX.count = nil
+  if ch == 'z' and ctx.mx_view_menu then ctx.mx_view_menu(); return true end
   if OPS[ch] then MX.pending, MX.pcount = ch, count; ctx.msg((count and (count .. ' ') or '') .. ch .. '...'); return true end   -- 10 окт: счётчик доживает до второй клавиши (5dd)
   -- Ctrl+Up / Ctrl+Down (9 окт, как Paketti в Renoise): дубль слота выше / ниже,
   -- в копии заглушённые треки пустые

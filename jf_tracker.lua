@@ -7450,6 +7450,51 @@ ctx = {
     local nn = math.max(1, math.min(32, n + (d > 0 and 1 or -1)))
     if nn ~= n then ctx.sig_apply('all', nil, nn, dd, 'keep'); vim.msg = ('sig %d/%d'):format(nn, dd); ctx.mx_refresh() end
   end,
+  -- 13 окт: темп в начале региона (колонка BPM матрицы) и его правка — маркер темпа в начале паттерна
+  bpm_at = function(t) return reaper.TimeMap_GetDividedBpmAtTime(t) end,
+  bpm_prompt = function(rg)
+    if not rg then return end
+    state.bpm_rg = { pos = rg.pos, name = rg.name }
+    ctx.set_focus('matrix')
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    local b = reaper.TimeMap_GetDividedBpmAtTime(rg.pos)
+    vim.open_prompt('rgbpm ', (math.abs(b - math.floor(b + 0.5)) < 0.05) and tostring(math.floor(b + 0.5)) or ('%.2f'):format(b))
+  end,
+  region_bpm = function(arg)
+    local v = tonumber(arg or '')
+    local rg = state.bpm_rg
+    if not (v and rg) then vim.msg = 'BPM: a number'; return end
+    v = math.max(20, math.min(400, v))
+    edit.run('pattern tempo', function()
+      local hit
+      for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
+        local _, tpos = reaper.GetTempoTimeSigMarker(0, i)
+        if math.abs(tpos - rg.pos) < 1e-4 then hit = i end
+      end
+      if hit then
+        local _, tpos, mpos, bpos, _, num, den, lin = reaper.GetTempoTimeSigMarker(0, hit)
+        reaper.SetTempoTimeSigMarker(0, hit, tpos, -1, -1, v, num, den, lin)
+      else reaper.SetTempoTimeSigMarker(0, -1, rg.pos, -1, -1, v, 0, 0, false) end
+      reaper.UpdateTimeline()
+    end)
+    vim.msg = ('pattern %s: %.2f BPM from its start (a tempo marker; Cmd+Z back)'):format(rg.name ~= '' and rg.name or '', v)
+    model.invalidate()
+  end,
+  -- 13 окт: вид матрицы — одной кнопкой view (= z в матрице): detail, fill, ruler, s/e, bpm, loops, session
+  mx_view_menu = function()
+    local function on(b) return b and '  (on)' or '' end
+    local items = {
+      { key = 'i', label = 'detail: events inside the cells' .. on(MX.zoom == 'detail'), fn = function() ctx.mx_zoom() end },
+      { key = 'f', label = 'fill: the cells as bars of load' .. on(MX.fill), fn = function() MX.fill = not MX.fill end },
+      { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
+      { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
+      { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
+      { key = 'z', label = 'session: clips over the whole window', fn = function() if ctx.ss_big then ctx.ss_big() end end },
+    }
+    if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
+    vim.open_hydra({ title = 'matrix view (z)', items = items })
+    if not state.popup_at then state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
+  end,
   sig_prompt = function(rg)
     local n, d = ctx.sig_at(rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0))
     if rg then state.sig_rg = rg.idx; state.popup_at = { kind = 'mxrow', ri = MX.cur.ri } else state.sig_rg = nil; state.popup_at = { kind = 'strip', id = 'sig' } end
@@ -12049,6 +12094,7 @@ ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
+MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 SL.loop_ov = function(e)
@@ -12107,7 +12153,7 @@ local function hint_go(t)
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
-    if d == 'more' then ctx.mx_more() elseif d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
+    if d == 'view' then ctx.mx_view_menu() elseif d == 'more' then ctx.mx_more() elseif d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') elseif d == 'arrclips' then state.mxlaunch = not state.mxlaunch end
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then if d == 0 then ctx.region_len_menu() else ctx.region_len_step(d) end
@@ -15984,6 +16030,8 @@ local function frame()
   elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
+  elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
+  elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column, session (z)'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e on: the matrix goes from =START to =END; off: the whole project as the REAPER timeline (library regions after =END too, 16 free bars at the end) - only the view, the markers stay'
   elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
@@ -17223,6 +17271,9 @@ local function frame()
       MX.goto_cell(seq, snap, hover.matrix.name, MX.cur.ci)
       if dbl and click.zone == 'mxname' and click.row == hover.matrix.name then ctx.mx_name_prompt() end
       click = { t = now2, zone = 'mxname', row = hover.matrix.name }
+    elseif hover.matrix and hover.matrix.bpm then
+      MX.goto_cell(seq, snap, hover.matrix.bpm, MX.cur.ci); ctx.bpm_prompt(seq[hover.matrix.bpm])
+      click = { t = now2, zone = 'mxbpm' }
     elseif hover.matrix and hover.matrix.sig then
       MX.goto_cell(seq, snap, hover.matrix.sig, MX.cur.ci); ctx.sig_prompt(seq[hover.matrix.sig])
       click = { t = now2, zone = 'mxsig' }
@@ -19659,6 +19710,7 @@ if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
 -- 11 окт: кнопка матрицы по id — щелчок и выпадашка » (кнопки, что не влезли в ширину модуля)
 ctx.mx_btn_do = function(b)
   if b == 'more' then ctx.mx_more()
+  elseif b == 'view' then ctx.mx_view_menu()
   elseif b == 'zoom' then ctx.mx_zoom()
   elseif b == 'fold' then ctx.mx_zoom_cycle()
   elseif b == 'fill' then MX.fill = not MX.fill

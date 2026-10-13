@@ -236,7 +236,7 @@ KH.PAGES = {
     { k = 'v HJKL', d = 'block select; in block: y copy, d x cut, M mute', t = { 'v', 'H', 'J', 'K', 'L' } },
     { k = '^C ^X ^V ^N', d = 'block copy / cut / paste / mute' },
     { k = 'u ⌘⇧Z', d = 'undo / redo' },
-    { k = 'zz zi', d = 'session: clips over the whole window / zoom detail', t = { 'z' } },
+    { k = 'z', d = 'view menu (= the view button): i detail, f fill, r ruler, s s/e, b bpm column, z session (clips over the whole window)', t = { 'z' } },
     { k = 'f', m = 'fill: lit cells or an empty grid', d = 'fill: cells show their content (lit) or stay an empty grid - only the view' },
     { k = 't', m = 'trim: cut items past their region', d = 'trim: cut items that run past their region (the button trim)' },
     { k = 'R', m = 'ruler of bars on / off', d = 'ruler of bars on the left on / off (button ruler)' },
