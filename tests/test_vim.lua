@@ -311,6 +311,7 @@ keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
 ctrl_down = true; V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); V.key(51); eq('10 окт: Ctrl+3 = step 3', V.step, 3); ctrl_down = false
+V.step_next = true; ctrl_down = true; V.key(52); eq('13 окт: Ctrl+4 из next - шаг числом', V.step_next, false); eq('  step 4', V.step, 4); ctrl_down = false
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
 do local fi0 = V.cur.fi; V.cur.fi = 1; cmd_down = true; V.key(50); cmd_down = false
