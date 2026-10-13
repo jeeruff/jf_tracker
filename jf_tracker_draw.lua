@@ -7647,7 +7647,7 @@ function D.popup(L, p, anchor)
   -- 9 окт: пикер не уже заголовка (до 60 знаков) — поиск не сжимает окно
   -- 13 окт: окно ввода имени (vim.open_prompt): одна строка — текст, курсор; fresh — весь текст выделен
   if p.kind == 'prompt' then colw = math.max(ms(string.rep('W', 24)), ms(p.title or '') + ms('WW')) + 2 * L.pad end
-  if p.kind == 'picker' and ncol == 1 then
+  if (p.kind == 'picker' or p.kind == 'cmd') and ncol == 1 then
     local tmin = math.min(ms(p.title or ''), ms(string.rep('W', 60))) + 2 * L.pad
     if colw < tmin then tw = tw + (tmin - colw); colw = tmin end
   end
