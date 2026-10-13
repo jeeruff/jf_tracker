@@ -18562,9 +18562,16 @@ local function frame()
     local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
     if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10
     elseif dn and dn:byte(87) ~= 0 then c = 23; c_raw = 23   -- Ctrl+W (9 окт, панели): тоже не доходит
-    elseif dn and dn:byte(79) ~= 0 then c = 15; c_raw = 15 end   -- Ctrl+O (9 окт, прыжок назад)
+    elseif dn and dn:byte(79) ~= 0 then c = 15; c_raw = 15   -- Ctrl+O (9 окт, прыжок назад)
+    elseif dn and dn:byte(77) ~= 0 then c = 13; c_raw = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
   end
   ctx.ctrlj_t = reaper.time_precise()
+  -- 13 окт: Ctrl+M — метроном вкл / выкл из любого модуля (как в FL Studio; меню настроек — gm)
+  if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().alt and not ctx.mods().shift and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    reaper.Main_OnCommand(40364, 0)
+    vim.msg = 'metronome ' .. (reaper.GetToggleCommandState(40364) == 1 and 'on' or 'off') .. '  (Ctrl+M; gm - its menu)'
+    c = 0
+  end
   -- смарт-панель открыта (9 окт) — все клавиши её: h j k l, Enter, Esc
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
   -- 11 окт: Shift+Space — play / 2 (половинная скорость; стоп — скорость назад); медленная запись — кнопка slow
