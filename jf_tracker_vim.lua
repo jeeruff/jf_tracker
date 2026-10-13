@@ -386,11 +386,18 @@ local function is_event(c, strict)
   if strict then return is_head(c) end
   return is_head(c) or (c and c.kind == 'off') or false   -- 9 окт: точки громкости take — не события (x-fade «00» сбивал y3w)
 end
+-- 13 окт: начало пустого MIDI-клипа (#) — тоже событие (w b W B, dw)
+local function empty_start(f, r)
+  if not (f and f.col) or f.env or f.ml then return false end
+  local lane = f.lane or f.col.lanes[1]
+  for _, it in ipairs(lane and lane.items or {}) do if it.empty and math.floor(it.r0 + 1e-6) == r then return true end end
+  return false
+end
 local function track_event(f, r, strict)
   if f.env then return (not strict) and env_has(f, r) end
   if f.ml or f.folded then return false end
   for _, sub in ipairs(subs_of(f)) do if is_event(sub[r], strict) then return true end end
-  return false
+  return empty_start(f, r)
 end
 -- событие в одной подколонке (операторы dw / d2w — прямоугольник своей подколонки)
 local function next_ev(fi, row, dir)
@@ -401,6 +408,7 @@ local function next_ev(fi, row, dir)
   local r = row + dir
   while r >= 0 and r <= last + 1 do
     for _, sub in ipairs(subs_of(f)) do if is_event(sub[r]) then return r end end
+    if empty_start(f, r) then return r end
     r = r + dir
   end
   return nil
