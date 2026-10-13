@@ -225,6 +225,7 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
+  rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
@@ -659,7 +660,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'ruler', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -4849,11 +4850,17 @@ ctx = {
         relayout(); vim.msg = label .. ': ' .. (state[key] and 'on' or 'off')
       end }
     end
-    tog('ruler', 'r', 'region / marker strip left of the rows')
+    tog('ruler', 'r', 'region / marker strip')
     tog('rgnames', 'n', 'region names in the strip')
     tog('mknames', 'm', 'marker names in the strip')
     tog('rgbar', 'b', 'region colour bar at the row numbers')
     tog('rgedges', 'e', 'region edges across the tracks')
+    tog('mkedges', 'k', 'marker lines across the tracks')            -- 13 окт
+    items[#items + 1] = { key = 'R', label = 'strip on the right, at the master' .. (state.rulerside == 'right' and '  (on)' or ''), fn = function()   -- 13 окт: линейка слева / справа
+      state.rulerside = state.rulerside == 'right' and 'left' or 'right'
+      reaper.SetExtState(EXT, 'rulerside', state.rulerside, true)
+      relayout(); vim.msg = 'region / marker strip: ' .. state.rulerside
+    end }
     tog('mxregion', 'x', 'region of the cursor over the matrix')
     tog('mxmarks', 's', '=START / =END rows in the matrix')
     for k, v in ipairs({ 'off', 'beats', 'time', 'both' }) do
@@ -5950,7 +5957,7 @@ ctx = {
       end
     end
     trs = ctx.vz_trks
-    return { on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb, live = ctx.visor_live,
+    return { hints = state.hints, on = VZ.on, t = now, peak = ctx.visor_peak, tname = ctx.visor_tname, thumb = ctx.visor_thumb, pthumb = ctx.visor_pthumb, live = ctx.visor_live,
              tracks = trs, macros = ctx.visor_macros and ctx.visor_macros() or 0,
              scene = sl, scene_has = sl and VZ.st.scenes[sl] ~= nil }
   end,

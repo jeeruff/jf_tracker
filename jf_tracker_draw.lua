@@ -486,7 +486,10 @@ function D.layout(snap, state, nregions)
   L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
     or (tlr == 'both' and ms('999.4') + ms('0:00.000') + 2 * L.pad) or 0
   L.num_w = ms('0000') + 2 * L.pad
-  L.label_w = L.ruler_w + L.num_w + L.tl_w
+  -- 13 окт: линейка (регионы / маркеры, прыжки) — слева от номеров или справа, у мастера (опция ruler side)
+  L.ruler_right = state.rulerside == 'right' and L.ruler_w > 0
+  L.rl = L.ruler_right and 0 or L.ruler_w            -- что слева от номеров строк
+  L.label_w = L.rl + L.num_w + L.tl_w
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
   -- 5 окт: на 15% выше (больше строк свойств сэмпла)
@@ -680,8 +683,9 @@ function D.layout(snap, state, nregions)
   end
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
-  L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.label_w >= 6 * L.cw or false
-  L.master_w = L.master_right and L.label_w or 0
+  L.mstrip_w = L.label_w + (L.ruler_right and L.ruler_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
+  L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.mstrip_w >= 6 * L.cw or false
+  L.master_w = L.master_right and L.mstrip_w or 0
   -- 11 окт: колонка мастера (как show master track в REAPER, по умолчанию вкл) — его огибающие; нет огибающих — пустая дорожка
   L.mtrack = state.showmaster ~= false and snap.master and snap.master.track and not state.ptmode or false
   if L.mtrack then
@@ -692,7 +696,7 @@ function D.layout(snap, state, nregions)
     L.vis_w = (mv and (#mv.rows > 0 or state.visor_on)) and (2 * L.pad + ms('WWWWWWWWWW')) or 0
     L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
   end
-  L.cols_r = L.win_w - L.master_w
+  L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.ruler_w or 0)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
   L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
@@ -4585,9 +4589,9 @@ function D.frame(L, snap, rows, state, info)
   -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
   -- (там было пусто); та же отрисовка, что у трека, без шапки
   local hcols = L.cols
-  if L.mix_bottom and snap and snap.master and snap.master.vol and L.label_w >= 6 * L.cw and not L.mcol then   -- 11 окт: колонка мастера есть — полоса микшера у неё
+  if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol then   -- 11 окт: колонка мастера есть — полоса микшера у неё
     hcols = { table.unpack(L.cols) }
-    hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
+    hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and (L.mstrip_w or L.label_w) or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
   for _, c in ipairs(hcols) do
     local col = c.col
@@ -5741,10 +5745,16 @@ function D.frame(L, snap, rows, state, info)
       local e1 = rgedge[rg.r1] or {}; e1.prv = rg.rgb or D.BAR; rgedge[rg.r1] = e1
     end
   end
+  -- 13 окт: линии маркеров через все треки (опция marker lines) — цвет маркера, у верха его строки
+  local mkline = {}
+  if info.ruler and info.ruler.markers and state.mkedges then
+    for _, mk in ipairs(info.ruler.markers) do mkline[math.floor(mk.row_f + 1e-6)] = mk.rgb or U.AMBER end
+  end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
     local is_cur_row = vc and vc.row == r.row
+    if mkline[r.row] then set(mkline[r.row], 0.75); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.a = 1 end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
     -- треки с включённой записью (5 окт): чуть покрасневший фон колонки
@@ -5763,18 +5773,18 @@ function D.frame(L, snap, rows, state, info)
       local ly = cl == 'bottom' and (y + L.rh - 1) or y
       -- от края полос регионов / маркеров вправо (через линейку, если она
       -- включена): на сами полосы не заходит (3 окт)
-      local lx = tx0 + L.ruler_w
+      local lx = tx0 + L.rl
       if is_cur_row then set(D.CURTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
       if r.row == cur then set(D.EDITTOP); gfx.rect(lx, ly, W - lx, 1, 1) end
       -- 6 окт: кромки ещё раз после ячеек — серая ячейка курсора их закрывала
       if is_cur_row or r.row == cur then D.edge_lines = D.edge_lines or {}; D.edge_lines[#D.edge_lines + 1] = { lx, ly, W - lx, r.row == cur } end
     end
-    text(tx0 + L.ruler_w + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
     -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
     if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
       local b, t = info.tl_label(r.row)
-      local tx = tx0 + L.ruler_w + L.pad
+      local tx = tx0 + L.rl + L.pad
       local tcol = r.bar and U.TEXT or U.GREY
       local tlr = state.tlruler
       if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
@@ -5783,7 +5793,7 @@ function D.frame(L, snap, rows, state, info)
     local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     -- номера шагов (2 окт): протяжка = time selection REAPER
-    if in_body and mx >= tx0 + L.ruler_w and mx < tx0 + L.label_w then hover.rownum = r.row end
+    if in_body and mx >= tx0 + L.rl and mx < tx0 + L.label_w then hover.rownum = r.row end
     for _, c in ipairs(L.cols) do
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       if r.bar and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
@@ -6014,15 +6024,17 @@ function D.frame(L, snap, rows, state, info)
     for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
+  local rx0 = L.ruler_right and (L.win_w - L.ruler_w) or tx0   -- 13 окт: справа — у мастера
+  if L.ruler_right then set(U.LINE); gfx.rect(rx0, L.body_y, 1, L.body_h, 1) end
   if L.jl_w > 0 and #rows > 0 then
     local cr = info.vcur and info.vcur.row          -- курсор трекера (cur_row — edit-курсор REAPER)
     -- 10 окт: как верхняя линейка — подложка опцией jump ruler background, 0 у курсора, цифры приглушены
-    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
+    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(rx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
     for i, r in ipairs(rows) do
       local d = cr and (r.row - cr)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
-        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
+        text(rx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
   end
@@ -6030,7 +6042,7 @@ function D.frame(L, snap, rows, state, info)
     local row0, nr = rows[1].row, #rows
     local function ry(row) return L.body_y + (row - row0) * L.rh end
     local bot = L.body_y + nr * L.rh
-    local laneR, laneM = tx0 + L.jl_w + 3, tx0 + L.jl_w + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт); jl_w — линейка прыжков
+    local laneR, laneM = rx0 + L.jl_w + 3, rx0 + L.jl_w + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт); jl_w — линейка прыжков
     local c0 = info.view_clip and info.view_clip[1] or -math.huge
     local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
@@ -6058,7 +6070,7 @@ function D.frame(L, snap, rows, state, info)
       set(c); gfx.rect(laneR, y, L.rg_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
       if ynext - y > L.th and state.mknames ~= false then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
-    if mx >= tx0 + L.jl_w and mx < tx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
+    if mx >= rx0 + L.jl_w and mx < rx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
@@ -6069,7 +6081,7 @@ function D.frame(L, snap, rows, state, info)
     for _, rg in ipairs(info.ruler.regions) do
       local a, b = math.max(rg.r0, row0, c0), math.min(rg.r1, row0 + nr, c1)
       if b > a and rg.rgb then
-        set(rg.rgb); gfx.rect(tx0 + L.ruler_w, L.body_y + (a - row0) * L.rh, 2, (b - a) * L.rh, 1)
+        set(rg.rgb); gfx.rect(tx0 + L.rl, L.body_y + (a - row0) * L.rh, 2, (b - a) * L.rh, 1)
       end
     end
   end
@@ -6083,10 +6095,10 @@ function D.frame(L, snap, rows, state, info)
       -- авто-панч (5 окт): та же зона красным — запись только в ней
       local grey = info.punch and U.RED or { 0.80, 0.80, 0.80 }
       set(grey)
-      gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.ruler_w + 2, y0, L.label_w - L.ruler_w - 3, y1 - y0, 1)
+      gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.rl + 2, y0, L.label_w - L.rl - 3, y1 - y0, 1)
       gfx.a = 0.05; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1)
       gfx.a = 1
-      local sx = tx0 + L.ruler_w - 3                 -- спина скобки; усы — влево: «]»
+      local sx = tx0 + math.max(L.rl, 5) - 3                 -- спина скобки; усы — влево: «]»
       gfx.rect(sx, y0, 2, y1 - y0, 1)
       if info.timesel[1] >= row0 then gfx.rect(sx - 5, y0, 7, 2, 1) end
       if info.timesel[2] <= row0 + nr then gfx.rect(sx - 5, y1 - 2, 7, 2, 1) end

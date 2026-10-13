@@ -1051,7 +1051,9 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
     if sel then U.set(focused and U.mix(U.BG, U.TEXT, 0.14) or U.mix(U.BG, U.TEXT, 0.07)); gfx.rect(x + 1, ly, lw - 2, rh, 1) end
     local tx = x + pad
     if e.kind == 'addl' or e.kind == 'addfx' then
-      U.text(tx + ms('00 '), ly, e.kind == 'addl' and '+ shader (a)' or '+ effect (e)', hot and U.AMBER or U.GREY)
+      -- 13 окт: доступная команда — тусклее; клавиша в скобках — только при хинтах
+      local hk = env and env.hints and (e.kind == 'addl' and ' (a)' or ' (e)') or ''
+      U.text(tx + ms('00 '), ly, (e.kind == 'addl' and '+ shader' or '+ effect') .. hk, hot and U.AMBER or U.DIM)
       if hot then hover = { kind = 'row', i = i, tip = e.kind == 'addl' and 'add a shader layer (a) - fzf over the ReaVisor shaders' or 'add an effect to the chain (e) - it runs on the mix of the layers' } end
     else
       local on = e.slot.on ~= false
