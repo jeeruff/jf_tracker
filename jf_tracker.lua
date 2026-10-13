@@ -9474,7 +9474,7 @@ ctx = {
     spec.extra = 0
     spec.row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0))
     if spec.slice and spec.entry then PV.slice(spec.track, spec.entry, spec.entry.slices[spec.slice], spec.entry.slices[spec.slice + 1] or spec.entry.len)
-    elseif spec.pitch then ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 64) end
+    elseif spec.pitch then ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 64, ctx.sus_get({ item = spec.item })) end   -- 13 окт: луп удержания звучит, пока держат
     state.hold = spec
     vim.msg = 'hold: release to insert' .. (spec.stretch and ' (stretched)' or '') .. ' - j / down add a step, Esc cancels'
   end,
@@ -11353,13 +11353,13 @@ ctx = {
     for _, k in ipairs(K) do items[#items + 1] = { key = k[1], label = k[2] } end
     return { title = 'keys (Esc)', items = items }
   end,
-  preview = function(track, pitch, inst_item, row, step)
+  preview = function(track, pitch, inst_item, row, step, lp)   -- lp — луп удержания (13 окт: только удержания, звучит до PV.stop)
     if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
     -- 9 окт: сэмпл (аудио-item lib) звучит сам всегда — раньше MIDI-ноты на
     -- треке (от плагина-инструмента) переводили превью в play транспорта (q = весь сэмпл)
     if inst_item and PV.available() and reaper.ValidatePtr(inst_item, 'MediaItem*') then
       local itk = reaper.GetActiveTake(inst_item)
-      if itk and not reaper.TakeIsMIDI(itk) then PV.audio(track, inst_item, pitch - model.BASE_NOTE); return end
+      if itk and not reaper.TakeIsMIDI(itk) then PV.audio(track, inst_item, pitch - model.BASE_NOTE, nil, lp); return end
     end
     -- 9 окт: MIDI-превью (проигрывание от строки) — только если на треке есть
     -- кому звучать: плагин-инструмент или MIDI; пустой слот на пустом треке
@@ -12795,15 +12795,38 @@ local function poll_midi_in()
             PV.slice(tr, e, e.slices[idx], e.slices[idx + 1] or e.len)
             vim.msg = ('MIDI %s -> slice %d'):format(model.note_name(d1), idx)
           end
-        elseif e.item then PV.audio(tr, e.item, d1 - model.BASE_NOTE); vim.msg = 'MIDI ' .. model.note_name(d1)
+        elseif e.item then PV.note_on(d1, tr, e.item, d1 - model.BASE_NOTE, ctx.sus_get(e), d2 / 127); vim.msg = 'MIDI ' .. model.note_name(d1)   -- 13 окт: голос, луп удержания
         elseif e.file then PV.slice(tr, e, 0, e.len) end
+      elseif st and ((st & 0xF0) == 0x80 or ((st & 0xF0) == 0x90 and d2 == 0)) then PV.note_off(d1)
       end
     end
     midiin.held, midiin.nheld = {}, 0
     return
   end
   local ok, want_dev, want_ch = midi_input_ok(col)
-  if not (ok and vim.mode == 'insert' and state.focus == 'tracker') then midiin.held, midiin.nheld = {}, 0; return end
+  -- 13 окт: MIDI-клавиатура играет инструмент курсора всегда (NORMAL, фокус в панели) — сэмпл
+  -- голосом превью через FX трека; луп удержания держит ноту до note-off. Плагин-инструмент
+  -- звучит сам (вход трека), MIDI / automation как инструмент — без звука здесь
+  local pinst = col and not state.midi_inst and not state.auto_inst and not (ctx.inst_fx and ctx.inst_fx(col)) and (col.pool or {})[vim.inst] or nil
+  if pinst and not (pinst.item and reaper.ValidatePtr(pinst.item, 'MediaItem*')) then pinst = nil end
+  local function play_in(e)
+    if not pinst then return end
+    local st, d1, d2 = e.buf:byte(1), e.buf:byte(2) or 0, e.buf:byte(3) or 0
+    local kind = st and (st & 0xF0)
+    if ok and not ((want_dev == 63 or e.dev == want_dev or e.dev == 62) and (want_ch == 0 or ((st & 0x0F) + 1) == want_ch)) then return end
+    if kind == 0x90 and d2 > 0 then
+      local k = pinst.slices and #pinst.slices > 0 and (d1 - model.BASE_NOTE + 1) or nil
+      if k then
+        if k >= 1 and k <= #pinst.slices then PV.slice(col.track, pinst, pinst.slices[k], pinst.slices[k + 1] or pinst.len) end
+      else PV.note_on(d1, col.track, pinst.item, d1 - model.BASE_NOTE, ctx.sus_get(pinst), d2 / 127) end
+    elseif kind == 0x80 or (kind == 0x90 and d2 == 0) then PV.note_off(d1) end
+  end
+  if not (ok and vim.mode == 'insert' and state.focus == 'tracker') then
+    midiin.held, midiin.nheld = {}, 0
+    for k = #fresh, 1, -1 do play_in(fresh[k]) end
+    return
+  end
+  for k = #fresh, 1, -1 do play_in(fresh[k]) end           -- запись: нота слышна, пока держат
   local lane_idx = col.fixed and f.lane and f.lane.idx or nil
   for k = #fresh, 1, -1 do
     local e = fresh[k]
