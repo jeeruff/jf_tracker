@@ -96,7 +96,7 @@ KH.PAGES = {
     { k = 'S-A-h S-A-l', d = 'playrate of the instrument selected in the lib -0.01 / +0.01 (a count - by N)' },
     { k = ':mcmd', d = 'master column cmd = project markers on rows: Enter - edit the command of the row, ! - a REAPER action (marker !<id> - REAPER runs it when playback passes), BS / Del / x - delete; :mcmd <text> sets it, :mcmd alone deletes' },
     { k = 'dr daw', d = 'clear the track in the cursor region / all items of the track (the lib after =LIB stays)', t = { 'dr', 'daw' } },
-    { k = 'yy p P', d = 'copy rows / paste after / before', t = { 'yy', 'y', 'p', 'P' } },
+    { k = 'yy p P', d = 'copy rows / paste: p replaces the note on the row (x-fade on - keeps it), P beside it in a new subcolumn', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s', d = 'replace / split the event (mute events: select with v, then M)', t = { 'c', 's' } },
     { k = 'M S', d = 'mute / solo the cursor track (Shift+m / Shift+s)', t = { 'M', 'S' } },
     { k = '^A ^X', d = 'field value +1 / -1' },

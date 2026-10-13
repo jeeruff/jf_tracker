@@ -2489,7 +2489,7 @@ function V.key_impl(c)
       else V.msg = 'register has envelope points - put the cursor on an envelope column' end
     elseif env_of(V.cur.fi) then V.msg = 'register has notes - put the cursor on a note column'
     else
-      for _ = 1, n do E.paste(reg, lpb(), V.cur.row, paste_targets(V.cur.fi)) end
+      for _ = 1, n do E.paste(reg, lpb(), V.cur.row, paste_targets(V.cur.fi), ch == 'P') end   -- 13 окт: p заменяет ноту строки, P — рядом
       finish_edit()
     end
   elseif ch == 'u' then E.undo(); finish_move()

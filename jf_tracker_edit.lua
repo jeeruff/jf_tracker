@@ -1825,13 +1825,24 @@ function E.depot_span(track, entry, t0, t1)
 end
 
 -- targets(dfi) → {track=, lane_idx=} — колонка для смещения dfi от курсора
-function E.paste(reg, lpb, row, targets)
+-- beside (P) — рядом, в новую подколонку; иначе (p) — 13 окт: нота в строке вставки заменяется
+-- (аудио той же лейн, что начинается в этой строке), если не включён x-fade
+function E.paste(reg, lpb, row, targets, beside)
   if not reg or #reg.cells == 0 then return end
   run('paste', function()
     for _, c in ipairs(reg.cells) do
       local tg = targets(c.dfi)
       if tg then
         local t = row_time(row + c.drow, lpb, c.delay)
+        if c.kind == 'audio' and c.chunk and not beside and not E.xfade.on then
+          local r0, r1 = row_time(row + c.drow, lpb, 0), row_time(row + c.drow + 1, lpb, 0)
+          for i = R.CountTrackMediaItems(tg.track) - 1, 0, -1 do
+            local o = R.GetTrackMediaItem(tg.track, i)
+            local otk = R.GetActiveTake(o)
+            local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+            if otk and not R.TakeIsMIDI(otk) and same_lane(tg.track, o, tg.lane_idx) and op >= r0 - 1e-6 and op < r1 - 1e-6 then R.DeleteTrackMediaItem(tg.track, o) end
+          end
+        end
         if c.kind == 'audio' and c.chunk then
           -- 9 окт: как ввод ноты — звучащее на строке вставки обрезается (mono —
           -- на всём треке), иначе копии перекрывались и уезжали в соседнюю подколонку
