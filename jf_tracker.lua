@@ -17152,6 +17152,10 @@ local function frame()
       ctx.tl_paint = { key = hover.tlist.key, v = v, done = { [hover.tlist.ci] = true } }
       click = { t = now2, zone = 'tlist' }
     elseif hover.tlist_zoom then draw.TL.zoom = (draw.TL.zoom or 1) > 1 and 1 or 2; click = { t = now2, zone = 'tlzoom' }   -- 13 окт: зум слайсов дерева
+    elseif hover.tlist and hover.tlist.fold_key then          -- 13 окт: «+ / -» строки дерева — папка
+      draw.TL.cur = hover.tlist.li
+      draw.TL.open[hover.tlist.fold_key] = (not draw.TL.open[hover.tlist.fold_key]) or nil
+      click = { t = now2, zone = 'tlfold' }
     elseif hover.tlist and hover.tlist.what == 'row' then   -- 13 окт: строка дерева (инструмент, automation, lib)
       draw.TL.cur = hover.tlist.li
       ctx.tl_row_do((draw.TL.rows or {})[hover.tlist.li], dbl)

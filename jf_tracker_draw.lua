@@ -1418,7 +1418,12 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       elseif rw.k == 'ai' then lbl = '~ ' .. (rw.env.name or '') .. ((rw.ai.label or '') ~= '' and ('  ' .. rw.ai.label) or ''); colr = U.CYAN
       else lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('lib/  %d not used'):format(rw.n); colr = U.GREY end
       text(ix, ry, fit(lbl, x + w - ix - L.pad), colr)
-      if hot then hover.tlist = { ci = rw.ci, what = 'row', li = li } end
+      if hot then
+        hover.tlist = { ci = rw.ci, what = 'row', li = li }
+        -- 13 окт: щелчок по «+ / -» — открыть / закрыть папку (инструмент, automation, midi, lib)
+        local c1 = lbl:sub(1, 1)
+        if rw.key and (c1 == '+' or c1 == '-') and mx >= ix - 4 and mx < ix + ms('+ ') then hover.tlist.fold_key = rw.key end
+      end
       goto tl_next
     end
     local ci = rw.ci
