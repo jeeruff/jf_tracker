@@ -246,6 +246,12 @@ KH.PAGES = {
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Tab', d = 'next module' },
   } },
+  clipboard = { title = 'clipboard: the history of yanks (the newest on top)', e = {
+    { k = 'j k  g G', d = 'move' },
+    { k = 'Enter', d = 'make it the register - p in the tracker pastes it (click too)' },
+    { k = 'p P', d = 'paste it at the tracker cursor at once (p replaces, P beside)' },
+    { k = 'd x', d = 'remove from the history' },
+  } },
   inst = { title = 'lib', e = {
     { k = 'c', d = 'convert: l slices to the lib, s an RS5K per slice, w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },

@@ -4514,6 +4514,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'inst' then
         info.lib_tree = state.libtree == true and function(tx, ty, tw, th) D.track_list(L, state, snap, info, hover, tx, ty, tw, th, foc == 'inst') end or nil
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
+      elseif id == 'clipboard' and info.clip_draw then
+        info.clip_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'clipboard', hover)
       elseif id == 'slices' and info.slices_draw then
         local hs = info.slices_draw(L, ct.x + 3, ct.y + 2, ct.w - 5, ct.h - 4)
         if hs ~= nil then hover.slices = hs end

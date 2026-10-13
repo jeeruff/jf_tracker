@@ -333,6 +333,7 @@ state.panes = (function()
     -- 13 окт: lib и tracks — две вкладки одного места (lib — вся база сэмплов, tracks — дерево треков), один раз
     -- 13 окт: модуль slices снова виден — под lib (один раз)
     if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
+    if reaper.GetExtState(EXT, 'clip_tab') ~= '1' then draw.panes.keep_in(m, 'clipboard', 'inst'); reaper.SetExtState(EXT, 'clip_tab', '1', true) end   -- 13 окт: clipboard — вкладкой у lib
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
@@ -2136,7 +2137,7 @@ ctx = {
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -12050,6 +12051,36 @@ end
 SPROP.init(U, ctx)
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 draw.tl_insts = ctx.track_insts                           -- 13 окт: плагины-инструменты в дереве
+-- 13 окт: clipboard — история yank (панель clipboard, клавиша y в PANE)
+ctx.CB = { hist = {}, sel = 1 }
+ctx.clip_label = function(r)
+  local cs = r and r.cells or {}
+  local c = cs[1]
+  local what = r and r.kind == 'env' and ('%d point(s)'):format(#(r.pts or {}))
+    or (c and ((c.kind == 'midi' and c.pitch and model.note_name(c.pitch)) or c.name or 'audio') or 'empty')
+  return ('%s  %d ev  %d row(s)'):format(what, #cs, r and r.rows or 0)
+end
+ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
+  local CB = ctx.CB
+  U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
+  if #CB.hist == 0 then U.text(x, y, ctx.fit('clipboard: yank something (yy, y + motion) - it shows here', w), U.GREY); return end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local nv = math.max(1, math.floor(h / Lx.rh))
+  local top = math.max(0, math.min(CB.sel - 1, #CB.hist - nv))
+  for i = top + 1, math.min(#CB.hist, top + nv) do
+    local e = CB.hist[i]
+    local ry = y + (i - top - 1) * Lx.rh
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + Lx.rh
+    local cur = e.reg == vim.regs['"']
+    if i == CB.sel or hot then U.set(U.tint(U.AMBER, (i == CB.sel and foc) and 0.3 or 0.15)); gfx.rect(x, ry, w, Lx.rh, 1) end
+    U.text(x, ry, ctx.fit(('%s %s  %s'):format(cur and '>' or ' ', e.t, ctx.clip_label(e.reg)), w), cur and U.AMBER or U.TEXT)
+    if hot and gfx.mouse_cap & 1 == 1 and not ctx.cb_down then
+      ctx.cb_down = true; CB.sel = i; vim.regs['"'] = e.reg; CB.last = e.reg; ctx.set_focus('clipboard')
+      vim.msg = 'clipboard: register ' .. ctx.clip_label(e.reg) .. ' - p in the tracker pastes it'
+    end
+  end
+  if gfx.mouse_cap & 1 == 0 then ctx.cb_down = nil end
+end
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
@@ -15091,6 +15122,7 @@ local function frame()
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
+    clip_draw = function(Lx, x, y, w, h, foc, hv) ctx.clip_draw(Lx, x, y, w, h, foc, hv) end,
     slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -18682,6 +18714,18 @@ local function frame()
   -- (аудио: клип под курсором или последний выше; без аудио — плагин-инструмент трека);
   -- ручной выбор держится, пока курсор не дошёл до другого клипа или трека
   local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
+  -- 13 окт: clipboard — каждый новый yank в историю (последний сверху, до 40)
+  do
+    local CB = ctx.CB
+    local r = vim.regs['"']
+    if r and r ~= CB.last then
+      CB.last = r
+      for k = #CB.hist, 1, -1 do if CB.hist[k].reg == r then table.remove(CB.hist, k) end end
+      table.insert(CB.hist, 1, { reg = r, t = os.date('%H:%M:%S') })
+      while #CB.hist > 40 do table.remove(CB.hist) end
+      CB.sel = 1
+    end
+  end
   if aipos and aipos ~= ctx.autoinst_pos and state.focus == 'tracker' and L and L.flat and snap then
     ctx.autoinst_pos = aipos                          -- искать только когда курсор / снимок сменились
     local f = L.flat[vim.cur.fi]
@@ -19407,6 +19451,20 @@ local function frame()
         elseif ch == '+' or ch == '=' then ctrl_action(sel, 1)
         elseif ch == '-' then ctrl_action(sel, -1)
         elseif sel == 'bpm' and ch:match('%d') then state.bpm_edit = ch
+        else return vim.key(c) end
+      elseif state.focus == 'clipboard' then   -- 13 окт: история yank
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local ch = c < 256 and string.char(c) or ''
+        local CB = ctx.CB
+        local n = #CB.hist
+        if c == 27 then ctx.set_focus('tracker')
+        elseif ch == 'j' or c == keys.down then CB.sel = math.min(math.max(1, n), CB.sel + 1)
+        elseif ch == 'k' or c == keys.up then CB.sel = math.max(1, CB.sel - 1)
+        elseif ch == 'g' then CB.sel = 1 elseif ch == 'G' then CB.sel = math.max(1, n)
+        elseif (c == 13 or ch == 'p' or ch == 'P') and CB.hist[CB.sel] then
+          vim.regs['"'] = CB.hist[CB.sel].reg; CB.last = vim.regs['"']
+          if ch == 'p' or ch == 'P' then ctx.set_focus('tracker'); vim.key(c) else vim.msg = 'clipboard: register ' .. ctx.clip_label(CB.hist[CB.sel].reg) .. ' - p in the tracker pastes it' end
+        elseif (ch == 'd' or ch == 'x') and CB.hist[CB.sel] then table.remove(CB.hist, CB.sel); CB.sel = math.max(1, math.min(#CB.hist, CB.sel))
         else return vim.key(c) end
       elseif state.focus == 'tracks' then   -- 11 окт: Track Manager
         if not draw.TL.typing and (vim.mode == 'cmd' or vim.mode == 'search') then return vim.key(c) end

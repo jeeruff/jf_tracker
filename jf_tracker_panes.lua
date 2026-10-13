@@ -35,6 +35,7 @@ PN.PANELS = {
   { id = 'nmod',       label = 'note mod',   key = 'N', hint = 'nmod',    side = 'right', avail = 'itemtab' },   -- 12 окт: модуляция, которую запускает нота (слоты инструмента)
   { id = 'mixer',      label = 'mixer',      key = 'x', hint = 'tracker', side = 'bottom', avail = 'mixer' },   -- 11 окт: нижний микшер — свой модуль (полоски под колонками треков)
   { id = 'tracks',     label = 'tracks',     key = 'k', hint = 'tracks',  side = 'left' },    -- 11 окт: Track Manager (как в REAPER): видимость и M S R матрицей
+  { id = 'clipboard',  label = 'clipboard',  key = 'y', hint = 'clipboard', side = 'right' },   -- 13 окт: история yank — выбрать, что вставит p
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)
