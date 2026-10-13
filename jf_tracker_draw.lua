@@ -3633,8 +3633,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           end
           local r = math.max(0.25, math.min(2, it.slider.rate))
           local px = cx + math.floor((r - 0.25) / 1.75 * (sw2 - 1) + 0.5)
-          set(hot and U.AMBER or (math.abs(r - 1) > 1e-3 and U.AMBER or U.GREY))
-          gfx.rect(px - 1, cy + 2, 3, L.rh - 4, 1)
+          U.diamond(px, yy, math.max(3, math.floor((L.rh - 6) / 2)), (hot or math.abs(r - 1) > 1e-3) and U.AMBER or U.TEXT, hot)   -- 13 окт: ромбик
         elseif it.slider then                                 -- 9 окт: слайдер свинга −100..100 %, от центра
           local sw2 = 8 * L.cw
           local mid = cx + math.floor(sw2 / 2)
@@ -3643,9 +3642,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           set(U.GREY); gfx.rect(mid, cy + 3, 1, L.rh - 6, 1)
           local v = math.max(-1, math.min(1, it.slider.v or 0))
           local px = mid + math.floor(v * (sw2 / 2 - 1) + 0.5)
-          set(hot and U.AMBER or (math.abs(v) > 1e-6 and U.CYAN or U.GREY))
-          gfx.rect(math.min(mid, px), cy + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
-          gfx.rect(px - 1, cy + 2, 3, L.rh - 4, 1)
+          local sc = hot and U.AMBER or (math.abs(v) > 1e-6 and U.CYAN or U.TEXT)
+          set(sc, 0.6); gfx.rect(math.min(mid, px), yy - 1, math.max(1, math.abs(px - mid)), 3, 1)
+          U.diamond(px, yy, math.max(3, math.floor((L.rh - 6) / 2)), sc, hot)   -- 13 окт: ромбик
         end
         hint('ctrl', cx, cy, iw, L.rh, it[1])
         D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
