@@ -6268,13 +6268,13 @@ function D.frame(L, snap, rows, state, info)
       -- ширина колонки: 22 знака; тесно — оставшиеся блоки делят место
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
       local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
-      local bw1 = math.max(L.cw * 14, math.min(L.cw * 22, share))
+      local bw1 = math.max(L.cw * 14, math.min(L.cw * (f.colw or 22), share))   -- 13 окт: модуль может просить колонку шире
       local by = dy + 3 + L.rh
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
       local room = right
-      if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = 1 end
+      if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = math.max(1, math.floor((room - bx) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       local bw = bw1 * ncol
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
@@ -6830,11 +6830,37 @@ function D.frame(L, snap, rows, state, info)
         set(hot and U.AMBER or U.CYAN); gfx.rect(hx - 1, ry + 3, 3, L.rh - 6, 1)
         if hot then hover.dspab = { f = f, x = tx0, w = tw0 } end
       end
+      -- 13 окт: секции (f.heads[pi] — заголовок перед параметром): поток по колонкам, заголовок —
+      -- своя строка (янтарь + линия), внизу колонки не остаётся — переносится с секцией
+      local spos
+      if f.heads and not cl and not grp then
+        spos = {}
+        local col, row = pcol0, 0
+        for pi = 1, #f.params do
+          if f.heads[pi] then
+            -- секция целиком (заголовок + её параметры) не влезает в остаток колонки, а в целую влезает — с новой колонки
+            local n = 1
+            while f.params[pi + n] and not f.heads[pi + n] do n = n + 1 end
+            if row > 0 and (row >= nfit - 1 or (row + 1 + n > nfit and 1 + n <= nfit)) then col, row = col + 1, 0 end
+            local hy = by + L.rh + 1 + aw_off + row * L.rh
+            if col < ncol and nfit >= 2 then
+              local hx = bx + col * bw1 + L.pad
+              set(U.LINE); gfx.rect(hx, hy + L.rh - 2, pw, 1, 1)
+              text(hx, hy, fit(f.heads[pi], pw), U.AMBER)
+            end
+            row = row + 1
+          end
+          if row >= nfit then col, row = col + 1, 0 end
+          spos[pi] = { col, row }
+          row = row + 1
+        end
+      end
       for pi, p in ipairs(f.params) do
         if eq_only then break end
-        if not cl and pi > nfit * (ncol - pcol0) then break end
-        local colk = pcol0 + math.floor((pi - 1) / nfit)
-        local py = by + L.rh + 1 + aw_off + ((pi - 1) % nfit) * L.rh
+        if spos then if spos[pi][1] >= ncol then break end
+        elseif not cl and pi > nfit * (ncol - pcol0) then break end
+        local colk = spos and spos[pi][1] or (pcol0 + math.floor((pi - 1) / nfit))
+        local py = by + L.rh + 1 + aw_off + (spos and spos[pi][2] or ((pi - 1) % nfit)) * L.rh
         if grp and (pi - 1) % nfit == 0 then
           local gt = f.groups[math.floor((pi - 1) / nfit) + 1]
           if gt then text(bx + colk * bw1 + L.pad, by + L.rh + 1 + wtop, fit(gt, pw), U.AMBER) end

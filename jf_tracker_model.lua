@@ -1355,7 +1355,9 @@ function build_one(tr, fx, out)
           dyn = { done = true }
         end
       end
+      local heads, phead = {}, nil                 -- 13 окт: заголовки секций ({ head = 'DRIVE' } в списке): перед параметром
       for _, spec in ipairs(dyn.done and {} or lay.params) do
+        if spec.head then phead = spec.head; goto next_spec end
         local want = spec[1]:lower()
         for pi = 0, np - 1 do
           -- exact (5 окт): имя целиком (Amigo: «Loop» иначе находит «Loop Start»)
@@ -1369,12 +1371,15 @@ function build_one(tr, fx, out)
             if lay.view_param and spec[2] == lay.view_param then e_view_p = #params end
             if lay.xy and want == lay.xy.x then e_xy_x = #params end
             if lay.xy and want == lay.xy.y then e_xy_y = #params end
+            if phead then heads[#params] = phead; phead = nil end
             break
           end
         end
+        ::next_spec::
       end
       local e = { i = fx, name = renamed or lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
-                  groups = lay.groups, rows = lay.rows }               -- 9 окт: колонка = группа с заголовком
+                  groups = lay.groups, rows = lay.rows,                -- 9 окт: колонка = группа с заголовком
+                  heads = next(heads) and heads or nil, colw = lay.colw }   -- 13 окт: секции потоком, ширина колонки (знаков)
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему
       if lay.view then e.view, e.view_p = lay.view, e_view_p end
       -- XY-пэд (TG33 vector): индексы параметров X / Y
