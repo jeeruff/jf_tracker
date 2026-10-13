@@ -18971,14 +18971,15 @@ local function frame()
   if c > 0 and reaper.JS_VKeys_GetState then
     local m = ctx.mods()
     -- 13 окт: Option+Shift+H J K L — край ноты под курсором (vim.note_edge), физические клавиши
-    if m.alt and m.shift and not m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then
+    -- 13 окт: только NORMAL — в INSERT / KEYS Option+нота это вставка с питчем
+    if m.alt and m.shift and not m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
       local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
       for vk, a in pairs({ [72] = { 'start', -1 }, [76] = { 'start', 1 }, [74] = { 'end', 1 }, [75] = { 'end', -1 } }) do
         if ks and ks:byte(vk) ~= 0 then vim.note_edge(a[1], a[2]); c = 0; break end
       end
     end
     -- 13 окт: Shift+Option+Cmd+J / K — slip: звук внутри ноты под курсором на строку вниз / вверх (нота на месте)
-    if c ~= 0 and m.alt and m.shift and m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then
+    if c ~= 0 and m.alt and m.shift and m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
       local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
       local d = (ks and ks:byte(74) ~= 0 and 1) or (ks and ks:byte(75) ~= 0 and -1) or nil
       if d then vim.note_slip(d); c = 0 end
