@@ -14,6 +14,25 @@ local cur                     -- текущий CF_Preview
 local stop_at, restore_cur    -- MIDI-превью через транспорт
 
 function P.available() return R.CF_CreatePreview ~= nil end
+-- 13 окт: все превью — с проектом, где созданы. Сменилась / закрылась вкладка — сразу стоп:
+-- превью с выходом на трек закрытого проекта роняло REAPER (SWS CF_Preview::stopWatch →
+-- StopTrackPreview2 по освобождённому треку)
+local live = {}
+local function new_preview(src)
+  local pv = R.CF_CreatePreview(src)
+  if pv then live[pv] = R.EnumProjects(-1) end
+  return pv
+end
+function P.guard()
+  local cur_p = R.EnumProjects(-1)
+  for pv, pp in pairs(live) do
+    if pp ~= cur_p then pcall(R.CF_Preview_Stop, pv); live[pv] = nil
+    else
+      local ok, ok2 = pcall(R.CF_Preview_GetValue, pv, 'D_POSITION')
+      if not (ok and ok2) then live[pv] = nil end                 -- доиграло само
+    end
+  end
+end
 
 P.vol = 1                     -- громкость прослушивания файлов браузера (линейная, слайдер внизу браузера)
 P.cur_path, P.cur_len = nil, 0  -- что играет из браузера (мини-волна с позицией)
@@ -91,7 +110,7 @@ local function voice(track, item, semis, lp, gain)
   local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
   local out_tr = P.out_track(track)
   local function one(s, pos, loop)
-    local pv = R.CF_CreatePreview(s)
+    local pv = new_preview(s)
     if not pv then return nil end
     R.CF_Preview_SetValue(pv, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') + (semis or 0))   -- нота поверх transpose инструмента (6 окт)
     R.CF_Preview_SetValue(pv, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * (gain or 1))
@@ -201,7 +220,7 @@ function P.inst(track, item, max_sec)
   local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
   local dur = max_sec and math.min(max_sec, len) or len
   audio_stop_at = R.time_precise() + math.max(0.05, dur)
-  local pv = R.CF_CreatePreview(src)
+  local pv = new_preview(src)
   if not pv then return false end
   local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
   R.CF_Preview_SetValue(pv, 'D_POSITION', offs)
@@ -273,7 +292,7 @@ function P.slice(track, entry, t0, t1, semis)
   stop_audio()
   local rate = entry.rate or 1
   local dur = math.max(0.05, (t1 - t0))
-  local pv = R.CF_CreatePreview(src)
+  local pv = new_preview(src)
   if not pv then return false end
   R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
   -- 8 окт: конец слайса — по позиции самого превью (D_POSITION в источнике),
@@ -321,7 +340,7 @@ function P.file(track, path, max_sec, from, semis)
   stop_audio()
   audio_stop_at = max_sec and (R.time_precise() + max_sec) or nil
   local len = R.GetMediaSourceLength(src) or 0
-  local pv = R.CF_CreatePreview(src)
+  local pv = new_preview(src)
   R.PCM_Source_Destroy(src)          -- превью держит свою ссылку
   if not pv then return false end
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
@@ -340,6 +359,7 @@ end
 
 -- звать каждый кадр
 function P.tick()
+  P.guard()
   local now = R.time_precise()
   local dt = math.min(0.05, now - (P.last_tick or now))   -- длина кадра (defer ~30 Гц)
   P.last_tick = now
