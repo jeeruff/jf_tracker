@@ -1479,6 +1479,22 @@ function V.key_impl(c)
       V.count = nil; return
     end
   end
+  -- 13 окт: вставить пустую строку (Mac без Insert): Option+Backspace — на месте курсора
+  -- (Shift — на всех треках); Ctrl+Option+Cmd+J — под курсором, K — над ним
+  if V.mode ~= 'cmd' and V.mode ~= 'search' and ctx.time_edit and not env_of(V.cur.fi) then
+    local ins_at
+    if c == BS and mods.alt and not mods.ctrl and not mods.cmd then ins_at = V.cur.row
+    elseif mods.ctrl and mods.alt and mods.cmd and (c == 10 or c == 11 or c == ('j'):byte() or c == ('k'):byte() or c == 8710 or c == 730) then
+      ins_at = (c == 10 or c == ('j'):byte() or c == 8710) and V.cur.row + 1 or V.cur.row
+    end
+    if ins_at then
+      local nr = V.count or 1
+      ctx.time_edit('insert', V.cur.fi, ins_at, nr, mods.shift or false)
+      V.count = nil
+      V.msg = ('inserted %d empty row(s) %s'):format(nr, mods.shift and 'on all tracks' or 'on the track')
+      return
+    end
+  end
   -- 10 окт: Ctrl+цифра — длина шага (step 0..9; 0 — курсор стоит), step auto выкл
   if mods.ctrl and not mods.alt and not mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then
     V.step = c - ('0'):byte(); V.step_auto = false; V.step_next = false
