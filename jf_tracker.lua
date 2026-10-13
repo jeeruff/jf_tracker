@@ -9562,6 +9562,37 @@ ctx = {
   -- 13 окт: zx — нативный редактор кроссфейдов REAPER (41827) для ноты под курсором и тех нот
   -- трека, что перекрывают её (выделение items — его вход)
   env_remove = function(f)
+    -- 13 окт: MIDI-лейн (CC / AT / PB / PC …) — события этого вида во всех MIDI-клипах трека, лейн закрыт
+    if f.ml and f.col and f.col.track then
+      local ml, tr = f.ml, f.col.track
+      local CM = { cc = 0xB0, pc = 0xC0, at = 0xD0, pat = 0xA0, pb = 0xE0 }
+      local n = 0
+      edit.run('delete midi lane ' .. (ml.name or ''), function()
+        for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+          local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(tr, i))
+          if tk and reaper.TakeIsMIDI(tk) then
+            local _, _, ccn, txn = reaper.MIDI_CountEvts(tk)
+            if CM[ml.kind] then
+              for k = ccn - 1, 0, -1 do
+                local _, _, _, _, cm, _, m2 = reaper.MIDI_GetCC(tk, k)
+                if cm == CM[ml.kind] and (ml.kind ~= 'cc' or m2 == ml.num) then reaper.MIDI_DeleteCC(tk, k); n = n + 1 end
+              end
+            else
+              for k = txn - 1, 0, -1 do
+                local _, _, _, _, typ = reaper.MIDI_GetTextSysexEvt(tk, k)
+                if (ml.kind == 'sx' and typ == -1) or (ml.kind == 'tx' and typ and typ >= 1) then reaper.MIDI_DeleteTextSysexEvt(tk, k); n = n + 1 end
+              end
+            end
+            reaper.MIDI_Sort(tk)
+          end
+        end
+      end)
+      local t = model.extra_lanes[f.col.guid]
+      if t then for k = #t, 1, -1 do if t[k] == ml.num or t[k] == ml.kind then table.remove(t, k) end end end
+      model.invalidate()
+      vim.msg = ('%s lane deleted (%d events; Cmd+Z back)'):format(ml.name or 'midi', n)
+      return
+    end
     local env = f.env and f.env.env
     if not (env and reaper.ValidatePtr(env, 'TrackEnvelope*')) then return end
     local nm = f.env.name or 'envelope'

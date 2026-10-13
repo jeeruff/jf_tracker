@@ -2261,7 +2261,7 @@ function V.key_impl(c)
       -- 13 окт: dc — колонка огибающей курсора целиком: точки, automation items, сама колонка
       if p == 'd' and c == ('c'):byte() then
         local f = flat()[V.cur.fi]
-        if f and f.env and ctx.env_remove then ctx.env_remove(f) ; V.count = nil; finish_edit()
+        if f and (f.env or f.ml) and ctx.env_remove then ctx.env_remove(f) ; V.count = nil; finish_edit()
         else V.msg = 'dc: put the cursor on an automation column' end
         return
       end

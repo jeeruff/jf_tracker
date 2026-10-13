@@ -5458,8 +5458,19 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       local last_r = -1e9                     -- 11 окт: метка, налезающая на предыдущую, пропускается (узкие поля инструмент / слайс)
+      local function lab_x(p, d)
+        local fx, fw = D.field_rect(p.f.G or L, p.fld)
+        if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
+        if p.f.ml or p.f.env then fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0 end
+        local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
+        return p.f.x + (fx or 0) + math.floor(((fw or 0) - ms(lab)) / 2), ms(lab)
+      end
+      -- 13 окт: «0» курсора — главное: соседние метки, налезающие на него, не рисуются
+      local c0, c1
+      for _, p in ipairs(pos) do if cur_i and p.i == cur_i then local lx, lw = lab_x(p, 0); c0, c1 = lx - 1, lx + lw + 1 end end
       for _, p in ipairs(pos) do
         local d = cur_i and (p.i - cur_i) or nil
+        if d and d ~= 0 and c0 then local lx, lw = lab_x(p, d); if lx < c1 and lx + lw > c0 then d = nil end end
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
