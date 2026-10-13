@@ -354,7 +354,6 @@ function D.panes_layout(state, L, nregions, ncols)
     local p = D.panes.BY[id]
     local a = p and p.avail
     if a == 'itemtab' then return it == 1 end
-    if a == 'loopon' then return it == 1 and lo == 1 end   -- 13 окт: looploom — у сэмпла луп удержания
     if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
     if a == 'mixer' then return mxa == 1 end            -- 11 окт: модуль mixer — когда микшер включён и он снизу
     return true
@@ -4518,8 +4517,6 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if hs ~= nil then hover.slices = hs end
       elseif id == 'sprops' and info.sprops_draw then
         info.sprops_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
-      elseif id == 'looploom' and info.looploom_draw then
-        info.looploom_draw(L, ct.x + 1, ct.y + 2, ct.w - 2, ct.h - 4)
       elseif id == 'nmod' and info.nmod_draw then
         info.nmod_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4)
       elseif id == 'fxb' and info.fxb_draw then

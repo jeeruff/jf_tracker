@@ -311,21 +311,6 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     end
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
-  -- 13 окт: луп удержания — шов лупа отметками, как у B_LOOPSRC (хвост — отдельный item, его не видно)
-  if M.SU and take then
-    local _, sh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_sushead', '', false)
-    local lp = sh ~= '' and M.SU.parse((select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_loop', '', false))))
-    if lp and lp.on then
-      local r = rate > 0 and rate or 1
-      local first, per = (lp.ls - head.offs) / r, (lp.le - lp.ls) / r
-      if first > 0 and per > 1e-4 and first < head.len then
-        local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-        head.loop_first = (R.TimeMap2_timeToQN(0, pos + first) - qn0) * lpb
-        head.loop_rows = (R.TimeMap2_timeToQN(0, pos + first + per) - qn0) * lpb - head.loop_first
-        head.sus = lp
-      end
-    end
-  end
   local _, si = place(lane, r0, r1, head, nil, nil, d1 > 0 and d1 or nil)
   -- огибающая громкости take (5 окт): точки — значениями в колонке vol на
   -- строках продолжения (кроссфейд и ручные рампы видны числами, как в Renoise)

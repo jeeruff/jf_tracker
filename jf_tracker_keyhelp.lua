@@ -401,14 +401,6 @@ KH.PAGES = {
     { k = 'r  z  /', d = 'rename; fold the folder; filter by name (Esc clears)' },
     { k = 'Esc', d = 'clear the filter, then the marks, then back to the tracker' },
   } },
-  looploom = { title = 'sustain: the sustain loop of the instrument and its seam crossfade (points and candidates are on the item wave)', e = {
-    { k = 'j k  h l', d = 'row; value less / more (Shift - fine)' },
-    { k = 'Enter', d = 'the list (loop mode, curve) or the action of the row' },
-    { k = 'R', d = 'reset the row / find the points again' },
-    { k = 'n N', d = 'next / previous candidate (spectrally similar pairs, brackets on the item wave)' },
-    { k = 's', d = 'save this loop as a variant - a row Ln in the slices, its own instrument' },
-    { k = '+ -', d = 'seam view zoom (also the wheel)' },
-  } },
   sprops = { title = 'properties of the item / slice', e = {
     { k = 'J K', d = 'property row down / up' },
     { k = 'H L', d = 'value less / more (Shift - fine)' },
@@ -594,7 +586,6 @@ KH.BARS = {
   session = { { 'Tab', 'clip mode' }, { 'click >', 'launch' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
-  looploom = { { 'j k', 'row' }, { 'h l', 'value' }, { 'Enter', 'list' }, { 'R', 'reset / find' }, { 'n N', 'candidate' }, { 's', 'save variant' }, { '+ -', 'seam zoom' }, { 'Esc', 'tracker' } },   -- 13 окт
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { '1-5', 'marks' },
