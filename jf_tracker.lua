@@ -18976,6 +18976,12 @@ local function frame()
         if ks and ks:byte(vk) ~= 0 then vim.note_edge(a[1], a[2]); c = 0; break end
       end
     end
+    -- 13 окт: Shift+Option+Cmd+J / K — slip: звук внутри ноты под курсором на строку вниз / вверх (нота на месте)
+    if c ~= 0 and m.alt and m.shift and m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then
+      local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
+      local d = (ks and ks:byte(74) ~= 0 and 1) or (ks and ks:byte(75) ~= 0 and -1) or nil
+      if d then vim.note_slip(d); c = 0 end
+    end
     if c ~= 0 and m.alt and not m.cmd and not m.ctrl then
       local OPT_HJKL = { [729] = true, [8710] = true, [730] = true, [172] = true }
       if not OPT_HJKL[c] then

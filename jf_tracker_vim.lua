@@ -861,6 +861,30 @@ function V.note_edge(edge, d)
   V.msg = n > 0 and ('note %s %s a row (Opt+Shift+J K - the end, H L - the start)'):format(edge, d > 0 and 'later by' or 'earlier by')
           or 'note edge: no audio note under the cursor (MIDI notes: drag)'
 end
+-- 13 окт: slip — источник внутри аудио-ноты под курсором на строку (d = 1: звук вниз, -1: вверх)
+function V.note_slip(d)
+  local n = 0
+  for _, h in ipairs(V.covering(V.cur.fi, V.cur.row)) do
+    local it = h.item
+    local tk = h.kind == 'audio' and it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+    if tk then
+      local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local row_s = ctx.row_time(V.cur.row + 1) - ctx.row_time(V.cur.row)
+      local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+      local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+      local loop = reaper.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1
+      local no = offs - d * row_s * rate
+      if not loop then no = math.max(0, no) end
+      if math.abs(no - offs) > 1e-9 then
+        ctx.edit.run('slip', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', no) end)
+        ctx.edit.note_modified(it)
+        n = n + 1
+      end
+    end
+  end
+  ctx.model.invalidate()
+  V.msg = n > 0 and ('slip: the sound %s a row inside the note (Shift+Opt+Cmd+J K)'):format(d > 0 and 'down' or 'up') or 'slip: no audio note under the cursor (or the start of the file)'
+end
 function V.play_keys(keys, n)
   V.cmdbuf = {}
   for _ = 1, n or 1 do replay(keys) end

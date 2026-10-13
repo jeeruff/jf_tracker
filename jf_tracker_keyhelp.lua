@@ -42,6 +42,7 @@ KH.PAGES = {
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back); in INSERT Cmd+digit is a note' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto / next off' },
     { k = 'Opt+Shift+J K', d = 'the note under the cursor: its end a row later / earlier (not stretched; past the sample the instrument loop plays)' },
+    { k = 'Shift+Opt+Cmd+J K', d = 'slip: the sound inside the note under the cursor a row down / up (the note stays; looped - wraps)' },
     { k = 'Opt+Shift+H L', d = 'the note under the cursor: its start a row earlier / later (the source offset follows, as trim)' },
     { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
