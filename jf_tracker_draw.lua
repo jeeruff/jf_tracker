@@ -5696,6 +5696,12 @@ function D.frame(L, snap, rows, state, info)
                 if y0 < by0 then set(U.BG); gfx.rect(fx0, by0, fw0, 2, 1) end   -- срез сверху: без верхней кромки
                 if y1 > by1 then set(U.BG); gfx.rect(fx0, by1 - 2, fw0, 2, 1) end
               end
+              -- 13 окт: пустой MIDI-клип — «#» в его первой строке (Del / x на ней — удалить клип)
+              if it.empty and y0 >= by0 and y0 < by1 then
+                set(U.BG); gfx.rect(x0 + 2, y0 + 1, ms('#') + 4, L.rh - 2, 1)
+                text(x0 + 4, y0 + 1, '#', U.mix(rgb, U.TEXT, 0.6))
+                if mx >= x0 and mx < x0 + ms('#') + 6 and my >= y0 and my < y0 + L.rh then hover.emptymidi = it.item end
+              end
               -- стыки лупа item (2 окт): косые срезы поперёк, как у automation items
               if it.loop_rows and it.loop_rows > 1e-6 then
                 set(col)

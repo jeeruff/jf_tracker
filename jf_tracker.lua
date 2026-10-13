@@ -9557,6 +9557,11 @@ ctx = {
   msg = function(t) vim.msg = t end,
   -- 13 окт: zx — нативный редактор кроссфейдов REAPER (41827) для ноты под курсором и тех нот
   -- трека, что перекрывают её (выделение items — его вход)
+  delete_item = function(it)
+    if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then return end
+    edit.run('delete empty clip', function() reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(it), it) end)
+    model.invalidate()
+  end,
   xfade_native = function(heads)
     local it = heads and heads[1] and heads[1].item
     if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'zx: no audio note under the cursor'; return end
@@ -19282,7 +19287,13 @@ local function frame()
           elseif ch == 'K' then mv(ctx.mc_sel - 8)
           elseif ch == 'g' then mv(1)
           elseif ch == 'G' then mv(nl)
-          elseif ch == 'a' then ctx.mc_scope_set()
+          elseif ch == 'a' then ctx.mc_scope_set(); ctx.mc_dpend = nil
+          -- 13 окт: dd / x — удалить выбранный клип (пустые — тоже; Cmd+Z назад)
+          elseif ch == 'x' or (ch == 'd' and ctx.mc_dpend) then
+            ctx.mc_dpend = nil
+            local a = ctx.mc_list()[ctx.mc_sel]
+            if a and a.item then PV.stop(); ctx.delete_item(a.item); ctx.mc_cache = nil; vim.msg = 'midi clip deleted' .. ((a.nn or 0) == 0 and ' (empty)' or '') .. ' - Cmd+Z back' end
+          elseif ch == 'd' then ctx.mc_dpend = true; vim.msg = 'd - d again: delete the clip'
           elseif c == 13 then PV.stop(); ctx.mc_jump(ctx.mc_list()[ctx.mc_sel])
           else return vim.key(c) end
           return

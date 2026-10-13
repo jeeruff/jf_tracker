@@ -234,6 +234,15 @@ function V.heads_in(f0, f1, r0, r1)
 end
 
 -- события, накрывающие строку (голова, cont или off на этой строке)
+-- 13 окт: пустой MIDI-клип, что начинается в строке row колонки fi (рисуется «#») → item
+function V.empty_midi_at(fi, row)
+  local f = flat()[fi]
+  if not (f and f.col and not f.env and not f.ml) then return nil end
+  local lane = f.lane or f.col.lanes[1]
+  for _, it in ipairs(lane and lane.items or {}) do
+    if it.empty and math.floor(it.r0 + 1e-6) == row then return it.item end
+  end
+end
 function V.covering(fi, row)
   local f = flat()[fi]
   if not f then return {} end
@@ -1715,6 +1724,10 @@ function V.key_impl(c)
       ctx.time_edit('delete', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false)
       V.hexbuf = nil; return
     end
+    if c == DEL and fld == 1 and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
+      local em = V.empty_midi_at(V.cur.fi, V.cur.row)
+      if em and ctx.delete_item then ctx.delete_item(em); V.msg = 'empty MIDI clip deleted'; V.hexbuf = nil; return end
+    end
     if c == BS or c == DEL then
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       if fld == 1 then E.delete(heads, lpb())
@@ -2398,6 +2411,8 @@ function V.key_impl(c)
     finish_edit()
   elseif ch == 'x' and (flat()[V.cur.fi] or {}).ml then
     for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
+  elseif ch == 'x' and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 and V.empty_midi_at(V.cur.fi, V.cur.row) and ctx.delete_item then
+    ctx.delete_item(V.empty_midi_at(V.cur.fi, V.cur.row)); V.msg = 'empty MIDI clip deleted'; finish_edit()   -- 13 окт: «#» — пустой клип
   elseif ch == 'x' then
     apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
   elseif ch == 'M' or ch == 'S' then                     -- 9 окт: Shift+M / Shift+S — mute / solo трека (события — M в VISUAL)
