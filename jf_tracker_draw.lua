@@ -685,16 +685,23 @@ function D.layout(snap, state, nregions)
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
   L.mstrip_w = L.label_w + (L.ruler_right and L.ruler_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
   L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.mstrip_w >= 6 * L.cw or false
-  L.master_w = L.master_right and L.mstrip_w or 0
+  L.master_w = L.master_right and math.min(L.mstrip_w, 10 * L.cw + 2 * L.pad) or 0   -- 13 окт: полоса мастера экономнее (дальше — по его колонкам)
   -- 11 окт: колонка мастера (как show master track в REAPER, по умолчанию вкл) — его огибающие; нет огибающих — пустая дорожка
   L.mtrack = state.showmaster ~= false and snap.master and snap.master.track and not state.ptmode or false
   if L.mtrack then
     local ne = math.max(1, #(snap.master.envs or {}))
-    L.cmd_w = snap.master.cmd and (2 * L.pad + ms('WWWWWWWW')) or 0     -- 11 окт: колонка cmd (маркеры)
+    L.cmd_w = snap.master.cmd and (2 * L.pad + ms('WWWWW')) or 0     -- 11 окт: колонка cmd (маркеры); 13 окт: уже
+    -- 13 окт: огибающие мастера (темп) по умолчанию числами — колонка в ширину числа
+    L.menv_w = L.env_bx + ms('000') + 2 * L.pad
     -- 11 окт: колонка visor (маркеры v:) — когда visor включён или в песне есть его события
     local mv = snap.master.vis
-    L.vis_w = (mv and (#mv.rows > 0 or state.visor_on)) and (2 * L.pad + ms('WWWWWWWWWW')) or 0
-    L.master_w = math.max(L.master_w, ne * (L.env_w + 1) + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
+    L.vis_w = (mv and (#mv.rows > 0 or state.visor_on)) and (2 * L.pad + ms('WWWWWWW')) or 0
+    local function mew(e) local m = state.envvals and state.envvals[(snap.master.guid or '') .. '/' .. (e.name or '')]; return (m == nil or m == 'vals') and L.menv_w or L.env_w end
+    L.menv_of = mew
+    local ew = 0
+    for _, e in ipairs(snap.master.envs or {}) do ew = ew + mew(e) + 1 end
+    if #(snap.master.envs or {}) == 0 then ew = L.env_w + 1 end
+    L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
   end
   L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.ruler_w or 0)
   L.flat, L.cols = {}, {}
@@ -810,9 +817,10 @@ function D.layout(snap, state, nregions)
     local c = { col = mc, ci = ci, x = L.cols_r + 1, lanes = {}, envs = {}, mls = {}, master = true, mtrack = true }
     local lx = c.x
     for _, e in ipairs(mc.envs or {}) do
-      L.flat[#L.flat + 1] = { ci = ci, col = mc, env = e, sub = {}, x = lx, w = L.env_w }
-      c.envs[#c.envs + 1] = { e = e, x = lx, w = L.env_w, fi = #L.flat }
-      lx = lx + L.env_w + 1
+      local ew2 = L.menv_of and L.menv_of(e) or L.env_w
+      L.flat[#L.flat + 1] = { ci = ci, col = mc, env = e, sub = {}, x = lx, w = ew2 }
+      c.envs[#c.envs + 1] = { e = e, x = lx, w = ew2, fi = #L.flat }
+      lx = lx + ew2 + 1
     end
     if mc.cmd then
       L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.cmd, sub = {}, x = lx, w = L.cmd_w }
@@ -2033,7 +2041,10 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if vals then
     -- 12 окт: вид «значения» (ze) — как колонка команд: число в строке точки, иначе точки
     if ev.pt then
-      text(x + L.env_bx, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or ('%3d'):format(math.floor(ev.v * 127 + 0.5)), env_colour(e))
+      local tempo = e and e.name and e.name:lower():find('tempo', 1, true) and e.max and e.min   -- 13 окт: темп — сам BPM
+      local vt = tempo and ('%d'):format(math.floor(e.min + ev.v * (e.max - e.min) + 0.5))
+        or (D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or ('%3d'):format(math.floor(ev.v * 127 + 0.5)))
+      text(x + L.env_bx, ty, vt, env_colour(e))
     else text(x + L.env_bx, ty, D.envfmt == 'hex' and '..' or '...', D.EMPTY) end
     return
   end
@@ -4668,7 +4679,7 @@ function D.frame(L, snap, rows, state, info)
   local hcols = L.cols
   if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol then   -- 11 окт: колонка мастера есть — полоса микшера у неё
     hcols = { table.unpack(L.cols) }
-    hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and (L.mstrip_w or L.label_w) or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
+    hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and L.master_w or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
   for _, c in ipairs(hcols) do
     local col = c.col
@@ -5466,6 +5477,10 @@ function D.frame(L, snap, rows, state, info)
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
+          -- 13 окт: колонки мастера (cmd, visor, огибающие) — поля по своей ширине, не по раскладке трека (цифры налезали)
+          if p.f.ml or p.f.env then
+            fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0
+          end
           local cx = p.f.x + (fx or 0)
           local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
           local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
@@ -5943,7 +5958,7 @@ function D.frame(L, snap, rows, state, info)
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
           gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
-        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')])
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or (c.master and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
           hover.envx = math.max(0, math.min(1, (mx - ev.x - L.env_bx) / (EG.env_bar_w - 1)))

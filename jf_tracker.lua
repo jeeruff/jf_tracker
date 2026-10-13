@@ -2192,7 +2192,7 @@ ctx = {
     local cur = state.envvals[k]
     local function set(m, what) return function() state.envvals[k] = m; vim.msg = (f.env.name or 'envelope') .. ': ' .. what end end
     vim.open_hydra({ title = 'view of ' .. (f.env.name or 'the envelope'), items = {
-      { key = 'c', label = (cur == nil and '* ' or '') .. 'curve (as in REAPER)', fn = set(nil, 'curve') },
+      { key = 'c', label = ((cur == nil or cur == 'curve') and '* ' or '') .. 'curve (as in REAPER)', fn = set('curve', 'curve') },
       { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values (as a command column)', fn = set('vals', 'values') },
       { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
     } })
@@ -3187,7 +3187,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,q_colors,q_envs,q_meters,q_dsp|whichkey,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade',
+  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|clipsview,dsp_big,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,waveonly,textonly,q_colors,q_envs,q_meters,q_dsp|whichkey,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -3197,6 +3197,10 @@ ctx = {
     if q and not q:find('measure', 1, true) then   -- 7 окт: measure — в конец левой колонки
       local a, rest = q:match('^([^|]*)(|.*)$')
       if a then q = a .. ',measure' .. rest; state.quick = q end
+    end
+    -- 13 окт: wave only / text only — к быстрым опциям (за wave), один раз
+    if q and not q:find('waveonly', 1, true) and reaper.GetExtState(EXT, 'q_wo13') ~= '1' then
+      q = q:gsub('q_wave', 'q_wave,waveonly,textonly', 1); state.quick = q; reaper.SetExtState(EXT, 'q_wo13', '1', true)
     end
     if q and q:find('dsp_big', 1, true) and not q:find('whichkey', 1, true) then   -- whichkey — в начало третьей колонки
       local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
