@@ -9518,6 +9518,25 @@ ctx = {
   src_path = function(ps) return reaper.GetMediaSourceFileName(ps, '') end,
   FOCUS = function() return draw.FOCUS end,
   msg = function(t) vim.msg = t end,
+  -- 13 окт: выделение на волне item (секунды файла) и луп удержания на нём
+  sel_span = function(e)
+    local sel = SL.sel
+    if not (sel and e and SL.entry and (SL.entry == e or SL.entry.item == e.item)) then return nil end
+    local a, b = math.min(sel.a, sel.b), math.max(sel.a, sel.b)
+    if b - a < 0.005 then return nil end
+    local r = (e.rate and e.rate > 0) and e.rate or 1
+    return { (e.offs or 0) + a * r, (e.offs or 0) + b * r }
+  end,
+  sel_as_sustain = function(e, ss)
+    if not ss then return end
+    if ctx.loop_mode(e) ~= 'sus' then ctx.loop_set_mode(e, 'sus', ctx.inst_group(e)) end
+    local lp = ctx.sus_get(e) or { on = true, xf = 0.01 }
+    lp.on, lp.ls, lp.le = true, ss[1], ss[2]
+    lp.xf = math.min(lp.xf or 0.01, ss[2] - ss[1])
+    lp.file, lp.boff = nil, nil
+    ctx.sus_points(e, lp)
+    vim.msg = ('sustain loop = the selection %.3f - %.3f s'):format(ss[1], ss[2])
+  end,
   sus_points = function(e, lp)
     edit.sus_set(ctx.inst_group(e), lp)
     ctx.sus_bake_req = { e = e, t = reaper.time_precise() }
@@ -18181,9 +18200,15 @@ local function frame()
   if SL.loop_drag then   -- 13 окт: протяжка точки лупа удержания по волне (по окну зума, липнет как срезы)
     local ld, wv = SL.loop_drag, SL.wave
     if gfx.mouse_cap & 1 == 1 then
-      if wv and wv.w > 0 and gfx.mouse_x ~= ld.lx then
+      -- 13 окт: щелчок без сдвига ничего не меняет (точка улетала); x → время по карте самого оверлея лупа
+      ld.x0 = ld.x0 or gfx.mouse_x
+      local lm = SL.loop_map
+      if wv and lm and lm.w > 0 and gfx.mouse_x ~= ld.lx and (ld.moved or math.abs(gfx.mouse_x - ld.x0) > 2) then
+        ld.moved = true
         ld.lx = gfx.mouse_x
-        local t = SL.snap_t(math.max(0, math.min(wv.len, SL.x_to_t(gfx.mouse_x))))
+        local t = lm.va + (gfx.mouse_x - lm.x) / lm.w * lm.span
+        t = math.max(0, math.min(wv.len, t))
+        if ld.k ~= 'susx' then t = SL.snap_t(t) end
         local e = ld.e
         local lp = ctx.sus_get(e)
         if lp then

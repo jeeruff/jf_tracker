@@ -1158,6 +1158,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local lo = S.loop_ov and S.loop_ov(e)   -- 13 окт: и при выделении / правке срезов, и на спектрограмме — луп не пропадает
   if lo then
     S.loop_e = e
+    S.loop_map = { x = x, w = w, va = va, span = span }   -- 13 окт: протяжка точек лупа — по этой же волне (не по чужой S.wave)
     local mxw, myw = gfx.mouse_x, gfx.mouse_y
     local inw = mxw >= x and mxw < x + w and myw >= wy and myw < wy + wh
     local r = (lo.rate and lo.rate ~= 0) and lo.rate or 1

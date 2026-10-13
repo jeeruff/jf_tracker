@@ -12,7 +12,7 @@ local U, ctx
 LL.ROWS = {
   { k = 'loopm', label = 'loop' }, { k = 'susa', label = 'start' }, { k = 'susb', label = 'end' },
   { k = 'susx', label = 'x-fade' }, { k = 'susc', label = 'curve' }, { k = 'susl', label = 'level' },
-  { k = 'susr', label = 'find' }, { k = 'susv', label = 'save' },
+  { k = 'susr', label = 'generate' }, { k = 'susv', label = 'save' },
 }
 local MENU = { loopm = true, susc = true }
 local ACT = { susl = true, susr = true, susv = true }
@@ -264,10 +264,23 @@ function LL.draw(L, x, y, w, h, e, focused)
     else r.bar = nil end
   end
   -- 13 окт: кандидаты списком под параметрами — номер, точки, совпадение шва; щелчок / 1..9 — луп на нём
-  local hot_cand
+  local hot_cand, hot_selb
+  -- 13 окт: выделение на волне item — кнопка «selection as sustain»: луп встаёт на него
+  local ssel = ctx.sel_span and ctx.sel_span(e)
+  local yb = y + (#LL.ROWS) * L.rh
+  if ssel and yb + L.rh <= y + h then
+    local lab = ('selection as sustain  %.3f - %.3f'):format(ssel[1], ssel[2])
+    local bw = math.min(rw - 2 * L.pad, U.measure(lab) + 2 * L.pad)
+    hot_selb = inside and mx >= rx + L.pad and mx < rx + L.pad + bw and my >= yb and my < yb + L.rh
+    U.set(hot_selb and U.tint(U.AMBER, 0.35) or U.tint(U.CYAN, 0.18)); gfx.rect(rx + L.pad, yb, bw, L.rh, 1)
+    U.set(hot_selb and U.AMBER or U.CYAN); gfx.rect(rx + L.pad, yb, bw, L.rh, 0)
+    U.text(rx + 2 * L.pad, yb + 1, ctx.fit(lab, bw - 2 * L.pad), hot_selb and U.AMBER or U.CYAN)
+    if hot_selb then LL.status = 'selection as sustain: the loop start / end go to the selection on the item wave (the loop turns sustain)' end
+    yb = yb + L.rh + 2
+  end
   if mode == 'sus' and lp then
     local cs = cands(e)
-    local y0 = y + (#LL.ROWS) * L.rh
+    local y0 = yb
     if #cs > 0 and y0 + 2 * L.rh <= y + h then
       U.text(rx + L.pad, y0, ctx.fit('candidates  1..9  n N', rw - 2 * L.pad), U.DIM)
       local ci = cur_cand(lp)
@@ -320,6 +333,7 @@ function LL.draw(L, x, y, w, h, e, focused)
   elseif down and inside then
     ctx.set_focus('looploom')
     if LL.xdrag_now then LL.xdrag_now = nil
+    elseif hot_selb then ctx.sel_as_sustain(e, ssel)
     elseif hot_cand then apply(e, LL.cands[hot_cand])
     elseif hot_row then
       local r = LL.ROWS[hot_row]
