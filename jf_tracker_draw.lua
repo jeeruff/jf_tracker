@@ -1302,6 +1302,50 @@ function D.tl_tree(state, snap)
   return out
 end
 
+-- 13 окт: превью сэмпла строкой дерева (как колонка preview прежней lib): волна e (или его куска
+-- [a, b] секунд), выбранный слайс / кусок — инверсией (D.lib_zone), границы слайсов — чёрточками
+local function tree_wave(L, e, wx, y, npix, rh, a, b)
+  if npix < 8 or not e then return end
+  local len = e.len or 0
+  if len <= 0 then return end
+  a, b = a or 0, b or len
+  local head = e
+  if a > 0 or b < len then
+    local r = (e.rate and e.rate > 0) and e.rate or 1
+    head = { src = e.src, guid = tostring(e.guid) .. ':' .. ('%.4f'):format(a), offs = (e.offs or 0) + a * r, len = b - a, rate = r }
+  end
+  local pk = get_peaks and get_peaks(head, npix)
+  local rgb = e.rgb or U.CYAN
+  local wc = U.readable(U.mix(rgb, U.TEXT, 0.35), U.BG, 4.0)
+  local cy, hh = y + rh / 2, rh / 2 - 1
+  local za, zb
+  local z = D.lib_zone
+  if z and z.root == e and head == e then
+    za = math.floor(math.max(0, z.a) / len * npix)
+    zb = math.max(za + 1, math.floor(math.min(len, z.b) / len * npix))
+    set(wc); gfx.rect(wx + za, y, zb - za, rh, 1)
+  end
+  set(wc)
+  if pk and pk.n and pk.n > 0 then
+    for px = 0, npix - 1 do
+      local idx = math.floor(px / npix * pk.n) + 1
+      local lo, hi = pk.min[idx] or 0, pk.max[idx] or 0
+      if hi - lo < 0.03 then lo, hi = -0.015, 0.015 end
+      local inz = za and px >= za and px < zb
+      if inz then set(U.BG) end
+      gfx.line(wx + px, cy - hi * hh, wx + px, cy - lo * hh)
+      if inz then set(wc) end
+    end
+  else gfx.line(wx, cy, wx + npix, cy) end
+  if head == e and e.slices then
+    set(U.mix(wc, U.BG, 0.35))
+    for _, t in ipairs(e.slices) do
+      local px = wx + math.floor(t / len * npix)
+      if px > wx and px < wx + npix and not (za and px - wx >= za and px - wx <= zb) then gfx.rect(px, y + 1, 1, rh - 2, 1) end
+    end
+  end
+end
+
 function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
   local TL = D.TL
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -1417,7 +1461,18 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~~ automation  %d'):format(rw.n); colr = U.GREY
       elseif rw.k == 'ai' then lbl = '~ ' .. (rw.env.name or '') .. ((rw.ai.label or '') ~= '' and ('  ' .. rw.ai.label) or ''); colr = U.CYAN
       else lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('lib/  %d not used'):format(rw.n); colr = U.GREY end
-      text(ix, ry, fit(lbl, x + w - ix - L.pad), colr)
+      -- превью справа: инструмент — весь сэмпл (выбранный кусок инверсией), слайс — его кусок
+      local pw = math.floor(w * 0.38)
+      local px0 = x + w - L.pad - 3 - pw
+      local lab_w = x + w - ix - L.pad
+      if e and (rw.k == 'i' or rw.k == 'c' or (rw.k == 's' and rhh <= L.rh)) and px0 > ix + ms(lbl) + L.pad then
+        lab_w = px0 - L.pad - ix
+        if rw.k == 's' then
+          local t0 = e.slices and e.slices[rw.sk] or 0
+          tree_wave(L, e, px0, ry, pw, L.rh, t0, e.slices and (e.slices[rw.sk + 1] or e.len) or e.len)
+        else tree_wave(L, e, px0, ry, pw, L.rh) end
+      end
+      text(ix, ry, fit(lbl, lab_w), colr)
       if hot then
         hover.tlist = { ci = rw.ci, what = 'row', li = li }
         -- 13 окт: щелчок по «+ / -» — открыть / закрыть папку (инструмент, automation, midi, lib)
