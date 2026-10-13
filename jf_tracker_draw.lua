@@ -4928,21 +4928,21 @@ function D.frame(L, snap, rows, state, info)
           if c.master and col.track then
             H = H - 2 * L.rh                              -- 10 окт: строка среднего LUFS над routing
             D.lufs_row_y = y1 + H
-            local ry, rx, rw = y1 + H + L.rh, c.x + L.pad, math.min(c.w - 2 * L.pad, ms('routing') + 2 * L.pad)
+            local ry, rx, rw = y1 + H + L.rh, c.x + 2, math.min(c.w - 4, ms('routing') + 2 * L.pad)   -- 13 окт: ровно под кнопкой метра
             local hw = reaper.GetTrackNumSends(col.track, 1) > 0
             local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
-            set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry + 1, rw, L.rh - 2, 1)
-            set(hw and U.AMBER or U.DIM); gfx.rect(rx, ry + 1, rw, L.rh - 2, 0)
+            set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry + 1, rw, L.rh - 1, 1)
+            set(hw and U.AMBER or U.DIM); gfx.rect(rx, ry + 1, rw, L.rh - 1, 0)
             text(rx + L.pad, ry, fit('routing', rw - 2 * L.pad), (hot or state.routeview) and U.AMBER or (hw and U.AMBER or BTXT))
             if hot then hover.btn = { col = col, what = 'routeview' } end   -- 9 окт: диаграмма всех треков
             hint('btn', rx, ry, rw, L.rh, { col = col, what = 'routeview' })
             -- SRO мастера — его собственная маршрутизация (попап, как у треков)
-            local sx2, sw2 = rx + rw + L.pad, ms('SRO') + 4
+            local sx2, sw2 = rx + rw + 2, ms('SRO') + 4
             if sx2 + sw2 <= c.x + c.w - 1 then
               local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, hw }
               local hot2 = mx >= sx2 and mx < sx2 + sw2 and my >= ry and my < ry + L.rh
-              set(hot2 and D.CURROW or U.PANEL); gfx.rect(sx2, ry + 1, sw2, L.rh - 2, 1)
-              set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(sx2, ry + 1, sw2, L.rh - 2, 0)
+              set(hot2 and D.CURROW or U.PANEL); gfx.rect(sx2, ry + 1, sw2, L.rh - 1, 1)
+              set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(sx2, ry + 1, sw2, L.rh - 1, 0)
               local lx = sx2 + 2
               for i, ch in ipairs({ 'S', 'R', 'O' }) do
                 text(lx, ry, ch, has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)); lx = lx + ms(ch)
