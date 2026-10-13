@@ -11462,7 +11462,8 @@ ctx = {
     local mixf = f == 'mixer'
     if mixf then f = 'tracker' end
     state.mixfocus = (mixf and L and L.pn and L.pn.by_panel and L.pn.by_panel.mixer) and true or nil
-    if state.mixfocus then ctx.mixer_arm() elseif state.kslider and state.kslider.mix then state.kslider = nil end
+    -- 13 окт: ушли из микшера (щелчок в трекер, другой модуль) — режим слайдера всегда снимается (залипал после щелчка по фейдеру)
+    if state.mixfocus then ctx.mixer_arm() elseif state.kslider and not state.kslider.ctrl then state.kslider = nil end
     -- клик без Option фокус не переводит (опция focus by mouse, 5 окт); заметки — всегда
     if ctx.click_guard and f ~= state.focus and f ~= 'notes' and f ~= 'fxb' and f ~= 'slices' then return end   -- 10 окт: и список слайсов — щелчок даёт фокус (j k)   -- поиск эффектов — по клику (5 окт)
     if f == 'fxb' and state.focus ~= 'fxb' then state.fxb_back = state.focus end   -- после добавления — назад
@@ -17105,7 +17106,8 @@ local function frame()
       end
       -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
       if (t.vert and t.what == 'vol') or t.knob then   -- 9 окт: и кноб панорамы
-        state.kslider = { col = t.col, what = 'vol' }
+        ctx.set_focus('mixer')
+        state.kslider = { col = t.col, what = 'vol', mix = true }
         vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(t.col.name or '')
       end
       click = { t = now2, zone = 'trs', row = t.what }

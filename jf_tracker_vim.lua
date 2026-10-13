@@ -240,7 +240,7 @@ function V.empty_midi_at(fi, row)
   if not (f and f.col and not f.env and not f.ml) then return nil end
   local lane = f.lane or f.col.lanes[1]
   for _, it in ipairs(lane and lane.items or {}) do
-    if it.empty and math.floor(it.r0 + 1e-6) == row then return it.item end
+    if it.empty and math.floor(it.r0 + 1e-6) <= row and row < it.r1 - 1e-6 then return it.item end   -- строка внутри пустого клипа
   end
 end
 function V.covering(fi, row)
@@ -2234,6 +2234,11 @@ function V.key_impl(c)
       if c == ('g'):byte() then V.op = p; V.pending = 'g'; return end
       -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
       -- курсора в регионе (вне региона — до =END). Просьба 2 окт.
+      -- 13 окт: dw / dW внутри пустого MIDI-клипа (#) — удалить клип, как item
+      if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
+        local em = V.empty_midi_at(V.cur.fi, V.cur.row)
+        if em and ctx.delete_item then ctx.delete_item(em); V.msg = 'empty MIDI clip deleted'; V.count = nil; finish_edit(); return end
+      end
       if p == 'd' and c == ('W'):byte() then
         if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
         V.count = nil; return
