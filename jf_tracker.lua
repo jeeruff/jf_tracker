@@ -331,6 +331,7 @@ state.panes = (function()
     -- 13 окт: tracks — дерево трек → инструменты → automation — встаёт туда, где lib (вкладкой рядом), один раз
     if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
     -- 13 окт: модуль slices спрятан — слайсы и их клавиши в дереве tracks внутри инструмента (показать: Ctrl+W s / :pane slices show)
+    if reaper.GetExtState(EXT, 'tl_in_lib') ~= '1' then draw.panes.hide(m, 'tracks'); reaper.SetExtState(EXT, 'tl_in_lib', '1', true) end   -- 13 окт: дерево — во вкладке lib
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
   end   -- 13 окт: и при запуске — новые модули (looploom) на свои места
@@ -4020,6 +4021,7 @@ ctx = {
   end,
   pane_focus = function(id)
     local PN = draw.panes
+    if id == 'tracks' and state.libtree ~= false then id = 'inst' end   -- 13 окт: дерево tracks живёт во вкладке lib
     if not (id and PN.BY[id]) then return end
     ctx.pn_prev = ctx.pane_cur()
     if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
@@ -8191,7 +8193,34 @@ ctx = {
       end } end
     end
     if #items == 0 then items[1] = { key = 'x', label = '(no kits yet - the preset name: save)', fn = function() end } end
-    vim.open_hydra({ title = 'load a kit into the lib (adds)', items = items })
+    -- 13 окт: и шаблоны треков REAPER (TrackTemplates, кроме наборов lib) — вставляются треками после курсора
+    local tdir = reaper.GetResourcePath() .. '/TrackTemplates'
+    local tt = {}
+    local function scan(d, rel, depth)
+      local i = 0
+      while true do local f = reaper.EnumerateFiles(d, i); if not f then break end
+        if f:match('%.RTrackTemplate$') then tt[#tt + 1] = { name = rel .. f:gsub('%.RTrackTemplate$', ''), path = d .. '/' .. f } end; i = i + 1 end
+      if depth > 0 then
+        i = 0
+        while true do local sd = reaper.EnumerateSubdirectories(d, i); if not sd then break end
+          if sd ~= 'jf_libs' and sd ~= 'jf_kits' then scan(d .. '/' .. sd, rel .. sd .. '/', depth - 1) end; i = i + 1 end
+      end
+    end
+    scan(tdir, '', 2)
+    if #tt > 0 then
+      local sub = {}
+      for k, t in ipairs(tt) do
+        local key = k <= 9 and tostring(k) or keys:sub(k - 9, k - 9)
+        if key ~= '' then sub[#sub + 1] = { key = key, label = t.name, fn = function()
+          local col = cur_col()
+          if col and col.track then reaper.SetOnlyTrackSelected(col.track) end
+          reaper.Main_openProject(t.path)                 -- шаблон трека REAPER вставляет треками после выделенного
+          model.invalidate(); vim.msg = 'track template ' .. t.name .. ' inserted (Cmd+Z - back)'
+        end } end
+      end
+      items[#items + 1] = { key = 'T', label = 'track templates …', sub = function() return { title = 'insert a track template', items = sub } end }
+    end
+    vim.open_hydra({ title = 'load a kit into the lib (adds) / a track template', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
   sort_menu = function()
@@ -19498,6 +19527,8 @@ local function frame()
         else return vim.key(c) end
       elseif state.focus == 'inst' and (state.top or state.side) then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        -- 13 окт: вид tracks в lib — клавиши дерева (как в lf), остальное — прежние клавиши lib
+        if state.libtree ~= false and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
         local col = cur_col()
         local n = #(col and col.pool or {})
         local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))

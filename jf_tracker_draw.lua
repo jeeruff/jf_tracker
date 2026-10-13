@@ -3889,6 +3889,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
   end
+  -- 13 окт: вид tracks во вкладке lib — дерево трек → инструменты → слайсы / automation / MIDI,
+  -- неиспользованные — в lib/; кнопки шапки lib (load, пресет, track, sort, bsync, find) остаются
+  if info.lib_tree then
+    local ty = iy + L.rh + 4
+    info.lib_tree(ix + 1, ty, w - 2, iy + H - L.rh - 5 - ty)
+    return
+  end
   local rows = D.pool_rows(pool, sort, col, info.cols)
   -- 9 окт: инструменты-плагины трека (VSTi / AUi / CLAPi, JSFX-инструменты) —
   -- своя секция с номерами после сэмплов; выбран — клавиши пишут MIDI-ноты в
@@ -4424,6 +4431,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         hover.browser = info.browser_draw(L, ct.x, ct.y, ct.w, ct.h)
         if info.browser_fxb then local fh = info.browser_fxb(); if fh then hover.fxb = fh end end   -- 9 окт: вкладка fx браузера (router big) — щелчки
       elseif id == 'inst' then
+        info.lib_tree = state.libtree ~= false and function(tx, ty, tw, th) D.track_list(L, state, snap, info, hover, tx, ty, tw, th, foc == 'inst') end or nil
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'slices' and info.slices_draw then
         local hs = info.slices_draw(L, ct.x + 3, ct.y + 2, ct.w - 5, ct.h - 4)
