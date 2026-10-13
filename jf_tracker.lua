@@ -14881,7 +14881,7 @@ local function frame()
     status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
+    hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл

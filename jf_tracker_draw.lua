@@ -5932,6 +5932,15 @@ function D.frame(L, snap, rows, state, info)
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
+            -- 13 окт: набираемая команда / значение — прямо в ячейке курсора («0R__»), не только в статусе
+            if inv and info.hexbuf and info.hexbuf ~= '' and type(inv) == 'number' and inv >= 2 and not c.folded and not f.env then
+              local fx, fw = D.field_rect(f.G or L, inv)
+              local hb = info.hexbuf
+              local need = inv >= 4 and 4 or 2
+              local t = hb .. string.rep('_', math.max(0, need - #hb))
+              set(U.tint(U.AMBER, 0.45)); gfx.rect(x + fx - 1, y, math.max(fw, ms(t)) + 2, L.rh, 1)
+              text(x + fx, ty, t, U.AMBER)
+            end
             D.cur_box = nil; D.fx_half = nil
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
