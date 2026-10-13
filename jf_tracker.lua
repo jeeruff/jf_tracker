@@ -331,6 +331,8 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
     -- 13 окт: модуль slices спрятан — слайсы и их клавиши в дереве tracks внутри инструмента (показать: Ctrl+W s / :pane slices show)
     -- 13 окт: lib и tracks — две вкладки одного места (lib — вся база сэмплов, tracks — дерево треков), один раз
+    -- 13 окт: модуль slices снова виден — под lib (один раз)
+    if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
