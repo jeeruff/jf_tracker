@@ -19322,6 +19322,7 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         -- 13 окт: вид tracks в lib — клавиши дерева (как в lf), остальное — прежние клавиши lib
         if state.libtree == true and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
+        if c == ('c'):byte() and vim.mode ~= 'cmd' then ctx.slices_render_menu(); return end   -- 13 окт: convert — и во вкладке lib
         local col = cur_col()
         local n = #(col and col.pool or {})
         local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))

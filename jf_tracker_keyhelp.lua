@@ -245,6 +245,7 @@ KH.PAGES = {
     { k = 'Esc Tab', d = 'next module' },
   } },
   inst = { title = 'lib', e = {
+    { k = 'c', d = 'convert: l slices to the lib, s an RS5K per slice, w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
