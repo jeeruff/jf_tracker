@@ -157,14 +157,8 @@ function SP.draw(L, x, y, w, h, e, focused)
     if fr and sw >= L.cw * 4 then
       local cy = ry + math.floor(L.rh / 2)
       local onbar = hot and mx >= sx - 2 and mx < sx + sw + 2
-      U.set(U.DIM); gfx.rect(sx, cy - 1, sw, 2, 1)
-      U.set((foc or onbar or (SP.drag and SP.drag.k == r.k)) and U.AMBER or U.TEXT)
-      fr = math.max(0, math.min(1, fr))
-      if centered then
-        local mid, px = sx + math.floor(sw / 2), sx + math.floor(fr * sw + 0.5)
-        gfx.rect(math.min(mid, px), ry + 4, math.max(1, math.abs(px - mid)), L.rh - 8, 1)
-        U.set(U.LINE); gfx.rect(mid, ry + 3, 1, L.rh - 6, 1)
-      else gfx.rect(sx, ry + 4, math.max(1, math.floor(fr * sw + 0.5)), L.rh - 8, 1) end
+      local act = foc or onbar or (SP.drag and SP.drag.k == r.k)
+      U.dslider(sx, cy, sw, fr, centered, act and U.AMBER or U.TEXT, onbar, L.rh)   -- 13 окт: ромбик
       -- метки привязки (rate: ×½ ×1.5 ×2 …) — чёрточки под дорожкой
       if ctx.sp_marks then
         U.set(U.GREY)

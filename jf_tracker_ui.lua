@@ -84,6 +84,19 @@ end
 local function set(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 U.set = set
 
+-- 13 окт: слайдер-ромбик: тонкая дорожка, тонкая заливка (от центра или от края) и ромбик на значении
+function U.dslider(sx, cy, sw, fr, centered, col, hot, rh)
+  fr = math.max(0, math.min(1, fr or 0))
+  local px = sx + math.floor(fr * (sw - 1) + 0.5)
+  set(U.DIM); gfx.rect(sx, cy, sw, 1, 1)
+  local r = math.max(3, math.floor(((rh or 12) - 6) / 2))
+  if centered then
+    local mid = sx + math.floor(sw / 2)
+    set(U.LINE); gfx.rect(mid, cy - r, 1, 2 * r + 1, 1)
+    set(col, 0.6); gfx.rect(math.min(mid, px), cy - 1, math.max(1, math.abs(px - mid)), 3, 1)
+  else set(col, 0.6); gfx.rect(sx, cy - 1, math.max(1, px - sx), 3, 1) end
+  U.diamond(px, cy, r, col, hot)
+end
 -- 13 окт: ручка-ромбик (квадрат на угол): заливка цветом, обводка фоном и контуром текста —
 -- видна издалека в любой теме. cx, cy — центр, r — полудиагональ
 function U.diamond(cx, cy, r, col, hot)

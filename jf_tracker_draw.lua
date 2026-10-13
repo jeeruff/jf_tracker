@@ -2470,14 +2470,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     local cy = sy + math.floor(L.rh / 2)
     local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
     text(x + L.pad, sy, label, U.GREY)
-    set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)
-    frac = math.max(0, math.min(1, frac))
-    set(hot and U.AMBER or U.TEXT)
-    if centered then
-      local mid, px = wx0 + math.floor(ww / 2), wx0 + math.floor(frac * ww + 0.5)
-      set(U.LINE); gfx.rect(mid, sy + 3, 1, L.rh - 6, 1)                         -- 13 окт: ромбик, как в шапке трека
-      U.diamond(px, cy, math.max(3, math.floor((L.rh - 6) / 2)), hot and U.AMBER or U.TEXT, hot)
-    else gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1) end
+    U.dslider(wx0, cy, ww, frac, centered, hot and U.AMBER or U.TEXT, hot, L.rh)   -- 13 окт: ромбик
     text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY)
     if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww } end
     if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
@@ -4890,18 +4883,7 @@ function D.frame(L, snap, rows, state, info)
         local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
         local acc = hot and U.AMBER or U.TEXT
         text(sx, sy, label, U.GREY)
-        set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)
-        frac = math.max(0, math.min(1, frac))
-        if centered then
-          local mid = wx0 + math.floor(ww / 2)
-          local px = wx0 + math.floor(frac * ww + 0.5)
-          -- 13 окт: панорама — ромбик на дорожке (видно положение издалека), тонкая полоса от центра
-          set(U.LINE); gfx.rect(mid, sy + 3, 1, L.rh - 6, 1)
-          set(acc, 0.5); gfx.rect(math.min(mid, px), cy - 1, math.max(1, math.abs(px - mid)), 2, 1)
-          U.diamond(px, cy, math.max(3, math.floor((L.rh - 6) / 2)), acc, hot)
-        else
-          set(acc); gfx.rect(wx0, sy + 4, math.max(1, math.floor(frac * ww + 0.5)), L.rh - 8, 1)
-        end
+        U.dslider(wx0, cy, ww, frac, centered, acc, hot, L.rh)   -- 13 окт: ромбик
         if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
