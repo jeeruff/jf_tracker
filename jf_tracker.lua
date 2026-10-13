@@ -16556,6 +16556,14 @@ local function frame()
     vim.msg = 'fx removed: ' .. (h2.it.name or 'fx') .. ' (u - undo)'
     U.click = false
   end
+  -- 13 окт: Shift+щелчок по эффекту (шапка / микшер) — bypass
+  if U.click and hfx and (gfx.mouse_cap & 8 == 8) and (gfx.mouse_cap & 16 == 0) and hfx.it and hfx.it.i and hfx.col and hfx.col.track then
+    edit.fx_bypass(hfx.col.track, hfx.it.i)
+    model.invalidate(); ctx.hdr_cache = {}
+    local on = reaper.TrackFX_GetEnabled(hfx.col.track, hfx.it.i)
+    vim.msg = (hfx.it.name or 'fx') .. (on and ': on' or ': bypassed') .. ' (Shift+click again)'
+    U.click = false
+  end
   if U.click and (hover.hdrfx or hover.hdrinst or hover.hdrsend) then   -- фишки шапки (7 окт)
     local h2 = hover.hdrfx or hover.hdrinst or hover.hdrsend
     local kind = hover.hdrfx and 'fx' or (hover.hdrinst and 'inst' or 'send')
