@@ -4880,16 +4880,56 @@ ctx = {
     vim.open_hydra({ title = 'convert slices', items = {
       { key = 'l', label = 'to the lib - every slice its own instrument', fn = function() ctx.slices_render('lib') end },
       { key = 's', label = 'to the sampler - an RS5K per slice on the cursor track (slice note)', fn = function() ctx.slices_render('rs5k') end },
+      -- 13 окт: сэмплер целиком / с лупом и sustain / список файлов в одном RS5K
+      { key = 'w', label = 'sampler - the whole sample, one RS5K played by pitch', fn = function() ctx.slices_render('whole') end },
+      { key = 'p', label = 'sampler with a loop - the whole sample, loop on, obeys note-offs (sustain while held)', fn = function() ctx.slices_render('loop') end },
+      { key = 'm', label = 'sampler list - the selected samples into one RS5K (each note - the next file)', fn = function() ctx.rs5k_list() end },
     } })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  -- 13 окт: список сэмплов в одном RS5K (FILE0, FILE1 …): выделенные items в REAPER, иначе — сэмплы
+  -- треков, отмеченных в дереве lib (Space), иначе — инструмент под курсором; нота N — файл N
+  rs5k_list = function()
+    local col = cur_col(); if not col then vim.msg = 'sampler list: no track'; return end
+    local paths, seen = {}, {}
+    local function add_item(it)
+      local tk = it and reaper.GetActiveTake(it)
+      if not tk or reaper.TakeIsMIDI(tk) then return end
+      local src = reaper.GetMediaItemTake_Source(tk)
+      local f = (reaper.GetMediaSourceParent and reaper.GetMediaSourceParent(src)) or src
+      local p = reaper.GetMediaSourceFileName(f, '')
+      if p and p ~= '' and not seen[p] then seen[p] = true; paths[#paths + 1] = p end
+    end
+    for i = 0, reaper.CountSelectedMediaItems(0) - 1 do add_item(reaper.GetSelectedMediaItem(0, i)) end
+    if #paths == 0 then
+      for _, c in ipairs(snap and snap.cols or {}) do
+        if draw.TL.marks and draw.TL.marks[c.guid] then
+          for _, e in ipairs(c.pool or {}) do if not e.parent and e.track_set and e.track_set[c.name] then add_item(e.item) end end
+        end
+      end
+    end
+    if #paths == 0 then local e = (col.pool or {})[vim.inst]; if e then add_item((e.parent or e).item) end end
+    if #paths == 0 then vim.msg = 'sampler list: select items (or mark tracks in the lib tree with Space)'; return end
+    local tr = col.track
+    edit.run('sampler list', function()
+      local fx = reaper.TrackFX_AddByName(tr, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+      if not (fx and fx >= 0) then return end
+      for k, p in ipairs(paths) do reaper.TrackFX_SetNamedConfigParm(tr, fx, 'FILE' .. (k - 1), p) end
+      reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
+      reaper.TrackFX_SetNamedConfigParm(tr, fx, 'renamed_name', ('list %d'):format(#paths))
+      reaper.TrackFX_Show(tr, fx, 2)
+    end)
+    model.invalidate()
+    vim.msg = ('sampler list: %d sample(s) in one RS5K on %s (notes pick the file)'):format(#paths, col.name or 'track')
   end,
   slices_render = function(how)
     local root, col = ctx.slice_root()
     local sl = root and root.slices or {}
     -- 13 окт: не нарезан — в сэмплер целиком (один RS5K на весь сэмпл)
-    if not (root and col and root.item and (#sl > 0 or how == 'rs5k')) then vim.msg = 'convert: no slices on the selected instrument'; return end
+    local whole = how == 'whole' or how == 'loop'
+    if not (root and col and root.item and (#sl > 0 or how ~= 'lib')) then vim.msg = 'convert: no slices on the selected instrument'; return end
     local spans = {}
-    for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end
+    if not whole then for k, t0 in ipairs(sl) do spans[k] = { t0, sl[k + 1] or root.len } end end
     if #spans == 0 then spans[1] = { 0, root.len } end
     if how == 'lib' then
       local n = 0
@@ -4926,14 +4966,21 @@ ctx = {
           local note = math.max(0, math.min(127, base + k - 1))
           reaper.TrackFX_SetNamedConfigParm(tr, fx, 'FILE0', path)
           reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
-          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'MODE', '1')        -- sample: высота как есть, нота только выбирает
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'MODE', whole and '2' or '1')   -- sample: нота выбирает; whole — по высоте
           local ps, pe2 = pidx(fx, 'sample start offset'), pidx(fx, 'sample end offset')
           if ps then reaper.TrackFX_SetParamNormalized(tr, fx, ps, a) end
           if pe2 then reaper.TrackFX_SetParamNormalized(tr, fx, pe2, b) end
-          local ns, ne = pidx(fx, 'note range start'), pidx(fx, 'note range end')
-          if ns then reaper.TrackFX_SetParamNormalized(tr, fx, ns, note / 127) end
-          if ne then reaper.TrackFX_SetParamNormalized(tr, fx, ne, note / 127) end
-          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'renamed_name', ('S%02X %s'):format(k, root.name or ''))
+          if not whole then
+            local ns, ne = pidx(fx, 'note range start'), pidx(fx, 'note range end')
+            if ns then reaper.TrackFX_SetParamNormalized(tr, fx, ns, note / 127) end
+            if ne then reaper.TrackFX_SetParamNormalized(tr, fx, ne, note / 127) end
+          end
+          if how == 'loop' then                                      -- луп и удержание: звучит, пока нота держится
+            local pl, po = pidx(fx, 'loop'), pidx(fx, 'obey note')
+            if pl then reaper.TrackFX_SetParamNormalized(tr, fx, pl, 1) end
+            if po then reaper.TrackFX_SetParamNormalized(tr, fx, po, 1) end
+          end
+          reaper.TrackFX_SetNamedConfigParm(tr, fx, 'renamed_name', whole and (root.name or 'sampler') or ('S%02X %s'):format(k, root.name or ''))
           n = n + 1
         end
       end
@@ -5534,6 +5581,7 @@ ctx = {
     add('window  routing window (REAPER)', U.GREY, function() reaper.SetOnlyTrackSelected(tr); reaper.Main_OnCommand(40293, 0) end)
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y }
     vim.open_picker('route ' .. (is_master and 'master' or nm(tr)) .. (is_master and ': O > hardware outputs' or ': S > send  R < receive  O > hw'), items, function(it) if it.data then it.data() end end)
+    if vim.picker then vim.picker.rows = math.max(14, math.floor((gfx.h * 0.6) / L.rh)) end   -- 13 окт: выходов много
     vim.picker.rows = 18
     vim.picker.route = guid(tr)
   end,
@@ -9425,6 +9473,7 @@ ctx = {
       vim.msg = col.name .. ' input: ' .. it.label:sub(4)
     end)
     vim.picker.inp = col.guid
+    vim.picker.rows = math.max(14, math.floor((gfx.h * 0.6) / L.rh))   -- 13 окт: входов много — список высокий
     state.popup_at = anchor or { kind = 'in', guid = col.guid }
   end,
   -- + send (3 окт): fzf по трекам проекта → отправка с этого трека
