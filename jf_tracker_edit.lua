@@ -768,12 +768,36 @@ end
 
 function E.set_slices(it, slices)
   run('slices', function()
+    local old = E.item_slices(it)
     local parts = {}
     for _, t in ipairs(slices) do parts[#parts + 1] = ('%.6f'):format(t) end
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', table.concat(parts, ','), true)
     local tk = R.GetActiveTake(it)
     local offs = tk and R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', #slices > 0 and ('%.6f;%.6f;%.6f'):format(offs, R.GetMediaItemInfo_Value(it, 'D_LENGTH'), slice_rate_now(it)) or '', true)
+    -- 13 окт: ноты слайсов пулены — сдвинул границу слайса k в сэмпле, все его ноты (и транспонированные,
+    -- и сдвинутые slip) сдвигают начало на столько же; нота длиной в слайс — длиной в новый слайс
+    local root = iid_base(E.get_iid(it))
+    if root ~= '' and #old == #slices and #slices > 0 then
+      local ilen = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      for ti = 0, R.CountTracks(0) - 1 do
+        local tr = R.GetTrack(0, ti)
+        for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+          local o = R.GetTrackMediaItem(tr, ii)
+          local k = o ~= it and iid_base(E.get_iid(o)) == root and tonumber((select(2, R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_slice', '', false))))
+          local otk = k and slices[k] and R.GetActiveTake(o)
+          if otk and math.abs(slices[k] - old[k]) > 1e-7 or (otk and math.abs((slices[k + 1] or ilen) - (old[k + 1] or ilen)) > 1e-7) then
+            local r = R.GetMediaItemTakeInfo_Value(otk, 'D_PLAYRATE'); if r <= 0 then r = 1 end
+            local da = slices[k] - old[k]
+            R.SetMediaItemTakeInfo_Value(otk, 'D_STARTOFFS', R.GetMediaItemTakeInfo_Value(otk, 'D_STARTOFFS') + da * r)
+            local olen = ((old[k + 1] or ilen) - old[k]) / r
+            local nlen = ((slices[k + 1] or ilen) - slices[k]) / r
+            local cur = R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+            if math.abs(cur - olen) < 1e-3 or cur > nlen then R.SetMediaItemInfo_Value(o, 'D_LENGTH', math.max(0.001, nlen)) end
+          end
+        end
+      end
+    end
   end)
 end
 

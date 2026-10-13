@@ -1213,7 +1213,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
   local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
-    or (#slices > 0 and 'q whole  2 w 3 e ... slices  Opt+key pitch' or '')   -- 10 окт: коротко — число слайсов и так видно
+    or ((#slices > 0 and ctx.state and ctx.state.hints) and 'q whole  2 w 3 e ... slices  Opt+key pitch' or '')   -- 13 окт: подсказка клавиш — только при хинтах   -- 10 окт: коротко — число слайсов и так видно
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag: to a track / the lib as a slice   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
   -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать
