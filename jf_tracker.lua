@@ -14326,7 +14326,11 @@ local function frame()
   -- 8 окт: фокус в клипах — свой режим SESSION (клавиатура запускает клипы),
   -- не KEYS: слой пианино тут не действует
   if state.focus == 'session' and state.clipsview then left = '-- SESSION --'
-  elseif state.focus ~= 'tracker' then left = state.focus:upper() .. (state.focus == 'top' and (':' .. state.toptab) or '') end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
+  elseif state.focus ~= 'tracker' then
+    -- 13 окт: подпись панели из реестра (properties, lib, item), не её id (было «SPROPS», «INST»)
+    local pe = draw.panes.BY and draw.panes.BY[state.focus]
+    left = ((pe and pe.label) or state.focus):upper() .. (state.focus == 'top' and (':' .. state.toptab) or '')
+  end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
@@ -18661,7 +18665,7 @@ local function frame()
       vim.msg = 'Ctrl+Tab: off for now - click a tab, F2-F6 or Ctrl+W + panel letter'
     elseif m.alt then
       ctx.toggle_focus(back and -1 or 1)
-      vim.msg = 'focus: ' .. state.focus:upper()
+      vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     else vim.msg = 'Tab: only in the tracker (next track) for now' end   -- 10 окт: в панелях Tab пока ничего не делает
     c = 0
