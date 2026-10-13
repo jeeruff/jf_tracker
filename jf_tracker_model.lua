@@ -705,14 +705,22 @@ function M.build(lpb)
   -- rate его item в lib) — база, C-4 = как звучит инструмент; раньше нота
   -- была абсолютной и q / вставка играли без транспоза, а клик в lib — с ним
   snap.inst_semis = {}
-  for i, e in ipairs(all) do snap.inst_semis[i] = M.take_semitones(e.pitch, e.rate, e.ppitch) end
+  -- 13 окт: база — транспоз сэмпла в lib: у слайса / куска — его корня, у корня — его item в lib;
+  -- инструмент без item в lib (только ноты) — без базы. Раньше база бралась у самой длинной ноты
+  -- (представителя): она показывалась F-4, её копия — C-4, хотя высота у обеих одна
+  local function base_of(e)
+    local r = e.parent or e
+    if r.depot then return M.take_semitones(r.pitch, r.rate, r.ppitch) end
+    return 0
+  end
+  for i, e in ipairs(all) do snap.inst_semis[i] = base_of(e) end
   for _, col in ipairs(snap.cols) do
     for _, lane in ipairs(col.lanes) do
       for _, sub in ipairs(lane.subs) do
         for _, cell in pairs(sub) do
           if cell.kind == 'audio' and cell.item then
             local i = snap.inst_of[cell.item]
-            local base = i and all[i] and all[i].item ~= cell.item and snap.inst_semis[i] or 0
+            local base = i and all[i] and snap.inst_semis[i] or 0
             if base ~= 0 then
               cell.semis_abs = cell.semis
               cell.semis = cell.semis - base
