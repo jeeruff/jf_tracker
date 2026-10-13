@@ -901,5 +901,22 @@ do
   V.key(27); RENOISE = false; keys.set_renoise(false)
 end
 
+-- 13 окт: окно ввода имени — первая буква заменяет имя, стрелки — правка на месте
+do
+  reset()
+  local LEFT = 1818584692
+  V.open_prompt('tname ', 'Track 4')
+  eq('prompt: no command shown', V.popup().title, 'Track 4')
+  V.key(('x'):byte()); eq('prompt: a letter replaces the whole name', V.cmdline, 'tname x')
+  V.key(27)
+  V.open_prompt('tname ', 'Track 4')
+  V.key(LEFT); V.key(('y'):byte()); eq('prompt: after an arrow - edit in place', V.cmdline, 'tname Track y4')
+  V.key(8); V.key(8); eq('prompt: backspace edits', V.cmdline, 'tname Track4')
+  V.key(27)
+  V.open_prompt('tname ', 'Track 4'); V.key(8); eq('prompt: backspace first - clears', V.cmdline, 'tname ')
+  V.key(0x75000000 + 0x0431); eq('prompt: cyrillic letters', V.cmdline, 'tname б')
+  V.key(27); eq('prompt: Esc leaves', V.mode, 'normal')
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -1348,6 +1348,38 @@ function V.key_impl(c)
   end
 
   -- командная строка (+ подсказка и Tab-дополнение)
+  -- 13 окт: окно ввода имени (V.open_prompt): без «:команды» и подсказок. Первая буква / цифра
+  -- заменяет имя целиком (оно выделено); стрелки / Home / End / Backspace — правка имени на месте
+  if V.prompt and (V.mode ~= 'cmd' or (V.cmdline or ''):sub(1, #V.prompt.pre) ~= V.prompt.pre) then V.prompt = nil end   -- ушли из окна иначе (щелчок)
+  if V.mode == 'cmd' and V.prompt then
+    local pr = V.prompt
+    local back = (V.cmd_from == 'insert') and 'insert' or 'normal'
+    local t = V.cmdline:sub(#pr.pre + 1)
+    local n = utf8.len(t) or #t
+    local function cut(a, b) local ia = utf8.offset(t, a + 1) or (#t + 1); local ib = utf8.offset(t, b + 1) or (#t + 1); return t:sub(1, ia - 1), t:sub(ib) end
+    local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+    if c == ESC then V.mode = back; V.cmdline = nil; V.prompt = nil; return
+    elseif c == ENTER then local line = V.cmdline; V.mode = back; V.cmdline = nil; V.prompt = nil; return run_cmd(line)
+    elseif c == LEFT then pr.pos = math.max(0, pr.pos - 1); pr.fresh = false
+    elseif c == RIGHT then pr.pos = math.min(n, pr.pos + 1); pr.fresh = false
+    elseif c == 1752132965 then pr.pos = 0; pr.fresh = false
+    elseif c == 6647396 then pr.pos = n; pr.fresh = false
+    elseif c == BS then
+      if pr.fresh then t, pr.pos = '', 0
+      elseif pr.pos > 0 then local a, b = cut(pr.pos - 1, pr.pos); t = a .. b; pr.pos = pr.pos - 1 end
+      pr.fresh = false
+    elseif c == 6579564 then
+      if pr.fresh then t, pr.pos = '', 0 elseif pr.pos < n then local a, b = cut(pr.pos, pr.pos + 1); t = a .. b end
+      pr.fresh = false
+    elseif cp >= 32 and cp ~= 127 and cp < 0x110000 and (cp < 0xF700 or cp > 0xF8FF) then
+      local ch = utf8.char(cp)
+      if pr.fresh then t, pr.pos = ch, 1
+      else local a, b = cut(pr.pos, pr.pos); t = a .. ch .. b; pr.pos = pr.pos + 1 end
+      pr.fresh = false
+    end
+    V.cmdline = pr.pre .. t
+    return
+  end
   if V.mode == 'cmd' then
     local back = (V.cmd_from == 'insert') and 'insert' or 'normal'
     -- история (9 окт, как в zsh / atuin): ↑ ↓ Ctrl+P Ctrl+N — по набранному
@@ -1602,7 +1634,7 @@ function V.key_impl(c)
       V.mode = 'normal'; finish_edit(); return
     end
     local chk = (c < 256) and string.char(c) or ''
-    if chk == ':' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = ''; V.hexbuf = nil; return end
+    if chk == ':' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.hexbuf = nil; return end
     if chk == '/' and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) then V.cmd_from = 'insert'; V.mode = 'search'; V.searchline = ''; V.hexbuf = nil; return end
     if chk == '?' then V.open_hydra(ctx.hydra_keys()); return end
     -- m — клавиатура вкл / выкл и в INSERT (5 окт): выключена — ноты не пишутся
@@ -2322,7 +2354,7 @@ function V.key_impl(c)
   elseif ch == 'A' then ctx.automation_picker(); V.count = nil; return
   elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == 'V' then V.mode = 'vline'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
-  elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.count = nil; return
+  elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil; return
   -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
   -- :команды); поиск по содержимому — f (метки прыжка)
   elseif ch == '/' then V.count = nil; if ctx.command_search then ctx.command_search() else V.mode = 'search'; V.searchline = '' end; return
@@ -2563,6 +2595,10 @@ function V.popup()
     -- 11 окт: хинты включены — внизу меню «как сюда быстро» (h.how): для мышечной памяти
     if V.hydra.how and ctx.state and ctx.state.hints then lines[#lines + 1] = { key = ' ', text = 'fast: ' .. V.hydra.how, col = { 0.55, 0.55, 0.55 } } end
     return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
+  elseif V.mode == 'cmd' and V.prompt then
+    local t = (V.cmdline or ''):sub(#V.prompt.pre + 1)
+    local b = utf8.offset(t, V.prompt.pos + 1) or (#t + 1)
+    return { title = t, before = t:sub(1, b - 1), fresh = V.prompt.fresh, lines = {}, kind = 'prompt' }
   elseif V.mode == 'cmd' then
     local matches, word = V.cmd_matches(V.cmdline)
     local lines = {}
@@ -2655,9 +2691,15 @@ function V.pending_hint()
   return (V.count and (tostring(V.count) .. ' ') or '') .. h
 end
 
+-- 13 окт: окно ввода имени: pre — команда (её не видно), text — нынешнее имя (выделено)
+function V.open_prompt(pre, text)
+  V.cmd_from = (V.mode == 'cmd') and (V.cmd_from or 'normal') or V.mode
+  V.mode = 'cmd'; V.cmdline = pre .. (text or '')
+  V.prompt = { pre = pre, pos = utf8.len(text or '') or #(text or ''), fresh = true }
+end
 function V.status()
   local m = ({ normal = V.piano and '-- KEYS --' or '', insert = '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
-               cmd = ':' .. (V.cmdline or ''), search = '/' .. (V.searchline or '') })[V.mode] or ''
+               cmd = V.prompt and 'rename' or (':' .. (V.cmdline or '')), search = '/' .. (V.searchline or '') })[V.mode] or ''
   local extra = ''
   if V.macro then extra = ' rec@' .. V.macro.name end
   if V.pending then extra = extra .. ' ' .. V.pending end

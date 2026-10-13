@@ -7546,6 +7546,8 @@ function D.popup(L, p, anchor)
   if L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad > maxcol then tw = math.max(ms('WWWWWWWW'), maxcol - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad)) end
   local colw = L.pad + kw + 2 * L.pad + hcol + tw + 2 * L.pad
   -- 9 окт: пикер не уже заголовка (до 60 знаков) — поиск не сжимает окно
+  -- 13 окт: окно ввода имени (vim.open_prompt): одна строка — текст, курсор; fresh — весь текст выделен
+  if p.kind == 'prompt' then colw = math.max(ms(string.rep('W', 24)), ms(p.title or '') + ms('WW')) + 2 * L.pad end
   if p.kind == 'picker' and ncol == 1 then
     local tmin = math.min(ms(p.title or ''), ms(string.rep('W', 60))) + 2 * L.pad
     if colw < tmin then tw = tw + (tmin - colw); colw = tmin end
@@ -7574,6 +7576,15 @@ function D.popup(L, p, anchor)
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   -- рамка поярче (2 окт): видна поверх любого модуля
   set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
+  if p.kind == 'prompt' then
+    local t = p.title or ''
+    local tx, ty = x + L.pad, y + L.pad
+    if p.fresh and t ~= '' then set(U.tint(U.AMBER, 0.35)); gfx.rect(tx - 1, ty, ms(t) + 2, L.rh, 1) end
+    text(tx, ty + 1, t, U.TEXT)
+    local cx = tx + ms(p.before or t)
+    set(U.AMBER); gfx.rect(cx, ty, 2, L.rh, 1)
+    return
+  end
   text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
   for i, ln in ipairs(p.lines) do
     local ci = math.floor((i - 1) / nrow)

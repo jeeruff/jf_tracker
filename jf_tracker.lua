@@ -300,7 +300,7 @@ local state = {
   pm_ok = reaper.file_exists(DIR .. '/jf_tracker_pm.lua'),
   pmgrid = reaper.file_exists(DIR .. '/.dev') and reaper.file_exists(DIR .. '/jf_tracker_pm.lua') and flag('pmgrid', true) or false,
   pmthumb = flag('pmthumb', true), pmicon = flag('pmicon', true),   -- превью / метка DAW на карточках pm
-  keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples)
+  keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples), по умолчанию вкл
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
   hints = flag('hints', true),
@@ -5554,7 +5554,7 @@ ctx = {
   arr_rename_prompt = function()
     local nm = ctx.arr_name()
     if not nm then ctx.arr('new'); return end
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'arr name ' .. nm
+    vim.open_prompt('arr name ', nm)
   end,
   arr = function(what, arg)
     local AR = draw.arr
@@ -6944,7 +6944,7 @@ ctx = {
     if not rg then vim.msg = 'no region'; return end
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'name ' .. rg.name
+    vim.open_prompt('name ', rg.name or '')
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
@@ -10109,6 +10109,7 @@ ctx = {
       flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
       { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
       { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on (default): after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, aliases copy exactly what is seen; off - a note started in a pattern rings on into the next one (as in Renoise); the matrix trim button still cuts by hand', get = function() return state.hardedges ~= false end, set = function(v) state.hardedges = v end },
+      flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
     }
@@ -10131,7 +10132,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'copymedia', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
     }
@@ -11276,7 +11277,7 @@ ctx = {
     col = col or cur_col(); if not col then return end
     state.rename_guid = col.guid
     state.popup_at = { kind = 'track', guid = col.guid }
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'tname ' .. (col.name or '')
+    vim.open_prompt('tname ', col.name or '')   -- 13 окт: окно ввода имени, без :команды
   end,
   rename_track = function(text)
     text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
@@ -11293,7 +11294,7 @@ ctx = {
     local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
     if not e then vim.msg = 'no instrument'; return end
     state.popup_at = { kind = 'inst' }
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'iname ' .. (e.name or '')
+    vim.open_prompt('iname ', e.name or '')
   end,
   rename_inst = function(text)
     text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
@@ -12048,6 +12049,7 @@ ctx.LL = dofile(DIR .. '/jf_tracker_looploom.lua'); ctx.LL.init(U, ctx)   -- 13 
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
+if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 SL.loop_ov = function(e)
   local lp = e and e.item and ctx.sus_get(e)
@@ -14382,7 +14384,7 @@ local function frame()
     if on_fx and not sp_on_fx then state.dsp_take = true; dsp_sel.fx, dsp_sel.param = 1, 1; DK.anchor, DK.pending = nil, nil end
     sp_on_fx = on_fx
   end
-  edit.keep_samples, edit.copy_media = true, state.copymedia   -- 13 окт: страховка всегда (сэмпл трека всегда в lib), опции нет
+  edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
   if edit.rescued then
     vim.msg = 'last item of ' .. table.concat(edit.rescued, ', ') .. ' deleted - sample kept in track library (=LIB)'
@@ -18997,7 +18999,7 @@ local function frame()
       c = 0
     end
   end
-  c = keys.translate(c)
+  if not vim.prompt then c = keys.translate(c) end   -- 13 окт: в окне имени кириллица — буквами, не хоткеями
   -- Option+H / J / K / L (4 окт): символ зависит от раскладки (в русской Option+р —
   -- не «˙»), поэтому смотрим физическую клавишу; код — как от Option+h в US
   if c > 0 and reaper.JS_VKeys_GetState then
