@@ -38,6 +38,30 @@ do
   O.key(9); eq('Tab -> hotkeys', O.tab, 'hotkeys'); eq('hotkeys rows', #O.items, 3)
   O.open(g, 'hotkeys'); eq('open on hotkeys', O.tab, 'hotkeys')
 end
+-- 14 окт: блок (темы и шрифты) — строками в общем списке, клавиши ему, j / k за край — в список;
+-- поиск — по всем вкладкам
+do
+  local got, edge = {}, nil
+  local blk = { kind = 'block', label = 'themes', height = function() return 5 * 20 end,
+    key = function(c) got[#got + 1] = c; return edge end }
+  local g = {
+    { sep = true, title = 'look' }, { key = 'a', label = 'alpha', kind = 'toggle', get = function() return false end, set = function() end },
+    { sep = true, title = 'theme', group = 'options' }, blk,
+    { sep = true, title = 'audio', group = 'options' }, { key = 'b', label = 'buffer', kind = 'toggle', get = function() return false end, set = function() end },
+    { sep = true, title = 'hotkeys', group = 'hotkeys' }, { label = 'dd', kind = 'action', desc = 'delete alpha' },
+  }
+  O.rh = 20
+  O.open(g)
+  eq('block: tabs options, hotkeys', table.concat(O.tabs, ','), 'options,hotkeys')
+  eq('block: 5 rows + 5 rows', #O.items, 5 + 5)
+  O.sel = 2; O.key(('j'):byte()); eq('j enters the block', O.items[O.sel].blockrow, true)
+  O.key(('l'):byte()); eq('keys go to the block', got[#got], ('l'):byte())
+  edge = 'down'; O.key(('j'):byte()); eq('j past the block -> next option', O.items[O.sel].key, 'b')
+  edge = nil
+  O.key(('/'):byte()); for ch in ('alpha'):gmatch('.') do O.key(ch:byte()) end
+  eq('search over all tabs', #O.items, 2)
+  O.key(27)
+end
 -- компактная панель (5 окт): число цифрами, Enter, границы, Esc
 local vol = 0
 O.open_panel({ { label = 'volume', kind = 'num', min = -60, max = 12, step = 0.5, get = function() return vol end, set = function(v) vol = v end } }, 'item x', { x = 10, y = 10 })

@@ -5198,7 +5198,7 @@ ctx = {
   audio_items = function()
     local A = ctx.audio()
     local cur = A.read()
-    local items = { { sep = true, title = 'audio', group = 'audio' } }
+    local items = { { sep = true, title = 'audio', group = 'options' } }
     items[#items + 1] = { label = 'reload the device (F12)', kind = 'action', value = 'F12', desc = 'reopen the same audio device, as choosing it again: the audio stops and starts (fixes a device that went silent or changed its rate)', fn = function() ctx.audio_reload() end }
     if not cur then
       items[#items + 1] = { label = 'audio device', kind = 'action', value = '-', desc = 'only CoreAudio (macOS) settings can be changed from the tracker', fn = function() end }
@@ -5232,7 +5232,7 @@ ctx = {
     elseif what == 'bs' and tonumber(rest) then ctx.audio_set({ bs = math.floor(tonumber(rest)), bsuse = true })
     elseif what == 'sr' and rest == 'off' then ctx.audio_set({ sruse = false })
     elseif what == 'sr' and tonumber(rest) then ctx.audio_set({ sr = math.floor(tonumber(rest)), sruse = true })
-    elseif what == '' then state.opt_tab = 'audio'; ctx.options()   -- 12 окт: без аргумента — опции, вкладка audio
+    elseif what == '' then state.opt_tab = 'options'; ctx.options()   -- 12 окт: без аргумента — опции (14 окт: audio — раздел в них)
     else
       local l = A.live()
       vim.msg = ('audio: %s  %s Hz  %s smp - :audio dev <name> | bs N | sr N | bs off | sr off'):format(l.dev or '?', tostring(l.sr or '?'), tostring(l.bs or '?'))
@@ -10174,8 +10174,16 @@ ctx = {
     -- / ищет по клавише, описанию и модулю
     -- audio (10 окт): устройство REAPER в стиле трекера; правки копятся, apply применяет
     -- 10 окт: вкладка theme — темы и шрифты с примерами (jf_tracker_themetab.lua рисует сам)
-    items[#items + 1] = { sep = true, title = 'theme', group = 'theme' }
-    items[#items + 1] = { label = 'themes and fonts', kind = 'action', group = 'theme', key = 'theme', desc = 'theme cards and fonts in their own faces: h j k l, Enter; font size (font scale) and line spacing - under the fonts', fn = function() end }
+    -- 14 окт: вкладки theme и audio нет — разделы общего списка options (поиск находит всё)
+    items[#items + 1] = { gap = true, sep = true }
+    items[#items + 1] = { sep = true, title = 'theme and fonts', group = 'options' }
+    ctx.theme_tab.sync()
+    items[#items + 1] = { kind = 'block', label = 'themes and fonts',
+      height = function() return (ctx.theme_tab.last and ctx.theme_tab.last.total) or 40 * L.rh end,
+      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, { scroll = scroll }) end,
+      key = function(c) return ctx.theme_tab.key(c) end,
+      click = function() return ctx.theme_tab.click() end }
+    items[#items + 1] = { gap = true, sep = true }
     for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do

@@ -32,11 +32,9 @@ end
 function O.rebuild()
   local view = {}
   if O.query ~= '' then
-    -- поиск — только в открытой вкладке (5 окт)
-    local grp = 'options'
+    -- 14 окт: поиск — по всем вкладкам (опции, тема, аудио, хоткеи)
     for _, it in ipairs(O.all) do
-      if it.sep then grp = it.group or 'options' end
-      if not it.sep and (#O.tabs == 0 or grp == O.tab) and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.value or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
+      if not it.sep and it.kind ~= 'block' and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.value or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
     end
   elseif O.tab == 'all' then view = O.all
   else
@@ -45,7 +43,14 @@ function O.rebuild()
     local grp = 'options'
     for _, it in ipairs(O.all) do
       if it.sep then grp = it.group or 'options' end
-      if grp == O.tab then view[#view + 1] = it end
+      if grp == O.tab then
+        -- 14 окт: блок (темы и шрифты) — своими строками списка, рисует его владелец
+        if it.kind == 'block' then
+          local n = math.max(4, math.ceil((it.height and it.height() or 30 * 20) / math.max(1, O.rh or 20)))
+          it.nrows = n
+          for k = 1, n do view[#view + 1] = { blockrow = true, k = k, of = it, label = '' } end
+        else view[#view + 1] = it end
+      end
     end
   end
   O.items = view
@@ -84,7 +89,7 @@ function O.open_panel(items, title, anchor)
   O.compact = { title = title or '', x = anchor and anchor.x, y = anchor and anchor.y }
   O.page, O.active, O.sel, O.scroll, O.numbuf = 'list', true, 1, 0, nil
 end
-function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end; if t == 'theme' and ctx.theme_tab then ctx.theme_tab.sync() end end
+function O.set_tab(t) O.tab = t; O.sel, O.scroll = 1, 0; O.query = ''; O.rebuild(); if ctx.opt_tab then ctx.opt_tab(t) end end
 function O.step_tab(d)
   if #O.tabs == 0 then return end
   local i = 1
@@ -175,14 +180,26 @@ function O.key(c)
   if c == 9 or ch == ']' then O.step_tab(shift and -1 or 1); return true end
   if c == 25 or ch == '[' then O.step_tab(-1); return true end
   if c == 27 and O.query ~= '' then O.query = ''; O.rebuild(); return true end
-  -- 10 окт: вкладка theme — своя сетка (темы карточками, шрифты своим шрифтом)
-  if O.tab == 'theme' and O.query == '' and ctx.theme_tab and ctx.theme_tab.key(c) then return true end
   local n = #O.items
   local it = O.items[O.sel]
+  -- 14 окт: строка блока (темы и шрифты) — клавиши его владельцу; j / k за край — в список
+  if it and it.blockrow and c ~= 27 and ch ~= 'q' then
+    local r = it.of.key and it.of.key(c)
+    if r == 'down' then
+      local i = O.sel; while O.items[i] and O.items[i].blockrow do i = i + 1 end
+      while O.items[i] and O.items[i].sep do i = i + 1 end
+      O.sel = math.min(n, i)
+    elseif r == 'up' then
+      local i = O.sel; while O.items[i] and O.items[i].blockrow do i = i - 1 end
+      while i > 1 and O.items[i] and O.items[i].sep do i = i - 1 end
+      O.sel = math.max(1, i)
+    elseif r then O.block_follow = true end
+    return true
+  end
   if it and it.masked and it.masked() and (c == 13 or ch == ' ' or ch == 'l' or ch == 'h' or ch == '+' or ch == '-') then it.unmask(); return true end
   if c == 27 or ch == 'q' then O.close()
-  elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel < n do O.sel = O.sel + 1 end
-  elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel > 1 do O.sel = O.sel - 1 end
+  elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel < n do O.sel = O.sel + 1 end; O.block_follow = true
+  elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel > 1 do O.sel = O.sel - 1 end; O.block_follow = true
   elseif ch == 'g' then O.sel = 1
   elseif ch == 'G' then O.sel = n
   elseif c == 13 or ch == ' ' then O.adjust(it, 0)
@@ -196,10 +213,9 @@ end
 
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
-  if O.tab == 'theme' and O.query == '' and ctx.theme_tab then ctx.theme_tab.wheel(d); return end
   local it = O.items[O.hover or O.sel]
   -- список (хоткеи, действия, полоса прокрутки): колесо листает (5 окт)
-  if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' then
+  if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' or it.blockrow then
     local nv = O.nvis or 10
     O.scroll = math.max(0, math.min(math.max(0, #O.items - nv), O.scroll - d * 3))
     O.sel = math.max(O.scroll + 1, math.min(O.scroll + nv, O.sel))
@@ -231,7 +247,10 @@ function O.click(mx, my)
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.tab_hot then O.set_tab(O.tab_hot); return end
-  if O.tab == 'theme' and O.query == '' and ctx.theme_tab and ctx.theme_tab.click() then return end
+  if O.block_hot and O.block_hot.click and O.block_hot.click() then
+    for i, it in ipairs(O.items) do if it.blockrow and it.of == O.block_hot then O.sel = i; break end end
+    return
+  end
   if O.find_hot then O.typing = true; return end
   if O.sb_hot then O.sb_drag = true; return end
   if O.hover then
@@ -476,7 +495,6 @@ function O.draw(L, W, H)
   local tk = tostring(O.tab or '')
   if O.query == '' then O.nfull[tk] = math.max(O.nfull[tk] or 0, n) end
   local rows = math.max(12, math.ceil((O.nfull[tk] or n) / ncw), math.ceil(n / ncol))
-  if O.tab == 'theme' and O.query == '' then rows = math.max(rows, 60); bw = math.max(bw, math.min(W - 2 * L.pad - 20, L.cw * 150)) end   -- вкладка theme — во всю высоту
   local nvis = math.max(3, math.min(rows, math.floor((H - 6 * rh) / rh)))
   local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
@@ -554,10 +572,6 @@ function O.draw(L, W, H)
   local by0 = by
   if not O.compact then by = by + rh * ((#O.tabs > 0) and 3 or 2) end   -- список — под вкладками и поиском (2 строки)
   O.nvis = cap
-  if O.tab == 'theme' and O.query == '' and ctx.theme_tab then
-    ctx.theme_tab.draw(bx + L.pad, by + rh + 4, bw - 2 * L.pad, by0 + bh - (by + rh + 4) - 4)
-    return
-  end
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
   local sbw = 0
@@ -587,6 +601,37 @@ function O.draw(L, W, H)
     else O.drag = nil end
   end
   local colw = math.floor(bw / ncol)
+  O.rh = rh
+  O.block_hot = nil
+  -- 14 окт: блок — строки подряд; рисуется один раз с первой видимой его строки
+  local drawn_block = {}
+  for r = 1, cap do
+    local it0 = O.items[O.scroll + r]
+    if it0 and it0.blockrow and not drawn_block[it0.of] then
+      drawn_block[it0.of] = true
+      local nb = 0
+      while r + nb <= cap and O.items[O.scroll + r + nb] and O.items[O.scroll + r + nb].blockrow and O.items[O.scroll + r + nb].of == it0.of do nb = nb + 1 end
+      local yb = by + rh + 4 + (r - 1) * rh
+      local blk = it0.of
+      if blk.draw then
+        local _, sy0, sy1 = blk.draw(bx + L.pad, yb, bw - 2 * L.pad - sbw - 2, nb * rh, (it0.k - 1) * rh)
+        if mx >= bx and mx < bx + bw and my >= yb and my < yb + nb * rh then O.block_hot = blk end
+        -- выбор внутри блока виден: список листается за ним
+        local cur = O.items[O.sel]
+        if O.block_follow and cur and cur.blockrow and cur.of == blk and sy0 then
+          O.block_follow = nil
+          local first = O.scroll + r - (it0.k - 1)
+          local r0, r1 = first + math.floor(sy0 / rh), first + math.ceil(sy1 / rh)
+          if r0 <= O.scroll then O.scroll = math.max(0, r0 - 1) elseif r1 > O.scroll + cap then O.scroll = r1 - cap end
+          O.sel = math.max(O.scroll + 1, math.min(O.scroll + cap, r0))
+        end
+      end
+    end
+  end
+  -- высота блока поменялась (ширина окна, шрифт) — строки пересобрать
+  for _, it in ipairs(O.all or {}) do
+    if it.kind == 'block' and it.height and it.nrows and it.nrows ~= math.max(4, math.ceil(it.height() / rh)) then O.rebuild() end
+  end
   for r = 1, cap do
     local i = O.scroll + r
     local it = O.items[i]
@@ -596,7 +641,8 @@ function O.draw(L, W, H)
     -- колонка: свои x и ширина (у последней — минус полоса прокрутки)
     local bx, bw = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
     bw = math.min(bw, O.roww or bw)                   -- 13 окт: строка — по содержимому, не до края окна (колесо справа не меняло опции)
-    if it.sep then
+    if it.blockrow then
+    elseif it.sep then
       -- раздел (4 окт): заголовок темы, иначе — тонкая линия
       if it.gap then                                  -- 10 окт: пустая строка перед разделом
       elseif it.title then U.text(bx + L.pad, y + 1, it.title, U.CYAN); U.set(U.DIM); gfx.rect(bx + L.pad + U.measure(it.title) + L.pad, y + math.floor(rh / 2), bw - 3 * L.pad - U.measure(it.title), 1, 1)

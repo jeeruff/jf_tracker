@@ -20,6 +20,7 @@ MR.BUILTIN = {
   { name = 'repeat down', body = ':repeat',       desc = 'repeat the part of the region above the cursor down to the region end' },
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
   { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
+  { name = 'dedouble',    body = ':dedouble',     desc = 'doubled notes (same note at the same time) on the cursor row of the track - one is kept; VISUAL - in the selection' },
 }
 
 -- клавиши ↔ строка

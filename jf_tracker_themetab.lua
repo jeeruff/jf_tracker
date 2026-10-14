@@ -99,7 +99,9 @@ end
 local SCALES = { 1, 1.5, 2, 3 }
 local BTNS = { { 'o', 'own font' }, { 'i', 'install bundled fonts' }, { 'd', 'download fonts' }, { 'r', 'reload my themes' } }
 
-function TT.draw(x, y, w, h)
+-- emb (14 окт): вкладки theme нет — блок внутри списка опций; emb.scroll — сдвиг (px) от верха
+-- блока, прокрутку ведёт список, кнопки — в конце содержимого. → высота блока, sy0, sy1 выбранного
+function TT.draw(x, y, w, h, emb)
   local L, text, ms = ctx.L(), ctx.text, ctx.measure
   local rh, pad = L.rh, L.pad
   local themes, fonts = ctx.themes(), ctx.fonts()
@@ -132,9 +134,13 @@ function TT.draw(x, y, w, h)
   local my0 = fy0 + rh + math.ceil(#fonts / fcols) * ph + pad
   if TT.sec == 3 then local r = ((TT.i[3] or 1) - 1) // mcols; sy0 = my0 + rh + r * (mh + 2); sy1 = sy0 + mh end
   local total = my0 + rh + math.ceil(#mfs / mcols) * (mh + 2)
-  if sy0 - TT.scroll < 0 then TT.scroll = sy0 - (TT.sec == 1 and rh or 0) end
-  if sy1 - TT.scroll > vh then TT.scroll = sy1 - vh end
-  TT.scroll = math.max(0, math.min(TT.scroll, math.max(0, total - vh)))
+  if emb then
+    vh = h; TT.scroll = emb.scroll or 0
+  else
+    if sy0 - TT.scroll < 0 then TT.scroll = sy0 - (TT.sec == 1 and rh or 0) end
+    if sy1 - TT.scroll > vh then TT.scroll = sy1 - vh end
+    TT.scroll = math.max(0, math.min(TT.scroll, math.max(0, total - vh)))
+  end
   local function vis(yy, hh) return yy >= y and yy + hh <= y + vh end
   local oy = y - TT.scroll
   if vis(oy, rh) then text(x, oy, 'themes - h j k l, Enter applies', U.AMBER) end
@@ -212,6 +218,11 @@ function TT.draw(x, y, w, h)
   end
   -- кнопки
   local bx, by = x, y + h - rh - 2
+  if emb then
+    by = oy + total + 4
+    TT.last = { total = total + rh + 8, sy0 = sy0, sy1 = sy1 }
+    if not vis(by - 3, rh + 3) then return TT.last.total, sy0, sy1 end
+  end
   C(U.LINE); gfx.rect(x, by - 3, w, 1, 1)
   for _, b in ipairs(BTNS) do
     local lab = b[1] .. ' ' .. b[2]
@@ -229,6 +240,7 @@ function TT.draw(x, y, w, h)
   if TT.sec == 1 and themes[TT.i[1]] then tip = 'theme ' .. themes[TT.i[1]].name
   elseif fonts[TT.i[2]] then tip = fonts[TT.i[2]].tip end
   if tip and bx + ms(tip) + pad < x + w then text(bx + pad, by, ctx.fit(tip, x + w - bx - pad), U.GREY) end
+  if emb then return TT.last.total, sy0, sy1 end
 end
 
 local function apply()
@@ -257,9 +269,9 @@ function TT.key(c)
   if ch == 'l' or c == 1919379572 then TT.i[s] = math.min(n, i + 1)
   elseif ch == 'h' or c == 1818584692 then TT.i[s] = math.max(1, i - 1)
   elseif ch == 'j' or c == 1685026670 then
-    if i + cols <= n then TT.i[s] = i + cols elseif s < 3 then TT.sec = s + 1 end
+    if i + cols <= n then TT.i[s] = i + cols elseif s < 3 then TT.sec = s + 1 else return 'down' end   -- 14 окт: из блока — в список опций
   elseif ch == 'k' or c == 30064 then
-    if i - cols >= 1 then TT.i[s] = i - cols elseif s > 1 then TT.sec = s - 1 end
+    if i - cols >= 1 then TT.i[s] = i - cols elseif s > 1 then TT.sec = s - 1 else return 'up' end
   elseif ch == 'g' then TT.sec, TT.i[1] = 1, 1
   elseif ch == 'G' then TT.sec, TT.i[2] = 2, TT.nf or 1
   elseif c == 13 or ch == ' ' then apply()

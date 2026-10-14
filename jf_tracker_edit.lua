@@ -415,6 +415,66 @@ function E.delete(heads, lpb)
   end)
 end
 
+-- 14 окт: dedouble — одинаковые ноты, начинающиеся в одно время (на строках heads), остаются
+-- одной: MIDI — та же высота и канал, аудио — тот же файл, offset и высота. Первая (по
+-- подколонкам слева) живёт, MIDI-клип, где после этого не осталось нот, удаляется. → число удалённых
+function E.dedouble(heads, lpb)
+  local want, takes, tseen, items = {}, {}, {}, {}
+  local function ms(t) return math.floor(t * 1000 + 0.5) end
+  for _, h in ipairs(heads) do
+    if h.kind == 'midi' and h.take and R.ValidatePtr(h.take, 'MediaItem_Take*') then
+      if not tseen[h.take] then tseen[h.take] = true; takes[#takes + 1] = h.take end
+    elseif h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then items[#items + 1] = h end
+  end
+  -- ключи MIDI-голов: только ноты на строках выделения (не весь клип)
+  for _, h in ipairs(heads) do
+    if h.kind == 'midi' and tseen[h.take] then
+      local i = note_index(h.take, head_ppq(h, lpb), h.pitch, h.ch)
+      if i then
+        local _, _, _, sppq = R.MIDI_GetNote(h.take, i)
+        want[('m%d:%d:%d'):format(h.pitch, h.ch or 0, ms(R.MIDI_GetProjTimeFromPPQPos(h.take, sppq)))] = true
+      end
+    end
+  end
+  local n = 0
+  run('dedouble', function()
+    local seen = {}
+    for _, take in ipairs(takes) do
+      local _, cnt = R.MIDI_CountEvts(take)
+      local del = {}
+      for i = 0, cnt - 1 do
+        local _, _, _, sppq, _, ch, pitch = R.MIDI_GetNote(take, i)
+        local k = ('m%d:%d:%d'):format(pitch, ch, ms(R.MIDI_GetProjTimeFromPPQPos(take, sppq)))
+        if want[k] then
+          if seen[k] then del[#del + 1] = i else seen[k] = true end
+        end
+      end
+      if #del > 0 then
+        R.MIDI_DisableSort(take)
+        for j = #del, 1, -1 do R.MIDI_DeleteNote(take, del[j]) end
+        R.MIDI_Sort(take)
+        n = n + #del
+        local _, left = R.MIDI_CountEvts(take)
+        if left == 0 then
+          local it = R.GetMediaItemTake_Item(take)
+          local tr = it and R.GetMediaItem_Track(it)
+          if tr then R.DeleteTrackMediaItem(tr, it) end
+        end
+      end
+    end
+    for _, h in ipairs(items) do
+      local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+      local file = h.src and R.GetMediaSourceFileName(h.src, '') or ''
+      local k = ('a%s:%d:%d:%d'):format(file, ms(h.offs or 0), math.floor((h.semis or 0) * 100 + 0.5), ms(pos))
+      if seen[k] then
+        local tr = R.GetMediaItem_Track(h.item)
+        if tr then R.DeleteTrackMediaItem(tr, h.item); n = n + 1 end
+      else seen[k] = true end
+    end
+  end)
+  return n
+end
+
 -- ── mute ──────────────────────────────────────────────────────────────────
 -- flag: true/false — установить, nil — переключить каждое
 function E.mute(heads, lpb, flag)
