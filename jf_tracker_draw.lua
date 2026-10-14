@@ -400,8 +400,11 @@ function D.layout(snap, state, nregions)
   L.x_slc = L.x_inst + L.w_inst + L.pad
   L.x_vol = L.x_slc + L.w_slc + L.pad
   -- порядок: волна | нота | инстр. | vol | fx1..n | delay (просьба 1 окт)
+  -- 14 окт: колонка пана (опция pan column) — сразу за громкостью, hex 00..FF, 80 — центр
+  L.w_pan = ms('00')
+  L.x_pan = state.pancol and (L.x_vol + L.w_vol + L.pad) or false
   L.x_fx = {}
-  local x = L.x_vol + L.w_vol + L.pad
+  local x = L.x_pan and (L.x_pan + L.w_pan + L.pad) or (L.x_vol + L.w_vol + L.pad)
   for k = 1, L.nfx do L.x_fx[k] = x; x = x + L.w_fx + L.pad end
   L.x_del = x
   x = L.x_del + L.w_del + L.pad
@@ -409,14 +412,14 @@ function D.layout(snap, state, nregions)
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
   L.sub_w_narrow = L.pad + L.w_note + L.pad + L.w_vol + L.pad
-  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false,
+  L.GN = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_pan = false,
     x_vol = L.pad + L.w_note + L.pad, x_fx = {}, x_del = L.pad + L.w_note + L.pad, sub_w = L.sub_w_narrow }, { __index = L })
   -- свёрнутый трек (fold, 2 окт): только волна и нота; ноты аккорда — только нота;
   -- огибающие — узкая схема: линия в символ шириной + hex значения точек
   L.sub_w_compact = L.x_note + L.w_note + L.pad
-  L.GC = setmetatable({ notes_only = true, nfx = 0, x_inst = false, x_slc = false, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
+  L.GC = setmetatable({ notes_only = true, nfx = 0, x_inst = false, x_slc = false, x_pan = false, x_fx = {}, x_vol = L.x_note, x_del = L.x_note, sub_w = L.sub_w_compact }, { __index = L })
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
-  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_fx = {},
+  L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_pan = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
   L.fold_w = ms('o') + 2 * L.pad
   L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
@@ -1688,6 +1691,7 @@ end
 function D.field_rect(L, fld)
   if fld == 'inst' then return L.x_inst or L.x_note, ms('00') end      -- поле инструмента (5 окт)
   if fld == 'slc' then return L.x_slc or L.x_note, L.w_slc or ms('S00') end   -- 11 окт: поле слайса
+  if fld == 'pan' then return L.x_pan or L.x_vol, L.w_pan or ms('00') end      -- 14 окт: поле пана
   if fld == 1 then return L.x_note, L.w_note
   elseif fld == 2 then return L.x_vol, L.w_vol
   elseif fld == 3 then return L.x_del, L.w_del
@@ -1832,6 +1836,11 @@ local function draw_cell(L, cell, x, y, ty, inv)
       local sk = cell and cell.kind == 'audio' and cell.slice
       if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), c('slc', cell.muted and U.GREY or D.RN_OTHER))   -- своё поле: курсор инструмента его не красит
       else text(x + L.x_slc, ty, '...', c('slc',  (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+    end
+    if L.x_pan then
+      local pv = cell and cell.kind == 'audio' and cell.pan
+      if pv then text(x + L.x_pan, ty, pv, c('pan', cell.muted and U.GREY or (D.RN_PAN or U.CYAN)))
+      else text(x + L.x_pan, ty, '..', c('pan', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     end
   end
   if not cell then
@@ -5466,12 +5475,17 @@ function D.frame(L, snap, rows, state, info)
         for _, fld in ipairs(vo(fi)) do
           idx = idx + 1
           local half = type(fld) == 'number' and fld >= 4 and not (f.env or f.compact or f.folded)   -- 12 окт: поле команды — два шага (код | значение)
-          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and not (half and vc.sub == 'val') then cur_i = idx end
+          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and vc.sub ~= 'pan' and not (half and vc.sub == 'val') then cur_i = idx end
           if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = half and 'code' or nil } end
           if half then
             idx = idx + 1
             if fi == vc.fi and fld == vc.field and vc.sub == 'val' then cur_i = idx end
             if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = 'val' } end
+          end
+          if fld == 2 and (f.G or L).x_pan and not (f.env or f.compact or f.folded) then   -- 14 окт: подполе пана — шаг
+            idx = idx + 1
+            if fi == vc.fi and vc.field == 2 and vc.sub == 'pan' then cur_i = idx end
+            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'pan' } end
           end
           if fld == 1 and inst_ok then          -- подполе инструмента — тоже шаг (10 окт)
             idx = idx + 1
@@ -5929,6 +5943,7 @@ function D.frame(L, snap, rows, state, info)
             local inv = (vc and vc.fi == fi and vc.row == r.row) and (c.folded and 1 or (vc.field or 1)) or nil
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
             if inv == 1 and vc.sub == 'slc' and (f.G or L).x_slc then inv = 'slc' end     -- 11 окт: курсор на слайсе
+            if inv == 2 and vc.sub == 'pan' and (f.G or L).x_pan then inv = 'pan' end     -- 14 окт: курсор на пане
             D.fx_half = (type(inv) == 'number' and inv >= 4 and not c.folded and not f.env) and (vc.sub == 'val' and 'val' or 'code') or nil   -- 12 окт
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)

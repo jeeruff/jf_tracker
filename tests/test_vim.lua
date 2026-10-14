@@ -75,6 +75,7 @@ function E.set_pitch(heads, lpb, p) calls[#calls + 1] = ('pitch:%s:%d'):format(n
 function E.note_off(heads, lpb, row) calls[#calls + 1] = ('off:%s@%d'):format(names(heads), row) end
 function E.insert_note(track, lane, lpb, row, pitch, vel, len, depot) calls[#calls + 1] = ('ins:%s@%d:%d:%d'):format(track, row, pitch, len) end
 function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
+function E.set_pan(heads, v) calls[#calls + 1] = ('pan:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
 function E.run(_, fn) fn() end
 function E.set_delay(heads, lpb, d) calls[#calls + 1] = ('delay:%s:%d'):format(names(heads), d) end
 E.cmds = { CODES = { ['0U'] = true, ['0D'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true, ['0R'] = true, ZT = true, ZJ = true, ['0G'] = true, ['0Y'] = true } }
@@ -849,6 +850,12 @@ keysin('l'); eq('full sub: l -> vol', V.cur.field, 2); eq('full sub: vol has no 
 keysin('h'); eq('full sub: h -> slc', V.cur.sub, 'slc')
 keysin('h'); eq('full sub: h -> inst', V.cur.sub, 'inst')
 keysin('h'); eq('full sub: h -> note', V.cur.sub, nil); eq('full sub: note field', V.cur.field, 1)
+-- 14 окт: колонка пана — подполе громкости
+reset(); L.flat[1].G = { x_inst = 40, x_slc = 60, x_pan = 90 }
+keysin('lll'); eq('pan: l -> vol', V.cur.field, 2)
+keysin('l'); eq('pan: l -> pan', V.cur.sub, 'pan')
+keysin('h'); eq('pan: h -> vol', V.cur.sub, nil); eq('  vol field', V.cur.field, 2)
+keysin('l'); keysin('i'); keysin('40'); eq('pan: 40 typed in INSERT', last(), 'pan:kick:64'); V.key(27)
 L.flat[1].G = nil
 -- Shift+Opt+H / L — playrate инструмента, курсор стоит (не переход по трекам)
 reset(); alt_down, shift_down = true, true

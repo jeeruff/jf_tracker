@@ -478,6 +478,13 @@ function motion(c, n, op)
   local L = ctx.layout()
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
   elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(0, cur.row - n), linewise = true }
+  -- 14 окт: колонка пана — подполе громкости: vol → pan → дальше; h с поля за ним — на пан
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and (cur.field or 1) == 2 and cur.sub ~= 'pan' and V.pan_field_ok() then
+    return { fi = cur.fi, row = cur.row, field = 2, sub = 'pan' }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and (cur.field or 1) == 2 and cur.sub == 'pan' then
+    return { fi = cur.fi, row = cur.row, field = 2 }
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and (cur.field or 1) == 2 and cur.sub == 'pan' then
+    local fi, fld = step_field(1, 1); return { fi = fi, row = cur.row, field = fld }
   -- поле инструмента (5 окт): подполе ноты между нотой и громкостью
   -- 11 окт: подполе слайса (Sxx) — за инструментом: нота → инструмент → слайс → громкость
   elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and V.inst_field_ok() and (cur.field or 1) == 1 and cur.sub ~= 'inst' and cur.sub ~= 'slc' then
@@ -512,7 +519,11 @@ function motion(c, n, op)
     end
     V.cur = save
     return t
-  elseif c == ('h'):byte() or c == LEFT then local fi, fld = step_field(-1, n); return { fi = fi, row = cur.row, field = fld, sub = (fld or 1) >= 4 and 'val' or nil }
+  elseif c == ('h'):byte() or c == LEFT then
+    local fi, fld = step_field(-1, n)
+    local sub = (fld or 1) >= 4 and 'val' or nil
+    if fld == 2 and fi == cur.fi then local sv = V.cur; V.cur = { fi = fi, row = cur.row, field = 2 }; if V.pan_field_ok() then sub = 'pan' end; V.cur = sv end
+    return { fi = fi, row = cur.row, field = fld, sub = sub }
   elseif c == ('l'):byte() or c == RIGHT then local fi, fld = step_field(1, n); return { fi = fi, row = cur.row, field = fld }
   elseif c == ('H'):byte() or c == ('L'):byte() then
     local F = flat(); local f = F[cur.fi]; if not f then return nil end
@@ -773,7 +784,8 @@ local function hex_entry(c, fld, heads)
     if h and h.kind == 'audio' and h.item then ctx.edit.cont_vol(h.item, ctx.row_time(V.cur.row), tonumber(buf, 16), ctx.row_time(V.cur.row + 1)); return true end
   end
   if #heads == 0 then V.msg = 'no note in this row - type the note first (vol / delay / effects belong to a note)'; return 'none' end
-  if fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
+  if fld == 2 and V.cur.sub == 'pan' then ctx.edit.set_pan(heads, tonumber(buf, 16))   -- 14 окт: колонка пана
+  elseif fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))
   elseif fld == 3 then ctx.edit.set_delay(heads, lpb(), tonumber(buf, 16))
   else
     -- 12 окт: у каждой строки своя команда. В колонке строки стояла другая — уступает место новой.
@@ -1804,6 +1816,7 @@ function V.key_impl(c)
     if c == BS or c == DEL then
       local heads = V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       if fld == 1 then E.delete(heads, lpb())
+      elseif fld == 2 and V.cur.sub == 'pan' then E.set_pan(heads, 128)
       elseif fld == 2 then E.set_vol(heads, lpb(), 128)
       elseif fld == 3 then E.set_delay(heads, lpb(), 0)
       else
@@ -3036,6 +3049,12 @@ function V.slc_field_ok()
   local f = flat()[V.cur.fi]
   local G = f.G or ctx.layout()
   return G.x_slc and not G.notes_only and true or false
+end
+function V.pan_field_ok()
+  local f = flat()[V.cur.fi]
+  if not f or f.env or f.compact or f.folded or f.ml then return false end
+  local G = f.G or ctx.layout()
+  return G.x_pan and true or false
 end
 function V.inst_field_ok()
   local f = flat()[V.cur.fi]

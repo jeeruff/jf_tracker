@@ -561,6 +561,17 @@ function E.set_vol(heads, lpb, v)
   end)
 end
 
+-- 14 окт: пан аудио-ноты (колонка пана): xx 00..FF, 80 — центр
+function E.set_pan(heads, v)
+  if #heads == 0 then return end
+  v = math.max(0, math.min(255, math.floor(v + 0.5)))
+  run('pan', function()
+    for _, h in ipairs(heads) do
+      if h.kind == 'audio' and h.take then R.SetMediaItemTakeInfo_Value(h.take, 'D_PAN', math.abs(v - 128) <= 0 and 0 or ((v - 128) / (v < 128 and 128 or 127))) end
+    end
+  end)
+end
+
 -- delay: сдвиг старта внутри строки, xx/256
 function E.set_delay(heads, lpb, d)
   if #heads == 0 then return end

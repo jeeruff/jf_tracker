@@ -203,7 +203,7 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
     if slen and slen > 0 then fx[#fx + 1] = '0S' .. M.hex2(offs / slen * 256) end
   end
   local pan = R.GetMediaItemTakeInfo_Value(take, 'D_PAN')
-  if math.abs(pan) > 1e-6 then fx[#fx + 1] = '0P' .. M.hex2((pan + 1) / 2 * 255) end
+  if math.abs(pan) > 1e-6 and not M.PANCOL then fx[#fx + 1] = '0P' .. M.hex2((pan + 1) / 2 * 255) end
   local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
   local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
   -- штатные фейды REAPER (10 мс) — не команда, а шум: порог 20 мс
@@ -269,6 +269,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     frac = math.abs(semis - math.floor(semis + 0.5)) > 0.01,   -- дробный питч
     semis = semis,
     vol = M.vol_hex(vol),
+    pan = (function() local p = take and R.GetMediaItemTakeInfo_Value(take, 'D_PAN') or 0; return math.abs(p) > 1e-6 and M.hex2((p + 1) / 2 * 255) or nil end)(),   -- 14 окт: колонка пана
     delay = d0,
     muted = R.GetMediaItemInfo_Value(it, 'B_MUTE_ACTUAL') == 1,
     offs = take and R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') or 0,
