@@ -456,7 +456,8 @@ function S.key(c)
   if (mods.alt and (ch == 'd' or ch == 'D')) or cpd == 8706 then S.dt_toggle(); return true end
   if S.dpanel and S.dt_key(c, mods.shift) then return true end
   local a, b = S.span()
-  local pk = S.entry and not S.entry.file and piano_slice(c)
+  -- 14 окт: s — меню нарезки и в раскладке renoise (там s — нота C#, слушала слайс 1 вместо меню)
+  local pk = S.entry and not S.entry.file and ch ~= 's' and piano_slice(c)
   if pk then
     if pk == 0 then ctx.preview_slice(S.track, S.entry, 0, S.entry.len); S.msg = 'q: the whole sample'   -- 5 окт
     elseif pk >= 1 and pk <= #(S.slices or {}) then S.preview(pk) else S.msg = ('no slice %d (%d slices)'):format(pk, #(S.slices or {})) end

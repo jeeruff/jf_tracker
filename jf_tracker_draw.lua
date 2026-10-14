@@ -3529,7 +3529,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if p then
     local dim = p.active == false
     local lbl = ('oct %d'):format(p.octave or 4)
-    local zx = 'z- x+'
+    local zx = D.PIANO_RENOISE and '[- ]+' or 'z- x+'   -- 14 окт: в renoise z x — ноты, октава — [ ]
     local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
     text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
     text(x + L.pad, ly + L.rh, zx, U.GREY)
@@ -3587,7 +3587,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         end
       end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
-      D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { 'q2w3e', 'notes' }, { 'z x', 'oct' } }) or { { 'z x', 'oct' }, { 'm', 'keys' } } }
+      D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e', 'notes' }, { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' } }) or { { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' }, { 'm', 'keys' } } }
     end
   end
   -- полоса транспорта (5 окт): от детального к общему — клавиатура, шаг
