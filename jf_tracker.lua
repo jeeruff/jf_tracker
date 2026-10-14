@@ -8905,6 +8905,7 @@ ctx = {
       if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = col, k = e.k } end
       if draw.csel_on(col and col.guid, fx, pi) then draw.csel_frame(x + 1, y, w2 - 2, L.rh) end
       ctx.hint('hdrparam', x, y, w2, L.rh, { col = col, k = e.k })
+      if draw.slr then draw.slr[#draw.slr + 1] = { g = 'hdr:' .. tostring(col.guid), col = col, fx = fx, p = pi, name = pn, x = x + 1, y = y, w = w2 - 2, h = L.rh } end   -- 14 окт: SLIDER
     end
     local function chip(e, x, y, w2, lab)
       local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
@@ -14994,6 +14995,7 @@ local function frame()
       else gfx.mouse_y = my - L.rh end
     end
   end
+  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Ctrl+Cmd)
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
@@ -16628,10 +16630,91 @@ local function frame()
     -- жест «треки» (Control+Option): окно по ширине — все треки зонами; вбок —
     -- выбор трека (фейдер в фокусе клавиатуры), вертикально — его громкость
     -- 11 окт: Ctrl+Option — сначала просто модификаторы; режим слайдеров — только когда мышь пошла (> 6 px)
+    -- 14 окт: SLIDER (держать Ctrl+Cmd): группа параметров у мыши — параметры эффектов в шапке
+    -- ближайшего трека или колонка устройства в DSP (рамкой, как поле control surface в Ableton);
+    -- высота окна — полосы по числу параметров (карта трекпада справа): вверх-вниз — параметр,
+    -- вбок — значение (относительно, Shift мелко); отпустил — один undo
+    local sl_raw = gfx.mouse_cap & 52 == 36
+    if sl_raw then
+      if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
+      local SG = ctx.sl
+      if not SG then
+        local best, bd
+        for _, r in ipairs(draw.slr or {}) do
+          local ddx = math.max(r.x - gfx.mouse_x, 0, gfx.mouse_x - (r.x + r.w))
+          local ddy = math.max(r.y - gfx.mouse_y, 0, gfx.mouse_y - (r.y + r.h))
+          if not bd or ddx * ddx + ddy * ddy < bd then best, bd = r, ddx * ddx + ddy * ddy end
+        end
+        SG = { none = true }
+        if best then
+          local list = {}
+          for _, r in ipairs(draw.slr) do if r.g == best.g then list[#list + 1] = r end end
+          SG = { list = list, col = best.dsp and dcol or best.col, x0 = gfx.mouse_x }
+        end
+        ctx.sl = SG
+      end
+      if not SG.none and SG.col and SG.col.track then
+        local n = #SG.list
+        local k = math.max(1, math.min(n, math.floor(gfx.mouse_y / math.max(1, gfx.h) * n) + 1))
+        -- новая полоса — значение замирает, пока палец не уйдёт вбок заметно (> 10 px и больше, чем
+        -- по вертикали): ведёшь вниз по полосам — значения не дрожат
+        if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
+        if not SG.live then
+          local ax, ay = math.abs(gfx.mouse_x - SG.ax), math.abs(gfx.mouse_y - SG.ay)
+          if ax > 10 and ax > ay then SG.live = true; SG.x0 = gfx.mouse_x end
+          if ay > 2 * L.rh and ax <= 10 then SG.ax, SG.ay = gfx.mouse_x, gfx.mouse_y end   -- вертикаль внутри полосы — заново
+        end
+        local dx = SG.live and (gfx.mouse_x - SG.x0) or 0
+        if SG.live then SG.x0 = gfx.mouse_x end
+        local function tgt(r) return { kind = 'fx', tid = SG.col.guid, track = SG.col.track, fx = r.fx, p = r.p, name = r.name } end
+        local cur = SG.list[k]
+        if dx ~= 0 then
+          local v = ctx.cm_io.get(tgt(cur))
+          if v then
+            ctx.cm_io.set(tgt(cur), math.max(0, math.min(1, v + dx * CM.UNIT.fx.step * (state.cmsens or 50) / 100 * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
+            SG.moved = true
+          end
+        end
+        -- рамка группы на месте и выбранный параметр
+        local x0, y0, x1, y1 = 1e9, 1e9, -1e9, -1e9
+        for _, r in ipairs(SG.list) do x0, y0, x1, y1 = math.min(x0, r.x), math.min(y0, r.y), math.max(x1, r.x + r.w), math.max(y1, r.y + r.h) end
+        U.set(U.AMBER); gfx.rect(x0 - 3, y0 - 2, x1 - x0 + 6, y1 - y0 + 4, 0); gfx.rect(x0 - 2, y0 - 1, x1 - x0 + 4, y1 - y0 + 2, 0)
+        U.set(U.AMBER, 0.30); gfx.rect(cur.x, cur.y, cur.w, cur.h, 1)
+        U.set(U.AMBER); gfx.rect(cur.x - 1, cur.y, cur.w + 2, cur.h, 0)
+        -- карта трекпада: полоса справа во всю высоту, параметр на полосу
+        local pw = math.min(math.floor(gfx.w / 4), L.cw * 26)
+        local px = gfx.w - pw
+        local bh = gfx.h / n
+        U.set(U.BG, 0.88); gfx.rect(px, 0, pw, gfx.h, 1)
+        U.set(U.AMBER); gfx.rect(px, 0, 1, gfx.h, 1)
+        for i, r in ipairs(SG.list) do
+          local by0, by1 = math.floor((i - 1) * bh), math.floor(i * bh)
+          local on = i == k
+          if on then U.set(U.AMBER, 0.30); gfx.rect(px + 1, by0, pw - 1, by1 - by0, 1) end
+          U.set(U.LINE); gfx.rect(px + 1, by1 - 1, pw - 1, 1, 1)
+          local v = ctx.cm_io.get(tgt(r)) or 0
+          local cy = by0 + math.floor((by1 - by0) / 2)
+          if by1 - by0 >= L.rh + 4 then
+            U.text(px + L.pad, cy - L.rh, ctx.fit(r.name or '', pw - 2 * L.pad), on and U.AMBER or U.GREY)
+            U.set(U.DIM); gfx.rect(px + L.pad, cy + 2, pw - 2 * L.pad, 2, 1)
+            U.set(on and U.AMBER or U.CYAN); gfx.rect(px + L.pad, cy + 2, math.max(1, math.floor((pw - 2 * L.pad) * v + 0.5)), 2, 1)
+          else
+            U.set(on and U.AMBER or U.CYAN, 0.6); gfx.rect(px + 1, by0 + 1, math.max(1, math.floor((pw - 2) * v + 0.5)), math.max(1, by1 - by0 - 2), 1)
+          end
+        end
+        state.status = ('-- SLIDER --  %s  %d / %d  %s   (up / down: parameter, sideways: value, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n, ctx.cm_io.show and ctx.cm_io.show(tgt(cur)) or '')
+      else
+        state.status = '-- SLIDER --  no parameters on the screen: show fx parameters in the track headers, or open the DSP'
+      end
+      U.click, U.rclick = false, false
+    elseif ctx.sl then
+      if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: slider'); model.invalidate() end
+      ctx.sl = nil
+    end
     local gest_raw = gfx.mouse_cap & 48 == 48
     if gest_raw then ctx.cm_g0 = ctx.cm_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.cm_g0 = nil end
     local gest = gest_raw and (ctx.cm_gest ~= nil or math.abs(gfx.mouse_x - ctx.cm_g0[1]) + math.abs(gfx.mouse_y - ctx.cm_g0[2]) > 6)
-    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw
+    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}
