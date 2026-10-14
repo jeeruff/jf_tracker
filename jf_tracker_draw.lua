@@ -3836,9 +3836,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local sw = x + w - L.pad - sx0
     local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
     mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-    while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
     local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
     local dx = sx0
+    if D.modefont and mode ~= '' then
+      -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
+      local hpx = 2 * L.th
+      gfx.setfont(4, D.modefont, hpx)
+      while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
+      local mw, mh = gfx.measurestr(mode)
+      set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode)
+      gfx.setfont(D.font_id)
+      dx = sx0 + mw + 3 * L.pad
+      mode = ''
+    end
+    while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
     if mode ~= '' then D.big_text(sx0, sy, mode, col, 2); dx = sx0 + D.big_measure(mode, 2) + 3 * L.pad end
     local small = ((rest or ''):gsub('^%s+', ''))
     if st[2] ~= '' then small = small ~= '' and (small .. '   ' .. st[2]) or st[2] end

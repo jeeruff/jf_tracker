@@ -10004,6 +10004,10 @@ ctx = {
       { label = 'install bundled fonts', kind = 'action', value = 'fonts/', desc = 'copies the pixel fonts that come with the tracker (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270) into your user fonts folder; authors and licences - fonts/README.md. A font not shown yet - restart REAPER', fn = function() vim.msg = ctx.fonts_install() end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
+      -- 13 окт: шрифт крупного режима в статусе (NORMAL / INSERT) — декоративный: готика, каллиграфия, «хакерский»
+      { key = 'modefont', label = 'mode font', kind = 'cycle', values = { 'off', 'Luminari', 'Trattatello', 'Herculanum', 'Apple Chancery', 'Zapfino', 'Snell Roundhand', 'Papyrus', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font' },
+        desc = 'the big mode word in the status (NORMAL, INSERT ...): medieval (Luminari, Herculanum), calligraphic (Trattatello, Apple Chancery, Zapfino, Snell Roundhand), hacker (Silom, Krungthep, Andale Mono, Monocraft); off - the tracker font',
+        get = function() return state.modefont or 'off' end, set = function(v) state.modefont = v ~= 'off' and v or nil; draw.modefont = state.modefont; reaper.SetExtState(EXT, 'modefont', state.modefont or '', true) end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
@@ -10136,7 +10140,7 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
+      { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'modefont', 'tintmute' } },
       { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
@@ -12147,6 +12151,7 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
 end
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
+state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
