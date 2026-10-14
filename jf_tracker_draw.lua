@@ -3838,11 +3838,24 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
     local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
     local dx = sx0
+    -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
+    local SCRIPT = {
+      ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
+      ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
+      ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
+      -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
+      ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
+    }
+    local tr = D.modefont and SCRIPT[D.modefont]
+    if tr and mode ~= '' then
+      local w1 = mode:match('^(%S+)')
+      if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
+    end
     if D.modefont and mode ~= '' then
       -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
       local hpx = math.floor(3 * L.th)   -- 13 окт: в полтора раза крупнее (просьба)
       gfx.setfont(4, D.modefont, hpx)
-      while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
+      while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
       local mw, mh = gfx.measurestr(mode)
       set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode)
       gfx.setfont(D.font_id)

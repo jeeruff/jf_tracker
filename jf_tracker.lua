@@ -11928,7 +11928,7 @@ OPT.ask.init(U, ctx)
 -- 10 окт: вкладка theme окна Options — темы карточками, шрифты своим шрифтом
 ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
-ctx.MODEFONTS = { 'off', 'Luminari', 'Trattatello', 'Herculanum', 'Apple Chancery', 'Zapfino', 'Snell Roundhand', 'Papyrus', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font' }
+ctx.MODEFONTS = { 'off', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Trattatello', 'Herculanum', 'Apple Chancery', 'Zapfino', 'Snell Roundhand', 'Papyrus', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font' }
 ctx.modefonts = function() return ctx.MODEFONTS end
 ctx.modefont_get = function() return state.modefont or 'off' end
 ctx.modefont_set = function(v) state.modefont = v ~= 'off' and v or nil; draw.modefont = state.modefont; reaper.SetExtState(EXT, 'modefont', state.modefont or '', true); vim.msg = 'mode font: ' .. v end
