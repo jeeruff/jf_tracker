@@ -1010,7 +1010,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   b(st.blend == 'add' and 'add' or 'mix', st.blend == 'add', 'blend', 'how layers stack (b): mix - by fade, add - light adds up')
   b('scene', env.scene_has, 'scene_save', 'save everything as the scene of the cursor slot ' .. (env.scene or '') .. ' (s); with follow it comes back when the playhead enters the slot')
   b('follow', st.follow, 'follow', 'scenes follow the slot under the playhead (S)')
-  b('matrix', VZ.mxv, 'mxtoggle', 'modulation matrix (M): sources - LFO 1-4, track peaks, macros - into the parameters of the selected layer')
+  b('mod matrix', VZ.mxv, 'mxtoggle', 'modulation matrix (M): sources - LFO 1-4, track peaks, macros - into the parameters of the selected layer')
   b('macros', (env.macros or 0) > 0, 'macros', (env.macros or 0) > 0 and 'macros M1..M16 (jf_visor_macros on the master): click - pick one to show as an automation column of the master' or 'macros: click - put 16 knobs (jf_visor_macros) on the master; their automation in the tracker drives the matrix rows M1..M16')
   b(('res %d%%'):format(math.floor((st.scale or 0.3) * 100 + 0.5)), false, 'res', 'render resolution of the page: click - next (lower is lighter for the GPU)')
   b(('fps %d'):format(st.fps or 60), false, 'fps', 'frame rate cap of the page: click - next')
@@ -1097,8 +1097,22 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   if y + h - top >= 12 * rh then
     local nsrc = #VZ.sources(env)
     local mhh = math.min((nsrc + 1) * rh + 2 + (VZ.vtext and U.measure('WWWWWWW') or 0), (y + h - top) * 45 // 100)   -- 13 окт: + вертикальные подписи
+    -- 13 окт: высота матрицы — тянуть линию над ней (VZ.mx_frac — доля области)
+    if VZ.mx_frac then mhh = math.floor((y + h - top) * VZ.mx_frac) end
     mhh = math.max(mhh, 4 * rh)
+    mhh = math.min(mhh, y + h - top - 4 * rh)
     local mtop = y + h - mhh - pad                -- отступ от дна: последний ряд не на границе
+    do
+      local ly = mtop - pad // 2 - 1
+      local mxp, myp = gfx.mouse_x, gfx.mouse_y
+      local near = mxp >= mx0 and mxp < x + w and math.abs(myp - ly) <= 3
+      local down = gfx.mouse_cap & 1 == 1
+      if VZ.mx_drag and not down then VZ.mx_drag = nil end
+      if near and down and not VZ.mx_drag and not VZ.mx_down0 then VZ.mx_drag = true end
+      VZ.mx_down0 = down
+      if VZ.mx_drag then VZ.mx_frac = math.max(0.15, math.min(0.85, (y + h - pad - myp) / math.max(1, y + h - top))) end
+      if near or VZ.mx_drag then U.set(U.AMBER); gfx.rect(mx0, ly - 1, x + w - mx0, 3, 1); hover = { kind = 'mxsplit', tip = 'drag: the modulation matrix taller / lower' } end
+    end
     U.set(U.LINE); gfx.rect(mx0 - math.floor(pad / 2) - 1, top, 1, y + h - top, 1)
     gfx.rect(mx0 - math.floor(pad / 2) - 1, mtop - pad // 2 - 1, x + w - mx0 + math.floor(pad / 2) + 1, 1, 1)
     local mh = VZ.draw_matrix(L, U, mx0, mtop, x + w - mx0 - pad, mhh, focused and VZ.mxv, env, fit, hint)

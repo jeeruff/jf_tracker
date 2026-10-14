@@ -124,9 +124,16 @@ function TT.draw(x, y, w, h)
   else local r = (TT.i[2] - 1) // fcols; sy0 = fy0 + rh + r * ph; sy1 = sy0 + ph end
   local bh = rh + 4                                    -- строка кнопок внизу
   local vh = h - bh
+  -- 13 окт: шрифт слова режима (NORMAL / INSERT) — третья секция, ячейки своим шрифтом
+  local mfs = ctx.modefonts and ctx.modefonts() or {}
+  local mh = 3 * L.th + 4
+  local mcols = math.max(1, math.floor((w + pad) / (pw + pad)))
+  TT.mcols, TT.nm = mcols, #mfs
+  local my0 = fy0 + rh + math.ceil(#fonts / fcols) * ph + pad
+  if TT.sec == 3 then local r = ((TT.i[3] or 1) - 1) // mcols; sy0 = my0 + rh + r * (mh + 2); sy1 = sy0 + mh end
+  local total = my0 + rh + math.ceil(#mfs / mcols) * (mh + 2)
   if sy0 - TT.scroll < 0 then TT.scroll = sy0 - (TT.sec == 1 and rh or 0) end
   if sy1 - TT.scroll > vh then TT.scroll = sy1 - vh end
-  local total = fy0 + rh + math.ceil(#fonts / fcols) * ph
   TT.scroll = math.max(0, math.min(TT.scroll, math.max(0, total - vh)))
   local function vis(yy, hh) return yy >= y and yy + hh <= y + vh end
   local oy = y - TT.scroll
@@ -180,6 +187,29 @@ function TT.draw(x, y, w, h)
       if mx >= cx and mx < cx + pw and my >= cy and my < cy + ph then TT.hot = { 2, i }; C(U.TEXT); gfx.rect(cx, cy, pw, ph, 0) end
     end
   end
+  do
+    local my1 = oy + my0
+    if vis(my1, rh) then text(x, my1, 'mode word in the status (NORMAL / INSERT) - its own font', U.AMBER) end
+    local curm = ctx.modefont_get and ctx.modefont_get() or 'off'
+    for i, nm in ipairs(mfs) do
+      local r, c = (i - 1) // mcols, (i - 1) % mcols
+      local cx, cy = x + c * (pw + pad), my1 + rh + r * (mh + 2)
+      if vis(cy, mh) then
+        local sel = TT.sec == 3 and TT.i[3] == i
+        C(sel and U.tint(U.AMBER, 0.30) or U.BG); gfx.rect(cx, cy, pw, mh, 1)
+        C((nm == curm) and U.AMBER or U.LINE); gfx.rect(cx, cy, pw, mh, 0)
+        if nm == 'off' then text(cx + pad, cy + 2, 'off - tracker font', U.GREY)
+        else
+          gfx.setfont(5, nm, 2 * L.th)
+          C(U.AMBER); gfx.x, gfx.y = cx + pad, cy + 1; gfx.drawstr('INSERT')
+          local iw = gfx.measurestr('INSERT ')
+          gfx.setfont(ctx.font_id and ctx.font_id() or 1)
+          text(cx + pad + iw, cy + mh - rh - 1, ctx.fit(nm, pw - iw - 2 * pad), U.GREY)
+        end
+        if mx >= cx and mx < cx + pw and my >= cy and my < cy + mh then TT.hot = { 3, i }; C(U.TEXT); gfx.rect(cx, cy, pw, mh, 0) end
+      end
+    end
+  end
   -- кнопки
   local bx, by = x, y + h - rh - 2
   C(U.LINE); gfx.rect(x, by - 3, w, 1, 1)
@@ -203,6 +233,7 @@ end
 
 local function apply()
   if TT.sec == 1 then local th = ctx.themes()[TT.i[1]]; if th then ctx.apply_theme(th.name) end
+  elseif TT.sec == 3 then local nm = (ctx.modefonts and ctx.modefonts() or {})[TT.i[3] or 1]; if nm then ctx.modefont_set(nm) end
   else local f = ctx.fonts()[TT.i[2]]; if f then ctx.set_font(f.key); TT.fkey = nil end end
 end
 
@@ -219,14 +250,16 @@ end
 function TT.key(c)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local s = TT.sec
-  local n, cols = (s == 1 and TT.nt or TT.nf) or 1, (s == 1 and TT.tcols or TT.fcols) or 1
+  TT.i[3] = TT.i[3] or 1
+  local n = (s == 1 and TT.nt) or (s == 2 and TT.nf) or TT.nm or 1
+  local cols = (s == 1 and TT.tcols) or (s == 2 and TT.fcols) or TT.mcols or 1
   local i = TT.i[s]
   if ch == 'l' or c == 1919379572 then TT.i[s] = math.min(n, i + 1)
   elseif ch == 'h' or c == 1818584692 then TT.i[s] = math.max(1, i - 1)
   elseif ch == 'j' or c == 1685026670 then
-    if i + cols <= n then TT.i[s] = i + cols elseif s == 1 then TT.sec = 2 end
+    if i + cols <= n then TT.i[s] = i + cols elseif s < 3 then TT.sec = s + 1 end
   elseif ch == 'k' or c == 30064 then
-    if i - cols >= 1 then TT.i[s] = i - cols elseif s == 2 then TT.sec = 1 end
+    if i - cols >= 1 then TT.i[s] = i - cols elseif s > 1 then TT.sec = s - 1 end
   elseif ch == 'g' then TT.sec, TT.i[1] = 1, 1
   elseif ch == 'G' then TT.sec, TT.i[2] = 2, TT.nf or 1
   elseif c == 13 or ch == ' ' then apply()

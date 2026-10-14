@@ -3840,7 +3840,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local dx = sx0
     if D.modefont and mode ~= '' then
       -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
-      local hpx = 2 * L.th
+      local hpx = math.floor(3 * L.th)   -- 13 окт: в полтора раза крупнее (просьба)
       gfx.setfont(4, D.modefont, hpx)
       while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
       local mw, mh = gfx.measurestr(mode)

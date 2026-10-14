@@ -470,8 +470,11 @@ function O.draw(L, W, H)
   -- не меньше 12 строк; что не влезло — скроллом
   local ncw = 1
   if not O.compact and O.tab ~= 'hotkeys' then
-    ncw = math.max(1, math.min(3, math.floor((W - 2 * L.pad - 20) / colw0)))
+    ncw = math.max(1, math.min(4, math.floor((W - 4 * L.pad - 20) / colw0)))   -- 13 окт: окно во всю ширину — колонок сколько влезет
     if ncw > 1 then bw = ncw * colw0 end
+  end
+  O.roww = colw0
+  if false then
   end
   local ncol = O.query == '' and ncw or 1
   O.nfull = O.nfull or {}                                -- по вкладке: хоткеи длиннее опций
@@ -482,6 +485,11 @@ function O.draw(L, W, H)
   local nvis = math.max(3, math.min(rows, math.floor((H - 6 * rh) / rh)))
   local nvis2 = math.max(3, nvis - 1 - ((#O.tabs > 0) and 1 or 0))   -- вкладки — своей строкой над поиском
   nvis = nvis2
+  -- 13 окт: окно опций — одного размера на всех вкладках, почти во всё окно (раньше прыгало по вкладкам)
+  if not O.compact then
+    bw = W - 4 * L.pad
+    nvis = math.max(3, math.floor((H - 4 * L.pad) / rh) - 4 - ((#O.tabs > 0) and 1 or 0))
+  end
   local bh = (nvis + 4 + ((#O.tabs > 0) and 1 or 0)) * rh
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
   if O.compact then
@@ -583,6 +591,7 @@ function O.draw(L, W, H)
     local y = by + rh + 4 + rr * rh
     -- колонка: свои x и ширина (у последней — минус полоса прокрутки)
     local bx, bw = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
+    bw = math.min(bw, O.roww or bw)                   -- 13 окт: строка — по содержимому, не до края окна (колесо справа не меняло опции)
     if it.sep then
       -- раздел (4 окт): заголовок темы, иначе — тонкая линия
       if it.gap then                                  -- 10 окт: пустая строка перед разделом
