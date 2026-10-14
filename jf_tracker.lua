@@ -11938,6 +11938,10 @@ ctx.tt = {}
 ctx.theme_tab.init(U, {
   L = function() return L end, text = draw.text, measure = draw.measure, fit = draw.fit,
   font_id = function() return draw.font_id or 0 end,
+  -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
+  modefonts = function() return ctx.MODEFONTS end,
+  modefont_get = function() return ctx.modefont_get() end,
+  modefont_set = function(v) ctx.modefont_set(v) end,
   themes = function()
     if not ctx.tt.themes then
       local okb, base = pcall(dofile, DIR .. '/jf_tracker_ui.lua')     -- палитра REAPER (как apply_theme)
