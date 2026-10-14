@@ -3368,12 +3368,20 @@ end
 -- p = { octave, held = { [смещение] = true }, last = смещение }
 D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
 D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }   -- [3] — после какой белой
--- 13 окт: раскладка renoise — подписи нижнего ряда (z x c …; верхний q w e играет октавой выше)
+-- 13 окт: раскладка renoise; 14 окт — две октавы целиком, узкими клавишами: нижняя — ряд z s x d …
+-- (октава курсора), верхняя — q 2 w 3 … (октавой выше)
+D.PIANO_RENOISE = false
 function D.piano_layout(renoise)
-  local W = renoise and { 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/' } or { 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p' }
-  local B = renoise and { 's', 'd', 'g', 'h', 'j', 'l', ';' } or { '2', '3', '5', '6', '7', '9', '0' }
-  for i, k in ipairs(D.PIANO_WHITE) do k[2] = W[i] end
-  for i, k in ipairs(D.PIANO_BLACK) do k[2] = B[i] end
+  D.PIANO_RENOISE = renoise and true or false
+  if renoise then
+    D.PIANO_WHITE = { { 0, 'z' }, { 2, 'x' }, { 4, 'c' }, { 5, 'v' }, { 7, 'b' }, { 9, 'n' }, { 11, 'm' },
+                      { 12, 'q' }, { 14, 'w' }, { 16, 'e' }, { 17, 'r' }, { 19, 't' }, { 21, 'y' }, { 23, 'u' } }
+    D.PIANO_BLACK = { { 1, 's', 1 }, { 3, 'd', 2 }, { 6, 'g', 4 }, { 8, 'h', 5 }, { 10, 'j', 6 },
+                      { 13, '2', 8 }, { 15, '3', 9 }, { 18, '5', 11 }, { 20, '6', 12 }, { 22, '7', 13 } }
+  else
+    D.PIANO_WHITE = { { 0, 'q' }, { 2, 'w' }, { 4, 'e' }, { 5, 'r' }, { 7, 't' }, { 9, 'y' }, { 11, 'u' }, { 12, 'i' }, { 14, 'o' }, { 16, 'p' } }
+    D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 10, '7', 6 }, { 13, '9', 8 }, { 15, '0', 9 } }
+  end
 end
 -- транспорт (5 окт, из главного модуля): две строки ячеек { id, текст, цвет };
 -- транспорт блоками (5 окт): сетка | шаг | переключатели; в блоке — две
@@ -3540,8 +3548,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
-    local kw0 = (D.PIANO_SMALL and 0 or ms('W')) + ms('W') + 4
-    local kw = math.floor(math.min(kw0, (w - lw - L.pad) / 22))
+    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
+    local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
     if kw >= 4 then
       local ky, kh = y + 2, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
