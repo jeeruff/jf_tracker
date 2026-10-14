@@ -199,7 +199,7 @@ KH.PAGES = {
     { k = 'h j k l', d = 'field / row' },
     { k = 'H L G g', d = 'track left / right, last row / first row' },
     { k = 'b n', d = 'bar back / forward' },
-    { k = 'z x', d = 'octave down / up' },
+    { k = 'z x', d = 'octave down / up (keys renoise: [ ], velocity { })' },
     { k = 'c C', d = 'velocity -8 / +8' },
     { k = ', .', d = 'instrument previous / next' },
     { k = 'a', d = 'step auto: jump past the inserted item' },
@@ -591,6 +591,9 @@ KH.BARS = {
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' }, { 'F1', 'help' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
+  -- 14 окт: keys renoise — ноты двумя рядами, октава [ ], громкость { } (z x c — ноты)
+  insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
+             { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'help' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },

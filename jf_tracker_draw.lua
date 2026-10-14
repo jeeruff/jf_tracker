@@ -3544,7 +3544,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       text(x + L.pad, vy, vl, vhot and U.AMBER or U.TEXT)
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
-      text(math.max(kx, x + L.pad + vw + 2 * L.pad), vy, 'c- C+', U.GREY)   -- не на подпись vel (без наложений)
+      text(math.max(kx, x + L.pad + vw + 2 * L.pad), vy, D.PIANO_RENOISE and '{- }+' or 'c- C+', U.GREY)   -- не на подпись vel (без наложений)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)

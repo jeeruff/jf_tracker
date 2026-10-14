@@ -973,7 +973,7 @@ V.COMMANDS = {
   { '!', 'text', 'REAPER actions (all, incl. scripts / custom): fzf, recent first - kept apart from tracker commands; also \\ a' },
   { 'midi', '', 'MIDI learn tab: knobs and pads of a controller drive the slicer (Enter: learn)' },
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
-  { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT)' },
+  { 'vel', 'N', 'velocity of inserted notes 1..127 (c / C in INSERT; keys renoise - { })' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
   { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Insert / I / Shift)' },
   { 'ramp', 'xx [len]', 'envelope ramp to xx (hex) over len rows / Nb beats; VISUAL: selection' },
@@ -1344,6 +1344,10 @@ end
 local function keys_control(c)
   local ch = (c < 256) and string.char(c) or ''
   if ctx.keys_renoise and ctx.keys_renoise() and ctx.piano[c] then return false end   -- 13 окт: renoise — нижний ряд играет ноты
+  -- 14 окт: renoise — c в нотах, громкость { } (Shift к октаве [ ])
+  if ctx.keys_renoise and ctx.keys_renoise() and (c == 123 or c == 125) then
+    V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true
+  end
   local function heads() return V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) end
   if ch == 'h' or ch == 'j' or ch == 'k' or ch == 'l' or ch == 'H' or ch == 'L' or ch == 'G' then
     local m = motion(c, V.count or 1)

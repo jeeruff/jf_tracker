@@ -15200,7 +15200,7 @@ local function frame()
     end)(),
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
-    hint_bars = state.hints and function(p) return KH.BARS[p] end or nil,
+    hint_bars = state.hints and function(p) return (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
