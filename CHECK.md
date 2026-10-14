@@ -900,3 +900,4 @@
 - [ ] 13 окт: опция mode font (options → look) — слово режима в статусе декоративным шрифтом (Luminari, Trattatello, Apple Chancery, Silom …)
 - [ ] 14 окт: mode font — фрактура (UnifrakturMaguntia), старославянский (Ponomar), китайский (Songti SC), арабский (Diwan Thuluth), клингонский pIqaD (pIqaD qolqoS): слово режима переводится
 - [ ] 14 окт: опция pan column — поле пана после громкости (l с vol), 2 hex цифры: 00 лево, 80 центр, FF право; BS — центр; 0Pxx тогда не показывается
+- [ ] 14 окт: options — одна колонка со скроллбаром на всех вкладках; поиск высотой 2 строки (2/3 ширины), пустой — тусклая подсказка «press / or f … then type», при наборе — «pnc finds pan column…»; текст не налезает на рамку при узком окне

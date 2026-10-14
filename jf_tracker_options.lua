@@ -468,14 +468,9 @@ function O.draw(L, W, H)
   -- 9 окт: поиск размер окна не меняет — ширина как без поиска (результаты
   -- одной колонкой), высота — по самому длинному списку без фильтра (O.nfull),
   -- не меньше 12 строк; что не влезло — скроллом
+  -- 14 окт: одной колонкой со скроллом (колонки по ширине убраны)
   local ncw = 1
-  if not O.compact and O.tab ~= 'hotkeys' then
-    ncw = math.max(1, math.min(4, math.floor((W - 4 * L.pad - 20) / colw0)))   -- 13 окт: окно во всю ширину — колонок сколько влезет
-    if ncw > 1 then bw = ncw * colw0 end
-  end
   O.roww = colw0
-  if false then
-  end
   local ncol = O.query == '' and ncw or 1
   O.nfull = O.nfull or {}                                -- по вкладке: хоткеи длиннее опций
   local tk = tostring(O.tab or '')
@@ -488,9 +483,9 @@ function O.draw(L, W, H)
   -- 13 окт: окно опций — одного размера на всех вкладках, почти во всё окно (раньше прыгало по вкладкам)
   if not O.compact then
     bw = W - 4 * L.pad
-    nvis = math.max(3, math.floor((H - 4 * L.pad) / rh) - 4 - ((#O.tabs > 0) and 1 or 0))
+    nvis = math.max(3, math.floor((H - 4 * L.pad) / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
   end
-  local bh = (nvis + 4 + ((#O.tabs > 0) and 1 or 0)) * rh
+  local bh = (nvis + 5 + ((#O.tabs > 0) and 1 or 0)) * rh   -- 14 окт: +1 строка — поиск в 2 строки
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
   if O.compact then
     nvis = math.min(n, math.floor((H - 4 * rh) / rh))
@@ -523,9 +518,10 @@ function O.draw(L, W, H)
   O.tab_hot, O.find_hot = nil, nil
   if not O.compact then
     local ty = by + rh + 4
-    -- поиск (5 окт): строка ввода слева, широкая; пустая — подсказка тусклым
-    local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/ find')
-    local fw = math.max(math.floor(bw / 3), U.measure(fq) + 2 * L.pad)
+    -- поиск (5 окт): строка ввода слева, широкая; 14 окт — в 2 строки, пустая — подсказка
+    -- призрачным цветом, как начать искать
+    local fq = O.typing and ('/' .. O.query .. '_') or (O.query ~= '' and ('/' .. O.query) or '/')
+    local fw = math.max(math.floor(bw * 2 / 3), U.measure(fq) + 2 * L.pad)
     local fx = bx + L.pad
     -- вкладки — строкой над поиском (5 окт)
     local tx = bx + L.pad
@@ -541,14 +537,22 @@ function O.draw(L, W, H)
       U.text(tx + L.pad, ty, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
       tx = tx + w + 2
     end
-    local fhot = mx >= fx and mx < fx + fw and my >= fy and my < fy + rh
+    local fh = 2 * rh
+    local fhot = mx >= fx and mx < fx + fw and my >= fy and my < fy + fh
     if fhot then O.find_hot = true end
-    U.set(O.typing and U.tint(U.AMBER, 0.25) or (fhot and U.PANEL or U.BG)); gfx.rect(fx, fy, fw, rh - 1, 1)
-    U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, fy, fw, rh - 1, 0)
-    U.text(fx + L.pad, fy, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
+    U.set(O.typing and U.tint(U.AMBER, 0.25) or (fhot and U.PANEL or U.BG)); gfx.rect(fx, fy, fw, fh - 1, 1)
+    U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, fy, fw, fh - 1, 0)
+    local ty3 = fy + math.floor((fh - rh) / 2)
+    U.text(fx + L.pad, ty3, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
+    if O.query == '' then
+      local gx = fx + L.pad + U.measure(fq) + L.pad
+      local ghost = O.typing and 'letters in order: pnc finds pan column, a space splits words   Enter: keep   Esc: clear'
+        or 'press / or f anywhere here, or click - then type: letters in order find the option'
+      U.text(gx, ty3, ctx.fit(ghost, fx + fw - L.pad - gx), U.DIM)
+    end
   end
   local by0 = by
-  if not O.compact then by = by + rh * ((#O.tabs > 0) and 2 or 1) end   -- список — под вкладками и поиском
+  if not O.compact then by = by + rh * ((#O.tabs > 0) and 3 or 2) end   -- список — под вкладками и поиском (2 строки)
   O.nvis = cap
   if O.tab == 'theme' and O.query == '' and ctx.theme_tab then
     ctx.theme_tab.draw(bx + L.pad, by + rh + 4, bw - 2 * L.pad, by0 + bh - (by + rh + 4) - 4)
