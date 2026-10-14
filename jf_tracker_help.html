@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>jf_tracker help</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f5f4f0; --panel: #ebe9e3; --text: #1b1b1a; --grey: #6b6a66; --line: #d2cfc6;
@@ -58,6 +60,9 @@
   .graph path { stroke: var(--grey); fill: none; stroke-width: 1.4; }
   .graph path.w { stroke: var(--amber); }
   .graph .lbl { fill: var(--grey); font-size: 11px; }
+  /* буквица (14 окт): первая буква большого абзаца — средневековым шрифтом (Google Fonts, без сети — Luminari / Apple Chancery из macOS) */
+  .drop::first-letter { font-family: "UnifrakturMaguntia", "Luminari", "Apple Chancery", serif; float: left; font-size: 3.4em;
+    line-height: 0.82; padding: 6px 10px 0 0; color: var(--amber); }
   footer { margin-top: 56px; color: var(--grey); font-size: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
 </style>
 </head>
@@ -69,11 +74,11 @@
   <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
   <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
-  <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
+  <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#values">values by hand</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
 
 <h2 id="why">Why</h2>
-<p class="lead">Hands stay on the home row. <kbd>j</kbd> and <kbd>f</kbd> are the two keys with bumps under your index
+<p class="lead drop">Hands stay on the home row. <kbd>j</kbd> and <kbd>f</kbd> are the two keys with bumps under your index
 fingers, and that is the name. <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> move the cursor, and <kbd>f</kbd> jumps to
 anything on screen by a two-letter label. The mouse is optional.</p>
 <p class="lead">It is REAPER, hard native. The tracker is only a shell over your project. What you see are real tracks,
@@ -257,7 +262,7 @@ such as <code>:interp vol</code> (a ramp), <code>:arp up 2</code>, <code>:scramb
 </table>
 
 <h2 id="matrix">Matrix</h2>
-<p>The song is a list of patterns. A pattern is a REAPER region; regions with the same name are copies of one pattern
+<p class="drop">The song is a list of patterns. A pattern is a REAPER region; regions with the same name are copies of one pattern
 (aliases), and an edit in one copy goes into all of them (<code>autosync</code>). Each slot row shows the name, the time
 signature and the length; a click on them edits. Cells are pattern × track.</p>
 <p>Pattern codes, as Elektron banks: a name that starts with a letter and a number (<code>A1</code>, <code>D12 verse</code>)
@@ -300,7 +305,7 @@ the item tab edits.</p>
 </table>
 
 <h2 id="mod">Automation and modulation</h2>
-<p>Three different things, three places:</p>
+<p class="drop">Three different things, three places: what is drawn in time, what moves while it plays, and what every note starts.</p>
 <table>
 <tr><td>automation</td><td>a value over time, the same every play: REAPER envelopes and automation items, shown as envelope
 columns. <kbd>Opt</kbd>+<kbd>A</kbd> turns the last touched knob into a column. <kbd>z</kbd><kbd>e</kbd> picks how a column
@@ -343,6 +348,25 @@ compressor curve, bands, delay taps), Airwindows get their category and descript
 <tr><td><code>:fxa</code> <code>:fxb</code> <code>:morph N</code></td><td>A/B snapshots of a block and a morph between them</td></tr>
 <tr><td><kbd>/</kbd> or the list on the left</td><td>add an effect; drag a block by its title to reorder</td></tr>
 </table>
+
+<h2 id="values">Values by hand</h2>
+<p class="drop">Every slider on the screen — a track's volume and pan, the fx parameters in a track header, a DSP device, the
+mixer faders, an XY pad — can be moved without aiming at it. Three ways, from the keys to the whole trackpad:</p>
+<table>
+<tr><td><kbd>f</kbd> on a slider — FADE</td><td>the slider gets an amber frame and the status says <code>-- FADE vol --</code>:
+<kbd>h</kbd> <kbd>l</kbd> value (<kbd>H</kbd> <kbd>L</kbd> fine), <kbd>j</kbd> <kbd>k</kbd> the next one, <kbd>0</kbd> reset,
+<kbd>Esc</kbd> done. In the properties a jumped-to slider is framed the same way</td></tr>
+<tr><td>hold <kbd>Ctrl</kbd> + move</td><td>the selected parameters change (else the one under the mouse, else the FADE one):
+up is more, <kbd>Shift</kbd> fine, two selected — XY. <kbd>Cmd</kbd>+click adds to the selection, <kbd>Shift</kbd>+click — a range</td></tr>
+<tr><td>hold <kbd>Ctrl</kbd>+<kbd>Option</kbd> + move</td><td>TRACKS: the window width is one zone per track — sideways picks a
+track, up / down moves its fader. Add <kbd>Cmd</kbd> and the whole window is a pan pad for that track</td></tr>
+<tr><td>hold <kbd>Ctrl</kbd>+<kbd>Cmd</kbd> + move</td><td>SLIDER: the bank of up to 8 sliders nearest the mouse is framed, the one
+you move now — bright. The trackpad is split into one zone per slider, the way they lie: horizontal sliders (headers, DSP) —
+up / down picks, sideways changes; vertical faders (mixer) — sideways picks, up / down changes; an XY pad — both at once.
+A value moves only after a clear move along its axis, so sliding over the zones does not touch them. Let go — one undo</td></tr>
+</table>
+<p>A click on a parameter's name only selects it; the value changes on its bar. Who wants the old way (a click anywhere on the
+row sets the value from the mouse) finds it in options → <code>odd options</code> → <code>name click sets</code>.</p>
 
 <h2 id="transport">Transport strip</h2>
 <p>Under the tracker: position, BPM, LPB, time signature, the beats of the bar, metronome, follow, loop, octave, step,
