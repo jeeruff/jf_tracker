@@ -4933,6 +4933,7 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
+        if D.slr then D.slr[#D.slr + 1] = { g = 'trs:' .. tostring(col.guid), col = col, trk = what, name = label .. ' ' .. (col.name or ''), x = wx0, y = sy, w = ww, h = L.rh } end   -- 14 окт: SLIDER
         -- слайдер под клавиатурой (метка f, 5 окт): янтарная рамка
         local ks = info.kslider
         if ks and ks.what == what and ks.col and ks.col.guid == col.guid then set(U.AMBER); gfx.rect(wx0 - 2, sy + 1, ww + 4, L.rh - 2, 0) end
@@ -5110,6 +5111,7 @@ function D.frame(L, snap, rows, state, info)
         if kon then set(U.AMBER); gfx.rect(c.x + 1, y1 - 1, c.w - 1, H, 0) end   -- полоса под клавиатурой (щелчок / f): k j громкость, h l панорама
         local lblw = (bigf and fx_w >= lblw0 + 4 * L.cw) and lblw0 or 0
         local bx0, bw0 = sx + lblw, fx_w - lblw
+        if D.slr then D.slr[#D.slr + 1] = { g = 'mix', ori = 'v', col = col, trk = 'vol', name = col.name or '', x = bx0, y = ty0, w = bw0, h = th } end   -- 14 окт: SLIDER — фейдеры вертикальные
         local dark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
         local tick = U.mix(U.GREY, dark, 0.45)          -- 9 окт: риски темнее, как метки
         set(dark); gfx.rect(bx0, ty0 - 6, bw0, th + 9, 1)
@@ -7033,6 +7035,8 @@ function D.frame(L, snap, rows, state, info)
         if not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
           hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side }
         end
+        local qx, qy = f.params[f.xy_x], f.params[f.xy_y]
+        if D.slr and qx and qy then D.slr[#D.slr + 1] = { g = 'dspxy:' .. tostring(k), dsp = true, xy = { qx.fx or f.i, qx.i, qy.fx or f.i, qy.i }, name = f.name or 'XY', x = px0, y = py0, w = side, h = side } end   -- 14 окт: SLIDER — XY
       end
       if f.wave then
         -- сэмплер (RS5K): волна файла с зоной start..end, ручки тянутся мышью,

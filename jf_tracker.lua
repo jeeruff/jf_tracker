@@ -16630,10 +16630,11 @@ local function frame()
     -- жест «треки» (Control+Option): окно по ширине — все треки зонами; вбок —
     -- выбор трека (фейдер в фокусе клавиатуры), вертикально — его громкость
     -- 11 окт: Ctrl+Option — сначала просто модификаторы; режим слайдеров — только когда мышь пошла (> 6 px)
-    -- 14 окт: SLIDER (держать Ctrl+Cmd): группа параметров у мыши — параметры эффектов в шапке
-    -- ближайшего трека или колонка устройства в DSP (рамкой, как поле control surface в Ableton);
-    -- высота окна — полосы по числу параметров (карта трекпада справа): вверх-вниз — параметр,
-    -- вбок — значение (относительно, Shift мелко); отпустил — один undo
+    -- 14 окт: SLIDER (держать Ctrl+Cmd): группа слайдеров у мыши (рамкой, как поле control surface в
+    -- Ableton). Сколько их и как лежат: горизонтальные (шапка трека, колонка DSP) — высота окна делится
+    -- на полосы, вверх-вниз выбор, вбок значение; вертикальные (фейдеры микшера) — ширина на столбцы,
+    -- вбок выбор, вверх-вниз значение; XY-пэд — обе оси сразу. Значение — относительно, после заметного
+    -- движения по своей оси (> 10 px); Shift мелко; отпустил — один undo
     local sl_raw = gfx.mouse_cap & 52 == 36
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
@@ -16647,64 +16648,117 @@ local function frame()
         end
         SG = { none = true }
         if best then
+          -- до 8 зон: банк из 8 подряд, в котором ближайший (как поле control surface в Ableton)
+          local all, bi = {}, 1
+          for _, r in ipairs(draw.slr) do if r.g == best.g then all[#all + 1] = r; if r == best then bi = #all end end end
+          local b0 = ((bi - 1) // 8) * 8
           local list = {}
-          for _, r in ipairs(draw.slr) do if r.g == best.g then list[#list + 1] = r end end
-          SG = { list = list, col = best.dsp and dcol or best.col, x0 = gfx.mouse_x }
+          for i = b0 + 1, math.min(#all, b0 + 8) do list[#list + 1] = all[i] end
+          SG = { list = list, x0 = gfx.mouse_x, y0 = gfx.mouse_y, ori = best.xy and 'xy' or (best.ori or 'h'), dsp = best.dsp }
         end
         ctx.sl = SG
       end
-      if not SG.none and SG.col and SG.col.track then
+      local function tcol(r) return r.dsp and dcol or r.col end
+      local function tgts(r)
+        local c = tcol(r)
+        if not (c and c.track) then return {} end
+        if r.xy then return { { kind = 'fx', tid = c.guid, track = c.track, fx = r.xy[1], p = r.xy[2], name = r.name .. ' X' },
+                              { kind = 'fx', tid = c.guid, track = c.track, fx = r.xy[3], p = r.xy[4], name = r.name .. ' Y' } } end
+        if r.trk then return { trk(c, r.trk) } end
+        return { { kind = 'fx', tid = c.guid, track = c.track, fx = r.fx, p = r.p, name = r.name } }
+      end
+      local function frac(t)
+        local v = ctx.cm_io.get(t) or 0
+        local u = CM.unit(t)
+        return math.max(0, math.min(1, (v - u.lo) / math.max(1e-9, u.hi - u.lo)))
+      end
+      local function nudge(t, d)
+        local v = ctx.cm_io.get(t)
+        if not v then return end
+        local u = CM.unit(t)
+        ctx.cm_io.set(t, math.max(u.lo, math.min(u.hi, v + d * u.step * (state.cmsens or 50) / 100 * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
+        SG.moved = true
+      end
+      if not SG.none then
         local n = #SG.list
-        local k = math.max(1, math.min(n, math.floor(gfx.mouse_y / math.max(1, gfx.h) * n) + 1))
-        -- новая полоса — значение замирает, пока палец не уйдёт вбок заметно (> 10 px и больше, чем
-        -- по вертикали): ведёшь вниз по полосам — значения не дрожат
+        local vert = SG.ori == 'v'
+        local k = 1
+        if SG.ori ~= 'xy' then
+          local pos, span = vert and gfx.mouse_x or gfx.mouse_y, vert and gfx.w or gfx.h
+          k = math.max(1, math.min(n, math.floor(pos / math.max(1, span) * n) + 1))
+        end
         if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
+        local cur = SG.list[k]
+        local ts = tgts(cur)
         if not SG.live then
           local ax, ay = math.abs(gfx.mouse_x - SG.ax), math.abs(gfx.mouse_y - SG.ay)
-          if ax > 10 and ax > ay then SG.live = true; SG.x0 = gfx.mouse_x end
-          if ay > 2 * L.rh and ax <= 10 then SG.ax, SG.ay = gfx.mouse_x, gfx.mouse_y end   -- вертикаль внутри полосы — заново
+          local along, across = vert and ay or ax, vert and ax or ay      -- по оси значения / по оси выбора
+          if SG.ori == 'xy' then along, across = math.max(ax, ay), 0 end
+          if along > 10 and along > across then SG.live = true; SG.x0, SG.y0 = gfx.mouse_x, gfx.mouse_y end
+          if across > 2 * L.rh and along <= 10 then SG.ax, SG.ay = gfx.mouse_x, gfx.mouse_y end
         end
-        local dx = SG.live and (gfx.mouse_x - SG.x0) or 0
-        if SG.live then SG.x0 = gfx.mouse_x end
-        local function tgt(r) return { kind = 'fx', tid = SG.col.guid, track = SG.col.track, fx = r.fx, p = r.p, name = r.name } end
-        local cur = SG.list[k]
-        if dx ~= 0 then
-          local v = ctx.cm_io.get(tgt(cur))
-          if v then
-            ctx.cm_io.set(tgt(cur), math.max(0, math.min(1, v + dx * CM.UNIT.fx.step * (state.cmsens or 50) / 100 * (gfx.mouse_cap & 8 == 8 and CM.FINE or 1))))
-            SG.moved = true
-          end
+        if SG.live then
+          local dx, dy = gfx.mouse_x - SG.x0, SG.y0 - gfx.mouse_y        -- вверх — больше
+          SG.x0, SG.y0 = gfx.mouse_x, gfx.mouse_y
+          if SG.ori == 'xy' then if dx ~= 0 and ts[1] then nudge(ts[1], dx) end; if dy ~= 0 and ts[2] then nudge(ts[2], dy) end
+          elseif vert then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end
+          elseif dx ~= 0 and ts[1] then nudge(ts[1], dx) end
         end
-        -- рамка группы на месте и выбранный параметр
+        -- рамка группы на месте и выбранный слайдер
         local x0, y0, x1, y1 = 1e9, 1e9, -1e9, -1e9
         for _, r in ipairs(SG.list) do x0, y0, x1, y1 = math.min(x0, r.x), math.min(y0, r.y), math.max(x1, r.x + r.w), math.max(y1, r.y + r.h) end
         U.set(U.AMBER); gfx.rect(x0 - 3, y0 - 2, x1 - x0 + 6, y1 - y0 + 4, 0); gfx.rect(x0 - 2, y0 - 1, x1 - x0 + 4, y1 - y0 + 2, 0)
-        U.set(U.AMBER, 0.30); gfx.rect(cur.x, cur.y, cur.w, cur.h, 1)
-        U.set(U.AMBER); gfx.rect(cur.x - 1, cur.y, cur.w + 2, cur.h, 0)
-        -- карта трекпада: полоса справа во всю высоту, параметр на полосу
-        local pw = math.min(math.floor(gfx.w / 4), L.cw * 26)
-        local px = gfx.w - pw
-        local bh = gfx.h / n
-        U.set(U.BG, 0.88); gfx.rect(px, 0, pw, gfx.h, 1)
-        U.set(U.AMBER); gfx.rect(px, 0, 1, gfx.h, 1)
-        for i, r in ipairs(SG.list) do
-          local by0, by1 = math.floor((i - 1) * bh), math.floor(i * bh)
-          local on = i == k
-          if on then U.set(U.AMBER, 0.30); gfx.rect(px + 1, by0, pw - 1, by1 - by0, 1) end
-          U.set(U.LINE); gfx.rect(px + 1, by1 - 1, pw - 1, 1, 1)
-          local v = ctx.cm_io.get(tgt(r)) or 0
-          local cy = by0 + math.floor((by1 - by0) / 2)
-          if by1 - by0 >= L.rh + 4 then
-            U.text(px + L.pad, cy - L.rh, ctx.fit(r.name or '', pw - 2 * L.pad), on and U.AMBER or U.GREY)
-            U.set(U.DIM); gfx.rect(px + L.pad, cy + 2, pw - 2 * L.pad, 2, 1)
-            U.set(on and U.AMBER or U.CYAN); gfx.rect(px + L.pad, cy + 2, math.max(1, math.floor((pw - 2 * L.pad) * v + 0.5)), 2, 1)
-          else
-            U.set(on and U.AMBER or U.CYAN, 0.6); gfx.rect(px + 1, by0 + 1, math.max(1, math.floor((pw - 2) * v + 0.5)), math.max(1, by1 - by0 - 2), 1)
+        -- выбранный — ярко (его сейчас и крутишь): плотная заливка, двойная рамка — светлая снаружи;
+        -- значение живое — заливка ярче
+        U.set(U.AMBER, SG.live and 0.65 or 0.45); gfx.rect(cur.x, cur.y, cur.w, cur.h, 1)
+        U.set(U.AMBER); gfx.rect(cur.x - 1, cur.y - 1, cur.w + 2, cur.h + 2, 0)
+        U.set(U.TEXT); gfx.rect(cur.x - 2, cur.y - 2, cur.w + 4, cur.h + 4, 0)
+        -- карта трекпада: горизонтальные — полосы справа, вертикальные — столбцы снизу, XY — квадрат
+        if SG.ori == 'xy' then
+          local sd = math.min(math.floor(gfx.h / 3), L.cw * 24)
+          local qx, qy = gfx.w - sd - 4, 4
+          U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
+          local fx_, fy_ = ts[1] and frac(ts[1]) or 0.5, ts[2] and frac(ts[2]) or 0.5
+          gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4, 1, 1)
+          state.status = ('-- SLIDER XY --  %s  X %d  Y %d   (move: both; let Ctrl+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
+        else
+          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / 4), L.cw * 26)
+          local maph = vert and math.min(math.floor(gfx.h / 4), 8 * L.rh) or gfx.h
+          local mx0, my0 = gfx.w - mapw, gfx.h - maph
+          U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
+          U.set(U.AMBER); if vert then gfx.rect(mx0, my0, mapw, 1, 1) else gfx.rect(mx0, my0, 1, maph, 1) end
+          local step = (vert and mapw or maph) / n
+          for i, r in ipairs(SG.list) do
+            local a0, a1 = math.floor((i - 1) * step), math.floor(i * step)
+            local on = i == k
+            local t1 = tgts(r)[1]
+            local fr = t1 and frac(t1) or 0
+            if vert then
+              local bx = mx0 + a0
+              if on then U.set(U.AMBER, 0.30); gfx.rect(bx, my0 + 1, a1 - a0, maph - 1, 1) end
+              U.set(U.LINE); gfx.rect(bx + a1 - a0 - 1, my0 + 1, 1, maph - 1, 1)
+              local bh = math.floor((maph - L.rh - 6) * fr + 0.5)
+              U.set(on and U.AMBER or U.CYAN, 0.7); gfx.rect(bx + 2, my0 + maph - 2 - bh, math.max(1, a1 - a0 - 5), bh, 1)
+              if a1 - a0 >= U.measure('mm') then U.text(bx + 2, my0 + 2, ctx.fit(r.name or '', a1 - a0 - 4), on and U.AMBER or U.GREY) end
+            else
+              local by0, by1 = my0 + a0, my0 + a1
+              if on then U.set(U.AMBER, 0.30); gfx.rect(mx0 + 1, by0, mapw - 1, by1 - by0, 1) end
+              U.set(U.LINE); gfx.rect(mx0 + 1, by1 - 1, mapw - 1, 1, 1)
+              local cy = by0 + math.floor((by1 - by0) / 2)
+              if by1 - by0 >= L.rh + 4 then
+                U.text(mx0 + L.pad, cy - L.rh, ctx.fit(r.name or '', mapw - 2 * L.pad), on and U.AMBER or U.GREY)
+                U.set(U.DIM); gfx.rect(mx0 + L.pad, cy + 2, mapw - 2 * L.pad, 2, 1)
+                U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, cy + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), 2, 1)
+              else
+                U.set(on and U.AMBER or U.CYAN, 0.6); gfx.rect(mx0 + 1, by0 + 1, math.max(1, math.floor((mapw - 2) * fr + 0.5)), math.max(1, by1 - by0 - 2), 1)
+              end
+            end
           end
+          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s: slider, %s: value, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n,
+            ts[1] and ctx.cm_io.show(ts[1]) or '', vert and 'sideways' or 'up / down', vert and 'up / down' or 'sideways')
         end
-        state.status = ('-- SLIDER --  %s  %d / %d  %s   (up / down: parameter, sideways: value, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n, ctx.cm_io.show and ctx.cm_io.show(tgt(cur)) or '')
       else
-        state.status = '-- SLIDER --  no parameters on the screen: show fx parameters in the track headers, or open the DSP'
+        state.status = '-- SLIDER --  no sliders on the screen'
       end
       U.click, U.rclick = false, false
     elseif ctx.sl then
