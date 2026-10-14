@@ -10055,7 +10055,7 @@ ctx = {
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
-      flag('beacon', 'cursor beacon', 'a jump of the tracker cursor (G gg, Ctrl+O, f-labels, a far track, the search) flashes a bar at its new place that shrinks to the cursor in half a second, as beacon-mode in Emacs - the eye finds where it landed'),
+      flag('beacon', 'cursor beacon', 'a jump of the tracker cursor (G gg, Ctrl+O, f-labels, a far track, the search) flashes a bar that flies in from where the cursor came (above - down the column, a side - along the row) and shrinks to the cursor in half a second, as beacon-mode in Emacs - the eye finds where it landed'),
       flag('bigcur', 'big fixed cursor', 'with the fixed cursor (centre) its row is drawn twice as big: two rows high, half the width around the cursor field; the rows below move one row down. Off while f-hints are shown'),
       { key = 'phtail', label = 'playhead shade', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, a gradient of the playhead colour (0, default - the playhead is a plain row, like the cursor)', get = function() return state.phtail or 0 end, set = function(v) state.phtail = v end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
@@ -15931,7 +15931,11 @@ local function frame()
     local b, cur = ctx.beacon, { fi = vim.cur.fi, row = vim.cur.row }
     local last = ctx.beacon_last
     if last and (math.abs(cur.row - last.row) >= 8 or math.abs(cur.fi - last.fi) >= 3) then
-      ctx.beacon = { t = reaper.time_precise() }; b = ctx.beacon
+      -- 14 окт: полоса прилетает с той стороны, откуда курсор: сверху / снизу — вертикально по
+      -- колонке, сбоку — горизонтально по строке
+      local dr, df = cur.row - last.row, cur.fi - last.fi
+      local side = (math.abs(dr) / 8 >= math.abs(df) / 3) and (dr > 0 and 'top' or 'bottom') or (df > 0 and 'left' or 'right')
+      ctx.beacon = { t = reaper.time_precise(), side = side }; b = ctx.beacon
     end
     ctx.beacon_last = cur
     if b then
@@ -15940,10 +15944,26 @@ local function frame()
       local r = vim.cur.row - rows[1].row
       if k >= 1 or not (f and f.x) or r < 0 or r >= (L.nrows or 0) then ctx.beacon = nil
       else
-        local x0, x1 = math.max(L.matrix_w or 0, f.x), (L.win_w or gfx.w)
-        local y = L.body_y + r * L.rh
-        local w = math.floor((x1 - x0) * (1 - k) ^ 2)
-        U.set(U.AMBER, 0.55 * (1 - k)); gfx.rect(x0, y, math.max(f.w or L.cw, w), L.rh, 1)
+        local q = (1 - k) ^ 2
+        local cx, cw = math.max(L.matrix_w or 0, f.x), f.w or L.cw
+        local cy = L.body_y + r * L.rh
+        U.set(U.AMBER, 0.55 * (1 - k))
+        if b.side == 'top' then
+          local h = math.floor((cy - L.body_y) * q)
+          gfx.rect(cx, cy - h, cw, h + L.rh, 1)
+        elseif b.side == 'bottom' then
+          local h = math.floor((L.body_y + L.nrows * L.rh - cy - L.rh) * q)
+          gfx.rect(cx, cy, cw, L.rh + math.max(0, h), 1)
+        elseif b.side == 'left' then
+          local xl = cx
+          for _, g in ipairs(L.flat) do if g.x and g.x >= (L.matrix_w or 0) and g.x < xl then xl = g.x end end
+          local w = math.floor((cx - xl) * q)
+          gfx.rect(cx - w, cy, w + cw, L.rh, 1)
+        else
+          local x1 = L.win_w or gfx.w
+          local w = math.floor((x1 - cx) * q)
+          gfx.rect(cx, cy, math.max(cw, w), L.rh, 1)
+        end
       end
     end
   end
