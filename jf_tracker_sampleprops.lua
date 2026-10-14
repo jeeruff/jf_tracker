@@ -159,6 +159,8 @@ function SP.draw(L, x, y, w, h, e, focused)
       local onbar = hot and mx >= sx - 2 and mx < sx + sw + 2
       local act = foc or onbar or (SP.drag and SP.drag.k == r.k)
       U.dslider(sx, cy, sw, fr, centered, act and U.AMBER or U.TEXT, onbar, L.rh)   -- 13 окт: ромбик
+      -- 14 окт: выбранный (f, j k) — рамка вокруг слайдера, как у фейдера под клавиатурой в микшере
+      if sel then U.set(U.AMBER); gfx.rect(sx - 4, ry + 1, sw + 8, L.rh - 2, 0) end
       -- метки привязки (rate: ×½ ×1.5 ×2 …) — чёрточки под дорожкой
       if ctx.sp_marks then
         U.set(U.GREY)

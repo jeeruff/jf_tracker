@@ -10013,7 +10013,7 @@ ctx = {
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
-      { key = 'cmsens', label = 'fader speed', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'Ctrl / Ctrl+Option drag (slider mode, faders by the mouse): how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
+      { key = 'cmsens', label = 'fader speed', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'Ctrl / Ctrl+Option drag (fade mode, faders by the mouse): how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -14994,7 +14994,7 @@ local function frame()
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
-    status_left = state.kslider and ('-- SLIDER %s --  h l value, j k slider, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден
+    status_left = state.kslider and ('-- FADE %s --  h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: SLIDER → FADE (fademode), SLIDER — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
