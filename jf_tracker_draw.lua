@@ -3673,7 +3673,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
       local bx = x + L.pad + vw + 2 * L.pad
-      local bw = math.max(L.cw * 6, math.min(L.cw * 16, kx + (#D.PIANO_WHITE) * L.cw * 2 - bx))
+      -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
+      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      local bw = math.max(L.cw * 4, math.min(L.cw * 12, kx + #D.PIANO_WHITE * kwv - 1 - bx))
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
       U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
       if bhot then hover.ctrl = 'velbar' end
