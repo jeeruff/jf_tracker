@@ -5255,6 +5255,19 @@ ctx = {
   end,
   -- 15 окт: human — насколько каждая вставленная нота «живая»: тайминг ±10 мс, высота ±8 центов,
   -- громкость ±1 dB / velocity ±12 (при 100 %)
+  -- 15 окт: какие маркеры 1..10 есть (строка маркеров под кнопками транспорта); кэш по проекту
+  marker_set = function()
+    local sc = reaper.GetProjectStateChangeCount(0)
+    if ctx.mk_cc == sc then return ctx.mk_set end
+    local set = {}
+    local _, nm, nr = reaper.CountProjectMarkers(0)
+    for k = 0, nm + nr - 1 do
+      local ok, isr, _, _, _, idx = reaper.EnumProjectMarkers3(0, k)
+      if ok and ok > 0 and not isr and idx >= 1 and idx <= 10 then set[idx] = true end
+    end
+    ctx.mk_cc, ctx.mk_set = sc, set
+    return set
+  end,
   human_menu = function()
     local function set(v) return function() state.human = v; edit.human = v; vim.msg = v > 0 and ('human %d%%: timing, pitch and velocity of every inserted note vary a little'):format(v) or 'human off' end end
     local function mark(v) return (state.human or 0) == v and '  *' or '' end
@@ -7983,6 +7996,7 @@ ctx = {
     swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
     swingbar = 'swing amount: drag left / right from the middle',
     velbar = 'velocity of the inserted notes 1..127: drag; { } (renoise) or c C - step 8',
+    mk1 = 'go to marker 1', mk2 = 'go to marker 2', mk3 = 'go to marker 3', mk4 = 'go to marker 4', mk5 = 'go to marker 5', mk6 = 'go to marker 6', mk7 = 'go to marker 7', mk8 = 'go to marker 8', mk9 = 'go to marker 9', mk10 = 'go to marker 10 (0)',
     human = 'human: every inserted note a little different - timing, pitch, velocity / volume; click - 0 / 25 / 50 / 100 %',
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
     tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
@@ -14367,6 +14381,11 @@ function ctrl_action(name, delta)
   elseif name == 'ratebar' then
     if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
+  elseif name:match('^mk%d+$') then   -- 15 окт: строка маркеров под rew — прыжок к маркеру N
+    local n = tonumber(name:sub(3))
+    if reaper.GoToMarker then reaper.GoToMarker(0, n, false) end
+    vim.cur.row = math.max(0, math.floor(model.row_of_time(reaper.GetCursorPosition(), state.lpb) + 0.5)); vim.ensure_visible()
+    vim.msg = ('marker %d'):format(n)
   elseif name == 'punch' then
     local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch')
     if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_exact('Record: Set record mode to normal') or 40252, 0)
@@ -15552,7 +15571,7 @@ local function frame()
         end
         return out
       end)() or nil,
-      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
