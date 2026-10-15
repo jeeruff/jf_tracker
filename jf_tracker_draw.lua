@@ -3500,7 +3500,7 @@ function D.transport_groups(c)
   -- 15 окт: шаг — крупно (×2, как BPM), без слова step (оно — вертикальной скобкой); inst ввода не показываем
   -- 15 окт: сетка блока — крупный шаг слева (ширина по значению, не уже «16» — соседи не прыгают от цифры
   -- к цифре), справа две ровные колонки: LPB / pitch и legato / human (общая ширина колонки — res)
-  local stxt = tostring(c.step or 0)
+  local stxt = ({ auto = 'a', next = 'n' })[c.step] or tostring(c.step or 0)   -- 15 окт: режимы шага буквой — ширина как у числа
   local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2))
   local col2, col3 = 'pitch resample', 'human 100%'
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
