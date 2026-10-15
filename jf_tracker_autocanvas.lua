@@ -37,10 +37,11 @@ function ACV.grid_label(grid, lpb)
 end
 
 -- диапазон заливки: якорь…курсор (включая обе строки), иначе клетка сетки под курсором
-function ACV.range(st)
+function ACV.range(st, snap)
   local r0, r1 = st.r0 or 0, st.r1 or (ACV.row + 1)
   if ACV.anchor then
     local a, b = math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row) + 1
+    if snap then local g = math.max(1, ACV.grid); b = a + math.ceil((b - a) / g) * g end   -- заливка — целыми клетками (форма не сжимается в хвост)
     return math.max(r0, a), math.min(r1, b)
   end
   local g = math.max(1, ACV.grid)
@@ -91,7 +92,7 @@ function ACV.lfo_band(mod, t, base, bps)
   local speed = v['lfo.speed'] or 1
   local phase = v['lfo.phase'] or 0
   local x
-  if (v['lfo.temposync'] or 0) >= 0.5 then x = t * (bps or 2) / math.max(1e-6, speed) + phase   -- speed — долей на цикл
+  if (v['lfo.temposync'] or 0) >= 0.5 then x = t * (bps or 2) * speed + phase   -- пробник 15 окт: speed — циклов на долю
   else x = t * speed + phase end
   x = x % 1
   local w
@@ -107,6 +108,12 @@ function ACV.lfo_band(mod, t, base, bps)
   else lo, hi = base - str / 2, base + str / 2 end
   local val = lo + (w + 1) / 2 * (hi - lo)
   return clamp01(lo), clamp01(hi), clamp01(val)
+end
+
+-- полоса модуляции кривой cv (kind lfo / acs) вокруг base: ACS — вверх от базы на силу, без волны
+function ACV.mod_band(cv, t, base, bps)
+  if cv.kind == 'acs' then local str = clamp01(cv.mod and cv.mod.v and cv.mod.v['acs.strength'] or 1); return base, clamp01(base + str), base end
+  return ACV.lfo_band(cv.mod, t, base, bps)
 end
 
 -- клавиши; st = { r0, r1, lpb, ncurves, kind (активной кривой) }; mods = { shift, ... }
@@ -247,10 +254,29 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     for px = 0, gw - 1, 2 do
       local t = span.t0 + (span.t1 - span.t0) * px / math.max(1, gw - 1)
       local base = cache.ys[ACV.cur] and cache.ys[ACV.cur][px] or 0.5
-      local lo, hi = ACV.lfo_band(act.mod, t, base, span.bps)
+      local lo, hi = ACV.mod_band(act, t, base, span.bps)
       gfx.rect(gx + px, vy(hi), 2, math.max(1, vy(lo) - vy(hi)), 1)
     end
     gfx.a = 1
+    -- предсказанная волна LFO тонкой линией
+    if act.kind == 'lfo' then
+      U.set(act.rgb or U.CYAN, 0.8)
+      local px0, py0
+      for px = 0, gw - 1 do
+        local t = span.t0 + (span.t1 - span.t0) * px / math.max(1, gw - 1)
+        local base = cache.ys[ACV.cur] and cache.ys[ACV.cur][px] or 0.5
+        local _, _, vv = ACV.lfo_band(act.mod, t, base, span.bps)
+        local yy = vy(vv)
+        if px0 then gfx.line(px0, py0, gx + px, yy) end
+        px0, py0 = gx + px, yy
+      end
+      gfx.a = 1
+    end
+  end
+  -- живое значение параметра при игре (модуляция + автоматизация, как слышно)
+  if span.play_row and act.live and span.play_row >= r0 and span.play_row < r1 then
+    local ok, lv = pcall(act.live)
+    if ok and lv then U.set(U.GREEN); gfx.circle(rx(span.play_row), vy(lv), 3, 1, 1) end
   end
   trace(ACV.cur, act.rgb or U.GREEN, 1)
   -- точки активной
@@ -274,6 +300,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   for i, cv in ipairs(curves) do
     local on = i == ACV.cur
     local val = cache.ys[i] and cache.ys[i][math.max(0, math.min(gw - 1, cx - gx))] or 0
+    if cv.kind == 'lfo' and cv.mod and cv.mod.v then val = cv.mod.v['lfo.strength'] or 0 elseif cv.kind == 'acs' and cv.mod and cv.mod.v then val = cv.mod.v['acs.strength'] or 0 end
     local lab = ('%s %3d%%'):format(cv.name or '?', math.floor(val * 100 + 0.5))
     local ix, iy, iw
     if lay.side then

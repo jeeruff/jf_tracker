@@ -531,7 +531,7 @@ KH.PAGES = {
     { k = '[ ]', d = 'grid finer / coarser (1 row .. a bar)' },
     { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, then every envelope of the track, then note mod slots; a click on the legend too' },
     { k = 'w b', d = 'next / previous point of the active curve' },
-    { k = 'm e', d = 'LFO / audio follower of the active parameter (soon: shown as a band on the canvas)' },
+    { k = 'm e', d = 'LFO / audio follower of the active parameter on / off: it appears as its own curve (LFO · name) - the band is its swing around the automation, the thin line the predicted wave; with it active: s t q r R n shape, [ ] speed (x2, tempo sync: cycles per beat), j k strength, w b phase. A green dot while playing - the real value' },
     { k = 'P', d = 'the params page (from there L - the generator); on the canvas L is a grid step' },
     { k = 'Esc', d = 'drop the anchor, then back to the tracker' },
   } },

@@ -12185,7 +12185,7 @@ ctx.acv_span = function()
     local qn = reaper.TimeMap2_timeToQN(0, t0)
     local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
     if qms and qme then t0, t1 = reaper.TimeMap2_QNToTime(0, qms), reaper.TimeMap2_QNToTime(0, qme) end
-    label = 'bar ' .. (reaper.TimeMap_QNToMeasures(0, qn + 1e-6) + 1)
+    label = 'bar ' .. reaper.TimeMap_QNToMeasures(0, qn + 1e-6)   -- номер такта у REAPER с 1
   end
   local r0 = math.floor(model.row_of_time(t0, state.lpb) + 0.5)
   local r1 = math.max(r0 + 1, math.floor(model.row_of_time(t1, state.lpb) + 0.5))
@@ -12218,12 +12218,33 @@ ctx.acv_curves = function(sp)
         if #pts > 2000 then break end
       end
     end
+    if (e.name or ''):lower():find('tempo', 1, true) then write = false end   -- карта темпа — только смотреть (правка — колонка темпа)
     list[i] = { kind = 'env', e = e, env = e.env, name = name, rgb = rgb, write = write ~= false,
+      track = reaper.Envelope_GetParentTrack and reaper.Envelope_GetParentTrack(e.env) or nil,
       eval = function(t) return edit.env_value(e, t) end, points = pts }
   end
   if tgt and tgt.e then add(tgt.e, tgt.label or (tgt.e.name or 'envelope')) end
   if col then
     for _, e in ipairs(col.envs or {}) do add(e, (col.name or '') .. ' / ' .. (e.name or 'env')) end
+    -- 15 окт: модуляция параметров трека — кривые «LFO · param» / «ACS · param»: база — огибающая параметра
+    -- (если есть), иначе baseline; j k правят силу, формы — форму LFO; точек нет
+    -- трек модуляций — владелец целевой огибающей (курсор может стоять на другом треке / мастере)
+    local tr = (list[1] and list[1].track) or col.track
+    local mods = (tr == col.track) and col.mods or (tr and model.track_mods(tr)) or {}
+    for _, m in ipairs(mods) do
+      if (m.lfo or m.acs) and tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+        local env = reaper.GetFXEnvelope(tr, m.fx, m.param, false)
+        local be
+        if env then for _, cv in ipairs(list) do if cv.env == env then be = cv.e end end end
+        local basev = (m.v and m.v['mod.baseline']) or 0.5
+        local kind = m.lfo and 'lfo' or 'acs'
+        local pname = (m.fxname or ''):sub(1, 8) .. ' / ' .. (m.pname or '?')
+        list[#list + 1] = { kind = kind, mod = m, name = (m.lfo and 'LFO · ' or 'ACS · ') .. pname, rgb = U.CYAN, write = false, points = {},
+          track = tr, env = nil, base_e = be,
+          eval = be and function(t) return edit.env_value(be, t) end or function() return basev end,
+          live = function() return reaper.TrackFX_GetParamNormalized(tr, m.fx, m.param) end }
+      end
+    end
     local nl = ctx.nmod_list and ctx.nmod_list()
     for _, sl in ipairs(nl and nl.slots or {}) do
       if sl.ai and sl.ai.env then add({ env = sl.ai.env, name = sl.label or 'note mod', min = sl.ai.min or 0, max = sl.ai.max or 1, key = 'env_item_pitch' }, 'note mod / ' .. (sl.label or '?')) end
@@ -12264,8 +12285,46 @@ ctx.acv_do = function(op, sp, curves)
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
   local act = curves[ACV.cur]
   if op.op == 'leave' then ctx.set_focus('tracker'); return end
-  if op.op == 'mod' or op.op == 'lfo' then vim.msg = 'modulation on the canvas: the modulation tab for now (next stage)'; return end
   if not act then vim.msg = 'canvas: no curve - Opt+A on a knob, or the cursor on an envelope lane'; return end
+  if op.op == 'mod' then
+    -- m / e: LFO / ACS параметра активной кривой (модуляционная — её параметр; огибающая FX — найти её параметр)
+    local col = cur_col(); local tr = act.track or (col and col.track)
+    local fx, param = act.mod and act.mod.fx, act.mod and act.mod.param
+    if not fx and tr and act.env then
+      for _, fa in ipairs(model.fx_addresses(tr)) do
+        for pi = 0, math.min(64, reaper.TrackFX_GetNumParams(tr, fa.fx)) - 1 do
+          if reaper.GetFXEnvelope(tr, fa.fx, pi, false) == act.env then fx, param = fa.fx, pi; break end
+        end
+        if fx then break end
+      end
+    end
+    if not fx then vim.msg = 'modulation: only FX parameters (track volume / pan have none) - Opt+A on a knob first'; return end
+    edit.mod_set(tr, fx, param, op.what)
+    ctx.acv_cc = nil
+    vim.msg = ('%s of the parameter %s - Tab to its curve: s t q r R n shape, [ ] speed, j k strength, w b phase'):format(op.what == 'lfo' and 'LFO' or 'audio follower', act.name)
+    return
+  end
+  if op.op == 'lfo' then
+    local m = act.mod
+    if not m then vim.msg = 'this curve has no modulation (m - LFO, e - audio follower)'; return end
+    local tr = act.track or (cur_col() and cur_col().track)
+    local v = m.v or {}
+    local cur = v[op.key] or 0
+    local nv
+    if op.val then nv = op.val
+    elseif op.mul then nv = math.max(0.0039, math.min(16, (cur > 0 and cur or 1) * op.mul))
+    else
+      nv = cur + op.d
+      if op.key == 'lfo.phase' then nv = nv % 1 else nv = math.max(0, math.min(1, nv)) end
+    end
+    edit.mod_field(tr, m.fx, m.param, op.key, nv)
+    ctx.acv_cc = nil
+    local shown = op.key == 'lfo.shape' and (ctx.ACV.LFO_NAMES[math.floor(nv)] or nv)
+      or (op.key == 'lfo.speed' and ((v['lfo.temposync'] or 0) >= 0.5 and ('%g / beat'):format(nv) or ('%.2f Hz'):format(nv)))
+      or ('%d%%'):format(math.floor(nv * 100 + 0.5))
+    vim.msg = ('%s: %s = %s'):format(act.name, op.key:gsub('^%w+%.', ''), tostring(shown))
+    return
+  end
   if act.write == false then vim.msg = 'canvas: this curve is view only'; return end
   local e = act.e
   local rowdur = math.max(1e-4, sp.time(ACV.row + 1) - sp.time(ACV.row))
@@ -12283,7 +12342,7 @@ ctx.acv_do = function(op, sp, curves)
     local n = edit.env_del_range(e, sp.time(a), sp.time(b))
     vim.msg = ('%s: %d point(s) removed (rows %d..%d)'):format(act.name, n, a, b - 1)
   elseif op.op == 'fill' then
-    local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 })
+    local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }, true)
     local level = edit.env_value(e, t)
     if level < 0.02 then level = 1 end                           -- кривая на нуле — форма во всю высоту
     if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end

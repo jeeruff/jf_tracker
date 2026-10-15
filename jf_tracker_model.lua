@@ -1004,7 +1004,7 @@ end
 -- ── модуляции параметров FX трека (нативные: LFO / ACS / plink) ──────────
 -- TrackFX_GetNamedConfigParm 'param.N.mod.active' и т.д. Считается в
 -- снимке (не каждый кадр); до 64 параметров на FX.
-M.MOD_KEYS = { 'mod.baseline', 'lfo.active', 'lfo.shape', 'lfo.speed', 'lfo.temposync', 'lfo.strength',
+M.MOD_KEYS = { 'mod.baseline', 'lfo.active', 'lfo.shape', 'lfo.speed', 'lfo.temposync', 'lfo.strength', 'lfo.phase', 'lfo.dir',   -- 15 окт: phase / dir — для холста
   'acs.active', 'acs.attack', 'acs.release', 'acs.strength', 'plink.active', 'plink.effect', 'plink.param',
   'plink.scale', 'plink.offset' }
 -- адреса всех FX трека, включая детей контейнеров (0x2000000…, v7.06+:

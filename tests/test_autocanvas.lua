@@ -38,6 +38,8 @@ ACV.row, ACV.grid = 6, 4
 local a, b = ACV.range(st); eq('cell range a', a, 4); eq('cell range b', b, 8)
 ACV.key(('v'):byte(), st); eq('v anchor', ACV.anchor, 6)
 ACV.row = 13; a, b = ACV.range(st); eq('v range a', a, 6); eq('v range b', b, 14)
+a, b = ACV.range(st, true); eq('v range snapped a', a, 6); eq('v range snapped b (whole cells)', b, 14)
+ACV.row = 11; a, b = ACV.range(st, true); eq('v range snapped up', b, 14)
 eq('Esc clears anchor', ACV.key(27, st), true); eq('anchor gone', ACV.anchor, nil)
 eq('Esc leaves', ACV.key(27, st).op, 'leave')
 -- LFO-кривая: те же клавиши правят LFO
@@ -72,8 +74,10 @@ lo, hi, v = ACV.lfo_band(mod, 0.25, 0.5); near('sin at 1/4', v, 0.7)
 mod.v['lfo.dir'] = 1; lo, hi = ACV.lfo_band(mod, 0, 0.5); near('dir up lo', lo, 0.5); near('dir up hi', hi, 0.9)
 mod.v['lfo.dir'] = -1; lo, hi = ACV.lfo_band(mod, 0, 0.9); near('dir down lo', lo, 0.5); near('dir down hi', hi, 0.9)
 mod.v['lfo.temposync'] = 1; mod.v['lfo.speed'] = 1; mod.v['lfo.dir'] = 0
-local _, _, v1 = ACV.lfo_band(mod, 0.125, 0.5, 2)   -- 2 удара/с, цикл = 1 доля (0.5 с): четверть цикла в 0.125 с
+local _, _, v1 = ACV.lfo_band(mod, 0.125, 0.5, 2)   -- 2 удара/с, speed 1 = цикл на долю (0.5 с): четверть цикла в 0.125 с
 near('temposync quarter cycle', v1, 0.7)
+mod.v['lfo.speed'] = 2; _, _, v1 = ACV.lfo_band(mod, 0.0625, 0.5, 2); near('temposync 2 per beat', v1, 0.7)
+local alo, ahi = ACV.mod_band({ kind = 'acs', mod = { v = { ['acs.strength'] = 0.3 } } }, 0, 0.5); near('acs band lo', alo, 0.5); near('acs band hi', ahi, 0.8)
 -- раскладка: легенда сбоку при ширине, строкой при узости; поле не выходит за w / h
 local L = { cw = 7, rh = 14, pad = 4 }
 local lay = ACV.layout(L, 600, 200, 3); eq('wide: side legend', lay.side, true); eq('wide: fits', lay.gx + lay.gw + lay.lw + L.pad <= 600, true); eq('wide: height', lay.gy + lay.gh <= 200, true)
