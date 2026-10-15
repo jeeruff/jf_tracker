@@ -3689,7 +3689,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local ky, kh = y + 2, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
       local held, last = p.held or {}, p.last
-      local white_c = U.mix(U.BG, U.TEXT, dim and 0.35 or 0.85)
+      local white_c = U.mix(U.BG, U.TEXT, dim and 0.22 or 0.85)   -- 15 окт: выкл — ещё тусклее (было 0.35)
       local function key_fill(off, base)
         if held[off] then return U.tint(U.AMBER, 0.75) end
         if off == last then return U.mix(base, U.AMBER, 0.35) end
@@ -3705,7 +3705,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- неё картинка текста ×2 складывается с фоном, и тёмное пропадало
           local kf = key_fill(k[1], white_c)
           local lb = D.key_label and D.key_label(k[2]) or k[2]               -- русская раскладка — кириллицей (5 окт)
-          text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, U.readable(U.BG, kf, dim and 3.0 or 4.5), kf)
+          text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, U.readable(U.BG, kf, dim and 2.0 or 4.5), kf)
           out.letters = out.letters + 1
         end
       end
@@ -3717,7 +3717,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
         out.black = out.black + 1
         if letters and bw >= ms('W') + 2 then
-          text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], U.readable(U.TEXT, fill, 4.5))
+          text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5))
           out.letters = out.letters + 1
         end
       end
