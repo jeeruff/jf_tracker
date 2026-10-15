@@ -12181,6 +12181,8 @@ draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 о�
 local function hint_go(t)
   if ctx.jump_mark then ctx.jump_mark() end         -- 9 окт: f-прыжок — в список прыжков (Ctrl+O назад)
   local d = t.data
+  -- 15 окт: прыжок не на фейдер — режим FADE прежнего фейдера снят (f на take volume крутил громкость канала)
+  if not (t.kind == 'trs' or t.kind == 'trsbtn' or (t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar'))) then state.kslider = nil end
   if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда
   elseif t.kind == 'fxbbtn' then                                   -- 9 окт: fx list — папка / * / поиск
     ctx.set_focus('fxb')
