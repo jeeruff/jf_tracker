@@ -10144,8 +10144,9 @@ ctx = {
       { key = 'hintpos', label = 'hints where', kind = 'cycle', values = { 'tabs', 'panes', 'status' }, desc = 'key hints (option hints on): tabs - in the tab row of every module, right of its name (the tracker keeps its row below); panes - a row under every module; status - one big row at the bottom for the focused module (hover it: all the keys)', get = function() return state.hintpos or 'tabs' end, set = function(v) state.hintpos = v; relayout() end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
-      { key = 'keysrenoise', label = 'keys: renoise', kind = 'toggle', desc = 'note keys as in Renoise: two octaves at once - the bottom row z s x d c ... is the cursor octave, the top row q 2 w 3 e ... an octave higher; in INSERT those letters are notes (octave - [ ], move - arrows). Off - one top row (Ableton), the bottom rows control',
-        get = function() return keys.renoise end, set = function(v) keys.set_renoise(v); reaper.SetExtState(EXT, 'keysrenoise', v and '1' or '0', true); draw.piano_layout(keys.renoise) end },
+      -- 15 окт: двухрядная раскладка renoise — пока выключена (пользователь: «от лукавого»): одна строка q2w3e, октава z x
+      -- { key = 'keysrenoise', label = 'keys: renoise', kind = 'toggle', desc = 'note keys as in Renoise: two octaves at once - the bottom row z s x d c ... is the cursor octave, the top row q 2 w 3 e ... an octave higher; in INSERT those letters are notes (octave - [ ], move - arrows). Off - one top row (Ableton), the bottom rows control',
+      --   get = function() return keys.renoise end, set = function(v) keys.set_renoise(v); reaper.SetExtState(EXT, 'keysrenoise', v and '1' or '0', true); draw.piano_layout(keys.renoise) end },
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
@@ -12629,7 +12630,8 @@ ctx.ut_key = function(c)
   if n then vim.msg = ('%s%s'):format((n.label or ''):gsub('^jf_tracker: ', ''), (n.live and '') or (n.snap and '  (another branch - Enter restores its snapshot)' or '  (another branch, no snapshot)')) end
   return true
 end
-if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
+-- if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
+-- 15 окт: опция выключена — раскладка всегда одна строка q2w3e, октава z x
 if reaper.GetExtState(EXT, 'hint_tabs15') ~= '1' then if state.hintpos == 'panes' then state.hintpos = 'tabs' end; reaper.SetExtState(EXT, 'hint_tabs15', '1', true) end   -- 15 окт: подсказки в строку вкладок — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
