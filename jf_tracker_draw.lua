@@ -68,6 +68,11 @@ function D.init(u, peaks_fn, matrix)
   D.SEPW  = 2                                   -- толщина границ модулей (3 окт: жирнее), линии внутри модулей — 1 px
   D.FOCUS = U.mix(U.TEXT, { 1, 1, 1 }, 0.55)    -- светлый ободок модуля с фокусом (просьба 1 окт: без розового)
   D.FOCUS_INS = { 1.0, 0.15, 0.1 }              -- та же рамка в INSERT (красная, толще)
+  -- 15 окт: цвет режима — рамка поля и слово режима: NORMAL белый, INSERT красный, VISUAL янтарный, ввод команды голубой
+  local function cp(c) return { c[1], c[2], c[3] } end   -- копия: своя запись в D.KEEP, не весь янтарь цветной в mono
+  D.MODE_COL = { normal = { 1, 1, 1 }, insert = D.FOCUS_INS, visual = cp(U.AMBER), vline = nil, cmd = cp(U.CYAN), search = nil }
+  D.MODE_COL.vline, D.MODE_COL.search = D.MODE_COL.visual, D.MODE_COL.cmd
+  D.REC = cp(U.RED)                               -- 15 окт: O записи (rec, ^O) — красное и в mono
   D.ENVLINE = U.readable(U.CYAN, U.BG, 4.5)
   -- фон шапки трека (3 окт): как TCP REAPER — col_tr1_bg темы, выделенный —
   -- col_seltrack; цвет трека подмешивается так же (~30 %, сверено по TCP)
@@ -102,7 +107,8 @@ function D.init(u, peaks_fn, matrix)
   end
   D.ARM_T, D.FXG_T = U.mix(U.PANEL, D.ARM, 0.55), U.mix(U.PANEL, D.FXG, 0.85)
   D.FXTXT = { 0.94, 1.0, 0.90 }                -- светлый текст на зелёном, как FX в REAPER
-  D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true }
+  D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true,
+             [D.MODE_COL.visual] = true, [D.MODE_COL.cmd] = true, [D.REC] = true }   -- 15 окт: цвета режимов и O записи
   D.CURCELL = U.MONO_CURSOR or U.TEXT
   U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
@@ -3466,14 +3472,14 @@ function D.transport_buttons(c)
     -- 9 окт: кнопки как на кассетнике — сверху символ, снизу слово; [5] — символ
     return { { 'tp_rew', 'rew', nil, nil, '<<' }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil, nil, '||' },
              { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil, nil, playing and '[]' or '>' },
-             { 'rec', 'rec', c.recording and U.RED or nil, U.RED, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' },
+             { 'rec', 'rec', c.recording and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' },
              { 'loop', 'loop', c.loop and U.CYAN or nil, nil, D.ttf and '∞' or 'oo' } }
   end
   if not c.tpbuttons then
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
   end
   return { { 'tp_rew', '<<' }, { 'tp_play', '>', playing and U.GREEN or nil },
-           { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'O', c.recording and U.RED or nil, U.RED },
+           { 'tp_pause', '||', ps & 2 == 2 and U.AMBER or nil }, { 'rec', 'O', c.recording and D.REC or nil, D.REC },
            { 'tp_fwd', '>>' }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
 end
 -- 11 окт: вторая строка full-транспорта, по колонкам кнопок: rew | pause | play | rec | ff | loop
@@ -3854,7 +3860,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           set(fr2); gfx.rect(sx, sy, tbw, L.rh, 0)
           if si == 1 then cut(sx, sy + L.rh - 1, 1, -1, fr2) end
           if si == #sub then cut(sx + tbw - 1, sy + L.rh - 1, -1, -1, fr2) end
-          text(sx + math.floor((tbw - ms(b[2])) / 2), sy, fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY))
+          -- 15 окт: |<< прижат влево, >>| вправо (к своему краю); у ^O буква O — красная, как у rec
+          local lab, lc = fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
+          local tx = sx + math.floor((tbw - ms(lab)) / 2)
+          if b[1] == 'tp_start' then tx = sx + L.pad elseif b[1] == 'tp_end' then tx = sx + tbw - L.pad - ms(lab) end
+          if b[1] == 'shiftrec' and lab == '^O' then
+            text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC)
+          else text(tx, sy, lab, lc) end
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tbw, L.rh, b[1])
         end
@@ -4093,7 +4105,10 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
   if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-  local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
+  -- 15 окт: цвет режима (D.MODE_COL), как у рамки поля; модуль в фокусе (LIB, UNDO…) — янтарный
+  local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal' }
+  local mk = MK[mode:match('^[%u%-]+') or '']
+  local col = mk and D.MODE_COL[mk] or U.AMBER
   local dx = sx0
   local sy = sy0
   local tr = D.modefont and D.MODE_SCRIPT[D.modefont]
@@ -7981,19 +7996,12 @@ function D.frame(L, snap, rows, state, info)
     local f = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
     local rects = D.module_rects or {}
     local r = rects[f]
-    if f == 'tracker' and D.trk_field then r = D.trk_field end   -- 15 окт: рамка — вокруг поля с курсором, не всего модуля
+    -- 15 окт: фокус и режим — разные рамки: фокус (куда идут клавиши) — вокруг всего модуля, как у всех;
+    -- режим INSERT (клавиши пишут в проект) — красная вокруг поля строк, где пишутся ноты
+    local ins = info.vmode == 'insert' and info.focus == 'tracker'
     if r then
-      -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
-      local ins = info.vmode == 'insert' and info.focus == 'tracker'
-      set(ins and D.FOCUS_INS or D.FOCUS)
-      -- 8 окт: ободок внутри модуля (на пиксель внутрь): общая линия с соседом
-      -- остаётся серой — видно, какой из двух соседних активен; INSERT — 2 px
-      -- 10 окт: рамка — по самой границе модуля, второй пиксель INSERT — наружу (на линию-разделитель):
-      -- внутри (на 1-2 px) она ложилась на содержимое — кнопку R крайнего трека
-      -- 15 окт: снова 1 px (INSERT — 2): толстая рамка закрывала края растягивания панелей
-      gfx.rect(r[1], r[2], r[3], r[4], 0)
-      if ins then gfx.rect(r[1] - 1, r[2] - 1, r[3] + 2, r[4] + 2, 0) end
-      -- 15 окт: опция dim unfocused — остальные модули слегка притушены
+      -- 15 окт: опция dim unfocused — остальные модули слегка притушены; до рамок — иначе тень ложилась
+      -- на рамку там, где прямоугольник соседа перекрывает трекер (пропадала верхняя кромка)
       if state.dimfocus then
         local seen = { [table.concat(r, ',')] = true }
         for k, r2 in pairs(rects) do
@@ -8001,6 +8009,19 @@ function D.frame(L, snap, rows, state, info)
           if k ~= f and not seen[key] and r2[3] > 0 and r2[4] > 0 then seen[key] = true; gfx.set(0, 0, 0, 0.22); gfx.rect(r2[1], r2[2], r2[3], r2[4], 1) end
         end
         gfx.a = 1
+      end
+      set(D.FOCUS)
+      -- 8 окт: ободок внутри модуля (на пиксель внутрь): общая линия с соседом
+      -- остаётся серой — видно, какой из двух соседних активен; INSERT — 2 px
+      -- 10 окт: рамка — по самой границе модуля, второй пиксель INSERT — наружу (на линию-разделитель):
+      -- внутри (на 1-2 px) она ложилась на содержимое — кнопку R крайнего трека
+      -- 15 окт: снова 1 px (INSERT — 2): толстая рамка закрывала края растягивания панелей
+      gfx.rect(r[1], r[2], r[3], r[4], 0)
+      -- рамка режима: поле строк трекера в цвете режима (D.MODE_COL); INSERT — 2 px
+      local tf = info.focus == 'tracker' and not info.mixfocus and D.trk_field
+      if tf then
+        set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(tf[1], tf[2], tf[3], tf[4], 0)
+        if ins then gfx.rect(tf[1] + 1, tf[2] + 1, tf[3] - 2, tf[4] - 2, 0) end
       end
       -- 15 окт: опция focus beacon — фокус перешёл в модуль: рамка вспыхивает и стягивается к нему за 0.4 с
       local now = reaper.time_precise()

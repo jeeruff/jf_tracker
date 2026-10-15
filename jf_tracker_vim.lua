@@ -2880,14 +2880,16 @@ function V.open_prompt(pre, text)
   V.prompt = { pre = pre, pos = utf8.len(text or '') or #(text or ''), fresh = true }
 end
 function V.status()
-  local m = ({ normal = V.piano and '-- KEYS --' or '', insert = '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
+  local m = ({ normal = '', insert = '-- INSERT --', visual = '-- VISUAL --', vline = '-- V-LINE --',
                cmd = V.prompt and 'rename' or (':' .. (V.cmdline or '')), search = '/' .. (V.searchline or '') })[V.mode] or ''
   local extra = ''
   if V.macro then extra = ' rec@' .. V.macro.name end
   if V.pending then extra = extra .. ' ' .. V.pending end
   if V.hexbuf then extra = extra .. ' [' .. V.hexbuf .. '_]' end
   if V.count then extra = extra .. ' ' .. V.count end
-  return m .. extra, ('oct %d vel %d step %s inst %d'):format(V.octave, V.vel or 100, V.step_next and 'next' or (V.step_auto and 'auto' or tostring(V.step)), V.inst)
+  -- 15 окт: KEYS — не режим (видимая клавиатура), убран; набранное (d, 3, [E_], rec@) — третьим значением,
+  -- в статус, не в слово режима
+  return m, ('oct %d vel %d step %s inst %d'):format(V.octave, V.vel or 100, V.step_next and 'next' or (V.step_auto and 'auto' or tostring(V.step)), V.inst), (extra:gsub('^%s+', ''))
 end
 
 -- обёртка: оператор, начатый из INSERT (d…), по завершении возвращает в INSERT

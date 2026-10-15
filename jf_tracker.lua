@@ -15354,7 +15354,7 @@ local function frame()
   -- статус-бар: слева только то, чего нет в контрол-блоке сверху (режим Vim,
   -- набранные клавиши, фокус, очередь, сообщение); остальное — описание того,
   -- на что наведена мышь (state.status)
-  local mode = vim.status()
+  local mode, _, typed = vim.status()   -- 15 окт: набранное — в статус, не в слово режима
   local left = mode ~= '' and mode or (state.focus ~= 'tracker' and '' or 'NORMAL')
   -- 8 окт: фокус в клипах — свой режим SESSION (клавиатура запускает клипы),
   -- не KEYS: слой пианино тут не действует
@@ -15364,6 +15364,7 @@ local function frame()
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
     left = ((pe and pe.label) or state.focus):upper() .. (state.focus == 'top' and (':' .. state.toptab) or '')
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
+  if typed and typed ~= '' then left = left .. ' | ' .. typed end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
