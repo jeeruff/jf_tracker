@@ -3622,28 +3622,24 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 12 окт: velocity — под клавиатурой, третьей строкой (c - тише, C - громче, как z x для октавы)
     if cc.tpfull then
       local vy = ly + 2 * L.rh + 2
-      local vl = ('vel %d'):format(cc.vel or 100)
-      local vw = math.max(ms(vl), ms('vel 127'))
-      local vhot = mx >= x + L.pad - 2 and mx < x + L.pad + vw + 2 and my >= vy and my < vy + L.rh
-      if vhot then set(D.CURROW); gfx.rect(x + L.pad - 2, vy, vw + 4, L.rh, 1); hover.ctrl = 'vel' end
-      text(x + L.pad, vy, vl, vhot and U.AMBER or (dim and U.GREY or U.AMBER))   -- 15 окт: как oct — одним цветом
-      hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
+      -- 15 окт: vel — как oct: подпись вертикально, число крупно (×2) на две строки, справа слайдер
+      local vs = tostring(cc.vel or 100)
+      local vw = L.th + L.pad + math.max(D.big_measure(vs, 2), D.big_measure('127', 2))
+      local vh = 2 * L.rh
+      local vhot = mx >= x + L.pad - 2 and mx < x + L.pad + vw + 2 and my >= vy and my < vy + vh
+      if vhot then set(D.CURROW); gfx.rect(x + L.pad - 2, vy, vw + 4, vh, 1); hover.ctrl = 'vel' end
+      D.vtext(x + L.pad, vy, vh, 'vel', U.GREY, vhot and D.CURROW or U.PANEL)
+      D.big_text(x + L.pad + L.th + L.pad, vy, vs, vhot and U.AMBER or (dim and U.GREY or U.AMBER), 2)
+      hint('ctrl', x + L.pad, vy, vw, vh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
-      -- 15 окт: рядом с vel — слайдер 1..127 (тянуть), клавиши — строкой ниже, под vel
       local bx = x + L.pad + vw + 2 * L.pad
       local bw = math.max(L.cw * 6, math.min(L.cw * 16, kx + (#D.PIANO_WHITE) * L.cw * 2 - bx))
-      local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
-      U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
+      local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + vh
+      U.dslider(bx, vy + math.floor(vh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
       if bhot then hover.ctrl = 'velbar' end
       hint('ctrl', bx, vy, bw, L.rh, 'velbar')
       D.strip_cell.velbar = { bx, vy, bw }
-      -- 15 окт: клавиши октавы и velocity — одной строкой (клавиши — тише, подписи — третьим уровнем)
-      local hx = x + L.pad
-      -- только при hints: иначе клавиши и так видны в статусе при наведении
-      for _, kv in ipairs(cc.hints and { { zx, 'oct' }, { D.PIANO_RENOISE and '{- }+' or 'c- C+', 'vel' } } or {}) do
-        text(hx, vy + L.rh + 2, kv[1], U.GREY); hx = hx + ms(kv[1]) + L.pad
-        text(hx, vy + L.rh + 2, kv[2], U.DIM); hx = hx + ms(kv[2]) + 3 * L.pad
-      end
+      -- 15 окт: строки клавиш oct / vel нет — при наведении они в статусе (vel крупно занял две строки)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
