@@ -3503,14 +3503,19 @@ function D.transport_groups(c)
   local stxt = tostring(c.step or 0)
   local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2))
   local col2, col3 = 'pitch resample', 'human 100%'
-  g[#g + 1] = { boxed = true, bracket = 'step',
+  g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
                 { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
                   { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
-  if c.tpfull then table.insert(g[#g], lsn)
+  -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
+  if c.tpfull then
+    table.insert(g[#g], { { '_steplab', 'step', U.GREY } })
+    local row4 = { { 'listen', 'listen', U.GREY } }
+    for _, it in ipairs(lsn) do row4[#row4 + 1] = it end
+    table.insert(g[#g], row4)
   else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
   -- запись (5 окт): рядом с метрономом
   -- транспорт и запись (5 окт): кнопки [<<][>][II][o][>>], под ними метроном,
@@ -3708,7 +3713,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       for _, it in ipairs(row) do
         local iw = cw_of(it)
         local ih = it.big and (2 * L.rh) or L.rh
-        local hot = it[1] ~= '_' and cell_hot(cx, cy, iw, ih)
+        local hot = it[1]:sub(1, 1) ~= '_' and cell_hot(cx, cy, iw, ih)
         if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, ih, 1); hover.ctrl = it[1] end
         if it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
         elseif it[1] ~= '_' then text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT)) end
