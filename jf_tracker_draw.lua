@@ -4103,6 +4103,7 @@ local MW = {
   VIDEO      = { 'ВИДѢНІЕ',         '视频',       'فيديو',            'mIllogh' },
   VISOR      = { 'ЗЕРЦАЛО',         '视觉',       'مرئيات',           'legh' },
   TOP        = { 'ВЕРХЪ',           '顶部',       'أعلى',             'Dung' },
+  REAPER     = { 'ЖНЕЦЪ',           '收割者',     'حاصد',             "HoHwI'" },   -- 15 окт: клавиши у REAPER (окно без фокуса)
 }
 -- pIqaD (CSUR U+F8D0…): клингонская латиница → знаки; tlh ch gh ng — один знак
 local function klingon(w)
