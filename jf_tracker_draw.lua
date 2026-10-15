@@ -34,6 +34,7 @@ function D.init(u, peaks_fn, matrix)
   U.textc = function(x, y, w, str, col) D.text(x + (w - ms(str)) / 2, y, str, col) end
   U.textr = function(x, y, w, str, col) D.text(x + w - ms(str), y, str, col) end
   U.measure, U.texth = ms, TH
+  U.hint_text, U.hint_colors = D.hint_text, D.hint_colors   -- 15 окт: стандарт подсказок для модулей
   -- контраст ярче: текст тянем к 7:1 (U — копия модуля, jf_looper не трогаем)
   U.TEXT = U.readable(U.TEXT, U.BG, 7.0)
   U.GREY = U.mix(U.TEXT, U.BG, 0.40)
@@ -1600,6 +1601,35 @@ function D.route_strip(L, info, hover, x0, x1)
 end
 
 D.PANE_KEYS = { { 'Cmd+hjkl', 'panel' }, { 'Cmd+Shift+hjkl', 'move' }, { 'Ctrl+W', 'panes' }, { 'F2', 'tracker' }, { '?', 'help' } }
+-- 15 окт: стандарт подсказок ВЕЗДЕ (активный модуль или нет): клавиша — акцентным цветом на 75 %,
+-- описание — текстом на 60 % (тускло, но читаемо); на фоне bg, с проверкой контраста
+function D.hint_colors(bg)
+  bg = bg or U.PANEL
+  return U.readable(U.mix(bg, U.AMBER, 0.75), bg, 3.0), U.readable(U.mix(bg, U.TEXT, 0.60), bg, 3.0)
+end
+-- строка подсказок одной строкой: куски через 2+ пробела; «клавиша: что» — по двоеточию,
+-- иначе последнее слово — что, остальное — клавиши («q whole», «2 w 3 e ... slices»)
+function D.hint_text(x, y, s, maxw, bg)
+  local kc, dc = D.hint_colors(bg)
+  local cx, x1 = x, x + (maxw or 1e9)
+  local sp = ms(' ') > 0 and ms(' ') or 4
+  for raw in (s .. '  '):gmatch('(.-)%s%s+') do
+    local chunk = raw:gsub('^%s+', '')
+    if chunk ~= '' then
+      local k, d = chunk:match('^(.-):%s*(.*)$')
+      if not k then k, d = chunk:match('^(.*)%s(%S+)$') end
+      if not k then k, d = chunk, '' end
+      local kw, dw = ms(k), (d ~= '' and ms(d) or 0)
+      if cx + kw > x1 then break end
+      text(cx, y, k, kc)
+      if d ~= '' then
+        if cx + kw + sp + dw > x1 then text(cx + kw + sp, y, D.fit(d, x1 - cx - kw - sp), dc); break end
+        text(cx + kw + sp, y, d, dc)
+      end
+      cx = cx + kw + (d ~= '' and (sp + dw) or 0) + 2 * sp
+    end
+  end
+end
 function D.hint_bar(L, x, y, w, items, active)
   if not L.hint_h or L.hint_h <= 0 or not items or w <= 0 then return end
   set(U.PANEL); gfx.rect(x, y, w, L.hint_h, 1)
@@ -1611,8 +1641,9 @@ function D.hint_bar(L, x, y, w, items, active)
   for _, it in ipairs(items) do
     local kw, dw = ms(it[1]), ms(it[2])
     if cx + kw + sp + dw > x + w - L.pad then break end
-    text(cx, y + 1, it[1], active and U.AMBER or U.GREY)
-    text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.GREY)
+    local kc, dc = D.hint_colors(U.PANEL)
+    text(cx, y + 1, it[1], kc)
+    text(cx + kw + sp, y + 1, it[2], dc)
     cx = cx + kw + sp + dw + 2 * sp
   end
 end
@@ -3491,8 +3522,9 @@ function D.strip_hints(L, x, y, w, active)
     for _, it in ipairs(cl[3]) do
       local kw, dw = ms(it[1]), ms(it[2])
       if cx + kw + sp + dw > x1 then break end
-      text(cx, y + 1, it[1], active and U.AMBER or U.GREY)
-      text(cx + kw + sp, y + 1, it[2], active and U.TEXT or U.mix(U.GREY, U.PANEL, 0.25))
+      local kc, dc = D.hint_colors(U.PANEL)
+      text(cx, y + 1, it[1], kc)
+      text(cx + kw + sp, y + 1, it[2], dc)
       cx = cx + kw + sp + dw + 2 * sp
     end
   end

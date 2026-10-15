@@ -1462,7 +1462,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.text(x + 4, zy + 1, zs, U.GREY)
     end
     if ctx.hints_on and ctx.hints_on() and ZH > 3 * rh then
-      U.text(x + 4, zy + ZH - rh - 1, ctx.fit(zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8), U.GREY)
+      U.hint_text(x + 4, zy + ZH - rh - 1, zk and 'drag: fine move   wheel: wider / closer' or 'wheel: wider / closer', w - 8, U.BG)
     end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
@@ -1571,7 +1571,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
       end
     end
-    U.text(x, fy, ctx.fit(foot, math.max(0, bx - x - L.pad)), U.GREY)   -- 10 окт: подсказка — приглушённо
+    if foot ~= S.msg and U.hint_text then U.hint_text(x, fy, foot, math.max(0, bx - x - L.pad), U.PANEL)   -- 15 окт: стандарт подсказок
+    else U.text(x, fy, ctx.fit(foot, math.max(0, bx - x - L.pad)), U.GREY) end   -- 10 окт: подсказка — приглушённо
   end
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end

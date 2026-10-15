@@ -529,7 +529,11 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  if not O.compact then U.text(hx, by + 2, ctx.fit((#O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'), bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad), U.GREY) end   -- до крестика
+  if not O.compact then
+    local hs = #O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'
+    local hw = bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad   -- до крестика
+    if U.hint_text then U.hint_text(hx, by + 2, hs, hw, U.BG) else U.text(hx, by + 2, ctx.fit(hs, hw), U.GREY) end   -- 15 окт: стандарт подсказок
+  end
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- вкладки (5 окт) и поле поиска справа; не влезают — по ширине, до поиска
