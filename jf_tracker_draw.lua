@@ -7318,7 +7318,7 @@ function D.frame(L, snap, rows, state, info)
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
-        text(bxc + L.pad, py, fit(p.name, nw - L.pad), psel and U.AMBER or U.TEXT)
+        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)   -- 15 окт: ~ автоматизирован, % модулирован (знак после обрезки имени)
         if vw > 4 and not steps_inline then
           -- 10 окт: вид значения из реестра (RS5K): нота именем, root — нота оригинала, канал 0 — all
           local vs = v.s
@@ -7348,7 +7348,7 @@ function D.frame(L, snap, rows, state, info)
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
         -- 14 окт: SLIDER (Ctrl+Cmd) — параметры колонки устройства одной группой
-        if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, x = bxc + L.pad, y = py, w = pw, h = L.rh } end
+        if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
         ::next_param::
       end
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе

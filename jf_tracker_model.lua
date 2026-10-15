@@ -1521,6 +1521,16 @@ function M.track_midilanes(tr, lpb, guid)
     for r in pairs(l.ev) do l.rows[#l.rows + 1] = r end
     table.sort(l.rows)
   end
+  -- 15 окт: пометки у параметров: ~ есть огибающая (автоматизация), % модулируется (LFO / ACS / link)
+  for _, e in ipairs(out) do
+    for _, p in ipairs(e.params or {}) do
+      local fx = p.fx or e.i
+      local okm, act = A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i))
+      p.auto = R.GetFXEnvelope and R.GetFXEnvelope(tr, fx, p.i, false) ~= nil or false
+      p.mod = okm and act == '1' or false
+      p.mk = (p.auto and ' ~' or '') .. (p.mod and ' %' or '')
+    end
+  end
   return out
 end
 

@@ -529,7 +529,7 @@ KH.PAGES = {
     { k = 'v', d = 'anchor: the range from here to the cursor; Esc - off' },
     { k = 'f r R s t q n', d = 'fill the range (or the grid cell under the cursor) with a shape per cell: flat, ramp up, ramp down, sine, triangle, square, noise; the height - the curve value at the cursor (0 - full); n again - another noise' },
     { k = '[ ]', d = 'grid finer / coarser (1 row .. a bar)' },
-    { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, then every envelope of the track, then note mod slots; a click on the legend too' },
+    { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, every envelope of the track, the take envelopes of the samples selected in the lib (v there) and the envelopes of their tracks, note mod slots, LFO / ACS curves; a click on the legend too' },
     { k = 'w b', d = 'next / previous point of the active curve' },
     { k = 'm e', d = 'LFO / audio follower of the active parameter on / off: it appears as its own curve (LFO · name) - the band is its swing around the automation, the thin line the predicted wave; with it active: s t q r R n shape, [ ] speed (x2, tempo sync: cycles per beat), j k strength, w b phase. A green dot while playing - the real value' },
     { k = 'P', d = 'the params page (from there L - the generator); on the canvas L is a grid step' },

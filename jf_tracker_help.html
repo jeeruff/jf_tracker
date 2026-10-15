@@ -327,7 +327,7 @@ that belong to the notes, so it sits under the LFO like any envelope. In a word:
 around it.</i></p>
 <h3>The canvas (automation tab → <code>curve</code>, <kbd>C</kbd>)</h3>
 <p>The curves of the cursor track over the bar at the cursor (or the cursor region, or the time selection): one is active and bright,
-the rest are dim — the lane under the cursor first, then every envelope of the track, then the note mod slots. <kbd>Tab</kbd> walks
+the rest are dim — the lane under the cursor first, then every envelope of the track, the take envelopes of the samples selected in the lib (<kbd>v</kbd> there — several items side by side), the note mod slots and the modulation curves. <kbd>Tab</kbd> walks
 through them, a click on the legend too. The cursor of the canvas is the cursor of the tracker: <kbd>h</kbd> <kbd>l</kbd> move it a
 row, <kbd>H</kbd> <kbd>L</kbd> a grid cell, and the tracker follows.</p>
 <table>
@@ -345,6 +345,7 @@ around the curve, and with that curve active the same keys shape it — <kbd>s</
 <kbd>n</kbd> the LFO shape, <kbd>[</kbd> <kbd>]</kbd> its speed, <kbd>j</kbd> <kbd>k</kbd> its strength, <kbd>w</kbd> <kbd>b</kbd> its
 phase. A green dot while it plays is the real value of the parameter — automation and modulation together</td></tr>
 </table>
+<p>In the DSP a parameter name carries <code>~</code> when it has an envelope and <code>%</code> when it is modulated, so you see at a glance what moves.</p>
 <p>The other pages stay: <kbd>P</kbd> params — every parameter of the track with ENV / ARM / MOD at a glance; <kbd>L</kbd> curves —
 the generator (LFO, podkat, follow) that writes a whole curve into the envelope or a new automation item; the item editor for
 automation items with its own grid tools.</p>

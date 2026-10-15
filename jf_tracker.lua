@@ -12200,7 +12200,7 @@ ctx.acv_curves = function(sp)
   local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
   local tgt = ctx.lfo_target()
   local col = cur_col()
-  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst)
+  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0)
   if ctx.acv_cc and ctx.acv_cc.key == key then return ctx.acv_cc.list end
   local list, seen = {}, {}
   local PAL = { U.CYAN, U.AMBER, U.RED, U.TEXT }
@@ -12243,6 +12243,40 @@ ctx.acv_curves = function(sp)
           track = tr, env = nil, base_e = be,
           eval = be and function(t) return edit.env_value(be, t) end or function() return basev end,
           live = function() return reaper.TrackFX_GetParamNormalized(tr, m.fx, m.param) end }
+      end
+    end
+    -- 15 окт: выделение в lib (v) — огибающие take выбранных сэмплов (время take от начала отрезка)
+    -- и огибающие треков, где они стоят
+    if IK.anchor and sp then
+      local a, b = IK.range(vim.inst)
+      for i = a, math.min(b, #(col.pool or {})) do
+        local pe = col.pool[i]
+        if pe and pe.item and reaper.ValidatePtr(pe.item, 'MediaItem*') then
+          local pos = reaper.GetMediaItemInfo_Value(pe.item, 'D_POSITION')
+          local tk = reaper.GetActiveTake(pe.item)
+          local rate = tk and reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') or 1
+          if not rate or rate <= 0 then rate = 1 end
+          for _, te in ipairs(ctx.take_envs(pe.item)) do
+            if not seen[te.env] then
+              seen[te.env] = true
+              local ee = { env = te.env, name = te.envname or 'take', min = te.min or 0, max = te.max or 1, key = 'env_item_vol' }
+              local t2e = function(t) return (t - sp.t0) * rate end
+              local e2t = function(tt) return sp.t0 + tt / rate end
+              local pts = {}
+              for _, p in ipairs(te.pts or {}) do
+                local span2 = (ee.max - ee.min); pts[#pts + 1] = { e2t(p[1]), span2 > 0 and (p[2] - ee.min) / span2 or 0 }
+              end
+              local ii = #list + 1
+              list[ii] = { kind = 'take', e = ee, env = te.env, name = (pe.name or 'item') .. ' / ' .. (te.envname or 'take'), rgb = U.mix(U.AMBER, PAL[ii % #PAL + 1], 0.4),
+                write = true, t2e = t2e, e2t = e2t, points = pts, eval = function(t) return edit.env_value(ee, t2e(t)) end }
+            end
+          end
+          for _, tn in ipairs(pe.tracks or {}) do
+            for _, c2 in ipairs(snap and snap.cols or {}) do
+              if c2.name == tn then for _, e2 in ipairs(c2.envs or {}) do add(e2, tn .. ' / ' .. (e2.name or 'env')) end end
+            end
+          end
+        end
       end
     end
     local nl = ctx.nmod_list and ctx.nmod_list()
@@ -12327,9 +12361,10 @@ ctx.acv_do = function(op, sp, curves)
   end
   if act.write == false then vim.msg = 'canvas: this curve is view only'; return end
   local e = act.e
-  local rowdur = math.max(1e-4, sp.time(ACV.row + 1) - sp.time(ACV.row))
+  local t2e = act.t2e or function(x) return x end        -- огибающая take — время take
+  local rowdur = math.max(1e-4, t2e(sp.time(ACV.row + 1)) - t2e(sp.time(ACV.row)))
   local tol = math.min(0.02, rowdur / 2)
-  local t = sp.time(ACV.row)
+  local t = t2e(sp.time(ACV.row))
   if op.op == 'nudge' then
     edit.env_nudge(e, t, op.d, tol)
     vim.msg = ('%s: %d%% at row %d'):format(act.name, math.floor(edit.env_value(e, t) * 100 + 0.5), ACV.row)
@@ -12339,7 +12374,7 @@ ctx.acv_do = function(op, sp, curves)
   elseif op.op == 'del' then
     local a, b = ACV.row, ACV.row + 1
     if ACV.anchor then a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }); ACV.anchor = nil end
-    local n = edit.env_del_range(e, sp.time(a), sp.time(b))
+    local n = edit.env_del_range(e, t2e(sp.time(a)), t2e(sp.time(b)))
     vim.msg = ('%s: %d point(s) removed (rows %d..%d)'):format(act.name, n, a, b - 1)
   elseif op.op == 'fill' then
     local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }, true)
@@ -12348,8 +12383,8 @@ ctx.acv_do = function(op, sp, curves)
     if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end
     local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
     local pts = {}
-    for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do pts[#pts + 1] = { t = sp.time(p.row), v = raw(p.v), shape = p.shape } end
-    edit.env_put_points(e, sp.time(a), sp.time(b), pts)
+    for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do pts[#pts + 1] = { t = t2e(sp.time(p.row)), v = raw(p.v), shape = p.shape } end
+    edit.env_put_points(e, t2e(sp.time(a)), t2e(sp.time(b)), pts)
     ACV.anchor = nil
     vim.msg = ('%s: %s on rows %d..%d, grid %s, %d point(s)'):format(act.name, op.shape, a, b - 1, ACV.grid_label(ACV.grid, state.lpb), #pts)
   elseif op.op == 'point' then
