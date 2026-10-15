@@ -124,6 +124,14 @@ function ACV.key(c, st, mods)
   local r0, r1 = st.r0 or 0, st.r1 or (st.r0 or 0) + 16
   local lfo = st.kind == 'lfo' or st.kind == 'acs'
   local function clamp_row() ACV.row = math.max(r0, math.min(r1 - 1, ACV.row)) end
+  -- 15 окт: zp — весь проект / отрезок (такт, регион, time selection)
+  if ACV.zpend then
+    ACV.zpend = nil
+    if ch == 'p' then ACV.proj = not ACV.proj; return true end
+    if c == 27 then return true end
+    return false
+  end
+  if ch == 'z' then ACV.zpend = true; return true end
   if c == 27 then
     if ACV.anchor then ACV.anchor = nil; return true end
     return { op = 'leave' }
@@ -209,9 +217,10 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   -- сетка: клетки тускло, такты ярче; уровни 25 / 50 / 75
   local bar = (span.lpb or 4) * 4
   local g = math.max(1, ACV.grid)
+  local dense = gw / nr * g < 3                                  -- проект целиком: клетки сливаются — только такты
   for row = r0, r1 - 1 do
     local d = row - r0
-    if d % g == 0 then U.set(U.mix(U.LINE, U.BG, (d % bar == 0) and 0.2 or 0.6)); gfx.rect(rx(row), gy, 1, gh, 1) end
+    if d % g == 0 and (not dense or d % bar == 0) then U.set(U.mix(U.LINE, U.BG, (d % bar == 0) and 0.2 or 0.6)); gfx.rect(rx(row), gy, 1, gh, 1) end
   end
   U.set(U.mix(U.LINE, U.BG, 0.65))
   for _, f in ipairs({ 0.25, 0.5, 0.75 }) do gfx.rect(gx, vy(f), gw, 1, 1) end

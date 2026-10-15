@@ -21,6 +21,9 @@ ACV.key(('h'):byte(), st); ACV.key(('H'):byte(), st); eq('H', ACV.row, 0)
 ACV.key(('G'):byte(), st); eq('G', ACV.row, 31); ACV.key(('g'):byte(), st); eq('g', ACV.row, 0)
 ACV.key(('['):byte(), st); eq('[ finer', ACV.grid, 2); ACV.key((']'):byte(), st); ACV.key((']'):byte(), st); eq('] coarser', ACV.grid, 8)
 eq('grid label 1/8', ACV.grid_label(2, 4), '1/8'); eq('grid label rows', ACV.grid_label(3, 4), '3 rows'); eq('grid label bar', ACV.grid_label(16, 4), '1/1')
+-- zp — проект / отрезок
+ACV.key(('z'):byte(), st); ACV.key(('p'):byte(), st); eq('zp on', ACV.proj, true); ACV.key(('z'):byte(), st); ACV.key(('p'):byte(), st); eq('zp off', ACV.proj, false)
+ACV.key(('z'):byte(), st); eq('z then other key not mine', ACV.key(('Q'):byte(), st), false)
 -- Tab по кривым
 ACV.key(9, st); eq('Tab', ACV.cur, 2); ACV.key(9, st, { shift = true }); eq('S-Tab', ACV.cur, 1); ACV.key(9, st, { shift = true }); eq('S-Tab wraps', ACV.cur, 3)
 -- ops

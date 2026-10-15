@@ -11771,6 +11771,7 @@ ctx = {
     return { title = 'keys (Esc)', items = items }
   end,
   preview = function(track, pitch, inst_item, row, step, lp, key)   -- lp — луп удержания (13 окт: только удержания, звучит до PV.stop)
+    if state.debug and ctx.dlog then ctx.dlog('preview from: ' .. (debug.traceback('', 2):gsub('%s+', ' '):sub(1, 500))) end   -- 15 окт: кто позвал (debug)
     if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
     -- 9 окт: сэмпл (аудио-item lib) звучит сам всегда — раньше MIDI-ноты на
     -- треке (от плагина-инструмента) переводили превью в play транспорта (q = весь сэмпл)
@@ -12181,7 +12182,8 @@ ctx.ACV.init(U, ctx, LG)
 -- отрезок холста: как у генератора (time selection → регион курсора → такт), в строках и секундах
 ctx.acv_span = function()
   local t0, t1, label = ctx.lfo_span()
-  if label == 'one bar' then                                  -- такт, в котором курсор (генератор берёт такт от курсора)
+  if ctx.ACV.proj then t0, t1, label = 0, math.max(1, reaper.GetProjectLength(0)), 'project'   -- 15 окт: zp — весь проект
+  elseif label == 'one bar' then                                  -- такт, в котором курсор (генератор берёт такт от курсора)
     local qn = reaper.TimeMap2_timeToQN(0, t0)
     local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
     if qms and qme then t0, t1 = reaper.TimeMap2_QNToTime(0, qms), reaper.TimeMap2_QNToTime(0, qme) end
