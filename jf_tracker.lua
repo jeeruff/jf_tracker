@@ -19485,6 +19485,7 @@ local function frame()
       ctx.toggle_focus(back and -1 or 1)
       vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
+    elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
     else vim.msg = 'Tab: only in the tracker (next track) for now' end   -- 10 окт: в панелях Tab пока ничего не делает
     c = 0
   end

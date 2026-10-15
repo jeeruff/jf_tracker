@@ -459,6 +459,7 @@ local function piano_slice(c)
   local base = (ctx.slice_base and ctx.slice_base()) or 60
   return (oct + 1) * 12 + off - base + 1
 end
+S.piano_slice = piano_slice
 
 -- клавиши; true — съедена
 -- 15 окт: частота источника (кадры линейки hex и gw)
@@ -493,6 +494,46 @@ function S.more_do(side)
   elseif side == 'b' and post > 1e-4 then ctx.autotrim(e, 0, e.len + post)
   else S.msg = side == 'a' and 'the sample already starts at the file start' or 'the sample already ends at the file end' end
 end
+-- 15 окт: Tab / Shift+Tab — курсор волны к следующему / прошлому транзиенту (стандарт нарезки:
+-- прошёл, послушал кусок до следующего, $ — разрезать здесь)
+function S.trans_step(dir)
+  local e = S.entry
+  if not (e and e.item and not e.file) then S.msg = 'Tab: transients of a sample on a track or in the lib'; return end
+  if #(S.trans or {}) == 0 and S.env then S.detect() end
+  if #(S.trans or {}) == 0 then S.msg = 'no transients found (Opt+D - the detector)'; return end
+  local t0 = (S.wcur and S.wcur_e == e.item) and S.wcur or (dir > 0 and -1 or e.len + 1)
+  local best
+  for _, u in ipairs(S.trans) do
+    if dir > 0 and u > t0 + 1e-6 and (not best or u < best) then best = u end
+    if dir < 0 and u < t0 - 1e-6 and (not best or u > best) then best = u end
+  end
+  if not best then S.msg = dir > 0 and 'the last transient' or 'the first transient'; return end
+  S.wcur, S.wcur_e = best, e.item
+  local nxt = e.len
+  for _, u in ipairs(S.trans) do if u > best + 1e-6 and u < nxt then nxt = u end end
+  if ctx.preview_slice then ctx.preview_slice(S.track, e, best, nxt) end
+  if S.va and S.vb and (best < S.va or best > S.vb) then local sp = S.vb - S.va; S.va = math.max(0, best - sp / 2); S.vb = S.va + sp end
+  S.msg = ('transient %X - $ cuts a slice here, Tab / Shift+Tab - next / previous'):format(S.frame_of(e, best))
+end
+-- $ — слайс у курсора волны (без нарезки — первый слайс с начала и этот)
+function S.cut_here()
+  local e = S.entry
+  if not (S.wcur and S.wcur_e == (e and e.item)) then S.msg = '$: Tab to a transient (or gw HEX) first'; return end
+  if #S.slices == 0 then S.slices[1] = 0 end
+  S.add_at(S.wcur)
+end
+-- d + клавиша слайса — удалить его; dd — слайс под курсором волны / выбранный
+function S.delete_key(c)
+  local ch = c < 256 and string.char(c) or ''
+  local k
+  if ch == 'd' then
+    local e = S.entry
+    if S.wcur and S.wcur_e == (e and e.item) then for i, u in ipairs(S.slices) do if u <= S.wcur + 1e-6 then k = i end end end
+    if not k then k = (ctx.ssel and e and ctx.ssel.item == e.item) and ctx.ssel.k or nil end
+  else k = S.piano_slice and S.piano_slice(c) end
+  if not k or k < 1 or not S.slices[k] then S.msg = 'd: a slice key (2 w 3 e ...) or d - the slice under the wave cursor'; return end
+  S.remove(k)
+end
 -- ближайший транзиент к t (детекция по требованию); нет — t
 function S.snap_trans(t)
   if #(S.trans or {}) == 0 and S.env then S.detect() end
@@ -525,6 +566,13 @@ function S.key(c)
     if S.gbuf then S.msg = 'gw ' .. S.gbuf .. '_  hex frame, Enter - to the nearest transient, Shift+Enter - exact, Esc' end
     return true
   end
+  if S.dpend then
+    S.dpend = nil
+    if c ~= 27 then S.delete_key(c) else S.msg = '' end
+    return true
+  end
+  if ch == 'd' and S.entry and not S.entry.file then S.dpend = true; S.msg = 'd: a slice key (2 w 3 e ...) deletes it, d - the slice under the wave cursor'; return true end
+  if ch == '$' and S.entry and not S.entry.file then S.cut_here(); return true end
   if S.gpend then
     S.gpend = nil
     if ch == 'w' then S.gbuf = ''; S.msg = 'gw _  hex frame of the ruler, Enter'; return true end
@@ -574,7 +622,6 @@ function S.key(c)
     local te = S.cut_point(S.cross.t + S.cross.dt)
     ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
   elseif (ch == 'S' or ch == 's') and ctx.slice_hydra then ctx.slice_hydra()
-  elseif ch == 'd' then S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens)
   elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
   elseif ch == 'x' then S.clear()
