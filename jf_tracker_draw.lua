@@ -570,7 +570,10 @@ function D.layout(snap, state, nregions)
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
-  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 6) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
+  -- 15 окт: у символов кнопок пусто сверху — кнопки ниже на tp_cut, строки 3-4 и низ полосы выше на столько же
+  -- (не больше зазора между строками: текст второй строки не налезает на третью)
+  L.tp_cut = math.max(0, math.min(math.floor((L.th or L.rh) * 0.3), L.rh - (L.th or L.rh) + 1))
+  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 3 - L.tp_cut) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
   L.mode_h = 2 * L.th + 6
   L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
@@ -3621,7 +3624,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local kx = x + lw
     -- 12 окт: velocity — под клавиатурой, третьей строкой (c - тише, C - громче, как z x для октавы)
     if cc.tpfull then
-      local vy = ly + 2 * L.rh + 2
+      local vy = ly + 2 * L.rh + 2 - (L.tp_cut or 0)
       -- 15 окт: vel — строкой «vel 111» (как было), справа слайдер 1..127 (тянуть)
       local vl = ('vel %d'):format(cc.vel or 100)
       local vw = math.max(ms(vl), ms('vel 127'))
@@ -3722,7 +3725,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       gx = gx + br_l(g)
     end
     for ri, row in ipairs(g) do
-      local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh
+      local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh - ((ri >= 3 and not y0) and (L.tp_cut or 0) or 0)   -- 15 окт: строки 3-4 — выше (tp_cut)
       for _, it in ipairs(row) do
         local iw = cw_of(it)
         local ih = it.big and (2 * L.rh) or L.rh
@@ -3794,7 +3797,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
-    local by, bh = ly, 2 * L.rh - 1
+    local by, bh = ly, 2 * L.rh - 1 - (L.tp_cut or 0)   -- 15 окт: без пустоты над символом
     -- 12 окт: срезанный угол — только у крайних кнопок блока (фон в угол, рамка по диагонали, 2 px)
     local function cut(cx, cy, dx, dy, frame)
       set(U.PANEL); gfx.rect(cx, cy, 1, 1, 1); gfx.rect(cx + dx, cy, 1, 1, 1); gfx.rect(cx, cy + dy, 1, 1, 1)
@@ -3814,7 +3817,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local sym = b[5] or ''
       -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
       local gap2 = math.max(0, math.floor((bh - 2 * L.th - 3) / 2))
-      text(bx + math.floor((bw - ms(sym)) / 2), by + 2 + gap2, sym, tc)
+      text(bx + math.floor((bw - ms(sym)) / 2), by + 2 + gap2 - (L.tp_cut or 0), sym, tc)   -- пустой верх глифа — над рамкой
       text(bx + math.floor((bw - ms(b[2])) / 2), by + bh - 1 - L.th - gap2, b[2], hot and U.AMBER or (on and b[3] or U.GREY))
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
@@ -3857,7 +3860,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 15 окт: строка под кнопками — по колонкам: под rew / pause — маркеры 1..0, под play — rate,
     -- под rec и дальше — тоглы записи (punch pre-roll rec>lib slow; не влезли — короче)
     if c.tpfull then
-      local ry = ly + 3 * L.rh + 4
+      local ry = ly + 3 * L.rh + 4 - (L.tp_cut or 0)
       local colx = function(i) return bx0 + (i - 1) * (tbw + 2) end
       local function cellb(id, lab, x0, w0, on, dimc)
         local hot = cell_hot(x0, ry, w0, L.rh)
@@ -3951,8 +3954,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       bx = bx + b.w + 3 * L.pad
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
-    if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2) end
-    if c.tpfull and D.swing_line then draw_group(D.swing_line, bx0, bigw, ly + 3 * L.rh + 4) end   -- 15 окт: swing — под метрономом
+    if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2 - (L.tp_cut or 0)) end
+    if c.tpfull and D.swing_line then draw_group(D.swing_line, bx0, bigw, ly + 3 * L.rh + 4 - (L.tp_cut or 0)) end   -- 15 окт: swing — под метрономом
   end
   -- порядок блоков
   local by_id = {}
