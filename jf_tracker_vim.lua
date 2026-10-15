@@ -2858,7 +2858,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold track | c close | o open | f folder | M fold all | R open all | z center | t top | b bottom | s clips (session)',
+  z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: w all items of the track (the lib after =LIB stays) | Esc',

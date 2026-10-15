@@ -945,3 +945,4 @@
 - [ ] 15 окт: :xf stretch 2 / reverse / gravity 2 / fib / tuplet 3 на VISUAL или треке в регионе (MIDI и аудио), u откатывает одним шагом; встроенные макросы stretch x2 … golden fade
 - [ ] 15 окт: :mackey <макрос> x — @x запускает макрос; :keys пишет Data/jf_tracker_keys.md
 - [ ] 15 окт: метры канала на 15% выше; listen в блоке step — подпись, не кнопка; полоса транспорта без пустых строк
+- [ ] 15 окт: меню z (which-key) — есть c compact / o open; подсказка статуса z короткая и без устаревших R open all / z center
