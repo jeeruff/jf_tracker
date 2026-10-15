@@ -72,11 +72,34 @@
 <h1>jf_tracker</h1>
 <p class="sub">a tracker shell over the REAPER project, with Vim keys</p>
 <div class="nav">
-  <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
+  <a href="#signs">signs</a> <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
   <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
   <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#values">values by hand</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
+
+<!-- 15 окт: глоссарий знаков — первым: управление строго буквами, а где нужен знак — вот что он значит -->
+<h2 id="signs">Signs</h2>
+<p>Every control is a letter. Where a sign stands instead, it means one thing everywhere:</p>
+<table>
+<tr><td><code>~</code></td><td>automation: the envelopes of the track (the button in the track header; lit when there are some, filled when shown)</td></tr>
+<tr><td><code>(o)</code></td><td>record arm, a round button; filled when armed. <code>(A)</code> inside: auto-arm, the track arms itself when selected</td></tr>
+<tr><td><code>(ø)</code></td><td>phase invert, a round button by <code>~</code></td></tr>
+<tr><td><code>I</code> <code>M</code> <code>S</code></td><td>input monitor (outline: auto / tape), mute, solo</td></tr>
+<tr><td><code>SRO</code></td><td>routing: <code>S</code> sends, <code>R</code> receives, <code>O</code> hardware outputs; a letter is lit when there is one</td></tr>
+<tr><td><code>Δ</code></td><td>delta solo: hear what an effect takes away</td></tr>
+<tr><td><code>&lt;&lt;</code> <code>||</code> <code>&gt;</code> <code>O</code> <code>&gt;&gt;</code> <code>oo</code></td><td>transport: rewind, pause, play, record, forward, loop</td></tr>
+<tr><td><code>|&lt;&lt;</code> <code>&gt;&gt;|</code></td><td>to the start / the end</td></tr>
+<tr><td><code>*</code> <code>*N</code></td><td>freeze: the loop is held; <code>*N</code> — N bars frozen</td></tr>
+<tr><td><code>/2</code> <code>x2</code></td><td>half / double speed (the lit one blinks)</td></tr>
+<tr><td><code>^O</code></td><td>shift rec: <code>^</code> is Shift, <code>O</code> is rec — waits for a MIDI note, then records</td></tr>
+<tr><td><code>++</code></td><td>dub: copy the loop forward and go on</td></tr>
+<tr><td><code>a</code> <code>n</code></td><td>step: <code>a</code> auto, <code>n</code> next note</td></tr>
+<tr><td><code>[3d_]</code></td><td>what you are typing, right at the cursor (a count, an operator, a value) — the eyes stay where you work</td></tr>
+<tr><td><code>@</code></td><td>macros: <code>@a</code> plays register a; the word <code>MACROS@a</code> in the modeline while one is being recorded</td></tr>
+<tr><td><code>'</code></td><td>harpoon: pinned places</td></tr>
+<tr><td>frames</td><td>a thin light frame — the module with the keyboard; the frame of the rows is the mode colour: white NORMAL, red INSERT (thicker), amber VISUAL, blue <code>:</code> and <code>/</code></td></tr>
+</table>
 
 <h2 id="why">Why</h2>
 <p class="lead drop">Hands stay on the home row. <kbd>j</kbd> and <kbd>f</kbd> are the two keys with bumps under your index
@@ -108,7 +131,7 @@ dropdown of the field under the cursor: it shows what can be typed there. Type t
 <tr><td><kbd>m</kbd></td><td>the keyboard on / off. On, it has priority: the top row and the digits play notes, <kbd>z</kbd> <kbd>x</kbd> change the octave. Off, every key is Vim</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>INSERT and back, as in Renoise: in INSERT the keyboard writes notes (with the keyboard off, <kbd>i</kbd> works too)</td></tr>
 <tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
-<tr><td><kbd>Tab</kbd></td><td>next module: the keyboard goes there (a pink frame shows where)</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>next module: the keyboard goes there (a light frame shows where)</td></tr>
 <tr><td><kbd>F2</kbd> … <kbd>F6</kbd></td><td><kbd>F2</kbd> tracker ↔ item tab (from any tab — back to the tracker), <kbd>F3</kbd> modulate and on through the tabs, <kbd>F4</kbd> midi, <kbd>F5</kbd> scopes, <kbd>F6</kbd> master; the same key again — back to the tracker</td></tr>
 <tr><td><kbd>`</kbd> &nbsp; <kbd>\</kbd></td><td>the main menu of everything (at the main module) / the context menu of what is under the cursor, the same as the right click. In INSERT <kbd>`</kbd> is the note-off</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd> &nbsp; <kbd>Option</kbd>+<kbd>/</kbd> &nbsp; <kbd>Cmd</kbd>+<kbd>/</kbd></td><td>find an effect (all of them) / inside the DSP chain of the track / a file in the browser</td></tr>
@@ -131,7 +154,7 @@ dropdown of the field under the cursor: it shows what can be typed there. Type t
   <li><b>browser</b>: files, Media Explorer databases, projects, kits</li>
   <li><b>DSP</b>: the FX chain of the cursor track, with meters</li>
 </ol>
-<p>The module with the keyboard focus has a pink frame; in INSERT the tracker frame is red. By default a plain click works
+<p>The module with the keyboard focus has a thin light frame; the rows of the tracker have a second frame in the colour of the mode (see <a href="#signs">signs</a>). By default a plain click works
 inside a module and leaves the focus where it is; <kbd>Option</kbd>+click moves the focus (option <code>focus by mouse</code>).</p>
 
 <h2 id="panes">Panes</h2>
@@ -408,7 +431,7 @@ row sets the value from the mouse) finds it in options → <code>odd options</co
 <p>Under the tracker: position, BPM, LPB, time signature, the beats of the bar, metronome, follow, loop, octave, step,
 instrument, velocity. Click or wheel changes a value; a click on the signature asks whether it is for the whole project or
 one pattern. The keyboard on the left shows what the note keys play and hides with <kbd>m</kbd>; the strip stays. One look, no
-options for its position or style. The mode word is the modeline in the corner of the tracker field; the status line is
+options for its position or style. The mode word is the modeline, its own row under the tracker field; the status line is
 always the bottom row of the window.</p>
 
 <h2 id="map">Tracker → REAPER</h2>

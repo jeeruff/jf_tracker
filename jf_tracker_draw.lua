@@ -5074,9 +5074,9 @@ function D.frame(L, snap, rows, state, info)
                        { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
                        { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
                        { 'ø', col.phase, U.AMBER, 'phase' },          -- 8 окт: инверсия фазы (буква, как в блоке трека DSP)
-                       { 'trim', nenv > 0, U.CYAN or U.AMBER, 'auto' } }
+                       { '~', nenv > 0, U.CYAN or U.AMBER, 'auto' } }   -- 15 окт: ~ — автоматизация (было trim), знак из глоссария справки
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
-      local trim_w = ms('trim') + 4
+      local trim_w = ms('~') + 4
       local trim_x = c.x + c.w - L.pad - trim_w
       -- 9 окт: микшер открыт — R I M S ø столбиком справа от фейдера, в том же
       -- порядке (как кнопки у фейдера в микшере REAPER); в шапке остаётся trim.
@@ -5139,6 +5139,7 @@ function D.frame(L, snap, rows, state, info)
       local gap = L.pad
       -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
+      trim_w = bwh; trim_x = c.x + c.w - L.pad - trim_w   -- ~ — кнопкой той же ширины
       local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
       by = by - 1
       local ph_x = trim_x - 1 - bwh
@@ -5558,7 +5559,6 @@ function D.frame(L, snap, rows, state, info)
         if mixcol then
           for k = 1, 6 do
             local b = labels[k]
-            if b[4] == 'auto' and ms('trim') + 4 > D.mcb_w then b = { 'A', b[2], b[3], b[4] } end   -- узко — буквой
             hbtn(b, sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
           end
           local sc = D.sro_col
