@@ -302,6 +302,16 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   U.set(U.AMBER); gfx.circle(cx, vy(cv_now), 3, 1, 1)
   if span.play_row and span.play_row >= r0 and span.play_row < r1 then U.set(U.GREEN); gfx.rect(rx(span.play_row), gy, 1, gh, 1) end
   U.set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
+  -- 15 окт: рамка правки — то, что сейчас изменят клавиши: клетка сетки под курсором или v-диапазон
+  -- (целыми клетками, как заливка); у LFO / ACS — весь отрезок (модуляция одна на параметр)
+  do
+    local a, b
+    if act.kind == 'lfo' or act.kind == 'acs' then a, b = r0, r1 else a, b = ACV.range(span, true) end
+    local fx0, fx1 = math.max(gx, rx(a)), math.min(gx + gw, rx(b))
+    U.set(U.AMBER, focused and 1 or 0.45); gfx.rect(fx0, gy, math.max(2, fx1 - fx0), gh, 0)
+    if focused then gfx.rect(fx0 + 1, gy + 1, math.max(1, fx1 - fx0 - 2), gh - 2, 0) end
+    gfx.a = 1
+  end
   -- легенда: имя и значение в строке курсора; активная янтарём
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover

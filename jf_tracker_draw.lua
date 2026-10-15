@@ -6200,7 +6200,10 @@ function D.frame(L, snap, rows, state, info)
           local ml = m.ml
           local e = ml.ev[r.row]
           local foc = vc and vc.fi == m.fi and vc.row == r.row
-          if foc then set(info.focus == 'tracker' and U.AMBER or U.LINE); gfx.rect(m.x, y, m.w, L.rh, 0) end
+          -- 15 окт: курсор — как везде (заливка D.CURCELL, текст цветом фона), не янтарная рамка
+          local cbg = foc and (info.focus == 'tracker' and D.CURCELL or U.LINE) or nil
+          if cbg then set(cbg); gfx.rect(m.x, y, m.w, L.rh, 1) end
+          local function ctext(tx2, ty2, str, col) text(tx2, ty2, str, cbg and U.BG or col) end
           if (ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
             -- держится ли значение: последнее событие до строки
             local held
@@ -6218,10 +6221,10 @@ function D.frame(L, snap, rows, state, info)
             if (ml.kind == 'vis' or ml.kind == 'cmd') and head then
               local hc = e.n > 1 and U.AMBER or U.CYAN
               local hw = gfx.measurestr(head)
-              text(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
-              if hw < m.w - L.pad - L.cw then text(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
-            else text(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN) end
-          else text(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis') and '....' or '..', D.EMPTY) end
+              ctext(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
+              if hw < m.w - L.pad - L.cw then ctext(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
+            else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN) end
+          else ctext(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
         ::ml_next::
