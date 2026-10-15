@@ -2117,6 +2117,10 @@ function V.key_impl(c)
       local rn = ctx.keys_renoise and ctx.keys_renoise()   -- 13 окт: renoise — z x ноты, октава [ ]
       if c == (rn and '[' or 'z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
       if c == (rn and ']' or 'x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
+      -- 15 окт: громкость и в KEYS (клавиатура в NORMAL): renoise — { }, иначе c C (как в INSERT)
+      if (rn and (c == 123 or c == 125)) or (not rn and (c == 99 or c == 67)) then
+        V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
+      end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
       if ctx.piano and ctx.piano[base] then
