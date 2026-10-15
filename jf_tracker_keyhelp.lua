@@ -169,7 +169,7 @@ KH.PAGES = {
     { k = 'zm', d = 'mixer on / off' },
     { k = 'zx', d = 'crossfade editor of REAPER: the note under the cursor and the notes of the track overlapping it' },
     { k = 'Tab Shift+Tab', d = 'next / previous track (in the matrix - the next / previous track column)' },
-    { k = 'Opt+note', d = 'chord typing (letter keys; Option+digits pick instruments): the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },
+    { k = 'Opt+note', d = 'chord typing, both octaves (q2w3e… and zsxdc…: Option+2 3 5 6 7 9 0 are the sharps here; Option+digits pick instruments in NORMAL): the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },
     { k = 'keys button', d = 'keyboard on / off (also m; quick options keys): on - it has priority, q 2 w 3 e ... play notes, z x octave, Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'Space', d = 'play / stop' },
     { k = 'C-⌘Space ⌥⌘Space', d = 'play at x0.5 / x2 (the buttons under play); again or Space - stop, x1 comes back' },

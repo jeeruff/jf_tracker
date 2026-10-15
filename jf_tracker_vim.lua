@@ -1424,7 +1424,9 @@ end
 -- → 'beside'; Ctrl (коды 1..26 или флаг ctrl) → 'capture'; иначе 'insert'.
 local SHIFTED = { ['@'] = '2', ['#'] = '3', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['('] = '9', [')'] = '0' }
 local OPTCH = { [339] = 'q', [8721] = 'w', [180] = 'e', [174] = 'r', [8224] = 't', [165] = 'y', [168] = 'u',
-                [710] = 'i', [248] = 'o', [960] = 'p' }   -- 9 окт: Option+цифры — инструменты (аккорд — буквы)
+                [710] = 'i', [248] = 'o', [960] = 'p',
+                -- 15 окт: и цифры второй октавы (диезы q2w3e…): в INSERT Option+цифра с нотой — аккорд, как буквы
+                [8482] = '2', [163] = '3', [8734] = '5', [167] = '6', [182] = '7', [170] = '9', [186] = '0' }
 function V.note_key(c, mods)
   mods = mods or {}
   -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
@@ -1589,6 +1591,10 @@ function V.key_impl(c)
     local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 0 }
     local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local d = OPTDIG[cp] or ((mods.alt and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
+    -- 15 окт: в INSERT / слое пианино цифра с нотой (2 3 5 6 7 9 0 — диезы второй октавы) — нота (аккорд, Option+note),
+    -- инструмент по Option+цифре — в NORMAL и на цифрах без ноты
+    local dch = d and (('0'):byte() + d)
+    if d and (V.mode == 'insert' or V.piano) and ctx.piano and ctx.piano[dch] then d = nil end
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' then
       if d == 0 then d = 10 end
       if ctx.pool_select then ctx.pool_select(d) end
