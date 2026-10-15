@@ -84,6 +84,8 @@ _G.reaper = {
   MIDI_GetProjQNFromPPQPos = function(tk, ppq) return t2qn(tk.item.pos) + ppq / 960 end,
   TimeMap2_timeToQN = function(_, t) return t2qn(t) end,
   TimeMap2_QNToTime = function(_, qn) return qn2t(qn) end,
+  TimeMap_GetTimeSigAtTime = function() return 4, 4, 120 end,
+  TimeMap_GetMetronomePattern = function() return 4, "ABBB" end,
   TimeMap_QNToMeasures = function(_, qn)
     local m = math.floor(qn / 4 + 1e-9)
     return m, m * 4, (m + 1) * 4
@@ -421,5 +423,18 @@ do
   eq('CC74 row 4 = 127 (1 QN at LPB 4)', ls[1] and ls[1].ev[4] and ls[1].ev[4].v, 127)
   eq('PC row 4 = 5', ls[2] and ls[2].ev[4] and ls[2].ev[4].v, 5)
 end
+-- 15 окт: акцент строки по паттерну метронома
+eq('accent bar', M.accent(0, 16, 0, 'ABBB'), 0)
+eq('accent weak beat', M.accent(0, 16, 1, 'ABBB'), 1)
+eq('accent group beat (ABAB)', M.accent(0, 16, 2, 'ABAB'), 0)
+eq('accent half beat', M.accent(8, 16, 1, 'ABBB'), 2)
+eq('accent quarter beat', M.accent(4, 16, 1, 'ABBB'), 3)
+eq('accent quarter beat 12', M.accent(12, 16, 1, 'ABBB'), 3)
+eq('accent eighth', M.accent(2, 16, 1, 'ABBB'), 4)
+eq('accent odd row plain', M.accent(1, 16, 1, 'ABBB'), 5)
+eq('accent thirds (lpb 6)', M.accent(2, 6, 0, 'ABBB'), 2)
+eq('accent thirds (lpb 12): 4', M.accent(4, 12, 0, 'ABBB'), 2); eq('accent lpb 12: 2', M.accent(2, 12, 0, 'ABBB'), 3)
+eq('accent lpb 4: 2', M.accent(2, 4, 0, 'ABBB'), 2)
+eq('accent lpb 1', M.accent(0, 1, 3, 'ABBB'), 1)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

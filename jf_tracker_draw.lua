@@ -6051,10 +6051,17 @@ function D.frame(L, snap, rows, state, info)
   if info.ruler and info.ruler.markers and state.mkedges then
     for _, mk in ipairs(info.ruler.markers) do if not D.se_hidden(state, mk) then mkline[math.floor(mk.row_f + 1e-6)] = mk.rgb or U.AMBER end end
   end
+  -- 15 окт: яркость точек и номера строки — по акценту (такт / сильные доли паттерна метронома ярко,
+  -- как номер; деления доли — ступенями тише); база восстанавливается после строк
+  local empty0, under0 = D.EMPTY, D.EMPTY_UNDER
+  local ACC_F = { [0] = 1, 0.8, 0.5, 0.3, 0.15, 0 }
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
     local is_cur_row = vc and vc.row == r.row
+    local af = ACC_F[r.acc or 5] or 0
+    D.EMPTY = af > 0 and U.mix(empty0, U.TEXT, af) or empty0
+    D.EMPTY_UNDER = af > 0 and U.mix(under0, U.TEXT, af * 0.6) or under0
     if mkline[r.row] then set(mkline[r.row], 0.75); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.a = 1 end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
@@ -6080,7 +6087,7 @@ function D.frame(L, snap, rows, state, info)
       -- 6 окт: кромки ещё раз после ячеек — серая ячейка курсора их закрывала
       if is_cur_row or r.row == cur then D.edge_lines = D.edge_lines or {}; D.edge_lines[#D.edge_lines + 1] = { lx, ly, W - lx, r.row == cur } end
     end
-    text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, (is_cur_row or r.beat) and U.TEXT or U.GREY)
+    text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, is_cur_row and U.TEXT or ((r.acc or 5) <= 2 and D.EMPTY or U.GREY))   -- 15 окт: номер — яркостью акцента, как точки
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
     -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
     if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
@@ -6231,6 +6238,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
+  D.EMPTY, D.EMPTY_UNDER = empty0, under0
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil

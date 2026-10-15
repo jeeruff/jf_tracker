@@ -751,7 +751,7 @@ function M.invalidate() cache.key = nil; rcache.key = nil end
 -- ── строки вида ───────────────────────────────────────────────────────────
 -- Описания видимых строк: время, такт/доля. Считаем только для окна вида.
 function M.rows(row0, n, lpb)
-  local out = {}
+  local out, pats = {}, {}
   for i = 1, n do
     local row = row0 + i - 1
     local qn = row / lpb
@@ -759,10 +759,44 @@ function M.rows(row0, n, lpb)
     local meas, qms = R.TimeMap_QNToMeasures(0, qn)
     local beat = math.abs(qn - math.floor(qn + 0.5)) < 1e-6
     local bar = beat and qms and math.abs(qn - qms) < 1e-6
-    out[i] = { row = row, qn = qn, t = t, bar = row >= 0 and bar, beat = row >= 0 and beat, measure = meas,
+    -- 15 окт: акцент по паттерну метронома (кэш на такт в пределах вызова)
+    local acc = 5
+    if row >= 0 and qms then
+      local m = meas or 0
+      if not pats[m] then
+        local _, den = R.TimeMap_GetTimeSigAtTime(0, t)
+        pats[m] = { p = select(2, R.TimeMap_GetMetronomePattern(0, t, 'EXTENDED')) or '', den = (den and den > 0) and den or 4 }
+      end
+      -- доля — по знаменателю размера (6/8 — восьмая); строк в доле не целое — по четвертям
+      local rpb = lpb * 4 / pats[m].den
+      if rpb < 1 or rpb % 1 ~= 0 then rpb = lpb end
+      local rin = math.floor((qn - qms) * lpb + 0.5)
+      acc = M.accent(rin % rpb, rpb, rin // rpb, pats[m].p)
+    end
+    out[i] = { row = row, qn = qn, t = t, bar = row >= 0 and bar, beat = row >= 0 and beat, measure = meas, acc = acc,
                label = row >= 0 and string.format('%04d', row % 10000) or string.format('-%03d', (-row) % 1000) }   -- 11 окт: до начала проекта — с минусом (было пусто)
   end
   return out
+end
+
+-- 15 окт: уровень акцента строки для яркости точек и номера: 0 — такт и сильные доли паттерна метронома
+-- (A в 'ABBB'), 1 — прочие доли, 2.. — деления доли (пополам / на три, глубже — слабее), 5 — без акцента.
+-- sub — строка внутри доли (0..lpb-1), bi — доля в такте (0..), pat — паттерн метронома
+function M.accent(sub, lpb, bi, pat)
+  if sub == 0 then
+    if bi == 0 then return 0 end
+    local ch = pat and pat:sub(bi + 1, bi + 1) or ''
+    return ch == 'A' and 0 or 1
+  end
+  local d, lv = lpb, 2
+  while d > 1 and lv <= 4 do
+    local p = (d % 3 == 0) and 3 or ((d % 2 == 0) and 2 or d)   -- триоли первыми: lpb 12 = 3 × 4
+    local step = d // p
+    if step < 1 then break end
+    if sub % step == 0 then return lv end
+    sub = sub % step; d = step; lv = lv + 1
+  end
+  return 5
 end
 
 -- Строка плейхеда/курсора от времени проекта (может быть дробной).

@@ -192,7 +192,7 @@ local state = {
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
   phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
-  bigcur = flag('bigcur', false),                 -- fixed cursor: строка курсора лупой ×2 (8 окт)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
+  bigcur = flag('bigcur', false),                 -- cursor zoom: строка курсора лупой ×2 (8 окт; 15 окт — и без fixed)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
   offbar = flag('offbar', false),                -- OFF рисовать как «|» (опция, 8 окт)
@@ -2223,6 +2223,21 @@ ctx = {
     return e
   end,
   status = function(s) state.status = s end,
+  -- 15 окт: поля hover строкой (debug: лог щелчков и инженерный статус); short — без координат и таблиц
+  hover_dump = function(hv, short)
+    local parts = {}
+    local skip = short and { x = true, y = true, envx = true, row = true, fi = true, field = true } or {}
+    for k, v in pairs(hv or {}) do
+      local tv = type(v)
+      if skip[k] then
+      elseif tv == 'number' then parts[#parts + 1] = k .. '=' .. (v % 1 == 0 and tostring(v) or ('%.3f'):format(v))
+      elseif tv == 'string' or tv == 'boolean' then parts[#parts + 1] = k .. '=' .. tostring(v)
+      elseif tv == 'table' and not short then parts[#parts + 1] = k .. '={}'
+      elseif tv == 'table' and short and (v.id or v.key or v.name) then parts[#parts + 1] = k .. '=' .. tostring(v.id or v.key or v.name) end
+    end
+    table.sort(parts)
+    return table.concat(parts, ' ')
+  end,
   nmod_focus = function() ctx.pane_focus('nmod') end,
   nmod_list = function()
     local e = ctx.nmod_entry()
@@ -10141,7 +10156,7 @@ ctx = {
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
       flag('beacon', 'cursor beacon', 'a jump of the tracker cursor (G gg, Ctrl+O, f-labels, a far track, the search) flashes a bar that flies in from where the cursor came (above - down the column, a side - along the row) and shrinks to the cursor in half a second, as beacon-mode in Emacs - the eye finds where it landed'),
-      flag('bigcur', 'big fixed cursor', 'with the fixed cursor (centre) its row is drawn twice as big: two rows high, half the width around the cursor field; the rows below move one row down. Off while f-hints are shown'),
+      flag('bigcur', 'cursor zoom', 'the cursor row is drawn twice as big (font x2): two rows high, half the width around the cursor field; the rows below move one row down. Off while f-hints are shown and on the last row'),
       { key = 'phtail', label = 'playhead shade', kind = 'cycle', values = { 0, 2, 4, 8, 16 }, desc = 'rows behind the playhead that fade out, a gradient of the playhead colour (0, default - the playhead is a plain row, like the cursor)', get = function() return state.phtail or 0 end, set = function(v) state.phtail = v end },
       { key = 'sbw', label = 'scrollbar width', kind = 'cycle', values = { 2, 3, 4, 6, 8 }, desc = 'thickness of every scrollbar, px (default 3)', get = function() return state.sbw or 3 end, set = function(v) state.sbw = v end },
       flag('pianosmall', 'small piano', 'the keyboard under the tracker with keys just as wide as their letter (big bitmap fonts, narrow windows); off - a char wider'),
@@ -15383,7 +15398,7 @@ local function frame()
     local fps_t = tonumber(state.fps)
     -- big fixed cursor (8 окт): кадр в буфер и при fps max — лупа копирует
     -- строку курсора из картинки, не из экрана
-    ctx.bigbuf = state.fixed and state.bigcur or nil
+    ctx.bigbuf = state.bigcur or nil   -- 15 окт: cursor zoom — и без фиксированного курсора
     if fps_t or ctx.bigbuf then
       if fps_buf.w ~= gfx.w or fps_buf.h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); fps_buf.w, fps_buf.h = gfx.w, gfx.h; fps_buf.last = 0 end
       gfx.dest = 1021
@@ -16096,6 +16111,8 @@ local function frame()
       return hv
     end or nil,
   })
+  -- 15 окт: строка курсора — из этого кадра (курсор без фиксации ходит; прошлый кадр давал лупу с опозданием)
+  if ctx.bigcur and draw.cur_y and draw.cur_y >= L.body_y and draw.cur_y + 2 * L.rh <= ctx.bigcur.yb then ctx.bigcur.yc = draw.cur_y end
   if ctx.bigcur then draw.bigcur(ctx.bigcur) end
   -- большая справка F1 (6 окт): поверх всего окна
   draw.pmark('post: big views')
@@ -16122,14 +16139,7 @@ local function frame()
     local cap = gfx.mouse_cap
     local was = ctx.dbg_cap or 0
     if (cap & 3) ~= 0 and (was & 3) == 0 then
-      local parts = {}
-      for k, v in pairs(hover or {}) do
-        local tv = type(v)
-        if tv == 'number' or tv == 'string' or tv == 'boolean' then parts[#parts + 1] = k .. '=' .. tostring(v)
-        elseif tv == 'table' then parts[#parts + 1] = k .. '={}' end
-      end
-      table.sort(parts)
-      ctx.dlog(('mouse %s %d,%d cap %d focus %s | %s'):format(cap & 2 == 2 and 'R' or 'L', gfx.mouse_x, gfx.mouse_y, cap, state.focus, table.concat(parts, ' ')))
+      ctx.dlog(('mouse %s %d,%d cap %d focus %s | %s'):format(cap & 2 == 2 and 'R' or 'L', gfx.mouse_x, gfx.mouse_y, cap, state.focus, ctx.hover_dump(hover)))
     end
     ctx.dbg_cap = cap
   end
@@ -16787,6 +16797,11 @@ local function frame()
     local c = hover.header_col or hover.col
     state.status = c.name .. (c.muted and ' [muted]' or '') .. (c.solo and ' [solo]' or '') .. (c.armed and ' [rec]' or '') .. ' - click: select track in REAPER, dblclick name: rename (:tname), rclick: track menu'
   else state.status = '' end
+  -- 15 окт: debug — статус инженерный: что под мышью (поля hover: id кнопки / опции / действия), потом обычный текст
+  if state.debug then
+    local d = ctx.hover_dump(hover, true)
+    if d ~= '' then state.status = 'dbg ' .. d .. ((state.status or '') ~= '' and ('  |  ' .. state.status) or '') end
+  end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
     local ks = {}; for k in pairs(hover) do ks[#ks + 1] = k end; table.sort(ks)
     if hover.matrix then for k, v in pairs(hover.matrix) do ks[#ks + 1] = 'mx.' .. k .. '=' .. tostring(v) end end
