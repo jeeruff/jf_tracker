@@ -3516,14 +3516,14 @@ end
 -- 11 окт: вторая строка full-транспорта, по колонкам кнопок: rew | pause | play | rec | ff | loop
 D.RATE_SNAPS = { 0.25, 0.5, 0.75, 1, 1.5, 2 }
 function D.transport_sub(c)
-  -- 15 окт: слов нет — символы: * freeze (*N — заморожено N), ^O shift rec (^ — шифт, O — как rec), ++ dub; слова — в статусе
+  -- 15 окт: слов нет — символы: * freeze (*N — заморожено N), ^O^ shift rec (^ — шифт, O — как rec), ++ dub; слова — в статусе
   local frz = c.frz and ('*%s'):format(c.frz) or '*'
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
              { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
-           { 'shiftrec', '^O', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
+           { 'shiftrec', '^O^', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
            { 'tp_end', '>>|' }, { 'dub', '++', nil } }
 end
 function D.transport_groups(c, L)   -- 15 окт: L — для ширины вертикальной подписи step
@@ -3895,8 +3895,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local lab, lc = fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
           local tx = sx + math.floor((tbw - ms(lab)) / 2)
           if b[1] == 'tp_start' then tx = sx + L.pad elseif b[1] == 'tp_end' then tx = sx + tbw - L.pad - ms(lab) end
-          if b[1] == 'shiftrec' and lab == '^O' then
-            text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC)
+          if b[1] == 'shiftrec' and lab == '^O^' then   -- 15 окт: ^O^ (просьба), O — красное, как у rec
+            text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC); text(tx + ms('^O'), sy, '^', lc)
           else text(tx, sy, lab, lc) end
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tbw, L.rh, b[1])

@@ -925,5 +925,40 @@ do
   V.key(27); eq('prompt: Esc leaves', V.mode, 'normal')
 end
 
+-- 15 окт: счётчики простых действий (2p было одной вставкой; 3u, [ ] ( ) счётчик не брали)
+do
+  reset()
+  keysin('yy'); local n0 = #calls
+  keysin('2p')
+  eq('2p: two pastes', #calls - n0, 2)
+  eq('2p: first at the cursor row', calls[n0 + 1], 'paste:1@0:trA')
+  eq('2p: second one register height lower', calls[n0 + 2], 'paste:1@1:trA')
+  reset(); keysin('3u')
+  local u = 0; for _, c in ipairs(calls) do if c == 'undo' then u = u + 1 end end
+  eq('3u: three undo steps', u, 3)
+  reset(); keysin('3'); V.key(18)
+  local r = 0; for _, c in ipairs(calls) do if c == 'redo' then r = r + 1 end end
+  eq('3 Ctrl+R: three redo steps', r, 3)
+  reset(); V.octave = 4; keysin('2]'); eq('2]: octave +2', V.octave, 6)
+  keysin('3['); eq('3[: octave -3', V.octave, 3)
+  reset(); V.inst = 5; keysin('2)'); eq('2): instrument +2', V.inst, 7)
+  keysin('3('); eq('3(: instrument -3', V.inst, 4)
+  reset(); keysin('3j'); eq('3j: three rows down', V.cur.row, 3)
+  keysin('2k'); eq('2k: two rows up', V.cur.row, 1)
+  reset(); keysin('5G'); eq('5G: row 5 (row index 4)', V.cur.row, 4)
+  reset(); keysin('3x'); eq('3x: rows 0..2 of the column', last(), 'delete:kick')
+  reset(); V.cur.row = 8; keysin('2dd'); eq('2dd: snare (rows 8..9)', last(), 'delete:snare')
+  -- 2. — последнее действие дважды
+  reset(); keysin('yy'); keysin('p'); local p0 = #calls
+  keysin('2.')
+  local np = 0; for i = p0 + 1, #calls do if calls[i]:match('^paste') then np = np + 1 end end
+  eq('2.: the last edit twice', np, 2)
+  -- 2@a — макрос дважды
+  reset(); keysin('qa'); keysin('j'); keysin('q'); V.cur.row = 0
+  keysin('2@a'); eq('2@a: the macro (j) twice', V.cur.row, 2)
+  -- 2w — через два события
+  reset(); keysin('2w'); eq('2w: two events on (ov, then snare)', V.cur.row, 8)
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

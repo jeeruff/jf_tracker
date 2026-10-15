@@ -136,7 +136,7 @@ do
   eq(slow({})[4], nil, 'slow: no fixed bright text colour')
   local function smart(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'shiftrec' then return b end end end
   eq(smart({ shiftrec = 'rec' })[3], RED, 'shift rec recording: red')
-  eq(smart({ shiftrec = 'rec' })[2], '^O', 'shift rec: the button is ^O (15 окт: символы; was shift, smart)')
+  eq(smart({ shiftrec = 'rec' })[2], '^O^', 'shift rec: the button is ^O^ (15 окт; was ^O, shift, smart)')
   eq(smart({})[3], nil, 'smart off: plain')
 end
 

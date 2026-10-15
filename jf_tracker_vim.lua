@@ -2357,7 +2357,7 @@ function V.key_impl(c)
     elseif p == '@' then
       local name = (c == ('@'):byte()) and V.last_macro or string.char(c)
       local keys = name and V.regs['@' .. name]
-      if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
+      if keys then V.last_macro = name; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end   -- 15 окт: счётчик — до повторов (2@a было три раза)
       if not keys and c < 256 and ctx.mac_by_key then ctx.mac_by_key(string.char(c)) end   -- 15 окт: 1..9 A..Z — свои / встроенные, / — по имени
       V.count = nil; return
     elseif p == 'T' then
@@ -2622,7 +2622,8 @@ function V.key_impl(c)
   elseif ch == 'u' then for _ = 1, n do E.undo() end; finish_move()   -- 15 окт: 3u — три шага
   elseif c == ctrl('r') and not (ctx.mods and (ctx.mods().ctrl or ctx.mods().alt or ctx.mods().cmd)) then for _ = 1, n do E.redo() end; finish_move()   -- 5 окт: Ctrl+R — вкладка rec (main); 15 окт: со счётчиком
   elseif ch == '.' then
-    if V.last_edit then local keys = V.last_edit; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
+    -- 15 окт: счётчик — до повторов (иначе первый повтор брал его сам: 2. давало три раза)
+    if V.last_edit then local keys = V.last_edit; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end
   elseif ch == '[' then V.octave = math.max(0, V.octave - n)   -- 15 окт: счётчик — на N
   elseif ch == ']' then V.octave = math.min(8, V.octave + n)
   elseif ch == '(' then ctx.pool_select(V.inst - n)
