@@ -6648,7 +6648,12 @@ function D.frame(L, snap, rows, state, info)
     local bx = fbw + L.pad
     local lvl = info.pool_col and info.dsp_levels and info.dsp_levels(info.pool_col)
     local mw = math.max(ms('o') + 4, 12)                -- тонкие метры (5 окт)
-    local mby, mbh = dy + L.rh + 4, DH - L.rh - 6 - (L.hint_h or 0)
+    -- 15 окт: стандарт размерности DSP — все блоки (вкладки track / take / route, блок трека, FX, заглушки,
+    -- роутер) в одной полосе: верх под шапкой, низ над полосой прокрутки цепочки — рамки встают вровень
+    local sbh = (D.SBW or 3) + 4
+    local boxy, boxh = dy + L.rh + 3, DH - L.rh - 6 - (L.hint_h or 0) - sbh
+    D.DSP_BOX = { y = boxy, h = boxh }
+    local mby, mbh = boxy, boxh
     -- 11 окт: track fx / take fx / fx routing — колонкой в начале модуля, подписи
     -- вертикально (как имена треков в матрице); шапка остаётся под имя трека
     do
@@ -6686,7 +6691,7 @@ function D.frame(L, snap, rows, state, info)
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io and info.dsptrack then
       local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
-      local used = D.track_block(L, info, info.pool_col, bx, dy + L.rh + 4, tw, DH - L.rh - 6 - (L.hint_h or 0), hover, rawset_col)
+      local used = D.track_block(L, info, info.pool_col, bx, boxy, tw, boxh, hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
     end
     D.aw_status = nil
@@ -6703,8 +6708,7 @@ function D.frame(L, snap, rows, state, info)
     local right = DR - (lvl and (mw + cvw + 2 * L.pad) or 0)
     local stubw = ms('99>') + 2 * L.pad
     -- 11 окт: под блоками — полоса прокрутки цепочки (вместо кнопок «<N» / «N>»)
-    local sbh = (D.SBW or 3) + 4
-    local bh0 = DH - L.rh - 6 - (L.hint_h or 0) - sbh
+    local bh0 = boxh
     local function ncol_of(f)
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
@@ -6730,7 +6734,7 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_first = first
     local sb_x0, nshown = bx, 0
     local function stub(x, label, k, at_right)
-      local sy = dy + 3 + L.rh
+      local sy = boxy
       local hot = not drag and mx >= x and mx < x + stubw and my >= sy and my < sy + bh0
       set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, sy, stubw, bh0, 1)
       set(hot and U.AMBER or U.LINE); gfx.rect(x, sy, stubw, bh0, 0)
@@ -6741,7 +6745,7 @@ function D.frame(L, snap, rows, state, info)
     -- роутер (7 окт): в панели DSP FX вместо блоков — схема цепочки (имена и
     -- кабели), прокрутка по горизонтали; метры in / out остаются по краям
     if info.dsp_router and info.draw_router then
-      local hv = info.draw_router(bx, dy + L.rh + 4, right - bx - L.pad, bh0)
+      local hv = info.draw_router(bx, boxy, right - bx - L.pad, bh0)
       for k2, v2 in pairs(hv or {}) do hover[k2] = v2 end
       bx = right
       goto dsp_router_done
@@ -6754,7 +6758,7 @@ function D.frame(L, snap, rows, state, info)
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
       local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
       local bw1 = math.max(L.cw * 14, math.min(L.cw * (f.colw or 22), share))   -- 13 окт: модуль может просить колонку шире
-      local by = dy + 3 + L.rh
+      local by = boxy
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
