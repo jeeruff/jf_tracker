@@ -15519,6 +15519,8 @@ local function frame()
                fxen = reaper.GetMediaTrackInfo_Value(tr, 'I_FXEN') == 1 }
     end or nil,
     -- метки линейки таймлайна для строки (3 окт): форматы REAPER (2 — такты.доли, 0 — время)
+    -- 15 окт: такт.доля строки — для модлайна (не зависит от линейки)
+    bbt = function(row) return (reaper.format_timestr_pos(reaper.TimeMap2_QNToTime(0, row / state.lpb), '', 2):gsub('%.00$', '')) end,
     tl_label = state.tlruler ~= 'off' and function(row)
       local t = reaper.TimeMap2_QNToTime(0, row / state.lpb)
       local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')

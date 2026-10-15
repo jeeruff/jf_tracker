@@ -571,12 +571,15 @@ function D.layout(snap, state, nregions)
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 6) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
-  L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
+  -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
+  L.mode_h = 2 * L.th + 6
+  L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
   L.route_y = L.mix_y
   L.hsb_y = L.mix_y + L.mix_h
-  L.piano_y = L.hsb_y + L.hsb_h
+  L.mode_y = L.hsb_y + L.hsb_h
+  L.piano_y = L.mode_y + L.mode_h
   if L.tppos == 'top' then L.piano_y = 0 elseif L.tppos == 'bottom' then L.piano_y = gfx.h - L.status_h - L.tp_h end
   L.stat_y = L.body_y + L.body_h + L.low_h          -- статус в трекере (status_in)
   L.under_y = L.stat_y + L.status_in                -- строки подсказок тела
@@ -679,7 +682,8 @@ function D.layout(snap, state, nregions)
       L.mix_rows = math.max(4, math.floor((mxr.h - 4 - L.route_h) / L.rh))
       L.route_y = L.mix_y
     end
-    L.piano_y = L.hsb_y + L.hsb_h
+    L.mode_y = L.hsb_y + L.hsb_h
+    L.piano_y = L.mode_y + L.mode_h
     if L.tppos == 'top' then L.piano_y = tr.y elseif L.tppos == 'bottom' then L.piano_y = bot - L.tp_h end
     L.stat_y = L.body_y + L.body_h + L.low_h
     L.under_y = L.stat_y + L.status_in
@@ -6268,15 +6272,38 @@ function D.frame(L, snap, rows, state, info)
   -- 15 окт: поле трекера (строки и шапка подколонок) — для рамки фокуса; модлайн — режим крупно в его
   -- левом нижнем углу на подложке (курсор в нижних строках — в левом верхнем, чтобы не закрыть его)
   D.trk_field = { tx0, L.body_y - L.rh - 1, W - tx0, L.body_h + L.rh + 1 + (D.SBW or 3) + 2 }
-  if L.nrows >= 6 and info.status_left then
-    local mw, mh = D.draw_mode(L, 0, 0, 3 * (W - tx0), info.status_left, true)
-    if mw > 0 then
-      local x = tx0 + (L.rl or 0) + L.pad          -- правее линейки переходов (она рисуется позже и закрывала начало слова)
-      local y = L.body_y + L.body_h - mh - 4
-      local ci = vc and rows[1] and (vc.row - rows[1].row) or -1
-      if ci >= L.nrows - math.ceil((mh + 6) / L.rh) - 1 then y = L.body_y + 3 end
-      set(U.BG); gfx.rect(x - L.pad, y - 2, mw + 2 * L.pad, mh + 4, 1)
-      D.draw_mode(L, x, y, 3 * (W - tx0), info.status_left)
+  -- модлайн (15 окт): своя строка под полем — режим крупно слева, справа мелко: трек и строка курсора
+  if (L.mode_h or 0) > 0 and L.mode_y then
+    local my0 = L.mode_y
+    set(U.PANEL); gfx.rect(tx0, my0, W - tx0, L.mode_h, 1)
+    local x = tx0 + (L.rl or 0) + L.pad
+    local mw = D.draw_mode(L, x, my0 + 3, 3 * (W - tx0), info.status_left or 'NORMAL')
+    -- сегменты, как в Emacs: трек · поле · строка · такт.доля · регион · выделение; имя — TEXT, подписи — GREY
+    local f = vc and L.flat and L.flat[vc.fi]
+    local segs = {}
+    if f and f.col then
+      segs[#segs + 1] = { (f.col.name ~= '' and f.col.name) or 'track' }
+      local fld = vc.field or 1
+      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
+        or ({ 'note', 'vol', 'delay' })[fld] or ('fx ' .. (fld - 3))
+      segs[#segs + 1] = { fname, 'field' }
+      local row = math.max(0, vc.row or 0)
+      segs[#segs + 1] = { ('%04d'):format(row), 'row' }
+      if info.bbt then segs[#segs + 1] = { info.bbt(row), 'bar' } end
+      for _, rg in ipairs(info.ruler and info.ruler.regions or {}) do
+        if row >= rg.r0 and row < rg.r1 and (rg.name or '') ~= '' then segs[#segs + 1] = { rg.name, 'region' }; break end
+      end
+      local vs = info.vis
+      if vs and vs.r0 then segs[#segs + 1] = { ('%d x %d'):format(math.abs(vs.r1 - vs.r0) + 1, math.abs((vs.f1 or 0) - (vs.f0 or 0)) + 1), 'rows x fields' } end
+    end
+    local wx = x + mw + 3 * L.pad
+    local ty = my0 + 3 + math.floor(L.th / 2)
+    for k, sg in ipairs(segs) do
+      if k > 1 then text(wx, ty, '·', U.DIM); wx = wx + ms('·') + 2 * L.pad end
+      if sg[2] then local lb = sg[2]; if wx + ms(lb) + L.pad >= W - L.pad then break end; text(wx, ty, lb, U.GREY); wx = wx + ms(lb) + L.pad end   -- пробел в битмапе — нулевой ширины
+      local room = W - L.pad - wx
+      if room <= ms('W') then break end
+      text(wx, ty, fit(sg[1], room), U.TEXT); wx = wx + math.min(room, ms(sg[1])) + 2 * L.pad
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
