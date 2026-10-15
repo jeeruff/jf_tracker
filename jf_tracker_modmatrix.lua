@@ -101,6 +101,7 @@ function MM.draw(L, x, y, w, h, rows, focused, title)
   if MM.row > #rows then MM.row = math.max(1, #rows) end
   if MM.row - 1 < MM.scroll then MM.scroll = MM.row - 1 end
   if MM.row - 1 >= MM.scroll + nvis then MM.scroll = MM.row - nvis end
+  if U.vbar then U.vbar('modmatrix', x, top, w, nvis * L.rh, MM.scroll, nvis, #rows) end   -- 15 окт: длинному списку — полоса всегда
   if #rows == 0 then
     U.text(x, top, ctx.fit('no modulated parameters - a: add (fzf), or rclick a DSP parameter', w), U.GREY)
   end

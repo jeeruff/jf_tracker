@@ -260,6 +260,7 @@ function PP.draw(L, x, y, w, h, col, focused)
   if PP.row - 1 < PP.scroll then PP.scroll = PP.row - 1 end
   if PP.row - 1 >= PP.scroll + nvis then PP.scroll = PP.row - nvis end
   PP.scroll = math.max(0, math.min(PP.scroll, math.max(0, #rows - nvis)))
+  if U.vbar then U.vbar('params', x, top, w, nvis * L.rh, PP.scroll, nvis, #rows) end   -- 15 окт: длинному списку — полоса всегда
   if #rows == 0 then U.text(x, top, ctx.fit(PP.used and 'nothing automated or modulated yet - v: all parameters' or 'no parameters', w), U.GREY) end
   local now = R.time_precise()
   local fresh = not PP.t or now - PP.t > 0.25

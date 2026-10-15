@@ -132,6 +132,7 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   y = y + L.rh
   local nvis = math.floor((by + bh - y - 2) / L.rh)
   P.scroll = math.max(0, math.min(P.scroll, math.max(0, #P.tracks - nvis)))
+  if U.vbar then U.vbar('perf', bx, y, bw, nvis * L.rh, P.scroll, nvis, #P.tracks) end   -- 15 окт: длинному списку — полоса всегда
   for i = P.scroll + 1, math.min(#P.tracks, P.scroll + nvis) do
     local t = P.tracks[i]
     local ms = (a.sr or 0) > 0 and t.pdc / a.sr * 1000 or 0

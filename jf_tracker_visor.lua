@@ -1149,6 +1149,7 @@ function VZ.draw(L, U, x, y, w, h, focused, env, fit, hint)
   if VZ.psel > VZ.pscroll + nvis then VZ.pscroll = VZ.psel - nvis end
   if VZ.psel <= VZ.pscroll then VZ.pscroll = math.max(0, VZ.psel - 1) end
   VZ.pscroll = math.max(0, math.min(VZ.pscroll, #rows - nvis))
+  if U.vbar then U.vbar('visorp', px0, top, pw, nvis * rh, VZ.pscroll, nvis, #rows) end   -- 15 окт: длинному списку — полоса всегда
   local nw = 0
   for _, r in ipairs(rows) do nw = math.max(nw, ms(r.name .. (r.axis and (r.axis == 1 and '.x' or '.y') or ''))) end
   local pwr = pw - thw

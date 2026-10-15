@@ -59,6 +59,7 @@ function MC.draw(L, snap, x0, y0, w, h, label_w, cur_row, rpb, regions, fit)
   if cur_bar >= MC.scroll + nvis then MC.scroll = cur_bar - nvis + 1 end
   U.set(U.BG); gfx.rect(x0, y0, w, h, 1)
   local nb = math.max(c.last + 2, cur_bar + 1)
+  if U.vbar then U.vbar('macroview', x0, y0, w, nvis * rh, MC.scroll, nvis, nb) end   -- 15 окт: длинному списку — полоса всегда
   local maxn = 1
   for _, t in pairs(c.by) do for _, e in pairs(t) do if e.n > maxn then maxn = e.n end end end
   for i = 0, nvis - 1 do

@@ -91,6 +91,7 @@ function GD.draw(L, x, y, w, h, snap, seq, info, focused)
   local nvis = math.max(1, math.floor((h - (ry0 - y)) / L.rh))
   if GD.cur.ri - 1 < GD.scroll then GD.scroll = GD.cur.ri - 1 end
   if GD.cur.ri > GD.scroll + nvis then GD.scroll = GD.cur.ri - nvis end
+  if U.vbar then U.vbar('garden', x, ry0, w, nvis * L.rh, GD.scroll, nvis, #seq) end   -- 15 окт: длинному списку — полоса всегда
   for r = 1, nvis do
     local ri = GD.scroll + r
     local rg = seq[ri]

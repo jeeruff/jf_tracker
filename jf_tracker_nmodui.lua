@@ -53,6 +53,7 @@ function N.draw(L, x, y, w, h, list, focused)
   local per = math.max(1, math.floor((h - L.rh) / L.rh))
   N.scroll = math.max(0, math.min(N.scroll or 0, n - per))
   if N.sel > N.scroll + per then N.scroll = N.sel - per elseif N.sel <= N.scroll then N.scroll = N.sel - 1 end
+  if U.vbar then U.vbar('nmod', x, y + L.rh, w, per * L.rh, N.scroll, per, n) end   -- 15 окт: длинному списку — полоса всегда
   local numw = U.measure('00') + L.pad
   for i = N.scroll + 1, math.min(n, N.scroll + per) do
     local ry = y + (i - N.scroll) * L.rh

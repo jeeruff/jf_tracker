@@ -94,6 +94,7 @@ function VD.draw(L, U, x, y, w, h, focused, data, fit, hint)
   VD.sel = math.max(1, math.min(#list, VD.sel))
   if VD.sel > VD.scroll + nvis then VD.scroll = VD.sel - nvis end
   if VD.sel <= VD.scroll then VD.scroll = math.max(0, VD.sel - 1) end
+  if U.vbar then U.vbar('video', lx, y + L.rh + 2, x + w - lx, nvis * L.rh, VD.scroll, nvis, #list) end   -- 15 окт: длинному списку — полоса всегда
   if #list == 0 then U.text(lx, y + L.rh + 2, fit('no video in the project - drop a video file from the browser onto a track', x + w - lx), U.GREY) end
   for k = 1, nvis do
     local i = VD.scroll + k

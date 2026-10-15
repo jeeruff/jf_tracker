@@ -5098,9 +5098,10 @@ function D.frame(L, snap, rows, state, info)
       -- M S R — буквами всегда (решение пользователя); A и мониторинг — иконками,
       -- без иконок — A и I. Мониторинг: 0 выкл, 1 вкл, 2 авто (tape) — контур
       local mon = col.recmon or 0
-      local labels = { { 'R', col.armed, D.ARM, 'arm' },
-                       { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
-                       { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
+      -- 15 окт: без заглавных — i m s sro (пользователь: «no caps»)
+      local labels = { { 'r', col.armed, D.ARM, 'arm' },
+                       { 'i', mon > 0, U.CYAN, 'monitor', mon == 2 },
+                       { 'm', col.muted, U.AMBER, 'mute' }, { 's', col.solo, U.GREEN, 'solo' },
                        { 'ø', col.phase, U.AMBER, 'phase' },          -- 8 окт: инверсия фазы (буква, как в блоке трека DSP)
                        { '~', nenv > 0, U.CYAN or U.AMBER, 'auto' } }   -- 15 окт: ~ — автоматизация (было trim), знак из глоссария справки
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
@@ -5138,9 +5139,10 @@ function D.frame(L, snap, rows, state, info)
           set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
           if b[4] == 'arm' then
             local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
-            if aa then text(cx - math.floor(ms('A') / 2), tyc, 'A', on and U.TEXT or rc)
+            -- 15 окт: строчная a (без заглавных), по центру круга — не по прямоугольнику кнопки (съезжала)
+            if aa then text(cx - math.floor(ms('a') / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)
             else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
-          else text(cx - math.floor(ms(b[1]) / 2), tyc, b[1], on and U.TEXT or BTXT) end
+          else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or BTXT) end
           local key = b[4] == 'phase' and 'trkio' or 'btn'
           if hot then hover[key] = { col = col, what = b[4] } end
           hint(key, x, by, bwk, bh + 2, { col = col, what = b[4] })
@@ -5191,9 +5193,9 @@ function D.frame(L, snap, rows, state, info)
         set(hot and D.CURROW or U.PANEL); gfx.rect(rx, ry, rw, rhh, 1)
         set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(rx, ry, rw, rhh, 0)
         local th3 = L.rh - 4
-        local lx = vert and 0 or (rx + math.floor((rw - ms('SRO')) / 2))
+        local lx = vert and 0 or (rx + math.floor((rw - ms('sro')) / 2))
         local ly = vert and (ry + math.floor((rhh - 3 * th3) / 2) - 1) or (ry + math.floor((rhh - (L.rh - 2)) / 2))
-        for i, ch in ipairs({ 'S', 'R', 'O' }) do
+        for i, ch in ipairs({ 's', 'r', 'o' }) do
           local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)   -- S голубой, R зелёный, O янтарь
           if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
           elseif rw >= 2 * ms('SRO') then text(rx + math.floor((i - 1) * rw / 3 + (rw / 3 - ms(ch)) / 2), ly, ch, cc)   -- 12 окт: широкая — буквы врозь

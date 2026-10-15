@@ -838,7 +838,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
       if mx >= ex and mx < ex + colw and my >= ey and my < ey + L.rh then hover = r end
     end
   end
-  U.vbar('keyhelp', x, top, w, nr * L.rh, KH.scroll, nr, nrt)   -- 15 окт: полоса вместо «v more»
+  if U.vbar then U.vbar('keyhelp', x, top, w, nr * L.rh, KH.scroll, nr, nrt) end   -- 15 окт: полоса вместо «v more»
   -- ASCII-взрыв точками вокруг подсвеченной строки
   if flash_rect and KH.flash then
     local t = now - KH.flash.t0

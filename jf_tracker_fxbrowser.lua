@@ -291,7 +291,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     end
     ::next_row::
   end
-  U.vbar('fxb', x, top, w, nvis * L.rh, FB.scroll, nvis, #res)   -- 15 окт: длинному списку — полоса всегда
+  if U.vbar then U.vbar('fxb', x, top, w, nvis * L.rh, FB.scroll, nvis, #res) end   -- 15 окт: длинному списку — полоса всегда
   return hover
 end
 

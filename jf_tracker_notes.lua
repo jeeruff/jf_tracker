@@ -161,7 +161,7 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
   local nvis = math.max(1, math.floor((y + h - top - 2) / L.rh))
   if cur_v - 1 < NT.scroll then NT.scroll = cur_v - 1 end
   if cur_v - 1 >= NT.scroll + nvis then NT.scroll = cur_v - nvis end
-  U.vbar('notes', x, top, w, nvis * L.rh, NT.scroll, nvis, #vis)   -- 15 окт: полоса всегда
+  if U.vbar then U.vbar('notes', x, top, w, nvis * L.rh, NT.scroll, nvis, #vis) end   -- 15 окт: полоса всегда
   for i = 1, nvis do
     local v = vis[NT.scroll + i]
     if not v then break end
