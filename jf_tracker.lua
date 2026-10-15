@@ -336,7 +336,7 @@ state.panes = (function()
     -- 13 окт: модуль slices снова виден — под lib (один раз)
     if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
     if reaper.GetExtState(EXT, 'clip_tab') ~= '1' then draw.panes.keep_in(m, 'clipboard', 'inst'); reaper.SetExtState(EXT, 'clip_tab', '1', true) end   -- 13 окт: clipboard — вкладкой у lib
-    if reaper.GetExtState(EXT, 'ut_tab') ~= '1' then draw.panes.keep_in(m, 'undotree', 'inst'); reaper.SetExtState(EXT, 'ut_tab', '1', true) end   -- 15 окт: undo — вкладкой у lib
+    if reaper.GetExtState(EXT, 'ut_tab2') ~= '1' and draw.panes.keep_in(m, 'undotree', 'browser') then reaper.SetExtState(EXT, 'ut_tab2', '1', true) end   -- 15 окт: undo — вкладкой у браузера (один раз; браузер спрятан — когда появится)
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
