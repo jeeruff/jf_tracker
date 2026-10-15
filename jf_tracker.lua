@@ -16063,35 +16063,57 @@ local function frame()
       -- колонке, сбоку — горизонтально по строке
       local dr, df = cur.row - last.row, cur.fi - last.fi
       local side = (math.abs(dr) / 8 >= math.abs(df) / 3) and (dr > 0 and 'top' or 'bottom') or (df > 0 and 'left' or 'right')
-      ctx.beacon = { t = reaper.time_precise(), side = side }; b = ctx.beacon
+      ctx.beacon = { t = reaper.time_precise(), side = side, dur = tonumber(reaper.GetExtState(EXT, 'beacon_dur')) or 0.5 }; b = ctx.beacon   -- beacon_dur — для тестов (снимок посреди полёта)
     end
     ctx.beacon_last = cur
     if b then
-      local k = (reaper.time_precise() - b.t) / 0.5
+      local k = (reaper.time_precise() - b.t) / (b.dur or 0.5)
       local f = L.flat[vim.cur.fi]
       local r = vim.cur.row - rows[1].row
       if k >= 1 or not (f and f.x) or r < 0 or r >= (L.nrows or 0) then ctx.beacon = nil
       else
+        -- 15 окт: комета — ярче всего у курсора, к началу следа плавно гаснет; прямой след шириной в
+        -- ячейку курсора — яркий, по всей колонке (строке) — только тусклый ореол
         local q = (1 - k) ^ 2
+        local fade = 1 - k
         local cx, cw = math.max(L.matrix_w or 0, f.x), f.w or L.cw
         local cy = L.body_y + r * L.rh
-        U.set(U.AMBER, 0.55 * (1 - k))
-        if b.side == 'top' then
-          local h = math.floor((cy - L.body_y) * q)
-          gfx.rect(cx, cy - h, cw, h + L.rh, 1)
-        elseif b.side == 'bottom' then
-          local h = math.floor((L.body_y + L.nrows * L.rh - cy - L.rh) * q)
-          gfx.rect(cx, cy, cw, L.rh + math.max(0, h), 1)
-        elseif b.side == 'left' then
-          local xl = cx
-          for _, g in ipairs(L.flat) do if g.x and g.x >= (L.matrix_w or 0) and g.x < xl then xl = g.x end end
-          local w = math.floor((cx - xl) * q)
-          gfx.rect(cx - w, cy, w + cw, L.rh, 1)
-        else
-          local x1 = L.win_w or gfx.w
-          local w = math.floor((x1 - cx) * q)
-          gfx.rect(cx, cy, math.max(cw, w), L.rh, 1)
+        local nx, nw = cx, cw                            -- ячейка курсора (поле под курсором)
+        if not f.env and draw.field_rect then
+          local okf, fx0, fw0 = pcall(draw.field_rect, L, vim.cur.sub or vim.cur.field or 1)
+          if okf and fx0 and fw0 and fw0 > 0 then nx, nw = f.x + fx0, fw0 end
         end
+        -- градиент полосой: to_end — ярче к концу (вниз / вправо), иначе к началу
+        local function grad(x, y, w, h, vert, to_end, A)
+          if w <= 0 or h <= 0 then return end
+          local N = 16
+          for i = 0, N - 1 do
+            local t = (i + 0.5) / N
+            U.set(U.AMBER, A * ((to_end and t or (1 - t)) ^ 1.6))
+            if vert then local a0, a1 = y + math.floor(h * i / N), y + math.floor(h * (i + 1) / N); if a1 > a0 then gfx.rect(x, a0, w, a1 - a0, 1) end
+            else local a0, a1 = x + math.floor(w * i / N), x + math.floor(w * (i + 1) / N); if a1 > a0 then gfx.rect(a0, y, a1 - a0, h, 1) end end
+          end
+        end
+        local HALO, CORE = 0.16 * fade, 0.75 * fade
+        if b.side == 'top' or b.side == 'bottom' then
+          local top = b.side == 'top'
+          local len = math.floor((top and (cy - L.body_y) or (L.body_y + L.nrows * L.rh - cy - L.rh)) * q)
+          local y0 = top and (cy - len) or (cy + L.rh)
+          grad(cx, y0, cw, len, true, top, HALO)
+          grad(nx, y0, nw, len, true, top, CORE)
+        else
+          local left = b.side == 'left'
+          local len
+          if left then
+            local xl = cx
+            for _, g in ipairs(L.flat) do if g.x and g.x >= (L.matrix_w or 0) and g.x < xl then xl = g.x end end
+            len = math.floor((nx - xl) * q)
+          else len = math.floor(((L.win_w or gfx.w) - (nx + nw)) * q) end
+          local x0 = left and (nx - len) or (nx + nw)
+          grad(x0, cy - L.rh, len, 3 * L.rh, false, left, HALO)
+          grad(x0, cy, len, L.rh, false, left, CORE)
+        end
+        U.set(U.AMBER, CORE); gfx.rect(nx, cy, nw, L.rh, 1)   -- голова — сама ячейка
       end
     end
   end
