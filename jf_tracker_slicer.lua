@@ -1166,6 +1166,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       key_of[k] = (ctx.key_label and ctx.key_label(string.char(code))) or string.char(code)
     end
   end
+  -- 15 окт: первый слайс — начало сэмпла, конец последнего — его конец: волна вне — притушена,
+  -- края — скобками [ ] во всю высоту (видно, что играет, после dd первых слайсов)
+  if #slices > 0 and wave_view then
+    local a0 = slices[1]
+    local pa, pb = tx(a0), tx(len)
+    if a0 > va + 1e-6 then gfx.set(0, 0, 0, 0.6); gfx.rect(x, wy, math.max(0, math.min(x + w, pa) - x), wh, 1) end
+    if pb < x + w then gfx.set(0, 0, 0, 0.6); gfx.rect(math.max(x, pb), wy, x + w - math.max(x, pb), wh, 1) end
+    gfx.a = 1
+    U.set(U.AMBER)
+    if pa >= x and pa < x + w then gfx.rect(pa, wy, 2, wh, 1); gfx.rect(pa, wy, 6, 2, 1); gfx.rect(pa, wy + wh - 2, 6, 2, 1) end
+    if pb > x and pb <= x + w then gfx.rect(pb - 2, wy, 2, wh, 1); gfx.rect(pb - 6, wy, 6, 2, 1); gfx.rect(pb - 6, wy + wh - 2, 6, 2, 1) end
+  end
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
   local lab_end = -1e9            -- 6 окт: подписи не налезают — только если влезает до следующей линии и после прошлой подписи
   for k, t in ipairs(slices) do
