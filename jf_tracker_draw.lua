@@ -3498,11 +3498,16 @@ function D.transport_groups(c)
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   local lsn = { { 'ls_ins', 'insert', c.hear and U.AMBER or U.GREY }, { 'ls_step', 'step', c.trklisten and U.AMBER or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.AMBER or U.GREY }, { 'ls_line', 'line', c.steplisten and U.AMBER or U.GREY } }   -- включённые — янтарём (ярче голубого)
   -- 15 окт: шаг — крупно (×2, как BPM), без слова step (оно — вертикальной скобкой); inst ввода не показываем
-  local stepw = math.max(D.big_measure(tostring(c.step or 0), 2), D.big_measure('next', 2))
-  g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', tostring(c.step or 0), big = true, res = 'next' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
-
-                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY },
-                  { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = 'human 100%' } } }   -- 15 окт: человечнее — тайминг, высота, velocity   -- 13 окт: шаг legato — нота дотягивается до следующей
+  -- 15 окт: сетка блока — крупный шаг слева (ширина по значению, не уже «16» — соседи не прыгают от цифры
+  -- к цифре), справа две ровные колонки: LPB / pitch и legato / human (общая ширина колонки — res)
+  local stxt = tostring(c.step or 0)
+  local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2))
+  local col2, col3 = 'pitch resample', 'human 100%'
+  g[#g + 1] = { boxed = true, bracket = 'step',
+                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
+                  { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
+                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
+                  { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   if c.tpfull then table.insert(g[#g], lsn)
