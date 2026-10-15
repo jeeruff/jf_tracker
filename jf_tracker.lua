@@ -19908,6 +19908,13 @@ local function frame()
     if not taken then reaper.DeleteExtState(EXT, 'quit', false); reaper.DeleteExtState(EXT, 'owner', false) end
     if ctx.PM and ctx.PM.flush then pcall(ctx.PM.flush, true) end
     PV.stop(); save_win(); gfx.quit()
+    -- 15 окт: :reload — тот же скрипт заново из файлов в следующем тике (новые модули, новое окно)
+    if ctx.reloading then
+      reaper.defer(function()
+        local ok, err = pcall(dofile, SELF)
+        if not ok then reaper.SetExtState(EXT, 'err_load', tostring(err), false); reaper.ShowConsoleMsg('jf_tracker reload failed: ' .. tostring(err) .. '\n') end
+      end)
+    end
   end
 end
 
