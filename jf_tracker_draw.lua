@@ -332,7 +332,7 @@ function D.panes_layout(state, L, nregions, ncols)
   do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
   if state.sp_none then it = 0 end                      -- 11 окт: сэмпла нет — нечего показывать
   local lo = state.loop_on and 1 or 0
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.lo == lo and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == ((state.hints and state.hintpos ~= 'status') and 1 or 0) then
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.lo == lo and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == D.hint_mode(state) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
@@ -340,11 +340,12 @@ function D.panes_layout(state, L, nregions, ncols)
   s.it = it
   s.lo = lo
   s.mxa = mxa
-  s.hi = (state.hints and state.hintpos ~= 'status') and 1 or 0
+  s.hi = D.hint_mode(state)
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
   M.tab_h = L.rh + 2                                    -- подпись листа — в верхней линии рамки (zellij)
-  M.hint_h = (state.hints and state.hintpos ~= 'status') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
+  M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
+  M.hint_trk = (state.hints and state.hintpos == 'tabs') and (L.rh + 1) or nil   -- 15 окт: tabs — подсказки в строке вкладок; у трекера вкладок нет — его строка внизу
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
   M.minh = function(id)
@@ -1628,6 +1629,30 @@ function D.hint_text(x, y, s, maxw, bg)
       end
       cx = cx + kw + (d ~= '' and (sp + dw) or 0) + 2 * sp
     end
+  end
+end
+-- 15 окт: режим подсказок для кэша раскладки: 0 нет / в статусе, 1 под панелью, 2 в строке вкладок
+function D.hint_mode(state) return state.hints and ((state.hintpos == 'panes' and 1) or (state.hintpos == 'tabs' and 2)) or 0 end
+-- пары «клавиша что» в строку от x до x1 (строка вкладок): с подложкой — по строке идёт линия рамки
+function D.hint_pairs(x, y, x1, items, bg)
+  local kc, dc = D.hint_colors(bg)
+  local sp = math.max(4, ms(' '))
+  -- сначала — что влезает, потом одна сплошная подложка (по частям — линия рамки просвечивала «-» между парами)
+  local fit_n, cx = 0, x
+  for i, it in ipairs(items or {}) do
+    local w2 = ms(it[1]) + sp + ms(it[2])
+    if cx + w2 > x1 then break end
+    fit_n, cx = i, cx + w2 + 2 * sp
+  end
+  if fit_n == 0 then return end
+  set(bg or U.PANEL); gfx.rect(x - 2 * sp, y - 1, cx - x, (type(TH) == 'function' and TH() or 12) + 2, 1)
+  cx = x
+  for i = 1, fit_n do
+    local it = items[i]
+    local kw = ms(it[1])
+    text(cx, y, it[1], kc)
+    text(cx + kw + sp, y, it[2], dc)
+    cx = cx + kw + sp + ms(it[2]) + 2 * sp
   end
 end
 function D.hint_bar(L, x, y, w, items, active)
@@ -4563,6 +4588,18 @@ function D.panes_frame(L, snap, state, info, hover, ph)
             hint('ptab', t.x, t.y, t.w, t.h, t.id)
           end
         end
+      end
+      -- 15 окт: hints where = tabs — клавиши модуля в строке вкладок, справа от подписей (глаз уже здесь)
+      if c.tab and info.hint_bars and state.hints and state.hintpos == 'tabs' and id ~= 'mixer' then
+        local last = c.tabs[#c.tabs]
+        local hx = (last and (last.x + math.min(last.w, ms(fit(D.ic(last.id, PN.BY[last.id].label), last.w - 2 * L.pad)) + 2 * L.pad)) or c.x) + 3 * L.pad
+        local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
+        local bar = info.hint_bars(page) or D.PANE_KEYS
+        D.qm_bars = D.qm_bars or setmetatable({}, { __mode = 'k' })
+        local qb = D.qm_bars[bar]
+        if not qb then qb = { { '\\', 'menu' } }; for _, it in ipairs(bar) do qb[#qb + 1] = it end; D.qm_bars[bar] = qb end
+        local badge = (state.pane_mode and c.num and c.num <= 9) and (3 * L.cw) or 0
+        D.hint_pairs(hx, c.y + 1, c.x + c.w - L.pad - badge, qb, U.PANEL)
       end
       -- режим PANE: номер листа (1..9 — фокус цифрой) у правого края рамки
       if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
