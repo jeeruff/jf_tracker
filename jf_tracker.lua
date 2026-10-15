@@ -12050,6 +12050,7 @@ ctx.theme_tab.init(U, {
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
   modefonts = function() return ctx.MODEFONTS end,
   mode_word = function(f) local t = draw.MODE_SCRIPT[f]; return t and t.INSERT or 'INSERT' end,
+  mode_scale = function(f) return draw.MODE_FONT_SCALE[f] or 1 end,
   modefont_get = function() return ctx.modefont_get() end,
   modefont_set = function(v) ctx.modefont_set(v) end,
   themes = function()

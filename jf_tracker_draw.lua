@@ -4013,14 +4013,79 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
 end
 
 -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
-D.MODE_SCRIPT = {
-  ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
-  ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
-  ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
-  -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
-  ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
+-- 15 окт: все слова режима, включая модуль в фокусе (UNDO, LIB, DSP…); клингонский — латиницей
+-- клингонского, в pIqaD переводит klingon() ниже; слова без перевода — латиница как есть
+local MW = {
+  --            Ponomar            Songti SC     Diwan Thuluth        клингонский
+  NORMAL     = { 'ОБЫЧНО',          '常规',       'عادي',             'motlh' },
+  INSERT     = { 'ВСТАВКА',         '插入',       'إدراج',            'lIch' },
+  VISUAL     = { 'ЗРѢНІЕ',          '选择',       'تحديد',            'legh' },
+  ['V-LINE'] = { 'СТРОКА',          '行选',       'سطر',              'tlhegh' },
+  KEYS       = { 'КЛАВИШИ',         '键盘',       'مفاتيح',           'leQ' },
+  UNDO       = { 'ВОЗВРАТЪ',        '撤销',       'تراجع',            'chegh' },
+  PANE       = { 'ОКНО',            '窗格',       'لوحة',             'Qorwagh' },
+  SLIDER     = { 'ДВИЖОКЪ',         '推子',       'منزلق',            'joD' },
+  FADE       = { 'ДВИЖОКЪ',         '推子',       'منزلق',            'joD' },
+  TRACKS     = { 'ДОРОЖКИ',         '轨道',       'مسارات',           'He' },
+  SESSION    = { 'СОБОРЪ',          '会话',       'جلسة',             'qep' },
+  CTRL       = { 'ВЛАСТЬ',          '控制',       'تحكم',             'SeH' },
+  COMMAND    = { 'ПОВЕЛѢНІЕ',       '命令',       'أمر',              "ra'" },
+  SEARCH     = { 'ПОИСКЪ',          '搜索',       'بحث',              'nej' },
+  RENAME     = { 'ИМЯ',             '重命名',     'تسمية',            'pong' },
+  AUTOMATION = { 'САМОДѢЙСТВІЕ',    '自动化',     'أتمتة',            'mIw' },
+  BROWSER    = { 'ОБЗОРЪ',          '浏览',       'متصفح',            'nejwI\'' },
+  CLIPBOARD  = { 'ХРАНИЛИЩЕ',       '剪贴板',     'حافظة',            'pol' },
+  CLIPS      = { 'ОТРЫВКИ',         '片段',       'مقاطع',            "pe'" },
+  DSP        = { 'ЗВУКЪ',           '处理',       'معالجة',           'wab' },
+  FX         = { 'ДѢЙСТВА',         '效果',       'مؤثرات',           'choH' },
+  GRID       = { 'РѢШЕТКА',         '网格',       'شبكة',             'mach' },
+  HARMONIZER = { 'СОГЛАСІЕ',        '和声',       'تناغم',            'bom' },
+  ITEM       = { 'ПРЕДМЕТЪ',        '条目',       'عنصر',             'Doch' },
+  LIB        = { 'КНИЖНИЦА',        '库',         'مكتبة',            'paq' },
+  MACROS     = { 'МАКРОСЫ',         '宏',         'وحدات',            'ra\'mey' },
+  MAIN       = { 'ГЛАВА',           '主页',       'رئيسي',            "wa'DIch" },
+  MASTER     = { 'ВЛАДЫКА',         '总线',       'الإخراج',          'pIn' },
+  MATRIX     = { 'МАТРИЦА',         '矩阵',       'مصفوفة',           'mIr' },
+  MIDI       = { 'МИДИ',            '迷笛',       'ميدي',             'QIn' },
+  MIXER      = { 'СМѢСИТЕЛЬ',       '混音',       'مازج',             'DuD' },
+  MODULATION = { 'ИЗМѢНЕНІЕ',       '调制',       'تضمين',            'choH' },
+  NOTES      = { 'ЗАПИСИ',          '笔记',       'ملاحظات',          'ghItlh' },
+  ORCA       = { 'ОРКА',            '逆戟鲸',     'أوركا',            'Qogh' },
+  PM         = { 'ДѢЛА',            '项目',       'مشاريع',           'Qu\'' },
+  PROPERTIES = { 'СВОЙСТВА',        '属性',       'خصائص',            'Daj' },
+  REC        = { 'ЗАПИСЬ',          '录音',       'تسجيل',            'qon' },
+  SCOPES     = { 'ЗЕРЦАЛА',         '示波器',     'راسم',             'leghwI\'' },
+  SLICES     = { 'ЛОМТИ',           '切片',       'شرائح',            "pe'" },
+  TRACKER    = { 'ТРЕКЕРЪ',         '音轨器',     'متتبع',            'ghoch' },
+  VIDEO      = { 'ВИДѢНІЕ',         '视频',       'فيديو',            'mIllogh' },
+  VISOR      = { 'ЗЕРЦАЛО',         '视觉',       'مرئيات',           'legh' },
+  TOP        = { 'ВЕРХЪ',           '顶部',       'أعلى',             'Dung' },
 }
+-- pIqaD (CSUR U+F8D0…): клингонская латиница → знаки; tlh ch gh ng — один знак
+local function klingon(w)
+  local L1 = { a = 0, b = 1, D = 3, e = 4, H = 6, I = 7, j = 8, l = 9, m = 10, n = 11, o = 13, p = 14, q = 15, Q = 16, r = 17, S = 18, t = 19, u = 21, v = 22, w = 23, y = 24, ["'"] = 25 }
+  local out, i = {}, 1
+  while i <= #w do
+    local c3, c2, c1 = w:sub(i, i + 2), w:sub(i, i + 1), w:sub(i, i)
+    local cp, n
+    if c3 == 'tlh' then cp, n = 20, 3
+    elseif c2 == 'ch' then cp, n = 2, 2
+    elseif c2 == 'gh' then cp, n = 5, 2
+    elseif c2 == 'ng' then cp, n = 12, 2
+    else cp, n = L1[c1], 1 end
+    out[#out + 1] = cp and utf8.char(0xF8D0 + cp) or c1
+    i = i + n
+  end
+  return table.concat(out)
+end
+D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {} }
+for k, v in pairs(MW) do
+  D.MODE_SCRIPT['Ponomar'][k], D.MODE_SCRIPT['Songti SC'][k], D.MODE_SCRIPT['Diwan Thuluth'][k] = v[1], v[2], v[3]
+  D.MODE_SCRIPT['pIqaD qolqoS'][k] = klingon(v[4])
+end
 -- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
+-- 15 окт: множитель размера — у шрифта мелкое очко при той же высоте строки (арабский был вдвое мельче)
+D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 function D.draw_mode(L, sx0, sy0, sw, str, dry)
@@ -4033,12 +4098,16 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   local sy = sy0
   local tr = D.modefont and D.MODE_SCRIPT[D.modefont]
   if tr and mode ~= '' then
-    local w1 = mode:match('^(%S+)')
-    if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
+    -- 15 окт: целиком (NOTE MOD), иначе первое слово (TOP:item, UNDO …)
+    if tr[mode] then mode = tr[mode]
+    else
+      local w1 = mode:match('^([%u%-]+)')
+      if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
+    end
   end
   if D.modefont and mode ~= '' then
     -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
-    local hpx = math.floor(3 * L.th)   -- 13 окт: в полтора раза крупнее (просьба)
+    local hpx = math.floor(3 * L.th * (D.MODE_FONT_SCALE[D.modefont] or 1))   -- 13 окт: в полтора раза крупнее (просьба)
     gfx.setfont(4, D.modefont, hpx)
     while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
     local mw, mh = gfx.measurestr(mode)

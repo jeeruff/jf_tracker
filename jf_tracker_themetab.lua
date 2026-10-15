@@ -206,7 +206,7 @@ function TT.draw(x, y, w, h, emb)
         C((nm == curm) and U.AMBER or U.LINE); gfx.rect(cx, cy, pw, mh, 0)
         if nm == 'off' then text(cx + pad, cy + 2, 'off - tracker font', U.GREY)
         else
-          gfx.setfont(5, nm, 2 * L.th)
+          gfx.setfont(5, nm, math.floor(2 * L.th * (ctx.mode_scale and ctx.mode_scale(nm) or 1)))
           local wd = ctx.mode_word and ctx.mode_word(nm) or 'INSERT'   -- 15 окт: письменность — своим словом (插入, إدراج, ВСТАВКА, pIqaD)
           C(U.AMBER); gfx.x, gfx.y = cx + pad, cy + 1; gfx.drawstr(wd)
           local iw = gfx.measurestr(wd .. ' ')
