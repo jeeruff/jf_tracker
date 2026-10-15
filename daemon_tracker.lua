@@ -273,20 +273,40 @@ function M.tick(mono)
       end
     end
   end
-  -- arc: кольца 1 LPB, 2 октава, 3 шаг, 4 инструмент — накапливаем дельту,
-  -- шаг на каждые 8 тиков энкодера
+  -- 15 окт: arc — мост в трекер. Повороты копим в суммы и пишем jf_tracker/arcenc «t1,t2,t3,t4»
+  -- (трекер берёт разницу — ничего не теряется); трекер отвечает уровнями колец jf_tracker/arcrings
+  -- «v1..v4» (0..1, -1 — пусто). Кольца ни к чему не привязаны — по-старому: 1 LPB, 2 октава, 3 шаг, 4 инструмент
+  st.tot = st.tot or { 0, 0, 0, 0 }
+  local rs = {}
+  for v in (reaper.GetExtState(EXT, 'arcrings') or ''):gmatch('%-?[%d%.]+') do rs[#rs + 1] = tonumber(v) end
+  local bound = #rs >= 4 and (rs[1] >= 0 or rs[2] >= 0 or rs[3] >= 0 or rs[4] >= 0)
   st.acc = st.acc or { 0, 0, 0, 0 }
   local ENC = { { 'lpb-', 'lpb+' }, { 'oct-', 'oct+' }, { 'step-', 'step+' }, { 'inst-', 'inst+' } }
+  local moved = false
   for _, e in ipairs(mono.encs or {}) do
     local n, d = e[1] + 1, e[2]
-    if ENC[n] then
-      st.acc[n] = st.acc[n] + d
-      while st.acc[n] >= 8 do st.acc[n] = st.acc[n] - 8; cmd(ENC[n][2]) end
-      while st.acc[n] <= -8 do st.acc[n] = st.acc[n] + 8; cmd(ENC[n][1]) end
+    if n >= 1 and n <= 4 then
+      st.tot[n] = st.tot[n] + d; moved = true
+      if not bound and ENC[n] then
+        st.acc[n] = st.acc[n] + d
+        while st.acc[n] >= 8 do st.acc[n] = st.acc[n] - 8; cmd(ENC[n][2]) end
+        while st.acc[n] <= -8 do st.acc[n] = st.acc[n] + 8; cmd(ENC[n][1]) end
+      end
     end
   end
+  if moved or not st.enc_sent then
+    reaper.SetExtState(EXT, 'arcenc', table.concat(st.tot, ','), false); st.enc_sent = true
+  end
   if mono.grid_ok then frame(mono, live and p or nil, ts) end
-  if mono.arc_ok and ts then
+  if mono.arc_ok and bound then
+    for n = 1, 4 do
+      local levels = {}
+      local v = rs[n]
+      local lit = v >= 0 and math.floor(v * 64 + 0.5) or 0
+      for i = 1, 64 do levels[i] = v < 0 and 0 or (i <= lit and 10 or 1) end
+      mono.ring(n - 1, levels)
+    end
+  elseif mono.arc_ok and ts then
     local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16 }
     local li = 4
     for i, v in ipairs(LPBS) do if v == ts.lpb then li = i end end

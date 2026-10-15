@@ -60,6 +60,7 @@ MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video 
 MX.VZ = dofile(DIR .. '/jf_tracker_visor.lua')          -- 10 окт: панель visor — шейдеры ReaVisor (страница isf в браузере) из трекера
 MX.VZ.vtext = draw.vtext                                -- 13 окт: вертикальные подписи колонок матрицы модуляций
 MX.VZ.WEB = reaper.GetResourcePath() .. '/reaper_www_root/isf'
+MX.ARC = dofile(DIR .. '/jf_tracker_arc.lua')          -- 15 окт: monome arc — 4 кольца = 4 параметра эффекта (панель grid)
 MX.MR = dofile(DIR .. '/jf_tracker_macros.lua')         -- вкладка macros (9 окт)
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
@@ -14506,11 +14507,83 @@ end
 -- последовательности (regions без библиотеки), колонки — треки.
 -- jf_tracker/gridkey: «x,y,n» от демона (нажатие) — n растёт, читаем новые.
 -- стартовое значение gridkey не исполняем: оно от прошлого сеанса
+-- 15 окт: arc — кольца на параметры эффекта. Фокус в DSP — эффект под курсором DSP (параметры из памяти
+-- по имени эффекта, иначе подряд от курсора); вне DSP — последний эффект остаётся. Значения — прямо в
+-- параметр (TrackFX_SetParamNormalized): автоматизация пишется нативно, если у трека latch / write.
+do   -- 15 окт: свой блок — у главного чанка лимит 200 локальных
+local arc = { bound = nil, vals = {}, rings_last = '' }
+local function arc_mem(name) return MX.ARC.decode(reaper.GetExtState(EXT, 'arcfx_' .. (name or ''))) end
+local function arc_bind()
+  if state.focus ~= 'dsp' then return end
+  local t = dsp_target()
+  local f = t and t.fx and t.fx[dsp_sel.fx]
+  if not f then return end
+  local mem = arc_mem(f.name)
+  local key = tostring(t.track) .. ':' .. f.i .. ':' .. (mem and 'm' or dsp_sel.param)
+  if arc.bound and arc.bound.key == key then return end
+  arc.bound = { key = key, track = t.track, fxi = f.i, fxname = f.name, trackname = t.name or (t.col and t.col.name) or '',
+                slots = MX.ARC.slots(f.params or {}, dsp_sel.param, mem), mem = mem ~= nil }
+end
+-- назначить кольцу n параметр (пикер параметров эффекта); память — по имени эффекта, для всех экземпляров
+ctx.arc_assign = function(n)
+  local b = arc.bound
+  if not b then vim.msg = 'arc: pick an effect in DSP first (Tab to DSP, h l)'; return end
+  local api = model.fxapi(b.track)
+  local items = { { label = '- empty -', data = -1 } }
+  for pi = 0, api.GetNumParams(b.track, b.fxi) - 1 do
+    local _, pn = api.GetParamName(b.track, b.fxi, pi, '')
+    items[#items + 1] = { label = pn or ('p' .. pi), data = pi }
+  end
+  vim.open_picker(('arc ring %d - %s'):format(n, b.fxname), items, function(it)
+    local mem = arc_mem(b.fxname) or {}
+    for k = 1, 4 do mem[k] = mem[k] or (b.slots[k] and b.slots[k].i) or -1 end
+    mem[n] = it.data
+    reaper.SetExtState(EXT, 'arcfx_' .. b.fxname, MX.ARC.encode(mem), true)
+    arc.bound = nil; vim.msg = ('arc ring %d -> %s (remembered for every %s)'):format(n, it.label, b.fxname)
+  end)
+end
+-- забыть назначения эффекта — снова подряд от курсора DSP
+ctx.arc_forget = function()
+  local b = arc.bound
+  if b then reaper.DeleteExtState(EXT, 'arcfx_' .. b.fxname, true); arc.bound = nil; vim.msg = 'arc: ' .. b.fxname .. ' - rings follow the DSP cursor again' end
+end
+ctx.arc_info = function()
+  local b = arc.bound
+  if not b then return nil end
+  local rings = {}
+  for n = 1, 4 do local sl = b.slots[n]; rings[n] = sl and { name = sl.name, v = arc.vals[n] } or nil end
+  return { fx = b.fxname, track = b.trackname, mem = b.mem, rings = rings }
+end
+local function arc_tick()
+  arc_bind()
+  local d = MX.ARC.deltas(reaper.GetExtState(EXT, 'arcenc'))
+  local b = arc.bound
+  if b and not (reaper.ValidatePtr(b.track, 'MediaTrack*') or reaper.ValidatePtr(b.track, 'MediaItem_Take*')) then arc.bound, b = nil, nil end
+  if not b then
+    if arc.rings_last ~= '' then reaper.SetExtState(EXT, 'arcrings', '', false); arc.rings_last = '' end
+    return
+  end
+  local api = model.fxapi(b.track)
+  local fine = gfx.mouse_cap & 8 == 8                    -- Shift — тонко
+  for n = 1, 4 do
+    local sl = b.slots[n]
+    if sl then
+      local v = api.GetParamNormalized(b.track, b.fxi, sl.i)
+      if d[n] ~= 0 then v = MX.ARC.step(v, d[n], fine); api.SetParamNormalized(b.track, b.fxi, sl.i, v) end
+      arc.vals[n] = v
+    else arc.vals[n] = nil end
+  end
+  local rs = MX.ARC.rings(arc.vals)
+  if rs ~= arc.rings_last then reaper.SetExtState(EXT, 'arcrings', rs, false); arc.rings_last = rs end
+end
+ctx.arc_tick = arc_tick
+end
 local mx_last, gridkey_last = '', reaper.GetExtState(EXT, 'gridkey')
 local function publish_matrix(playpos)
   -- 8 окт: читает только daemon_tracker (мономе) — без монома не собираем
   -- (строка сетки на 425 × 28 клеток каждый кадр стоила ~50 мс)
   if not mono_read().alive then return end
+  ctx.arc_tick()   -- 15 окт: кольца arc → параметры эффекта
   -- страница clips грида (7 окт): состояние сессии, команды — poll_gridkey
   do
     local SS = MX.SS
@@ -15622,6 +15695,7 @@ local function frame()
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
     mono = (state.top and state.gridtab and state.toptab == 'grid') and mono_read() or nil,
+    arc_info = ctx.arc_info,
     master = (state.top and (state.toptab == 'master' or state.toptab == 'scope') and snap.master) and {
       peaks = { reaper.Track_GetPeakInfo(snap.master.track, 0), reaper.Track_GetPeakInfo(snap.master.track, 1) },
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
@@ -16630,6 +16704,7 @@ local function frame()
     local hints = { name = 'parameter - dblclick: default value, o: FX window, w: native modulation window', num = 'value - wheel / + - (Shift ×10)', toggle = 'on/off - click twice / Enter', enum = 'LFO shape - Enter / wheel', link = 'link source - Enter: pick parameter (fzf)' }
     state.status = (c and c.head or '') .. ': ' .. (c and hints[c.kind] or '') .. '   a: add parameter, x: remove'
   elseif hover.scopemode then state.status = ({ scope = 'oscilloscope (ring 256 samples, 8 kHz)', spec = 'spectrum analyzer: 48 log bands 30 Hz..Nyquist, -60..0 dB', sgram = 'spectrogram: time → right, 48 bands, heat = level' })[hover.scopemode] .. ' (:scopemode)'
+  elseif hover.arcring then state.status = ('arc ring %d - click: pick its parameter (remembered for every instance of this effect); Shift while turning - fine; :arcforget - back to the DSP cursor'):format(hover.arcring)
   elseif hover.monobtn then state.status = hover.monobtn == 'take' and 'monome: give the surface to the tracker module (gmem jf_mono[2] = 9)' or 'monome: return the surface to the GRID mixer mod'
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', lib = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
@@ -17705,6 +17780,7 @@ local function frame()
       if dbl and same then MMX.activate(cur_col() and cur_col().mods or {}) end
       click = { t = now2, zone = 'mm', row = hover.mm.row, ci = hover.mm.col }
     elseif hover.scopemode then ctx.scopemode(hover.scopemode); click = { t = now2, zone = 'scopemode' }
+    elseif hover.arcring then ctx.arc_assign(hover.arcring); click = { t = now2, zone = 'arcring' }
     elseif hover.monobtn then ctx.mono_take(hover.monobtn == 'take'); click = { t = now2, zone = 'monobtn' }
     elseif hover.retrobtn then
       local b = hover.retrobtn
@@ -17925,11 +18001,16 @@ local function frame()
       if SPROP.hover.fit then ctx.sprops_fit(); click = { t = now2, zone = 'spropfit' }; goto sprop_done end
       local same = click.zone == 'sprop' and click.row == SPROP.hover.row
       SPROP.sel = SPROP.hover.row or SPROP.sel
+      -- 15 окт: переключатели — одним кликом (beatsync не было в списке: клик молчал, двойной — «сброс» = выкл);
+      -- второй клик двойного по переключателю не сбрасывает; ползунки — двойной клик = значение по умолчанию
+      local TOG = { ppitch = true, loop = true, fx = true, norm = true, mute = true, lock = true, swing = true, pthru = true, sus = true, bsync = true }
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
+      elseif e and dbl and same and TOG[SPROP.hover.k] then   -- второй клик двойного — уже щёлкнул первым
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
       elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
-      elseif e and (SPROP.hover.k == 'ppitch' or SPROP.hover.k == 'loop' or SPROP.hover.k == 'fx' or SPROP.hover.k == 'norm' or SPROP.hover.k == 'mute' or SPROP.hover.k == 'lock' or SPROP.hover.k == 'swing' or SPROP.hover.k == 'pthru' or SPROP.hover.k == 'sus') then ctx.sp_adjust(e, SPROP.hover.k, 1) end
+      elseif e and SPROP.hover.k == 'bsync' then ctx.bsync_toggle(e)
+      elseif e and TOG[SPROP.hover.k] then ctx.sp_adjust(e, SPROP.hover.k, 1) end
       click = { t = now2, zone = 'sprop', row = SPROP.hover.row }
       ::sprop_done::
     elseif hover.dspcomp then

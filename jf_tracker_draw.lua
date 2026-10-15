@@ -2739,6 +2739,33 @@ local function draw_mono(L, info, X0, Y0, MW, H, hover)
         bx = bx - L.pad
       end
       y0 = y0 + L.rh + 2
+      -- 15 окт: arc — куда идут кольца: эффект (из DSP; память по имени эффекта) и 4 параметра; клик — назначить
+      local ai = info.arc_info and info.arc_info()
+      if ai then
+        local head = ('arc -> %s / %s%s'):format(ai.track ~= '' and ai.track or '?', ai.fx, ai.mem and '  (remembered)' or '  (from the DSP cursor)')
+        text(X0 + 2, y0 + 1, fit(head, MW - 2 * L.pad), U.TEXT)
+        y0 = y0 + L.rh
+        local cw4 = math.floor((MW - 2 * L.pad) / 4)
+        for n = 1, 4 do
+          local rx = X0 + (n - 1) * cw4
+          local r = ai.rings[n]
+          local hot = mx >= rx and mx < rx + cw4 - 2 and my >= y0 and my < y0 + 2 * L.rh
+          set(hot and D.CURROW or U.PANEL); gfx.rect(rx, y0, cw4 - 2, 2 * L.rh, 1)
+          set(hot and U.AMBER or U.LINE); gfx.rect(rx, y0, cw4 - 2, 2 * L.rh, 0)
+          text(rx + L.pad, y0 + 1, fit(n .. ' ' .. (r and r.name or '- click: assign'), cw4 - 2 * L.pad - 2), r and U.TEXT or U.DIM)
+          if r and r.v then
+            local bw = cw4 - 2 * L.pad - 2
+            set(U.DIM); gfx.rect(rx + L.pad, y0 + L.rh + math.floor(L.rh / 2), bw, 2, 1)
+            set(U.AMBER); gfx.rect(rx + L.pad, y0 + L.rh + math.floor(L.rh / 2) - 1, math.floor(bw * r.v + 0.5), 4, 1)
+          end
+          if hot then hover.arcring = n end
+          hint('arcring', rx, y0, cw4 - 2, 2 * L.rh, n)
+        end
+        y0 = y0 + 2 * L.rh + 4
+      else
+        text(X0 + 2, y0 + 1, fit('arc: pick an effect in DSP - its 4 parameters go to the rings', MW - 2 * L.pad), U.GREY)
+        y0 = y0 + L.rh + 2
+      end
       -- мини-грид 16×8 (яркость как на устройстве) + легенда справа
       local avail = H - 2 - y0
       local cs = math.max(2, math.min(math.floor((MW * 0.45) / 16), math.floor(avail / 8)))
@@ -2761,7 +2788,7 @@ local function draw_mono(L, info, X0, Y0, MW, H, hover)
       -- легенда — горизонтально справа от мини-грида
       local lx = X0 + 16 * cs + L.pad
       local lw = (X0 + MW) - lx - L.pad
-      local lines = { 'rows 1-7: slots x tracks', 'lit: events  X: muted', 'arc: 1 lpb 2 oct 3 step 4 inst', 'col 16: host (mod list)' }
+      local lines = { 'rows 1-7: slots x tracks', 'lit: events  X: muted', 'arc: rings = the effect above (none: 1 lpb 2 oct 3 step 4 inst)', 'col 16: host (mod list)' }
       for i, ln in ipairs(lines) do
         local ly = y0 + (i - 1) * L.rh
         if ly + L.rh > H - 2 then break end

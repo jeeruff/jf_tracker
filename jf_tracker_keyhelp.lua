@@ -495,7 +495,7 @@ KH.PAGES = {
     { k = 'g[ g]', d = 'give back the file before / after the sample (the cyan < 3.21s / 10.27s > tags at the wave edges say how much is there; a click on a tag does the same)' },
     { k = 'q 2 w 3 e', d = 'listen: q - the whole sample, 2 w 3 e ... - slices 1 2 3 4; keys renoise - here only this top row plays, the bottom row (s x v d n z) stays the slicer commands' },
     { k = 'gw', d = 'go to a hex position on the wave: gw, the frame as on the ruler above the wave (hex, from the sample start), Enter - the wave cursor at the nearest transient, Shift+Enter - exactly there; [ ] then set the sample start / end at it' },
-    { k = '[ ]', d = 'sample start / end: at the edge of the span dragged on the wave, else at the wave cursor (gw), else at the edge of the selected slice - cuts it for all notes of the instrument (as the blue ia / ib handles)' },
+    { k = '[ ]', d = 'sample start / end: at the edge of the span dragged on the wave, else at the wave cursor (gw), else at the marker of the selected slice ([ - the sample starts there, ] - it ends there: the slice before it is the last) - cuts it for all notes of the instrument (as the blue ia / ib handles)' },
     { k = 'D', d = 'selection to lib' },
     { k = 'Space', d = 'preview selection' },
     { k = 'j k', t = { 'j', 'k', 'J', 'K' }, d = 'properties: row down / up' },
@@ -510,7 +510,7 @@ KH.PAGES = {
   grid = { title = 'monome grid / arc (jf_grid)', e = {
     { k = 'take', d = 'give the grid to the tracker module (rows 1-7: slots x tracks, row 8: transport)' },
     { k = 'grid', d = 'return the grid to the GRID mixer mod' },
-    { k = 'arc', d = 'ring 1 lpb, 2 oct, 3 step, 4 inst' },
+    { k = 'arc', d = '4 rings = 4 parameters of the effect picked in DSP (stays when you leave DSP); click a ring in this tab - pick its parameter, remembered for every instance of that effect; :arcforget - follow the DSP cursor again; nothing picked - 1 lpb, 2 oct, 3 step, 4 inst' },
     { k = 'options', d = 'the tab can be switched off in options (grid tab) if you have no monome' },
     { k = 'Esc', d = 'back to tracker' },
   } },

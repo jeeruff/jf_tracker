@@ -631,7 +631,8 @@ function S.key(c)
     elseif S.wcur and S.wcur_e == e.item then t = S.wcur
     else
       local k = (ctx.ssel and ctx.ssel.item == e.item) and ctx.ssel.k or 0
-      if k and k > 0 and S.slices[k] then local t0, t1 = S.bounds(S.slices, k, e.len); t = (ch == '[') and t0 or t1 end
+      -- 15 окт: оба — по метке выбранного слайса: [ — с неё начало, ] — на ней конец (она — конец последнего слайса)
+      if k and k > 0 and S.slices[k] then t = S.bounds(S.slices, k, e.len) end
     end
     if not t then S.msg = '[ ]: gw HEX - a wave cursor, or select a slice (slices pane, j k), or drag a span on the wave'
     elseif ch == '[' and t > 1e-4 then ctx.autotrim(e, t, e.len); S.wcur = nil
