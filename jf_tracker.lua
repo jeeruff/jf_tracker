@@ -15487,6 +15487,11 @@ local function frame()
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
     left = ((pe and pe.label) or state.focus):upper() .. (state.focus == 'top' and (':' .. state.toptab) or '')
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
+  -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
+  -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
+  local wf = gfx.getchar(65536)
+  ctx.win_focus = not (wf >= 0 and (wf & 1) == 1 and (wf & 2) == 0)
+  if not ctx.win_focus then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
@@ -15585,7 +15590,7 @@ local function frame()
     status_left = state.kslider and ('-- FADE %s --  h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: SLIDER → FADE (fademode), SLIDER — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
+    hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, win_focus = ctx.win_focus, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл

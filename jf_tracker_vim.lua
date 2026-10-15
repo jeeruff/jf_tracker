@@ -1760,6 +1760,20 @@ function V.key_impl(c)
         V.msg = (ch == 'd' and 'cut: ' or 'copied: ') .. e.text .. ' - p puts it on the cursor row'
         return
       end
+      -- 15 окт: dw / dW — событие под курсором, иначе ближайшее ниже (как dw в Vim): маркер на мастере
+      if pend == 'd' and (ch == 'w' or ch == 'W') then
+        local row = V.cur.row
+        if not e then
+          local best
+          for r in pairs(cf.ml.ev or {}) do if r > row and (not best or r < best) then best = r end end
+          row, e = best, best and cf.ml.ev[best]
+        end
+        if not e then V.msg = 'no event below'; return end
+        V.mlreg = { kind = kind, text = e.text }
+        if set then set(row, '') end
+        V.msg = 'cut: ' .. e.text .. ' - p puts it on the cursor row'
+        return
+      end
       if ch == 'd' or ch == 'y' then V.mlpend = ch; return end
       if ch == 'p' or ch == 'P' then
         local r = V.mlreg
@@ -2900,7 +2914,7 @@ function V.status()
                cmd = V.prompt and 'rename' or (':' .. (V.cmdline or '')), search = '/' .. (V.searchline or '') })[V.mode] or ''
   -- 15 окт: KEYS — не режим (видимая клавиатура), убран. Набранное (счётчик, оператор) — третьим значением:
   -- рисуется у курсора [3d_], взгляд не прыгает; hex ([E_]) — уже в самой ячейке; запись макроса — слово режима MACROS@имя
-  local extra = tostring(V.count or '') .. (V.pending or '')
+  local extra = tostring(V.count or '') .. (V.pending or V.mlpend or '')   -- 15 окт: и d в лейнах мастера
   if V.macro then m = 'MACROS@' .. V.macro.name end
   return m, ('oct %d vel %d step %s inst %d'):format(V.octave, V.vel or 100, V.step_next and 'next' or (V.step_auto and 'auto' or tostring(V.step)), V.inst), extra
 end
