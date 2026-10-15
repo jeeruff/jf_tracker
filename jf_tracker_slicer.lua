@@ -461,6 +461,25 @@ end
 -- кадр источника от начала сэмпла (как в линейке) ↔ секунды e
 function S.frame_of(e, t) return math.floor(t * ((e.rate and e.rate ~= 0) and e.rate or 1) * S.srate(e) + 0.5) end
 function S.time_of(e, fr) return fr / S.srate(e) / ((e.rate and e.rate ~= 0) and e.rate or 1) end
+-- 15 окт: сколько файла за краями сэмпла (секунды e): до начала и после конца; nil — не item
+function S.more(e)
+  if not (e and e.item and not e.file and R.ValidatePtr(e.item, 'MediaItem*')) then return nil end
+  local tk = R.GetActiveTake(e.item)
+  local src = tk and R.GetMediaItemTake_Source(tk)
+  local slen = src and R.GetMediaSourceLength(src) or 0
+  if slen <= 0 then return nil end
+  local rate = (e.rate and e.rate ~= 0) and e.rate or 1
+  return math.max(0, (e.offs or 0) / rate), math.max(0, (slen - (e.offs or 0)) / rate - e.len)
+end
+-- вернуть файл за краем: side 'a' — до начала, 'b' — после конца (все ноты, как ручки ia / ib)
+function S.more_do(side)
+  local e = S.entry
+  local pre, post = S.more(e)
+  if not pre or not ctx.autotrim then return end
+  if side == 'a' and pre > 1e-4 then ctx.autotrim(e, -pre, e.len)
+  elseif side == 'b' and post > 1e-4 then ctx.autotrim(e, 0, e.len + post)
+  else S.msg = side == 'a' and 'the sample already starts at the file start' or 'the sample already ends at the file end' end
+end
 -- ближайший транзиент к t (детекция по требованию); нет — t
 function S.snap_trans(t)
   if #(S.trans or {}) == 0 and S.env then S.detect() end
@@ -496,7 +515,8 @@ function S.key(c)
   if S.gpend then
     S.gpend = nil
     if ch == 'w' then S.gbuf = ''; S.msg = 'gw _  hex frame of the ruler, Enter'; return true end
-  elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave'; return true end
+    if ch == '[' or ch == ']' then S.more_do(ch == '[' and 'a' or 'b'); return true end   -- 15 окт: g[ g] — файл за краем обратно
+  elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave, [ ] - give back the file before / after the sample'; return true end
   local a, b = S.span()
   -- 14 окт: s — меню нарезки и в раскладке renoise (там s — нота C#, слушала слайс 1 вместо меню)
   local pk = S.entry and not S.entry.file and ch ~= 's' and piano_slice(c)
@@ -1256,6 +1276,29 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(U.AMBER)
     if pa >= x and pa < x + w then gfx.rect(pa, wy, 2, wh, 1); gfx.rect(pa, wy, 6, 2, 1); gfx.rect(pa, wy + wh - 2, 6, 2, 1) end
     if pb > x and pb <= x + w then gfx.rect(pb - 2, wy, 2, wh, 1); gfx.rect(pb - 6, wy, 6, 2, 1); gfx.rect(pb - 6, wy + wh - 2, 6, 2, 1) end
+  end
+  -- 15 окт: в файле есть звук за краем сэмпла — метка у края «< 3.21s» / «10.27s >»; щелчок
+  -- (или g[ g]) возвращает его
+  S.more_hot = nil
+  if wave_view and e.item and not e.file then
+    local pre, post = S.more(e)
+    local function tag(side, secs)
+      local lab = side == 'a' and ('< %.2fs'):format(secs) or ('%.2fs >'):format(secs)
+      local tw = U.measure(lab) + 2 * L.pad
+      local bx = side == 'a' and (x + 8) or (x + w - tw - 8)
+      local by = wy + wh - rh - 6
+      local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + tw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
+      if hot then S.more_hot = side end
+      -- край волны штрихами: там продолжается файл
+      U.set(U.CYAN)
+      local ex = side == 'a' and x or (x + w - 3)
+      for yy = wy, wy + wh - 1, 4 do gfx.rect(ex, yy, 3, 2, 1) end
+      U.set(hot and U.tint(U.CYAN, 0.35) or U.BG); gfx.rect(bx, by, tw, rh, 1)
+      U.set(U.CYAN); gfx.rect(bx, by, tw, rh, 0)
+      U.text(bx + L.pad, by, lab, hot and U.TEXT or U.CYAN)
+    end
+    if pre and pre > 0.005 and va <= 1e-6 then tag('a', pre) end
+    if post and post > 0.005 and vb >= len - 1e-6 then tag('b', post) end
   end
   -- 15 окт: курсор волны (gw) — светлая линия с hex-кадром
   if S.wcur and S.wcur_e == e.item and S.wcur >= va and S.wcur <= vb then

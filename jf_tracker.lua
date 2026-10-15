@@ -17211,6 +17211,9 @@ local function frame()
         vim.msg = 'spectrogram: recalculating'
       else SL.view = hover.sample.view end
       click = { t = now2, zone = 'sampleview' }
+    elseif hover.sample and SL.more_hot then
+      SL.more_do(SL.more_hot); vim.msg = SL.msg ~= '' and SL.msg or vim.msg   -- 15 окт: метка «файл за краем» — вернуть его
+      click = { t = now2, zone = 'samplemore' }
     elseif hover.sample and SL.item_hot and SL.item_e then
       -- 11 окт: начало / конец item-инструмента — протяжка (see SL.item_drag ниже)
       local e = SL.item_e

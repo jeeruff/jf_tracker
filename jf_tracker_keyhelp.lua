@@ -481,6 +481,7 @@ KH.PAGES = {
     { k = 'zz', d = 'item on the whole window (zoom), again - back', t = { 'z' } },
     { k = '< >', d = 'volume -1 / +1 dB' },
     { k = 'n', d = 'normalize' },
+    { k = 'g[ g]', d = 'give back the file before / after the sample (the cyan < 3.21s / 10.27s > tags at the wave edges say how much is there; a click on a tag does the same)' },
     { k = 'gw', d = 'go to a hex position on the wave: gw, the frame as on the ruler above the wave (hex, from the sample start), Enter - the wave cursor at the nearest transient, Shift+Enter - exactly there; [ ] then set the sample start / end at it' },
     { k = '[ ]', d = 'sample start / end: at the edge of the span dragged on the wave, else at the wave cursor (gw), else at the edge of the selected slice - cuts it for all notes of the instrument (as the blue ia / ib handles)' },
     { k = 'D', d = 'selection to lib' },
