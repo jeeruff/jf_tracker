@@ -24,6 +24,7 @@ local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 model.SEC = dofile(DIR .. '/jf_tracker_sections.lua')   -- 12 окт: коды паттернов, секции
 local draw = dofile(DIR .. '/jf_tracker_draw.lua')
+U.vbar_impl = function(...) return draw.vbar(...) end   -- 15 окт: одна полоса прокрутки на все модули
 draw.arr = dofile(DIR .. '/jf_tracker_arr.lua')           -- аранжировки = наборы играющих лейнов (9 окт)
 draw.llm = dofile(DIR .. '/jf_tracker_llm.lua')         -- 10 окт: мост к модели / MCP (ExtState llm_in → файл ответа)
 draw.panes = dofile(DIR .. '/jf_tracker_panes.lua')     -- раскладка окна как tmux / zellij (9 окт); полем draw: предел локальных
@@ -1691,8 +1692,18 @@ ctx = {
     local item = cell and cell.item
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'dW: no item under cursor'; return false end
     local tr = reaper.GetMediaItemTrack(item)
-    edit.run('delete item', function() reaper.DeleteTrackMediaItem(tr, item) end)
-    vim.msg = 'dW: item deleted'
+    -- 15 окт: ghost-слайсы (playthru + q) — одна группа с головой: dW по голове или по куску удаляет все
+    local _, gid = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_ghost', '', false)
+    if gid == '' then _, gid = reaper.GetSetMediaItemInfo_String(item, 'GUID', '', false) end
+    local group = {}
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local o = reaper.GetTrackMediaItem(tr, i)
+      local _, g = reaper.GetSetMediaItemInfo_String(o, 'P_EXT:jf_ghost', '', false)
+      local _, og = reaper.GetSetMediaItemInfo_String(o, 'GUID', '', false)
+      if o == item or g == gid or og == gid then group[#group + 1] = o end
+    end
+    edit.run('delete item', function() for _, o in ipairs(group) do reaper.DeleteTrackMediaItem(tr, o) end end)
+    vim.msg = #group > 1 and ('dW: item and its %d ghost slices deleted'):format(#group - 1) or 'dW: item deleted'
     return true
   end,
   -- dt: очистить трек курсора в его регионе; вне региона — от =START до =END
@@ -9454,7 +9465,9 @@ ctx = {
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
-    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0 end
+    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0
+    elseif key == 'undotree' then return (ctx.ut_state().scroll or 0)   -- 15 окт
+    elseif key == 'fxb' then return FB.scroll or 0 elseif key == 'macros' then return MX.MR.scroll or 0 elseif key == 'notes' then return NT.scroll or 0 elseif key == 'keyhelp' then return KH.scroll or 0 end
     return 0
   end,
   vbar_scroll = function(key, v)
@@ -9463,7 +9476,18 @@ ctx = {
     v = math.max(0, math.min(mx, v))
     if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
     elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1)
-    elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur)) end   -- курсор — в видимое, иначе прокрутку вернёт
+    elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
+    elseif key == 'fxb' then FB.scroll = v; FB.cur = math.max(v + 1, math.min(v + (r and r.nvis or 1), FB.cur))
+    elseif key == 'keyhelp' then KH.scroll = v
+    elseif key == 'undotree' then   -- 15 окт: дерево undo держит прокрутку за выделенным — выделение в видимое
+      local ST = ctx.ut_state(); ST.scroll = v
+      local rows = ctx.UTM.layout(ST.T)
+      local si = 1
+      for i, rr in ipairs(rows) do if rr.id == ST.sel then si = i end end
+      local nv = r and r.nvis or 1
+      if si <= v then si = v + 1 elseif si > v + nv then si = v + nv end
+      if rows[si] then ST.sel = rows[si].id end
+    end
   end,
   -- swap (3 окт): 'on' — звук выбранного исходника подменён; файл — его новый
   -- звук (on) или выбранный в браузере (off)
@@ -12276,6 +12300,7 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local nv = math.max(1, math.floor(h / Lx.rh))
   local top = math.max(0, math.min(CB.sel - 1, #CB.hist - nv))
+  draw.vbar('clipboard', x, y, w, nv * Lx.rh, top, nv, #CB.hist)   -- 15 окт: полоса всегда
   for i = top + 1, math.min(#CB.hist, top + nv) do
     local e = CB.hist[i]
     local ry = y + (i - top - 1) * Lx.rh
@@ -12566,6 +12591,7 @@ ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
   if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
   local cw = math.max(8, math.floor(Lx.cw * 1.2))
   local gw = (math.min(maxc, 12) + 1) * cw
+  local sbw = #rows > nv and ((draw.SBW or 3) + 4) or 0
   local rowof = {}
   for i, r in ipairs(rows) do rowof[r.id] = i end
   local function cy(i) return y + (i - ST.scroll - 1) * rh + math.floor(rh / 2) end
@@ -12602,9 +12628,11 @@ ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
     local tm = (n.t or 0) > 0 and os.date('%H:%M:%S', n.t) or ''
     local tx = x + gw + Lx.pad
     local tw = U.measure(tm)
-    U.text(tx, ry, ctx.fit((cur and '> ' or '') .. lab, x + w - tx - tw - 2 * Lx.pad), col)
-    if tm ~= '' then U.text(x + w - tw, ry, tm, U.GREY) end
+    local rw = w - sbw                                   -- 15 окт: место под полосу прокрутки
+    U.text(tx, ry, ctx.fit((cur and '> ' or '') .. lab, x + rw - tx - tw - 2 * Lx.pad), col)
+    if tm ~= '' then U.text(x + rw - tw, ry, tm, U.GREY) end
   end
+  if draw.vbar then draw.vbar('undotree', x, y, w, h, ST.scroll, nv, #rows) end   -- 15 окт: длинному списку — полоса всегда
   if hv and ST.hot and gfx.mouse_cap & 1 == 1 and not ctx.ut_down then
     ctx.ut_down = true
     local now = reaper.time_precise()

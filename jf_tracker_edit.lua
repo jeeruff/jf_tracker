@@ -1894,6 +1894,7 @@ function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
   local htk = R.GetActiveTake(head)
   if not htk then return end
   local q = E.ghost_q
+  local _, hguid = R.GetSetMediaItemInfo_String(head, 'GUID', '', false)
   local t0 = R.GetMediaItemInfo_Value(head, 'D_POSITION')
   local hend = t0 + R.GetMediaItemInfo_Value(head, 'D_LENGTH')      -- playthru уже обрезан следующей нотой
   local rate = R.GetMediaItemTakeInfo_Value(htk, 'D_PLAYRATE')
@@ -1949,7 +1950,7 @@ function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
     fit(gi, gtk, g.j, g.t, te)
     R.SetMediaItemInfo_Value(gi, 'B_MUTE', 0)
     R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_slice', tostring(g.j), true)
-    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_ghost', '1', true)
+    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_ghost', hguid, true)   -- 15 окт: GUID головы — dW удаляет всю группу
     R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_bsync', '', true)       -- rate уже как у головы: не подгонять заново
     E.set_iid(gi, root .. '#' .. g.j)
   end

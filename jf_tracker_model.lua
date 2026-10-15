@@ -284,7 +284,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
   }
   head.fx, head.rowfx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   do local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); head.slice = tonumber(sk) end   -- 11 окт: номер слайса — поле в ячейке
-  do local _, gh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ghost', '', false); head.ghost = gh == '1' or nil end   -- 15 окт: ghost-слайс playthru + q (рисуется бледно)
+  do local _, gh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ghost', '', false); head.ghost = (gh ~= nil and gh ~= '') or nil end   -- 15 окт: ghost-слайс playthru + q (рисуется бледно)
   head.rgb = M.item_rgb(it)
   -- видео-лейн (9 окт): видео-item — событие как аудио (фейды Ixx / Oxx
   -- REAPER применяет и к картинке), в поле ноты — VID

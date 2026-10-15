@@ -125,6 +125,7 @@ function MR.draw(d, x, y, w, h, rows)
   if MR.sel <= MR.scroll then MR.scroll = MR.sel - 1 end
   MR.scroll = math.max(0, math.min(MR.scroll, math.max(0, #rows - nvis)))
   local hv
+  U.vbar('macros', x, y, w, nvis * L.rh, MR.scroll, nvis, #rows)   -- 15 окт: полоса всегда
   local nw = math.min(math.floor(w * 0.3), L.cw * 18)
   for i = MR.scroll + 1, math.min(#rows, MR.scroll + nvis) do
     local r = rows[i]

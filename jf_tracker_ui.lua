@@ -197,6 +197,12 @@ function U.rule(x, y, w)
   set(U.DIM); gfx.rect(x, y, w, 1, 1)
 end
 
+-- 15 окт: полоса прокрутки длинного списка — одна на всех (draw.vbar: вид, толщина опции scrollbar width,
+-- протяжка мышью там, где main знает key); модули видят только U — ставит main (U.vbar_impl = draw.vbar)
+function U.vbar(key, x, y, w, h, scroll, nvis, total)
+  if U.vbar_impl then return U.vbar_impl(key, x, y, w, h, scroll, nvis, total) end
+end
+
 function U.begin_frame()
   U.click  = gfx.mouse_cap & 1 == 1 and not U.mdown
   U.rclick = gfx.mouse_cap & 2 == 2 and not U.rdown
