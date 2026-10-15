@@ -439,8 +439,21 @@ end
 -- прослушивание слайса (4 окт): хроматическая раскладка q 2 w 3 e r 5 t …, как
 -- вставка в трекере и подписи над волной (слайс k = нота C-4 + k - 1 на
 -- текущей октаве); прежняя q..p = 1..10 и цифры-нарезки с ней спорили
+-- 15 окт: во вкладке item нотные клавиши — только верхний ряд q 2 w 3 e …; в раскладке renoise
+-- нижний ряд (z s x d c v …) — команды слайсера, верхний — со сдвигом на октаву вниз (q — весь сэмпл)
+local TOP_ROW = { q = 1, ['2'] = 1, w = 1, ['3'] = 1, e = 1, r = 1, ['5'] = 1, t = 1, ['6'] = 1, y = 1, ['7'] = 1,
+                  u = 1, i = 1, ['9'] = 1, o = 1, ['0'] = 1, p = 1 }
+local function item_off(code)
+  local off = ctx and ctx.piano and ctx.piano[code]
+  if off == nil then return nil end
+  if ctx.keys_renoise and ctx.keys_renoise() then
+    if not (code < 256 and TOP_ROW[string.char(code)]) then return nil end
+    off = off - 12
+  end
+  return off
+end
 local function piano_slice(c)
-  local off = ctx and ctx.piano and ctx.piano[c]
+  local off = item_off(c)
   if off == nil then return nil end
   local oct = (ctx.octave and ctx.octave()) or 4
   local base = (ctx.slice_base and ctx.slice_base()) or 60
@@ -518,8 +531,8 @@ function S.key(c)
     if ch == '[' or ch == ']' then S.more_do(ch == '[' and 'a' or 'b'); return true end   -- 15 окт: g[ g] — файл за краем обратно
   elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave, [ ] - give back the file before / after the sample'; return true end
   local a, b = S.span()
-  -- 14 окт: s — меню нарезки и в раскладке renoise (там s — нота C#, слушала слайс 1 вместо меню)
-  local pk = S.entry and not S.entry.file and ch ~= 's' and piano_slice(c)
+  -- 14 окт: s — меню нарезки и в раскладке renoise (15 окт: весь нижний ряд renoise здесь — команды)
+  local pk = S.entry and not S.entry.file and piano_slice(c)
   if pk then
     if pk == 0 then ctx.preview_slice(S.track, S.entry, 0, S.entry.len); S.msg = 'q: the whole sample'   -- 5 окт
     elseif pk >= 1 and pk <= #(S.slices or {}) then S.preview(pk) else S.msg = ('no slice %d (%d slices)'):format(pk, #(S.slices or {})) end
@@ -1260,9 +1273,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   do
     local oct = (ctx and ctx.octave and ctx.octave()) or 4
     local base = (ctx and ctx.slice_base and ctx.slice_base()) or 60
-    for code, off in pairs((ctx and ctx.piano) or {}) do
-      local k = (oct + 1) * 12 + off - base + 1
-      key_of[k] = (ctx.key_label and ctx.key_label(string.char(code))) or string.char(code)
+    for code in pairs((ctx and ctx.piano) or {}) do
+      local off = item_off(code)
+      if off then
+        local k = (oct + 1) * 12 + off - base + 1
+        key_of[k] = (ctx.key_label and ctx.key_label(string.char(code))) or string.char(code)
+      end
     end
   end
   -- 15 окт: первый слайс — начало сэмпла, конец последнего — его конец: волна вне — притушена,
