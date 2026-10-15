@@ -1916,12 +1916,29 @@ function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
   end
   if #starts == 0 then return end
   -- 15 окт: кусок играет СВОЙ слайс (до следующей метки, с beatsync — по rate), не до следующего ghost:
-  -- иначе хвост головы доигрывал транзиент следующего слайса раньше бита, и он звучал дважды
+  -- иначе хвост головы доигрывал транзиент следующего слайса раньше бита, и он звучал дважды.
+  -- beatsync: кусок РАСТЯНУТ до начала следующего (rate = исходник слайса / промежуток) — весь луп
+  -- в метроном и доигрывается без дыр; последний — до своего конца, привязанного к сетке q
   local full = base.len or (slices[#slices] + 1)
-  local function nat(j) return ((slices[j + 1] or full) - slices[j]) * r0 / rate end
-  R.SetMediaItemInfo_Value(head, 'D_LENGTH', math.min(nat(k), starts[1].t - t0))
+  local function src(j) return ((slices[j + 1] or full) - slices[j]) * r0 end     -- секунды исходника слайса j
+  local function nat(j) return src(j) / rate end
+  local function qend(t)                                                           -- конец, привязанный к сетке q
+    local rf = R.TimeMap2_timeToQN(0, t) * lpb
+    return row_time(math.max(1, math.floor(rf / q + 0.5)) * q, lpb, 0)
+  end
+  local function fit(it, tk, j, ts, te)
+    if te <= ts + 1e-4 then te = ts + nat(j) end
+    if bs and tk then
+      R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', src(j) / (te - ts))
+      R.SetMediaItemInfo_Value(it, 'D_LENGTH', te - ts)
+    else
+      R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(nat(j), te - ts))
+    end
+  end
+  fit(head, htk, k, t0, starts[1].t)
+  if bs then R.GetSetMediaItemInfo_String(head, 'P_EXT:jf_bsync', '', true) end   -- растянут вручную: bsync_fit не перетирает
   for i, g in ipairs(starts) do
-    local te = math.min(starts[i + 1] and starts[i + 1].t or hend, g.t + nat(g.j))
+    local te = starts[i + 1] and starts[i + 1].t or math.min(hend, qend(g.t + nat(g.j)))
     local gi = insert_chunk(track, lane_idx, g.t, chunk)
     local gtk = R.GetActiveTake(gi)
     if gtk then
@@ -1929,7 +1946,7 @@ function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
       R.SetMediaItemTakeInfo_Value(gtk, 'D_PLAYRATE', rate)
     end
     R.SetMediaItemInfo_Value(gi, 'D_POSITION', g.t)
-    R.SetMediaItemInfo_Value(gi, 'D_LENGTH', te - g.t)
+    fit(gi, gtk, g.j, g.t, te)
     R.SetMediaItemInfo_Value(gi, 'B_MUTE', 0)
     R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_slice', tostring(g.j), true)
     R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_ghost', '1', true)

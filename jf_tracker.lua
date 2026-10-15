@@ -17997,7 +17997,7 @@ local function frame()
       ::ai_click_done::
     elseif SPROP.hover and ctx.sp_live() then
       ctx.set_focus(ctx.sp_in_pane and 'sprops' or 'top')
-      local e = cur_col() and (cur_col().pool or {})[vim.inst]
+      local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])   -- 15 окт: как у клавиш — запись выбранной области (слайс / нота), не всегда инструмент
       if SPROP.hover.scope then ctx.sp_scope_menu(); click = { t = now2, zone = 'spropscope' }; goto sprop_done end
       if SPROP.hover.title then ctx.rename_inst_prompt(); click = { t = now2, zone = 'sproptitle' }; goto sprop_done end
       if SPROP.hover.fit then ctx.sprops_fit(); click = { t = now2, zone = 'spropfit' }; goto sprop_done end
@@ -19368,7 +19368,7 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if gfx.mouse_x ~= SPROP.drag.lx then
         SPROP.drag.lx = gfx.mouse_x
-        local e = cur_col() and (cur_col().pool or {})[vim.inst]
+        local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])   -- 15 окт: как у клавиш — запись выбранной области (слайс / нота), не всегда инструмент
         if e then ctx.sp_set_frac(e, SPROP.drag.k, (gfx.mouse_x - SPROP.drag.x) / math.max(1, SPROP.drag.w)) end
       end
     else SPROP.drag = nil end
