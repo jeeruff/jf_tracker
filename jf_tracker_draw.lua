@@ -4684,13 +4684,13 @@ function D.panes_frame(L, snap, state, info, hover, ph)
             if stack then
               local bx, bw = tx - L.pad // 2 - 1, ms(lbl) + L.pad + 2
               -- 15 окт: вкладка в фокусе — акцентом (жёлтым), активные в других стопках — контрастно, но тише
-              local soft = U.readable(U.mix(U.TEXT, U.PANEL, 0.25), U.PANEL, 4.5)
-              set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.14)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
+              local soft = U.TEXT   -- 15 окт: выбранная вне фокуса — сам заголовок полным TEXT (было тише — терялся)
+              set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.20)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
               set(on and (fon and U.AMBER or soft) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
             else
               set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
             end
-            local col = on and (fon and U.AMBER or U.readable(U.mix(U.TEXT, U.PANEL, 0.25), U.PANEL, 4.5)) or (hot and U.TEXT or U.GREY)
+            local col = on and (fon and U.AMBER or U.TEXT) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
             text(tx, c.y + 1, lbl, col)
             if hot then hover.ptab = { id = t.id } end
