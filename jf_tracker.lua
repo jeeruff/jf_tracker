@@ -12200,6 +12200,7 @@ end
 ctx.ut_poll = function() local ST = ctx.ut_state(); ctx.UTM.poll(ST); return ST end
 edit.ut_hook = function(label) ctx.UTM.hook(ctx.ut_state(), label) end   -- не poll: он добавил бы ту же правку второй раз
 edit.before_undo = function() ctx.UTM.before_undo(ctx.ut_state()) end
+edit.after_undo = function() if SL.active then SL.resync() end end   -- 15 окт: слайсер — нарезка с item после отката
 ctx.ut_go = function(id)
   local msg = ctx.UTM.go(ctx.ut_state(), id, edit.undo, edit.redo)
   if msg then vim.msg = msg end

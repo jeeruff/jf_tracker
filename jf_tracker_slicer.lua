@@ -411,6 +411,19 @@ function S.apply()
   S.active = false
 end
 
+-- 15 окт: после undo / redo — нарезка и края с item (слайсер держал прежние в памяти)
+function S.resync()
+  local e = S.entry
+  if not (e and e.item and not e.file and R.ValidatePtr(e.item, 'MediaItem*')) then return end
+  local sl = ctx.edit and ctx.edit.item_slices and ctx.edit.item_slices(e.item) or {}
+  S.slices = {}
+  for _, t in ipairs(sl) do S.slices[#S.slices + 1] = t end
+  e.slices = #S.slices > 0 and { table.unpack(S.slices) } or nil
+  local tk = R.GetActiveTake(e.item)
+  if tk then e.offs = R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') end
+  e.len = R.GetMediaItemInfo_Value(e.item, 'D_LENGTH')
+  S.wcur = nil
+end
 function S.clear()
   if not S.entry or not S.entry.item then return end
   ctx.edit.set_slices(S.entry.item, {})
@@ -564,6 +577,12 @@ function S.key(c)
     elseif ch:match('^%x$') then S.gbuf = S.gbuf .. ch:upper()
     end
     if S.gbuf then S.msg = 'gw ' .. S.gbuf .. '_  hex frame, Enter - to the nearest transient, Shift+Enter - exact, Esc' end
+    return true
+  end
+  -- 15 окт: u — undo, Ctrl+R — redo и во вкладке item (u была нотой верхнего ряда — слушала слайс)
+  if (ch == 'u' or c == 18) and ctx.edit then
+    if ch == 'u' then ctx.edit.undo() else ctx.edit.redo() end
+    S.msg = (ch == 'u' and 'undo: ' or 'redo: ') .. tostring(R.Undo_CanUndo2(0) or '')
     return true
   end
   if S.dpend then

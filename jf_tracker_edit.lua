@@ -3037,8 +3037,8 @@ end
 
 -- ── прочее ────────────────────────────────────────────────────────────────
 -- 15 окт: перед откатом — снимок узла, который покидаем (дерево undo: ветка не теряется)
-function E.undo() if E.before_undo then pcall(E.before_undo) end; R.Main_OnCommand(40029, 0); if model then model.invalidate() end end
-function E.redo() R.Main_OnCommand(40030, 0); if model then model.invalidate() end end
+function E.undo() if E.before_undo then pcall(E.before_undo) end; R.Main_OnCommand(40029, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end end
+function E.redo() R.Main_OnCommand(40030, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end end   -- 15 окт: after_undo — слайсер перечитывает нарезку
 function E.save() R.Main_SaveProject(0, false) end
 -- 12 окт: старт — с курсора трекера (lock): main ставит E.start_at; иначе REAPER стартовал со своего курсора,
 -- который мог остаться старым (gg во время игры)
