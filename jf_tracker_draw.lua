@@ -3480,7 +3480,7 @@ function D.transport_sub(c)
            { 'shiftrec', 'shift', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
            { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
 end
-function D.transport_groups(c)
+function D.transport_groups(c, L)   -- 15 окт: L — для ширины вертикальной подписи step
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
   local num = math.max(1, math.min(16, c.sig_num or 4))
   local cur = c.beat and (math.floor(c.beat) + 1) or 0
@@ -3502,10 +3502,10 @@ function D.transport_groups(c)
   -- 15 окт: сетка блока — крупный шаг слева (ширина по значению, не уже «16» — соседи не прыгают от цифры
   -- к цифре), справа две ровные колонки: LPB / pitch и legato / human (общая ширина колонки — res)
   local stxt = ({ auto = 'a', next = 'n' })[c.step] or tostring(c.step or 0)   -- 15 окт: режимы шага буквой — ширина как у числа
-  local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2))
+  local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2)) + L.th + L.pad   -- + вертикальная подпись step (15 окт)
   local col2, col3 = 'pitch resample', 'human 100%'
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
-                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
+                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = c.tpfull and 3 or 2 }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
                 { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
                   { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
@@ -3513,8 +3513,8 @@ function D.transport_groups(c)
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
   if c.tpfull then
-    table.insert(g[#g], { { '_steplab', 'step', U.GREY } })
-    local row4 = { { '_listen', 'listen', U.GREY } }   -- подпись строки, не кнопка
+    -- 15 окт: listen — третьей строкой, под цифрой (слева — вертикальная подпись step на весь блок)
+    local row4 = { { '_', '', w = math.max(0, L.th + L.pad - (2 * L.pad + 6)) }, { '_listen', 'listen', U.GREY } }   -- подпись строки, не кнопка
     for _, it in ipairs(lsn) do row4[#row4 + 1] = it end
     table.insert(g[#g], row4)
   else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
@@ -3604,8 +3604,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local lbl = ('oct %d'):format(p.octave or 4)
     local zx = D.PIANO_RENOISE and '[- ]+' or 'z- x+'   -- 14 окт: в renoise z x — ноты, октава — [ ]
     local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
-    text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
-    text(x + L.pad, ly + L.rh, zx, U.GREY)
+    if cc.tpfull then
+      -- 15 окт: oct — подпись вертикально, цифра крупно (×2) на две строки; клавиши — строкой под vel
+      local ds = tostring(p.octave or 4)
+      lw = L.th + L.pad + math.max(D.big_measure(ds, 2), D.big_measure('9', 2)) + 2 * L.pad
+      D.vtext(x + L.pad, ly, 2 * L.rh, 'oct', U.GREY, U.PANEL)
+      D.big_text(x + L.pad + L.th + L.pad, ly, ds, dim and U.GREY or U.AMBER, 2)
+    else
+      text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
+      text(x + L.pad, ly + L.rh, zx, U.GREY)
+    end
     local kx = x + lw
     -- 12 окт: velocity — под клавиатурой, третьей строкой (c - тише, C - громче, как z x для октавы)
     if cc.tpfull then
@@ -3625,7 +3633,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if bhot then hover.ctrl = 'velbar' end
       hint('ctrl', bx, vy, bw, L.rh, 'velbar')
       D.strip_cell.velbar = { bx, vy, bw }
-      text(x + L.pad, vy + L.rh + 2, D.PIANO_RENOISE and '{- }+' or 'c- C+', U.GREY)
+      -- 15 окт: клавиши октавы и velocity — одной строкой (клавиши — тише, подписи — третьим уровнем)
+      local hx = x + L.pad
+      -- только при hints: иначе клавиши и так видны в статусе при наведении
+      for _, kv in ipairs(cc.hints and { { zx, 'oct' }, { D.PIANO_RENOISE and '{- }+' or 'c- C+', 'vel' } } or {}) do
+        text(hx, vy + L.rh + 2, kv[1], U.GREY); hx = hx + ms(kv[1]) + L.pad
+        text(hx, vy + L.rh + 2, kv[2], U.DIM); hx = hx + ms(kv[2]) + 3 * L.pad
+      end
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
@@ -3683,7 +3697,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 12 окт: it.res — самая длинная подпись этой ячейки (step 1 → step auto): место заранее, соседи не прыгают
   -- 15 окт: it.big — крупно (×2, как BPM) на две строки; it.w — пустое место заданной ширины
   local function cw_of(it)
-    if it.big then return math.max(D.big_measure(it[2], 2), it.res and D.big_measure(it.res, 2) or 0) end
+    if it.big then return math.max(D.big_measure(it[2], 2), it.res and D.big_measure(it.res, 2) or 0) + (it.vlab and (L.th + L.pad) or 0) end   -- 15 окт: vlab — подпись вертикально слева
     if it.w then return it.w end
     return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
@@ -3716,7 +3730,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         local ih = it.big and (2 * L.rh) or L.rh
         local hot = it[1]:sub(1, 1) ~= '_' and cell_hot(cx, cy, iw, ih)
         if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, ih, 1); hover.ctrl = it[1] end
-        if it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
+        if it.big and it.vlab then
+          D.vtext(cx, cy, (it.vlab_rows or 2) * L.rh, it.vlab, U.GREY, U.PANEL)   -- на высоту блока (step — 3 строки)
+          D.big_text(cx + L.th + L.pad, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
+        elseif it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
         elseif it[1] ~= '_' then text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT)) end
         if it.beats then
           local bs = math.max(4, L.rh - 6)
@@ -3941,7 +3958,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   -- порядок блоков
   local by_id = {}
-  for _, g in ipairs(D.transport_groups(c)) do by_id[g[1][1][1]] = g end
+  for _, g in ipairs(D.transport_groups(c, L)) do by_id[g[1][1][1]] = g end
   local order = {}
   local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   addg('step')

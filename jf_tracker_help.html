@@ -41,6 +41,7 @@
   .nav a { text-decoration: none; }
   .nav a:hover { text-decoration: underline; }
   .lead { font-size: 18px; line-height: 1.5; }
+  blockquote { margin: 18px 0; padding: 4px 0 4px 16px; border-left: 3px solid currentColor; font-style: italic; opacity: .85; }   /* 15 окт: цитата в Why */
   .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
   .keys div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
   .keys b { display: block; font-size: 13px; color: var(--grey); font-weight: 500; margin-bottom: 4px; }
@@ -88,6 +89,7 @@ the project is exactly as it was, and every edit is one REAPER undo step.</p>
 registers, the <kbd>.</kbd> repeat, macros, the <kbd>:</kbd> command line. Every control is a letter, never an icon: when a
 sign is needed, it comes from another alphabet (<code>Δ</code> delta solo, <code>ø</code> phase).</p>
 
+<blockquote>«I feel free when I am absolutely constrained.» — Igor Stravinsky. Fewer ways, one look, one place for each thing: the constraint is the instrument.</blockquote>
 <p>A few rules hold everywhere, and changes keep to them:</p>
 <ul>
 <li><b>Nothing of its own.</b> A feature writes what REAPER already has (items, envelopes, automation items, take FX,
@@ -405,8 +407,9 @@ row sets the value from the mouse) finds it in options → <code>odd options</co
 <h2 id="transport">Transport strip</h2>
 <p>Under the tracker: position, BPM, LPB, time signature, the beats of the bar, metronome, follow, loop, octave, step,
 instrument, velocity. Click or wheel changes a value; a click on the signature asks whether it is for the whole project or
-one pattern. The keyboard on the left shows what the note keys play and hides with <kbd>m</kbd>; the strip stays. Options:
-<code>big BPM</code>, and <code>status bar: keyboard</code> puts the status line into the strip.</p>
+one pattern. The keyboard on the left shows what the note keys play and hides with <kbd>m</kbd>; the strip stays. One look, no
+options for its position or style. The mode word is the modeline in the corner of the tracker field; the status line is
+always the bottom row of the window.</p>
 
 <h2 id="map">Tracker → REAPER</h2>
 <table>
