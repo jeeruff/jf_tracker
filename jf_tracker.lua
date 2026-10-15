@@ -1115,8 +1115,17 @@ ctx = {
     if state.lpb_before_zoom then set_lpb(state.lpb_before_zoom); state.lpb_before_zoom = nil; vim.msg = 'zoom back: LPB ' .. state.lpb
     else state.lpb_before_zoom = state.lpb; set_lpb(1); vim.msg = 'zoom out: a row is a beat (:macro again - back)' end
   end,
-  fold = function(col, v) state.folds[col.guid] = v or nil; ctx.hdr_push(col) end,
-  fold_all = function(v) for _, c in ipairs(snap.cols) do state.folds[c.guid] = v or nil; ctx.hdr_push(c) end end,
+  -- 15 окт: za не работал — уровень ширины трека (wlevel) перекрывает свёртку, а сбрасывался только в
+  -- hdr_push при sync header, и общий зум ширины (wzlevel) тоже глушил; теперь: свёртка = уровень трека 0 / 1,
+  -- развернуть — снять уровень (при общем зуме — полный уровень трека)
+  fold = function(col, v)
+    state.folds[col.guid] = v or nil
+    state.wlevel = state.wlevel or {}
+    if v then state.wlevel[col.guid] = v == 'mini' and 0 or 1
+    else state.wlevel[col.guid] = state.wzlevel and (3 + math.min(L and L.MAXFX or 4, state.fxcols or 0)) or nil end
+    ctx.hdr_push(col)
+  end,
+  fold_all = function(v) for _, c in ipairs(snap.cols) do ctx.fold(c, v) end end,   -- 15 окт: через fold (уровень ширины)
   -- sync track header size (6 окт): высота трека REAPER (I_TCPH) ↔ свёртка
   -- колонки: < 36 px — свёрнута (mini), < 80 — компактная, выше — полная;
   -- свёртка в трекере ставит высоту 24 / 56 / 96 (I_HEIGHTOVERRIDE)
@@ -5415,6 +5424,33 @@ ctx = {
     list[#list + 1] = { name = name, body = MX.MR.encode(keys) }
     ctx.mac_write(list)
     vim.msg = 'macro saved: ' .. name
+  end,
+  -- 15 окт: :mackey имя x — сохранённый макрос на регистр @x (клавиши тела; «:команда» — набор : … Enter)
+  mac_key = function(arg)
+    local name, key = (arg or ''):match('^%s*(.-)%s+(%l)%s*$')
+    if not name then vim.msg = 'mackey: like :mackey my fill x  (then @x plays it)'; return end
+    local list, hit = ctx.mac_saved(), nil
+    for _, m in ipairs(list) do if m.name == name then hit = m end end
+    if not hit then
+      for _, m in ipairs(MX.MR.BUILTIN) do if m.name == name then hit = { name = m.name, body = m.body }; list[#list + 1] = hit end end
+    end
+    if not hit then vim.msg = 'mackey: no macro named ' .. name; return end
+    for _, m in ipairs(list) do if m.key == key and m ~= hit then m.key = nil end end
+    hit.key = key
+    ctx.mac_write(list)
+    ctx.mac_keys_load()
+    vim.msg = ('macro %s -> @%s'):format(name, key)
+  end,
+  -- регистры из файла макросов: тело «:команда» — как набор клавиш : … Enter
+  mac_keys_load = function()
+    for _, m in ipairs(ctx.mac_saved()) do
+      if m.key then
+        local keys
+        if m.body:sub(1, 1) == ':' then keys = {}; for ch in m.body:gmatch('.') do keys[#keys + 1] = ch:byte() end; keys[#keys + 1] = 13
+        else keys = MX.MR.decode(m.body) end
+        vim.regs['@' .. m.key] = keys
+      end
+    end
   end,
   mac_do = function(a)
     if not (a and a.row) then return end
@@ -12224,6 +12260,8 @@ end
 -- туда — восстановлением снимка (новый шаг undo). Файл «Имя.jf-undo» рядом с .rpp, только дописывается
 -- 15 окт: холст автоматизации (страница curve вкладки automation, jf_tracker_autocanvas): несколько
 -- кривых наложением, курсор холста = строка курсора трекера, клавиши пишут точки и формы по сетке
+ctx.XF = dofile(DIR .. '/jf_tracker_xform.lua')   -- 15 окт: модификаторы времени / громкости (:xf, макросы)
+ctx.mac_keys_load()
 ctx.ACV = dofile(DIR .. '/jf_tracker_autocanvas.lua')
 ctx.ACV.init(U, ctx, LG)
 -- отрезок холста: как у генератора (time selection → регион курсора → такт), в строках и секундах

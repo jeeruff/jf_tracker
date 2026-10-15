@@ -21,6 +21,17 @@ MR.BUILTIN = {
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
   { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
   { name = 'dedouble',    body = ':dedouble',     desc = 'doubled notes (same note at the same time) on the cursor row of the track - one is kept; VISUAL - in the selection' },
+  -- 15 окт: модификаторы (jf_tracker_xform) — время и громкость блока / трека в регионе
+  { name = 'stretch x2',  body = ':xf stretch 2',  desc = 'time x2 from the block start (twice slower); :xf stretch 0.5 - twice faster' },
+  { name = 'shrink /2',   body = ':xf stretch 0.5', desc = 'time / 2: the block plays twice as fast' },
+  { name = 'reverse',     body = ':xf reverse',    desc = 'retrograde: the notes of the block in reverse order' },
+  { name = 'rotate',      body = ':xf rotate 4',   desc = 'cyclic shift by 4 rows inside the block (:xf rotate -4 back)' },
+  { name = 'shuffle',     body = ':xf shuffle',    desc = 'the notes swap places at random' },
+  { name = 'gravity',     body = ':xf gravity 2',  desc = 'the notes fall: denser to the end of the block (:xf gravity 0.5 - denser to the start)' },
+  { name = 'bounce',      body = ':xf bounce 0.7', desc = 'a bouncing ball: every gap is 0.7 of the one before' },
+  { name = 'fibonacci',   body = ':xf fib',        desc = 'the notes sit on Fibonacci rows from the first one: 0 1 2 3 5 8 13 ...' },
+  { name = 'tuplet 3',    body = ':xf tuplet 3',   desc = 'the first 3 notes evenly over the block (a triplet over the rows)' },
+  { name = 'golden fade', body = ':xf golden',     desc = 'volume: every next note is 0.618 of the one before (golden ratio)' },
 }
 
 -- клавиши ↔ строка
@@ -47,14 +58,14 @@ end
 function MR.parse(text)
   local list = {}
   for line in ((text or '') .. '\n'):gmatch('([^\n]*)\n') do
-    local name, body = line:match('^([^\t#][^\t]*)\t(.+)$')
-    if name and body then list[#list + 1] = { name = name, body = body } end
+    local name, body, key = line:match('^([^\t#][^\t]*)\t([^\t]+)\t?(%l?)$')
+    if name and body then list[#list + 1] = { name = name, body = body, key = key ~= '' and key or nil } end   -- 15 окт: третья колонка — буква регистра (@x)
   end
   return list
 end
 function MR.serialize(list)
-  local out = { '# jf_tracker macros: name<TAB>body; body ":command" or vim keys (<13> = Enter, <27> = Esc)' }
-  for _, m in ipairs(list) do out[#out + 1] = (m.name:gsub('[\t\n]', ' ')) .. '\t' .. (m.body:gsub('\n', ' ')) end
+  local out = { '# jf_tracker macros: name<TAB>body[<TAB>key]; body ":command" or vim keys (<13> = Enter, <27> = Esc); key - a register letter, @key plays it' }
+  for _, m in ipairs(list) do out[#out + 1] = (m.name:gsub('[\t\n]', ' ')) .. '\t' .. (m.body:gsub('\n', ' ')) .. (m.key and ('\t' .. m.key) or '') end
   return table.concat(out, '\n') .. '\n'
 end
 
@@ -72,7 +83,7 @@ function MR.rows(regs, saved, builtin)
   for _, r in ipairs(rec) do rows[#rows + 1] = r end
   rows[#rows + 1] = { hdr = 'saved  (s on a recorded one, or edit the file)' }
   if #(saved or {}) == 0 then rows[#rows + 1] = { empty = 'none yet' } end
-  for _, m in ipairs(saved or {}) do rows[#rows + 1] = { kind = 'saved', name = m.name, body = m.body } end
+  for _, m in ipairs(saved or {}) do rows[#rows + 1] = { kind = 'saved', name = m.name .. (m.key and ('  @' .. m.key) or ''), body = m.body } end
   rows[#rows + 1] = { hdr = 'built-in' }
   for _, m in ipairs(builtin or MR.BUILTIN) do rows[#rows + 1] = { kind = 'builtin', name = m.name, body = m.body, desc = m.desc } end
   return rows

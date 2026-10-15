@@ -515,7 +515,7 @@ function D.layout(snap, state, nregions)
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
-  L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (3 * L.rh + 4) or 0)) or 0   -- 15 окт: full — 4 строки   -- 11 окт: full — строка |<< freeze slow >>| dub
+  L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 6) or 0)) or 0   -- 15 окт: full — 4 строки   -- 11 окт: full — строка |<< freeze slow >>| dub
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0
   D.jr_bg = state.jrbg                                -- 10 окт: подложка линейки прыжков (опция)                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
@@ -569,7 +569,7 @@ function D.layout(snap, state, nregions)
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
-  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (3 * L.rh + 4) or 0)   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
+  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 6) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
@@ -3513,7 +3513,7 @@ function D.transport_groups(c)
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
   if c.tpfull then
     table.insert(g[#g], { { '_steplab', 'step', U.GREY } })
-    local row4 = { { 'listen', 'listen', U.GREY } }
+    local row4 = { { '_listen', 'listen', U.GREY } }   -- подпись строки, не кнопка
     for _, it in ipairs(lsn) do row4[#row4 + 1] = it end
     table.insert(g[#g], row4)
   else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
@@ -3985,7 +3985,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   elseif st and st.small ~= false then
     -- 12 окт: ниже второго ряда кнопок (full: |<< freeze /2 x2 …) — раньше налезало; режим крупно x2,
     -- остальное (после |) и правая часть — обычным шрифтом по середине его высоты
-    local sy = ly + 2 * L.rh + (cc.tpfull and (3 * L.rh + 4) or 0) + 2   -- 15 окт: full — строкой ниже 4-й (место под { } и строку маркеров)
+    local sy = ly + 2 * L.rh + (cc.tpfull and (2 * L.rh + 6) or 0) + 2   -- 15 окт: full — сразу под 4-й строкой ({ }, маркеры), без пустых
     local sx0 = x + L.pad
     local sw = x + w - L.pad - sx0
     local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
@@ -6279,7 +6279,7 @@ function D.frame(L, snap, rows, state, info)
   -- низа тела до середины, сегменты зелёный / янтарный / красный
   if state.meters and info.peaks and state.meterstyle == 'pt' then
     local by = L.body_y + L.body_h
-    local maxh = math.floor(L.body_h * 0.5)
+    local maxh = math.floor(L.body_h * 0.575)   -- 15 окт: на 15 % выше
     for _, c in ipairs(L.cols) do
       if c.x then
         local pl, pr = info.peaks(c.col)
@@ -6296,7 +6296,7 @@ function D.frame(L, snap, rows, state, info)
     gfx.a = 1
   elseif state.meters and info.peaks then
     local rh = L.rh
-    local ncell = math.max(1, math.floor(L.nrows * 0.5))       -- до середины тела
+    local ncell = math.max(1, math.floor(L.nrows * 0.575))     -- до середины тела (15 окт: на 15 % выше)
     local by = L.body_y + L.nrows * rh
     local cwm = math.max(3, L.cw - 1)
     for _, c in ipairs(L.cols) do
