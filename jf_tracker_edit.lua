@@ -1855,6 +1855,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local t0 = t_exact or E.swing_time(row, lpb)           -- t_exact: стык с концом предыдущего слайса; свинг (6 окт)
   local made
   run('insert slice ' .. k, function()
+    if E.playthru(inst_item) then E.ghost_prepare(track, lane_idx, t0) end   -- 15 окт: старые ghost — до вставки (иначе копились и обрезали ноту)
     local root = iid_base(E.ensure_iid(inst_item))
     local ok, chunk = R.GetItemStateChunk(inst_item, '', false)
     if not ok then return end
@@ -1883,6 +1884,34 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
     made = it
   end)
   return made
+end
+
+-- 15 окт: перед вставкой ноты с playthru: ghost-сироты (их голова удалена / заменена) — долой; ghost от строки
+-- ноты до следующей настоящей ноты лейна — тоже (новая нота обрывает прошлую, как в Renoise); голова на этой же
+-- позиции заменяется — её хвост уходит с ней. Хвосты нот ниже не трогаются.
+function E.ghost_prepare(track, lane_idx, t0)
+  local items, guids = {}, {}
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local o = R.GetTrackMediaItem(track, i)
+    if same_lane(track, o, lane_idx) then
+      local _, g = R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_ghost', '', false)
+      local _, og = R.GetSetMediaItemInfo_String(o, 'GUID', '', false)
+      local p = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      items[#items + 1] = { it = o, g = g ~= '' and g or nil, guid = og, p = p }
+      guids[og] = true
+    end
+  end
+  local nxt
+  for _, e in ipairs(items) do if not e.g and e.p > t0 + 1e-4 and (not nxt or e.p < nxt) then nxt = e.p end end
+  local gone = {}
+  for _, e in ipairs(items) do
+    if not e.g and math.abs(e.p - t0) < 1e-4 then gone[e.guid] = true end   -- голова на этом месте будет заменена
+  end
+  for _, e in ipairs(items) do
+    if e.g and (not guids[e.g] or gone[e.g] or (e.p >= t0 - 1e-4 and (not nxt or e.p < nxt - 1e-4))) then
+      R.DeleteTrackMediaItem(track, e.it)
+    end
+  end
 end
 
 -- 15 окт: ghost-слайсы. playthru + квантование слайсов (q row / 2 / beat / bar, E.ghost_q строк, ставит main):

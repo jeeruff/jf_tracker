@@ -149,6 +149,8 @@ local function reset()
         function(it) calls[#calls + 1] = 'pick:' .. it.label end)
     end,
     delete_item_at_cursor = function() calls[#calls + 1] = 'delitem'; return true end,
+    new_track = function(n) calls[#calls + 1] = 'newtrack:' .. (n or 1); return true end,   -- 15 окт: счётчики tt / td
+    tracks_op = function(op, n) calls[#calls + 1] = 'tracks:' .. op .. ':' .. (n or 1); return true end,
     clear_track = function(all) calls[#calls + 1] = all and 'cleartrack:all' or 'cleartrack'; return true end,
     delete_track = function() calls[#calls + 1] = 'deltrack'; return true end,
     delete_time = function() calls[#calls + 1] = 'deltime'; return true end,
@@ -958,6 +960,15 @@ do
   keysin('2@a'); eq('2@a: the macro (j) twice', V.cur.row, 2)
   -- 2w — через два события
   reset(); keysin('2w'); eq('2w: two events on (ov, then snare)', V.cur.row, 8)
+  -- 15 окт: заглушки — поиск, треки, gw
+  reset(); V.search = 'a'                               -- snare (8) и hat (16)
+  keysin('2n'); eq('2n: the second match below', V.cur.row, 16)
+  keysin('N'); eq('N: back to the previous match', V.cur.row, 8)
+  reset(); keysin('3tt'); eq('3tt: three new tracks', last(), 'newtrack:3')
+  reset(); keysin('5td'); eq('5td: five tracks deleted', last(), 'tracks:delete:5')
+  reset(); keysin('2tx'); eq('2tx: two tracks cut', last(), 'tracks:cut:2')
+  reset(); keysin('2gw'); eq('2gw: kick swaps with the 2nd event below (hat)', last(), 'swap:kick:hat')
+  eq('2gw: the cursor follows', V.cur.row, 16)
 end
 
 print(('%d checks, %d failed'):format(checks, fails))
