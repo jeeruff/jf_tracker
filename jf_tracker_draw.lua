@@ -1632,6 +1632,8 @@ function D.hint_text(x, y, s, maxw, bg)
   end
 end
 -- 15 окт: режим подсказок для кэша раскладки: 0 нет / в статусе, 1 под панелью, 2 в строке вкладок
+-- 15 окт: кнопка s/e матрицы выключена — маркеров =START / =END нет нигде (линейка у мастера, линии по трекам)
+function D.se_hidden(state, mk) return state.mxmarks == false and (mk.name == '=START' or mk.name == '=END') end
 function D.hint_mode(state) return state.hints and ((state.hintpos == 'panes' and 1) or (state.hintpos == 'tabs' and 2)) or 0 end
 -- пары «клавиша что» в строку от x до x1 (строка вкладок): с подложкой — по строке идёт линия рамки
 function D.hint_pairs(x, y, x1, items, bg)
@@ -5966,7 +5968,7 @@ function D.frame(L, snap, rows, state, info)
   -- 13 окт: линии маркеров через все треки (опция marker lines) — цвет маркера, у верха его строки
   local mkline = {}
   if info.ruler and info.ruler.markers and state.mkedges then
-    for _, mk in ipairs(info.ruler.markers) do mkline[math.floor(mk.row_f + 1e-6)] = mk.rgb or U.AMBER end
+    for _, mk in ipairs(info.ruler.markers) do if not D.se_hidden(state, mk) then mkline[math.floor(mk.row_f + 1e-6)] = mk.rgb or U.AMBER end end
   end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
@@ -6288,7 +6290,7 @@ function D.frame(L, snap, rows, state, info)
     local mks = {}
     for _, mk in ipairs(info.ruler.markers) do
       local row = math.floor(mk.row_f + 1e-6)
-      if row >= row0 and row < row0 + nr then mks[#mks + 1] = { row = row, mk = mk } end
+      if row >= row0 and row < row0 + nr and not D.se_hidden(state, mk) then mks[#mks + 1] = { row = row, mk = mk } end
     end
     table.sort(mks, function(p, q) return p.row < q.row end)
     for k, m in ipairs(mks) do

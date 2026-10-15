@@ -16056,13 +16056,20 @@ local function frame()
   -- на новом месте полоса во всю ширину до правого края тела, за 0.5 с стягивается
   -- к курсору и гаснет. Только в теле трекера (границы модуля)
   if state.beacon and L and L.flat and rows and rows[1] then
-    local b, cur = ctx.beacon, { fi = vim.cur.fi, row = vim.cur.row }
+    local fc = L.flat[vim.cur.fi]
+    local ti
+    if fc and fc.col and snap and snap.cols then for i, c2 in ipairs(snap.cols) do if c2 == fc.col then ti = i; break end end end
+    local b, cur = ctx.beacon, { fi = vim.cur.fi, row = vim.cur.row, ci = fc and (fc.col or fc.ci), ti = ti }
     local last = ctx.beacon_last
-    if last and (math.abs(cur.row - last.row) >= 8 or math.abs(cur.fi - last.fi) >= 3) then
+    -- 15 окт: вбок — на любой другой трек (h l через границу, Tab), не только прыжок через 3 колонки
+    local trk = last and cur.ci and last.ci and cur.ci ~= last.ci
+    if last and (math.abs(cur.row - last.row) >= 8 or math.abs(cur.fi - last.fi) >= 3 or trk) then
       -- 14 окт: полоса прилетает с той стороны, откуда курсор: сверху / снизу — вертикально по
       -- колонке, сбоку — горизонтально по строке
       local dr, df = cur.row - last.row, cur.fi - last.fi
-      local side = (math.abs(dr) / 8 >= math.abs(df) / 3) and (dr > 0 and 'top' or 'bottom') or (df > 0 and 'left' or 'right')
+      -- 15 окт: сторона — по порядку треков в проекте: Tab прокручивает вид, номера колонок и x сдвигаются (след был не с той стороны)
+      if cur.ti and last.ti and cur.ti ~= last.ti then df = (cur.ti > last.ti) and math.max(1, math.abs(df)) or -math.max(1, math.abs(df)) end
+      local side = (math.abs(dr) >= 8 and math.abs(dr) / 8 >= math.abs(df) / 3) and (dr > 0 and 'top' or 'bottom') or (df > 0 and 'left' or 'right')
       ctx.beacon = { t = reaper.time_precise(), side = side, dur = tonumber(reaper.GetExtState(EXT, 'beacon_dur')) or 0.5 }; b = ctx.beacon   -- beacon_dur — для тестов (снимок посреди полёта)
     end
     ctx.beacon_last = cur
