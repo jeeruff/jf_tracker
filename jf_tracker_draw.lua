@@ -3479,14 +3479,15 @@ end
 -- 11 окт: вторая строка full-транспорта, по колонкам кнопок: rew | pause | play | rec | ff | loop
 D.RATE_SNAPS = { 0.25, 0.5, 0.75, 1, 1.5, 2 }
 function D.transport_sub(c)
-  local frz = c.frz and ('frz %s'):format(c.frz) or 'freeze'
+  -- 15 окт: слов нет — символы: * freeze (*N — заморожено N), ^O shift rec (^ — шифт, O — как rec), ++ dub; слова — в статусе
+  local frz = c.frz and ('*%s'):format(c.frz) or '*'
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
              { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
-           { 'shiftrec', 'shift', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
-           { 'tp_end', '>>|' }, { 'dub', 'dub', nil } }
+           { 'shiftrec', '^O', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
+           { 'tp_end', '>>|' }, { 'dub', '++', nil } }
 end
 function D.transport_groups(c, L)   -- 15 окт: L — для ширины вертикальной подписи step
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -3794,6 +3795,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[5] or b[2])) end   -- 15 окт: слов нет — ширина по символу и нижнему ряду
     if c.tpfull then for _, b in ipairs(D.transport_sub(c)) do if b[1] then tbw = math.max(tbw, ms(b[2])) end end end   -- 11 окт: и нижняя строка
     tbw = tbw + 2 * L.pad
+    -- 15 окт: кнопки узкие (символы) — колонка не уже третьей строки: маркеры (10 на 2 колонки), rate, punch pre lib slow на 3
+    if c.tpfull then
+      local rec = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + 8 * L.pad
+      tbw = math.max(tbw, math.ceil(10 * (ms('0') + 2) / 2), ms('x1.10') + 2 * L.pad, math.ceil((rec - 4) / 3))
+    end
     btot = #blist * (tbw + 2) - 2
   end
   local function draw_text_buttons(bx0)
