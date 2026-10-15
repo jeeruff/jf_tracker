@@ -466,6 +466,60 @@ local function draw_about(L, W, H)
   end
 end
 
+-- 15 окт: раскладка кирпичами: разделы (заголовок sep с title … до следующего) — рамками в колонки;
+-- → { place = { {i, x, y, w} }, frames = { {x, y, w, h, title, i0, i1} } } или nil (не влезает / поиск / хоткеи)
+function O.masonry_plan(L, bx, y0, bw, ch)
+  if O.compact or O.query ~= '' then return nil end
+  local rh, pad = L.rh, L.pad
+  local secs, cur = {}, nil
+  for i, it in ipairs(O.items) do
+    if it.sep then
+      if it.title and it.title ~= '' then cur = { title = it.title, rows = {} }; secs[#secs + 1] = cur end
+    elseif it.hk then return nil                       -- хоткеи — длинный список: одной колонкой
+    else
+      if not cur then cur = { title = '', rows = {} }; secs[#secs + 1] = cur end
+      cur.rows[#cur.rows + 1] = i
+    end
+  end
+  local list = {}
+  for _, sc in ipairs(secs) do if #sc.rows > 0 then list[#list + 1] = sc end end
+  if #list == 0 then return nil end
+  local colw = O.roww or (L.cw * 56)
+  local fw = colw + 2 * pad                            -- рамка: строка + поля
+  local gap = 2 * pad
+  local ncols = math.max(1, math.floor((bw - 2 * pad + gap) / (fw + gap)))
+  local function hpx(sc) return (#sc.rows + 1) * rh + 6 end   -- строка заголовка + строки + низ рамки
+  -- по порядку: раздел — в текущую колонку, не влез в высоту hmax — в следующую
+  local function pack(hmax)
+    local cols, ci, yy = { {} }, 1, 0
+    for _, sc in ipairs(list) do
+      local h = hpx(sc)
+      if h > hmax then return nil end
+      if yy > 0 and yy + h > hmax then ci = ci + 1; yy = 0; cols[ci] = {} end
+      if ci > ncols then return nil end
+      cols[ci][#cols[ci] + 1] = { sc = sc, y = yy, h = h }
+      yy = yy + h + 6
+    end
+    return cols
+  end
+  -- наименьшая высота колонок, при которой всё влезает (колонки ровнее, низ окна свободнее)
+  local lo, hi = 0, ch
+  if not pack(hi) then return nil end
+  for _ = 1, 20 do local mid = math.floor((lo + hi) / 2); if pack(mid) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
+  local cols = pack(hi)
+  local place, frames = {}, {}
+  for c, col in ipairs(cols) do
+    local x = bx + pad + (c - 1) * (fw + gap)
+    for _, e in ipairs(col) do
+      local sc, fy = e.sc, y0 + e.y
+      frames[#frames + 1] = { x = x, y = fy, w = fw, h = e.h, title = sc.title, i0 = sc.rows[1], i1 = sc.rows[#sc.rows] }
+      for k, i in ipairs(sc.rows) do place[#place + 1] = { i = i, x = x + pad, y = fy + k * rh + 2, w = colw - 2 * pad } end
+    end
+  end
+  table.sort(place, function(a, b) return a.i < b.i end)
+  return { place = place, frames = frames, ncols = #cols }
+end
+
 function O.draw(L, W, H)
   if not O.active then return end
   if O.page == 'about' then return draw_about(L, W, H) end
@@ -576,10 +630,12 @@ function O.draw(L, W, H)
   local by0 = by
   if not O.compact then by = by + rh * ((#O.tabs > 0) and 3 or 2) end   -- список — под вкладками и поиском (2 строки)
   O.nvis = cap
+  local masonry = O.masonry_plan(L, bx, by + rh + 4, bw, nvis * rh)   -- 15 окт: разделы рамками в колонки (см. O.masonry_plan)
+  if masonry then O.scroll = 0 end
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
   local sbw = 0
-  if #O.items > cap then
+  if #O.items > cap and not masonry then
     sbw = 7
     local sx, sy, sh = bx + bw - sbw - 2, by + rh + 4, nvis * rh
     local th = math.max(8, math.floor(sh * cap / #O.items))
@@ -607,22 +663,39 @@ function O.draw(L, W, H)
   local colw = math.floor(bw / ncol)
   O.rh = rh
   O.block_hot = nil
+  -- 15 окт: места — где рисовать строку i: { i, x, y, w }. Опции без поиска — разделы рамками,
+  -- кирпичами в колонки по ширине окна (всё на одном экране, высота колонок — наименьшая, при которой
+  -- влезает по порядку); не влезает — прежний список со скроллом
+  local place, frames = {}, nil
+  if masonry then
+    place, frames = masonry.place, masonry.frames
+  else
+    for r = 1, cap do
+      local i = O.scroll + r
+      if not O.items[i] then break end
+      local col, rr = (r - 1) // nvis, (r - 1) % nvis
+      local x, w = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
+      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = math.min(w, O.roww or w) }
+    end
+  end
+  O.masonry_on = masonry and true or nil
   -- 14 окт: блок — строки подряд; рисуется один раз с первой видимой его строки
   local drawn_block = {}
-  for r = 1, cap do
-    local it0 = O.items[O.scroll + r]
+  for pi, pl in ipairs(place) do
+    local it0 = O.items[pl.i]
     if it0 and it0.blockrow and not drawn_block[it0.of] then
       drawn_block[it0.of] = true
       local nb = 0
-      while r + nb <= cap and O.items[O.scroll + r + nb] and O.items[O.scroll + r + nb].blockrow and O.items[O.scroll + r + nb].of == it0.of do nb = nb + 1 end
-      local yb = by + rh + 4 + (r - 1) * rh
+      while place[pi + nb] and O.items[place[pi + nb].i] and O.items[place[pi + nb].i].blockrow and O.items[place[pi + nb].i].of == it0.of do nb = nb + 1 end
+      local yb, r = pl.y, pi
       local blk = it0.of
+      local bx, bw = pl.x, pl.w + 2 * L.pad - (masonry and 0 or (sbw + 2))
       if blk.draw then
-        local _, sy0, sy1 = blk.draw(bx + L.pad, yb, bw - 2 * L.pad - sbw - 2, nb * rh, (it0.k - 1) * rh)
+        local _, sy0, sy1 = blk.draw(bx + L.pad, yb, bw - 2 * L.pad, nb * rh, (it0.k - 1) * rh)
         if mx >= bx and mx < bx + bw and my >= yb and my < yb + nb * rh then O.block_hot = blk end
         -- выбор внутри блока виден: список листается за ним
         local cur = O.items[O.sel]
-        if O.block_follow and cur and cur.blockrow and cur.of == blk and sy0 then
+        if O.block_follow and not masonry and cur and cur.blockrow and cur.of == blk and sy0 then
           O.block_follow = nil
           local first = O.scroll + r - (it0.k - 1)
           local r0, r1 = first + math.floor(sy0 / rh), first + math.ceil(sy1 / rh)
@@ -636,15 +709,24 @@ function O.draw(L, W, H)
   for _, it in ipairs(O.all or {}) do
     if it.kind == 'block' and it.height and it.nrows and it.nrows ~= math.max(4, math.ceil(it.height() / rh)) then O.rebuild() end
   end
-  for r = 1, cap do
-    local i = O.scroll + r
+  -- рамки разделов: под строками; раздел с выбранной строкой — акцентом (фокус)
+  for _, fr in ipairs(frames or {}) do
+    local foc = O.sel >= fr.i0 and O.sel <= fr.i1
+    local ty = fr.y + math.floor(rh / 2)
+    U.set(foc and U.AMBER or U.LINE); gfx.rect(fr.x, ty, fr.w, fr.h - math.floor(rh / 2), 0)
+    if fr.title and fr.title ~= '' then
+      local tw = U.measure(fr.title) + 2 * L.pad
+      U.set(U.BG); gfx.rect(fr.x + L.pad, fr.y, tw, rh, 1)
+      U.text(fr.x + 2 * L.pad, fr.y + 1, fr.title, foc and U.AMBER or U.CYAN)
+    end
+  end
+  for _, pl in ipairs(place) do
+    local i = pl.i
     local it = O.items[i]
     if not it then break end
-    local col, rr = (r - 1) // nvis, (r - 1) % nvis
-    local y = by + rh + 4 + rr * rh
-    -- колонка: свои x и ширина (у последней — минус полоса прокрутки)
-    local bx, bw = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
-    bw = math.min(bw, O.roww or bw)                   -- 13 окт: строка — по содержимому, не до края окна (колесо справа не меняло опции)
+    local y = pl.y
+    -- колонка: свои x и ширина (13 окт: строка — по содержимому, не до края окна)
+    local bx, bw = pl.x, pl.w
     if it.blockrow then
     elseif it.sep then
       -- раздел (4 окт): заголовок темы, иначе — тонкая линия
