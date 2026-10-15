@@ -1206,6 +1206,19 @@ function M.auto_reset(short) M.fx_gen = M.fx_gen + 1; for k in pairs(auto_cache)
 M.fx_gen = 0
 local fx_cache = setmetatable({}, { __mode = 'k' })   -- 8 окт, замер: слабый ключ MediaTrack* живёт и после GC
 local build_track_fx
+-- 15 окт: пометки у параметров: ~ есть огибающая (автоматизация), % модулируется (LFO / ACS / link);
+-- считаются при каждом снимке (в ключ кэша FX не входят) — только у показанных параметров
+local function mark_params(tr, A, out)
+  for _, e in ipairs(out) do
+    for _, p in ipairs(e.params or {}) do
+      local fx = p.fx or e.i
+      local okm, act = A.GetNamedConfigParm and A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i))
+      p.auto = (R.GetFXEnvelope and not M.is_take(tr) and R.GetFXEnvelope(tr, fx, p.i, false) ~= nil) or false
+      p.mod = (okm and act == '1') or false
+      p.mk = (p.auto and ' ~' or '') .. (p.mod and ' %' or '')
+    end
+  end
+end
 function M.track_fx(tr)
   local A = M.fxapi(tr)
   if not A.GetCount then return {} end
@@ -1240,11 +1253,13 @@ function M.track_fx(tr)
         e.file = ok and file ~= '' and file or nil
       end
     end
+    mark_params(tr, A, c.out)
     return c.out
   end
   local out = build_track_fx(tr)
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
+  mark_params(tr, A, out)
   return out
 end
 
@@ -1520,16 +1535,6 @@ function M.track_midilanes(tr, lpb, guid)
     l.rows = {}
     for r in pairs(l.ev) do l.rows[#l.rows + 1] = r end
     table.sort(l.rows)
-  end
-  -- 15 окт: пометки у параметров: ~ есть огибающая (автоматизация), % модулируется (LFO / ACS / link)
-  for _, e in ipairs(out) do
-    for _, p in ipairs(e.params or {}) do
-      local fx = p.fx or e.i
-      local okm, act = A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i))
-      p.auto = R.GetFXEnvelope and R.GetFXEnvelope(tr, fx, p.i, false) ~= nil or false
-      p.mod = okm and act == '1' or false
-      p.mk = (p.auto and ' ~' or '') .. (p.mod and ' %' or '')
-    end
   end
   return out
 end
