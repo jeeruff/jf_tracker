@@ -662,6 +662,9 @@ function D.layout(snap, state, nregions)
     L.pn = lay
     local c = lay.by_panel.tracker
     local tr = c and c.content or { x = 0, y = 0, w = gfx.w, h = gfx.h - L.status_h }
+    -- 15 окт: развёрнут другой модуль (zz) — у трекера листа нет: не раскладывать его на всё окно под ним
+    -- (шапка «fx Superior», транспорт и модлайн ложились поверх развёрнутого слайсера)
+    if not c and state.panes.zoom and state.panes.zoom ~= 'tracker' then tr = { x = 0, y = gfx.h - L.status_h, w = gfx.w, h = 0 }; L.pn_hidden_tracker = true else L.pn_hidden_tracker = nil end
     L.side_w, L.rstrip_w, L.slices_w, L.inst_w, L.top_h, L.pool_h, L.dsp_h = 0, 0, 0, 0, 0, 0, 0
     L.browser_left, L.lside_rect, L.slices_split = false, nil, false
     L.ctrl_alone, L.ctrl_box, L.ctrl_dsp, L.mx_top, L.mx_bot, L.mx_ext, L.top_x0 = false, nil, nil, nil, nil, nil, 0
@@ -8046,11 +8049,12 @@ function D.frame(L, snap, rows, state, info)
     if r then
       -- 15 окт: опция dim unfocused — остальные модули слегка притушены; до рамок — иначе тень ложилась
       -- на рамку там, где прямоугольник соседа перекрывает трекер (пропадала верхняя кромка)
-      if state.dimfocus then
+      local dk = (tonumber(state.dimfocus) or 0) / 100   -- 15 окт: сила — слайдер в опциях (0 = выкл)
+      if dk > 0 then
         local seen = { [table.concat(r, ',')] = true }
         for k, r2 in pairs(rects) do
           local key = table.concat(r2, ',')
-          if k ~= f and not seen[key] and r2[3] > 0 and r2[4] > 0 then seen[key] = true; gfx.set(0, 0, 0, 0.22); gfx.rect(r2[1], r2[2], r2[3], r2[4], 1) end
+          if k ~= f and not seen[key] and r2[3] > 0 and r2[4] > 0 then seen[key] = true; gfx.set(0, 0, 0, dk); gfx.rect(r2[1], r2[2], r2[3], r2[4], 1) end
         end
         gfx.a = 1
       end
