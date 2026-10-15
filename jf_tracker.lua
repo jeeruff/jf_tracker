@@ -16062,7 +16062,8 @@ local function frame()
     local b, cur = ctx.beacon, { fi = vim.cur.fi, row = vim.cur.row, ci = fc and (fc.col or fc.ci), ti = ti }
     local last = ctx.beacon_last
     -- 15 окт: вбок — на любой другой трек (h l через границу, Tab), не только прыжок через 3 колонки
-    local trk = last and cur.ci and last.ci and cur.ci ~= last.ci
+    -- по номеру трека в проекте: объекты колонок пересобираются моделью — сравнение таблиц давало «другой трек» без сдвига (второй бикон справа)
+    local trk = last and cur.ti and last.ti and cur.ti ~= last.ti
     if last and (math.abs(cur.row - last.row) >= 8 or math.abs(cur.fi - last.fi) >= 3 or trk) then
       -- 14 окт: полоса прилетает с той стороны, откуда курсор: сверху / снизу — вертикально по
       -- колонке, сбоку — горизонтально по строке
