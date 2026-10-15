@@ -5422,6 +5422,27 @@ ctx = {
     if #items == 0 then items[1] = { key = 'q', label = 'no macros yet - q + letter records one', fn = function() end } end
     return { title = 'macros (play at the cursor)', items = items }
   end,
+  -- 15 окт: всплывашка @ — те же клавиши, что в \ q (записанные — буквой регистра, свои и встроенные — 1..9 A..Z),
+  -- @ / — выбор по имени с набором (пикер)
+  mac_wk = function()
+    local h = ctx.mac_hydra()
+    local items = {}
+    for _, it in ipairs(h.items) do if it.fn then items[#items + 1] = { it.key, it.label } end end
+    items[#items + 1] = { '@', 'the last one again' }
+    items[#items + 1] = { '/', 'by name - type to filter, Enter plays' }
+    return { title = '@ - play a macro', items = items }
+  end,
+  mac_by_key = function(ch)
+    if ch == '/' then
+      local items = {}
+      for _, r in ipairs(ctx.mac_rows()) do
+        if r.kind then items[#items + 1] = { label = (r.kind == 'rec' and ('@' .. r.name .. '  ' .. (r.body or '')) or (r.name .. '  ' .. (r.desc or r.body or ''))), data = r } end
+      end
+      vim.open_picker('macro', items, function(it) ctx.mac_do({ kind = 'play', row = it.data }) end)
+      return true
+    end
+    for _, it in ipairs(ctx.mac_hydra().items) do if it.key == ch and it.fn then it.fn(); return true end end
+  end,
   -- :mac имя — макрос по имени (свой / встроенный / @a)
   mac_run = function(name)
     name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
@@ -16353,7 +16374,8 @@ local function frame()
   -- (там, куда уже смотрят глаза) список того, что можно нажать дальше
   local pop = vim.popup()
   if not pop and (state.whichkey or state.pane_mode) then
-    local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
+    local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
+      or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
       or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then

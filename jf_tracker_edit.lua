@@ -551,7 +551,15 @@ function E.transpose(heads, lpb, semis)
   if #heads == 0 or semis == 0 then return end
   run(('transpose %+d'):format(semis), function()
     for _, h in ipairs(heads) do
-      if h.kind == 'audio' and h.take then
+      local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
+      if h.kind == 'audio' and h.take and tonumber(slk) then
+        -- 15 окт: слайс — его высота (как E.set_pitch): D_PITCH от базы инструмента; раньше шло через rate
+        -- (resample), а слайс держит свою длину — высота не менялась
+        local ref = E.inst_ref and E.inst_ref(h.item)
+        local rtk = ref and ref ~= h.item and R.GetActiveTake(ref)
+        local base = rtk and R.GetMediaItemTakeInfo_Value(rtk, 'D_PITCH') or 0
+        E.slice_pitch(h.item, R.GetMediaItemTakeInfo_Value(h.take, 'D_PITCH') - base + semis)
+      elseif h.kind == 'audio' and h.take then
         audio_set_semis(h, audio_semis(h) + semis)
       elseif h.kind == 'midi' then
         local i, n = midi_note(h, lpb)

@@ -2330,6 +2330,7 @@ function V.key_impl(c)
       local name = (c == ('@'):byte()) and V.last_macro or string.char(c)
       local keys = name and V.regs['@' .. name]
       if keys then V.last_macro = name; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
+      if not keys and c < 256 and ctx.mac_by_key then ctx.mac_by_key(string.char(c)) end   -- 15 окт: 1..9 A..Z — свои / встроенные, / — по имени
       V.count = nil; return
     elseif p == 'T' then
       -- 11 окт: T f — take FX ноте под курсором (fzf), T o — её цепь в DSP
