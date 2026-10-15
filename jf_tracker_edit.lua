@@ -1915,9 +1915,13 @@ function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
     if not used[rq] and tq > t0 + 1e-4 and tq < hend - 1e-4 then used[rq] = true; starts[#starts + 1] = { j = j, t = tq } end
   end
   if #starts == 0 then return end
-  R.SetMediaItemInfo_Value(head, 'D_LENGTH', starts[1].t - t0)
+  -- 15 окт: кусок играет СВОЙ слайс (до следующей метки, с beatsync — по rate), не до следующего ghost:
+  -- иначе хвост головы доигрывал транзиент следующего слайса раньше бита, и он звучал дважды
+  local full = base.len or (slices[#slices] + 1)
+  local function nat(j) return ((slices[j + 1] or full) - slices[j]) * r0 / rate end
+  R.SetMediaItemInfo_Value(head, 'D_LENGTH', math.min(nat(k), starts[1].t - t0))
   for i, g in ipairs(starts) do
-    local te = starts[i + 1] and starts[i + 1].t or hend
+    local te = math.min(starts[i + 1] and starts[i + 1].t or hend, g.t + nat(g.j))
     local gi = insert_chunk(track, lane_idx, g.t, chunk)
     local gtk = R.GetActiveTake(gi)
     if gtk then

@@ -189,12 +189,22 @@ function S.mouse_up()
   S.drag = nil
   if d and d.kind == 'slice' then
     -- клик без протяжки — только выбор (граница не двигается, без правки)
+    -- 15 окт: выбранным остаётся слайс ЭТОЙ метки (после сдвига список пересобран — номер другой;
+    -- выбор прыгал на соседний слева)
+    local function keep(t)
+      local k = d.k
+      for i, u in ipairs(S.slices or {}) do if math.abs(u - t) < 1e-6 then k = i end end
+      if S.entry and ctx.select_slice then ctx.select_slice(S.entry, k); S.zedge_k, S.zedge_e = k, S.entry.item or S.entry.path end
+      if ctx.set_last_slice then ctx.set_last_slice(k) end
+      return k
+    end
     if math.abs(gfx.mouse_x - (d.mx0 or gfx.mouse_x)) < 3 then
       if d.t0 then S.slices[d.k] = d.t0 end
-      S.msg = ('slice S%02X selected'):format(d.k)
+      S.msg = ('slice S%02X selected'):format(keep(S.slices[d.k]))
       return d
     end
-    commit(); S.msg = ('slice %d moved'):format(d.k)
+    local tnew = S.slices[d.k]
+    commit(); S.msg = ('slice %d moved'):format(keep(tnew))
     S.roll(S.slices[d.k], S.line_is_end(d.t0), true)   -- 10 окт: auto play — кусок у края, не весь слайс
     return d
   end

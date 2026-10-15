@@ -6341,7 +6341,7 @@ function D.frame(L, snap, rows, state, info)
             -- 15 окт: набранное (счётчик, оператор: 3d) — тегом [3d_] сразу за ячейкой курсора; рисуется в конце кадра
             if inv and info.typed and info.typed ~= '' then
               local fx, fw = D.field_rect(f.G or L, type(inv) == 'number' and inv or 1)
-              D.typed_at = { x = x + fx + fw + 2, y = y, ty = ty, s = '[' .. info.typed .. '_]' }
+              D.typed_at = { x = x + fx, y = y, ty = ty, w = fw, s = '[' .. info.typed .. '_]' }   -- 15 окт: прямо на ячейке курсора
             end
             D.cur_box = nil; D.fx_half = nil
             if in_body and mx >= x and mx < x + f.w then
@@ -8061,7 +8061,7 @@ function D.frame(L, snap, rows, state, info)
   local ta = D.typed_at
   D.typed_at = nil
   if ta and info.typed and info.typed ~= '' then
-    local w = ms(ta.s) + 2
+    local w = math.max(ms(ta.s), ta.w or 0) + 2
     set(U.tint(U.AMBER, 0.45)); gfx.rect(ta.x - 1, ta.y, w, L.rh, 1)
     text(ta.x, ta.ty, ta.s, U.AMBER)
   end
