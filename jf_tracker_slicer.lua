@@ -448,6 +448,27 @@ local function piano_slice(c)
 end
 
 -- клавиши; true — съедена
+-- 15 окт: частота источника (кадры линейки hex и gw)
+function S.srate(e)
+  local src = e and e.src
+  if not src and e and e.item and R.ValidatePtr(e.item, 'MediaItem*') then
+    local tk = R.GetActiveTake(e.item)
+    src = tk and R.GetMediaItemTake_Source(tk)
+  end
+  local sr = src and R.GetMediaSourceSampleRate(src) or 0
+  return sr > 0 and sr or 44100
+end
+-- кадр источника от начала сэмпла (как в линейке) ↔ секунды e
+function S.frame_of(e, t) return math.floor(t * ((e.rate and e.rate ~= 0) and e.rate or 1) * S.srate(e) + 0.5) end
+function S.time_of(e, fr) return fr / S.srate(e) / ((e.rate and e.rate ~= 0) and e.rate or 1) end
+-- ближайший транзиент к t (детекция по требованию); нет — t
+function S.snap_trans(t)
+  if #(S.trans or {}) == 0 and S.env then S.detect() end
+  local best
+  for _, u in ipairs(S.trans or {}) do if not best or math.abs(u - t) < math.abs(best - t) then best = u end end
+  return best or t
+end
+
 function S.key(c)
   local ch = c < 256 and string.char(c) or ''
   -- 10 окт: Opt+D — модуль детектора транзиентов; пока открыт — его клавиши первыми
@@ -455,6 +476,27 @@ function S.key(c)
   local cpd = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
   if (mods.alt and (ch == 'd' or ch == 'D')) or cpd == 8706 then S.dt_toggle(); return true end
   if S.dpanel and S.dt_key(c, mods.shift) then return true end
+  -- 15 окт: gw HEX Enter — курсор волны на кадр линейки (по умолчанию к ближайшему транзиенту;
+  -- Shift+Enter — ровно туда); [ ] ставят по нему начало / конец
+  if S.gbuf then
+    if c == 27 then S.gbuf = nil; S.msg = ''
+    elseif c == 8 then S.gbuf = S.gbuf:sub(1, -2)
+    elseif c == 13 and S.entry then
+      local fr = tonumber(S.gbuf ~= '' and S.gbuf or '0', 16) or 0
+      local t = math.max(0, math.min(S.entry.len, S.time_of(S.entry, fr)))
+      local exact = mods.shift
+      S.wcur = exact and t or S.snap_trans(t); S.wcur_e = S.entry.item
+      S.gbuf = nil
+      S.msg = ('wave cursor %X%s - [ ] set the sample start / end here'):format(S.frame_of(S.entry, S.wcur), exact and '' or ' (snapped to a transient; Shift+Enter - exact)')
+    elseif ch:match('^%x$') then S.gbuf = S.gbuf .. ch:upper()
+    end
+    if S.gbuf then S.msg = 'gw ' .. S.gbuf .. '_  hex frame, Enter - to the nearest transient, Shift+Enter - exact, Esc' end
+    return true
+  end
+  if S.gpend then
+    S.gpend = nil
+    if ch == 'w' then S.gbuf = ''; S.msg = 'gw _  hex frame of the ruler, Enter'; return true end
+  elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave'; return true end
   local a, b = S.span()
   -- 14 окт: s — меню нарезки и в раскладке renoise (там s — нота C#, слушала слайс 1 вместо меню)
   local pk = S.entry and not S.entry.file and ch ~= 's' and piano_slice(c)
@@ -471,18 +513,30 @@ function S.key(c)
   elseif ch == 'v' then S.cycle_view()
   elseif ch == 'D' or (ch == 'd' and a) then if a then ctx.depot_span(S.entry, a, b) end
   elseif ch == ' ' and a then ctx.preview_slice(S.track, S.entry, a, b)
-  elseif ch == '[' and a then S.sel.a = math.max(0, a - S.entry.len * 0.01); S.sel.b = b
-  elseif ch == ']' and a then S.sel.a = a; S.sel.b = math.min(S.entry.len, b + S.entry.len * 0.01)
   elseif S.entry and S.entry.file and (ch == 'x' or ch == 's') then
     S.msg = 'file: slices live on items - drag selection to a track or D: to lib, then slice'
   -- нарезка (4 окт): префикс s — всплывашка: t транзиенты, 2 4 8 1 3 6 —
   -- равные части 2 4 8 16 32 64 (цифры без s — клавиши нот, слушают слайсы)
   -- 12 окт: прицел ноты под курсором трекера: [ ] — ±5 мс, { } — ±0.5 мс (h l заняты панелью свойств),
   -- s — разрезать эту ноту здесь; меню нарезки — S (без ноты под курсором — и s)
-  elseif S.cross and not a and (ch == '[' or ch == ']' or ch == '{' or ch == '}') then
-    local st = (ch == '{' or ch == '}') and 0.0005 or 0.005
-    S.cross.dt = S.cross.dt + ((ch == ']' or ch == '}') and st or -st)
-    S.msg = ('cut point %+.1f ms from the row - s cuts the note here'):format(S.cross.dt * 1000)
+  -- 15 окт: [ ] — начало / конец сэмпла; прицел — { } по 1 мс
+  elseif S.cross and not a and (ch == '{' or ch == '}') then
+    S.cross.dt = S.cross.dt + (ch == '}' and 0.001 or -0.001)
+    S.msg = ('cut point %+.1f ms from the row ({ } - 1 ms) - s cuts the note here'):format(S.cross.dt * 1000)
+  -- 15 окт: [ ] — начало / конец сэмпла (все ноты инструмента, как ручки ia / ib): у выделения на
+  -- волне — его край, иначе — край выбранного слайса (j k в slices)
+  elseif (ch == '[' or ch == ']') and S.entry and S.entry.item and not S.entry.file and ctx.autotrim then
+    local e, t = S.entry, nil
+    if a then t = (ch == '[') and a or b
+    elseif S.wcur and S.wcur_e == e.item then t = S.wcur
+    else
+      local k = (ctx.ssel and ctx.ssel.item == e.item) and ctx.ssel.k or 0
+      if k and k > 0 and S.slices[k] then local t0, t1 = S.bounds(S.slices, k, e.len); t = (ch == '[') and t0 or t1 end
+    end
+    if not t then S.msg = '[ ]: gw HEX - a wave cursor, or select a slice (slices pane, j k), or drag a span on the wave'
+    elseif ch == '[' and t > 1e-4 then ctx.autotrim(e, t, e.len); S.wcur = nil
+    elseif ch == ']' and t < e.len - 1e-4 then ctx.autotrim(e, 0, t); S.wcur = nil
+    else S.msg = ch == '[' and 'the sample already starts here' or 'the sample already ends here' end
   elseif ch == 's' and S.cross and ctx.cut_at then
     local te = S.cut_point(S.cross.t + S.cross.dt)
     ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
@@ -934,6 +988,31 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- пики на всю длину с плотностью окна; пиксель → индекс по окну
   local ntot = math.max(w, math.min(16384, math.floor(w * len / span)))
   local function idx_of(px, n) return math.floor((va + px / w * span) / len * n) + 1 end
+  -- 15 окт: линейка над волной, как в Renoise — кадры источника от начала сэмпла в hex
+  if wh > 4 * rh then
+    local RH = rh - 2
+    U.set(U.BG); gfx.rect(x, wy, w, RH, 1)
+    local sr, rate = S.srate(e), (e.rate and e.rate ~= 0) and e.rate or 1
+    local f0, f1 = va * rate * sr, vb * rate * sr
+    local lw = U.measure('FFFFFF') + 2 * L.pad
+    local need = (f1 - f0) * lw / math.max(1, w)          -- кадров на подпись
+    local st = 1
+    while st < need do                                      -- шаг 1 2 4 8 × 16^k: круглые hex
+      local m = 1
+      while m < 16 and st * m < need do m = m * 2 end
+      if st * m >= need then st = st * m; break end
+      st = st * 16
+    end
+    for k = math.ceil(f0 / st), math.floor(f1 / st) do
+      local fr = k * st
+      local px = x + math.floor((fr / rate / sr - va) / span * w)
+      U.set(U.LINE); gfx.rect(px, wy + RH - 4, 1, 4, 1)
+      local lab = ('%X'):format(fr)
+      if px + 2 + U.measure(lab) < x + w then U.text(px + 2, wy, lab, U.GREY) end
+    end
+    U.set(U.LINE); gfx.rect(x, wy + RH - 1, w, 1, 1)
+    wy, wh = wy + RH, wh - RH
+  end
   U.set(U.PANEL); gfx.rect(x, wy, w, wh, 1)
   local cy, hh = wy + wh / 2, wh / 2 - 1
   local base = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
@@ -1177,6 +1256,13 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.set(U.AMBER)
     if pa >= x and pa < x + w then gfx.rect(pa, wy, 2, wh, 1); gfx.rect(pa, wy, 6, 2, 1); gfx.rect(pa, wy + wh - 2, 6, 2, 1) end
     if pb > x and pb <= x + w then gfx.rect(pb - 2, wy, 2, wh, 1); gfx.rect(pb - 6, wy, 6, 2, 1); gfx.rect(pb - 6, wy + wh - 2, 6, 2, 1) end
+  end
+  -- 15 окт: курсор волны (gw) — светлая линия с hex-кадром
+  if S.wcur and S.wcur_e == e.item and S.wcur >= va and S.wcur <= vb then
+    local px = tx(S.wcur)
+    local lab = ('%X'):format(S.frame_of(e, S.wcur))
+    U.set(U.TEXT); gfx.rect(px, wy, 1, wh, 1); gfx.rect(px + 1, wy + 1, U.measure(lab) + 4, rh, 1)
+    U.text(px + 3, wy + 1, lab, U.BG, U.TEXT)
   end
   local in_wave = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= wy and gfx.mouse_y < wy + wh
   local lab_end = -1e9            -- 6 окт: подписи не налезают — только если влезает до следующей линии и после прошлой подписи
