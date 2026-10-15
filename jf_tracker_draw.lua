@@ -5091,13 +5091,33 @@ function D.frame(L, snap, rows, state, info)
           D.mcb_w, D.mcb_h = math.max(L.btn_w, L.rh + 4), L.rh
         end
       end
-      local function hbtn(b, x, by, bwk, bh)
+      local function hbtn(b, x, by, bwk, bh, round)
         bh = bh or (L.rh - 2)
+        -- 15 окт: буква — по центру рамки (по высоте шрифта, не строки)
+        local tyc = by + math.floor((bh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0)
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
+        -- 15 окт: круглые — запись (кружок внутри; A — автоарм при выборе трека) и фаза (ø)
+        if round then
+          local r = math.floor((bh - 1) / 2)
+          local cx, cy = x + math.floor(bwk / 2), by + math.floor(bh / 2)
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          local rc = b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or (on and b[3] or BTXT)
+          set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.circle(cx, cy, r, 1, 1)
+          set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
+          if b[4] == 'arm' then
+            local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
+            if aa then text(cx - math.floor(ms('A') / 2), tyc, 'A', on and U.TEXT or rc)
+            else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
+          else text(cx - math.floor(ms(b[1]) / 2), tyc, b[1], on and U.TEXT or BTXT) end
+          local key = b[4] == 'phase' and 'trkio' or 'btn'
+          if hot then hover[key] = { col = col, what = b[4] } end
+          hint(key, x, by, bwk, bh + 2, { col = col, what = b[4] })
+          return
+        end
         set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
         set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, bh, 0)
-        text(x + math.floor((bwk - ms(b[1])) / 2), by + math.floor((bh - (L.rh - 2)) / 2), b[1], on and b[3] or (b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or BTXT))   -- 9 окт: R — красная всегда
+        text(x + math.floor((bwk - ms(b[1])) / 2), tyc, b[1], on and b[3] or (b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or BTXT))   -- 9 окт: R — красная всегда
         if b[4] == 'phase' then
           if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.trkio = { col = col, what = 'phase' } end
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
@@ -5112,12 +5132,21 @@ function D.frame(L, snap, rows, state, info)
       local srw = ms('SRO') + 4
       local bwh = math.max(L.btn_w, math.min(2 * L.cw + 4, math.floor((avail - srw * 1.5) / 5) - 1))   -- сколько влезает, не шире двойной
       D.hbtn_w = bwh
+      -- 15 окт: (R) I · M S · SRO … (ø) trim: запись круглой, M S — отступом, фаза — у trim; высота — в строку (низ резался)
+      local gap = L.pad
+      -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
+      bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
+      local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
+      by = by - 1
+      local ph_x = trim_x - 1 - bwh
       for k, b in ipairs(c.master and {} or labels) do
-        local x = bx + (k - 1) * (bwh + 1)
+        local x = bx + (k - 1) * (bwh + 1) + (k >= 3 and gap or 0)
         local bwk = bwh
-        if b[4] == 'auto' then x, bwk = trim_x, trim_w; if x < bx + 5 * (bwh + 1) + L.pad then break end end
+        if b[4] == 'phase' then x = ph_x end
+        if b[4] == 'auto' then x, bwk = trim_x, trim_w end
+        if (b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad then break end
         if x + bwk > c.x + c.w - 1 then break end
-        if not mixcol then hbtn(b, x, by, bwk) end
+        if not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
       end
       -- route (9 окт): SRO вместо слова — S сенды, R ресивы, O аппаратные
       -- выходы; буква светится, если есть. Щелчок — окно маршрутизации трека.
@@ -5149,10 +5178,12 @@ function D.frame(L, snap, rows, state, info)
           local fh0 = (L.mix_rows - (tonumber(D.mix_under) or 0)) * L.rh - ((L.mix_bottom and state.mixnames ~= 'off') and L.rh or 0) - ((L.mix_bottom and state.hdrin ~= false) and L.rh or 0)
           if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
         end
-        local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, (trim_x - L.pad) - (bx + 5 * ((D.hbtn_w or L.btn_w) + 1))))   -- 12 окт: SRO шире, сколько влезает
-        local rx = mixcol and bx or (bx + 5 * ((D.hbtn_w or L.btn_w) + 1))
-        local lim = mixcol and (c.x + c.w - 1) or (trim_x - L.pad)
-        if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, L.rh - 2, false) end
+        -- 15 окт: SRO — после M S (фаза ушла к trim)
+        local hw1 = (D.hbtn_w or L.btn_w) + 1
+        local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad)
+        local lim = mixcol and (c.x + c.w - 1) or (trim_x - hw1 - L.pad)
+        local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, lim - rx))   -- 12 окт: SRO шире, сколько влезает
+        if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false) end
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
@@ -6275,6 +6306,11 @@ function D.frame(L, snap, rows, state, info)
               local t = hb .. string.rep('_', math.max(0, need - #hb))
               set(U.tint(U.AMBER, 0.45)); gfx.rect(x + fx - 1, y, math.max(fw, ms(t)) + 2, L.rh, 1)
               text(x + fx, ty, t, U.AMBER)
+            end
+            -- 15 окт: набранное (счётчик, оператор: 3d) — тегом [3d_] сразу за ячейкой курсора; рисуется в конце кадра
+            if inv and info.typed and info.typed ~= '' then
+              local fx, fw = D.field_rect(f.G or L, type(inv) == 'number' and inv or 1)
+              D.typed_at = { x = x + fx + fw + 2, y = y, ty = ty, s = '[' .. info.typed .. '_]' }
             end
             D.cur_box = nil; D.fx_half = nil
             if in_body and mx >= x and mx < x + f.w then
@@ -7990,6 +8026,14 @@ function D.frame(L, snap, rows, state, info)
   -- верхняя линия главного модуля и верхней панели (5 окт): как у lib сверху;
   -- до сайдбара — у него своя
   if L.top_h > 0 and L.top_first then set(D.SEP); gfx.rect(0, L.top_y or 0, (L.side_w or 0) > 0 and (L.side_x or L.win_w) - 2 or L.win_w, D.SEPW, 1) end
+  -- 15 окт: тег набранного у курсора — поверх соседних ячеек
+  local ta = D.typed_at
+  D.typed_at = nil
+  if ta and info.typed and info.typed ~= '' then
+    local w = ms(ta.s) + 2
+    set(U.tint(U.AMBER, 0.45)); gfx.rect(ta.x - 1, ta.y, w, L.rh, 1)
+    text(ta.x, ta.ty, ta.s, U.AMBER)
+  end
   -- рамка фокуса клавиатуры: модуль, которому идут клавиши; последней в
   -- кадре (5 окт) — скроллбар, пианинка и разделители закрывали низ и право
   do
