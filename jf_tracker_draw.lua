@@ -4596,6 +4596,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local last = c.tabs[#c.tabs]
         local hx = (last and (last.x + math.min(last.w, ms(fit(D.ic(last.id, PN.BY[last.id].label), last.w - 2 * L.pad)) + 2 * L.pad)) or c.x) + 3 * L.pad
         local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
+        if PN.BY[id].tab and id == info.toptab and info.top_page then page = info.top_page end   -- 15 окт: вкладка — подсказки её страницы (холст automation)
         local bar = info.hint_bars(page) or D.PANE_KEYS
         D.qm_bars = D.qm_bars or setmetatable({}, { __mode = 'k' })
         local qb = D.qm_bars[bar]

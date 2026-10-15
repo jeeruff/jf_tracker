@@ -1,5 +1,6 @@
 -- jf_tracker_autocanvas.lua — холст автоматизации (15 окт): страница curve вкладки automation.
 --
+-- { } — клетка сетки; L P — страницы curves / params (main).
 -- X — строки трекера на отрезке (time selection → регион курсора → такт), Y — значение 0..1.
 -- Несколько кривых наложением (активная ярко, остальные тускло), курсор — строка; значение
 -- берётся с активной кривой. Клавиши пишут точки сразу: j k — ±1/16 (J K — 1/128), 0-9 —
@@ -137,8 +138,8 @@ function ACV.key(c, st, mods)
     return { op = 'leave' }
   elseif ch == 'h' or c == 1818584692 then ACV.row = ACV.row - 1; clamp_row(); return true
   elseif ch == 'l' or c == 1919379572 then ACV.row = ACV.row + 1; clamp_row(); return true
-  elseif ch == 'H' then ACV.row = ACV.row - math.max(1, ACV.grid); clamp_row(); return true
-  elseif ch == 'L' then ACV.row = ACV.row + math.max(1, ACV.grid); clamp_row(); return true
+  elseif ch == '{' then ACV.row = ACV.row - math.max(1, ACV.grid); clamp_row(); return true   -- 15 окт: клетка — { } (L P — страницы, как в подсказке)
+  elseif ch == '}' then ACV.row = ACV.row + math.max(1, ACV.grid); clamp_row(); return true
   elseif ch == 'g' then ACV.row = r0; return true
   elseif ch == 'G' then ACV.row = r1 - 1; return true
   elseif c == 9 then                                            -- Tab / Shift+Tab — кривая

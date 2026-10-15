@@ -20249,7 +20249,7 @@ local function frame()
           local r = MMX.PP.key(c, cur_col())
           if r == 'leave' then ctx.set_focus('tracker')
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and ctx.acv_key(c) then   -- 15 окт: холст (L здесь — клетка сетки; генератор — через P, L)
+        elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and c ~= 76 and ctx.acv_key(c) then   -- 15 окт: холст (L P — страницы, как в подсказке)
         elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
         elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
         elseif state.toptab == 'automation' then

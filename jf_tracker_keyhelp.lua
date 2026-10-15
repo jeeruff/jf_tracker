@@ -522,7 +522,7 @@ KH.PAGES = {
     { k = 'Esc', d = 'back to tracker' },
   } },
   autocanvas = { title = 'curve: the automation canvas - curves of the track over the bar / region / time selection, drawn from the keyboard', e = {
-    { k = 'h l  H L', d = 'row (= the tracker cursor) / a grid cell; g G - the edges of the span' },
+    { k = 'h l  { }', d = 'row (= the tracker cursor) / a grid cell; g G - the edges of the span' },
     { k = 'j k  J K', d = 'the value of the active curve at the row: -/+ 1/16, Shift - 1/128 (a point is written)' },
     { k = '0..9', d = 'level 0 %..90 % at the row' },
     { k = 'x  BS', d = 'remove the points of the row (with v - of the range)' },
@@ -533,7 +533,7 @@ KH.PAGES = {
     { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, every envelope of the track, the take envelopes of the samples selected in the lib (v there) and the envelopes of their tracks, note mod slots, LFO / ACS curves; a click on the legend too' },
     { k = 'w b', d = 'next / previous point of the active curve' },
     { k = 'm e', d = 'LFO / audio follower of the active parameter on / off: it appears as its own curve (LFO · name) - the band is its swing around the automation, the thin line the predicted wave; with it active: s t q r R n shape, [ ] speed (x2, tempo sync: cycles per beat), j k strength, w b phase. A green dot while playing - the real value' },
-    { k = 'P', d = 'the params page (from there L - the generator); on the canvas L is a grid step' },
+    { k = 'P L', d = 'pages params / curves (the generator) - as everywhere in the automation tab' },
     { k = 'Esc', d = 'drop the anchor, then back to the tracker' },
   } },
   automation = { title = 'automation: envelopes over the song - params, curve, LFO generator, automation items', e = {
@@ -649,7 +649,7 @@ KH.BARS = {
   sample = { { 's', 'cut at aim' }, { 'S', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' }, { '?', 'help' } },
   automation = { { 'Opt+A', 'last touched' }, { 'C', 'canvas' }, { 'L', 'curves' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
-  autocanvas = { { 'hl', 'row' }, { 'jk', 'value' }, { '0-9', 'level' }, { 'v', 'range' }, { 'f r s t q n', 'shape' }, { '[ ]', 'grid' }, { 'Tab', 'curve' }, { 'zp', 'project' }, { 'x', 'remove' }, { 'Esc', 'back' } },
+  autocanvas = { { 'hl', 'row' }, { '{ }', 'cell' }, { 'jk', 'value' }, { '0-9', 'level' }, { 'v', 'range' }, { 'f r s t q n', 'shape' }, { '[ ]', 'grid' }, { 'Tab', 'curve' }, { 'zp', 'project' }, { 'x', 'remove' }, { 'P L', 'pages' }, { 'Esc', 'back' } },
   modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
   retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
