@@ -10280,7 +10280,7 @@ ctx = {
     ctx.theme_tab.sync()
     items[#items + 1] = { kind = 'block', label = 'themes and fonts',
       height = function() return (ctx.theme_tab.last and ctx.theme_tab.last.total) or 40 * L.rh end,
-      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, { scroll = scroll }) end,
+      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil) end,   -- 15 окт: без scroll — своя прокрутка (рамка справа в раскладке кирпичами)
       key = function(c) return ctx.theme_tab.key(c) end,
       click = function() return ctx.theme_tab.click() end }
     items[#items + 1] = { gap = true, sep = true }

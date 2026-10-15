@@ -481,40 +481,80 @@ function O.masonry_plan(L, bx, y0, bw, ch)
       cur.rows[#cur.rows + 1] = i
     end
   end
-  local list = {}
-  for _, sc in ipairs(secs) do if #sc.rows > 0 then list[#list + 1] = sc end end
+  -- 15 окт: раздел-блок (темы и шрифты) — не колонкой: в узкой колонке карточки тем по одной
+  -- в ряд, блок выше экрана; он занимает всю ширину справа от колонок опций
+  local list, wide = {}, nil
+  for _, sc in ipairs(secs) do
+    if #sc.rows > 0 then
+      local it = O.items[sc.rows[1]]
+      if it.blockrow and not wide then wide = { sc = sc, blk = it.of } else list[#list + 1] = sc end
+    end
+  end
   if #list == 0 then return nil end
   local colw = O.roww or (L.cw * 56)
   local fw = colw + 2 * pad                            -- рамка: строка + поля
   local gap = 2 * pad
   local ncols = math.max(1, math.floor((bw - 2 * pad + gap) / (fw + gap)))
-  local function hpx(sc) return (#sc.rows + 1) * rh + 6 end   -- строка заголовка + строки + низ рамки
-  -- по порядку: раздел — в текущую колонку, не влез в высоту hmax — в следующую
-  local function pack(hmax)
+  -- 15 окт: раздел выше колонки не отменяет раскладку — продолжается рамкой в следующей колонке;
+  -- рвётся только между строками, блок — целиком
+  for _, sc in ipairs(list) do
+    sc.atoms = {}
+    for _, i in ipairs(sc.rows) do
+      local it, last = O.items[i], sc.atoms[#sc.atoms]
+      if it.blockrow and last and last.of == it.of then last[#last + 1] = i
+      else sc.atoms[#sc.atoms + 1] = { i, of = it.blockrow and it.of or nil } end
+    end
+  end
+  local function fh(n) return (n + 1) * rh + 6 end    -- строка заголовка + строки + низ рамки
+  -- по порядку: раздел — в текущую колонку; не влез — остаток в следующую (та же подпись)
+  local function pack(hmax, maxc)
     local cols, ci, yy = { {} }, 1, 0
     for _, sc in ipairs(list) do
-      local h = hpx(sc)
-      if h > hmax then return nil end
-      if yy > 0 and yy + h > hmax then ci = ci + 1; yy = 0; cols[ci] = {} end
-      if ci > ncols then return nil end
-      cols[ci][#cols[ci] + 1] = { sc = sc, y = yy, h = h }
-      yy = yy + h + 6
+      local fr = nil
+      for _, a in ipairs(sc.atoms) do
+        if fh(#a) > hmax then return nil end
+        local n = fr and #fr.rows or 0
+        if not fr or fr.y + fh(n + #a) > hmax then
+          if fr then yy = fr.y + fh(n) + 6 end
+          if yy > 0 and yy + fh(#a) > hmax then ci = ci + 1; yy = 0; cols[ci] = {} end
+          if ci > maxc then return nil end
+          fr = { sc = sc, y = yy, rows = {} }
+          cols[ci][#cols[ci] + 1] = fr
+        end
+        for _, i in ipairs(a) do fr.rows[#fr.rows + 1] = i end
+      end
+      if fr then yy = fr.y + fh(#fr.rows) + 6 end
     end
     return cols
   end
-  -- наименьшая высота колонок, при которой всё влезает (колонки ровнее, низ окна свободнее)
+  -- с блоком: колонок опций — сколько нужно на всю высоту, остальное блоку (не уже одной колонки)
+  local maxc = ncols
+  if wide then
+    maxc = nil
+    for k = 1, ncols - 1 do if pack(ch, k) then maxc = k; break end end
+    if not maxc then return nil end
+  end
+  -- наименьшая высота колонок, при которой всё влезает (колонки ровнее, низ окна свободнее);
+  -- с блоком справа колонки во всю высоту — ровнять незачем
   local lo, hi = 0, ch
-  if not pack(hi) then return nil end
-  for _ = 1, 20 do local mid = math.floor((lo + hi) / 2); if pack(mid) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
-  local cols = pack(hi)
+  if not pack(hi, maxc) then return nil end
+  if not wide then
+    for _ = 1, 20 do local mid = math.floor((lo + hi) / 2); if pack(mid, maxc) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
+  end
+  local cols = pack(hi, maxc)
   local place, frames = {}, {}
   for c, col in ipairs(cols) do
     local x = bx + pad + (c - 1) * (fw + gap)
     for _, e in ipairs(col) do
-      local sc, fy = e.sc, y0 + e.y
-      frames[#frames + 1] = { x = x, y = fy, w = fw, h = e.h, title = sc.title, i0 = sc.rows[1], i1 = sc.rows[#sc.rows] }
-      for k, i in ipairs(sc.rows) do place[#place + 1] = { i = i, x = x + pad, y = fy + k * rh + 2, w = colw - 2 * pad } end
+      local fy = y0 + e.y
+      frames[#frames + 1] = { x = x, y = fy, w = fw, h = fh(#e.rows), title = e.sc.title, i0 = e.rows[1], i1 = e.rows[#e.rows] }
+      for k, i in ipairs(e.rows) do place[#place + 1] = { i = i, x = x + pad, y = fy + k * rh + 2, w = colw - 2 * pad } end
     end
+  end
+  if wide then
+    local x = bx + pad + #cols * (fw + gap)
+    local r = wide.sc.rows
+    frames[#frames + 1] = { x = x, y = y0, w = bx + bw - pad - x, h = ch, title = wide.sc.title, i0 = r[1], i1 = r[#r], block = wide.blk }
   end
   table.sort(place, function(a, b) return a.i < b.i end)
   return { place = place, frames = frames, ncols = #cols }
@@ -718,6 +758,14 @@ function O.draw(L, W, H)
       local tw = U.measure(fr.title) + 2 * L.pad
       U.set(U.BG); gfx.rect(fr.x + L.pad, fr.y, tw, rh, 1)
       U.text(fr.x + 2 * L.pad, fr.y + 1, fr.title, foc and U.AMBER or U.CYAN)
+    end
+  end
+  -- 15 окт: блок справа (темы и шрифты) — рамкой во всю высоту, рисует владелец со своей прокруткой
+  for _, fr in ipairs(frames or {}) do
+    if fr.block and fr.block.draw then
+      local x, y, w, h = fr.x + L.pad, fr.y + rh + 2, fr.w - 2 * L.pad, fr.h - rh - 6
+      fr.block.draw(x, y, w, h, nil)
+      if mx >= x and mx < x + w and my >= y and my < y + h then O.block_hot = fr.block end
     end
   end
   for _, pl in ipairs(place) do
