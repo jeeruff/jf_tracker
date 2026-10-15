@@ -81,6 +81,8 @@ function TH.apply(U, name)
   if not p then return false end
   U.BG, U.PANEL, U.TEXT, U.GREY = hex(p.bg), hex(p.panel), hex(p.text), hex(p.grey)
   U.DIM, U.LINE = hex(p.dim), hex(p.line)
+  -- 15 окт: DIM (третий уровень: пустые строки, отменённые шаги undo, «нет …») терялся — ярче на четверть пути к TEXT
+  U.DIM = { U.DIM[1] + (U.TEXT[1] - U.DIM[1]) * 0.25, U.DIM[2] + (U.TEXT[2] - U.DIM[2]) * 0.25, U.DIM[3] + (U.TEXT[3] - U.DIM[3]) * 0.25 }
   -- 15 окт: подписи (GREY — второй уровень) на 10 % тише, во всех темах; уровни: TEXT важное, GREY второстепенное, DIM вспомогательное
   U.GREY = { U.GREY[1] * 0.9 + U.BG[1] * 0.1, U.GREY[2] * 0.9 + U.BG[2] * 0.1, U.GREY[3] * 0.9 + U.BG[3] * 0.1 }
   U.AMBER, U.CYAN, U.GREEN, U.RED = hex(p.amber), hex(p.cyan), hex(p.green), hex(p.red)
