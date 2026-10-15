@@ -16071,7 +16071,17 @@ local function frame()
       -- 15 окт: сторона — по порядку треков в проекте: Tab прокручивает вид, номера колонок и x сдвигаются (след был не с той стороны)
       if cur.ti and last.ti and cur.ti ~= last.ti then df = (cur.ti > last.ti) and math.max(1, math.abs(df)) or -math.max(1, math.abs(df)) end
       local side = (math.abs(dr) >= 8 and math.abs(dr) / 8 >= math.abs(df) / 3) and (dr > 0 and 'top' or 'bottom') or (df > 0 and 'left' or 'right')
-      ctx.beacon = { t = reaper.time_precise(), side = side, dur = tonumber(reaper.GetExtState(EXT, 'beacon_dur')) or 0.5 }; b = ctx.beacon   -- beacon_dur — для тестов (снимок посреди полёта)
+      -- 15 окт: и трек, и строка сменились заметно — диагональ: от прежней ячейки к новой (край вида, если она за ним)
+      local origin
+      if math.abs(dr) >= 4 and (trk or math.abs(df) >= 3) and rows[1] then
+        local lf = L.flat[last.fi]
+        local ox = lf and lf.x or ((df > 0) and (L.matrix_w or 0) or (L.win_w or gfx.w))
+        local oy = L.body_y + (last.row - rows[1].row) * L.rh
+        ox = math.max(L.matrix_w or 0, math.min((L.win_w or gfx.w) - L.cw, ox))
+        oy = math.max(L.body_y, math.min(L.body_y + (L.nrows - 1) * L.rh, oy))
+        side, origin = 'diag', { ox, oy }
+      end
+      ctx.beacon = { t = reaper.time_precise(), side = side, origin = origin, dur = tonumber(reaper.GetExtState(EXT, 'beacon_dur')) or 0.5 }; b = ctx.beacon   -- beacon_dur — для тестов (снимок посреди полёта)
     end
     ctx.beacon_last = cur
     if b then
@@ -16103,7 +16113,20 @@ local function frame()
           end
         end
         local HALO, CORE = 0.16 * fade, 0.75 * fade
-        if b.side == 'top' or b.side == 'bottom' then
+        if b.side == 'diag' and b.origin then
+          -- диагональ: отпечатки ячейки вдоль прямой от начала следа к курсору, ярче к курсору
+          local ox, oy = b.origin[1], b.origin[2]
+          local sx, sy = nx + (ox - nx) * q, cy + (oy - cy) * q      -- хвост стягивается к курсору
+          local dist = math.sqrt((sx - nx) ^ 2 + (sy - cy) ^ 2)
+          local n = math.max(1, math.floor(dist / math.max(4, L.rh / 2)))
+          for i = 0, n - 1 do
+            local t = i / n                                        -- 0 — хвост, 1 — у курсора
+            local px, py = sx + (nx - sx) * t, sy + (cy - sy) * t
+            local a = t ^ 1.6
+            U.set(U.AMBER, HALO * 0.5 * a); gfx.rect(math.floor(px - nw), math.floor(py - L.rh), 3 * nw, 3 * L.rh, 1)
+            U.set(U.AMBER, CORE * 0.35 * a); gfx.rect(math.floor(px), math.floor(py), nw, L.rh, 1)
+          end
+        elseif b.side == 'top' or b.side == 'bottom' then
           local top = b.side == 'top'
           local len = math.floor((top and (cy - L.body_y) or (L.body_y + L.nrows * L.rh - cy - L.rh)) * q)
           local y0 = top and (cy - len) or (cy + L.rh)
