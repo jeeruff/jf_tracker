@@ -511,7 +511,7 @@ function D.layout(snap, state, nregions)
   -- внизу окна; опции положения нет
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
-  L.kbstat = true                                     -- строка режима в полосе транспорта (5 окт; 15 окт — всегда)
+  L.kbstat = false                                    -- 15 окт: режима в полосе нет — модлайн в поле трекера, полоса компактнее
   -- положение полосы транспорта (5 окт): tracker — под трекером (как было),
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
@@ -3979,48 +3979,60 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     divider(lx - math.floor(sep / 2) - 1)
     last.draw(lx, last.w)
   end
-  -- статус третьей строкой (опция status bar: keyboard)
-  if st and st.big then
-    -- big status: режим уже крупно слева — здесь только мелкое, во всю ширину
-  elseif st and st.small ~= false then
-    -- 12 окт: ниже второго ряда кнопок (full: |<< freeze /2 x2 …) — раньше налезало; режим крупно x2,
-    -- остальное (после |) и правая часть — обычным шрифтом по середине его высоты
-    local sy = ly + 2 * L.rh + (cc.tpfull and (2 * L.rh + 6) or 0) + 2   -- 15 окт: full — сразу под 4-й строкой ({ }, маркеры), без пустых
-    local sx0 = x + L.pad
-    local sw = x + w - L.pad - sx0
-    local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
-    mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-    local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
-    local dx = sx0
-    -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
-    local SCRIPT = {
-      ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
-      ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
-      ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
-      -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
-      ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
-    }
-    local tr = D.modefont and SCRIPT[D.modefont]
-    if tr and mode ~= '' then
-      local w1 = mode:match('^(%S+)')
-      if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
-    end
-    if D.modefont and mode ~= '' then
-      -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
-      local hpx = math.floor(3 * L.th)   -- 13 окт: в полтора раза крупнее (просьба)
-      gfx.setfont(4, D.modefont, hpx)
-      while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
-      local mw, mh = gfx.measurestr(mode)
-      set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode)
-      gfx.setfont(D.font_id)
-      dx = sx0 + mw + 3 * L.pad
-      mode = ''
-    end
-    while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
-    if mode ~= '' then D.big_text(sx0, sy, mode, col, 2); dx = sx0 + D.big_measure(mode, 2) + 3 * L.pad end
-    -- 15 окт: здесь только режим; сообщения и описание — строкой статуса внизу окна
-  end
+  -- 15 окт: режим — модлайном в поле трекера (D.draw_mode), в полосе его нет
   return out
+end
+
+-- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
+-- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
+function D.draw_mode(L, sx0, sy0, sw, str, dry)
+  local mode = (str or ''):match('^([^|]*)') or ''
+  -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
+  if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
+  mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
+  local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
+  local dx = sx0
+  local sy = sy0
+  -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
+  local SCRIPT = {
+    ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
+    ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
+    ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
+    -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
+    ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
+  }
+  local tr = D.modefont and SCRIPT[D.modefont]
+  if tr and mode ~= '' then
+    local w1 = mode:match('^(%S+)')
+    if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
+  end
+  if D.modefont and mode ~= '' then
+    -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
+    local hpx = math.floor(3 * L.th)   -- 13 окт: в полтора раза крупнее (просьба)
+    gfx.setfont(4, D.modefont, hpx)
+    while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
+    local mw, mh = gfx.measurestr(mode)
+    if not dry then set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode) end
+    gfx.setfont(D.font_id)
+    dx = sx0 + mw
+    mode = ''
+  end
+  while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
+  if mode ~= '' then if not dry then D.big_text(sx0, sy, mode, col, 2) end; dx = sx0 + D.big_measure(mode, 2) end
+  return dx - sx0, 2 * L.th
+end
+
+-- 15 окт: строка ввода (:команда, /поиск, переименование) — полем под курсором трекера, не в статусе;
+-- a = { x, y } — место; → высота поля (всплывашка подсказок — ниже него)
+function D.input_line(L, a, str)
+  if not (a and str and str ~= '') then return 0 end
+  local w = math.min(gfx.w - a.x - L.pad, math.max(ms(str) + 3 * L.pad, L.cw * 40))
+  local x = math.max(L.pad, math.min(gfx.w - w - L.pad, a.x))
+  local h = L.rh + 4
+  set(U.BG); gfx.rect(x, a.y, w, h, 1)
+  set(U.AMBER); gfx.rect(x, a.y, w, h, 0)
+  text(x + L.pad, a.y + 2, fit(str .. '_', w - 2 * L.pad), U.TEXT)
+  return h
 end
 
 -- тонкий вертикальный скролл-бар списка (4 окт): матрица, lib, браузер.
@@ -6236,6 +6248,20 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.EMPTY, D.EMPTY_UNDER = empty0, under0
+  -- 15 окт: поле трекера (строки и шапка подколонок) — для рамки фокуса; модлайн — режим крупно в его
+  -- левом нижнем углу на подложке (курсор в нижних строках — в левом верхнем, чтобы не закрыть его)
+  D.trk_field = { tx0, L.body_y - L.rh - 1, W - tx0, L.body_h + L.rh + 1 + (D.SBW or 3) + 2 }
+  if L.nrows >= 6 and info.status_left then
+    local mw, mh = D.draw_mode(L, 0, 0, 3 * (W - tx0), info.status_left, true)
+    if mw > 0 then
+      local x = tx0 + (L.rl or 0) + L.pad          -- правее линейки переходов (она рисуется позже и закрывала начало слова)
+      local y = L.body_y + L.body_h - mh - 4
+      local ci = vc and rows[1] and (vc.row - rows[1].row) or -1
+      if ci >= L.nrows - math.ceil((mh + 6) / L.rh) - 1 then y = L.body_y + 3 end
+      set(U.BG); gfx.rect(x - L.pad, y - 2, mw + 2 * L.pad, mh + 4, 1)
+      D.draw_mode(L, x, y, 3 * (W - tx0), info.status_left)
+    end
+  end
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
@@ -7833,6 +7859,7 @@ function D.frame(L, snap, rows, state, info)
     local f = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
     local rects = D.module_rects or {}
     local r = rects[f]
+    if f == 'tracker' and D.trk_field then r = D.trk_field end   -- 15 окт: рамка — вокруг поля с курсором, не всего модуля
     if r then
       -- INSERT — красная и на пиксель толще: видно, что клавиши пишут в проект
       local ins = info.vmode == 'insert' and info.focus == 'tracker'

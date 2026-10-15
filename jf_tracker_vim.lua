@@ -2787,7 +2787,8 @@ function V.popup()
     end
     -- 13 окт: совпадений нет — строкой (иначе окно сжималось до «:i» и казалось, что набор сбросился)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no such command - Backspace, or :! for REAPER actions', col = { 0.6, 0.6, 0.6 } } end
-    return { title = ':' .. (V.cmdline or ''), lines = lines, kind = 'cmd', hl = #matches > 0 and V.cmd_cycle or nil }
+    -- 15 окт: набранное — в поле над списком, не заголовком
+    return { title = 'commands - Tab completes', lines = lines, kind = 'cmd', hl = #matches > 0 and V.cmd_cycle or nil }
   elseif V.mode == 'search' then
     return { title = '/' .. (V.searchline or ''), lines = { { key = 'Enter', text = 'find next' }, { key = 'n / N', text = 'next / previous' }, { key = '*', text = 'search name under cursor' } }, kind = 'search' }
   end
