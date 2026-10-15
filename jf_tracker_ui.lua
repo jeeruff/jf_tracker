@@ -88,7 +88,8 @@ U.set = set
 function U.dslider(sx, cy, sw, fr, centered, col, hot, rh)
   fr = math.max(0, math.min(1, fr or 0))
   local px = sx + math.floor(fr * (sw - 1) + 0.5)
-  set(U.DIM); gfx.rect(sx, cy, sw, 1, 1)
+  -- 15 окт: дорожка видна всегда (U.DIM терялся на тёмном фоне, у пана в центре заливки нет) — цветом ручки, приглушённо
+  set(U.readable(U.mix(col, U.BG, 0.55), U.BG, 2.0)); gfx.rect(sx, cy, sw, 1, 1)
   local r = math.max(3, math.floor(((rh or 12) - 6) / 2))
   if centered then
     local mid = sx + math.floor(sw / 2)
