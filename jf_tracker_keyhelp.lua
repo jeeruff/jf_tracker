@@ -521,9 +521,24 @@ KH.PAGES = {
     { k = 'buttons', d = 'equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play' },
     { k = 'Esc', d = 'back to tracker' },
   } },
+  autocanvas = { title = 'curve: the automation canvas - curves of the track over the bar / region / time selection, drawn from the keyboard', e = {
+    { k = 'h l  H L', d = 'row (= the tracker cursor) / a grid cell; g G - the edges of the span' },
+    { k = 'j k  J K', d = 'the value of the active curve at the row: -/+ 1/16, Shift - 1/128 (a point is written)' },
+    { k = '0..9', d = 'level 0 %..90 % at the row' },
+    { k = 'x  BS', d = 'remove the points of the row (with v - of the range)' },
+    { k = 'v', d = 'anchor: the range from here to the cursor; Esc - off' },
+    { k = 'f r R s t q n', d = 'fill the range (or the grid cell under the cursor) with a shape per cell: flat, ramp up, ramp down, sine, triangle, square, noise; the height - the curve value at the cursor (0 - full); n again - another noise' },
+    { k = '[ ]', d = 'grid finer / coarser (1 row .. a bar)' },
+    { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, then every envelope of the track, then note mod slots; a click on the legend too' },
+    { k = 'w b', d = 'next / previous point of the active curve' },
+    { k = 'm e', d = 'LFO / audio follower of the active parameter (soon: shown as a band on the canvas)' },
+    { k = 'P', d = 'the params page (from there L - the generator); on the canvas L is a grid step' },
+    { k = 'Esc', d = 'drop the anchor, then back to the tracker' },
+  } },
   automation = { title = 'automation: envelopes over the song - params, curve, LFO generator, automation items', e = {
     { k = 'Opt+A', d = 'from anywhere: the last touched parameter (move a knob in a plugin or in DSP) becomes an envelope column on its track, the cursor goes there - type values in INSERT; a take FX parameter opens its take envelope here' },
     { k = 'L', d = 'curves (generator) - beside the params when wide, a page [curves] when narrow; L again - back' },
+    { k = 'C', d = 'curve: the canvas - the curves of the track drawn from the keyboard (its own key page)' },
     { k = 'P', d = 'params: every parameter of the track (track envelopes + all FX params) - ENV ACT ARM PTS MOD value; also rclick on trim in a track header' },
     { k = 'params', d = 'Enter: cell, e: envelope create / show / hide, a: arm, b: active, m: modulate (LFO) - the row in the modulation tab, c: curve into it, o: FX window, w: modulation window, v: used only, M: automation mode, /: find' },
     { k = 'LFO j k h l', d = 'field / value: shape (sin tri saw+ saw- sqr rnd), period in rows, depth, center, phase, points per period' },
@@ -632,7 +647,8 @@ KH.BARS = {
   visor = { { 'p', 'on' }, { 'o', 'page' }, { 'a e', 'add' }, { 'j k', 'row' }, { 'J K', 'param' }, { 'H L', 'value' }, { 'h l', 'level' }, { 'm', 'mod' }, { 'M', 'matrix' }, { '=', 'type' }, { 's', 'scene' }, { 'i', 'presets' }, { 'n N', 'preset' }, { 'zz', 'big' }, { '?', 'help' } },
   sample = { { 's', 'cut at aim' }, { 'S', 'slice menu' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
              { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' }, { '?', 'help' } },
-  automation = { { 'Opt+A', 'last touched' }, { 'L', 'curves' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
+  automation = { { 'Opt+A', 'last touched' }, { 'C', 'canvas' }, { 'L', 'curves' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
+  autocanvas = { { 'hl', 'row' }, { 'jk', 'value' }, { '0-9', 'level' }, { 'v', 'range' }, { 'f r s t q n', 'shape' }, { '[ ]', 'grid' }, { 'Tab', 'curve' }, { 'x', 'remove' }, { 'Esc', 'back' } },
   modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
   retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
@@ -644,7 +660,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'sample', 'nmod', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'sample', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

@@ -308,17 +308,46 @@ the item tab edits.</p>
 </table>
 
 <h2 id="mod">Automation and modulation</h2>
-<p class="drop">Three different things, three places: what is drawn in time, what moves while it plays, and what every note starts.</p>
+<p class="drop">Three different things, three places: what is drawn in time, what moves while it plays, and what every note starts.
+They add up, and the tracker shows them in one picture.</p>
 <table>
-<tr><td>automation</td><td>a value over time, the same every play: REAPER envelopes and automation items, shown as envelope
-columns. <kbd>Opt</kbd>+<kbd>A</kbd> turns the last touched knob into a column. <kbd>z</kbd><kbd>e</kbd> picks how a column
-looks: curve, values, or steps (a small fader on every row, as on a 303)</td></tr>
-<tr><td>modulation</td><td>a parameter moved by a source while it plays: REAPER's own LFO / audio follower / parameter link
-(the modulation tab)</td></tr>
-<tr><td>note mod</td><td>modulation started by every note of a sample (the note mod module next to the properties). A slot is a
-parameter and a curve: each note gets a pooled automation item from its start, its length. One curve for all the notes; rate - higher
-notes run it faster; loop - it repeats to the end of the note. Insert, move, copy or delete a note - its automation item follows</td></tr>
+<tr><td>automation</td><td>a value over time, the same every play: a REAPER envelope. In the tracker it is a column next to the
+notes (<kbd>Opt</kbd>+<kbd>A</kbd> turns the last touched knob into one, <kbd>A</kbd> picks any parameter; <kbd>z</kbd><kbd>e</kbd>
+chooses curve / values / steps) — and, bigger, the <b>canvas</b> in the automation tab</td></tr>
+<tr><td>modulation</td><td>a parameter moved by a source while it plays, never written down: REAPER's own LFO, the audio
+follower (ACS) and the link to another parameter (the modulation tab, a table). It moves <i>around</i> the automation value</td></tr>
+<tr><td>note mod</td><td>modulation started by every note of a sample (the note mod module next to the properties): a curve on a
+parameter that runs from the start of each note, at the note's rate, looping or not. In REAPER it is a pooled automation item per
+note — insert, move, copy or delete a note and its item follows</td></tr>
 </table>
+<p><b>How they add up.</b> REAPER takes the envelope as the base. If the parameter has an LFO, the LFO swings around that base by its
+strength: above it, below it, or centred — the envelope is the midline of the swing. The audio follower pushes the value up from the
+base as the source gets loud. A link copies another parameter, scaled and offset. Note mod is automation too, only chopped into items
+that belong to the notes, so it sits under the LFO like any envelope. In a word: <i>automation says where, modulation says how far
+around it.</i></p>
+<h3>The canvas (automation tab → <code>curve</code>, <kbd>C</kbd>)</h3>
+<p>The curves of the cursor track over the bar at the cursor (or the cursor region, or the time selection): one is active and bright,
+the rest are dim — the lane under the cursor first, then every envelope of the track, then the note mod slots. <kbd>Tab</kbd> walks
+through them, a click on the legend too. The cursor of the canvas is the cursor of the tracker: <kbd>h</kbd> <kbd>l</kbd> move it a
+row, <kbd>H</kbd> <kbd>L</kbd> a grid cell, and the tracker follows.</p>
+<table>
+<tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>the value at the row −/+ 1/16 (<kbd>J</kbd> <kbd>K</kbd> 1/128): a point is written right away</td></tr>
+<tr><td><kbd>0</kbd>…<kbd>9</kbd></td><td>level 0 %…90 % at the row (no counts on the canvas — digits are levels)</td></tr>
+<tr><td><kbd>v</kbd> + shape</td><td>anchor a range, then <kbd>f</kbd> flat <kbd>r</kbd> ramp up <kbd>R</kbd> ramp down <kbd>s</kbd> sine
+<kbd>t</kbd> triangle <kbd>q</kbd> square <kbd>n</kbd> noise: one shape per grid cell, as drawing with the grid tools in Ableton;
+without <kbd>v</kbd> — the cell under the cursor. The height is the value at the cursor (set it with a digit first; 0 means full).
+<kbd>n</kbd> again — a different noise</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>grid finer / coarser, from a row to a bar — the shape period</td></tr>
+<tr><td><kbd>x</kbd> · <kbd>w</kbd> <kbd>b</kbd></td><td>remove the points of the row (of the range with <kbd>v</kbd>) · next / previous point</td></tr>
+<tr><td><kbd>u</kbd></td><td>undo, as everywhere; every stroke is one REAPER undo step</td></tr>
+<tr><td><kbd>m</kbd> <kbd>e</kbd></td><td>LFO / audio follower of the active parameter: its predicted swing shows as a band on the canvas
+around the curve, and with that curve active the same keys shape it — <kbd>s</kbd> <kbd>t</kbd> <kbd>q</kbd> <kbd>r</kbd> <kbd>R</kbd>
+<kbd>n</kbd> the LFO shape, <kbd>[</kbd> <kbd>]</kbd> its speed, <kbd>j</kbd> <kbd>k</kbd> its strength, <kbd>w</kbd> <kbd>b</kbd> its
+phase (coming next)</td></tr>
+</table>
+<p>The other pages stay: <kbd>P</kbd> params — every parameter of the track with ENV / ARM / MOD at a glance; <kbd>L</kbd> curves —
+the generator (LFO, podkat, follow) that writes a whole curve into the envelope or a new automation item; the item editor for
+automation items with its own grid tools.</p>
 <p><b>MIDI from sample notes.</b> Sample notes are audio items and send no MIDI, so MIDI modulators (counters, key trackers,
 envelopes inside plugins) cannot see them. <code>midi trig</code> in note mod puts a tiny take FX on the sample and its notes:
 each note sends a note-on to its own track, with its pitch and its volume as the velocity. No hidden track, no new routing:

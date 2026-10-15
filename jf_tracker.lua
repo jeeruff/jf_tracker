@@ -2458,6 +2458,7 @@ ctx = {
   -- курсор трекера на это время
   curve_cache = {},
   curve_draw = function(Lx, x, y, w, h)
+    if ctx.acv_draw then return ctx.acv_draw(Lx, x, y, w, h) end   -- 15 окт: холст (jf_tracker_autocanvas)
     local tgt = ctx.lfo_target()
     local e = tgt and tgt.e
     local env = e and e.env
@@ -12173,6 +12174,136 @@ end
 -- узел — шаг undo (правки трекера — по E.ut_hook, остальное — по смене подписи undo REAPER).
 -- Покидаешь узел откатом — снимок (jf_tracker_undosnap); ветвление гасит live у прежней линии,
 -- туда — восстановлением снимка (новый шаг undo). Файл «Имя.jf-undo» рядом с .rpp, только дописывается
+-- 15 окт: холст автоматизации (страница curve вкладки automation, jf_tracker_autocanvas): несколько
+-- кривых наложением, курсор холста = строка курсора трекера, клавиши пишут точки и формы по сетке
+ctx.ACV = dofile(DIR .. '/jf_tracker_autocanvas.lua')
+ctx.ACV.init(U, ctx, LG)
+-- отрезок холста: как у генератора (time selection → регион курсора → такт), в строках и секундах
+ctx.acv_span = function()
+  local t0, t1, label = ctx.lfo_span()
+  if label == 'one bar' then                                  -- такт, в котором курсор (генератор берёт такт от курсора)
+    local qn = reaper.TimeMap2_timeToQN(0, t0)
+    local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
+    if qms and qme then t0, t1 = reaper.TimeMap2_QNToTime(0, qms), reaper.TimeMap2_QNToTime(0, qme) end
+    label = 'bar ' .. (reaper.TimeMap_QNToMeasures(0, qn + 1e-6) + 1)
+  end
+  local r0 = math.floor(model.row_of_time(t0, state.lpb) + 0.5)
+  local r1 = math.max(r0 + 1, math.floor(model.row_of_time(t1, state.lpb) + 0.5))
+  local sp = { r0 = r0, r1 = r1, t0 = t0, t1 = t1, lpb = state.lpb, label = label or '', sc = reaper.GetProjectStateChangeCount(0),
+    bps = reaper.Master_GetTempo() / 60, row_of = function(t) return model.row_of_time(t, state.lpb) end,
+    time = function(r) return edit.row_time(r, state.lpb, 0) end }
+  if reaper.GetPlayState() & 1 == 1 then sp.play_row = model.row_of_time(reaper.GetPlayPosition(), state.lpb) end
+  return sp
+end
+-- кривые холста: цель генератора (первая), огибающие трека курсора, огибающие слотов note mod
+ctx.acv_curves = function(sp)
+  local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
+  local tgt = ctx.lfo_target()
+  local col = cur_col()
+  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst)
+  if ctx.acv_cc and ctx.acv_cc.key == key then return ctx.acv_cc.list end
+  local list, seen = {}, {}
+  local PAL = { U.CYAN, U.AMBER, U.RED, U.TEXT }
+  local function add(e, name, write)
+    if not (e and e.env and reaper.ValidatePtr(e.env, 'TrackEnvelope*')) or seen[e.env] then return end
+    seen[e.env] = true
+    local i = #list + 1
+    local base = draw.env_colour(e)
+    local rgb = i == 1 and base or U.mix(base, PAL[(i - 2) % #PAL + 1], 0.55)
+    local pts = {}
+    if sp then
+      for _, p in ipairs(edit.env_points(e, sp.t0, sp.t1)) do
+        local span2 = (e.max or 1) - (e.min or 0)
+        pts[#pts + 1] = { p.t, span2 > 0 and ((p.v - (e.min or 0)) / span2) or 0 }
+        if #pts > 2000 then break end
+      end
+    end
+    list[i] = { kind = 'env', e = e, env = e.env, name = name, rgb = rgb, write = write ~= false,
+      eval = function(t) return edit.env_value(e, t) end, points = pts }
+  end
+  if tgt and tgt.e then add(tgt.e, tgt.label or (tgt.e.name or 'envelope')) end
+  if col then
+    for _, e in ipairs(col.envs or {}) do add(e, (col.name or '') .. ' / ' .. (e.name or 'env')) end
+    local nl = ctx.nmod_list and ctx.nmod_list()
+    for _, sl in ipairs(nl and nl.slots or {}) do
+      if sl.ai and sl.ai.env then add({ env = sl.ai.env, name = sl.label or 'note mod', min = sl.ai.min or 0, max = sl.ai.max or 1, key = 'env_item_pitch' }, 'note mod / ' .. (sl.label or '?')) end
+    end
+  end
+  ctx.acv_cc = { key = key, list = list }
+  return list
+end
+-- страница curve: холст
+ctx.acv_draw = function(Lx, x, y, w, h)
+  local ACV = ctx.ACV
+  local sp = ctx.acv_span()
+  local curves = ctx.acv_curves(sp)
+  -- курсор холста следует за курсором трекера (один курсор, две картинки)
+  if ctx.acv_row_seen ~= vim.cur.row then ctx.acv_row_seen = vim.cur.row; ACV.row = vim.cur.row end
+  return ACV.draw(Lx, x, y, w, h, curves, sp, state.focus == 'top' and mod_pane == 'curve')
+end
+-- клавиша холста: движение → курсор трекера; op → запись
+ctx.acv_key = function(c)
+  local ACV = ctx.ACV
+  local sp = ctx.acv_span()
+  local curves = ctx.acv_curves(sp)
+  local act = curves[ACV.cur]
+  local m = ctx.mods()
+  if c == 25 then c = 9; m = { shift = true } end
+  if c == 117 then edit.undo(); vim.msg = 'undo'; return true elseif c == 18 then edit.redo(); vim.msg = 'redo'; return true end   -- u / Ctrl+R — как везде
+  local r = ACV.key(c, { r0 = sp.r0, r1 = sp.r1, lpb = state.lpb, ncurves = #curves, kind = act and act.kind }, m)
+  if r == true then
+    if ACV.row ~= vim.cur.row then vim.cur.row = ACV.row; ctx.acv_row_seen = ACV.row; vim.ensure_visible() end
+    local a2 = curves[ACV.cur]
+    if a2 and a2 ~= act then vim.msg = ('curve: %s%s'):format(a2.name or '?', a2.write and '' or '  (view only)') end
+    return true
+  elseif type(r) == 'table' then ctx.acv_do(r, sp, curves); return true end
+  return false
+end
+ctx.acv_do = function(op, sp, curves)
+  local ACV = ctx.ACV
+  sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
+  local act = curves[ACV.cur]
+  if op.op == 'leave' then ctx.set_focus('tracker'); return end
+  if op.op == 'mod' or op.op == 'lfo' then vim.msg = 'modulation on the canvas: the modulation tab for now (next stage)'; return end
+  if not act then vim.msg = 'canvas: no curve - Opt+A on a knob, or the cursor on an envelope lane'; return end
+  if act.write == false then vim.msg = 'canvas: this curve is view only'; return end
+  local e = act.e
+  local rowdur = math.max(1e-4, sp.time(ACV.row + 1) - sp.time(ACV.row))
+  local tol = math.min(0.02, rowdur / 2)
+  local t = sp.time(ACV.row)
+  if op.op == 'nudge' then
+    edit.env_nudge(e, t, op.d, tol)
+    vim.msg = ('%s: %d%% at row %d'):format(act.name, math.floor(edit.env_value(e, t) * 100 + 0.5), ACV.row)
+  elseif op.op == 'level' then
+    edit.env_set(e, t, op.v, tol)
+    vim.msg = ('%s: %d%% at row %d'):format(act.name, math.floor(op.v * 100), ACV.row)
+  elseif op.op == 'del' then
+    local a, b = ACV.row, ACV.row + 1
+    if ACV.anchor then a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }); ACV.anchor = nil end
+    local n = edit.env_del_range(e, sp.time(a), sp.time(b))
+    vim.msg = ('%s: %d point(s) removed (rows %d..%d)'):format(act.name, n, a, b - 1)
+  elseif op.op == 'fill' then
+    local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 })
+    local level = edit.env_value(e, t)
+    if level < 0.02 then level = 1 end                           -- кривая на нуле — форма во всю высоту
+    if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end
+    local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
+    local pts = {}
+    for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do pts[#pts + 1] = { t = sp.time(p.row), v = raw(p.v), shape = p.shape } end
+    edit.env_put_points(e, sp.time(a), sp.time(b), pts)
+    ACV.anchor = nil
+    vim.msg = ('%s: %s on rows %d..%d, grid %s, %d point(s)'):format(act.name, op.shape, a, b - 1, ACV.grid_label(ACV.grid, state.lpb), #pts)
+  elseif op.op == 'point' then
+    local best
+    for _, p in ipairs(act.points or {}) do
+      local r = math.floor(sp.row_of(p[1]) + 1e-6)
+      if op.d > 0 and r > ACV.row and (not best or r < best) then best = r end
+      if op.d < 0 and r < ACV.row and (not best or r > best) then best = r end
+    end
+    if best then ACV.row = best; vim.cur.row = best; ctx.acv_row_seen = best; vim.ensure_visible()
+    else vim.msg = op.d > 0 and 'last point' or 'first point' end
+  end
+end
 ctx.UTM = dofile(DIR .. '/jf_tracker_undotree.lua')
 ctx.USN = dofile(DIR .. '/jf_tracker_undosnap.lua')
 ctx.UTS = {}                                     -- по проекту: сессия UT.session (+ sel, scroll для панели)
@@ -15326,7 +15457,7 @@ local function frame()
     hint_bars = state.hints and function(p) return (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
-    top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or state.toptab,
+    top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or state.toptab,   -- 15 окт: холст — свои подсказки
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
@@ -17294,6 +17425,7 @@ local function frame()
     elseif lfo_hover and state.top and state.toptab == 'automation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
+      if lfo_hover.legend then ctx.ACV.cur = lfo_hover.legend end   -- 15 окт: щелчок по легенде — активная кривая
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
       end
@@ -19661,6 +19793,7 @@ local function frame()
       vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
+    elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' then ctx.acv_key(back and 25 or 9)   -- 15 окт: холст — активная кривая
     else vim.msg = 'Tab: only in the tracker (next track) for now' end   -- 10 окт: в панелях Tab пока ничего не делает
     c = 0
   end
@@ -20009,6 +20142,7 @@ local function frame()
           if r == 'leave' then ctx.set_focus('tracker')
           elseif r == 'save' then mm_save()
           elseif not r then return vim.key(c) end
+        elseif state.toptab == 'automation' and c == 67 and mod_pane ~= 'curve' then mod_pane = 'curve'; vim.msg = 'curve: the canvas - h l row, j k value, v range, s t q r f n shapes, Tab curve, P params, L curves'   -- 15 окт: C — холст
         elseif state.toptab == 'automation' and mod_pane == 'lfo' then
           local r = LG.key(c, ctx.mods().shift and 0.1 or 1)   -- Shift — мелкий шаг (6 окт)
           if r == 'leave' then mod_pane = 'params'
@@ -20019,6 +20153,7 @@ local function frame()
           local r = MMX.PP.key(c, cur_col())
           if r == 'leave' then ctx.set_focus('tracker')
           elseif not r then return vim.key(c) end
+        elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and ctx.acv_key(c) then   -- 15 окт: холст (L здесь — клетка сетки; генератор — через P, L)
         elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
         elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
         elseif state.toptab == 'automation' then
