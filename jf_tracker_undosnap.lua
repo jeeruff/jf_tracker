@@ -16,11 +16,11 @@ function US.capture(UT)
   end
   local okm, mch = R.GetTrackStateChunk(R.GetMasterTrack(0), '', true)
   if okm then parts[#parts + 1] = { 'M', mch } end
-  local mk = {}
+  local mk = {}   -- 15 окт: имя в скобках — gsub отдаёт и число замен, оно влезало в имя маркера
   local _, nm, nr = R.CountProjectMarkers(0)
   for k = 0, nm + nr - 1 do
     local ok, isrgn, pos, rend, name, idx, col = R.EnumProjectMarkers3(0, k)
-    if ok and ok > 0 then mk[#mk + 1] = table.concat({ isrgn and 1 or 0, pos, rend, idx, col, (name or ''):gsub('[\t\n]', ' ') }, '\t') end
+    if ok and ok > 0 then mk[#mk + 1] = table.concat({ isrgn and 1 or 0, pos, rend, idx, col, ((name or ''):gsub('[\t\n]', ' ')) }, '\t') end
   end
   parts[#parts + 1] = { 'K', table.concat(mk, '\n') }
   local tm = {}

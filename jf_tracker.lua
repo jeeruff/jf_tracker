@@ -19164,7 +19164,8 @@ local function frame()
       code = tonumber(code)
       -- 10 окт: только в песочнице (проект без имени, треки sandbox_setup) — иначе отказ;
       -- после обработки — jf_tracker/inject_ack «токен ok …» (драйвер tests/live.py ждёт его)
-      if code and not ctx.is_sandbox() then reaper.SetExtState(EXT, 'inject_ack', inj .. ' REFUSED: not a sandbox', false)
+      -- 15 окт: и в открытом проекте, если драйвер явно разрешил (inject_any = 1, без сохранения) — пользователь: «проверяй на проекте»
+      if code and not ctx.is_sandbox() and reaper.GetExtState(EXT, 'inject_any') ~= '1' then reaper.SetExtState(EXT, 'inject_ack', inj .. ' REFUSED: not a sandbox', false)
       elseif code then c = code; inject_cap = tonumber(cap); ctx.inject_pending = inj end
     end
   end
