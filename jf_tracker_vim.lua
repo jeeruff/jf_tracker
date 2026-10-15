@@ -2870,7 +2870,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d delete track | c automation column | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',
