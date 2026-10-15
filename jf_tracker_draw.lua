@@ -4012,6 +4012,15 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   return out
 end
 
+-- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
+D.MODE_SCRIPT = {
+  ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
+  ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
+  ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
+  -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
+  ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
+}
+-- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 function D.draw_mode(L, sx0, sy0, sw, str, dry)
@@ -4022,15 +4031,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   local col = mode:match('^INSERT') and D.FOCUS_INS or U.AMBER   -- 12 окт: красный — только сам INSERT
   local dx = sx0
   local sy = sy0
-  -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
-  local SCRIPT = {
-    ['Ponomar'] = { NORMAL = 'ОБЫЧНО', INSERT = 'ВСТАВКА', VISUAL = 'ЗРѢНІЕ', ['V-LINE'] = 'СТРОКА', KEYS = 'КЛАВИШИ' },
-    ['Songti SC'] = { NORMAL = '常规', INSERT = '插入', VISUAL = '选择', ['V-LINE'] = '行选', KEYS = '键盘' },
-    ['Diwan Thuluth'] = { NORMAL = 'عادي', INSERT = 'إدراج', VISUAL = 'تحديد', ['V-LINE'] = 'سطر', KEYS = 'مفاتيح' },
-    -- pIqaD (CSUR, U+F8D0…): NORMAL — «motlh» (обычно), INSERT — «lIch» (налить), VISUAL — «legh» (видеть), KEYS — «leQ» (переключатель)
-    ['pIqaD qolqoS'] = { NORMAL = '\u{F8DA}\u{F8DD}\u{F8E4}', INSERT = '\u{F8D9}\u{F8D7}\u{F8D2}', VISUAL = '\u{F8D9}\u{F8D4}\u{F8D5}', ['V-LINE'] = '\u{F8D9}\u{F8D4}\u{F8D5}', KEYS = '\u{F8D9}\u{F8D4}\u{F8E0}' },
-  }
-  local tr = D.modefont and SCRIPT[D.modefont]
+  local tr = D.modefont and D.MODE_SCRIPT[D.modefont]
   if tr and mode ~= '' then
     local w1 = mode:match('^(%S+)')
     if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end

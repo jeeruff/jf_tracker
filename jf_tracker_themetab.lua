@@ -207,8 +207,9 @@ function TT.draw(x, y, w, h, emb)
         if nm == 'off' then text(cx + pad, cy + 2, 'off - tracker font', U.GREY)
         else
           gfx.setfont(5, nm, 2 * L.th)
-          C(U.AMBER); gfx.x, gfx.y = cx + pad, cy + 1; gfx.drawstr('INSERT')
-          local iw = gfx.measurestr('INSERT ')
+          local wd = ctx.mode_word and ctx.mode_word(nm) or 'INSERT'   -- 15 окт: письменность — своим словом (插入, إدراج, ВСТАВКА, pIqaD)
+          C(U.AMBER); gfx.x, gfx.y = cx + pad, cy + 1; gfx.drawstr(wd)
+          local iw = gfx.measurestr(wd .. ' ')
           gfx.setfont(ctx.font_id and ctx.font_id() or 1)
           text(cx + pad + iw, cy + mh - rh - 1, ctx.fit(nm, pw - iw - 2 * pad), U.GREY)
         end
