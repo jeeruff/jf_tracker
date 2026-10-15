@@ -500,17 +500,18 @@ function D.layout(snap, state, nregions)
   L.top_h = state.top and (state.top_px or math.max(5 * L.rh + 8, math.min(math.floor(11 * L.rh * 1.15), math.floor(gfx.h * 0.19 * 1.15)))) or 0
   if state.top and state.top_px then L.top_h = math.max(4 * L.rh + 8, math.min(math.floor(gfx.h * 0.5), state.top_px)) end
   -- большой редактор сэмпла (3 окт, :big): вкладка item на всю высоту окна
-  if state.top and state.sample_big and state.toptab == 'sample' then L.top_h = math.max(L.top_h, gfx.h - (state.statpos == 'tracker' and 0 or (L.rh + 4)) - 2) end
+  if state.top and state.sample_big and state.toptab == 'sample' then L.top_h = math.max(L.top_h, gfx.h - (L.rh + 4) - 2) end
   L.pool_h = L.top_h
   L.ctrl_w = L.cw * 30 + 2 * L.pad
   L.inst_w = state.side and 0 or (L.cw * 32 + 2 * L.pad)
   -- положение верхнего модуля (3 окт): top — над трекером, mid — над DSP,
   -- bottom — под DSP; статус-бар: bottom — низ окна, tracker — строка в модуле трекера
   L.toppos = (state.toppos == 'mid' or state.toppos == 'bottom' or state.toppos == 'clips') and state.toppos or 'top'   -- 8 окт: clips — под клипами, над строками трекера
-  L.statpos = state.statpos == 'bottom' and 'bottom' or 'keyboard'   -- 12 окт: статус в трекере убран, по умолчанию — под клавиатурой
+  -- 15 окт: как в Emacs — индикатор режима (modeline) в полосе трекера, строка статуса (echo area) всегда
+  -- внизу окна; опции положения нет
   -- статус в пианинке (5 окт): третья строка полосы; клавиатура спрятана (m) —
   -- статус внизу окна
-  L.kbstat = L.statpos == 'keyboard'                  -- полоса транспорта есть всегда (5 окт)
+  L.kbstat = true                                     -- строка режима в полосе транспорта (5 окт; 15 окт — всегда)
   -- положение полосы транспорта (5 окт): tracker — под трекером (как было),
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
@@ -546,8 +547,8 @@ function D.layout(snap, state, nregions)
   L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows
   L.header_h = L.header_rows * L.rh + 3
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
-  L.status_h = L.statpos == 'bottom' and (L.rh + 4) or 0     -- статус внизу окна
-  L.status_in = L.statpos == 'tracker' and (L.rh + 4) or 0   -- статус в модуле трекера
+  L.status_h = L.rh + 4                               -- статус внизу окна (15 окт: всегда)
+  L.status_in = 0
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
   -- session (7 окт): 7 строк под шапками треков — клипы; трекер под ними
@@ -643,7 +644,7 @@ function D.layout(snap, state, nregions)
   if state.panes_ui and D.panes and state.panes then
     -- zellij: подсказки клавиш панели в фокусе — одной строкой внизу окна, над статусом
     L.pn_keys = (state.hints and state.hintpos == 'status') and (L.rh + 1) or 0
-    L.status_h = (L.statpos == 'bottom' and (L.rh + 4) or 0) + L.pn_keys
+    L.status_h = (L.rh + 4) + L.pn_keys
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
     local c = lay.by_panel.tracker
@@ -3981,7 +3982,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- статус третьей строкой (опция status bar: keyboard)
   if st and st.big then
     -- big status: режим уже крупно слева — здесь только мелкое, во всю ширину
-    if st.small and st[2] ~= '' then text(x_all + L.pad, ly + 2 * L.rh, fit(st[2], w_all - 2 * L.pad), U.TEXT) end
   elseif st and st.small ~= false then
     -- 12 окт: ниже второго ряда кнопок (full: |<< freeze /2 x2 …) — раньше налезало; режим крупно x2,
     -- остальное (после |) и правая часть — обычным шрифтом по середине его высоты
@@ -4018,10 +4018,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
     if mode ~= '' then D.big_text(sx0, sy, mode, col, 2); dx = sx0 + D.big_measure(mode, 2) + 3 * L.pad end
-    local small = ((rest or ''):gsub('^%s+', ''))
-    if st[2] ~= '' then small = small ~= '' and (small .. '   ' .. st[2]) or st[2] end
-    local ty = sy + math.floor((2 * L.th - L.th) / 2)
-    if small ~= '' and dx < sx0 + sw then text(dx, ty, fit(small, sx0 + sw - dx), U.TEXT) end
+    -- 15 окт: здесь только режим; сообщения и описание — строкой статуса внизу окна
   end
   return out
 end
@@ -7634,13 +7631,10 @@ function D.frame(L, snap, rows, state, info)
     set(D.SEP); gfx.rect(sx, sy, sw, D.SEPW, 1)
     -- слева режим/сообщение (не шире трети), дальше — описание того, на что
     -- наведена мышь, во всю оставшуюся ширину
-    local left = fit(info.status_left or '', sw / 3)
-    -- 10 окт: «-- INSERT --» в статусе — красным во всех темах (цвет рамки INSERT), остальное — янтарь
-    local ins = info.vmode == 'insert' and left:sub(1, 12) == '-- INSERT --'
-    if ins then
-      text(sx + L.pad, sy + 2, '-- INSERT --', D.FOCUS_INS or U.RED)
-      text(sx + L.pad + ms('-- INSERT --'), sy + 2, left:sub(13), U.AMBER)
-    else key_text(sx + L.pad, sy + 2, left, sw / 3, U.AMBER) end
+    -- 15 окт: режим — в полосе трекера (modeline); здесь — то, что после «|» (сообщение), без слова режима
+    local left = (info.status_left or ''):match('^[^|]*|(.*)$') or ''   -- «РЕЖИМ | сообщение»: режим — до первой |
+    left = fit((left:gsub('^%s+', '')), sw / 3)
+    key_text(sx + L.pad, sy + 2, left, sw / 3, U.AMBER)
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
@@ -7753,7 +7747,6 @@ function D.frame(L, snap, rows, state, info)
     local st
     if L.kbstat or (info.ctrl and info.ctrl.bigstatus) then
       st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '', small = L.kbstat }
-      if L.kbstat then D.aw_status = nil end
     end
     if L.tppos == 'tracker' then D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
     else
