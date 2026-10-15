@@ -53,7 +53,7 @@ PN.PANELS = {
   { id = 'master',     label = 'master',     key = 'S', hint = 'master',  side = 'top', tab = true },
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
-  { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true, avail = 'gridtab' },
+  { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true },   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
   { id = 'garden',     label = 'orca',       key = 'O', hint = 'orca',    side = 'top', tab = true, avail = 'dev' },
 }
 PN.BY, PN.TABS, PN.BYKEY = {}, {}, {}

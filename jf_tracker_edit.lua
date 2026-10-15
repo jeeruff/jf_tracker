@@ -1879,9 +1879,59 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
     E.set_iid(it, root .. '#' .. k)                      -- все ноты слайса k — один инструмент
     finish_insert(track, lane_idx, it)
+    if E.playthru(inst_item) and (E.ghost_q or 0) > 0 then E.ghost_slices(track, lane_idx, lpb, it, slices, base, k, root) end
     made = it
   end)
   return made
+end
+
+-- 15 окт: ghost-слайсы. playthru + квантование слайсов (q row / 2 / beat / bar, E.ghost_q строк, ставит main):
+-- нота играет сэмпл не одним куском (живой брейк уплывает с сетки, луп съезжает), а послайсово — каждый
+-- следующий слайс своим item там, где он прозвучал бы при playthru (с beatsync — по его rate), привязанный
+-- к сетке q (строки от LPB). Голова обрезается до первого; ghost — P_EXT:jf_ghost (трекер рисует бледно).
+-- Дальше следующей ноты колонки и конца сэмпла не идёт; два на одну клетку — остаётся первый.
+function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
+  local htk = R.GetActiveTake(head)
+  if not htk then return end
+  local q = E.ghost_q
+  local t0 = R.GetMediaItemInfo_Value(head, 'D_POSITION')
+  local hend = t0 + R.GetMediaItemInfo_Value(head, 'D_LENGTH')      -- playthru уже обрезан следующей нотой
+  local rate = R.GetMediaItemTakeInfo_Value(htk, 'D_PLAYRATE')
+  local bs = E.bsync_of(head)
+  local r0 = bs and bs.rate0 or rate                                  -- таблица слайсов — секунды item при исходном rate
+  local offs0 = base.offs or 0
+  local ok, chunk = R.GetItemStateChunk(head, '', false)
+  if not ok then return end
+  chunk = strip_guids(chunk)
+  local row0 = R.TimeMap2_timeToQN(0, t0) * lpb
+  local starts = {}                                                   -- { j, t }
+  local used = { [math.floor(row0 + 0.5)] = true }
+  for j = k + 1, #slices do
+    local tj = t0 + (slices[j] - slices[k]) * r0 / rate
+    if tj >= hend - 1e-4 then break end
+    local rowf = R.TimeMap2_timeToQN(0, tj) * lpb
+    local rq = math.floor(rowf / q + 0.5) * q
+    local tq = row_time(rq, lpb, 0)
+    if not used[rq] and tq > t0 + 1e-4 and tq < hend - 1e-4 then used[rq] = true; starts[#starts + 1] = { j = j, t = tq } end
+  end
+  if #starts == 0 then return end
+  R.SetMediaItemInfo_Value(head, 'D_LENGTH', starts[1].t - t0)
+  for i, g in ipairs(starts) do
+    local te = starts[i + 1] and starts[i + 1].t or hend
+    local gi = insert_chunk(track, lane_idx, g.t, chunk)
+    local gtk = R.GetActiveTake(gi)
+    if gtk then
+      R.SetMediaItemTakeInfo_Value(gtk, 'D_STARTOFFS', offs0 + slices[g.j] * r0)
+      R.SetMediaItemTakeInfo_Value(gtk, 'D_PLAYRATE', rate)
+    end
+    R.SetMediaItemInfo_Value(gi, 'D_POSITION', g.t)
+    R.SetMediaItemInfo_Value(gi, 'D_LENGTH', te - g.t)
+    R.SetMediaItemInfo_Value(gi, 'B_MUTE', 0)
+    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_slice', tostring(g.j), true)
+    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_ghost', '1', true)
+    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_bsync', '', true)       -- rate уже как у головы: не подгонять заново
+    E.set_iid(gi, root .. '#' .. g.j)
+  end
 end
 
 -- Выделение сэмпл-модуля [t0, t1) (секунды item) → item на track в строке

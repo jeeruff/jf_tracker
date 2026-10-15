@@ -297,7 +297,6 @@ local state = {
   envfmt = reaper.GetExtState(EXT, 'envfmt') == 'hex' and 'hex' or 'midi',   -- значения огибающих / CC: midi 0..127 или hex (6 окт)
   -- вкладка grid (monome, 2 окт): опция — monome есть не у всех; по умолчанию
   -- включена, если установлен демон jf_grid
-  gridtab = reaper.file_exists(DIR .. '/.dev') and flag('gridtab', reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_grid/jf_grid.lua')) or false,
   -- pm cards (6 окт, экспериментально как grid / orca): вкладка pm браузера —
   -- сетка карточек jf_pm с превью, big — на всё окно (jf_tracker_pm.lua)
   -- модуля карточек нет в релизе (не отгружается) — без файла опции нет и с .dev
@@ -668,7 +667,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3570,7 +3569,7 @@ ctx = {
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
     local t = { 'retro', 'sample', 'automation', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
-    if state.gridtab then t[#t + 1] = 'grid' end
+    t[#t + 1] = 'grid'   -- 15 окт: всегда (была dev-опция gridtab)
     if state.dev then t[#t + 1] = 'garden' end
     return t
   end,
@@ -10209,7 +10208,6 @@ ctx = {
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
-      flag('gridtab', 'grid tab (monome)', 'tab for the monome grid / arc (jf_grid daemon)'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
       { sep = true, title = 'track' },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
@@ -10261,7 +10259,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'panes and bars', { 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -10273,7 +10271,7 @@ ctx = {
     local byk, used = {}, {}
     for _, it in ipairs(ctx.option_items()) do
       -- 11 окт: тема, шрифт и его размер — только во вкладке theme (там с примерами), здесь не дублируются
-      if not it.sep and it.key ~= 'theme' and it.key ~= 'ttf' and it.key ~= 'fontscale' and (state.dev or (it.key ~= 'gridtab' and it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
+      if not it.sep and it.key ~= 'theme' and it.key ~= 'ttf' and it.key ~= 'fontscale' and (state.dev or (it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
     end
     local function add_sect(title, keys)
       local first = true
@@ -15017,7 +15015,6 @@ local function frame()
     local on = (narr or 0) > 0
     if model.ARR_PLAYING_ONLY ~= on then model.ARR_PLAYING_ONLY = on; model.invalidate() end
   end
-  if state.toptab == 'grid' and not state.gridtab then state.toptab = 'master' end
   if state.toptab == 'garden' and not state.dev then state.toptab = 'master' end   -- Orca — только .dev   -- вкладка grid выключена в опциях
   -- заметки: автозапись через секунду после правки; context следует за item под курсором
   if state.notes_open then
@@ -15507,6 +15504,7 @@ local function frame()
   if not idle_skip then HN.reset() end
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
+  edit.ghost_q = ctx.slq_rows()                        -- 15 окт: playthru + q — ghost-слайсы по сетке q (0 = выкл)
   edit.swing_read()                                    -- свинг сетки проекта REAPER (6 окт)
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
@@ -15696,7 +15694,7 @@ local function frame()
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
-    mono = (state.top and state.gridtab and state.toptab == 'grid') and mono_read() or nil,
+    mono = mono_read(),   -- 15 окт: панель grid всегда; чтение шины — раз в 0.25 с
     arc_info = ctx.arc_info,
     master = (state.top and (state.toptab == 'master' or state.toptab == 'scope') and snap.master) and {
       peaks = { reaper.Track_GetPeakInfo(snap.master.track, 0), reaper.Track_GetPeakInfo(snap.master.track, 1) },

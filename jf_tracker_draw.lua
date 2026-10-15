@@ -1884,7 +1884,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
     else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
     return
   end
-  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or col end
+  local ghost = cell and cell.ghost   -- 15 окт: ghost-слайс (playthru + q) — бледно, как подсказка
+  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or (ghost and U.DIM or col) end
   -- инверсное поле: текст с непрозрачной подложкой цвета заливки
   local text_ = text
   -- 12 окт: курсор на половине поля команды (код | значение): инверсна только эта половина
