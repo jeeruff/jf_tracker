@@ -572,8 +572,9 @@ function D.layout(snap, state, nregions)
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   -- 15 окт: у символов кнопок пусто сверху — кнопки ниже на tp_cut, строки 3-4 и низ полосы выше на столько же
   -- (не больше зазора между строками: текст второй строки не налезает на третью)
-  L.tp_cut = math.max(0, math.min(math.floor((L.th or L.rh) * 0.3), L.rh - (L.th or L.rh) + 1))
-  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 3 - L.tp_cut) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
+  -- 15 окт: кнопки — одни символы в одну строку: полоса — 3 строки (кнопки, |<< freeze …, маркеры / punch)
+  L.tp_cut = 0
+  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
   L.mode_h = 2 * L.th + 6
   L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
@@ -3538,7 +3539,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
-  g[#g + 1] = { { { 'swing', c.swing_txt or 'swing off', c.swing_on and U.CYAN or U.GREY } },
+  g[#g + 1] = { { { 'swing', c.swing_on and (c.swing_txt or 'swing') or 'swing', c.swing_on and U.CYAN or U.GREY } },   -- 15 окт: выкл — просто «swing» серым
                 { { 'swingbar', '', nil, slider = { v = c.swing_amt or 0 } } } }
   return g
 end
@@ -3790,14 +3791,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local tbw
   if c.tptext then
     tbw = 0
-    for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[2]), ms(b[5] or ''), ms('pause')) end
+    for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[5] or b[2])) end   -- 15 окт: слов нет — ширина по символу и нижнему ряду
     if c.tpfull then for _, b in ipairs(D.transport_sub(c)) do if b[1] then tbw = math.max(tbw, ms(b[2])) end end end   -- 11 окт: и нижняя строка
     tbw = tbw + 2 * L.pad
     btot = #blist * (tbw + 2) - 2
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
-    local by, bh = ly, 2 * L.rh - 1 - (L.tp_cut or 0)   -- 15 окт: без пустоты над символом
+    local by, bh = ly, L.rh   -- 15 окт: одна строка — только символ
     -- 12 окт: срезанный угол — только у крайних кнопок блока (фон в угол, рамка по диагонали, 2 px)
     local function cut(cx, cy, dx, dy, frame)
       set(U.PANEL); gfx.rect(cx, cy, 1, 1, 1); gfx.rect(cx + dx, cy, 1, 1, 1); gfx.rect(cx, cy + dy, 1, 1, 1)
@@ -3816,9 +3817,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if bi == #blist then cut(bx + bw - 1, by, -1, 1, fr); if not sub_on then cut(bx + bw - 1, by + bh - 1, -1, -1, fr) end end
       local sym = b[5] or ''
       -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
-      local gap2 = math.max(0, math.floor((bh - 2 * L.th - 3) / 2))
-      text(bx + math.floor((bw - ms(sym)) / 2), by + 2 + gap2 - (L.tp_cut or 0), sym, tc)   -- пустой верх глифа — над рамкой
-      text(bx + math.floor((bw - ms(b[2])) / 2), by + bh - 1 - L.th - gap2, b[2], hot and U.AMBER or (on and b[3] or U.GREY))
+      text(bx + math.floor((bw - ms(sym ~= '' and sym or b[2])) / 2), by, sym ~= '' and sym or b[2], tc)   -- 15 окт: слов (rew, play …) нет — при наведении они в статусе
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
@@ -3860,7 +3859,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 15 окт: строка под кнопками — по колонкам: под rew / pause — маркеры 1..0, под play — rate,
     -- под rec и дальше — тоглы записи (punch pre-roll rec>lib slow; не влезли — короче)
     if c.tpfull then
-      local ry = ly + 3 * L.rh + 4 - (L.tp_cut or 0)
+      local ry = ly + 2 * L.rh + 2   -- 15 окт: маркеры / punch — третьей строкой (кнопки в одну строку)
       local colx = function(i) return bx0 + (i - 1) * (tbw + 2) end
       local function cellb(id, lab, x0, w0, on, dimc)
         local hot = cell_hot(x0, ry, w0, L.rh)
@@ -3955,7 +3954,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
     if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2 - (L.tp_cut or 0)) end
-    if c.tpfull and D.swing_line then draw_group(D.swing_line, bx0, bigw, ly + 3 * L.rh + 4 - (L.tp_cut or 0)) end   -- 15 окт: swing — под метрономом
+    if c.tpfull and D.swing_line then local sw0 = group_w(D.sig_line) + 3 * L.pad; draw_group(D.swing_line, bx0 + sw0, bigw - sw0, ly + 2 * L.rh + 2) end   -- 15 окт: swing — в строку с метрономом
   end
   -- порядок блоков
   local by_id = {}
@@ -3968,11 +3967,17 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
     local g = by_id.sig
-    D.sig_line = { { g[1][2], g[2][1] } }   -- 15 окт: sig — крупно рядом с BPM, здесь metro и доли
+    -- 15 окт: строка под BPM — metro словом-тумблером (цвет — вкл), доли квадратиками без «bar 1 beat 2/4»
+    -- (позиция крупно рядом); swing — туда же, если влезает
+    local mt = { 'metro', 'metro', c.metro and U.CYAN or U.GREY }
+    local bt = {}; for k2, v2 in pairs(g[2][1]) do bt[k2] = v2 end; bt[2] = ''
+    D.sig_line = { { mt, bt } }
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
   D.swing_line = (big and c.tpfull and D.sig_line and by_id.swing) and { { by_id.swing[1][1], by_id.swing[2][1] } } or nil
+  -- 15 окт: swing — в строку с метрономом, только если влезает в ширину BPM; иначе — у правого края, как раньше
+  if D.swing_line and group_w(D.sig_line) + 3 * L.pad + group_w(D.swing_line) > bigw then D.swing_line = nil end
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
   if big then order[#order + 1] = { w = bigw2, draw = draw_big } else addg('play') end
   if not D.rate_line then addg('rate') end         -- 11 окт: скорость проекта (15 окт: full — под кнопками)
