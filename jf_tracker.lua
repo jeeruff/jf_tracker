@@ -336,6 +336,7 @@ state.panes = (function()
     -- 13 окт: модуль slices снова виден — под lib (один раз)
     if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
     if reaper.GetExtState(EXT, 'clip_tab') ~= '1' then draw.panes.keep_in(m, 'clipboard', 'inst'); reaper.SetExtState(EXT, 'clip_tab', '1', true) end   -- 13 окт: clipboard — вкладкой у lib
+    if reaper.GetExtState(EXT, 'ut_tab') ~= '1' then draw.panes.keep_in(m, 'undotree', 'inst'); reaper.SetExtState(EXT, 'ut_tab', '1', true) end   -- 15 окт: undo — вкладкой у lib
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     return m
@@ -2139,7 +2140,7 @@ ctx = {
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' or f == 'undotree' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -12168,6 +12169,118 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
   end
   if gfx.mouse_cap & 1 == 0 then ctx.cb_down = nil end
 end
+-- 15 окт: дерево undo (панель undo, U в PANE) — как undotree в Vim. Ствол — родной undo REAPER;
+-- узел — шаг undo (правки трекера — по E.ut_hook, остальное — по смене подписи undo REAPER).
+-- Покидаешь узел откатом — снимок (jf_tracker_undosnap); ветвление гасит live у прежней линии,
+-- туда — восстановлением снимка (новый шаг undo). Файл «Имя.jf-undo» рядом с .rpp, только дописывается
+ctx.UTM = dofile(DIR .. '/jf_tracker_undotree.lua')
+ctx.USN = dofile(DIR .. '/jf_tracker_undosnap.lua')
+ctx.UTS = {}                                     -- по проекту: сессия UT.session (+ sel, scroll для панели)
+ctx.ut_api = {
+  undo_desc = function() return reaper.Undo_CanUndo2(0) or '' end,
+  redo_desc = function() return reaper.Undo_CanRedo2(0) or '' end,
+  count = function() return reaper.GetProjectStateChangeCount(0) end,
+  do_undo = function() reaper.Main_OnCommand(40029, 0) end,
+  do_redo = function() reaper.Main_OnCommand(40030, 0) end,
+  capture = function() local ok, d = pcall(ctx.USN.capture, ctx.UTM); return ok and d or nil end,
+  restore = function(data, label) ctx.USN.restore(ctx.UTM, data, label); model.invalidate() end,
+  read = function(path) local f = io.open(path, 'rb'); if not f then return nil end; local t = f:read('a'); f:close(); return t end,
+  append = function(path, s2) local f = io.open(path, 'ab'); if f then f:write(s2); f:close() end end,
+  now = function() return os.time() end,
+}
+ctx.ut_state = function()
+  local proj, rpp = reaper.EnumProjects(-1, '')
+  local path = (rpp and rpp ~= '') and (rpp:gsub('%.[Rr][Pp][Pp]$', '') .. '.jf-undo') or nil
+  local key = tostring(proj)
+  local ST = ctx.UTS[key]
+  if not ST then ST = ctx.UTM.session(ctx.ut_api, path); ctx.UTS[key] = ST
+  elseif path ~= ST.path then ctx.UTM.set_path(ST, path) end
+  return ST
+end
+ctx.ut_poll = function() local ST = ctx.ut_state(); ctx.UTM.poll(ST); return ST end
+edit.ut_hook = function(label) ctx.UTM.hook(ctx.ut_state(), label) end   -- не poll: он добавил бы ту же правку второй раз
+edit.before_undo = function() ctx.UTM.before_undo(ctx.ut_state()) end
+ctx.ut_go = function(id)
+  local msg = ctx.UTM.go(ctx.ut_state(), id, edit.undo, edit.redo)
+  if msg then vim.msg = msg end
+end
+ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
+  local ST = ctx.ut_poll()
+  local T, UTM = ST.T, ctx.UTM
+  U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
+  local rows, maxc = UTM.layout(T)
+  local rh = Lx.rh
+  local nv = math.max(1, math.floor(h / rh))
+  local si = 1
+  for i, r in ipairs(rows) do if r.id == ST.sel then si = i end end
+  ST.scroll = math.max(0, math.min(ST.scroll or 0, #rows - nv))
+  if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
+  local cw = math.max(8, math.floor(Lx.cw * 1.2))
+  local gw = (math.min(maxc, 12) + 1) * cw
+  local rowof = {}
+  for i, r in ipairs(rows) do rowof[r.id] = i end
+  local function cy(i) return y + (i - ST.scroll - 1) * rh + math.floor(rh / 2) end
+  local function cx(c) return x + math.min(c, 12) * cw + math.floor(cw / 2) end
+  -- линии к родителю: вниз по своей колонке, вбок — к колонке родителя
+  for i, r in ipairs(rows) do
+    local n = r.node
+    local pi = n.parent ~= nil and rowof[n.parent]
+    if pi then
+      local y0, y1 = math.max(y, cy(i)), math.min(y + h - 1, cy(pi))
+      local pc = rows[pi].col
+      U.set(n.live and U.LINE or U.DIM)
+      if y1 > y0 then gfx.rect(cx(r.col), y0, 1, y1 - y0, 1) end
+      if pc ~= r.col and cy(pi) >= y and cy(pi) < y + h then gfx.rect(math.min(cx(pc), cx(r.col)), cy(pi), math.abs(cx(r.col) - cx(pc)) + 1, 1, 1) end
+    end
+  end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  ST.hot = nil
+  for i = ST.scroll + 1, math.min(#rows, ST.scroll + nv) do
+    local r = rows[i]
+    local n = r.node
+    local ry = y + (i - ST.scroll - 1) * rh
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + rh
+    if hot then ST.hot = r.id end
+    if r.id == ST.sel then U.set(U.tint(U.AMBER, foc and 0.3 or 0.15)); gfx.rect(x, ry, w, rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, rh, 1) end
+    local cur = r.id == T.cur
+    local reach = n.live or n.snap
+    local col = cur and U.AMBER or (reach and U.TEXT or U.DIM)
+    local d = math.max(3, math.floor(rh / 3))
+    U.set(col)
+    gfx.rect(cx(r.col) - d, cy(i) - d, 2 * d + 1, 2 * d + 1, (n.live or cur) and 1 or 0)
+    local lab = (n.label or ''):gsub('^jf_tracker: ', '')
+    local tm = (n.t or 0) > 0 and os.date('%H:%M:%S', n.t) or ''
+    local tx = x + gw + Lx.pad
+    local tw = U.measure(tm)
+    U.text(tx, ry, ctx.fit((cur and '> ' or '') .. lab, x + w - tx - tw - 2 * Lx.pad), col)
+    if tm ~= '' then U.text(x + w - tw, ry, tm, U.GREY) end
+  end
+  if hv and ST.hot and gfx.mouse_cap & 1 == 1 and not ctx.ut_down then
+    ctx.ut_down = true
+    local now = reaper.time_precise()
+    if ST.sel == ST.hot and now - (ctx.ut_click or 0) < 0.35 then ctx.ut_go(ST.hot) end
+    ST.sel = ST.hot; ctx.ut_click = now; ctx.set_focus('undotree')
+  end
+  if gfx.mouse_cap & 1 == 0 then ctx.ut_down = nil end
+end
+ctx.ut_key = function(c)
+  local ST = ctx.ut_state()
+  local ch = c < 256 and string.char(c) or ''
+  local rows = ctx.UTM.layout(ST.T)
+  local si = 1
+  for i, r in ipairs(rows) do if r.id == ST.sel then si = i end end
+  if c == 27 then ctx.set_focus('tracker')
+  elseif ch == 'j' or c == keys.down then si = math.min(#rows, si + 1)
+  elseif ch == 'k' or c == keys.up then si = math.max(1, si - 1)
+  elseif ch == 'g' then si = 1 elseif ch == 'G' then si = #rows
+  elseif c == 13 then ctx.ut_go(ST.sel); return true
+  else return false end
+  ST.sel = rows[si] and rows[si].id or ST.sel
+  local n = ST.T.nodes[ST.sel]
+  if n then vim.msg = ('%s%s'):format((n.label or ''):gsub('^jf_tracker: ', ''), (n.live and '') or (n.snap and '  (another branch - Enter restores its snapshot)' or '  (another branch, no snapshot)')) end
+  return true
+end
 if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
@@ -14450,6 +14563,7 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  if ctx.ut_poll then pcall(ctx.ut_poll) end      -- 15 окт: дерево undo следит за историей REAPER и при скрытой панели
   -- 11 окт: микшер снизу = модуль mixer. Панель спрятали (Ctrl+W c, пресет) — микшер выкл;
   -- микшер включили (zm, опции) — панель снова под трекером. Иначе трекер рисовал
   -- полоски у себя внутри, без модуля
@@ -15215,6 +15329,7 @@ local function frame()
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
     clip_draw = function(Lx, x, y, w, h, foc, hv) ctx.clip_draw(Lx, x, y, w, h, foc, hv) end,
+    ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
     slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -19714,6 +19829,9 @@ local function frame()
         elseif ch == '-' then ctrl_action(sel, -1)
         elseif sel == 'bpm' and ch:match('%d') then state.bpm_edit = ch
         else return vim.key(c) end
+      elseif state.focus == 'undotree' then   -- 15 окт: дерево undo
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if not ctx.ut_key(c) then return vim.key(c) end
       elseif state.focus == 'clipboard' then   -- 13 окт: история yank
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''

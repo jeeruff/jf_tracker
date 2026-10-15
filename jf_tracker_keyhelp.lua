@@ -250,6 +250,12 @@ KH.PAGES = {
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Tab', d = 'next module' },
   } },
+  undotree = { title = 'undo - the undo tree (as undotree in Vim)', e = {
+    { k = 'j k  g G', d = 'move over the nodes (newest on top); the status says what the node is' },
+    { k = 'Enter / dblclick', d = 'go there: on the current line - plain REAPER undo / redo steps; on another branch - its snapshot is restored (one new undo step, u - back)' },
+    { k = 'the tree', d = 'every REAPER undo step is a node; undo and then a new edit makes a branch - the old line stays in the tree (its states were snapshotted when you left them); filled square - on the REAPER history, hollow - another branch, dim - no snapshot' },
+    { k = 'file', d = 'the tree lives next to the project: Name.jf-undo (only appended); an unsaved project keeps it in memory until the first save' },
+  } },
   clipboard = { title = 'clipboard: the history of yanks (the newest on top)', e = {
     { k = 'j k  g G', d = 'move' },
     { k = 'Enter', d = 'make it the register - p in the tracker pastes it (click too)' },
@@ -600,6 +606,7 @@ KH.BARS = {
   -- 14 окт: keys renoise — ноты двумя рядами, октава [ ], громкость { } (z x c — ноты)
   insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
              { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'help' } },
+  undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
@@ -637,7 +644,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'sample', 'nmod', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'sample', 'nmod', 'automation', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

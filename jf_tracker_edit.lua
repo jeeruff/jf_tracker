@@ -295,6 +295,7 @@ local function run(desc, fn)
   R.UpdateArrange()
   if model then model.invalidate() end
   if depth == 0 and t_run then E.last_ms = (R.time_precise() - t_run) * 1000; E.last_desc = desc end
+  if depth == 0 and E.ut_hook then pcall(E.ut_hook, 'jf_tracker: ' .. desc) end   -- 15 окт: дерево undo — узел правки (одинаковые подписи подряд тоже)
   if not ok then error(err, 0) end
 end
 E.run = run
@@ -3035,7 +3036,8 @@ function E.item_drag_to(item, edge, t, min_len, stretch)
 end
 
 -- ── прочее ────────────────────────────────────────────────────────────────
-function E.undo() R.Main_OnCommand(40029, 0); if model then model.invalidate() end end
+-- 15 окт: перед откатом — снимок узла, который покидаем (дерево undo: ветка не теряется)
+function E.undo() if E.before_undo then pcall(E.before_undo) end; R.Main_OnCommand(40029, 0); if model then model.invalidate() end end
 function E.redo() R.Main_OnCommand(40030, 0); if model then model.invalidate() end end
 function E.save() R.Main_SaveProject(0, false) end
 -- 12 окт: старт — с курсора трекера (lock): main ставит E.start_at; иначе REAPER стартовал со своего курсора,
