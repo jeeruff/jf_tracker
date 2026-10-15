@@ -3497,9 +3497,11 @@ function D.transport_groups(c)
   g[#g + 1] = { { { 'sig', 'sig ' .. sig }, tg('metro', 'metro', c.metro) },
                 { { 'beats', ('bar %d beat %d/%d'):format(c.bar or 1, math.max(1, cur), num), U.TEXT, beats = { num = num, cur = cur } } } }
   local lsn = { { 'ls_ins', 'insert', c.hear and U.AMBER or U.GREY }, { 'ls_step', 'step', c.trklisten and U.AMBER or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.AMBER or U.GREY }, { 'ls_line', 'line', c.steplisten and U.AMBER or U.GREY } }   -- включённые — янтарём (ярче голубого)
-  g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
+  -- 15 окт: шаг — крупно (×2, как BPM), без слова step (оно — вертикальной скобкой); inst ввода не показываем
+  local stepw = math.max(D.big_measure(tostring(c.step or 0), 2), D.big_measure('next', 2))
+  g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', tostring(c.step or 0), big = true, res = 'next' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
-                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY },
+                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY },
                   { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = 'human 100%' } } }   -- 15 окт: человечнее — тайминг, высота, velocity   -- 13 окт: шаг legato — нота дотягивается до следующей
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
@@ -3668,7 +3670,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
   local gap, sep = 2 * L.pad, 3 * L.pad
   -- 12 окт: it.res — самая длинная подпись этой ячейки (step 1 → step auto): место заранее, соседи не прыгают
-  local function cw_of(it) return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
+  -- 15 окт: it.big — крупно (×2, как BPM) на две строки; it.w — пустое место заданной ширины
+  local function cw_of(it)
+    if it.big then return math.max(D.big_measure(it[2], 2), it.res and D.big_measure(it.res, 2) or 0) end
+    if it.w then return it.w end
+    return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
   local function gap_of(g) return g.boxed and (gap + 6) or gap end
   -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
@@ -3696,9 +3702,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local cx, cy = gx, (y0 or ly) + (ri - 1) * L.rh
       for _, it in ipairs(row) do
         local iw = cw_of(it)
-        local hot = cell_hot(cx, cy, iw, L.rh)
-        if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, L.rh, 1); hover.ctrl = it[1] end
-        text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT))
+        local ih = it.big and (2 * L.rh) or L.rh
+        local hot = it[1] ~= '_' and cell_hot(cx, cy, iw, ih)
+        if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, ih, 1); hover.ctrl = it[1] end
+        if it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
+        elseif it[1] ~= '_' then text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT)) end
         if it.beats then
           local bs = math.max(4, L.rh - 6)
           local bx = cx + ms(it[2]) + L.pad
@@ -3858,6 +3866,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local big = (c.bigbpm or c.tpfull) and {
     { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
     { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
+    { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
   } or nil
   local bigw = 0
   if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
@@ -3885,7 +3894,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
     local g = by_id.sig
-    D.sig_line = { { g[1][1], g[1][2], g[2][1] } }
+    D.sig_line = { { g[1][2], g[2][1] } }   -- 15 окт: sig — крупно рядом с BPM, здесь metro и доли
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and { { by_id.rate[1][1], by_id.rate[2][1] } } or nil
