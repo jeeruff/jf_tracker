@@ -15645,6 +15645,8 @@ local function frame()
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
+      -- 15 окт: браузера на экране нет — модуль сразу у pm (без щелчка по заглушке)
+      if B.mode ~= 'pm' and state.panes and not draw.panes.visible(state.panes, 'browser') then B.mode = 'pm' end
       if B.mode ~= 'pm' then                        -- модуль сейчас у браузера (обе панели видны)
         U.text(x + Lx.pad, y + 2, ctx.fit('pm and the browser share one module - click here to show the projects', w - 2 * Lx.pad), U.GREY)
         return 'pmhere'
@@ -15658,6 +15660,8 @@ local function frame()
         return FB.draw(U, Lx, fx, fy, fw, fh, state.focus == 'fxb', ctx.fit)
       end or nil
       if not B.fx_draw and B.mode == 'fx' then B.mode = 'files' end
+      -- 15 окт: панели pm на экране нет — модуль сразу у браузера (вкладка browser была пустой с заглушкой)
+      if B.mode == 'pm' and state.panes and not draw.panes.visible(state.panes, 'pm') then B.mode = 'files' end
       if B.panes and B.mode == 'pm' then                -- 9 окт: модуль сейчас у панели pm
         U.text(x + Lx.pad, y + 2, ctx.fit('the browser and pm share one module - click here to show the files', w - 2 * Lx.pad), U.GREY)
         return 'browserhere'
