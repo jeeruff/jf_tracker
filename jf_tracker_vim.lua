@@ -577,6 +577,13 @@ function motion(c, n, op)
     return { fi = fi, row = r, field = 1, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('e'):byte() then
     return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true }
+  elseif c == ('E'):byte() then
+    -- 15 окт: E — конец нижнего видимого события трека (последнее, что начинается на экране)
+    local st = ctx.state
+    local bottom = (st.row0 or 0) + L.nrows
+    local r = next_ev(cur.fi, bottom, -1)
+    if not r then return nil end
+    return { fi = cur.fi, row = event_end(cur.fi, r), linewise = true }
   elseif c == ('G'):byte() then return { fi = cur.fi, row = V.count and (n - 1) or last, linewise = true }
   elseif c == ('{'):byte() or c == ('}'):byte() then
     local r = cur.row
@@ -2594,17 +2601,18 @@ function V.key_impl(c)
       else V.msg = 'register has envelope points - put the cursor on an envelope column' end
     elseif env_of(V.cur.fi) then V.msg = 'register has notes - put the cursor on a note column'
     else
-      for _ = 1, n do E.paste(reg, lpb(), V.cur.row, paste_targets(V.cur.fi), ch == 'P') end   -- 13 окт: p заменяет ноту строки, P — рядом
+      -- 15 окт: 2p — копии друг за другом (каждая на высоту регистра ниже), как в Vim; было n раз в ту же строку — одна
+      for k = 0, n - 1 do E.paste(reg, lpb(), V.cur.row + k * ((reg and reg.rows) or 1), paste_targets(V.cur.fi), ch == 'P') end   -- 13 окт: p заменяет ноту строки, P — рядом
       finish_edit()
     end
-  elseif ch == 'u' then E.undo(); finish_move()
-  elseif c == ctrl('r') and not (ctx.mods and (ctx.mods().ctrl or ctx.mods().alt or ctx.mods().cmd)) then E.redo(); finish_move()   -- 5 окт: Ctrl+R — вкладка rec (main)
+  elseif ch == 'u' then for _ = 1, n do E.undo() end; finish_move()   -- 15 окт: 3u — три шага
+  elseif c == ctrl('r') and not (ctx.mods and (ctx.mods().ctrl or ctx.mods().alt or ctx.mods().cmd)) then for _ = 1, n do E.redo() end; finish_move()   -- 5 окт: Ctrl+R — вкладка rec (main); 15 окт: со счётчиком
   elseif ch == '.' then
     if V.last_edit then local keys = V.last_edit; V.cmdbuf = {}; for _ = 1, n do replay(keys) end end
-  elseif ch == '[' then V.octave = math.max(0, V.octave - 1)
-  elseif ch == ']' then V.octave = math.min(8, V.octave + 1)
-  elseif ch == '(' then ctx.pool_select(V.inst - 1)
-  elseif ch == ')' then ctx.pool_select(V.inst + 1)
+  elseif ch == '[' then V.octave = math.max(0, V.octave - n)   -- 15 окт: счётчик — на N
+  elseif ch == ']' then V.octave = math.min(8, V.octave + n)
+  elseif ch == '(' then ctx.pool_select(V.inst - n)
+  elseif ch == ')' then ctx.pool_select(V.inst + n)
   elseif ch == 'F' then st.follow = not st.follow
   elseif ch == ' ' then E.play_stop()
   elseif c == ENTER and ctx.mods and ctx.mods().shift and ctx.describe_cell then
