@@ -49,7 +49,7 @@ KH.PAGES = {
     { k = 'Ctrl+Enter', d = 'the note under the cursor: all its properties in a box (only this note): j k row, h l value, Enter list, R reset, Esc close' },
     { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
-    { k = 'keys: renoise', d = 'option: two octaves at once - z s x d c v g b h n j m , l . ; / the cursor octave, q 2 w 3 e ... an octave higher; then in INSERT the octave is [ ], moving - the arrows' },
+    -- 15 окт: опция keys: renoise выключена (закомментирована в опциях)
     { k = 'gm', d = 'metronome menu: m on / off, speed, accents, pre-roll (:metro toggles too)' },
     { k = 'Ctrl - +', d = 'step down / up by one, in any mode (as in Renoise); - + alone - LPB (NORMAL, INSERT on the note field); Cmd - + - font size' },
     { k = '? Tab', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
