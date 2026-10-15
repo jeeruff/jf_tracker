@@ -201,6 +201,7 @@ KH.PAGES = {
     { k = 'H L G g', d = 'track left / right, last row / first row' },
     { k = 'b n', d = 'bar back / forward' },
     { k = 'z x', d = 'octave down / up (keys renoise: [ ], velocity { })' },
+    { k = 'vel  human', d = 'under the keyboard: vel - a slider of the inserted velocity (drag); in the step block human - every inserted note a little different: timing +-10 ms, pitch +-8 cents, velocity +-12 / volume +-1 dB at 100 % (click: 0 / 25 / 50 / 100 %)' },
     { k = 'c C', d = 'velocity -8 / +8' },
     { k = ', .', d = 'instrument previous / next' },
     { k = 'a', d = 'step auto: jump past the inserted item' },

@@ -226,7 +226,8 @@ local state = {
   mxruler = flag('mxruler', true),
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
-  namedrag = flag('namedrag', false),   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
+  namedrag = flag('namedrag', false),
+  focusbeacon = flag('focusbeacon', false), dimfocus = flag('dimfocus', false),   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
   ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
@@ -667,7 +668,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'namedrag', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'dimfocus', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'gridtab', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('transpos', state.transpos or 'tracker'); S('tpstyle3', state.tpstyle or 'full'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -5252,6 +5253,16 @@ ctx = {
     if not state.velrand then return v end
     return math.max(1, math.min(127, math.floor((v or 100) + (math.random() * 2 - 1) * 8 + 0.5)))
   end,
+  -- 15 окт: human — насколько каждая вставленная нота «живая»: тайминг ±10 мс, высота ±8 центов,
+  -- громкость ±1 dB / velocity ±12 (при 100 %)
+  human_menu = function()
+    local function set(v) return function() state.human = v; edit.human = v; vim.msg = v > 0 and ('human %d%%: timing, pitch and velocity of every inserted note vary a little'):format(v) or 'human off' end end
+    local function mark(v) return (state.human or 0) == v and '  *' or '' end
+    vim.open_hydra({ title = 'human - every inserted note a little different', items = {
+      { key = '0', label = 'off' .. mark(0), fn = set(0) }, { key = '1', label = '25 %' .. mark(25), fn = set(25) },
+      { key = '2', label = '50 %' .. mark(50), fn = set(50) }, { key = '4', label = '100 %' .. mark(100), fn = set(100) } } })
+    state.popup_at = { kind = 'strip', id = 'human' }
+  end,
   ins_menu = function()
     local m = state.insmode or 'fixed'
     local function mark(on) return on and '  *' or '' end
@@ -7971,6 +7982,8 @@ ctx = {
     ratebar = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2',
     swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
     swingbar = 'swing amount: drag left / right from the middle',
+    velbar = 'velocity of the inserted notes 1..127: drag; { } (renoise) or c C - step 8',
+    human = 'human: every inserted note a little different - timing, pitch, velocity / volume; click - 0 / 25 / 50 / 100 %',
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
     tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
     tp_play = 'play / stop (Space) - starts at the tracker cursor row',
@@ -10105,6 +10118,8 @@ ctx = {
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
+      flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
+      flag('dimfocus', 'dim unfocused', 'the modules without the keyboard focus are a little darker - the focused one stands out'),
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
       flag('pancol', 'pan column', 'a pan field after the volume of every audio note (00 left .. 80 centre .. FF right; empty - centre); 0Pxx is then not shown'),
       { key = 'textonly', label = 'text only', kind = 'toggle', desc = 'cells show only the text: no wave behind the notes, no item fill, no item frame', get = function() return state.textonly end, set = function(v) state.textonly = v; if v then state.waveonly = false end end },
@@ -10144,7 +10159,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
+      { 'panes and bars', { 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'statpos', 'hintpos', 'transpos', 'tpstyle', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure', 'gridtab' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -14268,6 +14283,9 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
+  elseif name == 'human' then ctx.human_menu()   -- 15 окт: human — выпадашка процентов
+  elseif name == 'velbar' then
+    if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
   elseif name == 'legato' then
     edit.step_legato = not edit.step_legato; reaper.SetExtState(EXT, 'steplegato', edit.step_legato and '1' or '0', true)
     vim.msg = 'legato ' .. (edit.step_legato and 'on: an inserted note and the one before it last to the next note, not stretched (the instrument loop plays on)' or 'off')
@@ -15093,6 +15111,14 @@ local function frame()
       if math.abs(r - reaper.Master_GetPlayRate(0)) > 1e-4 then reaper.CSurf_OnPlayRateChange(r); vim.msg = ('playrate x%.2f'):format(r) end
     else ctx.ratedrag = nil end
   end
+  -- 15 окт: протяжка слайдера velocity под пианинкой
+  if ctx.veldrag then
+    local r = draw.strip_cell and draw.strip_cell.velbar
+    if gfx.mouse_cap & 1 == 1 and r then
+      local v = math.floor(1 + math.max(0, math.min(1, (gfx.mouse_x - r[1]) / math.max(1, r[3] - 1))) * 126 + 0.5)
+      if v ~= vim.vel then vim.vel = v; vim.msg = 'velocity ' .. v end
+    else ctx.veldrag = nil end
+  end
   -- 9 окт: протяжка слайдера свинга в транспорте (ячейка swingbar)
   if ctx.swdrag then
     local r = draw.strip_cell and draw.strip_cell.swingbar
@@ -15503,7 +15529,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
-      insmode = state.insmode, legato = edit.step_legato, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      insmode = state.insmode, legato = edit.step_legato, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,

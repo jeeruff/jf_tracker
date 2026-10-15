@@ -1981,6 +1981,12 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         made = it
       end
     elseif mit or force_midi or (not has_audio and not depot_item) then
+      -- 15 окт: human — и у MIDI-нот: тайминг ±10 мс, velocity ±12 (при 100 %)
+      local hh = (E.human or 0) / 100
+      if hh > 0 then
+        t0 = math.max(0, t0 + (math.random() * 2 - 1) * hh * 0.010)
+        vel = math.max(1, math.min(127, math.floor((vel or 100) + (math.random() * 2 - 1) * hh * 12 + 0.5)))
+      end
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
     elseif depot_item then
       E.ensure_iid(depot_item)                          -- копия унесёт метку в чанке
@@ -2002,7 +2008,7 @@ end
 
 -- human (9 окт, экспериментально, опция human %): каждая вставленная
 -- нота-слайс — чуть другая, как живой удар: питч ±8 центов, громкость
--- ±1 dB, скорость ±0.3 % (при 100 %); 0 — выкл. E.human ставит main
+-- ±1 dB, скорость ±0.3 %, тайминг ±10 мс (при 100 %; MIDI — тайминг и velocity ±12); 0 — выкл. E.human ставит main
 E.human = 0
 function E.humanize(it, tk)
   local h = (E.human or 0) / 100
@@ -2011,6 +2017,7 @@ function E.humanize(it, tk)
   R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * 0.08)
   R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * 1.0 / 20))
   R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * (1 + r() * 0.003))
+  R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * 0.010))   -- 15 окт: и тайминг ±10 мс
 end
 
 -- ── арпеджиатор (3 окт, :arp) ─────────────────────────────────────────────

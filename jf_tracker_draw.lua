@@ -515,7 +515,7 @@ function D.layout(snap, state, nregions)
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
   L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
-  L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)) or 0   -- 11 окт: full — строка |<< freeze slow >>| dub
+  L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 4) or 0)) or 0   -- 15 окт: full — 4 строки   -- 11 окт: full — строка |<< freeze slow >>| dub
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0
   D.jr_bg = state.jrbg                                -- 10 окт: подложка линейки прыжков (опция)                  -- 9 окт: линейка прыжков над шапками (как relativenumber в Vim)
@@ -569,7 +569,7 @@ function D.layout(snap, state, nregions)
   L.hsb_h = 8
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
-  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
+  L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 4) or 0)   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   L.low_h = L.mix_h + L.hsb_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
@@ -1606,7 +1606,7 @@ D.PANE_KEYS = { { 'Cmd+hjkl', 'panel' }, { 'Cmd+Shift+hjkl', 'move' }, { 'Ctrl+W
 -- описание — текстом на 60 % (тускло, но читаемо); на фоне bg, с проверкой контраста
 function D.hint_colors(bg)
   bg = bg or U.PANEL
-  return U.readable(U.mix(bg, U.AMBER, 0.75), bg, 3.0), U.readable(U.mix(bg, U.TEXT, 0.60), bg, 3.0)
+  return U.readable(U.mix(bg, U.AMBER, 0.60), bg, 2.6), U.readable(U.mix(bg, U.TEXT, 0.55), bg, 2.6)   -- 15 окт: клавиша тише (60 %) — находится, но не отвлекает
 end
 -- строка подсказок одной строкой: куски через 2+ пробела; «клавиша: что» — по двоеточию,
 -- иначе последнее слово — что, остальное — клавиши («q whole», «2 w 3 e ... slices»)
@@ -3499,7 +3499,8 @@ function D.transport_groups(c)
   local lsn = { { 'ls_ins', 'insert', c.hear and U.AMBER or U.GREY }, { 'ls_step', 'step', c.trklisten and U.AMBER or U.GREY }, { 'ls_sel', 'sel', c.sellisten and U.AMBER or U.GREY }, { 'ls_line', 'line', c.steplisten and U.AMBER or U.GREY } }   -- включённые — янтарём (ярче голубого)
   g[#g + 1] = { boxed = true, bracket = 'step', { { 'step', 'step ' .. tostring(c.step or 0), res = 'step auto' }, { 'inst', ((c.insmode == 'random' and 'inst rnd') or (c.insmode == 'seq' and 'inst seq') or ('inst %d'):format(c.inst or 0)), (c.insmode and c.insmode ~= 'fixed') and U.CYAN or nil, res = 'inst 99' }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = 'LPB 64' } },   -- hear — во второй строке
 
-                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY } } }   -- 13 окт: шаг legato — нота дотягивается до следующей
+                { { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = 'pitch resample' }, { 'legato', 'legato', c.legato and U.CYAN or U.GREY },
+                  { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = 'human 100%' } } }   -- 15 окт: человечнее — тайминг, высота, velocity   -- 13 окт: шаг legato — нота дотягивается до следующей
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   if c.tpfull then table.insert(g[#g], lsn)
@@ -3600,10 +3601,18 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local vw = math.max(ms(vl), ms('vel 127'))
       local vhot = mx >= x + L.pad - 2 and mx < x + L.pad + vw + 2 and my >= vy and my < vy + L.rh
       if vhot then set(D.CURROW); gfx.rect(x + L.pad - 2, vy, vw + 4, L.rh, 1); hover.ctrl = 'vel' end
-      text(x + L.pad, vy, vl, vhot and U.AMBER or U.TEXT)
+      text(x + L.pad, vy, vl, vhot and U.AMBER or (dim and U.GREY or U.AMBER))   -- 15 окт: как oct — одним цветом
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
-      text(math.max(kx, x + L.pad + vw + 2 * L.pad), vy, D.PIANO_RENOISE and '{- }+' or 'c- C+', U.GREY)   -- не на подпись vel (без наложений)
+      -- 15 окт: рядом с vel — слайдер 1..127 (тянуть), клавиши — строкой ниже, под vel
+      local bx = x + L.pad + vw + 2 * L.pad
+      local bw = math.max(L.cw * 6, math.min(L.cw * 16, kx + (#D.PIANO_WHITE) * L.cw * 2 - bx))
+      local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
+      U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
+      if bhot then hover.ctrl = 'velbar' end
+      hint('ctrl', bx, vy, bw, L.rh, 'velbar')
+      D.strip_cell.velbar = { bx, vy, bw }
+      text(x + L.pad, vy + L.rh + 2, D.PIANO_RENOISE and '{- }+' or 'c- C+', U.GREY)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
@@ -3811,6 +3820,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       end
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
+    if D.rate_line then draw_group(D.rate_line, bx0, btot, ly + 3 * L.rh + 4) end   -- 15 окт: rate — под кнопками транспорта
   end
   local function draw_buttons(bx0)
     if c.tptext then return draw_text_buttons(bx0) end
@@ -3862,6 +3872,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
     if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2) end
+    if c.tpfull and D.swing_line then draw_group(D.swing_line, bx0, bigw, ly + 3 * L.rh + 4) end   -- 15 окт: swing — под метрономом
   end
   -- порядок блоков
   local by_id = {}
@@ -3876,13 +3887,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local g = by_id.sig
     D.sig_line = { { g[1][1], g[1][2], g[2][1] } }
   else D.sig_line = nil end
+  -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
+  D.rate_line = (c.tpfull and c.tptext and by_id.rate) and { { by_id.rate[1][1], by_id.rate[2][1] } } or nil
+  D.swing_line = (big and c.tpfull and D.sig_line and by_id.swing) and { { by_id.swing[1][1], by_id.swing[2][1] } } or nil
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
   if big then order[#order + 1] = { w = bigw2, draw = draw_big } else addg('play') end
-  addg('rate')                                   -- 11 окт: скорость проекта
+  if not D.rate_line then addg('rate') end         -- 11 окт: скорость проекта (15 окт: full — под кнопками)
   if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
   addg('punch')       -- 9 окт: LPB — в блоке step; блок размера такта начинается с sig
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
-  local last = by_id.swing and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
+  local last = (by_id.swing and not D.swing_line) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
@@ -3907,7 +3921,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   elseif st and st.small ~= false then
     -- 12 окт: ниже второго ряда кнопок (full: |<< freeze /2 x2 …) — раньше налезало; режим крупно x2,
     -- остальное (после |) и правая часть — обычным шрифтом по середине его высоты
-    local sy = ly + 2 * L.rh + (cc.tpfull and (L.rh + 2) or 0) + 2
+    local sy = ly + 2 * L.rh + (cc.tpfull and (2 * L.rh + 4) or 0) + 2   -- 15 окт: full — под 4-й строкой
     local sx0 = x + L.pad
     local sw = x + w - L.pad - sx0
     local mode, rest = (st[1] or ''):match('^([^|]*)|?(.*)$')
@@ -4578,12 +4592,14 @@ function D.panes_frame(L, snap, state, info, hover, ph)
             local tx = t.x + L.pad
             if stack then
               local bx, bw = tx - L.pad // 2 - 1, ms(lbl) + L.pad + 2
-              set(on and U.tint(fon and D.FOCUS or U.AMBER, 0.30) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
-              set(on and (fon and D.FOCUS or U.AMBER) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
+              -- 15 окт: вкладка в фокусе — акцентом (жёлтым), активные в других стопках — контрастно, но тише
+              local soft = U.readable(U.mix(U.TEXT, U.PANEL, 0.25), U.PANEL, 4.5)
+              set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.14)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
+              set(on and (fon and U.AMBER or soft) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
             else
               set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
             end
-            local col = on and (fon and D.FOCUS or U.AMBER) or (hot and U.TEXT or U.GREY)
+            local col = on and (fon and U.AMBER or U.readable(U.mix(U.TEXT, U.PANEL, 0.25), U.PANEL, 4.5)) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
             text(tx, c.y + 1, lbl, col)
             if hot then hover.ptab = { id = t.id } end
@@ -7753,8 +7769,36 @@ function D.frame(L, snap, rows, state, info)
       -- остаётся серой — видно, какой из двух соседних активен; INSERT — 2 px
       -- 10 окт: рамка — по самой границе модуля, второй пиксель INSERT — наружу (на линию-разделитель):
       -- внутри (на 1-2 px) она ложилась на содержимое — кнопку R крайнего трека
+      -- 15 окт: рамка фокуса вдвое толще (2 px, INSERT — 3): второй пиксель — наружу, на разделитель
       gfx.rect(r[1], r[2], r[3], r[4], 0)
-      if ins then gfx.rect(r[1] - 1, r[2] - 1, r[3] + 2, r[4] + 2, 0) end
+      gfx.rect(r[1] - 1, r[2] - 1, r[3] + 2, r[4] + 2, 0)
+      if ins then gfx.rect(r[1] - 2, r[2] - 2, r[3] + 4, r[4] + 4, 0) end
+      -- 15 окт: опция dim unfocused — остальные модули слегка притушены
+      if state.dimfocus then
+        local seen = { [table.concat(r, ',')] = true }
+        for k, r2 in pairs(rects) do
+          local key = table.concat(r2, ',')
+          if k ~= f and not seen[key] and r2[3] > 0 and r2[4] > 0 then seen[key] = true; gfx.set(0, 0, 0, 0.22); gfx.rect(r2[1], r2[2], r2[3], r2[4], 1) end
+        end
+        gfx.a = 1
+      end
+      -- 15 окт: опция focus beacon — фокус перешёл в модуль: рамка вспыхивает и стягивается к нему за 0.4 с
+      local now = reaper.time_precise()
+      if D.focus_last ~= f then
+        if D.focus_last and state.focusbeacon then D.fbeacon = { t = now } end
+        D.focus_last = f
+      end
+      local fb = D.fbeacon
+      if fb then
+        local k = (now - fb.t) / 0.4
+        if k >= 1 then D.fbeacon = nil
+        else
+          local g = math.floor(12 * (1 - k) ^ 2)
+          set(U.AMBER, 0.8 * (1 - k))
+          for d = 0, 2 do gfx.rect(r[1] - g - d, r[2] - g - d, r[3] + 2 * (g + d), r[4] + 2 * (g + d), 0) end
+          gfx.a = 1
+        end
+      end
     end
   end
   -- 11 окт: перенос трека за шапку — куда ляжет: линия между колонками или рамка (в папку)
