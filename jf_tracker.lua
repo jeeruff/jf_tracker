@@ -70,6 +70,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
 MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+MMX.SRG = dofile(DIR .. '/jf_tracker_surge.lua')   -- 16 окт: патчи Surge XT через чанк трека
 MMX.CM = dofile(DIR .. '/jf_tracker_ctrlmouse.lua')   -- мышь с Ctrl: универсальная ручка, Cmd / Shift-выделение, XY (8 окт)
 MMX.HM.init(U, MMX.CH)
 MMX.HM.root = tonumber(reaper.GetExtState('jf_tracker', 'harmroot')) or 0
@@ -11376,6 +11377,12 @@ ctx = {
     -- пресетов нет — «no preset» (< > всё равно листают то, что есть у самого плагина)
     local t = dsp_target(); if not (t and f) or f.container then return nil end
     local A = model.fxapi(t.track)
+    -- 16 окт: Surge XT — его патч (.fxp), загруженный из трекера; иначе — Init / свой
+    if ctx.is_surge(f) and not t.take then
+      local g = A.GetFXGUID(t.track, f.i)
+      local nm = ctx.surge_name[g or ''] or 'patches'
+      return { name = nm, idx = 0, cnt = #ctx.surge_list(), none = false }
+    end
     local idx, cnt = A.GetPresetIndex(t.track, f.i)
     local ok, nm = A.GetPreset(t.track, f.i, '')
     local has = (cnt or 0) > 0 or (ok and nm ~= '')
@@ -11525,9 +11532,72 @@ ctx = {
     ctx.preset_cache[ident] = names
     return names
   end,
+  -- 16 окт: Surge XT — патчи .fxp (factory, 3rd party, свои), загрузка — через чанк трека (jf_tracker_surge)
+  is_surge = function(f) return f and ((f.name or ''):find('Surge XT', 1, true) or (f.fxname or ''):find('Surge XT', 1, true)) ~= nil end,
+  surge_name = {},
+  surge_list = function()
+    if ctx.surge_cache then return ctx.surge_cache end
+    local list = {}
+    local home = os.getenv('HOME') or ''
+    local roots = { '/Library/Application Support/Surge XT/patches_factory', '/Library/Application Support/Surge XT/patches_3rdparty', home .. '/Documents/Surge XT/Patches' }
+    local function walk(root, dir, depth)
+      local i = 0
+      while true do
+        local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
+        if fn:lower():match('%.fxp$') then
+          local cat, nm = MMX.SRG.label(dir .. '/' .. fn, root)
+          list[#list + 1] = { label = (cat ~= '' and (cat .. ' / ') or '') .. nm, path = dir .. '/' .. fn, name = nm, cat = cat }
+        end
+        i = i + 1
+      end
+      if depth > 4 then return end
+      i = 0
+      while true do
+        local sd = reaper.EnumerateSubdirectories(dir, i); if not sd then break end
+        walk(root, dir .. '/' .. sd, depth + 1); i = i + 1
+      end
+    end
+    for _, r in ipairs(roots) do walk(r, r, 0) end
+    table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
+    ctx.surge_cache = list
+    return list
+  end,
+  surge_load = function(tr, fxi, e)
+    local f = io.open(e.path, 'rb'); if not f then vim.msg = 'surge: cannot read ' .. e.path; return end
+    local ch = MMX.SRG.fxp_chunk(f:read('*a')); f:close()
+    if not ch then vim.msg = 'surge: not a Surge patch - ' .. e.label; return end
+    local g = reaper.TrackFX_GetFXGUID(tr, fxi)
+    local _, tc = reaper.GetTrackStateChunk(tr, '', false)
+    -- блок этого Surge — последний <VST перед его FXID (и внутри контейнера)
+    local nth, cnt = nil, 0
+    for l in tc:gmatch('[^\n]+') do
+      if l:match('^%s*<VST ') then cnt = cnt + 1 end
+      if g and l:find('FXID ' .. g, 1, true) then nth = cnt; break end
+    end
+    local nc = nth and MMX.SRG.patch_track_chunk(tc, nth, ch)
+    if not nc then vim.msg = 'surge: its block was not found in the track'; return end
+    edit.run('Surge patch ' .. e.name, function() reaper.SetTrackStateChunk(tr, nc, false) end)
+    ctx.surge_name[g] = e.label
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = 'Surge XT: ' .. e.label
+  end,
   dsp_preset = function(k, what)
     local t, f = ctx.dsp_fx(k); if not f then return end
     local A = model.fxapi(t.track)
+    if ctx.is_surge(f) and not t.take then
+      local list = ctx.surge_list()
+      if #list == 0 then vim.msg = 'Surge XT: no .fxp patches found in /Library/Application Support/Surge XT'; return end
+      local g = A.GetFXGUID(t.track, f.i) or ''
+      if what == 'prev' or what == 'next' then
+        local cur = 0
+        for i, e in ipairs(list) do if e.label == ctx.surge_name[g] then cur = i end end
+        local nx = ((cur - 1 + (what == 'next' and 1 or -1)) % #list) + 1
+        ctx.surge_load(t.track, f.i, list[nx]); return
+      end
+      vim.open_picker('Surge XT patch (' .. #list .. ')', list, function(it) ctx.surge_load(t.track, f.i, it) end)
+      state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+      return
+    end
     if what == 'prev' or what == 'next' then
       A.NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
       local _, nm = A.GetPreset(t.track, f.i, '')
