@@ -1489,12 +1489,18 @@ function V.key_impl(c)
   -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)
   if V.picker then V.picker_key(c); return end
   if V.hydra then V.hydra_key(c); return end
-  -- 16 окт: курсор в колонке волны — stretch-маркеры с клавиатуры: a поставить, x убрать, J K — удар строки на строку вниз / вверх
+  -- 16 окт: курсор в колонке волны: s — разрезать ноту на строке, S — stretch-маркер (ещё раз — убрать), x убрать,
+  -- J K — удар строки на строку вниз / вверх (a — огибающие, не трогаем)
   if V.cur.sub == 'wave' and not V.pending and not V.op and (V.mode == 'normal' or V.mode == 'insert') and ctx.wave_key then
     local wch = (c < 256) and string.char(c) or ''
-    if wch == 'a' or wch == 'x' or wch == 'J' or wch == 'K' then
+    if wch == 's' then
       local hs = V.covering(V.cur.fi, V.cur.row)
-      if hs and hs[1] then ctx.wave_key(wch, hs[1], V.cur.row, V.count or 1) else V.msg = 'wave: no audio note on this row' end
+      if hs and hs[1] then ctx.edit.split(hs, lpb(), V.cur.row); V.msg = 'cut at this row (S - a stretch marker instead)' else V.msg = 'wave: no note on this row' end
+      V.count = nil; return
+    end
+    if wch == 'S' or wch == 'x' or wch == 'J' or wch == 'K' then
+      local hs = V.covering(V.cur.fi, V.cur.row)
+      if hs and hs[1] then ctx.wave_key(wch == 'S' and 'enter' or wch, hs[1], V.cur.row, V.count or 1) else V.msg = 'wave: no audio note on this row' end
       V.count = nil; return
     end
   end

@@ -7,14 +7,37 @@
 
 local A = {}
 
+-- 16 окт: n.smk = { { p = позиция в item (с), s = srcpos (от начала файла, в единицах rate) }, … } по возрастанию —
+-- stretch-маркеры ноты: место в файле — кусочно-линейно между ними (секунды файла = srcpos × rate). Без маркеров — прямая.
+-- Иначе прицел и полоска реза расходились с волной в трекере (она рисуется по маркерам)
+local function seg_map(m, x, kx, ky)   -- по точкам m (поля kx → ky): значение ky в x, края — наклон 1
+  if x <= m[1][kx] then return m[1][ky] + (x - m[1][kx]) end
+  for i = 1, #m - 1 do
+    local a, b = m[i], m[i + 1]
+    if x <= b[kx] then
+      local d = b[kx] - a[kx]
+      return d > 1e-9 and (a[ky] + (x - a[kx]) / d * (b[ky] - a[ky])) or a[ky]
+    end
+  end
+  return m[#m][ky] + (x - m[#m][kx])
+end
+A.seg_map = seg_map
+
 -- место в файле, которое нота играет в момент t проекта
-function A.src_at(n, t) return n.offs + (t - n.pos) * n.rate end
+function A.src_at(n, t)
+  if n.smk and #n.smk >= 2 then return seg_map(n.smk, t - n.pos, 'p', 's') * n.rate end
+  return n.offs + (t - n.pos) * n.rate
+end
 
 -- то же место в секундах окна инструмента e (может быть вне e: тот же файл, другой кусок)
 function A.e_time(n, e, t) return (A.src_at(n, t) - e.offs) / e.rate end
 
 -- обратно: точка окна e → момент проекта, где нота играет это место
-function A.proj_of(n, e, te) return n.pos + (e.offs + te * e.rate - n.offs) / n.rate end
+function A.proj_of(n, e, te)
+  local S = e.offs + te * e.rate                    -- секунды файла
+  if n.smk and #n.smk >= 2 then return n.pos + seg_map(n.smk, S / n.rate, 's', 'p') end
+  return n.pos + (S - n.offs) / n.rate
+end
 
 -- можно ли резать в t: строго внутри ноты (рез на краю не делит)
 function A.inside(n, t, eps) eps = eps or 1e-4; return t > n.pos + eps and t < n.pos + n.len - eps end

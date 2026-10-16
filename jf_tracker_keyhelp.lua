@@ -143,7 +143,7 @@ KH.PAGES = {
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three)' },
     { k = 'Opt+F1 F2', d = 'transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise)' },
-    { k = 'h (wave)', d = 'wave column (wave mode column): h from the note goes into the wave, l back; there a - a stretch marker on the row, x - remove it, J K - pull the hit a row down / up (3J - three); the mouse drags the amber line too' },
+    { k = 'h (wave)', d = 'wave column (wave mode column): h from the note goes into the wave, l back; there s - cut the note at the row, S - a stretch marker on the row (again - off), x - remove it, J K - pull the hit a row down / up (3J - three); the mouse drags the amber line too' },
     { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MTS sysex before the notes (MTS-ESP Master on the track before Surge XT), audio items - fractional pitch; Shift - the track' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt', d = 'the cursor row to the top (as in Vim)' },

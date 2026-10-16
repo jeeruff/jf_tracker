@@ -6949,6 +6949,13 @@ ctx = {
     if c.nrate <= 0 or c.erate <= 0 then return nil end
     local tr = edit.row_time(vim.cur.row, state.lpb, 0)
     c.n = { pos = c.npos, offs = c.noffs, rate = c.nrate, len = c.nlen }
+    -- 16 окт: stretch-маркеры ноты — прицел по ним (волна в трекере рисуется по ним же)
+    local nsm = reaper.GetTakeNumStretchMarkers(tk)
+    if nsm >= 2 then
+      c.n.smk = {}
+      for i = 0, nsm - 1 do local _, p, sp = reaper.GetTakeStretchMarker(tk, i); c.n.smk[#c.n.smk + 1] = { p = p, s = sp } end
+      table.sort(c.n.smk, function(a, b) return a.p < b.p end)
+    end
     c.e = { offs = c.eoffs, rate = c.erate }
     c.t = ctx.AIM.e_time(c.n, c.e, tr)
     -- 12 окт: точка может быть вне показанного инструмента (тот же файл, другой кусок) — окно прицела читает файл
@@ -6979,8 +6986,8 @@ ctx = {
       local _, p = reaper.GetTakeStretchMarker(tk, i)
       if p > 1e-4 and p < len - 1e-4 and p >= ta - 1e-6 and p < tb - 1e-6 then found = i; break end
     end
-    if ch == 'a' then
-      if found then vim.msg = 'wave: this row already has a stretch marker (J K move it, x removes)'; return end
+    if ch == 'enter' and found then ch = 'x' end                       -- 16 окт: Enter — переключатель: есть маркер — убрать
+    if ch == 'enter' then
       if ta <= 0.002 or ta >= len - 0.002 then vim.msg = 'wave: the row is at the edge of the note'; return end
       edit.run('stretch marker', function()
         local have0, haveL = false, false
@@ -6990,8 +6997,8 @@ ctx = {
         reaper.SetTakeStretchMarker(tk, -1, ta)
         reaper.UpdateItemInProject(it)
       end)
-      vim.msg = 'stretch marker on this row - J K pull the hit, x removes'
-    elseif not found then vim.msg = 'wave: no stretch marker on this row (a puts one)'; return
+      vim.msg = 'stretch marker on this row - J K pull the hit, S / x removes'
+    elseif not found then vim.msg = 'wave: no stretch marker on this row (S puts one)'; return
     elseif ch == 'x' then
       edit.run('stretch marker delete', function() reaper.DeleteTakeStretchMarkers(tk, found, 1); reaper.UpdateItemInProject(it) end)
       vim.msg = 'stretch marker removed'
