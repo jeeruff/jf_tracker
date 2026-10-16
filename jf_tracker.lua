@@ -7068,6 +7068,21 @@ ctx = {
     end
     return { rows = rows, smk = smk, segs = segs, item = c.item, k = (c.e.rate or 1) / ((c.n.rate and c.n.rate ~= 0) and c.n.rate or 1) }
   end,
+  -- 16 окт: ripple editing REAPER: 40309 off, 40310 per track, 40311 all tracks (их состояния — toggle)
+  ripple_mode = function()
+    if reaper.GetToggleCommandState(40311) == 1 then return 2 elseif reaper.GetToggleCommandState(40310) == 1 then return 1 end
+    return 0
+  end,
+  ripple_set = function(m)
+    reaper.Main_OnCommand(({ [0] = 40309, 40310, 40311 })[m] or 40309, 0)
+    vim.msg = 'ripple editing: ' .. ({ [0] = 'off', 'per track', 'all tracks' })[m] .. (m > 0 and ' - deleting a note pulls up what is below it (REAPER edits ripple too)' or '')
+  end,
+  ripple_menu = function()
+    local cur = ctx.ripple_mode()
+    local function it(k, m, lab) return { key = k, label = (cur == m and '* ' or '') .. lab, fn = function() ctx.ripple_set(m) end } end
+    vim.open_hydra({ title = 'ripple editing (as in REAPER)', items = { it('o', 0, 'off'), it('t', 1, 'per track: the rest of the track moves'), it('a', 2, 'all tracks: everything after moves') } })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   -- 16 окт: кнопка stretch слайсера — stretch-маркеры на границах слайсов (секунды item) и на краях; старые — заменяются
   slices_to_smk = function(item, slices)
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end
@@ -14786,6 +14801,7 @@ function ctrl_action(name, delta)
     local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch')
     if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_exact('Record: Set record mode to normal') or 40252, 0)
     elseif p then reaper.Main_OnCommand(p, 0) end
+  elseif name == 'ripple' then ctx.ripple_menu()   -- 16 окт: ripple editing — три значения, выпадашкой
   elseif name == 'preroll' then local p = ctx.cmd_exact('Pre-roll: toggle pre-roll on record') or ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'reclib' then state.reclib = not state.reclib; vim.msg = 'rec -> lib ' .. (state.reclib and 'on: recorded takes also become instruments' or 'off')
   -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
@@ -16060,6 +16076,7 @@ local function frame()
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+      ripple = ctx.ripple_mode(),   -- 16 окт: ripple editing REAPER (0 off, 1 per track, 2 all tracks)
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
@@ -17109,6 +17126,7 @@ local function frame()
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
+  elseif hover.ctrl == 'ripple' then state.status = 'ripple editing (REAPER): off / per track / all tracks - click: the list; on - deleting a note pulls up what is below it'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
   elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'
   elseif hover.ctrl == 'reclib' then state.status = 'rec -> lib: a take recorded into the tracker also becomes a new instrument in the lib'

@@ -3647,7 +3647,9 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   -- кнопки [<<][>][II][o][>>] — крупно справа от модуса (D.transport_buttons)
   -- 11 окт: тоглы записи — без on / off (цвет: голубой — вкл), иначе блок не влезал рядом с x1.00
   local function tc(id, label, on) return { id, label, on and U.CYAN or U.GREY } end
-  g[#g + 1] = { { tc('punch', 'punch', c.punch), tc('preroll', 'pre-roll', c.preroll) },
+  -- 16 окт: ripple — выпадашка (off / per track / all), голубой — вкл
+  local rip = { 'ripple', ({ [0] = 'ripple', 'ripple trk', 'ripple all' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = 'ripple all' }
+  g[#g + 1] = { { tc('punch', 'punch', c.punch), tc('preroll', 'pre-roll', c.preroll), rip },
                 { tc('reclib', 'rec>lib', c.reclib),
                   { 'slow', c.slowrate and ('slow %s'):format(({ [0.5] = '1/2', [0.25] = '1/4' })[c.slowrate] or (math.abs(c.slowrate - 2 / 3) < 1e-3 and '2/3') or '1/3') or 'slow',
                     c.slowrec and U.RED or (c.slowrate and U.CYAN or U.GREY) } } }   -- 11 окт: slow rec (Shift+Space)
@@ -3930,7 +3932,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     tbw = tbw + 2 * L.pad
     -- 15 окт: кнопки узкие (символы) — колонка не уже третьей строки: маркеры (10 на 2 колонки), rate, punch pre lib slow на 3
     if c.tpfull then
-      local rec = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + 8 * L.pad
+      local rec = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad   -- 16 окт: + ripple
       tbw = math.max(tbw, math.ceil(10 * (ms('0') + 2) / 2), ms('x1.10') + 2 * L.pad, math.ceil((rec - 4) / 3))
     end
     btot = #blist * (tbw + 2) - 2
@@ -4037,10 +4039,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cell.ratebar = { sx2, ry, sw2 }
       -- запись: от колонки rec до конца кнопок
       local ax, a1 = colx(4), bx0 + btot
-      local full = { { 'punch', 'punch', c.punch }, { 'preroll', 'pre-roll', c.preroll }, { 'reclib', 'rec>lib', c.reclib }, { 'slow', c.slowrate and 'slow*' or 'slow', c.slowrec or c.slowrate } }
+      local full = { { 'punch', 'punch', c.punch }, { 'preroll', 'pre-roll', c.preroll }, { 'reclib', 'rec>lib', c.reclib }, { 'slow', c.slowrate and 'slow*' or 'slow', c.slowrec or c.slowrate },
+                     { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
       local tot = 0
       for _, t in ipairs(full) do tot = tot + ms(t[2]) + 2 * L.pad end
-      if ax + tot > a1 then full[2][2], full[3][2] = 'pre', 'lib' end
+      if ax + tot > a1 then full[2][2], full[3][2] = 'pre', 'lib'; full[5][2] = (c.ripple or 0) == 2 and 'rip*' or 'rip' end   -- 16 окт: тесно — rip
       for _, t in ipairs(full) do
         local w0 = ms(t[2]) + 2 * L.pad
         if ax + w0 > a1 + L.pad then break end

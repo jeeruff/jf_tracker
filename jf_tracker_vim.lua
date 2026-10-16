@@ -2646,6 +2646,11 @@ function V.key_impl(c)
     for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
   elseif ch == 'x' and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 and V.empty_midi_at(V.cur.fi, V.cur.row) and ctx.delete_item then
     ctx.delete_item(V.empty_midi_at(V.cur.fi, V.cur.row)); V.msg = 'empty MIDI clip deleted'; finish_edit()   -- 13 окт: «#» — пустой клип
+  elseif ch == 'x' and ctx.ripple_mode and ctx.ripple_mode() > 0 and ctx.time_edit and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) > 0 then
+    -- 16 окт: ripple (кнопка rip, как в REAPER) — нота уходит вместе со своими строками: всё ниже подтягивается
+    -- (per track — этот трек, all tracks — все); без ripple — как было
+    local r1 = event_end(V.cur.fi, V.cur.row)
+    ctx.time_edit('delete', V.cur.fi, V.cur.row, math.max(1, r1 - V.cur.row + 1), ctx.ripple_mode() == 2); finish_edit()
   elseif ch == 'x' then
     apply('x', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1); finish_edit()
   elseif ch == 'M' or ch == 'S' then                     -- 9 окт: Shift+M / Shift+S — mute / solo трека (события — M в VISUAL)
