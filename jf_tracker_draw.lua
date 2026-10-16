@@ -6489,7 +6489,7 @@ function D.frame(L, snap, rows, state, info)
       local fld = vc.field or 1
       local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
         or ({ 'note', 'vol', 'delay' })[fld] or ('fx ' .. (fld - 3))
-      segs[#segs + 1] = { fname, 'field' }
+      segs[#segs + 1] = { fname, 'col' }   -- 16 окт: подпись col (было field)
       local row = math.max(0, vc.row or 0)
       segs[#segs + 1] = { ('%04d'):format(row), 'row' }
       if info.bbt then segs[#segs + 1] = { info.bbt(row), 'bar' } end
@@ -6497,7 +6497,7 @@ function D.frame(L, snap, rows, state, info)
         if row >= rg.r0 and row < rg.r1 and (rg.name or '') ~= '' then segs[#segs + 1] = { rg.name, 'region' }; break end
       end
       local vs = info.vis
-      if vs and vs.r0 then segs[#segs + 1] = { ('%d x %d'):format(math.abs(vs.r1 - vs.r0) + 1, math.abs((vs.f1 or 0) - (vs.f0 or 0)) + 1), 'rows x fields' } end
+      if vs and vs.r0 then segs[#segs + 1] = { ('%d x %d'):format(math.abs(vs.r1 - vs.r0) + 1, math.abs((vs.f1 or 0) - (vs.f0 or 0)) + 1), 'rows x cols' } end
     end
     local wx = x + mw + 3 * L.pad
     local ty = my0 + 3 + math.floor(L.th / 2)

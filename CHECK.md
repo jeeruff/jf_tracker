@@ -1029,3 +1029,4 @@
 - 16 окт: шапка трека — что не влезло в строку кнопок (m s ø ~ sro), во второй строке над − + (без header info)
 - 16 окт: mode font — ещё 22 шрифта (глаголица буквами из церковнославянского, Savoye, Brush Script, SignPainter, Didot, Eau de rose, Discognate, DemonCubicBlock, Topaz…); проверить превью во вкладке тем
 - 16 окт: pitch слайса — Shift+Option+нота (q2w3e…, zsx…); Option+цифры — всегда инструменты (в INSERT тоже); Option+нота у нарезанного — аккорд
+- 16 окт: модлайн — подпись col вместо field (и rows x cols)
