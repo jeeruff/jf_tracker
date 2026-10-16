@@ -41,6 +41,7 @@ eq('header size updated', string.unpack('<I4', got.hdr, #got.hdr - 11), #nd2)
 eq('no such block', S.patch_track_chunk(table.concat(lines, '\n'), 2, blk), nil)
 local c, nm = S.label('/R/Basses/Attacky.fxp', '/R')
 eq('label cat', c, 'Basses'); eq('label name', nm, 'Attacky')
+c = S.label('/R/A.Liv/Basses/X.fxp', '/R'); eq('label nested', c, 'A.Liv / Basses')
 
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

@@ -8461,7 +8461,7 @@ end
 -- содержимого, высота — от числа строк (до половины окна).
 -- anchor = { x, y } — место правки: всплывашка под ним (не влезает — над ним)
 function D.popup(L, p, anchor)
-  D.popup_hot, D.popup_rect, D.popup_pick = nil, nil, nil
+  D.popup_hot, D.popup_rect, D.popup_pick, D.popup_group = nil, nil, nil, nil
   if not p or not p.lines then return end
   local W = gfx.w
   local sy = L.body_y + L.body_h
@@ -8489,7 +8489,14 @@ function D.popup(L, p, anchor)
     local tmin = math.min(ms(p.title or ''), ms(string.rep('W', 60))) + 2 * L.pad
     if colw < tmin then tw = tw + (tmin - colw); colw = tmin end
   end
-  local w = math.min(W - 2 * L.pad, ncol * colw + L.pad)
+  -- 16 окт: пикер с папками — слева колонка папок (своя ширина, до 28 знаков), справа имена
+  local gw = 0
+  if p.groups then
+    for _, t in ipairs(p.groups.lines) do gw = math.max(gw, ms(t)) end
+    gw = math.min(gw, ms(string.rep('W', 28))) + 3 * L.pad
+    nrow = math.max(nrow, math.min(#p.groups.lines, maxrows))
+  end
+  local w = math.min(W - 2 * L.pad, ncol * colw + L.pad + gw)
   local h = (nrow + 1) * L.rh + 2 * L.pad
   local x, y = L.pad, sy - h - 2
   if anchor and anchor.box then
@@ -8523,12 +8530,26 @@ function D.popup(L, p, anchor)
     return
   end
   text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
+  if p.groups then
+    local G = p.groups
+    for i, t in ipairs(G.lines) do
+      if i > nrow then break end
+      local gi = G.first + i - 1
+      local ly = y + L.pad + i * L.rh
+      local on = gi == G.sel
+      local mhot = gfx.mouse_x >= x + L.pad and gfx.mouse_x < x + gw and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
+      if mhot then D.popup_group = gi end
+      if on or mhot then set(on and (G.focus and D.CURROW or U.tint(U.AMBER, 0.15)) or D.CURROW); gfx.rect(x + L.pad, ly, gw - 2 * L.pad, L.rh, 1) end
+      text(x + 2 * L.pad, ly + 1, fit(t, gw - 3 * L.pad), on and U.AMBER or U.TEXT)
+    end
+    set(U.LINE); gfx.rect(x + gw - L.pad, y + L.pad + L.rh, 1, h - 2 * L.pad - L.rh, 1)
+  end
   for i, ln in ipairs(p.lines) do
     local ci = math.floor((i - 1) / nrow)
     local ri = (i - 1) % nrow
-    local lx = x + L.pad + ci * colw
+    local lx = x + L.pad + ci * colw + gw
     local ly = y + L.pad + (ri + 1) * L.rh
-    if lx + colw > x + w + L.pad then break end
+    if lx + colw > x + w + L.pad + 1 and ci > 0 then break end
     -- мышь (5 окт): строка гидры под мышью подсвечена, клик — её буква
     -- 10 окт: и пикер (fzf-список) — строка под мышью подсвечена, клик — выбор
     local pick_ok = p.kind == 'picker' and p.first and i <= (p.nmatch or 0) - p.first + 1

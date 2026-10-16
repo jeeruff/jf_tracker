@@ -3050,7 +3050,10 @@ ctx = {
       while true do
         local ok, name, ident = reaper.EnumInstalledFX(i)
         if not ok then break end
-        items[#items + 1] = { label = name, data = ident }
+        -- 16 окт: папка пикера — разработчик (в скобках), у JS / без скобок — тип (VST3, JS …)
+        local dev = name:match('%(([^()]+)%)%s*$')
+        local typ = name:match('^(%w+i?):') or 'other'
+        items[#items + 1] = { label = name, data = ident, group = dev or typ, name = name:gsub('^[^:]*: ', '') }
         i = i + 1
         if i > 5000 then break end
       end
@@ -5769,7 +5772,7 @@ ctx = {
     if ch == '/' then
       local items = {}
       for _, r in ipairs(ctx.mac_rows()) do
-        if r.kind then items[#items + 1] = { label = (r.kind == 'rec' and ('@' .. r.name .. '  ' .. (r.body or '')) or (r.name .. '  ' .. (r.desc or r.body or ''))), data = r } end
+        if r.kind then items[#items + 1] = { label = (r.kind == 'rec' and ('@' .. r.name .. '  ' .. (r.body or '')) or (r.name .. '  ' .. (r.desc or r.body or ''))), data = r, group = ({ rec = 'recorded', saved = 'saved', builtin = 'built-in', shared = 'shared' })[r.kind] } end
       end
       vim.open_picker('macro', items, function(it) ctx.mac_do({ kind = 'play', row = it.data }) end)
       return true
@@ -11629,7 +11632,7 @@ ctx = {
         local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
         if fn:lower():match('%.fxp$') then
           local cat, nm = MMX.SRG.label(dir .. '/' .. fn, root)
-          list[#list + 1] = { label = (cat ~= '' and (cat .. ' / ') or '') .. nm, path = dir .. '/' .. fn, name = nm, cat = cat }
+          list[#list + 1] = { label = (cat ~= '' and (cat .. ' / ') or '') .. nm, path = dir .. '/' .. fn, name = nm, cat = cat, group = cat ~= '' and cat or '(root)' }
         end
         i = i + 1
       end
@@ -17941,7 +17944,8 @@ local function frame()
   if vim.picker and not OPT.active then
     local r = draw.popup_rect
     local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
-    if U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker_key(13); U.click = false
+    if U.click and draw.popup_group then vim.picker_group(draw.popup_group); vim.picker.side = 'right'; U.click = false   -- 16 окт: папка пикера
+    elseif U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker_key(13); U.click = false
     elseif (U.click or U.rclick) and not inside then vim.picker_key(27); U.click, U.rclick = false, false
     elseif U.click or U.rclick then U.click, U.rclick = false, false end
     if inside and gfx.mouse_wheel ~= 0 and vim.picker then

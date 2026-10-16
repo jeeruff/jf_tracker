@@ -988,5 +988,32 @@ do
   V.piano = false
 end
 
+-- 16 окт: пикер с папками — слева папки (all первой, по алфавиту), справа имена папки; набор — по всем
+do
+  local picked
+  V.open_picker('patches', { { label = 'Pads / Air', name = 'Air', group = 'Pads' }, { label = 'Bass / Sub', name = 'Sub', group = 'Bass' },
+                             { label = 'Bass / Wob', name = 'Wob', group = 'Bass' } }, function(it) picked = it.name end)
+  local pk = V.picker
+  eq('groups made', pk.groups and #pk.groups, 3)
+  eq('all first', pk.groups[1].name, 'all'); eq('sorted', pk.groups[2].name, 'Bass'); eq('count', pk.groups[2].n, 2)
+  eq('starts on the left', pk.side, 'left')
+  V.picker_key(1685026670)                                   -- ↓ — папка Bass
+  eq('down picks group', pk.gsel, 2); eq('right shows its items', #pk.matches, 2)
+  local pop = V.popup()
+  eq('names only inside a folder', pop.lines[1].text, 'Sub')
+  eq('popup has groups', pop.groups and #pop.groups.lines, 3)
+  V.picker_key(13)                                           -- Enter слева — направо
+  eq('enter goes right', pk.side, 'right')
+  V.picker_key(1685026670); V.picker_key(13)
+  eq('picks in the folder', picked, 'Wob')
+  V.open_picker('p2', { { label = 'Pads / Air', group = 'Pads' }, { label = 'Bass / Sub', group = 'Bass' }, { label = 'Bass / Wob', group = 'Bass' } }, function() end)
+  V.picker_group(2); V.picker_key(('A'):byte())
+  eq('typing searches all folders', V.picker.matches[1] and V.picker.matches[1].label, 'Pads / Air')
+  V.picker = nil
+  V.open_picker('flat', { { label = 'a', group = 'x' }, { label = 'b', group = 'x' } }, function() end)
+  eq('one folder - no columns', V.picker.groups, nil)
+  V.picker = nil
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

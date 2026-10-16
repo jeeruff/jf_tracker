@@ -100,11 +100,12 @@ function S.patch_track_chunk(tc, nth, chunk)
 end
 
 -- категория и имя из пути: …/patches_factory/Basses/Attacky.fxp → Basses, Attacky
+-- 16 окт: папка — весь путь от корня (3rd party: автор / категория), «A.Liv / Basses»
 function S.label(path, root)
   local rel = path:sub(#root + 2)
-  local cat = rel:match('^([^/]+)/') or ''
+  local dir = rel:match('^(.*)/[^/]+$') or ''
   local nm = (rel:match('([^/]+)%.fxp$') or rel)
-  return cat, nm
+  return (dir:gsub('/', ' / ')), nm
 end
 
 return S

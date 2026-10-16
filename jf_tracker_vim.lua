@@ -2776,9 +2776,13 @@ end
 local function picker_filter()
   local pk = V.picker
   local out = {}
+  -- 16 окт: папки (у пунктов group): без набора — пункты выбранной папки (1 — all), с набором — поиск по всем
+  local gname = pk.groups and pk.query == '' and pk.gsel > 1 and pk.groups[pk.gsel].name or nil
   for i, it in ipairs(pk.items) do
-    local sc = fuzzy_score(it.label, pk.query)
-    if sc then out[#out + 1] = { it = it, sc = sc, i = i } end
+    if not gname or it.group == gname then
+      local sc = fuzzy_score(it.label, pk.query)
+      if sc then out[#out + 1] = { it = it, sc = sc, i = i } end
+    end
   end
   -- при равном счёте — порядок списка (недавние действия сверху остаются сверху)
   table.sort(out, function(a, b) if a.sc ~= b.sc then return a.sc > b.sc end return a.i < b.i end)
@@ -2790,11 +2794,40 @@ end
 function V.picker_refilter() if V.picker then picker_filter() end end
 function V.open_picker(title, items, on_pick, query)
   V.picker = { title = title, items = items, query = query or '', sel = 1, matches = {}, on_pick = on_pick }
+  -- 16 окт: пункты с group — слева папки (all и по порядку появления, с числом), справа имена
+  local gs, seen = { { name = 'all', n = #items } }, {}
+  for _, it in ipairs(items) do
+    if it.group then
+      local g = seen[it.group]
+      if not g then g = { name = it.group, n = 0 }; seen[it.group] = g; gs[#gs + 1] = g end
+      g.n = g.n + 1
+    end
+  end
+  if #gs > 2 then
+    table.sort(gs, function(a, b) if a.name == 'all' then return b.name ~= 'all' elseif b.name == 'all' then return false end; return a.name:lower() < b.name:lower() end)
+    V.picker.groups, V.picker.gsel, V.picker.side = gs, 1, 'left'
+  end
   picker_filter()
+end
+-- выбрать папку (мышь / стрелки)
+function V.picker_group(i)
+  local pk = V.picker
+  if not (pk and pk.groups and pk.groups[i]) then return end
+  pk.gsel = i; pk.sel = 1; picker_filter()
 end
 
 function V.picker_key(c)
   local pk = V.picker
+  -- 16 окт: папки — ← → / Tab между колонками; слева ↑ ↓ — папка, Enter — к именам
+  if pk.groups and pk.query == '' then
+    if c == LEFT then pk.side = 'left'; return
+    elseif c == RIGHT or c == 9 then pk.side = 'right'; return
+    elseif pk.side == 'left' then
+      if c == 14 or c == DOWN or c == 10 then V.picker_group(math.min(#pk.groups, pk.gsel + 1)); return
+      elseif c == 16 or c == UP or c == 11 then V.picker_group(math.max(1, pk.gsel - 1)); return
+      elseif c == ENTER then pk.side = 'right'; return end
+    end
+  end
   if c == ESC then V.picker = nil
   elseif c == ENTER then
     local it = pk.matches[pk.sel]
@@ -2856,12 +2889,23 @@ function V.popup()
     local lines = {}
     local nr = pk.rows or 14                      -- 6 окт: высота задаётся (действия REAPER — на всю матрицу)
     local first = math.max(1, pk.sel - (nr - 1))
+    local named = pk.groups and pk.query == '' and pk.gsel > 1      -- 16 окт: внутри папки — только имя
     for i = first, math.min(#pk.matches, first + nr - 1) do
-      lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = pk.matches[i].label, col = pk.matches[i].col }   -- col: свой цвет строки (маршрутизация, 9 окт)
+      local m = pk.matches[i]
+      lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = named and (m.name or m.label) or m.label, col = m.col }   -- col: свой цвет строки (маршрутизация, 9 окт)
+    end
+    local groups
+    if pk.groups then
+      local gfirst = math.max(1, pk.gsel - (nr - 1))
+      groups = { first = gfirst, sel = pk.gsel, focus = pk.side == 'left' and pk.query == '', lines = {} }
+      for i = gfirst, math.min(#pk.groups, gfirst + nr - 1) do
+        local g = pk.groups[i]
+        groups.lines[#groups.lines + 1] = ('%s  %d'):format(g.name, g.n)
+      end
     end
     -- 9 окт: пусто — строкой, иначе окно сжималось до клочка заголовка («ro»)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no matches - Backspace (Ctrl+J / K or arrows move, letters search)', col = { 0.6, 0.6, 0.6 } } end
-    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil }
+    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil, groups = groups }
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
