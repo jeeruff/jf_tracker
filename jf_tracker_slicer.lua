@@ -1575,15 +1575,23 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if zgrid then
       local function rc(r) if not r or math.abs(r - 1) < 0.005 then return U.TEXT end; return r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)) end
       local zc2 = zy + math.floor(ZH / 2)
+      local mxz, myz = gfx.mouse_x, gfx.mouse_y
+      S.zslope_hot = nil
+      -- линия скорости: от r·(1 − slope) в начале отрезка к r·(1 + slope) в конце (наклон — постепенное ускорение);
+      -- тянуть линию вверх / вниз — наклон (Option+клик — сброс в 0)
+      local function ry(r) return zc2 - math.floor(math.max(-1, math.min(1, (r - 1) * 2)) * (ZH / 2 - 4)) end
       for _, sg in ipairs(zgrid.segs) do
-        if math.abs(sg.r - 1) >= 0.005 then
-          local ya = zc2 - math.floor(math.max(-1, math.min(1, (sg.r - 1) * 2)) * (ZH / 2 - 4))
-          local xa, xb = x + math.floor((sg.a - t0) / (2 * W2) * w), x + math.floor((sg.b - t0) / (2 * W2) * w)
-          U.set(rc(sg.r)); gfx.rect(xa, ya, math.max(1, xb - xa), 1, 1)
+        local sl = sg.sl or 0
+        local xa, xb = x + math.floor((sg.a - t0) / (2 * W2) * w), x + math.floor((sg.b - t0) / (2 * W2) * w)
+        local function rat(t) local f = (sg.tb > sg.ta) and (t - sg.ta) / (sg.tb - sg.ta) or 0; return sg.r * (1 - sl) + 2 * sg.r * sl * f end
+        local ya, yb = ry(rat(sg.a)), ry(rat(sg.b))
+        local near = mxz >= xa and mxz <= xb and xb > xa and math.abs(myz - (ya + (yb - ya) * (mxz - xa) / math.max(1, xb - xa))) <= 3
+        if near and not S.zsmk_drag then S.zslope_hot = sg end
+        if math.abs(sg.r - 1) >= 0.005 or math.abs(sl) > 0.005 or near then
+          U.set(near and U.AMBER or rc(sg.r)); gfx.line(xa, ya, xb, yb, 1)
           if xb - xa > U.measure('0.00x') + 4 then U.text(xa + 3, zy + ZH - rh - 1, ('%.2fx'):format(sg.r), U.mix(U.TEXT, U.BG, 0.3)) end
         end
       end
-      local mxz, myz = gfx.mouse_x, gfx.mouse_y
       local downz = (gfx.mouse_cap & 1) == 1
       local pressz = downz and not S.zp_prev
       S.zp_prev = downz
@@ -1600,6 +1608,34 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
           S.zsmk_drag = { idx = m.idx, p0 = m.p, x0 = mxz, lo = m.lo, hi = m.hi, item = zgrid.item, spp = 2 * W2 / w * zgrid.k, active = false }
         end
       end
+      -- наклон отрезка мышью
+      if pressz and S.zslope_hot and not S.zsmk_hot and not S.zsmk_drag then
+        local sg = S.zslope_hot
+        local tk = R.ValidatePtr(zgrid.item, 'MediaItem*') and R.GetActiveTake(zgrid.item)
+        if tk and (gfx.mouse_cap & 16) == 16 then
+          ctx.edit.run('stretch slope reset', function() R.SetTakeStretchMarkerSlope(tk, sg.idx, 0); R.UpdateItemInProject(zgrid.item) end)
+          if ctx.model and ctx.model.invalidate then ctx.model.invalidate() end
+        elseif tk then
+          S.zslope_drag = { idx = sg.idx, s0 = sg.sl or 0, y0 = myz, item = zgrid.item, active = false, side = (mxz - x) / w > ((sg.a + sg.b) / 2 - t0) / (2 * W2) and 1 or -1 }
+        end
+      end
+      local sd = S.zslope_drag
+      if sd then
+        local tk = R.ValidatePtr(sd.item, 'MediaItem*') and R.GetActiveTake(sd.item)
+        if downz and tk then
+          if not sd.active and math.abs(myz - sd.y0) > 2 then sd.active = true; ctx.edit.item_drag_begin('stretch slope') end
+          if sd.active then
+            -- за правую половину — конец отрезка вверх = быстрее к концу; за левую — наоборот
+            local ns = math.max(-0.99, math.min(0.99, sd.s0 + (sd.y0 - myz) / (ZH / 2) * sd.side))
+            R.SetTakeStretchMarkerSlope(tk, sd.idx, ns); R.UpdateItemInProject(sd.item)
+            S.msg = ('stretch slope %.2f (Option+click on the line: 0)'):format(ns)
+            if ctx.model and ctx.model.invalidate then ctx.model.invalidate() end
+          end
+        else
+          if sd.active then ctx.edit.note_modified(sd.item); ctx.edit.item_drag_end() end
+          S.zslope_drag = nil
+        end
+      elseif S.zslope_hot and not S.zsmk_hot then S.msg = 'stretch rate line - drag up / down: slope (gradual speed-up / slow-down), Option+click: back to 0' end
       local dg = S.zsmk_drag
       if dg then
         local tk = R.ValidatePtr(dg.item, 'MediaItem*') and R.GetActiveTake(dg.item)

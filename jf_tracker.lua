@@ -7055,7 +7055,11 @@ ctx = {
       local te = A.e_time(c.n, c.e, c.n.pos + m.p)
       if i < #M then
         local tb = A.e_time(c.n, c.e, c.n.pos + M[i + 1].p)
-        if tb > t0 and te < t1 then segs[#segs + 1] = { a = math.max(t0, te), b = math.min(t1, tb), r = rate(m, M[i + 1]) } end
+        if tb > t0 and te < t1 then
+          local tk2 = reaper.ValidatePtr(c.item, 'MediaItem*') and reaper.GetActiveTake(c.item)
+          local sl = tk2 and reaper.GetTakeStretchMarkerSlope and reaper.GetTakeStretchMarkerSlope(tk2, i - 1) or 0
+          segs[#segs + 1] = { a = math.max(t0, te), b = math.min(t1, tb), ta = te, tb = tb, r = rate(m, M[i + 1]), sl = sl, idx = i - 1 }
+        end
       end
       if m.p > 1e-4 and m.p < c.n.len - 1e-4 and te >= t0 and te <= t1 then
         smk[#smk + 1] = { te = te, idx = i - 1, p = m.p, up = i > 1 and rate(M[i - 1], m) or nil, dn = i < #M and rate(m, M[i + 1]) or nil,

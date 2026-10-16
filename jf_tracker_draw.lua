@@ -1891,10 +1891,13 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     for _, sg in ipairs(head.smk_src.segs) do
       local q0, q1 = math.floor(sg.f0 * total), math.floor(sg.f1 * total)
       local a0, a1 = math.max(q0, base), math.min(q1, base + L.rh)
-      if a1 > a0 and math.abs(sg.r - 1) >= 0.005 then
-        local lx = cxs + math.floor(math.max(-1, math.min(1, (sg.r - 1) * 2)) * hw2)
+      if a1 > a0 and (math.abs(sg.r - 1) >= 0.005 or math.abs(sg.sl or 0) > 0.005) then
+        -- 16 окт: наклон (slope) — скорость меняется по отрезку: от r·(1 − s) к r·(1 + s), линия — наклонная
+        local rs, re = sg.r * (1 - (sg.sl or 0)), sg.r * (1 + (sg.sl or 0))
+        local function lxo(r) return cxs + math.floor(math.max(-1, math.min(1, (r - 1) * 2)) * hw2) end
+        local function at(q) local f = (q1 > q0) and (q - q0) / (q1 - q0) or 0; return rs + (re - rs) * f end
         set(sg.r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)))   -- 16 окт: ярче (просьба), 2 px
-        gfx.rect(lx, y + a0 - base, 2, a1 - a0, 1)
+        gfx.line(lxo(at(a0)), y + a0 - base, lxo(at(a1)), y + a1 - base - 1); gfx.line(lxo(at(a0)) + 1, y + a0 - base, lxo(at(a1)) + 1, y + a1 - base - 1)
         if q0 >= base and q0 < base + L.rh and (xb - xa) >= ms('0.00x') then
           text(xa + 1, y + q0 - base + 1, ('%.2fx'):format(sg.r), U.mix(U.TEXT, U.BG, 0.3))
         end
