@@ -10810,7 +10810,7 @@ ctx = {
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
-      { key = 'cmsens', label = 'fader speed', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'Ctrl / Ctrl+Option drag (fade mode, faders by the mouse): how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
+      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Ctrl+Cmd (SLIDER, + Option - pan), Ctrl+Opt+Cmd over an item (ITEMS: move / volume). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -18299,6 +18299,39 @@ local function frame()
     -- движения по своей оси (> 10 px); Shift мелко; отпустил — один undo
     -- 16 окт: + Option к уже держимому Ctrl+Cmd — пан выбранного канала (вбок); не путать с жестом
     -- треков Ctrl+Option (+ Cmd — пан-пэд): тот начинается с Option, этот — с Cmd
+    -- 16 окт (эксперимент): ITEMS — Ctrl+Opt+Cmd разом над айтемом в трекере: вбок — по строкам, вверх-вниз —
+    -- громкость айтема (Shift — мелко); отпустил — один undo. Над фейдером при начатом SLIDER — пан (ниже)
+    local three = gfx.mouse_cap & 52 == 52
+    if three and not ctx.sl and not ctx.cm_gest then
+      local im = ctx.im
+      if not im then
+        local cell = hover.cell
+        if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
+        local it = cell and cell.item
+        if it and reaper.ValidatePtr(it, 'MediaItem*') then
+          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          im = { item = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, row0 = math.floor(model.row_of_time(pos, state.lpb) + 0.5), vol0 = reaper.GetMediaItemInfo_Value(it, 'D_VOL'), name = cell.name or 'item' }
+        else im = { none = true } end
+        ctx.im = im
+      end
+      if im.none then state.status = '-- ITEMS -- (experimental) hold Ctrl+Opt+Cmd over an item in the tracker: sideways - move by rows, up / down - its volume'
+      elseif reaper.ValidatePtr(im.item, 'MediaItem*') then
+        local fine = gfx.mouse_cap & 8 == 8
+        local dr = math.floor((gfx.mouse_x - im.x0) / (fine and (L.cw * 4) or (L.cw * 1.5)) + 0.5)
+        local ddb = (im.y0 - gfx.mouse_y) * (fine and 0.05 or 0.25)
+        local db0 = im.vol0 > 0 and 20 * math.log(im.vol0, 10) or -60
+        local db = math.max(-60, math.min(12, db0 + ddb))
+        local r = math.max(0, im.row0 + dr)
+        if r ~= im.row_set then reaper.SetMediaItemInfo_Value(im.item, 'D_POSITION', edit.row_time(r, state.lpb, 0)); im.row_set = r; im.moved = true end
+        if math.abs(ddb) > 0.01 then reaper.SetMediaItemInfo_Value(im.item, 'D_VOL', 10 ^ (db / 20)); im.moved = true end
+        reaper.UpdateArrange()
+        state.status = ('-- ITEMS -- (experimental) %s  row %04d (%+d)  vol %+.1f dB   (sideways: rows, up / down: volume, Shift fine; let go - done)'):format(im.name, r, dr, db)
+      end
+      U.click, U.rclick = false, false
+    elseif ctx.im then
+      if ctx.im.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: move / gain item (ctrl+opt+cmd)'); model.invalidate() end
+      ctx.im = nil
+    end
     local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
     local sl_raw = gfx.mouse_cap & 52 == 36 or sl_pan
     if sl_raw then
@@ -18461,10 +18494,10 @@ local function frame()
       if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: slider'); model.invalidate() end
       ctx.sl = nil
     end
-    local gest_raw = gfx.mouse_cap & 48 == 48
+    local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS (Ctrl+Opt+Cmd) — не жест треков
     if gest_raw then ctx.cm_g0 = ctx.cm_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.cm_g0 = nil end
     local gest = gest_raw and (ctx.cm_gest ~= nil or math.abs(gfx.mouse_x - ctx.cm_g0[1]) + math.abs(gfx.mouse_y - ctx.cm_g0[2]) > 6)
-    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw
+    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw and not ctx.im   -- 16 окт: ITEMS — без Ctrl-мыши
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}
