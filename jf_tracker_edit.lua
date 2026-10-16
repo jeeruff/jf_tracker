@@ -287,6 +287,7 @@ local function run(desc, fn)
   end
   -- 13 окт: луп удержания — хвосты нот за головами (после всех правок, в том же undo)
   if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
+  if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
@@ -1912,6 +1913,23 @@ function E.ghost_prepare(track, lane_idx, t0)
       R.DeleteTrackMediaItem(track, e.it)
     end
   end
+end
+
+-- 16 окт: ghost-слайсы, чья голова (P_EXT:jf_ghost = GUID головы) больше не существует, — долой. Любое удаление
+-- (dE, d, x, dr…) через run чистит хвост без отдельной логики в каждом операторе.
+function E.ghost_orphans()
+  local ghosts, guids = {}, {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, ii)
+      local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ghost', '', false)
+      local _, og = R.GetSetMediaItemInfo_String(it, 'GUID', '', false)
+      guids[og] = true
+      if g ~= '' then ghosts[#ghosts + 1] = { tr = tr, it = it, g = g } end
+    end
+  end
+  for _, e in ipairs(ghosts) do if not guids[e.g] then R.DeleteTrackMediaItem(e.tr, e.it) end end
 end
 
 -- 15 окт: playthru + квантование слайсов (q row / 2 / beat / bar, E.ghost_q строк, ставит main): нота — ОДНА,
