@@ -525,7 +525,8 @@ function PN.pin_mixer(model)
   local lf, par, ix = PN.find(model, 'mixer')
   if not lf then return false end
   local tl = PN.find(model, 'tracker')
-  if #lf.panes == 1 and par and par.ax == 'v' and ix and ix > 1 and par.kids[ix - 1] == tl and #tl.panes == 1 then return false end
+  -- 16 окт: и вкладкой в стеке (с dsp и т.п.), если этот стек — прямо под трекером: колонки те же
+  if par and par.ax == 'v' and ix and ix > 1 and par.kids[ix - 1] == tl and #tl.panes == 1 then return false end
   detach(model, 'mixer')
   insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
   return bump(model)

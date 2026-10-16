@@ -540,6 +540,8 @@ function D.layout(snap, state, nregions)
   -- громкости и панорамы (2) полоса микшера: фейдер шириной в лейн, справа
   -- (один лейн — под ним) эффекты с параметрами
   L.mixer = state.mixer and true or false
+  -- 16 окт: микшер вкладкой в стеке (с dsp) и вкладка не активна — микшера нет (шапки — как без него)
+  do local pl = D.pn_lay; if L.mixer and pl and pl.by_panel and pl.by_panel.mixer and not pl.rects.mixer then L.mixer = false end end
   -- 8 окт: микшер — над трекером (в шапке) или под ним (кнопки v ^ в уголке)
   L.mix_bottom = L.mixer and state.mixpos == 'bottom' or false
   L.mix_rows = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 0
@@ -684,7 +686,7 @@ function D.layout(snap, state, nregions)
     L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
     -- 11 окт: модуль mixer — полоски рисуются в его листе (по колонкам трекера), в теле трекера места не берут
     local mxl = L.mix_bottom and lay.by_panel.mixer
-    local mxr = mxl and mxl.content
+    local mxr = mxl and lay.rects.mixer   -- 16 окт: только активная вкладка (в стеке с dsp)
     if mxr then L.low_h = L.low_h - L.mix_h; L.mix_h = 0 end
     L.body_h = math.max(0, bot - L.body_y - L.status_in - L.low_h - (L.tppos == 'bottom' and L.tp_h or 0))
     L.mix_y = L.body_y + L.body_h
