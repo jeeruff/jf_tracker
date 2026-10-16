@@ -11052,7 +11052,7 @@ ctx = {
   -- \ o (4 окт): опции гидрой — буква у каждой (первая свободная буква подписи,
   -- тема — t); переключатель — сразу, выбор — список значений, число — + / -
   options_hydra = function()
-    local used, items = { ['?'] = true }, {}
+    local used, items = { ['?'] = true, o = true }, {}   -- 16 окт: \ o o — окно options (o занята заранее)
     local FIXED = { theme = 't', wavemode = 'w', curline = 'c', hdrfill = 'h', tlruler = 'r', fps = 'f',
                     toppos = 'p', ctrlpos = 'm', itemframe = 'i', itemalpha = 'a', curlead = 'l',
                     wave_os = 'd', fontscale = 'b' }
@@ -11092,7 +11092,7 @@ ctx = {
         end
       end
     end
-    items[#items + 1] = { key = 'O', label = 'options window …', fn = function() ctx.options() end }
+    items[#items + 1] = { key = 'o', label = 'options window …', fn = function() ctx.options() end }
     return { title = 'options', items = items }
   end,
   -- about (3 окт): ячейка в главном модуле, :about; логотип каждый раз другой
@@ -21492,10 +21492,10 @@ local function frame()
       -- ctrl пишем, только если Ctrl зажат (или Cmd не зажат)
       if c_raw >= 1 and c_raw <= 26 then nm = ((m.cmd and not m.ctrl) and '' or 'ctrl+') .. string.char(c_raw + 96)
       elseif c_raw < 127 then nm = string.char(c_raw)
-      elseif c_raw >= 26161 and c_raw <= 26169 then nm = 'f' .. (c_raw - 26160)
+      elseif keys.name(c_raw) then nm = keys.name(c_raw)   -- 16 окт: F1..F12 (F10..F12 — 6697264+, было «#6697265.0»)
       elseif c_raw >= 0x75000000 and c_raw < 0x75110000 then nm = utf8.char(c_raw - 0x75000000)   -- кириллица и Option-символы: префикс 'u' (5 окт)
       elseif c_raw < 0x110000 and utf8 then nm = utf8.char(c_raw)
-      else nm = '#' .. c_raw end
+      else nm = ('#%d'):format(math.floor(c_raw)) end
     end
     if m.cmd then nm = 'cmd+' .. nm end
     if m.alt and c_raw < 127 then nm = 'alt+' .. nm end

@@ -352,11 +352,21 @@ local function env_has(f, r)
   return false
 end
 
+-- 16 окт: лейн (cmd / visor мастера, CC / PC …) — события в f.ml.ev[row]: w b e W B видят и их
+local function ml_next(f, row, dir)
+  local best
+  for r in pairs(f.ml.ev or {}) do
+    if (dir > 0 and r > row or dir < 0 and r < row) and (not best or (dir > 0 and r < best) or (dir < 0 and r > best)) then best = r end
+  end
+  return best
+end
+
 local function next_head(fi, row, dir, any_sub)
   local F = flat()
   local f = F[fi]
   if not f then return nil end
   if f.env then return env_next(f, row, dir) end
+  if f.ml then return ml_next(f, row, dir) end
   local subs = subs_of(f)
   if any_sub then
     subs = {}
@@ -393,6 +403,8 @@ local function next_any(fi, row, dir)
       local f = F[i]
       if f and f.env then
         if env_has(f, r) then return i, r end
+      elseif f and f.ml then
+        if (f.ml.ev or {})[r] then return i, r end
       elseif f then
         for _, sub in ipairs(subs_of(f)) do if is_head(sub[r]) then return i, r end end
       end
@@ -420,7 +432,8 @@ local function empty_start(f, r)
 end
 local function track_event(f, r, strict)
   if f.env then return (not strict) and env_has(f, r) end
-  if f.ml or f.folded then return false end
+  if f.ml then return (not strict) and (f.ml.ev or {})[r] ~= nil end   -- 16 окт: события лейна (маркеры cmd, visor, CC) — для w b
+  if f.folded then return false end
   for _, sub in ipairs(subs_of(f)) do if is_event(sub[r], strict) then return true end end
   return empty_start(f, r)
 end
@@ -429,6 +442,7 @@ local function next_ev(fi, row, dir)
   local f = flat()[fi]
   if not f then return nil end
   if f.env then return env_next(f, row, dir) end
+  if f.ml then return ml_next(f, row, dir) end
   local last = ctx.snap().last_row or 0
   local r = row + dir
   while r >= 0 and r <= last + 1 do
@@ -463,6 +477,7 @@ local function event_end(fi, row)
   local f = flat()[fi]
   if not f then return row end
   if f.env then return env_next(f, row, 1) or row end    -- огибающая: конец «события» — следующая точка
+  if f.ml then return ml_next(f, row, 1) or row end      -- 16 окт: лейн — следующее событие
   for _, sub in ipairs(subs_of(f)) do
     local h = head_of(sub[row])
     if h then return h.row0 + (h.rows or 1) end

@@ -883,6 +883,14 @@ V.cmdline = 'mcmd hello world'; V.key(13); eq(':mcmd sets the row text', last(),
 V.cur = { fi = cfi, row = 2, field = 1 }
 keysin('x'); eq('cmd: x deletes the row command', last(), 'mcmd:2:')
 local ncalls = #calls; keysin('j'); eq('cmd: j still moves', V.cur.row, 3); eq('cmd: j writes nothing', #calls, ncalls)
+-- 16 окт: w b e — по событиям лейна (маркеры): со строки 0 w — на маркер 2, ещё w — дальше некуда, b — назад
+L.flat[cfi].ml.ev[9] = { text = 'm next', n = 1 }
+V.cur = { fi = cfi, row = 0, field = 1 }
+keysin('w'); eq('cmd: w -> the next marker', V.cur.row, 2)
+keysin('w'); eq('cmd: w -> the marker after it', V.cur.row, 9)
+keysin('b'); eq('cmd: b -> back', V.cur.row, 2)
+V.cur = { fi = cfi, row = 0, field = 1 }; keysin('e'); eq('cmd: e -> the next marker', V.cur.row, 2)
+L.flat[cfi].ml.ev[9] = nil
 -- вставка ноты обрывается следующим событием подколонки (E.cap_row на время вставки)
 reset()
 local CAP
