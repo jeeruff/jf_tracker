@@ -17901,7 +17901,10 @@ local function frame()
     -- на полосы, вверх-вниз выбор, вбок значение; вертикальные (фейдеры микшера) — ширина на столбцы,
     -- вбок выбор, вверх-вниз значение; XY-пэд — обе оси сразу. Значение — относительно, после заметного
     -- движения по своей оси (> 10 px); Shift мелко; отпустил — один undo
-    local sl_raw = gfx.mouse_cap & 52 == 36
+    -- 16 окт: + Option к уже держимому Ctrl+Cmd — пан выбранного канала (вбок); не путать с жестом
+    -- треков Ctrl+Option (+ Cmd — пан-пэд): тот начинается с Option, этот — с Cmd
+    local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
+    local sl_raw = gfx.mouse_cap & 52 == 36 or sl_pan
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local SG = ctx.sl
@@ -17914,13 +17917,26 @@ local function frame()
         end
         SG = { none = true }
         if best then
-          -- до 8 зон: банк из 8 подряд, в котором ближайший (как поле control surface в Ableton)
-          local all, bi = {}, 1
-          for _, r in ipairs(draw.slr) do if r.g == best.g then all[#all + 1] = r; if r == best then bi = #all end end end
-          local b0 = ((bi - 1) // 8) * 8
-          local list = {}
-          for i = b0 + 1, math.min(#all, b0 + 8) do list[#list + 1] = all[i] end
-          SG = { list = list, x0 = gfx.mouse_x, y0 = gfx.mouse_y, ori = best.xy and 'xy' or (best.ori or 'h'), dsp = best.dsp }
+          -- 16 окт: до 8 БЛИЖАЙШИХ к мыши той же ориентации — из любых групп (DSP, шапки, фейдеры
+          -- микшера), по оси выбора по порядку; первым выбран ближайший, выбор — от точки нажатия
+          local ori = best.xy and 'xy' or (best.ori or 'h')
+          local list = { best }
+          if ori ~= 'xy' then
+            local cand = {}
+            for _, r in ipairs(draw.slr) do
+              if r ~= best and not r.xy and (r.ori or 'h') == ori then
+                local cx, cy = r.x + r.w / 2, r.y + r.h / 2
+                cand[#cand + 1] = { r = r, d = (cx - gfx.mouse_x) ^ 2 + (cy - gfx.mouse_y) ^ 2 }
+              end
+            end
+            table.sort(cand, function(a, b) return a.d < b.d end)
+            for i = 1, math.min(7, #cand) do list[#list + 1] = cand[i].r end
+            if ori == 'v' then table.sort(list, function(a, b) return a.x < b.x end)
+            else table.sort(list, function(a, b) if a.y ~= b.y then return a.y < b.y end; return a.x < b.x end) end
+          end
+          local k0 = 1
+          for i, r in ipairs(list) do if r == best then k0 = i end end
+          SG = { list = list, x0 = gfx.mouse_x, y0 = gfx.mouse_y, ori = ori, dsp = best.dsp, k0 = k0, px0 = gfx.mouse_x, py0 = gfx.mouse_y }
         end
         ctx.sl = SG
       end
@@ -17948,14 +17964,22 @@ local function frame()
       if not SG.none then
         local n = #SG.list
         local vert = SG.ori == 'v'
-        local k = 1
-        if SG.ori ~= 'xy' then
-          local pos, span = vert and gfx.mouse_x or gfx.mouse_y, vert and gfx.w or gfx.h
-          k = math.max(1, math.min(n, math.floor(pos / math.max(1, span) * n) + 1))
+        local k = SG.sel or SG.k0 or 1
+        if SG.ori ~= 'xy' and not sl_pan then
+          -- от точки нажатия: шаг выбора — доля окна на слайдер (весь трекпад — все n), старт — ближайший
+          local pos, pos0, span = vert and gfx.mouse_x or gfx.mouse_y, vert and SG.px0 or SG.py0, vert and gfx.w or gfx.h
+          local stepx = math.max(L.rh * 2, span / math.max(1, n) / 2)
+          k = math.max(1, math.min(n, (SG.k0 or 1) + math.floor((pos - pos0) / stepx + 0.5)))
         end
         if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
         local cur = SG.list[k]
         local ts = tgts(cur)
+        -- 16 окт: Ctrl+Cmd+Option на фейдере — пан его канала, вбок (значение сразу, без порога)
+        if sl_pan and cur.trk and ts[1] and ts[1].kind == 'trk' then
+          ts = { trk(tcol(cur), 'pan') }
+          if not SG.pan then SG.pan, SG.x0, SG.y0 = true, gfx.mouse_x, gfx.mouse_y end
+          SG.live = true
+        elseif SG.pan then SG.pan = nil; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
         if not SG.live then
           local ax, ay = math.abs(gfx.mouse_x - SG.ax), math.abs(gfx.mouse_y - SG.ay)
           local along, across = vert and ay or ax, vert and ax or ay      -- по оси значения / по оси выбора
@@ -17967,7 +17991,7 @@ local function frame()
           local dx, dy = gfx.mouse_x - SG.x0, SG.y0 - gfx.mouse_y        -- вверх — больше
           SG.x0, SG.y0 = gfx.mouse_x, gfx.mouse_y
           if SG.ori == 'xy' then if dx ~= 0 and ts[1] then nudge(ts[1], dx) end; if dy ~= 0 and ts[2] then nudge(ts[2], dy) end
-          elseif vert then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end
+          elseif vert and not SG.pan then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end   -- 16 окт: пан — вбок и у фейдеров
           elseif dx ~= 0 and ts[1] then nudge(ts[1], dx) end
         end
         -- рамка группы на месте и выбранный слайдер
@@ -18020,8 +18044,18 @@ local function frame()
               end
             end
           end
-          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s: slider, %s: value, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n,
-            ts[1] and ctx.cm_io.show(ts[1]) or '', vert and 'sideways' or 'up / down', vert and 'up / down' or 'sideways')
+          -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
+          local desc = ('%s  %s'):format(cur.name or '?', ts[1] and ctx.cm_io.show(ts[1]) or '')
+          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Option: pan' or ''))
+          local dy0 = vert and (my0 - 2 * L.rh - 2) or (gfx.h - 2 * L.rh - 2)
+          local dw = vert and mapw or math.max(mapw, math.min(gfx.w, U.measure(desc) + 2 * L.pad))
+          local dx0 = gfx.w - dw
+          U.set(U.BG, 0.94); gfx.rect(dx0, dy0, dw, 2 * L.rh + 2, 1)
+          U.set(U.AMBER); gfx.rect(dx0, dy0, dw, 1, 1)
+          U.text(dx0 + L.pad, dy0 + 1, ctx.fit(desc, dw - 2 * L.pad), U.AMBER)
+          U.text(dx0 + L.pad, dy0 + 1 + L.rh, ctx.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
+          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n,
+            ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
       else
         state.status = '-- SLIDER --  no sliders on the screen'
@@ -20462,9 +20496,11 @@ local function frame()
   local fnote
   do
     local m = ctx.mods()
+    -- 16 окт: клавиатура включена — F-хоткеи молчат в любом модуле (нотой — только в трекере / сэмплере)
     if keys.layout == 'frow' and c > 255 and keys.piano[c] and not (m.cmd or m.alt or m.ctrl) and not vim.picker and not vim.hydra
-       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
-       and (state.piano_show or vim.mode == 'insert') then fnote = c; c = 0 end
+       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.piano_show or vim.mode == 'insert') then
+      fnote = (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample')) and c or false; c = 0
+    end
   end
   -- 10 окт: транспозиция как в Renoise — F1 / F2 полутон, F11 / F12 октава; Opt — выделение,
   -- Shift+Ctrl — колонка, Shift — трек, Ctrl — паттерн (без модификатора F1 / F2 / F11 / F12 — как было)
