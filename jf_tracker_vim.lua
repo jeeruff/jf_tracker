@@ -2658,7 +2658,7 @@ function V.key_impl(c)
   elseif ch == 'x' and (flat()[V.cur.fi] or {}).ml then
     for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
   elseif ch == 'x' and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 and V.empty_midi_at(V.cur.fi, V.cur.row) and ctx.delete_item then
-    ctx.delete_item(V.empty_midi_at(V.cur.fi, V.cur.row)); V.msg = 'empty MIDI clip deleted'; finish_edit()   -- 13 окт: «#» — пустой клип
+    ctx.delete_item(V.empty_midi_at(V.cur.fi, V.cur.row)); V.msg = 'empty MIDI clip deleted'; finish_edit()   -- 13 окт: «#» — пустой клип (16 окт: знак µ)
   elseif ch == 'x' and ctx.ripple_mode and ctx.ripple_mode() > 0 and ctx.time_edit and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) > 0 then
     -- 16 окт: ripple (кнопка rip, как в REAPER) — нота уходит вместе со своими строками: всё ниже подтягивается
     -- (per track — этот трек, all tracks — все); без ripple — как было
