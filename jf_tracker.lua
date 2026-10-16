@@ -15602,14 +15602,16 @@ local function frame()
       -- (6 окт) — клавиатура не прячется, тоже блёклая
       local active = state.piano_show and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
       local held = {}
-      if active and reaper.JS_VKeys_GetState then
+      -- 15 окт: клавиши играют ноты (INSERT или слой пианино) — нажатая подсвечивает клавиатуру: краем глаза видно, что идут ноты, не команды
+      local notemode = (vim.mode == 'insert' or vim.piano) and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
+      if (active or notemode) and reaper.JS_VKeys_GetState then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
         for code, off in pairs(keys.piano) do
           local vk = string.char(code):upper():byte()
           if ks and ks:byte(vk) ~= 0 then held[off] = true end
         end
       end
-      return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active and true or false }
+      return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active and true or false, glow = notemode and next(held) ~= nil }
     end)(),
     zone_draw = function(Lx, x, y, w, h) return OPT.tour.draw_zone(U, Lx, x, y, w, h, ctx.fit) end,
     input_name = function(col) return (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) and ctx.input_name(col.track) or '' end,

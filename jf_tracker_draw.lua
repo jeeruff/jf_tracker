@@ -3723,6 +3723,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           out.letters = out.letters + 1
         end
       end
+      -- 15 окт: нота играет — клавиатура вспыхивает (рамка и лёгкая заливка янтарём)
+      if p.glow then
+        local gw = #D.PIANO_WHITE * kw
+        set(U.AMBER, 0.12); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 1); gfx.a = 1
+        set(U.AMBER); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 0)
+      end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
       D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e', 'notes' }, { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' } }) or { { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' }, { 'm', 'keys' } } }
     end
