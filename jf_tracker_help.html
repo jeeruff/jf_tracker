@@ -74,7 +74,7 @@
 <p class="sub">a tracker shell over the REAPER project, with Vim keys</p>
 <div class="nav">
   <a href="#signs">signs</a> <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
-  <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
+  <a href="#keyboard">keyboard</a> <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
   <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#values">values by hand</a> <a href="#transport">transport</a> <a href="#ripple">ripple</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
@@ -200,13 +200,35 @@ Options → <code>panes</code> off brings the old fixed layout back.</p>
 <p>With the keyboard on (<kbd>m</kbd>) the top row and the digits play notes and <kbd>z</kbd> <kbd>x</kbd> change the octave; the rest of the keys stay Vim. A count goes before any motion or edit: <kbd>3j</kbd>, <kbd>d2w</kbd>, <kbd>5@a</kbd>. A Russian layout works by key
 position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd> the status line lists what can follow.</p>
 
+<h2 id="keyboard">Keyboard</h2>
+<div class="rows"> <span class="a">f1 f2    f4 f5 f6    f8 f9    f11</span>      <span class="g">black keys: C# D#  F# G# A#  C# D#  F#</span>
+<span class="a">1  2  3  4  5  6  7  8  9  0  -  =</span>    <span class="g">white keys: C D E F G A B C D E F G</span>
+ <span class="a">`</span>                                    <span class="g">NORMAL: the whole sample · INSERT: note-off</span>
+ <span class="a">[ ]</span> octave   <span class="a">{ }</span> velocity              <span class="g">the letters stay commands</span></div>
+<p>The notes live on the digit row and the function row above it. Physically it is a small piano: the digits are the
+white keys, and each F key sits over the gap between two digits, where a black key would be. There is no black key
+between E and F or B and C, so <kbd>F3</kbd>, <kbd>F7</kbd> and <kbd>F10</kbd> play nothing. That is an octave and a
+half under one hand; <kbd>[</kbd> <kbd>]</kbd> move the octave, <kbd>{</kbd> <kbd>}</kbd> the velocity.</p>
+<p>Why this way, and not the usual <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> row of trackers: here the letters
+are Vim. <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd>, <kbd>d</kbd>, <kbd>y</kbd>, <kbd>p</kbd>, <kbd>w</kbd>,
+<kbd>b</kbd>, <kbd>e</kbd> are moves and edits, and a note on any of them hides a command. On the digits and the F row
+the keyboard takes nothing from Vim: with the keyboard on you play and still move, cut and paste with the same hand
+position. While the keyboard plays (shown with <kbd>m</kbd>, or INSERT) the F-key shortcuts are off in every module, so
+a note never opens a panel. Counts like <kbd>3j</kbd> work again when the keyboard is hidden.</p>
+<table>
+<tr><td><kbd>Shift</kbd>+note</td><td>listen only, nothing is written (all white and black keys)</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Option</kbd>+note</td><td>the selected slice at that pitch</td></tr>
+<tr><td><kbd>`</kbd></td><td>NORMAL with the keyboard: the whole sample of the instrument; in INSERT it stays note-off</td></tr>
+<tr><td>layout qwerty</td><td>options → keyboard layout: the old row <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> <kbd>e</kbd>, octave <kbd>z</kbd> <kbd>x</kbd>, velocity <kbd>c</kbd> <kbd>C</kbd></td></tr>
+</table>
+
 <h2 id="insert">INSERT</h2>
 <figure>
   <img src="help/insert.png" alt="INSERT mode with the keyboard strip">
   <figcaption>INSERT: the red frame and the keyboard strip under the tracker.</figcaption>
 </figure>
 <div class="rows"> <span class="a">2 3   5 6 7   9 0</span>          <span class="g">black keys</span>
-<span class="a">q w e r t y u i o p</span>        <span class="g">notes: q = C of the octave, like Ableton</span>
+<span class="a">q w e r t y u i o p</span>        <span class="g">layout qwerty: q = C of the octave, like Ableton (default frow - see Keyboard)</span>
  a s d f g h j k l ;        <span class="g">a step auto · s select (⌥s :step) · d delete · f fx fields · g start · hjkl move · ; whole sample</span>
 z x c   b n M , .          <span class="g">z x octave · c C velocity · b n bar · M mute · , . sound</span></div>
 <table>

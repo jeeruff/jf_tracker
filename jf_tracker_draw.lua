@@ -3944,7 +3944,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 15 окт: кнопки узкие (символы) — колонка не уже третьей строки: маркеры (10 на 2 колонки), rate, punch pre lib slow на 3
     if c.tpfull then
       local rec = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad   -- 16 окт: + ripple
-      tbw = math.max(tbw, math.ceil(10 * (ms('0') + 2) / 2), ms('x1.10') + 2 * L.pad, math.ceil((rec - 4) / 3))
+      -- 16 окт: маркеры — одна кнопка markers (выпадашка с номерами), запись — на 4 колонки: кнопки уже
+      tbw = math.max(tbw, ms('mk') + 2 * L.pad, ms('x1.10') + 2 * L.pad, math.ceil((rec - 6) / 4))
     end
     btot = #blist * (tbw + 2) - 2
   end
@@ -4036,14 +4037,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         text(x0 + math.floor((w0 - ms(lab)) / 2), ry, lab, hot and U.AMBER or (on and U.CYAN or (dimc and U.DIM or U.GREY)))
         hint('ctrl', x0, ry, w0, L.rh, id)
       end
-      -- маркеры: десять ячеек на две колонки
-      local mw = (2 * tbw + 2) / 10
-      for k = 1, 10 do
-        local x0 = math.floor(colx(1) + (k - 1) * mw)
-        cellb('mk' .. k, tostring(k % 10), x0, math.floor(mw), false, not (c.marks and c.marks[k]))
-      end
-      -- rate: значение и слайдер в колонке play
-      local rx0 = colx(3)
+      -- 16 окт: маркеры — кнопка markers (не влезло — mk), щелчок — выпадашка 1..0
+      local any = false
+      for k = 1, 10 do if c.marks and c.marks[k] then any = true end end
+      cellb('markers', fit(ms('markers') + 2 <= tbw and 'markers' or 'mk', tbw), colx(1), tbw, false, not any)
+      -- rate: значение и слайдер — вторая колонка
+      local rx0 = colx(2)
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
       local rhot = cell_hot(rx0, ry, tbw, L.rh)
@@ -4059,7 +4058,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       hint('ctrl', rx0, ry, tbw, L.rh, 'ratebar')
       D.strip_cell.ratebar = { sx2, ry, sw2 }
       -- запись: от колонки rec до конца кнопок
-      local ax, a1 = colx(4), bx0 + btot
+      local ax, a1 = colx(3), bx0 + btot
       local full = { { 'punch', 'punch', c.punch }, { 'preroll', 'pre-roll', c.preroll }, { 'reclib', 'rec>lib', c.reclib }, { 'slow', c.slowrate and 'slow*' or 'slow', c.slowrec or c.slowrate },
                      { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
       local tot = 0
@@ -5256,6 +5255,8 @@ function D.frame(L, snap, rows, state, info)
       if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my, L) end   -- 11 окт: + мини-кноб панорамы
     elseif not c.master then
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
+    else
+      text(c.x + L.pad, hy + 1, fit('master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     -- 9 окт: полосы отступа вложенного трека нет (лишний серый разделитель) — вложенность видна по отступу имени
@@ -5405,15 +5406,16 @@ function D.frame(L, snap, rows, state, info)
             local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)
             set(cc)
             local x0, y0, x1, y1
+            -- 16 окт: внутри рамки — отступ 2 px с каждой стороны с учётом толщины (3 px)
             if vert then
               local yy = ry + 2 + (i - 1) * seg
-              x0, y0, x1, y1 = rx + 3, yy + seg - 2, rx + rw - 4, yy + 1
+              x0, y0, x1, y1 = rx + 3, yy + seg - 2, rx + rw - 6, yy + 2
             else
               local xx = rx + 2 + (i - 1) * seg
-              local sl = math.max(2, math.floor(seg * 0.45))
+              local sl = math.max(2, math.min(seg - 4, math.floor(seg * 0.45)))
               x0, y0, x1, y1 = xx + 1, ry + rhh - 3, xx + 1 + sl, ry + 2
             end
-            for t = 0, 2 do gfx.line(x0 + t, y0, x1 + t, y1) end
+            if x1 > x0 then for t = 0, 2 do gfx.line(x0 + t, y0, x1 + t, y1) end end
           end
           if hot then hover.btn = { col = col, what = 'route' } end
           hint('btn', rx, ry, rw, rhh + 2, { col = col, what = 'route' })

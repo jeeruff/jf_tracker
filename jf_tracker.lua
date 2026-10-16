@@ -15391,6 +15391,20 @@ function ctrl_action(name, delta)
   elseif name == 'ratebar' then
     if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
+  elseif name == 'markers' then   -- 16 окт: маркеры 1..0 — выпадашкой (была строка цифр под кнопками)
+    local items = {}
+    local _, nm, nr = reaper.CountProjectMarkers(0)
+    local names = {}
+    for k = 0, nm + nr - 1 do
+      local ok, isr, pos, _, mname, idx = reaper.EnumProjectMarkers3(0, k)
+      if ok and ok > 0 and not isr and idx >= 1 and idx <= 10 then names[idx] = { mname ~= '' and mname or ('marker ' .. idx), pos } end
+    end
+    for k = 1, 10 do
+      local m = names[k]
+      items[#items + 1] = { key = tostring(k % 10), label = m and ('%s  (%s)'):format(m[1], reaper.format_timestr_pos(m[2], '', 2)) or '- (no marker)', fn = function() if m then ctrl_action('mk' .. k, 0) end end }
+    end
+    vim.open_hydra({ title = 'go to marker', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   elseif name:match('^mk%d+$') then   -- 15 окт: строка маркеров под rew — прыжок к маркеру N
     local n = tonumber(name:sub(3))
     if reaper.GoToMarker then reaper.GoToMarker(0, n, false) end
