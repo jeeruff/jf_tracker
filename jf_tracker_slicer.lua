@@ -1081,6 +1081,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local ZH = 0
   -- 12 окт: прицел (зум края) — раньше полосы-обзора: при зуме обзор отнимал высоту, и прицел пропадал
   if zt and wh > 9 * rh then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end   -- волна пополам: сверху целиком, снизу край
+  -- 16 окт: вкладка item внизу экрана (опция zoom on top, по умолчанию вкл) — прицел НАД полной волной
+  local ztop = ZH > 0 and S.zoom_top
+  local zy_top = ztop and wy or nil
+  if ztop then wy = wy + ZH + 2 end
   if SBH > 8 and wh - SBH - 2 < 3 * rh then SBH = 8 end   -- места мало — обзор тонкой полосой, прицел остаётся
   if SBH > 0 then wh = wh - SBH - 2 end
   if wh < 6 then return end
@@ -1501,7 +1505,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   trail_rect(va, vb, x, w, wy, wh)
   if ZH > 0 then
-    local zy = wy + wh + 2
+    local zy = zy_top or (wy + wh + 2)
     local W2 = S.zwin or 0.04
     local t0 = zt - W2                     -- край — по центру окна
     U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
@@ -1709,7 +1713,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   -- полоска-обзор (10 окт): весь item, рамка — что видно сейчас; тянуть / щёлкнуть — прокрутка
   if SBH > 0 or (sbrect and zoomed0) then
-    local sy = wy + wh + (ZH > 0 and (ZH + 3) or 1)
+    local sy = wy + wh + ((ZH > 0 and not ztop) and (ZH + 3) or 1)
     local x, w, SBH = x, w, SBH
     if sbrect then x, w, sy, SBH = sbrect.x, sbrect.w, sbrect.y, rh end
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
@@ -1757,6 +1761,15 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     -- 16 окт: и действия прицела — cut (как s), smk (stretch-маркер на строку), squant (smart quantize, как Q)
     local BT = { { 'act_cut', 'cut', act = true }, { 'act_smk', 'smk', act = true }, { 'act_sq', 'squant', act = true },
                  { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
+    -- 16 окт: что делает каждая — в строку подсказки модуля и в статус окна (ctx.status_from_slicer)
+    S.CUT_DESC = S.CUT_DESC or {
+      act_cut = 'cut (s): cut the note under the cursor at the aimed point - the sound after it becomes the next note',
+      act_smk = 'smk (S): a stretch marker at the aimed point, snapped to the row start - the hit lands on the grid',
+      act_sq = 'squant (Q): smart quantize - the hits of the sample move to the nearest rows with stretch markers, the sound stays whole',
+      cut0x = '0-cross: cuts and markers move to the nearest zero crossing - no click at the edge',
+      cutsnap = 't-snap: the aimed point snaps to the nearest transient of the sample',
+      cutquant = 'quant (with t-snap): the snapped transient also goes to the nearest row of the grid (with swing)',
+    }
     local bx = x + w
     S.cut_hot = nil
     for k = #BT, 1, -1 do
@@ -1766,7 +1779,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local on = not b.act and st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
       local col = b[3] or U.AMBER
       local hot2 = mx2 >= bx and mx2 < bx + bw2 and my2 >= fy and my2 < fy + rh
-      if hot2 then S.cut_hot = b[1] end
+      if hot2 then S.cut_hot = b[1]; foot = S.CUT_DESC[b[1]] or foot end
       U.set(on and U.tint(col, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx, fy, bw2, rh - 1, 1)
       U.set(on and col or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx, fy, bw2, rh - 1, 0)
       U.text(bx + L.pad, fy, b[2], on and col or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))

@@ -321,6 +321,8 @@ local state = {
   libtab = 'audio',
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
+  snappanes = reaper.GetExtState(EXT, 'snappanes') ~= '0',
+  zoomtop = reaper.GetExtState(EXT, 'zoomtop') ~= '0',   -- 16 окт: item внизу — прицел над волной   -- 16 окт: линии пейнов прилипают друг к другу
   drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),
   drumalgo = tonumber(reaper.GetExtState(EXT, 'drumalgo')) or -1,   -- 16 окт: алгоритм запекания str   -- 16 окт: drumrs5k — подпись ячеек
   sliceaudition = reaper.GetExtState(EXT, 'sliceaud2') ~= '0',   -- 10 окт: по умолчанию вкл (новый ключ — старое «0» от прежнего умолчания не держит)   -- 10 окт: auto play в зуме края   -- 10 окт: слайсер, кнопка follow   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
@@ -10824,6 +10826,8 @@ ctx = {
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
+      { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
+      { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
       { key = 'armsel', label = 'rec follows selection', kind = 'toggle', desc = 'record arm follows the selected tracks: REAPER auto record-arm (track menu: Automatic record-arm when track selected) on every track, new ones too; off - removed from all tracks', get = function() return state.armsel end, set = function(v) state.armsel = v; ctx.armsel_apply(v) end },
@@ -10937,7 +10941,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'snappanes', 'zoomtop', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'sroslash', 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -15906,7 +15910,13 @@ local function process_queue(playpos)
 end
 
 local function frame()
-  if ctx.ut_poll then pcall(ctx.ut_poll) end      -- 15 окт: дерево undo следит за историей REAPER и при скрытой панели
+  if ctx.ut_poll then pcall(ctx.ut_poll) end
+  -- 16 окт: опция zoom on top — вкладка item ниже трекера: прицел (зум края) над полной волной
+  do
+    local cs = L and L.pn and L.pn.by_panel and L.pn.by_panel['sample']
+    local ct = L and L.pn and L.pn.by_panel and L.pn.by_panel['tracker']
+    SL.zoom_top = state.zoomtop ~= false and cs and ct and cs.y > ct.y or false
+  end      -- 15 окт: дерево undo следит за историей REAPER и при скрытой панели
   -- 11 окт: микшер снизу = модуль mixer. Панель спрятали (Ctrl+W c, пресет) — микшер выкл;
   -- микшер включили (zm, опции) — панель снова под трекером. Иначе трекер рисовал
   -- полоски у себя внутри, без модуля
@@ -17759,6 +17769,7 @@ local function frame()
   elseif hover.ctrl == 'hdr' then state.status = 'track header colour - click / wheel: off (no colour), line (strip under the name), header (name row filled), full (whole header, dimmer below the name)'
   elseif hover.ctrl == 'vel' then state.status = 'velocity of inserted notes: wheel +-4, click +8 (c / C in INSERT, :vel N)'
   elseif hover.ctrl == 'step' then state.status = 'edit step: wheel = rows, click = auto (cursor jumps past the end of the inserted item / slice) - :step N|auto'
+  elseif SL.cut_hot and SL.CUT_DESC and SL.CUT_DESC[SL.cut_hot] then state.status = SL.CUT_DESC[SL.cut_hot]   -- 16 окт: кнопки прицела (cut smk squant 0-cross t-snap quant)
   elseif hover.ruler then
     local names = {}
     for _, rg in ipairs(regions or {}) do if hover.ruler >= rg.r0 and hover.ruler < rg.r1 then names[#names + 1] = 'region ' .. (rg.name ~= '' and rg.name or ('#' .. rg.idx)) end end
@@ -18025,7 +18036,17 @@ local function frame()
       if gfx.mouse_cap & 1 == 1 then
         local cur = pd.g.ax == 'h' and gfx.mouse_x or gfx.mouse_y
         if cur ~= pd.last then
-          draw.panes.drag_grip(state.panes, L.pn, pd.g, cur - pd.last); pd.last = cur; relayout()
+          -- 16 окт: snap pane lines — рядом (8 px) линия другого пейна той же оси — встать ровно на неё (Shift — без)
+          local want = cur
+          local here
+          for _, g in ipairs(L.pn.grips or {}) do
+            local c0 = g.ax == 'h' and (g.x + g.w / 2) or (g.y + g.h / 2)
+            if g.node == pd.g.node and g.i == pd.g.i then here = c0
+            elseif state.snappanes ~= false and gfx.mouse_cap & 8 == 0 and g.ax == pd.g.ax and math.abs(c0 - cur) < 8 then want = c0 end
+          end
+          local delta = here and (want - here) or (cur - pd.last)
+          if math.abs(delta) >= 1 then draw.panes.drag_grip(state.panes, L.pn, pd.g, delta); relayout() end
+          pd.last = cur
         end
       else ctx.pn_drag = nil end
     elseif ctx.tab_drag then
@@ -20891,6 +20912,8 @@ local function frame()
     end
   end
   local quit = false
+  -- 16 окт: Ctrl+Cmd+F12 — перезапуск трекера из файлов (как :reload)
+  if c == 6697266 and ctx.mods().ctrl and ctx.mods().cmd then ctx.reloading = true; quit = true; c = 0 end
   -- 16 окт: frow — пока клавиатура играет (видна в трекере / сэмплере, или INSERT), F-клавиши без
   -- модификаторов — ноты: хоткеи F1..F12 пропускаются, код идёт в vim
   local fnote

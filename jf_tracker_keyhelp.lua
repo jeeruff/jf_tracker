@@ -119,6 +119,7 @@ KH.PAGES = {
     { k = 'H J K L', d = 'select: visual block from here, Shift+hjkl extends it (tracks: Option+h l)' },
     { k = 'za zM', d = 'fold track: wave + notes, envelopes as a thin line / all <-> open all (:fold, :unfold)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },
+    { k = 'Ctrl+Cmd+F12', d = 'restart the tracker from its files (as :reload) - after an update, no REAPER restart' },
     { k = 'zf', d = 'DSP: modules with pages (Surge XT) - all pages in one pane (default) / one page with vertical tabs on the right of the module' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
