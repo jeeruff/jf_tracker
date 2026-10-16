@@ -1473,6 +1473,8 @@ function V.key_impl(c)
   -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)
   if V.picker then V.picker_key(c); return end
   if V.hydra then V.hydra_key(c); return end
+  -- 15 окт: Esc при набранном счётчике (или d в лейне мастера) — только сброс набора, режим не меняется
+  if c == ESC and not V.pending and (V.count or V.mlpend) then V.count, V.mlpend = nil, nil; V.msg = ''; return end
   -- слайсер (оверлей) перехватывает всё остальное — кроме выбора инструмента /
   -- трека (10 окт: Opt+J / K из браузера молча съедал открытый слайсер):
   -- Option+hjkl, Option+цифра, Cmd+цифра идут дальше, как без слайсера

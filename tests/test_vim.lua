@@ -964,6 +964,7 @@ do
   reset(); V.search = 'a'                               -- snare (8) и hat (16)
   keysin('2n'); eq('2n: the second match below', V.cur.row, 16)
   keysin('N'); eq('N: back to the previous match', V.cur.row, 8)
+  reset(); keysin('44'); V.key(27); eq('Esc clears a typed count', V.count, nil); eq('Esc with a count stays in NORMAL', V.mode, 'normal')
   reset(); keysin('3tt'); eq('3tt: three new tracks', last(), 'newtrack:3')
   reset(); keysin('5td'); eq('5td: five tracks deleted', last(), 'tracks:delete:5')
   reset(); keysin('2tx'); eq('2tx: two tracks cut', last(), 'tracks:cut:2')

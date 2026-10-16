@@ -20273,6 +20273,8 @@ local function frame()
       if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты
       if not typing and (c == 1962934519 or (c == 47 and m0.alt)) then ctx.dsp_search(); return end     -- Option+/ (÷) — DSP
       if not typing and c == 47 and m0.cmd then ctx.file_search(); return end                           -- Cmd+/ — файлы
+      -- 15 окт: Esc в любом модуле сбрасывает недонабранное трекера (счётчик, ожидающую клавишу) — не висит тегом у курсора
+      if c == 27 and state.focus ~= 'tracker' and (vim.count or vim.pending or vim.mlpend) then vim.count, vim.pending, vim.mlpend = nil, nil, nil end
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
       if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         ctx.context_here(); return                       -- 10 окт: \ в модуле — его быстрое меню, в нём \ — главное
