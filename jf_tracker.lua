@@ -7047,14 +7047,22 @@ ctx = {
         end
       end
     end
-    local smk = {}
-    for _, m in ipairs(c.n.smk or {}) do
-      if m.p > 1e-4 and m.p < c.n.len - 1e-4 then
-        local te = A.e_time(c.n, c.e, c.n.pos + m.p)
-        if te >= t0 and te <= t1 then smk[#smk + 1] = te end
+    -- маркеры: te, индекс REAPER (по позиции), скорости отрезков слева / справа; отрезки — для линий скорости
+    local smk, segs = {}, {}
+    local M = c.n.smk or {}
+    local function rate(a, b) local d = b.p - a.p; return d > 1e-6 and (b.s - a.s) / d or 1 end
+    for i, m in ipairs(M) do
+      local te = A.e_time(c.n, c.e, c.n.pos + m.p)
+      if i < #M then
+        local tb = A.e_time(c.n, c.e, c.n.pos + M[i + 1].p)
+        if tb > t0 and te < t1 then segs[#segs + 1] = { a = math.max(t0, te), b = math.min(t1, tb), r = rate(m, M[i + 1]) } end
+      end
+      if m.p > 1e-4 and m.p < c.n.len - 1e-4 and te >= t0 and te <= t1 then
+        smk[#smk + 1] = { te = te, idx = i - 1, p = m.p, up = i > 1 and rate(M[i - 1], m) or nil, dn = i < #M and rate(m, M[i + 1]) or nil,
+          lo = i > 1 and M[i - 1].p or 0, hi = i < #M and M[i + 1].p or c.n.len }
       end
     end
-    return { rows = rows, smk = smk }
+    return { rows = rows, smk = smk, segs = segs, item = c.item, k = (c.e.rate or 1) / ((c.n.rate and c.n.rate ~= 0) and c.n.rate or 1) }
   end,
   -- 16 окт: кнопка stretch слайсера — stretch-маркеры на границах слайсов (секунды item) и на краях; старые — заменяются
   slices_to_smk = function(item, slices)

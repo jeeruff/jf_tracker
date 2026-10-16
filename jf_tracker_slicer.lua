@@ -1570,13 +1570,52 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     for k2, t2 in ipairs(zsl) do
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
     end
+    -- 16 окт: stretch-маркеры как в REAPER: линии скорости отрезков (выше центра — быстрее), ромб из половинок по скоростям
+    -- слева / справа (зелёный — быстрее, фиолетовый — медленнее); ромб тянется мышью (точно, без привязки, один undo)
     if zgrid then
-      for _, m in ipairs(zgrid.smk) do
-        local gx = x + math.floor((m - t0) / (2 * W2) * w)
-        U.set(U.mix(U.AMBER, U.BG, 0.3)); gfx.rect(gx, zy, 2, ZH, 1)
-        local hz = math.max(3, math.floor(rh / 3))
-        U.set(U.AMBER); gfx.triangle(gx - hz, zy + ZH / 2, gx + 1, zy + ZH / 2 - hz, gx + hz + 1, zy + ZH / 2, gx + 1, zy + ZH / 2 + hz)
+      local function rc(r) if not r or math.abs(r - 1) < 0.005 then return U.TEXT end; return r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)) end
+      local zc2 = zy + math.floor(ZH / 2)
+      for _, sg in ipairs(zgrid.segs) do
+        if math.abs(sg.r - 1) >= 0.005 then
+          local ya = zc2 - math.floor(math.max(-1, math.min(1, (sg.r - 1) * 2)) * (ZH / 2 - 4))
+          local xa, xb = x + math.floor((sg.a - t0) / (2 * W2) * w), x + math.floor((sg.b - t0) / (2 * W2) * w)
+          U.set(rc(sg.r)); gfx.rect(xa, ya, math.max(1, xb - xa), 1, 1)
+          if xb - xa > U.measure('0.00x') + 4 then U.text(xa + 3, zy + ZH - rh - 1, ('%.2fx'):format(sg.r), U.mix(U.TEXT, U.BG, 0.3)) end
+        end
       end
+      local mxz, myz = gfx.mouse_x, gfx.mouse_y
+      local downz = (gfx.mouse_cap & 1) == 1
+      local pressz = downz and not S.zp_prev
+      S.zp_prev = downz
+      S.zsmk_hot = nil
+      local hz = math.max(4, math.floor(rh / 2))
+      for _, m in ipairs(zgrid.smk) do
+        local gx = x + math.floor((m.te - t0) / (2 * W2) * w)
+        local hot = math.abs(mxz - gx) <= hz and myz >= zy and myz < zy + ZH
+        if hot then S.zsmk_hot = m end
+        U.set(hot and U.AMBER or U.mix(U.AMBER, U.BG, 0.3)); gfx.rect(gx, zy, hot and 2 or 1, ZH, 1)
+        U.set(rc(m.up)); gfx.triangle(gx, zc2 - hz, gx - hz, zc2, gx, zc2 + hz)
+        U.set(rc(m.dn)); gfx.triangle(gx + 1, zc2 - hz, gx + 1 + hz, zc2, gx + 1, zc2 + hz)
+        if pressz and hot and not S.zsmk_drag and ctx.edit then
+          S.zsmk_drag = { idx = m.idx, p0 = m.p, x0 = mxz, lo = m.lo, hi = m.hi, item = zgrid.item, spp = 2 * W2 / w * zgrid.k, active = false }
+        end
+      end
+      local dg = S.zsmk_drag
+      if dg then
+        local tk = R.ValidatePtr(dg.item, 'MediaItem*') and R.GetActiveTake(dg.item)
+        if downz and tk then
+          if not dg.active and math.abs(mxz - dg.x0) > 2 then dg.active = true; ctx.edit.item_drag_begin('stretch marker') end
+          if dg.active then
+            local np = math.max(dg.lo + 0.002, math.min(dg.hi - 0.002, dg.p0 + (mxz - dg.x0) * dg.spp))
+            R.SetTakeStretchMarker(tk, dg.idx, np); R.UpdateItemInProject(dg.item)
+            S.msg = ('stretch marker %+.1f ms'):format((np - dg.p0) * 1000)
+            if ctx.model and ctx.model.invalidate then ctx.model.invalidate() end
+          end
+        else
+          if dg.active then ctx.edit.note_modified(dg.item); ctx.edit.item_drag_end() end
+          S.zsmk_drag = nil
+        end
+      elseif S.zsmk_hot then S.msg = 'stretch marker - drag: move it (fine, no snap); in the tracker: drag the amber line, S / x / J K' end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
     trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)
