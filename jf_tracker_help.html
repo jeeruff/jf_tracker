@@ -134,7 +134,7 @@ dropdown of the field under the cursor: it shows what can be typed there. Type t
 <tr><td><kbd>Space</kbd></td><td>play / stop</td></tr>
 <tr><td><kbd>Tab</kbd></td><td>next module: the keyboard goes there (a light frame shows where)</td></tr>
 <tr><td><kbd>F2</kbd> … <kbd>F6</kbd></td><td><kbd>F2</kbd> tracker ↔ item tab (from any tab — back to the tracker), <kbd>F3</kbd> the bottom pane (dsp / mixer) and on through its tabs, <kbd>F4</kbd> the top pane through its tabs, <kbd>F5</kbd> scopes, <kbd>F6</kbd> master; the same key again — back to the tracker</td></tr>
-<tr><td><kbd>`</kbd> &nbsp; <kbd>\</kbd></td><td>the main menu of everything (at the main module) / the context menu of what is under the cursor, the same as the right click. In INSERT <kbd>`</kbd> is the note-off</td></tr>
+<tr><td><kbd>`</kbd> &nbsp; <kbd>\</kbd></td><td><kbd>`</kbd> plays the whole sample of the instrument (in INSERT it is the note-off) / <kbd>\</kbd> the context menu of what is under the cursor, the same as the right click</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd> &nbsp; <kbd>Option</kbd>+<kbd>/</kbd> &nbsp; <kbd>Cmd</kbd>+<kbd>/</kbd></td><td>find an effect (all of them) / inside the DSP chain of the track / a file in the browser</td></tr>
 <tr><td><kbd>?</kbd></td><td>the keys of the focused module</td></tr>
 <tr><td><code>:tutorial</code></td><td>a guided tour, twelve steps</td></tr>
@@ -195,7 +195,7 @@ Options → <code>panes</code> off brings the old fixed layout back.</p>
 <kbd>za</kbd> <kbd>zM</kbd> <kbd>zR</kbd> fold tracks<br>
 <kbd>+</kbd> <kbd>-</kbd> LPB · <kbd>F</kbd> follow · <kbd>m</kbd> keyboard on / off<br>
 <kbd>a</kbd> envelopes · <kbd>A</kbd> any parameter (fzf)<br>
-<kbd>`</kbd> menu · <kbd>\</kbd> context · <kbd>?</kbd> keys · <kbd>F1</kbd> help</div>
+<kbd>`</kbd> whole sample · <kbd>\</kbd> context · <kbd>?</kbd> keys · <kbd>F1</kbd> help</div>
 </div>
 <p>With the keyboard on (<kbd>m</kbd>) the top row and the digits play notes and <kbd>z</kbd> <kbd>x</kbd> change the octave; the rest of the keys stay Vim. A count goes before any motion or edit: <kbd>3j</kbd>, <kbd>d2w</kbd>, <kbd>5@a</kbd>. A Russian layout works by key
 position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd> the status line lists what can follow.</p>
@@ -203,7 +203,7 @@ position. After <kbd>d</kbd> <kbd>y</kbd> <kbd>c</kbd> <kbd>g</kbd> <kbd>z</kbd>
 <h2 id="keyboard">Keyboard</h2>
 <div class="rows"> <span class="a">f1 f2    f4 f5 f6    f8 f9    f11</span>      <span class="g">black keys: C# D#  F# G# A#  C# D#  F#</span>
 <span class="a">1  2  3  4  5  6  7  8  9  0  -  =</span>    <span class="g">white keys: C D E F G A B C D E F G</span>
- <span class="a">`</span>                                    <span class="g">KEYS: the whole sample · INSERT: note-off</span>
+ <span class="a">`</span>                                    <span class="g">NORMAL / KEYS: the whole sample · INSERT: note-off</span>
  <span class="a">[ ]</span> octave   <span class="a">{ }</span> velocity              <span class="g">the letters stay commands</span></div>
 <p>The notes live on the digit row and the function row above it. Physically it is a small piano: the digits are the
 white keys, and each F key sits over the gap between two digits, where a black key would be. There is no black key
@@ -218,7 +218,7 @@ a note never opens a panel. Counts like <kbd>3j</kbd> work again when the keyboa
 <table>
 <tr><td><kbd>Shift</kbd>+note</td><td>listen only, nothing is written (all white and black keys)</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>Option</kbd>+note</td><td>the selected slice at that pitch</td></tr>
-<tr><td><kbd>`</kbd></td><td>KEYS (NORMAL with the keyboard on, <kbd>m</kbd>): the whole sample of the instrument; in INSERT it stays note-off</td></tr>
+<tr><td><kbd>`</kbd></td><td>NORMAL and KEYS: the whole sample of the instrument; in INSERT it stays note-off</td></tr>
 <tr><td>layout qwerty</td><td>options → keyboard layout: the old row <kbd>q</kbd> <kbd>2</kbd> <kbd>w</kbd> <kbd>3</kbd> <kbd>e</kbd>, octave <kbd>z</kbd> <kbd>x</kbd>, velocity <kbd>c</kbd> <kbd>C</kbd></td></tr>
 </table>
 

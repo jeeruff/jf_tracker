@@ -945,6 +945,15 @@ function V.note_slip(d)
   ctx.model.invalidate()
   V.msg = n > 0 and ('slip: the sound %s a row inside the note (Shift+Opt+Cmd+J K)'):format(d > 0 and 'down' or 'up') or 'slip: no audio note under the cursor (or the start of the file)'
 end
+-- 16 окт: ` в NORMAL — прослушать весь сэмпл инструмента (был прыжок назад; есть гарпун и Ctrl+O)
+function V.play_whole()
+  local f0 = flat()[V.cur.fi]
+  local inst0 = f0 and (f0.col.pool or {})[V.inst]
+  if f0 and ctx.inst_fx and ctx.inst_fx(f0.col) then inst0 = nil end
+  local root = inst0 and (inst0.parent or inst0)
+  if f0 and ctx.preview then ctx.preview(f0.col.track, (ctx.model and ctx.model.BASE_NOTE) or 60, root and root.item, V.cur.row, 1) end
+  V.msg = root and ('whole sample: ' .. (root.name or '')) or 'whole sample: no sample instrument here'
+end
 function V.play_keys(keys, n)
   V.cmdbuf = {}
   for _ = 1, n or 1 do replay(keys) end
@@ -1489,6 +1498,7 @@ function V.note_key(c, mods)
     return base, 'hold'
   end
   -- 16 окт: frow — Shift+F-клавиша (чёрная) — прослушать, как Shift+буква / цифра
+  if mods.shift and mods.alt and c > 255 and ctx.piano and ctx.piano[c] then return c, 'pitch' end   -- Shift+Option+F — слайс по высоте
   if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end
   local ch = (c < 256) and string.char(c) or ''
   local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c   -- 'u'-префикс не-ASCII (5 окт)
@@ -2087,6 +2097,8 @@ function V.key_impl(c)
     local semis = 0
     -- 4 окт: Option — питч выбранного (слайс или весь айтем), Cmd — питч всего айтема
     if how == 'whole' then sliced = false; how = 'insert' end
+    -- 16 окт: кнопка $pitch — простая нота на нарезанном пишет ВЫБРАННЫЙ слайс на высоте клавиши (как Shift+Option)
+    if sliced and (how == nil or how == 'insert') and ctx.slicepitch_on and ctx.slicepitch_on() then how = 'pitch' end
     if how == 'pitch' and not sliced then how = 'beside' end   -- 16 окт: Shift+Option без нарезки — как Option
     if sliced and how == 'pitch' then
       local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
@@ -2243,16 +2255,7 @@ function V.key_impl(c)
       if (rn and (c == 123 or c == 125)) or (not rn and (c == 99 or c == 67)) then
         V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
       end
-      -- 16 окт: ` в NORMAL с клавиатурой — прослушать весь сэмпл инструмента (в INSERT ` — note-off)
-      if c == ('`'):byte() and V.mode == 'normal' then
-        local f0 = flat()[V.cur.fi]
-        local inst0 = f0 and (f0.col.pool or {})[V.inst]
-        if f0 and ctx.inst_fx and ctx.inst_fx(f0.col) then inst0 = nil end
-        local root = inst0 and (inst0.parent or inst0)
-        if f0 and ctx.preview then ctx.preview(f0.col.track, (ctx.model and ctx.model.BASE_NOTE) or 60, root and root.item, V.cur.row, 1) end
-        V.msg = root and ('whole sample: ' .. (root.name or '')) or 'whole sample: no sample instrument here'
-        return
-      end
+      if c == ('`'):byte() and V.mode == 'normal' then V.play_whole(); return end
       -- 16 окт: @ — макросы и при клавиатуре в NORMAL (Shift+2 было прослушиванием ноты — @ не работал)
       if c == 64 and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}
@@ -2269,6 +2272,7 @@ function V.key_impl(c)
         local sliced0 = inst0 and inst0.slices and #inst0.slices > 0 and kp0
         local psemis, k = 0, nil
         if sliced0 and how ~= 'whole' then
+          if how == 'pitch' or ((how == nil or how == 'insert') and ctx.slicepitch_on and ctx.slicepitch_on()) then how = 'beside' end   -- 16 окт: $pitch / Shift+Option
           if how == 'beside' then
             local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
             if selk > 0 then k = selk; psemis = kp0 - (SB0 - 1) end

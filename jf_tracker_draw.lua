@@ -124,7 +124,7 @@ local tcache, next_img = {}, 100
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
 -- 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
-local IMG_FIRST, IMG_LAST = 100, 797   -- 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
+local IMG_FIRST, IMG_LAST = 100, 796   -- 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
 -- сбрасывало весь кэш, и экран из сотен строк (pm cards) перезапекался
@@ -3313,7 +3313,7 @@ local function draw_topbar(L, info)
         if mx >= wx and mx < wx + ww and my >= y and my < y + wh then hover.retro = (mx - wx) / ww end
         hint('retro', wx, y, ww, wh, true)
         local secs = c.len * (b - a)
-        text(wx, y + wh + 1, fit(('sel %.2fs  drag: select · a: all · Space: play · p: put @cursor · d: to lib (=LIB) · [ ]: edges'):format(secs), ww), U.GREY)
+        text(wx, y + wh + 1, fit(('sel %.2fs  drag: select · a: all · Space: play · p: put @cursor · d: to lib (=LIB) · g[ g]: edges'):format(secs), ww), U.GREY)
       elseif not c then
         text(wx, y, 'select a track with jf_rec (< >)', U.GREY)
       end
@@ -3775,6 +3775,34 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if bhot then hover.ctrl = 'velbar' end
       hint('ctrl', bx, vy, bw, L.rh, 'velbar')
       D.strip_cell.velbar = { bx, vy, bw }
+      -- 16 окт: $pitch — клавиши играют выбранный слайс по высоте (тогл, справа от громкости)
+      do
+        local pl = '$pitch'
+        local pw2 = ms(pl) + 2 * L.pad
+        local px2 = bx + bw + 2 * L.pad
+        if px2 + pw2 <= x + w - L.pad then
+          local on = cc.slicepitch
+          local ph = mx >= px2 and mx < px2 + pw2 and my >= vy and my < vy + L.rh
+          set(on and U.tint(U.CYAN, 0.3) or (ph and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(px2, vy, pw2, L.rh - 1, 1)
+          set(on and U.CYAN or (ph and U.AMBER or U.LINE)); gfx.rect(px2, vy, pw2, L.rh - 1, 0)
+          text(px2 + L.pad, vy, pl, on and U.CYAN or (ph and U.AMBER or U.GREY))
+          if ph then hover.ctrl = 'slicepitch' end
+          hint('ctrl', px2, vy, pw2, L.rh, 'slicepitch')
+          -- 16 окт: pedal — сустейн (CC64), горит, когда нажат (и педалью MIDI-клавиатуры)
+          local dl = 'pedal'
+          local dw2 = ms(dl) + 2 * L.pad
+          local dx2 = px2 + pw2 + 2
+          if dx2 + dw2 <= x + w - L.pad then
+            local don = info and info.wheels and info.wheels().pedal
+            local dh = mx >= dx2 and mx < dx2 + dw2 and my >= vy and my < vy + L.rh
+            set(don and U.tint(U.GREEN, 0.35) or (dh and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(dx2, vy, dw2, L.rh - 1, 1)
+            set(don and U.GREEN or (dh and U.AMBER or U.LINE)); gfx.rect(dx2, vy, dw2, L.rh - 1, 0)
+            text(dx2 + L.pad, vy, dl, don and U.GREEN or (dh and U.AMBER or U.GREY))
+            if dh then hover.ctrl = 'pedal' end
+            hint('ctrl', dx2, vy, dw2, L.rh, 'pedal')
+          end
+        end
+      end
       -- 15 окт: строки клавиш oct / vel нет — при наведении они в статусе (vel крупно занял две строки)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
@@ -3785,6 +3813,27 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local ky, kh = y + 2, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
       local held, last = p.held or {}, p.last
+      -- 16 окт: колёса — pitch и mod вертикальными фейдерами с ромбиком слева от клавиш: показывают вход
+      -- MIDI-клавиатуры, тянутся мышью (значение — в виртуальную клавиатуру; pitch отпустил — в центр)
+      if info and info.wheels then
+        local wv = info.wheels()
+        local fw = math.max(6, math.floor(L.cw * 0.9))
+        for i, wd in ipairs({ { 'pb', (wv.bend or 0) * 0.5 + 0.5, 'pitch' }, { 'mod', wv.mod or 0, 'mod' } }) do
+          local fx0 = kx + (i - 1) * (fw + L.pad)
+          local hot = mx >= fx0 - 1 and mx < fx0 + fw + 1 and my >= ky and my < ky + kh
+          set(U.mix(U.BG, { 0, 0, 0 }, 0.5)); gfx.rect(fx0, ky, fw, kh, 1)
+          set(hot and U.AMBER or U.LINE); gfx.rect(fx0, ky, fw, kh, 0)
+          if wd[1] == 'pb' then set(U.DIM); gfx.rect(fx0 + 1, ky + math.floor(kh / 2), fw - 2, 1, 1) end
+          local dy = ky + 2 + math.floor((1 - wd[2]) * (kh - 5) + 0.5)
+          local dr = math.max(2, math.floor(fw / 2))
+          set(hot and U.AMBER or U.TEXT)
+          local cxw = fx0 + math.floor(fw / 2)
+          for t = 0, dr do gfx.line(cxw - (dr - t), dy - t, cxw + (dr - t), dy - t); gfx.line(cxw - (dr - t), dy + t, cxw + (dr - t), dy + t) end
+          if hot then hover.ctrl = 'wheel_' .. wd[1]; hover.wheel = { what = wd[1], y0 = ky, h = kh } end
+          hint('ctrl', fx0, ky, fw, kh, 'wheel_' .. wd[1])
+        end
+        kx = kx + 2 * (fw + L.pad) + L.pad
+      end
       local white_c = U.mix(U.BG, U.TEXT, dim and 0.22 or 0.85)   -- 15 окт: выкл — ещё тусклее (было 0.35)
       local function key_fill(off, base)
         if held[off] then return U.tint(U.AMBER, 0.75) end

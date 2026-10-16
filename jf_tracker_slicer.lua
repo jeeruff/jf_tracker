@@ -517,6 +517,22 @@ function S.more_do(side)
   elseif side == 'b' and post > 1e-4 then ctx.autotrim(e, 0, e.len + post)
   else S.msg = side == 'a' and 'the sample already starts at the file start' or 'the sample already ends at the file end' end
 end
+-- 16 окт: край сэмпла (g[ g]): у выделения на волне — его край, иначе курсор волны / метка выбранного слайса
+function S.edge_trim(ch)
+  if not (S.entry and S.entry.item and not S.entry.file and ctx.autotrim) then return end
+  local a, b = S.span()
+  local e, t = S.entry, nil
+  if a then t = (ch == '[') and a or b
+  elseif S.wcur and S.wcur_e == e.item then t = S.wcur
+  else
+    local k = (ctx.ssel and ctx.ssel.item == e.item) and ctx.ssel.k or 0
+    if k and k > 0 and S.slices[k] then t = S.bounds(S.slices, k, e.len) end
+  end
+  if not t then S.msg = 'g[ g]: gw HEX - a wave cursor, or select a slice (slices pane, j k), or drag a span on the wave'
+  elseif ch == '[' and t > 1e-4 then ctx.autotrim(e, t, e.len); S.wcur = nil
+  elseif ch == ']' and t < e.len - 1e-4 then ctx.autotrim(e, 0, t); S.wcur = nil
+  else S.msg = ch == '[' and 'the sample already starts here' or 'the sample already ends here' end
+end
 -- 15 окт: Tab / Shift+Tab — курсор волны к следующему / прошлому транзиенту (стандарт нарезки:
 -- прошёл, послушал кусок до следующего, $ — разрезать здесь)
 function S.trans_step(dir)
@@ -606,8 +622,11 @@ function S.key(c)
   if S.gpend then
     S.gpend = nil
     if ch == 'w' then S.gbuf = ''; S.msg = 'gw _  hex frame of the ruler, Enter'; return true end
-    if ch == '[' or ch == ']' then S.more_do(ch == '[' and 'a' or 'b'); return true end   -- 15 окт: g[ g] — файл за краем обратно
-  elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave, [ ] - give back the file before / after the sample'; return true end
+    -- 16 окт: g[ g] — край сэмпла здесь (autotrim; было [ ] — спорило с октавой frow и резало сэмпл);
+    -- g{ g} — вернуть файл за краем (было g[ g])
+    if ch == '[' or ch == ']' then S.edge_trim(ch); return true end
+    if ch == '{' or ch == '}' then S.more_do(ch == '{' and 'a' or 'b'); return true end
+  elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave, [ ] - the sample starts / ends here, { } - give back the file before / after it'; return true end
   local a, b = S.span()
   -- 14 окт: s — меню нарезки и в раскладке renoise (15 окт: весь нижний ряд renoise здесь — команды)
   local pk = S.entry and not S.entry.file and piano_slice(c)
@@ -634,21 +653,6 @@ function S.key(c)
   elseif S.cross and not a and (ch == '{' or ch == '}') then
     S.cross.dt = S.cross.dt + (ch == '}' and 0.001 or -0.001)
     S.msg = ('cut point %+.1f ms from the row ({ } - 1 ms) - s cuts the note here'):format(S.cross.dt * 1000)
-  -- 15 окт: [ ] — начало / конец сэмпла (все ноты инструмента, как ручки ia / ib): у выделения на
-  -- волне — его край, иначе — край выбранного слайса (j k в slices)
-  elseif (ch == '[' or ch == ']') and S.entry and S.entry.item and not S.entry.file and ctx.autotrim then
-    local e, t = S.entry, nil
-    if a then t = (ch == '[') and a or b
-    elseif S.wcur and S.wcur_e == e.item then t = S.wcur
-    else
-      local k = (ctx.ssel and ctx.ssel.item == e.item) and ctx.ssel.k or 0
-      -- 15 окт: оба — по метке выбранного слайса: [ — с неё начало, ] — на ней конец (она — конец последнего слайса)
-      if k and k > 0 and S.slices[k] then t = S.bounds(S.slices, k, e.len) end
-    end
-    if not t then S.msg = '[ ]: gw HEX - a wave cursor, or select a slice (slices pane, j k), or drag a span on the wave'
-    elseif ch == '[' and t > 1e-4 then ctx.autotrim(e, t, e.len); S.wcur = nil
-    elseif ch == ']' and t < e.len - 1e-4 then ctx.autotrim(e, 0, t); S.wcur = nil
-    else S.msg = ch == '[' and 'the sample already starts here' or 'the sample already ends here' end
   elseif ch == 's' and S.cross and ctx.cut_at then
     local te = S.cut_point(S.cross.t + S.cross.dt)
     ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
@@ -995,7 +999,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if e.muted and not e.depot then title = title .. '  (muted)' end   -- 10 окт: в lib заглушено всё — не пишем
   U.text(x, y, ctx.fit(title, vx - x - L.pad), U.TEXT)
   local hint = editing
-    and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  [ ]: edges'
+    and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  g[ g]: edges'
          or '2/4/8 1(16) 3(32) 6(64) equal  t transients (+ - sens)  x clear  v view')
     or 'dblclick / :slice / \\is — edit slices;  q whole, 2 w 3 e ... slices 1 2 3 4 (INSERT)  drag: select → drop on track'
   -- громкость item и нормализация — справа в строке подсказки (1 окт)
@@ -1380,7 +1384,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if pb > x and pb <= x + w then gfx.rect(pb - 2, wy, 2, wh, 1); gfx.rect(pb - 6, wy, 6, 2, 1); gfx.rect(pb - 6, wy + wh - 2, 6, 2, 1) end
   end
   -- 15 окт: в файле есть звук за краем сэмпла — метка у края «< 3.21s» / «10.27s >»; щелчок
-  -- (или g[ g]) возвращает его
+  -- (или g{ g}) возвращает его
   S.more_hot = nil
   if wave_view and e.item and not e.file then
     local pre, post = S.more(e)

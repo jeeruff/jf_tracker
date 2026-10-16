@@ -323,7 +323,7 @@ local state = {
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
   snappanes = reaper.GetExtState(EXT, 'snappanes') ~= '0',
   dimidle = reaper.GetExtState(EXT, 'dimidle') == '1',
-  glitch = reaper.GetExtState(EXT, 'glitch') ~= '0',   -- 16 окт: глитч трекера, пока клавиши у REAPER   -- 16 окт: эксперимент — трекер тусклее на 15 %, пока клавиши у REAPER
+  glitch = reaper.GetExtState(EXT, 'glitch2') == '1',   -- 16 окт: reaper glitch — глитч трекера, пока клавиши у REAPER (по умолчанию выкл)   -- 16 окт: эксперимент — трекер тусклее на 15 %, пока клавиши у REAPER
   zoomtop = reaper.GetExtState(EXT, 'zoomtop') ~= '0',   -- 16 окт: item внизу — прицел над волной   -- 16 окт: линии пейнов прилипают друг к другу
   drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),
   drumalgo = tonumber(reaper.GetExtState(EXT, 'drumalgo')) or -1,   -- 16 окт: алгоритм запекания str   -- 16 окт: drumrs5k — подпись ячеек
@@ -912,6 +912,44 @@ local MONO_ID = 9             -- id мода трекера на шине jf_mon
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
   keys_frow = function() return keys.layout == 'frow' end,
+  slicepitch_on = function() return state.slicepitch and true or false end,   -- 16 окт: кнопка $pitch
+  -- 16 окт: колёса и педаль: свежий вход MIDI (MIDI_GetRecentInputEvent) + то, что послано мышью / кнопкой
+  wheels = function()
+    local W = ctx.mw or { bend = 0, mod = 0, pedal = false, seq = 0 }
+    ctx.mw = W
+    if reaper.MIDI_GetRecentInputEvent then
+      local top
+      for i = 0, 31 do
+        local seq, buf = reaper.MIDI_GetRecentInputEvent(i)
+        if not seq or seq == 0 or seq <= (W.seq or 0) then break end
+        top = top or seq
+        local st, d1, d2 = buf:byte(1), buf:byte(2), buf:byte(3)
+        if st and d1 then
+          local kind = st & 0xF0
+          if kind == 0xE0 and d2 and W.got_pb == nil then W.bend = ((d2 * 128 + d1) - 8192) / 8192; W.got_pb = true
+          elseif kind == 0xB0 and d1 == 1 and d2 and W.got_mod == nil then W.mod = d2 / 127; W.got_mod = true
+          elseif kind == 0xB0 and d1 == 64 and d2 and W.got_ped == nil then W.pedal = d2 >= 64; W.got_ped = true end
+        end
+      end
+      W.got_pb, W.got_mod, W.got_ped = nil, nil, nil
+      if top then W.seq = top end
+    end
+    return W
+  end,
+  wheel_send = function(what, v)
+    local W = ctx.wheels()
+    if what == 'pb' then
+      W.bend = math.max(-1, math.min(1, v))
+      local n = math.max(0, math.min(16383, math.floor((W.bend + 1) * 8192 + 0.5)))
+      reaper.StuffMIDIMessage(0, 0xE0, n & 127, n >> 7)
+    elseif what == 'mod' then
+      W.mod = math.max(0, math.min(1, v))
+      reaper.StuffMIDIMessage(0, 0xB0, 1, math.floor(W.mod * 127 + 0.5))
+    elseif what == 'pedal' then
+      W.pedal = v and true or false
+      reaper.StuffMIDIMessage(0, 0xB0, 64, W.pedal and 127 or 0)
+    end
+  end,
   key_name = function(code) return keys.name(code) end,   -- 16 окт: имя клавиши по коду (f4)   -- 16 окт: раскладка frow (цифры + F-ряд)
   keys_renoise = function() return keys.renoise end,   -- 13 окт: опция keys: renoise (две октавы, нижний ряд — ноты)
   peaks = function(e, n, spec) return model.peaks(e, n, spec) end,
@@ -10828,7 +10866,7 @@ ctx = {
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
-      { key = 'glitch', label = 'glitch when inactive', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines - impossible to miss that the keys go elsewhere', get = function() return state.glitch ~= false end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch', v and '1' or '0', true) end },
+      { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines - impossible to miss that the keys go elsewhere', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
@@ -15542,6 +15580,8 @@ function ctrl_action(name, delta)
   elseif name == 'ratebar' then
     if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
+  elseif name == 'slicepitch' then if delta == 0 then state.slicepitch = not state.slicepitch; vim.msg = state.slicepitch and '$pitch on: the keys play the selected slice at their pitch (Shift+Option does it one-off)' or '$pitch off: a key - a slice' end   -- 16 окт
+  elseif name == 'pedal' then if delta == 0 then local W = ctx.wheels(); ctx.wheel_send('pedal', not W.pedal); vim.msg = 'pedal (sustain, CC64) ' .. (W.pedal and 'down' or 'up') end   -- 16 окт
   elseif name == 'markers' then   -- 16 окт: маркеры 1..0 — выпадашкой (была строка цифр под кнопками)
     local items = {}
     local _, nm, nr = reaper.CountProjectMarkers(0)
@@ -16762,6 +16802,7 @@ local function frame()
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
+    wheels = ctx.wheels,   -- 16 окт: pitch / mod / pedal — вход MIDI и мышь
     drum_key = function(n) return model.DR.key_of(n, ctx.piano, vim.octave) end,   -- 16 окт: подпись пэда drumrs5k (key)
     drumcell = state.drumcell or 'note',
     file_len = function(path) return model.file_len(path) end,
@@ -16838,7 +16879,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
-      insmode = state.insmode, legato = edit.step_legato, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
@@ -17509,6 +17550,18 @@ local function frame()
   end
   -- метки f и призраки бросков — после всех оверлеев (session, эффекты,
   -- роутер), иначе их заливка закрашивала метки клипов и сцен (8 окт)
+  -- 16 окт: кадры без перерисовки (fps-буфер) — наложения ниже (призраки, рамки, меню, полупрозрачное)
+  -- ложились поверх прошлых и копились: экран темнел. Чистый кадр — копией в 797; в пропущенном
+  -- кадре буфер сперва восстанавливается из неё, наложения рисуются один раз
+  if gfx.dest == 1021 then
+    if idle_skip and ctx.clean_w == gfx.w and ctx.clean_h == gfx.h then
+      gfx.a = 1; gfx.blit(797, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
+    elseif not idle_skip then
+      local d0 = gfx.dest
+      if ctx.clean_w ~= gfx.w or ctx.clean_h ~= gfx.h then gfx.setimgdim(797, gfx.w, gfx.h); ctx.clean_w, ctx.clean_h = gfx.w, gfx.h end
+      gfx.dest = 797; gfx.a = 1; gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h); gfx.dest = d0
+    end
+  end
   draw.pmark('post: hints, ghosts, popups')
   draw.pane_badge_tracker(L, state.pane_mode)
   HN.draw(U, L)
@@ -17826,7 +17879,7 @@ local function frame()
     if state.dimidle then U.set(U.BG, 0.15); gfx.rect(0, 0, gfx.w, gfx.h, 1); gfx.a = 1 end
     -- 16 окт: глитч, пока клавиши у REAPER (опция glitch when inactive, вкл): полосы окна рвутся вбок,
     -- редкие цветные строки развёртки; узор сменяется рывком раз в ~150 мс (не каждый кадр — без мерцания)
-    if state.glitch ~= false and gfx.w > 40 and gfx.h > 40 then
+    if state.glitch and gfx.w > 40 and gfx.h > 40 then
       local seed = math.floor(reaper.time_precise() / 0.15)
       local function rnd(a, b) seed = (seed * 1103515245 + 12345) % 2147483648; return a + seed % (b - a + 1) end
       rnd(0, 1)
@@ -18044,6 +18097,10 @@ local function frame()
       lock = 'lock: the tracker cursor is the REAPER edit cursor and selects the track in REAPER',
       fixed = 'fixed: the cursor stays in the middle of the screen, the rows scroll under it (Impulse Tracker)',
       q_endstop = 'end stop: playback started before =END stops there (recording never stops)',
+      wheel_pb = 'pitch wheel: what the MIDI keyboard sends; drag up / down to bend (back to the centre when you let go) - into the virtual keyboard of REAPER (an armed track hears it)',
+      wheel_mod = 'mod wheel (CC1): what the MIDI keyboard sends; drag up / down to set it - into the virtual keyboard of REAPER',
+      pedal = 'pedal: sustain (CC64) down / up - lit while it is down, also from the pedal of the MIDI keyboard',
+      slicepitch = '$pitch: the keys play the selected slice at their pitch instead of slice by key (Shift+Option+note does it one-off)',
       markers = 'markers: click - go to marker 1..0, add / name / delete the marker of the cursor row, previous / next, renumber, the marker manager',
       xfade = 'x-fade: inserted notes get a crossfade of that many ms with their neighbours (wheel - the length)',
     }
@@ -18093,7 +18150,7 @@ local function frame()
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap: selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
   elseif hover.sample and SL.ap_hot then state.status = 'spam: when you move a slice line and let go, that slice plays by itself; while dragging, a short roll at the edge (like SP-404)'
-  elseif hover.sample and hover.sample.sbtn then state.status = ({ follow = 'follow: a slice you play on the keyboard (or MIDI) becomes the selected one - the list, the wave and the zoom jump to it', pthru = 'playthru: a slice plays on to the end of the item, not just to its own end', mono = 'mono: a new note cuts the previous one on this track (poly when off)', quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)', scram = 'scramble: the slice notes of this track in the cursor region (or the VISUAL selection) swap their slices randomly - positions stay, one undo (:scramble)' })[hover.sample.sbtn] or hover.sample.sbtn
+  elseif hover.sample and hover.sample.sbtn then state.status = ({ follow = 'follow: a slice you play on the keyboard (or MIDI) becomes the selected one - the list, the wave and the zoom jump to it', pthru = 'playthru: a slice plays on to the end of the item, not just to its own end', mono = 'mono: a new note cuts the previous one on this track (poly when off)', quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'slice at transients (s or t)', ['sens-'] = 'fewer transients', ['sens+'] = 'more transients', clear = 'remove all slices (x)', smkall = 'stretch: a stretch marker on every slice boundary of the item (and its edges) - then each hit can be pulled to the grid on its own (smk / squant), one undo', slq = 'q: where the next slice starts when you play slices - off (right after the last one), a row, 2 rows, a beat or a bar', snap = 'snap: slice lines stick to transients and the existing slices while you drag them', trim = 'trim: cut the silence at the start / end of the sample', scram = 'scramble: the slice notes of this track in the cursor region (or the VISUAL selection) swap their slices randomly - positions stay, one undo (:scramble)' })[hover.sample.sbtn] or hover.sample.sbtn
   elseif hover.sample and hover.sample.vol then state.status = 'item volume: wheel / < > = 1 dB, click = 0 dB'
   elseif hover.sample and hover.sample.norm then state.status = 'normalize: item volume so the peak hits 0 dB (n)'
   elseif hover.sample and hover.sample.slice then state.status = ('slice marker %d - drag to move, hold Shift: fine (10x slower)'):format(hover.sample.slice)
@@ -18222,6 +18279,19 @@ local function frame()
         vim.msg = ('cell repeated to slot %d (%s)'):format(ri, r.linked and 'aliases' or 'unique copies')
       end
     else ctx.mx_rep = nil end
+  end
+  -- 16 окт: колёса pitch / mod — тянуть по вертикали (pitch — отпустил, вернулся в центр)
+  if U.click and hover.wheel then ctx.wheel_drag = hover.wheel; U.click = false end
+  if ctx.wheel_drag then
+    local wd = ctx.wheel_drag
+    if gfx.mouse_cap & 1 == 1 then
+      local v = math.max(0, math.min(1, 1 - (gfx.mouse_y - wd.y0) / math.max(1, wd.h)))
+      ctx.wheel_send(wd.what, wd.what == 'pb' and (v * 2 - 1) or v)
+      state.status = wd.what == 'pb' and ('pitch bend %+.0f%%'):format(ctx.wheels().bend * 100) or ('mod wheel %d'):format(math.floor(ctx.wheels().mod * 127 + 0.5))
+    else
+      if wd.what == 'pb' then ctx.wheel_send('pb', 0) end
+      ctx.wheel_drag = nil
+    end
   end
   if U.click and hover.ptab and hover.ptab.id and hover.ptab.id ~= 'tracker' and not ctx.tab_drag then
     ctx.tab_drag = { id = hover.ptab.id, x0 = gfx.mouse_x, y0 = gfx.mouse_y }   -- 10 окт: перенос вкладки мышью (порог 8 px)
@@ -21512,9 +21582,9 @@ local function frame()
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
   -- 12 окт: Opt+A (å) из любого модуля — последний подёрганный параметр в колонку автоматизации
   if c == 229 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then ctx.auto_touched(); c = 0 end
-  -- 9 окт: ` (обратная кавычка, как `` в Vim) — прыжок назад, без Control
-  if c == 96 and (vim.mode == 'normal' or state.focus ~= 'tracker') and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and not vim.pending then   -- в INSERT / KEYS ` — note-off
-    ctx.jump_back(); c = 0
+  -- 16 окт: ` в NORMAL — весь сэмпл инструмента (прыжок назад убран: гарпун и Ctrl+O); в INSERT ` — note-off
+  if c == 96 and not (ctx.mods().ctrl or ctx.mods().cmd) and (vim.mode == 'normal' or state.focus ~= 'tracker') and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and not vim.pending then
+    vim.play_whole(); c = 0
   end
   -- 9 окт: список прыжков — Ctrl+O назад, Ctrl+I вперёд (Ctrl+I = код Tab:
   -- отличаем по физической I); не в строке команд / поиске / пикере
