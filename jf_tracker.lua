@@ -660,6 +660,7 @@ local function relayout()
   -- ExtState jf_tracker/piano = '0' — спрятана
   if state.piano_show == nil then state.piano_show = reaper.GetExtState('jf_tracker', 'piano') ~= '0' end
   state.piano_strip = state.piano_show or nil
+  draw.micro = (state.micro or model.seen_micro) and true or nil; draw.micro_tag = model.micro_tag   -- 16 окт: микротоны — шире колонка нот
   L = draw.layout(snap, state, #regions)
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
@@ -19860,6 +19861,11 @@ local function frame()
   do
     local TK = { [26161] = -1, [26162] = 1, [6697265] = -12, [6697266] = 12 }
     local m = ctx.mods()
+    -- 16 окт: Cmd+F1 / F2 — микротон 1/6 тона (v / ^) у выделения или ноты строки
+    if (c == 26161 or c == 26162) and m.cmd and not m.alt and not m.ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if vim.transpose_scope(m.shift and 'track' or 'sel', TK[c], true) then model.invalidate() end
+      c = 0
+    end
     if TK[c] and not m.cmd and (m.alt or m.shift or m.ctrl) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local scope = m.alt and 'sel' or ((m.shift and m.ctrl) and 'col' or (m.shift and 'track' or 'pattern'))
       if vim.transpose_scope(scope, TK[c]) then model.invalidate() end

@@ -26,6 +26,7 @@ local function hint(kind, x, y, w, h, data) if D.hint then D.hint(kind, x, y, w,
 -- рамка выделения Ctrl-мыши (Cmd+щелчок, 8 окт) — объявлена до всех рисовальщиков
 local function csel_frame(x, y, w, h) U.set(U.CYAN); gfx.rect(x, y, w, h, 0) end
 local ms, TH   -- объявлены ниже (set_font)
+local EMPTY = { '...', '..', '..' }   -- пустые поля ячейки (16 окт: наверху — раскладка меняет ширину ноты)
 
 function D.init(u, peaks_fn, matrix)
   U, get_peaks, MX = u, peaks_fn, matrix
@@ -382,7 +383,8 @@ function D.layout(snap, state, nregions)
   L.pad = ms(' ')
   if L.pad < 2 then L.pad = math.max(3, math.floor(ms('W') / 2)) end
   L.cw = ms('W')
-  L.w_note = ms('C#4')
+  L.w_note = ms(D.micro and 'C#4^^' or 'C#4')   -- 16 окт: микротоны — метка ^ / v после октавы (2 знака)
+  EMPTY[1] = D.micro and '.....' or '...'
   L.w_vol = ms('FF')
   L.w_del = ms('FF')
   L.w_fx = ms('0UFF')                -- 12 окт: код из двух символов, как в Renoise
@@ -1870,7 +1872,6 @@ end
 
 -- ── ячейка ────────────────────────────────────────────────────────────────
 -- Пустые поля рисуются каждое на своём x — точки стоят ровно под текстом.
-local EMPTY = { '...', '..', '..' }
 -- группа кода команды → цвет (как в Renoise); Z… — глобальные, прочее — RN_OTHER
 local FXG = { ['0M'] = 'RN_VOL', ['0I'] = 'RN_VOL', ['0O'] = 'RN_VOL', SI = 'RN_VOL', SO = 'RN_VOL', ['0P'] = 'RN_PAN',
   ['0U'] = 'RN_PITCH', ['0D'] = 'RN_PITCH', ['0G'] = 'RN_PITCH', ['0V'] = 'RN_PITCH', ['0A'] = 'RN_PITCH', SF = 'RN_PITCH', SB = 'RN_GLOBAL' }
@@ -1962,6 +1963,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or U.TEXT)))   -- видео-событие (9 окт)
+    if cell.micro and D.micro and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
     elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.RN_DELAY))

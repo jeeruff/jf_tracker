@@ -2841,7 +2841,7 @@ end
 -- scope = 'sel' (выделение, иначе событие строки курсора) | 'col' (колонка, паттерн)
 -- | 'track' (все колонки трека, паттерн) | 'pattern' (все треки, паттерн)
 V.TSCOPE = { sel = 'selection', col = 'column', track = 'track', pattern = 'pattern' }
-function V.transpose_scope(scope, d)
+function V.transpose_scope(scope, d, micro)   -- 16 окт: micro — d ступеней 1/6 тона (72-EDO), не полутонов
   local F = flat()
   local f0, f1, r0, r1
   if scope == 'sel' then
@@ -2861,9 +2861,9 @@ function V.transpose_scope(scope, d)
   local notes = {}
   for _, h in ipairs(heads) do if h.kind == 'midi' or h.kind == 'audio' then notes[#notes + 1] = h end end
   if #notes == 0 then V.msg = ('transpose %s: no notes'):format(V.TSCOPE[scope] or scope); return false end
-  ctx.edit.transpose(notes, lpb(), d)
+  if micro then ctx.edit.micro_nudge(notes, lpb(), d) else ctx.edit.transpose(notes, lpb(), d) end
   V.last_edit = nil
-  V.msg = ('transpose %s %+d: %d note(s)'):format(V.TSCOPE[scope] or scope, d, #notes)
+  V.msg = ('transpose %s %+d%s: %d note(s)'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes)
   return true
 end
 -- умная выпадашка транспозиции (контекстное меню, :transpose): −24 … +24 и где (выделение / колонка / трек / паттерн)

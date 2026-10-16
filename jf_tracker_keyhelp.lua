@@ -143,6 +143,7 @@ KH.PAGES = {
     { k = 'f', d = 'hint labels: jump anywhere by two letters' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three)' },
     { k = 'Opt+F1 F2', d = 'transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise)' },
+    { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MTS sysex before the notes (MTS-ESP Master on the track before Surge XT), audio items - fractional pitch; Shift - the track' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt', d = 'the cursor row to the top (as in Vim)' },
     { k = 'zw', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },

@@ -35,6 +35,37 @@ function M.note_name(n)
   return NAMES[n % 12 + 1] .. tostring(o)
 end
 
+-- 16 окт: микротоны — 72-EDO, ступень ^ / v = 1/6 тона (16.7 ц); m = −3..+3 ступени от ноты 12-EDO.
+-- Метка после октавы: C-4^ C-4^^ C-4^3, вниз — v (буквами, без значков); 0 — пусто
+M.MICRO_STEP = 100 / 6
+function M.micro_of_cents(c) local m = math.floor((c or 0) / M.MICRO_STEP + 0.5); if m == 0 then return nil end; return math.max(-3, math.min(3, m)) end
+function M.micro_tag(m)
+  if not m or m == 0 then return '' end
+  local a = math.abs(m)
+  return (m > 0 and '^' or 'v') .. (a == 2 and (m > 0 and '^' or 'v') or (a == 3 and '3' or ''))
+end
+-- MTS: real-time single note tuning change (F0 7F 7F 08 02 prog n [kk xx yy zz] F7); центы ноты kk
+function M.mts_bytes(key, cents)
+  local c = math.max(0, math.min(12799.99, cents))
+  local xx = math.floor(c / 100)
+  local fr = math.floor((c - xx * 100) / 100 * 16384 + 0.5); if fr > 16383 then fr = 16383 end
+  return string.char(0xF0, 0x7F, 0x7F, 0x08, 0x02, 0x00, 0x01, key & 0x7F, xx, fr >> 7, fr & 0x7F, 0xF7)
+end
+function M.mts_parse(msg)
+  local b = { msg:byte(1, -1) }
+  local i = (b[1] == 0xF0) and 2 or 1
+  if b[i] ~= 0x7F or b[i + 2] ~= 0x08 or b[i + 3] ~= 0x02 then return nil end
+  local n = b[i + 5] or 0
+  local out = {}
+  for k = 0, n - 1 do
+    local j = i + 6 + k * 4
+    local kk, xx, yy, zz = b[j], b[j + 1], b[j + 2], b[j + 3]
+    if not zz then break end
+    out[kk] = xx * 100 + ((yy << 7) | zz) / 16384 * 100 - kk * 100   -- центы от 12-EDO ноты kk
+  end
+  return out
+end
+
 -- две hex-цифры, 0..255
 function M.hex2(v)
   v = math.floor(v + 0.5)
@@ -74,6 +105,7 @@ end
 -- Возвращает ноты {ppq, ppq_end, pitch, vel, ch, muted} в порядке потока.
 function M.parse_midi(buf)
   local notes, active = {}, {}
+  local tune
   local pos, ppq = 1, 0
   local n = #buf
   while pos <= n do
@@ -86,12 +118,16 @@ function M.parse_midi(buf)
       local st, ch = b1 & 0xF0, b1 & 0x0F
       local pitch, vel = msg:byte(2), msg:byte(3)
       local key = ch * 128 + pitch
-      if st == 0x90 and vel > 0 then
+      if b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
+        local t = M.mts_parse(msg)
+        if t then tune = tune or {}; for kk, c in pairs(t) do tune[kk] = { ppq = ppq, c = c } end end
+      elseif st == 0x90 and vel > 0 then
         -- две ноты одной высоты на одном канале одновременно невозможны:
         -- повторный note-on закрывает предыдущую
         local a = active[key]
         if a then a.ppq_end = ppq; notes[#notes + 1] = a end
-        active[key] = { ppq = ppq, pitch = pitch, vel = vel, ch = ch, muted = (flag & 2) == 2 }
+        local tu = tune and tune[pitch]
+        active[key] = { ppq = ppq, pitch = pitch, vel = vel, ch = ch, muted = (flag & 2) == 2, cents = tu and tu.ppq >= ppq - 4 and tu.c or nil }
       elseif st == 0x80 or (st == 0x90 and vel == 0) then
         local a = active[key]
         if a then a.ppq_end = ppq; notes[#notes + 1] = a; active[key] = nil end
@@ -266,6 +302,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     -- нота = высота (4 окт, вечер): «слайс = нота» не давал показать питч
     -- слайса — номер слайса снова командой Sxx, нота — C-4 + полутона
     note = M.note_name(M.BASE_NOTE + semis),
+    micro = M.micro_of_cents((pitch - math.floor(pitch + 0.5)) * 100),   -- 16 окт: микротон айтема — дробь D_PITCH
     frac = math.abs(semis - math.floor(semis + 0.5)) > 0.01,   -- дробный питч
     semis = semis,
     vol = M.vol_hex(vol),
@@ -283,6 +320,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
   head.fx, head.rowfx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
+  if head.micro then M.seen_micro = true end
   do local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); head.slice = tonumber(sk) end   -- 11 окт: номер слайса — поле в ячейке
   do local _, gh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ghost', '', false); head.ghost = (gh ~= nil and gh ~= '') or nil end   -- 15 окт: ghost-слайс playthru + q (рисуется бледно)
   head.rgb = M.item_rgb(it)
@@ -388,9 +426,11 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
         local head = {
           kind = 'midi', item = it, take = take,
           note = M.note_name(nt.pitch), pitch = nt.pitch, semis = nt.pitch - M.BASE_NOTE,
+          micro = M.micro_of_cents(nt.cents), ppq = nt.ppq,   -- 16 окт: микротон (MTS sysex перед нотой)
           vol = M.hex2(nt.vel), delay = d0, ch = nt.ch,
           muted = muted_item or nt.muted, row0 = r0, fx = midi_fx,
         }
+        if head.micro then M.seen_micro = true end
         local tail = { kind = 'off', of = head, delay = d1 }
         -- note-off ровно на границе строки — OFF стоит в этой строке с delay 0;
         -- если конец в той же строке, что и начало, OFF не помещается: нота
@@ -433,6 +473,7 @@ local pool_by_item = {}        -- item → gkey (все items, не только
 M.bprof = { envs = 0, pool = 0, mods = 0, fx = 0 }
 function M.build(lpb)
   M.bprof = { envs = 0, pool = 0, mods = 0, fx = 0 }
+  M.seen_micro = false   -- 16 окт: есть ноты с микротоном — трекер расширяет колонку нот
   pool_by_item = {}
   local snap = { lpb = lpb, cols = {}, last_row = 0 }
   local depot_tr

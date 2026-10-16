@@ -551,6 +551,7 @@ E.inst_base = inst_base
 function E.transpose(heads, lpb, semis)
   if #heads == 0 or semis == 0 then return end
   run(('transpose %+d'):format(semis), function()
+    local mic = {}
     for _, h in ipairs(heads) do
       local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
       if h.kind == 'audio' and h.take and tonumber(slk) then
@@ -567,9 +568,81 @@ function E.transpose(heads, lpb, semis)
         if i then
           local p = math.max(0, math.min(127, n.pitch + semis))
           R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, n.eppq, n.ch, p, n.vel, false)
+          mic[h.take] = mic[h.take] or {}; mic[h.take][('%d:%d:%d'):format(n.ch, math.floor(n.sppq + 0.5), p)] = h.micro or 0   -- 16 окт: микротон едет с нотой
         end
       end
     end
+    for tk, over in pairs(mic) do E.micro_sync(tk, over) end
+  end)
+end
+
+-- 16 окт: микротоны (72-EDO, ступень 1/6 тона). MIDI — MTS sysex перед каждым note-on тейка (MTS-ESP Master на
+-- треке раздаёт подстройку Surge XT и другим клиентам); у айтема — дробь D_PITCH. E.micro_sync переписывает поток
+-- тейка: старые MTS долой, новые — перед нотами (порядок потока = порядок воспроизведения в той же ppq).
+-- over — { ['ch:ppq:pitch'] = m } поверх того, что стоит; нет ни одного m ≠ 0 — sysex не пишется вовсе
+function E.micro_sync(take, over)
+  local ok, buf = R.MIDI_GetAllEvts(take, '')
+  if not ok then return end
+  local need = buf:find('\xF0\x7F\x7F\x08\x02', 1, true) ~= nil
+  for _, m in pairs(over or {}) do if m ~= 0 then need = true end end
+  if not need then return end                       -- тейк без микротонов — поток не трогаем
+  local evs, pos, ppq, tune = {}, 1, 0, {}
+  while pos <= #buf do
+    local okp, off, flag, msg, np = pcall(string.unpack, '<i4Bs4', buf, pos)
+    if not okp then break end
+    pos = np; ppq = ppq + off
+    local t = msg:byte(1) == 0xF0 and model.mts_parse(msg)
+    if t then for kk, c in pairs(t) do tune[kk] = c end
+    else
+      local e = { ppq = ppq, flag = flag, msg = msg }
+      local b1 = msg:byte(1) or 0
+      if #msg >= 3 and b1 & 0xF0 == 0x90 and msg:byte(3) > 0 then
+        local key = ('%d:%d:%d'):format(b1 & 0x0F, math.floor(ppq + 0.5), msg:byte(2))
+        local m = over and over[key]
+        if m == nil then m = model.micro_of_cents(tune[msg:byte(2)]) or 0 end
+        e.m = m
+      end
+      evs[#evs + 1] = e
+    end
+  end
+  local any = false
+  for _, e in ipairs(evs) do if e.m and e.m ~= 0 then any = true end end
+  local out, last = {}, 0
+  for _, e in ipairs(evs) do
+    if any and e.m then
+      local key = e.msg:byte(2)
+      out[#out + 1] = string.pack('<i4Bs4', math.floor(e.ppq - last + 0.5), 0, model.mts_bytes(key, key * 100 + e.m * model.MICRO_STEP))
+      last = e.ppq
+    end
+    out[#out + 1] = string.pack('<i4Bs4', math.floor(e.ppq - last + 0.5), e.flag, e.msg)
+    last = e.ppq
+  end
+  R.MIDI_SetAllEvts(take, table.concat(out))
+end
+
+-- сдвиг на d ступеней 1/6 тона; за ±3 — перенос в соседний полутон (C-4^3 + ^ = C#4v^… = C#4vv)
+function E.micro_nudge(heads, lpb, d)
+  if #heads == 0 or d == 0 then return end
+  run(('micro %+d/6'):format(d), function()
+    local by_take = {}
+    for _, h in ipairs(heads) do
+      if h.kind == 'audio' and h.take then
+        R.SetMediaItemTakeInfo_Value(h.take, 'D_PITCH', R.GetMediaItemTakeInfo_Value(h.take, 'D_PITCH') + d / 6)
+      elseif h.kind == 'midi' then
+        local i, n = midi_note(h, lpb)
+        if i then
+          local m = (h.micro or 0) + d
+          local p = n.pitch
+          while m > 3 do m = m - 6; p = p + 1 end
+          while m < -3 do m = m + 6; p = p - 1 end
+          p = math.max(0, math.min(127, p))
+          if p ~= n.pitch then R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, n.eppq, n.ch, p, n.vel, true) end
+          by_take[h.take] = by_take[h.take] or {}
+          by_take[h.take][('%d:%d:%d'):format(n.ch, math.floor(n.sppq + 0.5), p)] = m
+        end
+      end
+    end
+    for tk, over in pairs(by_take) do R.MIDI_Sort(tk); E.micro_sync(tk, over) end
   end)
 end
 
