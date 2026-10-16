@@ -620,6 +620,38 @@ function E.micro_sync(take, over)
   R.MIDI_SetAllEvts(take, table.concat(out))
 end
 
+-- 16 окт: микротоны нот, начавшихся в строке row трека (аккорд гармонизатора в натуральном строе):
+-- pmap = { [pitch] = m }; MIDI-тейки, что покрывают строку, — через micro_sync
+function E.micro_set_at(track, row, lpb, pmap)
+  local t0 = E.swing_time(row, lpb)
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local it = R.GetTrackMediaItem(track, i)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local tk = R.GetActiveTake(it)
+    if tk and R.TakeIsMIDI(tk) and t0 >= pos - 1e-6 and t0 < pos + len then
+      local ppq = R.MIDI_GetPPQPosFromProjTime(tk, t0)
+      local over = {}
+      local _, nn = R.MIDI_CountEvts(tk)
+      for k = 0, nn - 1 do
+        local _, _, _, sp, _, ch, p = R.MIDI_GetNote(tk, k)
+        if math.abs(sp - ppq) < 1 and pmap[p] then over[('%d:%d:%d'):format(ch, math.floor(sp + 0.5), p)] = pmap[p] end
+      end
+      if next(over) then E.micro_sync(tk, over) end
+    end
+  end
+end
+-- MTS-ESP Master первым на треке (раздаёт подстройку Surge XT и другим клиентам); true — добавлен
+function E.mts_master(track)
+  for k = 0, R.TrackFX_GetCount(track) - 1 do
+    local _, nm = R.TrackFX_GetFXName(track, k, '')
+    if (nm or ''):find('MTS-ESP Master', 1, true) then return false end
+  end
+  local fx = R.TrackFX_AddByName(track, 'VST3i: MTS-ESP Master (ODDSound)', false, -1000)
+  if not fx or fx < 0 then fx = R.TrackFX_AddByName(track, 'MTS-ESP Master (ODDSound)', false, -1000) end
+  return fx ~= nil and fx >= 0
+end
+
 -- сдвиг на d ступеней 1/6 тона; за ±3 — перенос в соседний полутон (C-4^3 + ^ = C#4v^… = C#4vv)
 function E.micro_nudge(heads, lpb, d)
   if #heads == 0 or d == 0 then return end

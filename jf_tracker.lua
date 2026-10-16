@@ -78,6 +78,7 @@ MMX.HM.root = tonumber(reaper.GetExtState('jf_tracker', 'harmroot')) or 0
 MMX.HM.minor = reaper.GetExtState('jf_tracker', 'harmminor') == '1'
 MMX.HM.show_staff = reaper.GetExtState('jf_tracker', 'harmstaff') ~= '0'   -- 9 окт: стан / таб аккорда
 MMX.HM.show_tab = reaper.GetExtState('jf_tracker', 'harmtab') ~= '0'
+MMX.HM.ji = reaper.GetExtState('jf_tracker', 'harmji') == '1'   -- 16 окт: натуральный строй
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
@@ -9513,6 +9514,7 @@ ctx = {
     reaper.SetExtState('jf_tracker', 'harmminor', MMX.HM.minor and '1' or '0', true)
     reaper.SetExtState('jf_tracker', 'harmstaff', MMX.HM.show_staff and '1' or '0', true)
     reaper.SetExtState('jf_tracker', 'harmtab', MMX.HM.show_tab and '1' or '0', true)
+    reaper.SetExtState('jf_tracker', 'harmji', MMX.HM.ji and '1' or '0', true)
     if r == true then vim.msg = 'harmonizer: ' .. MMX.HM.key_name() end
   end,
   chord_cmd = function(arg)
@@ -9537,12 +9539,16 @@ ctx = {
       rows = rb
       for r = row + 1, row + rb - 1 do if #ctx.chord_heads(col, r) > 0 then rows = r - row; break end end
     end
+    -- 16 окт: just во вкладке harm — аккорд в натуральном строе (микротоны 72-EDO), MTS-ESP Master на трек
+    local jm = MMX.HM.ji and MMX.HM.ji_micro(arg, pitches) or nil
+    local mts_new
     edit.run('chord ' .. arg, function()
       if #heads > 0 then edit.delete(heads, state.lpb) end
       for _, p in ipairs(pitches) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, rows) end
+      if jm and next(jm) then edit.micro_set_at(col.track, row, state.lpb, jm); mts_new = edit.mts_master(col.track) end
     end)
     model.invalidate()
-    vim.msg = ('%s: %s at %d, %d row(s) - %s'):format(col.name, arg, row, rows, table.concat((function() local t = {} for _, p in ipairs(pitches) do t[#t + 1] = model.note_name(p) end return t end)(), ' '))
+    vim.msg = ('%s: %s%s at %d, %d row(s) - %s%s'):format(col.name, arg, jm and ' (just)' or '', row, rows, table.concat((function() local t = {} for _, p in ipairs(pitches) do t[#t + 1] = model.note_name(p) .. ((jm and jm[p]) and (jm[p] > 0 and ({ '^', '^^', '^3' })[jm[p]] or ({ 'v', 'vv', 'v3' })[-jm[p]]) or '') end return t end)(), ' '), mts_new and ' + MTS-ESP Master on the track' or '')
   end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y

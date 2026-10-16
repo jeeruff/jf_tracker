@@ -7,7 +7,8 @@
 --
 -- Клавиши (фокус вкладки): 1..7 / ! @ # $ % ^ & — записать; h l — тоника
 -- вниз / вверх; m — мажор ↔ минор; a — лад по нотам трека; c — трек одним
--- лейном аккордов (:chord); s — нотный стан, t — гитарный таб; Esc — в трекер.
+-- лейном аккордов (:chord); s — нотный стан, t — гитарный таб; j — just (натуральный строй
+-- микротонами 72-EDO, 16 окт); Esc — в трекер.
 --
 -- HM.key / HM.click возвращают действие { write = sym } | { lane = true } |
 -- 'leave' | true; запись делает main (ctx.chord_cmd). Без reaper.*.
@@ -24,6 +25,32 @@ local ROM = { [false] = { 'I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°' }, [true] =
 local SHIFTD = { ['!'] = 1, ['@'] = 2, ['#'] = 3, ['$'] = 4, ['%'] = 5, ['^'] = 6, ['&'] = 7 }
 
 function HM.init(u, ch) U, CH = u, ch end
+
+-- 16 окт: натуральный строй (just intonation, 5- и 7-limit) — аккорд пишется микротонами 72-EDO
+-- (ступень 1/6 тона = 16.7 цента): интервал от корня аккорда → чистое отношение → поправка в ступенях.
+-- Терция 5/4 = 386 ц (−1), малая 6/5 = 316 ц (+1), септима 7/4 = 969 ц (−2) у доминантового 7,
+-- 9/5 = 1018 ц (+1) у минорного; j во вкладке — вкл / выкл
+HM.ji = false
+HM.JI_RATIO = { [0] = 1, 16 / 15, 9 / 8, 6 / 5, 5 / 4, 4 / 3, 45 / 32, 3 / 2, 8 / 5, 5 / 3, 7 / 4, 15 / 8 }
+function HM.ji_step(semis, minor7)
+  local iv = semis % 12
+  local r = HM.JI_RATIO[iv]
+  if iv == 10 and minor7 then r = 9 / 5 end
+  local cents = 1200 * math.log(r, 2)
+  return math.floor((cents - iv * 100) / (100 / 6) + 0.5)
+end
+-- ступени для нот аккорда sym: { [pitch] = m } (корень и чистая квинта — 0, без записи)
+function HM.ji_micro(sym, pitches)
+  local c = CH and CH.parse(sym)
+  if not c then return {} end
+  local m7 = c.suffix and c.suffix:match('^m') ~= nil and not c.suffix:match('^maj')
+  local out = {}
+  for _, p in ipairs(pitches or {}) do
+    local st = HM.ji_step(p - c.root, m7)
+    if st ~= 0 then out[p] = st end
+  end
+  return out
+end
 
 -- обозначение ступени k (1..7) лада: трезвучие / септаккорд
 function HM.degree(k, seventh)
@@ -144,6 +171,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   cx = btn(cx, y, bw_of('chord lane'), 'chord lane', info.lane, { kind = 'lane' }) + L.cw
   cx = btn(cx, y, bw_of('staff'), 'staff', HM.show_staff, { kind = 'staff' })
   cx = btn(cx, y, bw_of('tab'), 'tab', HM.show_tab, { kind = 'tab' })
+  cx = btn(cx, y, bw_of('just'), 'just', HM.ji, { kind = 'ji' })   -- 16 окт: натуральный строй микротонами (j)
   if info.col_name then U.text(cx + L.pad, y, fit(info.col_name .. (info.here and ('  now: ' .. info.here) or '  now: -'), x + w - cx - L.pad), info.here and U.TEXT or U.GREY) end
   -- строки 2..3: ступени — одна ширина на все (по самой длинной подписи)
   local roman = true
@@ -202,6 +230,7 @@ function HM.click(d, pitches)
   elseif d.kind == 'lane' then return { lane = true }
   elseif d.kind == 'staff' then HM.show_staff = not HM.show_staff; return true
   elseif d.kind == 'tab' then HM.show_tab = not HM.show_tab; return true
+  elseif d.kind == 'ji' then HM.ji = not HM.ji; return true
   elseif d.kind == 'deg' then return { write = HM.degree(d.k, d.seventh) } end
 end
 
@@ -218,6 +247,7 @@ function HM.key(c, pitches)
   if ch == 'c' then return { lane = true } end
   if ch == 's' then return HM.click({ kind = 'staff' }) end
   if ch == 't' then return HM.click({ kind = 'tab' }) end
+  if ch == 'j' then return HM.click({ kind = 'ji' }) end
   return nil
 end
 

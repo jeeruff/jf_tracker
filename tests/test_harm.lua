@@ -23,5 +23,13 @@ eq(g('C'), '-1 3 2 0 1 0', 'open C'); eq(g('Am'), '-1 0 2 2 1 0', 'open Am')
 eq(g('F'), '1 3 3 2 1 1', 'F barre'); eq(g('Dm'), '-1 -1 0 2 3 1', 'open Dm')
 eq(g('E7'), '0 2 0 1 0 0', 'E7'); eq(g('C/E'):sub(1, 1), '0', 'C/E: E in the bass')
 eq(HM.key(('s'):byte()), true, 's toggles staff'); eq(HM.show_staff, false, 'staff off')
+-- 16 окт: натуральный строй
+eq(HM.ji_step(4), -1, 'major third 5/4 = -1/6'); eq(HM.ji_step(3), 1, 'minor third 6/5 = +1/6'); eq(HM.ji_step(7), 0, 'fifth 3/2 = 0')
+eq(HM.ji_step(10), -2, 'harmonic seventh 7/4 = -2/6'); eq(HM.ji_step(10, true), 1, 'minor seventh 9/5 = +1/6')
+local jm = HM.ji_micro('C7', { 60, 64, 67, 70 })
+eq(jm[60], nil, 'root untouched'); eq(jm[64], -1, 'C7: E lower'); eq(jm[70], -2, 'C7: Bb 7/4'); eq(jm[67], nil, 'C7: G pure')
+local jm2 = HM.ji_micro('Am7', { 57, 60, 64, 67 })
+eq(jm2[60], 1, 'Am7: C higher (6/5)'); eq(jm2[67], 1, 'Am7: G 9/5')
+eq(HM.key(('j'):byte()), true, 'j toggles just'); eq(HM.ji, true, 'just on')
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end
