@@ -1852,10 +1852,17 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     local xa, xb
     if column then set(U.AMBER); xa, xb = x0w, x0w + L.w_wave - 1
     else set(U.mix(U.AMBER, U.BG, 0.65)); xa, xb = x + L.x_note, x + L.x_note + L.w_note - 1 end
+    local mxm, mym = gfx.mouse_x, gfx.mouse_y
     for _, fr in ipairs(head.smk) do
       local q = math.floor(fr * total)
       local py = q - (i * L.rh - off)
-      if py >= 0 and py < L.rh then gfx.line(xa, y + py, xb, y + py) end
+      if py >= 0 and py < L.rh then
+        -- 16 окт: маркер мышью (±3 px) — тянуть вверх / вниз (main: smk_drag); под мышью — янтарём во всю яркость
+        local hot = mxm >= xa and mxm <= xb and math.abs(mym - (y + py)) <= 3
+        if hot then D.smk_hot = { item = head.item, frac = fr }; set(U.AMBER) end
+        gfx.line(xa, y + py, xb, y + py)
+        if hot then gfx.line(xa, y + py + 1, xb, y + py + 1); set(column and U.AMBER or U.mix(U.AMBER, U.BG, 0.65)) end
+      end
     end
   end
   -- границы периода лупа (B_LOOPSRC): тусклые чёрточки по средней половине колонки

@@ -15710,6 +15710,7 @@ local function frame()
     end
   end
   draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Ctrl+Cmd)
+  draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
@@ -18690,6 +18691,21 @@ local function frame()
       end
       if gfx.mouse_cap & 16 == 16 and a.edge ~= 'move' then ai_drag.rate0 = reaper.GetSetAutomationItemInfo(a.e.env, a.idx, 'D_PLAYRATE', 0, false) end
       click = { t = now2, zone = 'aiedge' }
+    elseif draw.smk_hot and gfx.mouse_cap & 8 ~= 8 then
+      -- 16 окт: stretch-маркер в трекере — взять и тянуть (звук под ним растягивается, источник на месте)
+      local sh = draw.smk_hot
+      local tk = reaper.ValidatePtr(sh.item, 'MediaItem*') and reaper.GetActiveTake(sh.item)
+      if tk then
+        local len = reaper.GetMediaItemInfo_Value(sh.item, 'D_LENGTH')
+        local best, bd
+        for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+          local _, p = reaper.GetTakeStretchMarker(tk, i)
+          local d = math.abs(p - sh.frac * len)
+          if not bd or d < bd then best, bd = i, d end
+        end
+        if best then ctx.set_focus('tracker'); ctx.smk_drag = { item = sh.item, take = tk, idx = best, y0 = gfx.mouse_y, active = false } end
+      end
+      click = { t = now2, zone = 'smk' }
     elseif hover.itemedge and hover.itemedge.edge ~= 'move' and gfx.mouse_cap & 8 ~= 8 then
       -- край рамки item: trim как в аранжировке
       ctx.set_focus('tracker')
@@ -18762,6 +18778,32 @@ local function frame()
   end
   -- протяжка item: край → trim, тело (Option) → сдвиг; привязка к строке,
   -- Cmd — без привязки; один undo-блок на жест
+  if ctx.smk_drag then
+    if gfx.mouse_cap & 1 == 1 then
+      if not ctx.smk_drag.active and math.abs(gfx.mouse_y - ctx.smk_drag.y0) > 2 then ctx.smk_drag.active = true; edit.item_drag_begin('stretch marker') end
+      if ctx.smk_drag.active and rows[1] and reaper.ValidatePtr(ctx.smk_drag.item, 'MediaItem*') then
+        local rowf = rows[1].row + (gfx.mouse_y - L.body_y) / L.rh
+        if gfx.mouse_cap & 4 ~= 4 then rowf = math.floor(rowf + 0.5) end      -- привязка к строке, Cmd — свободно
+        local t = reaper.TimeMap2_QNToTime(0, math.max(0, rowf) / state.lpb)
+        local tk, k = ctx.smk_drag.take, ctx.smk_drag.idx
+        local p = t - reaper.GetMediaItemInfo_Value(ctx.smk_drag.item, 'D_POSITION')
+        local n = reaper.GetTakeNumStretchMarkers(tk)
+        local lo = 0.002; local hi = reaper.GetMediaItemInfo_Value(ctx.smk_drag.item, 'D_LENGTH') - 0.002
+        if k > 0 then local _, pp = reaper.GetTakeStretchMarker(tk, k - 1); lo = pp + 0.002 end
+        if k < n - 1 then local _, pn = reaper.GetTakeStretchMarker(tk, k + 1); hi = pn - 0.002 end
+        p = math.max(lo, math.min(hi, p))
+        reaper.SetTakeStretchMarker(tk, k, p)                                   -- источник маркера на месте — звук тянется
+        reaper.UpdateItemInProject(ctx.smk_drag.item)
+        state.status = ('stretch marker -> row %.2f (Cmd: free)'):format(rowf)
+        model.invalidate()
+      end
+    else
+      if ctx.smk_drag.active then edit.note_modified(ctx.smk_drag.item); edit.item_drag_end() end
+      ctx.smk_drag = nil
+    end
+  elseif draw.smk_hot then
+    state.status = 'stretch marker - drag up / down: the hit moves to that row, the sound stretches (Cmd: free)'
+  end
   if item_drag then
     if gfx.mouse_cap & 1 == 1 then
       if not item_drag.active and math.abs(gfx.mouse_y - item_drag.y0) > 2 then item_drag.active = true; edit.item_drag_begin('item ' .. item_drag.edge) end
