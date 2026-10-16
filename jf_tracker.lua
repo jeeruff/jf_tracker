@@ -13708,13 +13708,18 @@ ctx.ut_draw_big = function(Lx, x, y, w, h, foc, hv)
   for i, r in ipairs(rows) do if r.id == ST.sel then si = i end end
   ST.scroll = math.max(0, math.min(ST.scroll or 0, #rows - nv))
   if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
-  local gcw = math.max(6, math.min(2 * cw, math.floor(w * 0.4 / nb)))
-  local gw = nb * gcw
+  -- 17 окт: колонки ветвей — от самой левой из видимых (последняя ветвь — колонка 29 из 30: список стоял посреди экрана)
+  local cmin, cmax = math.huge, 0
+  for i = ST.scroll + 1, math.min(#rows, ST.scroll + nv) do local c = rows[i].col; if c < cmin then cmin = c end; if c > cmax then cmax = c end end
+  if cmin == math.huge then cmin = 0 end
+  local nbv = math.max(1, cmax - cmin + 1)
+  local gcw = math.max(6, math.min(2 * cw, math.floor(w * 0.4 / nbv)))
+  local gw = nbv * gcw
   local sbw = #rows > nv and ((draw.SBW or 3) + 4) or 0
   local rowof = {}
   for i, r in ipairs(rows) do rowof[r.id] = i end
   local function cy(i) return ly + (i - ST.scroll - 1) * rh + math.floor(rh / 2) end
-  local function cx(c) return x + c * gcw + math.floor(gcw / 2) end
+  local function cx(c) return x + math.max(0, math.min(nbv - 1, c - cmin)) * gcw + math.floor(gcw / 2) end
   for i, r in ipairs(rows) do
     local n = r.node
     local pi = n.parent ~= nil and rowof[n.parent]
@@ -13774,6 +13779,7 @@ ctx.ut_draw_big = function(Lx, x, y, w, h, foc, hv)
       local px = tx_of(t)
       U.set(U.DIM); gfx.rect(px, ty + 2, 1, ay - ty - 2, 1)
       local s = os.date(fmt, t)
+      if fmt ~= '%d.%m' and t1 - t0 > 86400 * 0.5 and os.date('%H%M', t) == '0000' then s = os.date('%d.%m', t) end   -- 17 окт: полночь — датой
       local sw = U.measure(s)
       local lx = math.max(x, math.min(x + w - sw, px - math.floor(sw / 2)))
       if lx > lastx + cw then U.text(lx, ay + 2, s, U.GREY); lastx = lx + sw end
