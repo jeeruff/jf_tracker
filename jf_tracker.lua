@@ -6965,6 +6965,57 @@ ctx = {
     if not ctx.AIM.inside(c.n, t) then return nil end
     return { item = c.item, rf = model.row_of_time(t, state.lpb) }
   end,
+  -- 16 окт: кнопка stretch слайсера — stretch-маркеры на границах слайсов (секунды item) и на краях; старые — заменяются
+  slices_to_smk = function(item, slices)
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end
+    local tk = reaper.GetActiveTake(item); if not tk or reaper.TakeIsMIDI(tk) then return end
+    if #slices == 0 then vim.msg = 'stretch: no slices yet (transients / s menu first)'; return end
+    local len = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    local n = 0
+    local bs = edit.bsync_of and edit.bsync_of(item)
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    local k = (bs and bs.rate0 and rate > 0) and (bs.rate0 / rate) or 1
+    edit.run('stretch markers at the slices', function()
+      local nm = reaper.GetTakeNumStretchMarkers(tk)
+      if nm > 0 then reaper.DeleteTakeStretchMarkers(tk, 0, nm) end
+      reaper.SetTakeStretchMarker(tk, -1, 0)
+      for _, s in ipairs(slices) do
+        local p = s * k                                 -- слайсы — секунды item при исходном rate (beatsync — пересчёт)
+        if p > 0.002 and p < len - 0.002 then reaper.SetTakeStretchMarker(tk, -1, p); n = n + 1 end
+      end
+      reaper.SetTakeStretchMarker(tk, -1, len)
+      reaper.UpdateItemInProject(item)
+    end)
+    vim.msg = ('stretch: %d markers at the slices - drag them in the tracker, or smk / squant'):format(n)
+    model.invalidate()
+  end,
+  -- 16 окт: stretch-маркер в точке прицела и на ближайшую строку (со свингом): удар на сетке, звук вокруг тянется.
+  -- Края item — тоже маркеры (если нет), чтобы растяжка была только между соседями
+  smk_at = function(c, te)
+    if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
+    local tk = reaper.GetActiveTake(c.item); if not tk then return end
+    local t = ctx.AIM.proj_of(c.n, c.e, te)
+    if not ctx.AIM.inside(c.n, t) then vim.msg = 'smk: the aim point is outside the note'; return end
+    local pos0 = reaper.GetMediaItemInfo_Value(c.item, 'D_POSITION')
+    local len = reaper.GetMediaItemInfo_Value(c.item, 'D_LENGTH')
+    local r = math.floor(model.row_of_time(t, state.lpb) + 0.5)
+    local qt = edit.swing_time(r, state.lpb) - pos0
+    edit.run('stretch marker at the aim', function()
+      local have0, haveL = false, false
+      for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+        local _, p = reaper.GetTakeStretchMarker(tk, i)
+        if p < 1e-4 then have0 = true end; if math.abs(p - len) < 1e-4 then haveL = true end
+      end
+      if not have0 then reaper.SetTakeStretchMarker(tk, -1, 0) end
+      if not haveL then reaper.SetTakeStretchMarker(tk, -1, len) end
+      local k = reaper.SetTakeStretchMarker(tk, -1, t - pos0)
+      if k and k >= 0 and qt > 0.002 and qt < len - 0.002 then reaper.SetTakeStretchMarker(tk, k, qt) end
+      reaper.UpdateItemInProject(c.item)
+    end)
+    edit.note_modified(c.item)
+    vim.msg = ('stretch marker: the hit to row %d (drag the amber line in the tracker to move it)'):format(r)
+    model.invalidate()
+  end,
   -- 12 окт: разрезать ноту в точке прицела (секунды e) — не по строке; правая часть без метки слайса
   cut_at = function(c, te, quant)
     if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end

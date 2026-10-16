@@ -713,6 +713,8 @@ function S.button(id)
     S.sens = math.max(0, math.min(1, S.sens + (id == 'sens+' and 0.05 or -0.05)))
     S.use_transients()
   elseif id == 'clear' then S.clear()
+  elseif id == 'smkall' then   -- 16 окт: stretch-маркеры на всех границах слайсов (и на краях item)
+    if ctx.slices_to_smk then ctx.slices_to_smk(S.entry.item, S.slices or {}) end
   elseif id == 'quant' then S.smart_quantize()
   elseif id == 'autotrim' then S.autotrim()
   elseif id == 'scram' and ctx.scramble then ctx.scramble()
@@ -1031,7 +1033,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
-                  { 'transients', 'trans' }, { '-', 'sens-' }, { '+', 'sens+' }, { 'clear', 'clear' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
+                  { 'transients', 'trans' }, { '-', 'sens-' }, { '+', 'sens+' }, { 'clear', 'clear' }, { 'stretch', 'smkall' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad
       local lim = brow == 0 and (x + hint_w) or (x + w)
@@ -1659,21 +1661,29 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local down = (gfx.mouse_cap & 1) == 1
     local press = down and not S.cb_prev
     S.cb_prev = down
-    local BT = { { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
+    -- 16 окт: и действия прицела — cut (как s), smk (stretch-маркер на строку), squant (smart quantize, как Q)
+    local BT = { { 'act_cut', 'cut', act = true }, { 'act_smk', 'smk', act = true }, { 'act_sq', 'squant', act = true },
+                 { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
     local bx = x + w
     S.cut_hot = nil
     for k = #BT, 1, -1 do
       local b = BT[k]
       local bw2 = U.measure(b[2]) + 2 * L.pad
       bx = bx - bw2 - (k < #BT and 2 or 0)
-      local on = st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
+      local on = not b.act and st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
       local col = b[3] or U.AMBER
       local hot2 = mx2 >= bx and mx2 < bx + bw2 and my2 >= fy and my2 < fy + rh
       if hot2 then S.cut_hot = b[1] end
       U.set(on and U.tint(col, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx, fy, bw2, rh - 1, 1)
       U.set(on and col or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx, fy, bw2, rh - 1, 0)
       U.text(bx + L.pad, fy, b[2], on and col or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))
-      if hot2 and press and ctx.state then
+      if hot2 and press and b.act then
+        local need = b[1] ~= 'act_sq'
+        if need and not S.cross then S.msg = b[2] .. ': aim at a note first (the cursor on a note of this sample)'
+        elseif b[1] == 'act_cut' then local te = S.cut_point(S.cross.t + S.cross.dt); ctx.cut_at(S.cross, te, st.cutsnap and st.cutquant); S.cross = nil
+        elseif b[1] == 'act_smk' and ctx.smk_at then ctx.smk_at(S.cross, S.cut_point(S.cross.t + S.cross.dt))
+        elseif b[1] == 'act_sq' then S.smart_quantize() end
+      elseif hot2 and press and ctx.state then
         st[b[1]] = not st[b[1]]
         S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
       end
