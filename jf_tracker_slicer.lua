@@ -948,6 +948,7 @@ end
 -- когда e — его исходник (слайс/кусок показывается на фоне целого сэмпла)
 function S.draw_in(U, L, x, y, w, h, e, track, zone)
   S.ap_hot = false
+  if zone and not (zone[1] and zone[2]) then zone = nil end   -- 15 окт: неполная зона (слайс отрезан) — без неё, не падать
   if not e then
     -- пустой трек: запись — во вкладке rec (3 окт)
     U.text(x, y + 1, ctx.fit('no instrument - select one in the lib, or record one in the rec tab', w), U.GREY)

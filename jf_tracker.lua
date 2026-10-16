@@ -16003,6 +16003,8 @@ local function frame()
           ctx.ssel = { item = root.item, k = k0, cell = ck }
         end
         local k = ctx.ssel.k or 0
+        -- 15 окт: ] отрезал выбранный слайс и всё после — номер за краем: последний оставшийся (zone[1] = nil ронял слайсер)
+        if k > #(root.slices or {}) then k = #(root.slices or {}); ctx.ssel.k = k end
         if k > 0 then
           local child = ctx.slice_child(col, root, k)
           sel_e = child or root
