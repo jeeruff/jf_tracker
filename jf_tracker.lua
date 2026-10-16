@@ -20139,7 +20139,9 @@ local function frame()
   if state.bpm_edit and c ~= 0 then
     local ch = c < 256 and string.char(c) or ''
     if c == 27 then state.bpm_edit = nil
-    elseif c == 13 then local v = tonumber(state.bpm_edit); state.bpm_edit = nil; if v then set_bpm(v) end
+    elseif c == 13 then   -- 16 окт: Enter — темп поставлен, выделение уходит (фокус обратно в трекер)
+      local v = tonumber(state.bpm_edit); state.bpm_edit = nil; if v then set_bpm(v) end
+      if state.focus == 'ctrl' then ctx.set_focus('tracker') end
     elseif c == 8 then state.bpm_edit = state.bpm_edit:sub(1, -2)
     elseif ch:match('[%d%.]') and #state.bpm_edit < 7 then state.bpm_edit = state.bpm_edit .. ch end
     c = 0

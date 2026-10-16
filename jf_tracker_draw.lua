@@ -1841,12 +1841,16 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     end
   end
   -- stretch-маркеры: янтарная чёрточка во всю ширину колонки на своей строке
-  if column and head.smk and not inv and D.show_smk ~= false then          -- опция stretch markers (5 окт)
-    set(U.AMBER)
+  -- 16 окт: и в режимах note / back — еле видная линия поверх волны (удар слайса подтянут к сетке q:
+  -- одна нота с маркерами вместо ghost-кусков); x0w..x1w — ширина, где лежит волна
+  if head.smk and not inv and D.show_smk ~= false then          -- опция stretch markers (5 окт)
+    local xa, xb
+    if column then set(U.AMBER); xa, xb = x0w, x0w + L.w_wave - 1
+    else set(U.mix(U.AMBER, U.BG, 0.65)); xa, xb = x + L.x_note, x + L.x_note + L.w_note - 1 end
     for _, fr in ipairs(head.smk) do
       local q = math.floor(fr * total)
       local py = q - (i * L.rh - off)
-      if py >= 0 and py < L.rh then gfx.line(x0w, y + py, x0w + L.w_wave - 1, y + py) end
+      if py >= 0 and py < L.rh then gfx.line(xa, y + py, xb, y + py) end
     end
   end
   -- границы периода лупа (B_LOOPSRC): тусклые чёрточки по средней половине колонки
