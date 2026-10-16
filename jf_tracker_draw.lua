@@ -8506,11 +8506,16 @@ function D.popup(L, p, anchor)
     if colw < tmin then tw = tw + (tmin - colw); colw = tmin end
   end
   -- 16 окт: пикер с папками — слева колонка папок (своя ширина, до 28 знаков), справа имена
-  local gw = 0
+  local gw, gws = 0, {}
   if p.groups then
-    for _, t in ipairs(p.groups.lines) do gw = math.max(gw, ms(t)) end
-    gw = math.min(gw, ms(string.rep('W', 28))) + 3 * L.pad
-    nrow = math.max(nrow, math.min(#p.groups.lines, maxrows))
+    -- 16 окт: колонки папок по уровням, у каждой своя ширина (до 24 знаков)
+    for k, col in ipairs(p.groups.cols) do
+      local cw = ms('all  0000')
+      for _, t in ipairs(col.lines) do cw = math.max(cw, ms(t)) end
+      gws[k] = math.min(cw, ms(string.rep('W', 24))) + 3 * L.pad
+      gw = gw + gws[k]
+      nrow = math.max(nrow, math.min(#col.lines, maxrows))
+    end
   end
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad + gw)
   local h = (nrow + 1) * L.rh + 2 * L.pad
@@ -8547,18 +8552,23 @@ function D.popup(L, p, anchor)
   end
   text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
   if p.groups then
-    local G = p.groups
-    for i, t in ipairs(G.lines) do
-      if i > nrow then break end
-      local gi = G.first + i - 1
-      local ly = y + L.pad + i * L.rh
-      local on = gi == G.sel
-      local mhot = gfx.mouse_x >= x + L.pad and gfx.mouse_x < x + gw and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
-      if mhot then D.popup_group = gi end
-      if on or mhot then set(on and (G.focus and D.CURROW or U.tint(U.AMBER, 0.15)) or D.CURROW); gfx.rect(x + L.pad, ly, gw - 2 * L.pad, L.rh, 1) end
-      text(x + 2 * L.pad, ly + 1, fit(t, gw - 3 * L.pad), on and U.AMBER or U.TEXT)
+    local cx = x
+    for k, G in ipairs(p.groups.cols) do
+      local cw = gws[k]
+      local foc = p.groups.focus == k
+      for i, t in ipairs(G.lines) do
+        if i > nrow then break end
+        local gi = G.first + i - 1
+        local ly = y + L.pad + i * L.rh
+        local on = gi == G.sel
+        local mhot = gfx.mouse_x >= cx + L.pad and gfx.mouse_x < cx + cw and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
+        if mhot then D.popup_group = { k, gi } end
+        if on or mhot then set(on and (foc and D.CURROW or U.tint(U.AMBER, 0.15)) or D.CURROW); gfx.rect(cx + L.pad, ly, cw - 2 * L.pad, L.rh, 1) end
+        text(cx + 2 * L.pad, ly + 1, fit(t, cw - 3 * L.pad), on and U.AMBER or (foc and U.TEXT or U.GREY))
+      end
+      set(U.LINE); gfx.rect(cx + cw - L.pad, y + L.pad + L.rh, 1, h - 2 * L.pad - L.rh, 1)
+      cx = cx + cw
     end
-    set(U.LINE); gfx.rect(x + gw - L.pad, y + L.pad + L.rh, 1, h - 2 * L.pad - L.rh, 1)
   end
   for i, ln in ipairs(p.lines) do
     local ci = math.floor((i - 1) / nrow)

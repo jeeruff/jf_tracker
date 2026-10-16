@@ -1404,6 +1404,7 @@ local function keys_control(c)
   -- 16 окт: frow — цифры и F-ряд играют ноты (- = — тоже ноты, не LPB), октава [ ], громкость { }
   if ctx.keys_frow and ctx.keys_frow() then
     if ctx.piano[c] then return false end
+    if V.SHIFTED and V.SHIFTED[ch] and ctx.piano[V.SHIFTED[ch]:byte()] then return false end   -- Shift+нота (+ _ ! $ *) — прослушать, не LPB
     if ch == '[' then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return true end
     if ch == ']' then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return true end
     if c == 123 or c == 125 then V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true end
@@ -1451,12 +1452,15 @@ end
 -- Клавиша ноты с модификатором → (код базовой клавиши, как):
 -- Shift (Q..P, @#%^&()) → 'audition'; Option (mac-символы œ∑®… или флаг alt)
 -- → 'beside'; Ctrl (коды 1..26 или флаг ctrl) → 'capture'; иначе 'insert'.
-local SHIFTED = { ['@'] = '2', ['#'] = '3', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['('] = '9', [')'] = '0' }
+local SHIFTED = { ['@'] = '2', ['#'] = '3', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['('] = '9', [')'] = '0',
+                  ['!'] = '1', ['$'] = '4', ['*'] = '8', ['_'] = '-', ['+'] = '=' }   -- 16 окт: frow — белые 1 4 8 - = тоже слушаются Shift
+V.SHIFTED = SHIFTED
 local OPTCH = { [339] = 'q', [8721] = 'w', [180] = 'e', [174] = 'r', [8224] = 't', [165] = 'y', [168] = 'u',
                 [710] = 'i', [248] = 'o', [960] = 'p' }
                 -- 16 окт: Option+цифры — снова только инструменты (15 окт были диезами аккорда — спорили с Opt+1)
 -- 16 окт: Shift+Option (раскладка US) — pitch слайса; Option+цифра больше не спорит с выбором инструмента Opt+1
 local SHOPTCH = { [338] = 'q', [8222] = 'w', [8240] = 'r', [711] = 't', [193] = 'y', [216] = 'o', [8719] = 'p',
+                  [8260] = '1', [8250] = '4', [176] = '8', [8212] = '-', [177] = '=',   -- 16 окт: frow — Shift+Option на белых 1 4 8 - =
                   [8364] = '2', [8249] = '3', [64257] = '5', [64258] = '6', [8225] = '7', [183] = '9', [8218] = '0',
                   [184] = 'z', [205] = 's', [731] = 'x', [206] = 'd', [199] = 'c', [9674] = 'v', [733] = 'g',
                   [305] = 'b', [211] = 'h', [732] = 'n', [212] = 'j', [194] = 'm' }
@@ -1476,6 +1480,8 @@ function V.note_key(c, mods)
     local base = (c >= 1 and c <= 26) and (c + 96) or c
     return base, 'hold'
   end
+  -- 16 окт: frow — Shift+F-клавиша (чёрная) — прослушать, как Shift+буква / цифра
+  if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end
   local ch = (c < 256) and string.char(c) or ''
   local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c   -- 'u'-префикс не-ASCII (5 окт)
   if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), 'pitch' end
@@ -2773,13 +2779,51 @@ local function fuzzy_score(label, q)
   return 500 - (pos - first) - #label * 0.01
 end
 
+-- 16 окт: папки пикера деревом (как ranger / lf): group пункта — путь «A / B», колонка на уровень
+-- (сколько уровней — по самому глубокому пути), справа — имена. pk.gpath[k] — выбранная строка
+-- колонки k (1 — all: дальше не фильтруем), pk.col — колонка фокуса (depth + 1 — имена)
+local function split_path(g)
+  local out = {}
+  for part in ((g or '') .. ' / '):gmatch('(.-) / ') do if part ~= '' then out[#out + 1] = part end end
+  return out
+end
+local function tree_sort(node)
+  table.sort(node.list, function(a, b) return a.name:lower() < b.name:lower() end)
+  for _, e in ipairs(node.list) do tree_sort(e.node) end
+end
+-- список колонки k: { {name, n, node}, … } с all первой; nil — колонки нет (выше выбран all)
+local function picker_col(pk, k)
+  local node = pk.tree
+  for lv = 1, k - 1 do
+    local gi = pk.gpath[lv] or 1
+    if gi <= 1 then return nil end
+    node = node.list[gi - 1].node
+    if not node or #node.list == 0 then return nil end
+  end
+  local out = { { name = 'all', n = node.n } }
+  for _, e in ipairs(node.list) do out[#out + 1] = e end
+  return out
+end
+-- префикс пути выбранных папок («Basses / A.Liv») или nil
+local function picker_prefix(pk)
+  local parts, node = {}, pk.tree
+  for lv = 1, pk.depth do
+    local gi = pk.gpath[lv] or 1
+    if gi <= 1 then break end
+    local e = node.list[gi - 1]
+    if not e then break end
+    parts[#parts + 1] = e.name; node = e.node
+  end
+  return #parts > 0 and table.concat(parts, ' / ') or nil
+end
+
 local function picker_filter()
   local pk = V.picker
   local out = {}
-  -- 16 окт: папки (у пунктов group): без набора — пункты выбранной папки (1 — all), с набором — поиск по всем
-  local gname = pk.groups and pk.query == '' and pk.gsel > 1 and pk.groups[pk.gsel].name or nil
+  -- 16 окт: папки (у пунктов group): без набора — пункты выбранной папки (и вложенных), с набором — поиск по всем
+  local pre = pk.tree and pk.query == '' and picker_prefix(pk) or nil
   for i, it in ipairs(pk.items) do
-    if not gname or it.group == gname then
+    if not pre or it.group == pre or (it.group or ''):sub(1, #pre + 3) == pre .. ' / ' then
       local sc = fuzzy_score(it.label, pk.query)
       if sc then out[#out + 1] = { it = it, sc = sc, i = i } end
     end
@@ -2794,49 +2838,66 @@ end
 function V.picker_refilter() if V.picker then picker_filter() end end
 function V.open_picker(title, items, on_pick, query)
   V.picker = { title = title, items = items, query = query or '', sel = 1, matches = {}, on_pick = on_pick }
-  -- 16 окт: пункты с group — слева папки (all и по порядку появления, с числом), справа имена
-  local gs, seen = { { name = 'all', n = #items } }, {}
+  local tree, depth, ng = { list = {}, by = {}, n = #items }, 0, 0
   for _, it in ipairs(items) do
     if it.group then
-      local g = seen[it.group]
-      if not g then g = { name = it.group, n = 0 }; seen[it.group] = g; gs[#gs + 1] = g end
-      g.n = g.n + 1
+      local parts = split_path(it.group)
+      depth = math.max(depth, #parts)
+      local node = tree
+      for _, nm in ipairs(parts) do
+        local e = node.by[nm]
+        if not e then e = { name = nm, n = 0, node = { list = {}, by = {}, n = 0 } }; node.by[nm] = e; node.list[#node.list + 1] = e; if node == tree then ng = ng + 1 end end
+        e.n = e.n + 1; e.node.n = e.n
+        node = e.node
+      end
     end
   end
-  if #gs > 2 then
-    table.sort(gs, function(a, b) if a.name == 'all' then return b.name ~= 'all' elseif b.name == 'all' then return false end; return a.name:lower() < b.name:lower() end)
-    V.picker.groups, V.picker.gsel, V.picker.side = gs, 1, 'left'
+  if ng >= 2 then
+    tree_sort(tree)
+    local pk = V.picker
+    pk.tree, pk.depth, pk.gpath, pk.col = tree, depth, {}, 1
   end
   picker_filter()
 end
--- выбрать папку (мышь / стрелки)
-function V.picker_group(i)
+-- выбрать строку i колонки папок k (мышь / клавиши); глубже — снова all
+function V.picker_pick(k, i)
   local pk = V.picker
-  if not (pk and pk.groups and pk.groups[i]) then return end
-  pk.gsel = i; pk.sel = 1; picker_filter()
+  local list = pk and pk.tree and picker_col(pk, k)
+  if not (list and list[i]) then return end
+  pk.gpath[k] = i
+  for lv = k + 1, pk.depth do pk.gpath[lv] = nil end
+  pk.sel = 1; picker_filter()
 end
 
 function V.picker_key(c)
   local pk = V.picker
   -- 16 окт: папки как в lf — h l j k g G (l на имени — выбрать), / — поиск (любая другая буква — тоже)
-  if pk.groups and pk.query == '' and not pk.typing then
+  if pk.tree and pk.query == '' and not pk.typing then
     local ch = (c > 0 and c < 256) and string.char(c) or ''
     if ch == '/' then pk.typing = true; return end
     if ch == 'h' then c = LEFT elseif ch == 'j' then c = DOWN elseif ch == 'k' then c = UP
-    elseif ch == 'l' then c = (pk.side == 'left') and RIGHT or ENTER
-    elseif ch == 'g' then if pk.side == 'left' then V.picker_group(1) else pk.sel = 1 end; return
-    elseif ch == 'G' then if pk.side == 'left' then V.picker_group(#pk.groups) else pk.sel = math.max(1, #pk.matches) end; return end
+    elseif ch == 'l' then c = (pk.col <= pk.depth) and RIGHT or ENTER
+    elseif ch == 'g' or ch == 'G' then
+      if pk.col <= pk.depth then local list = picker_col(pk, pk.col) or {}; V.picker_pick(pk.col, ch == 'g' and 1 or #list)
+      else pk.sel = ch == 'g' and 1 or math.max(1, #pk.matches) end
+      return
+    end
   end
   if pk.typing and c == ESC and pk.query == '' then pk.typing = nil; return end   -- выход из поиска — снова lf
   if pk.typing and c == BS and pk.query == '' then pk.typing = nil; return end
-  -- 16 окт: папки — ← → / Tab между колонками; слева ↑ ↓ — папка, Enter — к именам
-  if pk.groups and pk.query == '' then
-    if c == LEFT then pk.side = 'left'; return
-    elseif c == RIGHT or c == 9 then pk.side = 'right'; return
-    elseif pk.side == 'left' then
-      if c == 14 or c == DOWN or c == 10 then V.picker_group(math.min(#pk.groups, pk.gsel + 1)); return
-      elseif c == 16 or c == UP or c == 11 then V.picker_group(math.max(1, pk.gsel - 1)); return
-      elseif c == ENTER then pk.side = 'right'; return end
+  -- 16 окт: колонки — ← → / Tab; в колонке папок ↑ ↓ — папка, Enter / → — глубже (или к именам)
+  if pk.tree and pk.query == '' then
+    if c == LEFT then pk.col = math.max(1, pk.col - 1); return
+    elseif c == 9 then pk.col = pk.depth + 1; return
+    elseif c == RIGHT or (c == ENTER and pk.col <= pk.depth) then
+      local nxt = pk.col + 1
+      if nxt <= pk.depth and not picker_col(pk, nxt) then nxt = pk.depth + 1 end   -- выбран all / лист — сразу к именам
+      pk.col = math.min(pk.depth + 1, nxt); return
+    elseif pk.col <= pk.depth then
+      local list = picker_col(pk, pk.col) or {}
+      local gi = pk.gpath[pk.col] or 1
+      if c == 14 or c == DOWN or c == 10 then V.picker_pick(pk.col, math.min(#list, gi + 1)); return
+      elseif c == 16 or c == UP or c == 11 then V.picker_pick(pk.col, math.max(1, gi - 1)); return end
     end
   end
   if c == ESC then V.picker = nil
@@ -2847,7 +2908,7 @@ function V.picker_key(c)
   elseif c == BS then pk.query = pk.query:sub(1, -2); picker_filter()
   elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1)
   elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1)
-  elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); pk.typing = pk.groups and true or nil; picker_filter() end
+  elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); pk.typing = pk.tree and true or nil; picker_filter() end
 end
 
 -- ── hydra (which-key) ─────────────────────────────────────────────────────
@@ -2900,18 +2961,27 @@ function V.popup()
     local lines = {}
     local nr = pk.rows or 14                      -- 6 окт: высота задаётся (действия REAPER — на всю матрицу)
     local first = math.max(1, pk.sel - (nr - 1))
-    local named = pk.groups and pk.query == '' and pk.gsel > 1      -- 16 окт: внутри папки — только имя
+    local named = pk.tree and pk.query == '' and picker_prefix(pk) ~= nil   -- 16 окт: внутри папки — только имя
     for i = first, math.min(#pk.matches, first + nr - 1) do
       local m = pk.matches[i]
       lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = named and (m.name or m.label) or m.label, col = m.col }   -- col: свой цвет строки (маршрутизация, 9 окт)
     end
     local groups
-    if pk.groups then
-      local gfirst = math.max(1, pk.gsel - (nr - 1))
-      groups = { first = gfirst, sel = pk.gsel, focus = pk.side == 'left' and pk.query == '', lines = {} }
-      for i = gfirst, math.min(#pk.groups, gfirst + nr - 1) do
-        local g = pk.groups[i]
-        groups.lines[#groups.lines + 1] = ('%s  %d'):format(g.name, g.n)
+    if pk.tree then
+      -- колонки папок по уровням (пустая — колонки нет); focus — номер колонки
+      groups = { cols = {}, focus = pk.query == '' and pk.col or nil, items_focus = pk.col > pk.depth }
+      for k = 1, pk.depth do
+        local list = picker_col(pk, k)
+        local sel = pk.gpath[k] or 1
+        local gfirst = math.max(1, sel - (nr - 1))
+        local col = { first = gfirst, sel = sel, lines = {} }
+        if list then
+          for i = gfirst, math.min(#list, gfirst + nr - 1) do
+            local g = list[i]
+            col.lines[#col.lines + 1] = (g.node and #g.node.list > 0 and k < pk.depth) and ('%s  %d >'):format(g.name, g.n) or ('%s  %d'):format(g.name, g.n)
+          end
+        end
+        groups.cols[k] = col
       end
     end
     -- 9 окт: пусто — строкой, иначе окно сжималось до клочка заголовка («ro»)

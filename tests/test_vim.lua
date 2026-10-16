@@ -988,40 +988,42 @@ do
   V.piano = false
 end
 
--- 16 окт: пикер с папками — слева папки (all первой, по алфавиту), справа имена папки; набор — по всем
+-- 16 окт: пикер с папками деревом — колонка на уровень (A / B), справа имена; набор — по всем
 do
   local picked
-  V.open_picker('patches', { { label = 'Pads / Air', name = 'Air', group = 'Pads' }, { label = 'Bass / Sub', name = 'Sub', group = 'Bass' },
-                             { label = 'Bass / Wob', name = 'Wob', group = 'Bass' } }, function(it) picked = it.name end)
+  local items = { { label = 'Pads / factory / Air', name = 'Air', group = 'Pads / factory' },
+                  { label = 'Bass / factory / Sub', name = 'Sub', group = 'Bass / factory' },
+                  { label = 'Bass / Bluelight / Wob', name = 'Wob', group = 'Bass / Bluelight' } }
+  V.open_picker('patches', items, function(it) picked = it.name end)
   local pk = V.picker
-  eq('groups made', pk.groups and #pk.groups, 3)
-  eq('all first', pk.groups[1].name, 'all'); eq('sorted', pk.groups[2].name, 'Bass'); eq('count', pk.groups[2].n, 2)
-  eq('starts on the left', pk.side, 'left')
-  V.picker_key(1685026670)                                   -- ↓ — папка Bass
-  eq('down picks group', pk.gsel, 2); eq('right shows its items', #pk.matches, 2)
+  eq('tree made', pk.tree ~= nil, true); eq('depth 2', pk.depth, 2); eq('focus on folders', pk.col, 1)
   local pop = V.popup()
-  eq('names only inside a folder', pop.lines[1].text, 'Sub')
-  eq('popup has groups', pop.groups and #pop.groups.lines, 3)
-  V.picker_key(13)                                           -- Enter слева — направо
-  eq('enter goes right', pk.side, 'right')
-  V.picker_key(1685026670); V.picker_key(13)
-  eq('picks in the folder', picked, 'Wob')
-  V.open_picker('p2', { { label = 'Pads / Air', group = 'Pads' }, { label = 'Bass / Sub', group = 'Bass' }, { label = 'Bass / Wob', group = 'Bass' } }, function() end)
-  V.picker_group(2); V.picker_key(('A'):byte())
-  eq('typing searches all folders', V.picker.matches[1] and V.picker.matches[1].label, 'Pads / Air')
+  eq('two folder columns', #pop.groups.cols, 2)
+  eq('level 1: all + 2', #pop.groups.cols[1].lines, 3)
+  eq('level 1 sorted', pop.groups.cols[1].lines[2]:match('^%S+'), 'Bass')
+  eq('level 2 hidden under all', #pop.groups.cols[2].lines, 0)
+  V.picker_key(('j'):byte())                                -- Bass
+  eq('folder filters', #pk.matches, 2)
+  V.picker_key(('l'):byte())                                -- в колонку авторов
+  eq('l goes deeper', pk.col, 2)
+  pop = V.popup()
+  eq('level 2 shows authors', #pop.groups.cols[2].lines, 3)
+  V.picker_key(('j'):byte())                                -- Bluelight (по алфавиту первый)
+  eq('author filters', #pk.matches, 1)
+  eq('names only inside', V.popup().lines[1].text, 'Wob')
+  V.picker_key(('l'):byte()); eq('to names', pk.col, 3)
+  V.picker_key(('l'):byte())
+  eq('l on a name picks', picked, 'Wob')
+  V.open_picker('p2', items, function() end)
+  V.picker_pick(1, 2); V.picker_key(('A'):byte())
+  eq('typing searches all folders', V.picker.matches[1] and V.picker.matches[1].name, 'Air')
   V.picker = nil
-  -- lf: j — папка вниз, l — внутрь, j — имя, l — выбрать; / — поиск
-  picked = nil
-  V.open_picker('lf', { { label = 'Pads / Air', name = 'Air', group = 'Pads' }, { label = 'Bass / Sub', name = 'Sub', group = 'Bass' },
-                        { label = 'Bass / Wob', name = 'Wob', group = 'Bass' } }, function(it) picked = it.name end)
-  for _, ch in ipairs({ 'j', 'l', 'j', 'l' }) do V.picker_key(ch:byte()) end
-  eq('lf keys pick', picked, 'Wob')
-  V.open_picker('lf2', { { label = 'Pads / Air', group = 'Pads' }, { label = 'Bass / Sub', group = 'Bass' }, { label = 'Bass / Wob', group = 'Bass' } }, function() end)
+  V.open_picker('lf2', items, function() end)
   V.picker_key(('/'):byte()); V.picker_key(('j'):byte())
   eq('/ then letters search', V.picker.query, 'j')
   V.picker = nil
   V.open_picker('flat', { { label = 'a', group = 'x' }, { label = 'b', group = 'x' } }, function() end)
-  eq('one folder - no columns', V.picker.groups, nil)
+  eq('one folder - no columns', V.picker.tree, nil)
   V.picker = nil
 end
 

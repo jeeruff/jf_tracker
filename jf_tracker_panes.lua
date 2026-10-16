@@ -526,7 +526,18 @@ function PN.pin_mixer(model)
   if not lf then return false end
   local tl = PN.find(model, 'tracker')
   -- 16 окт: и вкладкой в стеке (с dsp и т.п.), если этот стек — прямо под трекером: колонки те же
-  if par and par.ax == 'v' and ix and ix > 1 and par.kids[ix - 1] == tl and #tl.panes == 1 then return false end
+  -- 16 окт (вечер): «прямо под трекером» — сосед сверху в вертикальном ряду СОДЕРЖИТ трекер (сам лист
+  -- или колонку, где трекер внизу) — раньше требовался сам лист трекера, и миксер выталкивало
+  local function holds(n)
+    if not n then return false end
+    if n == tl then return #tl.panes == 1 end
+    if n.kids then
+      if n.ax == 'v' then return holds(n.kids[#n.kids]) end           -- в колонке — нижний
+      for _, k in ipairs(n.kids) do if holds(k) then return true end end
+    end
+    return false
+  end
+  if par and par.ax == 'v' and ix and ix > 1 and holds(par.kids[ix - 1]) then return false end
   detach(model, 'mixer')
   insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
   return bump(model)

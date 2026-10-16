@@ -4290,8 +4290,11 @@ ctx = {
   pane_do = function(fn, msg)
     local before = draw.panes.encode(state.panes)
     if fn() then
-      draw.panes.pin_mixer(state.panes)   -- 11 окт: mixer — всегда под трекером
-      draw.panes.pin_sprops(state.panes)
+      local pinned = draw.panes.pin_mixer(state.panes)   -- 11 окт: mixer — всегда под трекером
+      local sp = draw.panes.pin_sprops(state.panes)
+      -- 16 окт: правило вернуло панель — сказать почему (а не молча «не вставляется»)
+      if pinned then msg = 'mixer stays right under the tracker - its strips follow the tracker columns (a tab in a stack under it is fine)' end
+      if sp then msg = (msg and (msg .. '; ') or '') .. 'properties stay beside the item tab' end
       ctx.pn_undo = ctx.pn_undo or {}
       table.insert(ctx.pn_undo, before)
       if #ctx.pn_undo > 20 then table.remove(ctx.pn_undo, 1) end
@@ -11677,7 +11680,14 @@ ctx = {
         local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
         if fn:lower():match('%.fxp$') then
           local cat, nm = MMX.SRG.label(dir .. '/' .. fn, root)
-          list[#list + 1] = { label = (cat ~= '' and (cat .. ' / ') or '') .. nm, path = dir .. '/' .. fn, name = nm, cat = cat, group = cat ~= '' and cat or '(root)' }
+          -- 16 окт: папки — категория / автор (factory — сам Surge, 3rd party — автор / категория, свои — user)
+          local parts = {}
+          for x in (cat .. ' / '):gmatch('(.-) / ') do if x ~= '' then parts[#parts + 1] = x end end
+          local grp
+          if root:find('patches_factory', 1, true) then grp = (parts[1] or 'other') .. ' / factory'
+          elseif root:find('patches_3rdparty', 1, true) then grp = (parts[2] or 'other') .. ' / ' .. (parts[1] or '?')
+          else grp = 'user' .. (parts[1] and (' / ' .. parts[1]) or '') end
+          list[#list + 1] = { label = grp .. ' / ' .. nm, path = dir .. '/' .. fn, name = nm, cat = cat, group = grp }
         end
         i = i + 1
       end
@@ -18014,7 +18024,7 @@ local function frame()
   if vim.picker and not OPT.active then
     local r = draw.popup_rect
     local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
-    if U.click and draw.popup_group then vim.picker_group(draw.popup_group); vim.picker.side = 'right'; U.click = false   -- 16 окт: папка пикера
+    if U.click and draw.popup_group then vim.picker_pick(draw.popup_group[1], draw.popup_group[2]); if vim.picker then vim.picker.col = math.min(vim.picker.depth + 1, draw.popup_group[1] + 1) end; U.click = false   -- 16 окт: папка пикера — выбрать, фокус правее
     elseif U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker_key(13); U.click = false
     elseif (U.click or U.rclick) and not inside then vim.picker_key(27); U.click, U.rclick = false, false
     elseif U.click or U.rclick then U.click, U.rclick = false, false end
