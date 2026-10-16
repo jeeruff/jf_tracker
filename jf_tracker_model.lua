@@ -315,7 +315,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     guid = R.BR_GetMediaItemGUID and R.BR_GetMediaItemGUID(it) or tostring(it),
     row0 = r0,
     rows_f = (qn1 - qn0) * lpb,          -- точная длина в строках (дробная) — волна строго в границах item
-    smk = M.stretch_fracs(take, R.GetMediaItemInfo_Value(it, 'D_LENGTH')),   -- stretch-маркеры: доли длины item
+    smk = nil, smk_src = nil,            -- stretch-маркеры: доли длины item, и откуда удар (ниже)
     smap = nil, smap_sig = nil,          -- карта маркеров для волны (ниже)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
@@ -331,6 +331,7 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     head.video = R.GetMediaSourceType(ps or src, ''):upper():find('VIDEO', 1, true) ~= nil
   end
   head.smap, head.smap_sig = M.stretch_map(take)
+  head.smk, head.smk_src = M.stretch_fracs(take, R.GetMediaItemInfo_Value(it, 'D_LENGTH'))   -- 16 окт: два значения (and режет)
   -- луп (B_LOOPSRC): период в строках и первая граница (offset укорачивает первый проход)
   if src and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1 then
     local slen = M.src_period(src)
@@ -1965,12 +1966,16 @@ function M.stretch_fracs(take, len)
   if not take or not R.GetTakeNumStretchMarkers or len <= 0 then return nil end
   local n = R.GetTakeNumStretchMarkers(take)
   if n == 0 then return nil end
-  local out = {}
+  local out, src = {}, {}
+  -- 16 окт: и где удар был без растяжки (srcpos от начала файла в единицах rate; минус offset) — линия «откуда куда»
+  local rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+  local o0 = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') / ((rate and rate > 0) and rate or 1)
   for i = 0, n - 1 do
-    local _, pos = R.GetTakeStretchMarker(take, i)
-    if pos and pos > 1e-6 and pos < len - 1e-6 then out[#out + 1] = pos / len end
+    local _, pos, sp = R.GetTakeStretchMarker(take, i)
+    if pos and pos > 1e-6 and pos < len - 1e-6 then out[#out + 1] = pos / len; src[#out] = sp and (sp - o0) / len or pos / len end
   end
-  return #out > 0 and out or nil
+  if #out == 0 then return nil end
+  return out, src
 end
 
 M.OVERSAMPLE = 1   -- 1/2/4: пиков на пиксель (Options → wave detail); max/min по группе

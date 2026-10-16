@@ -1853,15 +1853,34 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     if column then set(U.AMBER); xa, xb = x0w, x0w + L.w_wave - 1
     else set(U.mix(U.AMBER, U.BG, 0.65)); xa, xb = x + L.x_note, x + L.x_note + L.w_note - 1 end
     local mxm, mym = gfx.mouse_x, gfx.mouse_y
-    for _, fr in ipairs(head.smk) do
+    local base = i * L.rh - off
+    local mcol = column and U.AMBER or U.mix(U.AMBER, U.BG, 0.65)
+    for k, fr in ipairs(head.smk) do
       local q = math.floor(fr * total)
-      local py = q - (i * L.rh - off)
+      local py = q - base
+      -- 16 окт: как в REAPER — откуда удар утянут: пунктир от исходного места (srcpos) к маркеру, кусок этой строки
+      local sf = head.smk_src and head.smk_src[k]
+      local qs = sf and math.floor(sf * total)
+      if qs and math.abs(qs - q) >= 2 then
+        set(U.mix(U.AMBER, U.BG, 0.45))
+        local y0, y1 = math.max(math.min(qs, q), base), math.min(math.max(qs, q), base + L.rh - 1)
+        for yy = y0, y1 do
+          if yy % 2 == 0 then
+            local fx = xa + math.floor((yy - qs) / (q - qs) * (xb - xa) + 0.5)
+            gfx.rect(fx, y + yy - base, 1, 1, 1)
+          end
+        end
+        set(mcol)
+      end
       if py >= 0 and py < L.rh then
+        -- половинка ромба у левого края — ручка маркера (как в REAPER)
+        local hz = math.max(2, math.floor(L.rh / 4))
+        gfx.triangle(xa, y + py - hz, xa, y + py + hz, xa + hz, y + py)
         -- 16 окт: маркер мышью (±3 px) — тянуть вверх / вниз (main: smk_drag); под мышью — янтарём во всю яркость
         local hot = mxm >= xa and mxm <= xb and math.abs(mym - (y + py)) <= 3
         if hot then D.smk_hot = { item = head.item, frac = fr }; set(U.AMBER) end
         gfx.line(xa, y + py, xb, y + py)
-        if hot then gfx.line(xa, y + py + 1, xb, y + py + 1); set(column and U.AMBER or U.mix(U.AMBER, U.BG, 0.65)) end
+        if hot then gfx.line(xa, y + py + 1, xb, y + py + 1); set(mcol) end
       end
     end
   end
