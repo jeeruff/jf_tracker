@@ -5600,7 +5600,7 @@ function D.frame(L, snap, rows, state, info)
         local pyy = y1 + L.rh
         -- 9 окт: узкий фейдер — панорама кнобом (две строки, тянуть вверх /
         -- вниз, Shift мелко); big fader — слайдерами, как было
-        local function knob(kx, ky, d, frac, what, val)
+        local function knob(kx, ky, d, frac, what, val, width)
           local r = math.floor((d - 1) / 2)
           local cx, cy = kx + r, ky + r
           local khot = mx >= kx and mx < kx + 2 * r + 1 and my >= ky and my < ky + 2 * r + 1
@@ -5613,9 +5613,26 @@ function D.frame(L, snap, rows, state, info)
           local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
           -- 9 окт: дуги значения нет — только точка-указатель
           -- указатель — яркая точка на краю (9 окт, вместо линии)
-          set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
+          local pcol = U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7)
           local pr = math.max(1, math.floor(r / 4))
-          gfx.circle(cx + math.floor(math.sin(a) * (r - pr - 1) + 0.5), cy - math.floor(math.cos(a) * (r - pr - 1) + 0.5), pr, 1, 0)
+          local rr = r - pr - 1
+          -- 16 окт: width — точка расплывается дугой по краю в обе стороны от пана (100% — ±67°),
+          -- отрицательная (каналы местами) — красноватым; 0 — одна точка (моно)
+          local wd = width or 0
+          local half = math.min(1, math.abs(wd)) * 0.375 * math.pi
+          if half > 0.02 then
+            local wcol = U.mix(wd < 0 and U.RED or pcol, kdark, 0.45)
+            set(wcol)
+            local a0, a1 = math.max(-0.75 * math.pi, a - half), math.min(0.75 * math.pi, a + half)
+            local stp = math.max(0.04, 0.9 / math.max(1, rr))
+            local t = a0
+            while t <= a1 + 1e-6 do
+              gfx.circle(cx + math.floor(math.sin(t) * rr + 0.5), cy - math.floor(math.cos(t) * rr + 0.5), math.max(1, pr - 1), 1, 0)
+              t = t + stp
+            end
+          end
+          set(pcol)
+          gfx.circle(cx + math.floor(math.sin(a) * rr + 0.5), cy - math.floor(math.cos(a) * rr + 0.5), pr, 1, 0)
           if val and kx + 2 * r + 1 + L.pad + ms(val) <= sx + fx_w then text(kx + 2 * r + 1 + L.pad, ky + math.floor((2 * r + 1 - L.th) / 2), val, U.GREY) end
           if khot then hover.trs = { col = col, what = what, knob = true, sv = frac } end
           if D.csel_on(col.guid, what) then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
@@ -5625,7 +5642,7 @@ function D.frame(L, snap, rows, state, info)
         -- двумя слайдерами, как в микшере REAPER
         if not bigf and state.panknob ~= false and col.panmode ~= 5 and col.panmode ~= 6 then
           local d = math.min(2 * L.rh - 2, fx_w)
-          knob(sx + math.floor((fx_w - d) / 2), pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
+          knob(sx + math.floor((fx_w - d) / 2), pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)), lv('width', col.width or 1))
         elseif col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
