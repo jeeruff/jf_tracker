@@ -2619,7 +2619,7 @@ function V.key_impl(c)
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
-  elseif ch == '@' and ctx.mac_panel then ctx.mac_panel(n); V.count = nil; return   -- 16 окт: @ — большая панель макросов у курсора
+  elseif ch == '@' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: @ — большая панель макросов у курсора
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
     if V.macro then

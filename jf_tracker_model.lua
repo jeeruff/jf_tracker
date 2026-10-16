@@ -1975,6 +1975,17 @@ function M.stretch_fracs(take, len)
     if pos and pos > 1e-6 and pos < len - 1e-6 then out[#out + 1] = pos / len; src[#out] = sp and (sp - o0) / len or pos / len end
   end
   if #out == 0 then return nil end
+  -- 16 окт: скорости отрезков (как в REAPER: 0.95x 1.11x …): все маркеры с краями, rate = Δsrc / Δpos
+  local all = {}
+  for i = 0, n - 1 do local _, pos, sp = R.GetTakeStretchMarker(take, i); all[#all + 1] = { p = pos, s = sp } end
+  table.sort(all, function(a, b) return a.p < b.p end)
+  local segs = {}
+  for i = 1, #all - 1 do
+    local a, b = all[i], all[i + 1]
+    local dp = b.p - a.p
+    if dp > 1e-6 then segs[#segs + 1] = { f0 = math.max(0, a.p / len), f1 = math.min(1, b.p / len), r = (b.s - a.s) / dp } end
+  end
+  src.segs = segs
   return out, src
 end
 

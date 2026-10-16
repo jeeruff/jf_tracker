@@ -142,6 +142,7 @@ local function reset()
     arp_live_key = function(sp) calls[#calls + 1] = 'arplive:' .. tostring(sp.pitch) .. '@' .. sp.row end,
     hold_start = function(sp) calls[#calls + 1] = 'hold:' .. tostring(sp.pitch or ('s' .. tostring(sp.slice))) .. (sp.stretch and ':stretch' or '') end,
     preview = function(tr, p) calls[#calls + 1] = 'prev:' .. tostring(p) end,
+    mac_panel = function(n) calls[#calls + 1] = 'macpanel'; V.pending = '@'; V.count = (n or 1) > 1 and n or nil end,   -- 16 окт: как панель — следующая клавиша выбирает
     toggle_envs = function() calls[#calls + 1] = 'envs' end,
     loop = function(w, n) calls[#calls + 1] = 'loop:' .. tostring(w) .. ':' .. tostring(n) end,
     automation_picker = function()
@@ -972,6 +973,19 @@ do
   reset(); keysin('2tx'); eq('2tx: two tracks cut', last(), 'tracks:cut:2')
   reset(); keysin('2gw'); eq('2gw: kick swaps with the 2nd event below (hat)', last(), 'swap:kick:hat')
   eq('2gw: the cursor follows', V.cur.row, 16)
+end
+
+-- 16 окт: @ при клавиатуре в NORMAL — панель макросов, нота не звучит; в INSERT @ = Shift+2 — прослушка (так задумано)
+do
+  reset()
+  V.piano = true; V.mode = 'normal'
+  local nc = #calls
+  keysin('@')
+  local prev, panel = false, false
+  for k = nc + 1, #calls do local c = tostring(calls[k]); if c:match('^prev:') then prev = true end; if c == 'macpanel' then panel = true end end
+  eq('@ in NORMAL with the keyboard: the macro panel', panel, true)
+  eq('@ in NORMAL with the keyboard: no note preview', prev, false)
+  V.piano = false
 end
 
 print(('%d checks, %d failed'):format(checks, fails))

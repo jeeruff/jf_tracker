@@ -1859,29 +1859,45 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     for k, fr in ipairs(head.smk) do
       local q = math.floor(fr * total)
       local py = q - base
-      -- 16 окт: как в REAPER — откуда удар утянут: пунктир от исходного места (srcpos) к маркеру, кусок этой строки
-      local sf = head.smk_src and head.smk_src[k]
-      local qs = sf and math.floor(sf * total)
-      if qs and math.abs(qs - q) >= 2 then
-        set(U.mix(U.AMBER, U.BG, 0.45))
-        local y0, y1 = math.max(math.min(qs, q), base), math.min(math.max(qs, q), base + L.rh - 1)
-        for yy = y0, y1 do
-          if yy % 2 == 0 then
-            local fx = xa + math.floor((yy - qs) / (q - qs) * (xb - xa) + 0.5)
-            gfx.rect(fx, y + yy - base, 1, 1, 1)
-          end
-        end
-        set(mcol)
-      end
       if py >= 0 and py < L.rh then
-        -- половинка ромба у левого края — ручка маркера (как в REAPER)
-        local hz = math.max(2, math.floor(L.rh / 4))
-        gfx.triangle(xa, y + py - hz, xa, y + py + hz, xa + hz, y + py)
+        -- 16 окт: ромб как в REAPER — половинки по скорости отрезков сверху и снизу (зелёный — быстрее, фиолетовый — медленнее)
+        local hz = math.max(3, math.floor(L.rh / 3))
+        local segs = head.smk_src and head.smk_src.segs or {}
+        local up, dn
+        for _, sg in ipairs(segs) do
+          if math.abs(sg.f1 - fr) < 1e-6 then up = sg.r end
+          if math.abs(sg.f0 - fr) < 1e-6 then dn = sg.r end
+        end
+        local function rc(r) if not r or math.abs(r - 1) < 0.005 then return U.TEXT end; return r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)) end
+        local dx = math.floor((xa + xb) / 2)
+        set(rc(up)); gfx.triangle(dx - hz, y + py, dx + hz, y + py, dx, y + py - hz)
+        set(rc(dn)); gfx.triangle(dx - hz, y + py, dx + hz, y + py, dx, y + py + hz)
+        set(mcol)
         -- 16 окт: маркер мышью (±3 px) — тянуть вверх / вниз (main: smk_drag); под мышью — янтарём во всю яркость
         local hot = mxm >= xa and mxm <= xb and math.abs(mym - (y + py)) <= 3
         if hot then D.smk_hot = { item = head.item, frac = fr }; set(U.AMBER) end
         gfx.line(xa, y + py, xb, y + py)
         if hot then gfx.line(xa, y + py + 1, xb, y + py + 1); set(mcol) end
+      end
+    end
+  end
+  -- 16 окт: скорость отрезков между stretch-маркерами (как в REAPER): вертикаль правее центра — быстрее, левее — медленнее;
+  -- в начале отрезка подпись 1.11x (если влезает в ширину волны)
+  if head.smk and head.smk_src and head.smk_src.segs and not inv and D.show_smk ~= false then
+    local xa, xb = column and x0w or (x + L.x_note), column and (x0w + L.w_wave - 1) or (x + L.x_note + L.w_note - 1)
+    local cxs = math.floor((xa + xb) / 2)
+    local hw2 = math.max(2, math.floor((xb - xa) / 2) - 1)
+    local base = i * L.rh - off
+    for _, sg in ipairs(head.smk_src.segs) do
+      local q0, q1 = math.floor(sg.f0 * total), math.floor(sg.f1 * total)
+      local a0, a1 = math.max(q0, base), math.min(q1, base + L.rh)
+      if a1 > a0 and math.abs(sg.r - 1) >= 0.005 then
+        local lx = cxs + math.floor(math.max(-1, math.min(1, (sg.r - 1) * 2)) * hw2)
+        set(U.mix(sg.r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)), U.BG, 0.35))
+        gfx.rect(lx, y + a0 - base, 1, a1 - a0, 1)
+        if q0 >= base and q0 < base + L.rh and (xb - xa) >= ms('0.00x') then
+          text(xa + 1, y + q0 - base + 1, ('%.2fx'):format(sg.r), U.mix(U.TEXT, U.BG, 0.3))
+        end
       end
     end
   end
