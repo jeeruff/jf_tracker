@@ -32,10 +32,20 @@ end
 function O.rebuild()
   local view = {}
   if O.query ~= '' then
-    -- 14 окт: поиск — по всем вкладкам (опции, тема, аудио, хоткеи)
+    -- 16 окт: поиск — только по своей вкладке (options — опции, hotkeys — клавиши);
+    -- сначала строки с запросом подряд, потом буквы по порядку
+    local grp, near, far = 'options', {}, {}
+    local q = O.query:lower()
     for _, it in ipairs(O.all) do
-      if not it.sep and it.kind ~= 'block' and fuzzy((it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.value or '') .. ' ' .. (it.key or ''), O.query) then view[#view + 1] = it end
+      if it.sep then grp = it.group or 'options' end
+      if (O.tab == 'all' or grp == O.tab) and not it.sep and it.kind ~= 'block' then
+        local hay = (it.label or '') .. ' ' .. (it.desc or '') .. ' ' .. (it.value or '') .. ' ' .. (it.key or '')
+        if hay:lower():find(q, 1, true) then near[#near + 1] = it
+        elseif fuzzy(hay, O.query) then far[#far + 1] = it end
+      end
     end
+    for _, it in ipairs(near) do view[#view + 1] = it end
+    for _, it in ipairs(far) do view[#view + 1] = it end
   elseif O.tab == 'all' then view = O.all
   else
     -- вкладка = группа разделов (5 окт): заголовок с group = 'hotkeys' и всё под
@@ -662,8 +672,9 @@ function O.draw(L, W, H)
     U.text(fx + L.pad, ty3, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
     if O.query == '' then
       local gx = fx + L.pad + U.measure(fq) + L.pad
-      local ghost = O.typing and 'letters in order: pnc finds pan column, a space splits words   Enter: keep   Esc: clear'
-        or 'press / or f anywhere here, or click - then type: letters in order find the option'
+      local hk = O.tab == 'hotkeys'   -- 16 окт: поиск — по своей вкладке
+      local ghost = O.typing and (hk and 'a key or a word: dd, macro, slice   Enter: keep   Esc: clear' or 'letters in order: pnc finds pan column, a space splits words   Enter: keep   Esc: clear')
+        or (hk and 'press / or f, then type: finds hotkeys by key, module and description' or 'press / or f anywhere here, or click - then type: letters in order find the option')
       U.text(gx, ty3, ctx.fit(ghost, fx + fw - L.pad - gx), U.DIM)
     end
   end

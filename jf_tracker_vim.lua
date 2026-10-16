@@ -946,6 +946,8 @@ function V.note_slip(d)
   V.msg = n > 0 and ('slip: the sound %s a row inside the note (Shift+Opt+Cmd+J K)'):format(d > 0 and 'down' or 'up') or 'slip: no audio note under the cursor (or the start of the file)'
 end
 -- 16 окт: ` в NORMAL — прослушать весь сэмпл инструмента (был прыжок назад; есть гарпун и Ctrl+O)
+-- 16 окт: Option+Shift+2 (€ в раскладке US) — панель макросов
+function V.is_mac_key(c) return c == 8364 or c == 0x75000000 + 8364 end
 function V.play_whole()
   local f0 = flat()[V.cur.fi]
   local inst0 = f0 and (f0.col.pool or {})[V.inst]
@@ -2256,8 +2258,8 @@ function V.key_impl(c)
         V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
       end
       if c == ('`'):byte() and V.mode == 'normal' then V.play_whole(); return end
-      -- 16 окт: @ — макросы и при клавиатуре в NORMAL (Shift+2 было прослушиванием ноты — @ не работал)
-      if c == 64 and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
+      -- 16 окт: Option+Shift+2 (€) — панель макросов и при клавиатуре в NORMAL; Shift+2 (@) снова прослушивает ноту
+      if V.is_mac_key(c) and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
       if ctx.piano and ctx.piano[base] then
@@ -2660,7 +2662,7 @@ function V.key_impl(c)
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
-  elseif ch == '@' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: @ — большая панель макросов у курсора
+  elseif V.is_mac_key(c) and V.mode ~= 'insert' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: Option+Shift+2 — большая панель макросов у курсора (@a — регистр, как в Vim)
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
     if V.macro then

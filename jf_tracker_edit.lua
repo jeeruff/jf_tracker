@@ -1977,7 +1977,8 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
       local len, b = E.slice_len(inst_item, slices, base, k, track, lane_idx, t0, it)   -- playthru: до конца сэмпла (6 окт)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
       R.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
-      R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0)
+      -- 16 окт: D_PITCH не обнуляется — копия из чанка корня несёт transpose инструмента
+      -- (весь сэмпл звучал с ним, слайсы — без, «на полтона ниже»), как E.slice_pitch
       -- корень растянут маркерами (smart quantize): свой кусок источника
       local rtk = R.GetActiveTake(inst_item)
       local pts = E.root_markers(rtk)
@@ -4236,7 +4237,7 @@ function E.plant(o)
           R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
           R.SetMediaItemInfo_Value(it, 'D_LENGTH', b - a)
         end
-        R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0)
+        -- 16 окт: D_PITCH корня (transpose инструмента) остаётся, как в E.insert_slice
       else
         R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', (o.pitch or model.BASE_NOTE) - model.BASE_NOTE)
       end

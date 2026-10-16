@@ -114,7 +114,7 @@ KH.PAGES = {
     { k = '^R', d = 'the rec tab' },
     { k = 'F12', d = 'reload the audio device (as choosing it again; options - audio)' },
     { k = '⌥R ⌘R', d = 'record into the tracker from the cursor / a new sound into the lib; then Space keep, Enter keep + back, Esc delete' },
-    { k = 'q @', d = 'record macro (q a .. q) / play: @a register, @1..9 @A..Z saved and built-in (the @ popup lists them, same keys as \\ q), @@ the last, @/ by name (type to filter)' },
+    { k = 'q @', d = 'record macro (q a .. q) / play: @a register, @1..9 @A..Z saved and built-in (the @ popup lists them, same keys as \\ q), @@ the last, @/ by name (type to filter); Opt+Shift+2 - the big macros panel at the cursor (also with the keyboard on)' },
     { k = 'v V', d = 'visual block / visual lines' },
     { k = 'H J K L', d = 'select: visual block from here, Shift+hjkl extends it (tracks: Option+h l)' },
     { k = 'za zM', d = 'fold track: wave + notes, envelopes as a thin line / all <-> open all (:fold, :unfold)' },

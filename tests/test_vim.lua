@@ -983,8 +983,15 @@ do
   keysin('@')
   local prev, panel = false, false
   for k = nc + 1, #calls do local c = tostring(calls[k]); if c:match('^prev:') then prev = true end; if c == 'macpanel' then panel = true end end
-  eq('@ in NORMAL with the keyboard: the macro panel', panel, true)
-  eq('@ in NORMAL with the keyboard: no note preview', prev, false)
+  eq('@ (Shift+2) with the keyboard: no macro panel', panel, false)
+  -- 16 окт: панель макросов — Option+Shift+2 (€), и с клавиатурой, и без
+  for _, pn in ipairs({ true, false }) do
+    reset(); V.piano = pn; V.mode = 'normal'
+    nc = #calls; V.key(8364)
+    panel = false
+    for k = nc + 1, #calls do if tostring(calls[k]) == 'macpanel' then panel = true end end
+    eq('Opt+Shift+2 -> the macro panel (keyboard ' .. tostring(pn) .. ')', panel, true)
+  end
   V.piano = false
 end
 

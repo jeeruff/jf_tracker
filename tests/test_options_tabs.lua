@@ -39,7 +39,7 @@ do
   O.open(g, 'hotkeys'); eq('open on hotkeys', O.tab, 'hotkeys')
 end
 -- 14 окт: блок (темы и шрифты) — строками в общем списке, клавиши ему, j / k за край — в список;
--- поиск — по всем вкладкам
+-- поиск — по своей вкладке (16 окт)
 do
   local got, edge = {}, nil
   local blk = { kind = 'block', label = 'themes', height = function() return 5 * 20 end,
@@ -59,7 +59,11 @@ do
   edge = 'down'; O.key(('j'):byte()); eq('j past the block -> next option', O.items[O.sel].key, 'b')
   edge = nil
   O.key(('/'):byte()); for ch in ('alpha'):gmatch('.') do O.key(ch:byte()) end
-  eq('search over all tabs', #O.items, 2)
+  eq('search: only the options tab', #O.items, 1)
+  eq('search: the option alpha', O.items[1].key, 'a')
+  O.open(g, 'hotkeys'); O.key(('/'):byte()); for ch in ('alpha'):gmatch('.') do O.key(ch:byte()) end
+  eq('search on hotkeys: only hotkeys', #O.items, 1)
+  eq('search on hotkeys: dd', O.items[1].label, 'dd')
   O.key(27)
 end
 -- компактная панель (5 окт): число цифрами, Enter, границы, Esc
