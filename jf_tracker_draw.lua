@@ -1033,16 +1033,16 @@ local function routing_of(tr)
   for i = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
     local d = reaper.GetTrackSendInfo_Value(tr, 0, i, 'P_DESTTRACK')
     local col = reaper.GetTrackColor(d)
-    r[#r + 1] = { dir = '>', name = nm(d), dest = d, db = db(reaper.GetTrackSendInfo_Value(tr, 0, i, 'D_VOL')),
+    r[#r + 1] = { dir = '>', name = nm(d), dest = d, cat = 0, idx = i, db = db(reaper.GetTrackSendInfo_Value(tr, 0, i, 'D_VOL')),
                   mute = reaper.GetTrackSendInfo_Value(tr, 0, i, 'B_MUTE') == 1, rgb = col ~= 0 and { reaper.ColorFromNative(col) } or nil }
   end
   for i = 0, reaper.GetTrackNumSends(tr, -1) - 1 do
     local s = reaper.GetTrackSendInfo_Value(tr, -1, i, 'P_SRCTRACK')
-    r[#r + 1] = { dir = '<', name = nm(s), db = db(reaper.GetTrackSendInfo_Value(tr, -1, i, 'D_VOL')), mute = reaper.GetTrackSendInfo_Value(tr, -1, i, 'B_MUTE') == 1, recv = true }
+    r[#r + 1] = { dir = '<', name = nm(s), cat = -1, idx = i, db = db(reaper.GetTrackSendInfo_Value(tr, -1, i, 'D_VOL')), mute = reaper.GetTrackSendInfo_Value(tr, -1, i, 'B_MUTE') == 1, recv = true }
   end
   for i = 0, reaper.GetTrackNumSends(tr, 1) - 1 do
     local ch = math.floor(reaper.GetTrackSendInfo_Value(tr, 1, i, 'I_DSTCHAN')) & 1023
-    r[#r + 1] = { dir = '>', name = ('out %d/%d'):format(ch + 1, ch + 2), hw = true, mute = reaper.GetTrackSendInfo_Value(tr, 1, i, 'B_MUTE') == 1 }
+    r[#r + 1] = { dir = '>', name = ('out %d/%d'):format(ch + 1, ch + 2), hw = true, cat = 1, idx = i, mute = reaper.GetTrackSendInfo_Value(tr, 1, i, 'B_MUTE') == 1 }
   end
   if reaper.GetMediaTrackInfo_Value(tr, 'B_MAINSEND') == 1 then
     local par = reaper.GetParentTrack(tr)
@@ -1604,10 +1604,10 @@ function D.route_strip(L, info, hover, x0, x1)
         if k == fit_n and #outs > fit_n then text(lx + 1, y0 + 3, '+', U.CYAN); break end
         local tc = e.mute and U.GREY or (e.hw and U.AMBER or U.CYAN)
         local hot = mx >= lx and mx < lx + lw and my >= y0 and my < y0 + h
-        if hot then set(D.CURROW); gfx.rect(lx, y0 + 2, lw - 1, h - 3, 1); hover.btn = { col = col, what = 'route' } end
+        if hot then set(D.CURROW); gfx.rect(lx, y0 + 2, lw - 1, h - 3, 1); hover.btn = { col = col, what = 'route', send = e } end   -- 16 окт: Option+клик — удалить этот маршрут
         D.vtext(lx + 2, y0 + 3, nameh, e.name, tc, hot and D.CURROW or U.PANEL, true)
         need = math.max(need, #e.name)
-        if e.dest and xof[e.dest] then wires[#wires + 1] = { x = lx + math.floor(lw / 2), tx = xof[e.dest], rgb = e.rgb, mute = e.mute } end
+        if e.dest and xof[e.dest] then wires[#wires + 1] = { x = lx + math.floor(lw / 2), tx = xof[e.dest], rgb = e.rgb, mute = e.mute, col = col, e = e } end
         hint('btn', lx, y0 + 2, lw, h - 3, { col = col, what = 'route' })
       end
       if #outs == 0 then text(c.x + L.pad, y0 + 3, '-', U.DIM) end
@@ -1615,9 +1615,18 @@ function D.route_strip(L, info, hover, x0, x1)
   end
   -- провода: вниз из дорожки, по горизонтали к колонке получателя, стрелка вниз
   local wy0 = y0 + h - wires_h - 1
+  -- 16 окт: провод под мышью (±2 px) — янтарём; Option+клик удаляет маршрут, клик — меню маршрутизации
+  local whot
   for k, w in ipairs(wires) do
     local y = wy0 + 2 + ((k - 1) % 4) * 2
-    if w.mute then set(U.GREY) elseif w.rgb then rawset_col(w.rgb) else set(U.CYAN) end
+    local near = (my >= y - 2 and my <= y + 2 and mx >= math.min(w.x, w.tx) - 2 and mx <= math.max(w.x, w.tx) + 2)
+      or (math.abs(mx - w.x) <= 2 and my >= wy0 - 1 and my <= y) or (math.abs(mx - w.tx) <= 2 and my >= y and my < y0 + h)
+    if near then whot = k end
+  end
+  if whot then local w = wires[whot]; hover.btn = { col = w.col, what = 'route', send = w.e } end
+  for k, w in ipairs(wires) do
+    local y = wy0 + 2 + ((k - 1) % 4) * 2
+    if k == whot then set(U.AMBER) elseif w.mute then set(U.GREY) elseif w.rgb then rawset_col(w.rgb) else set(U.CYAN) end
     gfx.rect(w.x, wy0 - 1, 1, y - wy0 + 1, 1)
     gfx.rect(math.min(w.x, w.tx), y, math.abs(w.tx - w.x) + 1, 1, 1)
     gfx.rect(w.tx, y, 1, y0 + h - 1 - y, 1)
@@ -5470,7 +5479,8 @@ function D.frame(L, snap, rows, state, info)
           local n = 3
           local seg = vert and math.floor((rhh - 4) / n) or math.floor((rw - 4) / n)
           for i = 1, n do
-            local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)
+            local k3 = ({ U.CYAN, U.GREEN, U.AMBER })[i]
+            local cc = has[i] and k3 or U.mix(k3, U.PANEL, 0.68)   -- 16 окт: пусто — бледным своим цветом, есть — ярко
             set(cc)
             local x0, y0, x1, y1
             -- 16 окт: внутри рамки — отступ 2 px с каждой стороны с учётом толщины (3 px)
@@ -5489,7 +5499,8 @@ function D.frame(L, snap, rows, state, info)
           return
         end
         for i, ch in ipairs(D.sroslash and { '/', '/', '/' } or { 's', 'r', 'o' }) do   -- 16 окт: опция routing as /// (как в REAPER)
-          local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)   -- S голубой, R зелёный, O янтарь
+          local k3 = ({ U.CYAN, U.GREEN, U.AMBER })[i]
+          local cc = has[i] and k3 or U.mix(k3, U.PANEL, 0.68)   -- S голубой, R зелёный, O янтарь; 16 окт: пусто — бледным своим
           if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
           elseif rw >= 2 * ms('SRO') then text(rx + math.floor((i - 1) * rw / 3 + (rw / 3 - ms(ch)) / 2), ly, ch, cc)   -- 12 окт: широкая — буквы врозь
         else text(lx, ly, ch, cc); lx = lx + ms(ch) end
@@ -5632,7 +5643,8 @@ function D.frame(L, snap, rows, state, info)
               set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(sx2, ry + 1, sw2, L.rh - 1, 0)
               local lx = sx2 + 2
               for i, ch in ipairs({ 'S', 'R', 'O' }) do
-                text(lx, ry, ch, has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)); lx = lx + ms(ch)
+                local k3 = ({ U.CYAN, U.GREEN, U.AMBER })[i]
+                text(lx, ry, ch, has[i] and k3 or U.mix(k3, U.PANEL, 0.68)); lx = lx + ms(ch)   -- 16 окт: пусто — бледным своим цветом
               end
               if hot2 then hover.btn = { col = col, what = 'route' } end
               hint('btn', sx2, ry, sw2, L.rh, { col = col, what = 'route' })

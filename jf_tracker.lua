@@ -10911,7 +10911,7 @@ ctx = {
       flag('jrbg', 'jump ruler background', 'the jump ruler over the rows on a panel strip; off (default) - on the window background, only the numbers'),
       flag('rowjumps', 'row jump ruler', 'a narrow column left of the region strip, like relativenumber in Vim: how many rows each one is from the cursor (cyan above - k, grey below - j); the region strip moves right by its width'),
       flag('jumps', 'jump ruler', 'a row over the track headers, like relativenumber in Vim: how many tracks away each one is (3 - 3L right, cyan 2 - 2H left), the cursor track shows its number'),
-      flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu'),
+      flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu, Option+click on a name or a wire - remove that routing'),
       flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
       flag('dbmarks', 'dB marks', 'mixer faders: the +6 0 -12 -24 -48 marks and ticks (f jumps to a mark)'),
       flag('panknob', 'pan knob', 'mixer with a narrow fader: pan / width as knobs (drag up or right - more, Shift fine); off - small sliders'),
@@ -18242,6 +18242,9 @@ local function frame()
   elseif hover.btn and hover.btn.what == 'monitor' then
     local m = hover.btn.col.recmon or 0
     state.status = hover.btn.col.name .. ': input monitoring ' .. ({ [0] = 'off', [1] = 'on', [2] = 'auto (tape)' })[m] .. ' - click: off → on → auto'
+  elseif hover.btn and hover.btn.what == 'route' and hover.btn.send then   -- 16 окт: маршрут на микшере
+    local e = hover.btn.send
+    state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
     state.status = 'instrument plugin: click - note keys write MIDI to it, DSP shows it; dblclick - its window'
@@ -19921,6 +19924,17 @@ local function frame()
     elseif hover.btn and hover.btn.what == 'routeview' then
       state.routeview = not state.routeview or nil
       vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'
+      click = { t = now2, zone = 'btn' }
+    elseif hover.btn and hover.btn.what == 'route' and hover.btn.send and gfx.mouse_cap & 16 == 16 then
+      -- 16 окт: Option+клик по маршруту на микшере (подпись или провод) — удалить его
+      local e, tr = hover.btn.send, hover.btn.col.track
+      if tr and reaper.ValidatePtr(tr, 'MediaTrack*') and e.cat and e.idx and e.idx < reaper.GetTrackNumSends(tr, e.cat) then
+        reaper.Undo_BeginBlock()
+        reaper.RemoveTrackSend(tr, e.cat, e.idx)
+        reaper.Undo_EndBlock('jf_tracker: remove routing ' .. (e.name or ''), -1)
+        model.invalidate()
+        vim.msg = 'routing removed: ' .. (hover.btn.col.name or 'track') .. ' ' .. (e.dir or '>') .. ' ' .. (e.name or '') .. ' (u - back)'
+      end
       click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'route' then
       -- 9 окт: SRO / дорожка схемы — нативное меню маршрутизации (как ROUTE в REAPER)
