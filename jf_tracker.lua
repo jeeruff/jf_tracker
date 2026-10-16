@@ -20585,8 +20585,6 @@ local function frame()
         if c == 9 then ctx.toggle_focus()
         elseif state.toptab == 'sample' and SPROP.key(c, cur_col() and (cur_col().pool or {})[vim.inst]) then
           -- панель свойств: J K строка, H L значение, R сброс
-        elseif state.toptab == 'sample' and (ch == '4' or ch == '8') and not vim.count and mm_entry(true) then
-          SL.button('eq' .. ch); vim.msg = SL.msg ~= '' and SL.msg or ('slices: ' .. ch .. ' equal parts')   -- 15 окт: 4 8 — нарезка на равные куски
         elseif state.toptab == 'sample' and SL.active then
           vim.key(c)                                   -- 10 окт: через vim — там правило «выбор инструмента мимо слайсера»
           if not SL.active then ctx.set_focus('tracker') end
