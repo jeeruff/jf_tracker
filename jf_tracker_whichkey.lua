@@ -28,9 +28,8 @@ local T = {
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },
         { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
-        { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' },
-        { 'panels', 't tracker  k tracks  m matrix  b browser  l lib  n main' }, { '', 's slices  o notes  f fx list  d dsp' },
-        { '', 'r rec  i item  a automation  M midi' }, { '', 'h harmonizer  c scopes  S master  v video  V visor' }, { '', 'q macros  C clips  e properties  N note mod  x mixer' }, { '', 'p pm  g grid' } } },
+        { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' } },
+        panels = true },   -- 16 окт: клавиши панелей — из реестра панелей (main), по алфавиту, буква подсвечена
   ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'd', 'unpin this place' } } },
   T = { title = 'T - take (the note under the cursor)', items = { { 'f', 'add take fx (fzf)' }, { 'o', 'its take fx chain in DSP' } } },
   t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 'd', 'delete tracks (5td), to the buffer' }, { 'x', 'cut tracks' }, { 'p', 'paste tracks' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },

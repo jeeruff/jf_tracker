@@ -584,7 +584,7 @@ function D.layout(snap, state, nregions)
   L.tp_cut = 0
   L.piano_h = 2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and (L.rh + 2) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками
   -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
-  L.mode_h = 2 * L.th + 6
+  L.mode_h = 0   -- 16 окт: модлайна нет (смысла не было) — режим и место курсора в полосе транспорта
   L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
   L.body_h = math.max(0, gfx.h - L.body_y - L.status_h - L.status_in - L.dsp_h - L.hint_h - L.low_h - ((L.toppos == 'mid' or L.toppos == 'bottom') and L.top_h or 0) - (L.tppos == 'bottom' and L.tp_h or 0))
   L.mix_y = L.body_y + L.body_h                     -- микшер под трекером (mix_h = 0, если он сверху)
@@ -3631,6 +3631,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   set(D.SEP); gfx.rect(x, y, w, 1, 1)
   local ly = y + 3
   local x_all, w_all = x, w
+  -- 16 окт: модлайна нет — слово режима снова в полосе, слева (ширина постоянная: по самому широкому
+  -- из NORMAL / INSERT / VISUAL, длиннее — обрезается); остальное правее
+  if info and info.status_left then
+    local res = 0
+    for _, mw0 in ipairs({ 'NORMAL', 'INSERT', 'VISUAL' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
+    D.draw_mode(L, x + L.pad, ly + math.floor((math.min(h, 3 * L.rh) - 2 * L.th) / 2) - 2, 3 * res, info.status_left)
+    x = x + res + 3 * L.pad; w = w - res - 3 * L.pad
+  end
   -- big status (5 окт): левая треть — режим крупно (две строки высотой),
   -- клавиатура и транспорт — правее; мелкий статус — строкой под ними
   local cc = info and info.ctrl or {}
@@ -4025,6 +4033,23 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   for _, g in ipairs(D.transport_groups(c, L)) do by_id[g[1][1][1]] = g end
   local order = {}
   local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
+  -- 16 окт: где курсор — у клавиатуры (был модлайн): трек, ниже колонка и строка
+  do
+    local vc = info.vcur
+    local f = vc and L.flat and L.flat[vc.fi]
+    if f and f.col then
+      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
+        or ({ 'note', 'vol', 'delay' })[vc.field or 1] or ('fx ' .. ((vc.field or 1) - 3))
+      local l1 = (f.col.name ~= '' and f.col.name) or 'track'
+      local l2 = ('%04d'):format(math.max(0, vc.row or 0))
+      local lw = math.max(ms(fit(l1, 14 * L.cw)), ms('col ') + ms(fname), ms('row ') + ms(l2), 10 * L.cw)
+      order[#order + 1] = { w = lw, draw = function(gx)
+        text(gx, ly, fit(l1, lw), U.TEXT)
+        text(gx, ly + L.rh, 'col', U.GREY); text(gx + ms('col '), ly + L.rh, fit(fname, lw - ms('col ')), U.TEXT)
+        if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + ms('row '), ly + 2 * L.rh, l2, U.TEXT) end
+      end }
+    end
+  end
   addg('step')
   addg('listen')   -- 12 окт: step / sel / line
   order[#order + 1] = { w = btot, draw = draw_buttons }
@@ -8258,7 +8283,15 @@ function D.popup(L, p, anchor)
     if p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
     if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
-    text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), ln.col or U.GREY)
+    if ln.chips then   -- 16 окт: «клавиша имя» подряд, клавиша — янтарём
+      local cx = lx + L.pad + kw + 2 * L.pad + hcol
+      for _, ch in ipairs(ln.chips) do
+        local wd = ms(ch[1] .. ' ' .. ch[2] .. '  ')
+        if cx + wd > lx + colw then break end
+        text(cx, ly + 1, ch[1], U.AMBER); text(cx + ms(ch[1] .. ' '), ly + 1, ch[2], U.TEXT)
+        cx = cx + wd
+      end
+    else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), ln.col or U.GREY) end
   end
 end
 
