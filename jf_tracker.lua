@@ -15606,7 +15606,11 @@ local function frame()
   elseif state.focus ~= 'tracker' then
     -- 13 окт: подпись панели из реестра (properties, lib, item), не её id (было «SPROPS», «INST»)
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
-    left = ((pe and pe.label) or state.focus):upper() .. (state.focus == 'top' and (':' .. state.toptab) or '')
+    -- 16 окт: без обозначения панели (было TOP:samp) — имя самой вкладки; item — SAMPLER
+    if state.focus == 'top' then
+      local te = draw.panes.BY and draw.panes.BY[state.toptab]
+      left = state.toptab == 'sample' and 'SAMPLER' or ((te and te.label) or state.toptab or 'top'):upper()
+    else left = ((pe and pe.label) or state.focus):upper() end
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
