@@ -3943,7 +3943,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- 15 окт: |<< прижат влево, >>| вправо (к своему краю); у ^O буква O — красная, как у rec
           local lab, lc = fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
           local tx = sx + math.floor((tbw - ms(lab)) / 2)
-          if b[1] == 'tp_start' then tx = sx + L.pad elseif b[1] == 'tp_end' then tx = sx + tbw - L.pad - ms(lab) end
+          -- 16 окт: << / >> — ровно под << / >> верхнего ряда (по центру ячейки), черта | торчит наружу
+          if b[1] == 'tp_start' then tx = sx + math.floor((tbw - ms('<<')) / 2) - ms('|') elseif b[1] == 'tp_end' then tx = sx + math.floor((tbw - ms('>>')) / 2) end
           if b[1] == 'shiftrec' and lab == '^O^' then   -- 15 окт: ^O^ (просьба), O — красное, как у rec
             text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC); text(tx + ms('^O'), sy, '^', lc)
           else text(tx, sy, lab, lc) end
