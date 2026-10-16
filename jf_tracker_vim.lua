@@ -581,6 +581,7 @@ function motion(c, n, op)
     -- 15 окт: E — конец нижнего видимого события трека (последнее, что начинается на экране)
     local st = ctx.state
     local bottom = (st.row0 or 0) + L.nrows
+    bottom = math.min(bottom, (ctx.snap().last_row or 0) + 2)   -- 16 окт: экран длиннее трека — поиск от конца содержимого (иначе nil, dE молчал)
     local r = next_ev(cur.fi, bottom, -1)
     if not r then return nil end
     return { fi = cur.fi, row = event_end(cur.fi, r), linewise = true }
