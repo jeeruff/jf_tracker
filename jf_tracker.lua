@@ -10264,7 +10264,7 @@ ctx = {
       -- { key = 'keysrenoise', label = 'keys: renoise', kind = 'toggle', desc = 'note keys as in Renoise: two octaves at once - the bottom row z s x d c ... is the cursor octave, the top row q 2 w 3 e ... an octave higher; in INSERT those letters are notes (octave - [ ], move - arrows). Off - one top row (Ableton), the bottom rows control',
       --   get = function() return keys.renoise end, set = function(v) keys.set_renoise(v); reaper.SetExtState(EXT, 'keysrenoise', v and '1' or '0', true); draw.piano_layout(keys.renoise) end },
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
-      flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them) instead of one list with separators'),
+      flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
@@ -19954,10 +19954,28 @@ local function frame()
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
   -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
   do
-    local FTAB = { [26162] = 'sample', [26163] = 'automation', [26164] = 'midi', [26165] = 'scopes', [26166] = 'master' }
+    -- 16 окт: F3 — нижний стек (dsp / mixer): фокус туда, ещё раз — следующая вкладка; F4 — верхний стек (было F3)
+    local freeF = not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search'
+    if c == 26163 and freeF and state.panes_ui and L and L.pn then
+      local PNm = draw.panes
+      local lf = PNm.find(state.panes, 'dsp') or PNm.find(state.panes, 'mixer')
+      local list = {}
+      for _, id in ipairs(lf and lf.panes or {}) do if L.pn.by_panel[id] then list[#list + 1] = id end end
+      if #list > 0 then
+        local cur = ctx.pane_cur()
+        local act = lf.panes[lf.active] or list[1]
+        local nxt = act
+        for k, id in ipairs(list) do if id == cur then nxt = list[k % #list + 1] end end
+        ctx.pane_focus(nxt); vim.msg = 'bottom: ' .. nxt .. ' (F3 - next, F4 - top tabs)'
+      end
+      c = 0
+    end
+    local libf = c == 26164 and state.libtabs and state.focus == 'inst'   -- в lib (вкладками) F4 листает вкладки lib
+    if c == 26164 and not libf then c = 26163 end                          -- F4 — то, что было F3 (верхний стек по кругу)
+    local FTAB = { [26162] = 'sample', [26163] = 'automation', [26165] = 'scopes', [26166] = 'master' }
     local tab = FTAB[c]
-    -- 10 окт: lib вкладками — F4 листает их (Shift+F4 назад) и ставит фокус в lib
-    if c == 26164 and state.libtabs and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    -- 10 окт: lib вкладками — F4 листает их (Shift+F4 назад) и ставит фокус в lib (16 окт: когда фокус в lib)
+    if libf and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local LT = { 'audio', 'instruments', 'automation', 'midi' }
       local i = 1
       for k, t in ipairs(LT) do if t == state.libtab then i = k end end
@@ -19989,7 +20007,7 @@ local function frame()
           local act = lf.panes[lf.active] or list[1]
           local nxt = act
           if state.focus == 'top' then for k, id in ipairs(list) do if id == act then nxt = list[k % #list + 1] end end end
-          ctx.pane_focus(nxt); vim.msg = 'tab: ' .. nxt .. ' (F3 - next)'
+          ctx.pane_focus(nxt); vim.msg = 'tab: ' .. nxt .. ' (F4 - next)'
         end
       elseif state.focus == 'top' and cur == tab then ctx.set_focus('tracker'); vim.msg = 'tracker'
       else ctx.pane_focus(tab); vim.msg = 'tab: ' .. tab end
