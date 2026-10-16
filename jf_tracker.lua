@@ -17308,12 +17308,9 @@ local function frame()
         local list = {}
         for _, pp in ipairs(draw.panes.PANELS) do if pp.key and (pp.avail ~= 'dev' or state.dev) then list[#list + 1] = pp end end
         table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
-        local row, len = nil, 0
-        for _, pp in ipairs(list) do
-          local t = pp.key .. ' ' .. pp.label .. '  '
-          if not row or len + #t > 56 then row = { key = (#lines > #wk.items) and '' or 'panels', chips = {}, text = '' }; lines[#lines + 1] = row; len = 0 end
-          row.chips[#row.chips + 1] = { pp.key, pp.label }; row.text = row.text .. t; len = len + #t
-        end
+        -- 16 окт (вечер): строкой на панель — «клавиша  имя» колонкой, как остальной which-key (чипы слипались:
+        -- measurestr не считает пробел в конце «a »)
+        for _, pp in ipairs(list) do lines[#lines + 1] = { key = pp.key, text = pp.label } end
       end
       pop = { title = wk.title, lines = lines, kind = 'hydra' }
       if state.focus == 'dsp' and not anchor then anchor = { x = L.matrix_w + 4 * L.pad, y = (L.dsp_y or 0) + L.rh + 4 } end

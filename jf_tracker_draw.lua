@@ -8578,9 +8578,9 @@ function D.popup(L, p, anchor)
     if ln.chips then   -- 16 окт: «клавиша имя» подряд, клавиша — янтарём
       local cx = lx + L.pad + kw + 2 * L.pad + hcol
       for _, ch in ipairs(ln.chips) do
-        local wd = ms(ch[1] .. ' ' .. ch[2] .. '  ')
+        local wd = ms(ch[1]) + ms('W') + ms(ch[2]) + 2 * ms('W')   -- 16 окт: пробелы в конце measurestr не считает
         if cx + wd > lx + colw then break end
-        text(cx, ly + 1, ch[1], U.AMBER); text(cx + ms(ch[1] .. ' '), ly + 1, ch[2], U.TEXT)
+        text(cx, ly + 1, ch[1], U.AMBER); text(cx + ms(ch[1]) + ms('W'), ly + 1, ch[2], U.TEXT)
         cx = cx + wd
       end
     else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), ln.col or U.GREY) end
