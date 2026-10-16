@@ -7068,6 +7068,23 @@ ctx = {
     end
     return { rows = rows, smk = smk, segs = segs, item = c.item, k = (c.e.rate or 1) / ((c.n.rate and c.n.rate ~= 0) and c.n.rate or 1) }
   end,
+  -- 16 окт: VISUAL → razor edit REAPER: строки r0..r1 на треках колонок f0..f1 (у прочих razor снимается);
+  -- дальше работают действия REAPER над razor (удалить, растянуть, склеить, копировать) и видно в аранжировке
+  razor_from = function(f0, f1, r0, r1)
+    local t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0)
+    local want = {}
+    for fi = f0, f1 do local f = L.flat[fi]; if f and f.col and f.col.track then want[f.col.track] = true end end
+    local n = 0
+    edit.run('razor edit from the selection', function()
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, i)
+        reaper.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', want[tr] and ('%.10f %.10f ""'):format(t0, t1) or '', true)
+        if want[tr] then n = n + 1 end
+      end
+    end)
+    reaper.UpdateArrange()
+    vim.msg = ('razor: rows %d-%d on %d track(s) - REAPER razor actions work on it (Delete, Ctrl+C / V, glue)'):format(r0, r1, n)
+  end,
   -- 16 окт: ripple editing REAPER: 40309 off, 40310 per track, 40311 all tracks (их состояния — toggle)
   ripple_mode = function()
     if reaper.GetToggleCommandState(40311) == 1 then return 2 elseif reaper.GetToggleCommandState(40310) == 1 then return 1 end

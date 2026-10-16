@@ -2543,6 +2543,8 @@ function V.key_impl(c)
     local done = false
     if c == ESC then V.mode = 'normal'; done = true; finish_move()
     elseif c == ('o'):byte() then V.cur, V.anchor = V.anchor, V.cur; done = true
+    elseif c == ('R'):byte() and ctx.razor_from then   -- 16 окт: R — выделение в razor edit REAPER (те же строки × треки)
+      ctx.razor_from(f0, f1, r0, r1); V.mode = 'normal'; finish_move(); done = true
     elseif c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
         or c == ('M'):byte() or c == ('s'):byte() then
       local e = apply(c == ('M'):byte() and 'm' or string.char(c), f0, f1, r0, r1)
