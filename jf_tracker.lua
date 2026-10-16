@@ -2007,6 +2007,9 @@ ctx = {
       { key = 'd', label = 'delete the slices', fn = function() if not ready() then return end; SL.clear() end },        -- s d (4 окт): d = delete, как в Vim
       { key = 'Q', label = 'quantize ... (panel, the plan on the wave)', fn = function() if not ready() then return end; ctx.quant_open() end },
       { key = 'z', label = 'autotrim the silence', fn = function() if not ready() then return end; SL.autotrim() end },
+      -- 16 окт: - = — порог трансиентов, как кнопки - + у transients; меню остаётся открытым (жать подряд)
+      { key = '-', label = ('transients: fewer (sens %.2f)'):format(SL.sens or 0.5), fn = function() if not ready() then return end; SL.button('sens-'); vim.msg = ('transients: %d slices (sens %.2f)'):format(#(SL.slices or {}), SL.sens); ctx.slice_hydra() end },
+      { key = '=', label = 'transients: more', fn = function() if not ready() then return end; SL.button('sens+'); vim.msg = ('transients: %d slices (sens %.2f)'):format(#(SL.slices or {}), SL.sens); ctx.slice_hydra() end },
     } })
     state.popup_at = { kind = 'sprops' }                -- поверх панели свойств сэмпла (5 окт)
   end,
