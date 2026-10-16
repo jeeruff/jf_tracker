@@ -7477,6 +7477,30 @@ function D.frame(L, snap, rows, state, info)
           cl = {}
           local show = ks > 0 and ks or 1
           local cnt = 0
+          -- 16 окт: drumrs5k — первая строка правой колонки: слоты эффектов пэда (flt eq comp dist)
+          -- и str (запекание растяжки); есть эффект — голубым, его имя в подсказке
+          if D.DR and kid then
+            local sy = by + 2 * L.rh + 2
+            local sxb = cx + L.pad
+            local slots = {}
+            for _, sl in ipairs(kid.slots or {}) do slots[sl.cat] = slots[sl.cat] or sl end
+            local list = {}
+            for _, cat in ipairs(D.DR.CATS) do list[#list + 1] = cat end
+            list[#list + 1] = 'str'
+            for _, cat in ipairs(list) do
+              local sl = slots[cat]
+              local on = sl ~= nil or (cat == 'str' and kid.baked)
+              local w2 = ms(cat) + 2 * L.pad
+              if sxb + w2 > cx + bw1 - L.pad then break end
+              local hb = not drag and mx >= sxb and mx < sxb + w2 and my >= sy and my < sy + L.rh
+              set(on and U.tint(U.CYAN, 0.3) or (hb and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(sxb, sy, w2, L.rh - 1, 1)
+              set(on and U.CYAN or (hb and U.AMBER or U.LINE)); gfx.rect(sxb, sy, w2, L.rh - 1, 0)
+              text(sxb + L.pad, sy, cat, (sl and not sl.enabled) and U.GREY or (on and U.CYAN or (hb and U.AMBER or U.TEXT)))
+              if hb then hover.dspbtn = { fx = k, f = f, what = 'kslot', kid = kid, cat = cat, slot = sl, ki = ks } end
+              sxb = sxb + w2 + 2
+            end
+            cnt = 1
+          end
           for pi, p in ipairs(f.params) do
             if p.kid == show and not p.macro then cl[pi] = { 1, cnt }; cnt = cnt + 1 else cl[pi] = { 99, 0 } end
           end

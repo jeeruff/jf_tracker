@@ -2709,6 +2709,91 @@ function E.fx_move_into(track, src, c, par)
   if model then model.invalidate() end
   return ok
 end
+-- 16 окт: drumrs5k — пэды из файлов: c — контейнер-рэк (nil — новый «drumrs5k имя» в конце цепочки);
+-- пэд — RS5K, весь файл, режим sample, нота note0 + k - 1 (одна клавиша на пэд), имя «Sxx файл».
+-- Возвращает индекс рэка и число пэдов. Пэд с файлом replace — тот же RS5K, новый файл (бросок на пэд)
+function E.drum_pads(track, c, paths, note0, title)
+  local A = FA(track)
+  local n = 0
+  run('drumrs5k pads', function()
+    if not c then
+      c = add_fx(track, 'Container', -1)
+      if not c or c < 0 then c = nil; return end
+      A.SetNamedConfigParm(track, c, 'renamed_name', 'drumrs5k ' .. (title or 'kit'))
+    end
+    for k, path in ipairs(paths) do
+      local pos = cont_count(track, c) or 0
+      local addr = child_addr(track, c, pos)
+      local idx = add_fx(track, 'ReaSamplOmatic5000 (Cockos)', -1000 - addr)
+      if idx and idx >= 0 then
+        local note = math.max(0, math.min(127, note0 + k - 1))
+        E.drum_pad_set(track, addr, path, note, pos + 1)
+        n = n + 1
+      end
+    end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return c, n
+end
+-- один пэд: файл целиком, режим sample, нота (nil — не трогать), имя «Sxx файл»
+function E.drum_pad_set(track, addr, path, note, num)
+  local A = FA(track)
+  A.SetNamedConfigParm(track, addr, 'FILE0', path)
+  A.SetNamedConfigParm(track, addr, 'DONE', '')
+  A.SetNamedConfigParm(track, addr, 'MODE', '1')
+  local pi = model and model.rs5k_pidx and model.rs5k_pidx(A, track, addr) or {}
+  if pi.start then A.SetParamNormalized(track, addr, pi.start, 0) end
+  if pi.stop then A.SetParamNormalized(track, addr, pi.stop, 1) end
+  if note and pi.note then A.SetParamNormalized(track, addr, pi.note, note / 127) end
+  if note and pi.note_end then A.SetParamNormalized(track, addr, pi.note_end, note / 127) end
+  local nm = (path:match('[^/\\]+$') or path):gsub('%.%w+$', '')
+  if num then A.SetNamedConfigParm(track, addr, 'renamed_name', ('S%02X %s'):format(num, nm)) end
+end
+-- 16 окт: эффекты пэда drumrs5k. Пэд с эффектами — подконтейнер «pad» [RS5K, flt, eq, comp, dist],
+-- parallel = 1 (суммируется с остальными, а не обрабатывает их), у RS5K внутри вход отключён
+-- (иначе вход трека прошёл бы через фильтр пэда и сложился ещё раз). Адреса вложенных — по схеме
+-- REAPER 7: ребёнок k рэка c = 0x2000000 + (c + 1) + (k + 1) * (N0 + 1), внук j = адрес ребёнка
+-- + (j + 1) * (N0 + 1) * (N1 + 1); N0 — FX трека, N1 — детей рэка
+local function grand_addr(obj, c, k, j)
+  local n0 = FA(obj).GetCount(obj)
+  local n1 = cont_count(obj, c) or 0
+  return child_addr(obj, c, k) + (j + 1) * (n0 + 1) * (n1 + 1)
+end
+E.drum_grand_addr = grand_addr
+-- RS5K пэда k (с 0) — в подконтейнер на его месте; возвращает адрес подконтейнера
+function E.drum_wrap(track, c, k)
+  local A = FA(track)
+  local addr = child_addr(track, c, k)
+  local ok, cnt = A.GetNamedConfigParm(track, addr, 'container_count')
+  if ok and cnt then return addr end                              -- уже подконтейнер
+  local _, nm = A.GetNamedConfigParm(track, addr, 'renamed_name')
+  local sub = add_fx(track, 'Container', -1000 - addr)            -- встаёт на место k, RS5K — на k + 1
+  if not sub or sub < 0 then return nil end
+  copy_fx(track, child_addr(track, c, k + 1), track, grand_addr(track, c, k, 0), true)
+  addr = child_addr(track, c, k)
+  A.SetNamedConfigParm(track, addr, 'renamed_name', nm ~= '' and nm or 'pad')
+  A.SetNamedConfigParm(track, addr, 'parallel', '1')
+  local rs = grand_addr(track, c, k, 0)
+  for pin = 0, 1 do A.SetPinMappings(track, rs, 0, pin, 0, 0) end  -- вход RS5K — тишина: в пэде только его звук
+  A.Show(track, addr, 2)
+  return addr
+end
+-- эффект name в пэд k на позицию pos (после RS5K = 1); пэд без подконтейнера заворачивается
+function E.drum_slot_add(track, c, k, name, pos)
+  local ok = false
+  run('drumrs5k pad fx', function()
+    if not E.drum_wrap(track, c, k) then return end
+    local idx = add_fx(track, name, -1000 - grand_addr(track, c, k, pos or 1))
+    ok = idx ~= nil and idx >= 0
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+-- убрать эффект пэда (адрес внука — из модели)
+function E.drum_slot_del(track, addr)
+  run('drumrs5k pad fx off', function() FA(track).Delete(track, addr) end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
 -- меню контейнера (6 окт): маршрутизация ребёнка, вынос наружу, имя
 function E.fx_parallel(track, addr, v)
   run('fx parallel', function() FA(track).SetNamedConfigParm(track, addr, 'parallel', tostring(v or 0)) end)

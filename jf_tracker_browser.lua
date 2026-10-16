@@ -933,6 +933,7 @@ function B.key(c)
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
     local e = B.entries[B.cur]
     if e and not (e.dir or e.db or e.pm or e.pmdir or e.kit or e.trk or e.rgn or e.mark or e.other or e.empty) and ctx.lib_append_slice then ctx.lib_append_slice(B.full(e)) end
+  elseif ch == 'a' and ctx.browser_send_menu then ctx.browser_send_menu()   -- 16 окт: add to: lib / drumrs5k / сэмплер / список / слайсы
   elseif ch == 'm' then B.toggle_mark()                                -- 10 окт: отметка строк
   elseif ch == 'u' then B.clear_marks()                                -- 12 окт: u — снять все отметки, как в lf (было M)
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()

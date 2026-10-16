@@ -317,7 +317,8 @@ local state = {
   libtab = 'audio',
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
-  drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),   -- 16 окт: drumrs5k — подпись ячеек
+  drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),
+  drumalgo = tonumber(reaper.GetExtState(EXT, 'drumalgo')) or -1,   -- 16 окт: алгоритм запекания str   -- 16 окт: drumrs5k — подпись ячеек
   sliceaudition = reaper.GetExtState(EXT, 'sliceaud2') ~= '0',   -- 10 окт: по умолчанию вкл (новый ключ — старое «0» от прежнего умолчания не держит)   -- 10 окт: auto play в зуме края   -- 10 окт: слайсер, кнопка follow   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
@@ -4976,6 +4977,186 @@ ctx = {
     end
     vim.open_hydra({ title = 'markers and regions', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  -- 16 окт: drumrs5k — файлы в пэды рэка трека DSP (рэка нет — новый); нота — за последним пэдом
+  drum_add_files = function(paths)
+    local tgt = dsp_target()
+    local col = (tgt and tgt.col) or cur_col()
+    if not (col and col.track) or #paths == 0 then vim.msg = 'drumrs5k: no track / no files'; return end
+    if tgt and tgt.take then vim.msg = 'drumrs5k: a track, not take fx'; return end
+    local rack, note0
+    for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.kit and f.container then rack = f; break end end
+    if rack then
+      note0 = (ctx.slice_base and ctx.slice_base()) or 61
+      for _, kid in ipairs(rack.kids or {}) do if kid.note and kid.note >= note0 then note0 = kid.note + 1 end end
+    else note0 = (ctx.slice_base and ctx.slice_base()) or 61 end
+    local cp = {}
+    for i, pth in ipairs(paths) do cp[i] = edit.media_copy(pth) end
+    local c, n = edit.drum_pads(col.track, rack and rack.i, cp, note0, (cp[1]:match('[^/]+$') or 'kit'):gsub('%.%w+$', ''))
+    if c and not rack then ctx.ti_cache = nil; pcall(ctx.inst_fx_pick, col, c, false, true) end
+    vim.msg = ('drumrs5k: %d pad(s) %s on %s, from note %d'):format(n, rack and 'added' or 'in a new rack', col.name or 'track', note0)
+  end,
+  -- бросок файла на пэд — его сэмпл (нота и номер — прежние)
+  drum_pad_file = function(kid, path)
+    local col = dsp_target(); if not (col and kid and kid.rs5k_i) then return end
+    path = edit.media_copy(path)
+    local num = tonumber((kid.name or ''):match('^S(%x%x)') or '', 16)
+    edit.run('drumrs5k pad sample', function() edit.drum_pad_set(col.track, kid.rs5k_i, path, nil, num) end)
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = ('drumrs5k: %s -> %s'):format(path:match('[^/]+$') or path, kid.name or 'pad')
+  end,
+  -- 16 окт: браузер, a — отмеченные файлы (или файл под курсором) куда: lib / drumrs5k / сэмплеры / слайсы
+  browser_send_menu = function()
+    local files = {}
+    for _, o in ipairs(B.sel_order or {}) do local e = o.e; if not (e.pm or e.trk or e.rgn or e.kit or e.other or e.dir) then files[#files + 1] = o.full end end
+    if #files == 0 then local e = B.entries[B.cur]; if e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) then files[1] = B.full(e) end end
+    if #files == 0 then vim.msg = 'add to: no files (m marks files, or put the cursor on one)'; return end
+    local function done() B.sel, B.sel_order = {}, {} end
+    local nf = #files == 1 and (files[1]:match('[^/]+$') or files[1]) or (#files .. ' files')
+    vim.open_hydra({ title = 'add ' .. nf .. ' to', items = {
+      { key = 'l', label = 'the lib - each file its own instrument (= Enter)', fn = function() for _, f in ipairs(files) do ctx.add_to_depot(f) end; done(); vim.msg = #files .. ' file(s) into the lib' end },
+      { key = 'd', label = 'drumrs5k - a pad per file, a key each (the rack on the DSP track, or a new one)', fn = function() ctx.drum_add_files(files); done() end },
+      { key = 's', label = 'sampler - one RS5K per file on the DSP track, played by pitch', fn = function()
+        local col = dsp_target() or cur_col(); if not col then return end
+        edit.run('files to RS5K', function()
+          for _, f in ipairs(files) do
+            local fx = reaper.TrackFX_AddByName(col.track, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+            if fx and fx >= 0 then
+              local p2 = edit.media_copy(f)
+              reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'FILE0', p2); reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'DONE', '')
+              reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'renamed_name', ((p2:match('[^/]+$') or p2):gsub('%.%w+$', '')))
+            end
+          end
+        end)
+        model.invalidate(); done(); vim.msg = #files .. ' RS5K on ' .. (col.name or 'track')
+      end },
+      { key = 'm', label = 'sampler list - all files in one RS5K, each note the next file', fn = function()
+        local col = dsp_target() or cur_col(); if not col then return end
+        edit.run('sampler list', function()
+          local fx = reaper.TrackFX_AddByName(col.track, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+          if not (fx and fx >= 0) then return end
+          for k, f in ipairs(files) do reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'FILE' .. (k - 1), edit.media_copy(f)) end
+          reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'DONE', '')
+          reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'renamed_name', ('list %d'):format(#files))
+        end)
+        model.invalidate(); done(); vim.msg = ('sampler list: %d file(s) in one RS5K'):format(#files)
+      end },
+      { key = 'c', label = 'slices - new slices of the selected instrument (a files kit &)', fn = function() for _, f in ipairs(files) do ctx.lib_append_slice(f) end; done() end },
+    } })
+  end,
+  -- 16 окт: drumrs5k — слот эффекта пэда: избранное категории (цифры), b — любой из установленных
+  -- (попадает в избранное), x — убрать, o — окно, B — bypass; str — запекание растяжки
+  drum_slot_menu = function(hb)
+    local tgt = dsp_target(); if not (tgt and hb and hb.kid) or tgt.take then return end
+    local tr, kid, cat, sl = tgt.track, hb.kid, hb.cat, hb.slot
+    local rack = hb.f
+    if cat == 'str' then return ctx.drum_str_menu(hb) end
+    local favs = model.drum_favs[cat] or {}
+    local function put(name)
+      if sl then edit.drum_slot_del(tr, sl.i) end
+      local cats = { 'rs5k' }
+      for _, x in ipairs(kid.slots or {}) do if x ~= sl then cats[#cats + 1] = x.cat end end
+      local pos = model.DR.insert_pos(cats, cat)
+      if edit.drum_slot_add(tr, rack.i, hb.ki - 1, name, pos) then
+        model.drum_favs[cat] = model.DR.fav_add(favs, name)
+        reaper.SetExtState(EXT, 'drumfav_' .. cat, model.DR.encode_fav(model.drum_favs[cat]), true)
+        vim.msg = ('%s: %s %s'):format(kid.name or 'pad', model.DR.CAT_NAME[cat], model.DR.short(name))
+      else vim.msg = 'drumrs5k: could not add ' .. name end
+    end
+    local items = {}
+    for i, nm in ipairs(favs) do
+      if i > 9 then break end
+      local cur = sl and model.DR.short(nm):lower() == (sl.name or ''):lower()
+      items[#items + 1] = { key = tostring(i), label = model.DR.short(nm) .. (cur and '  (on)' or ''), fn = function() put(nm) end }
+    end
+    items[#items + 1] = { key = 'b', label = 'browse - any installed fx (it joins the favourites of ' .. model.DR.CAT_NAME[cat] .. ')', fn = function()
+      vim.open_picker(model.DR.CAT_NAME[cat] .. ' for ' .. (kid.name or 'pad'), ctx.fx_list(), function(x) put(x.label) end)
+    end }
+    if sl then
+      items[#items + 1] = { key = 'o', label = 'open the window of ' .. sl.name, fn = function() reaper.TrackFX_Show(tr, sl.i, 3) end }
+      items[#items + 1] = { key = 'B', label = (sl.enabled and 'bypass ' or 'enable ') .. sl.name, fn = function() edit.fx_bypass(tr, sl.i); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end }
+      items[#items + 1] = { key = 'x', label = 'remove ' .. sl.name, fn = function() edit.drum_slot_del(tr, sl.i); vim.msg = 'removed ' .. sl.name end }
+    end
+    vim.open_hydra({ title = (kid.name or 'pad') .. ': ' .. model.DR.CAT_NAME[cat], items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  -- str: алгоритм REAPER, скорость и полутоны (:drumstr rate pitch), запечь / вернуть оригинал
+  drum_str_menu = function(hb)
+    ctx.drum_str_hb = hb
+    local algo = state.drumalgo or -1
+    local an = 'project default'
+    if algo >= 0 then local ok, nm = reaper.EnumPitchShiftModes(algo >> 16); if ok then an = nm end end
+    local items = {
+      { key = 'a', label = 'algorithm: ' .. an, fn = function()
+        local list = { { label = 'project default', data = -1 } }
+        for m = 0, 30 do local ok, nm = reaper.EnumPitchShiftModes(m); if ok and nm and nm ~= '' then list[#list + 1] = { label = nm, data = m << 16 } end end
+        vim.open_picker('stretch algorithm', list, function(x) state.drumalgo = x.data; reaper.SetExtState(EXT, 'drumalgo', tostring(x.data), true); vim.msg = 'drumrs5k stretch: ' .. x.label end)
+      end },
+      { key = 'r', label = ('bake: rate and pitch (:drumstr rate semitones), now %.2f %+g'):format(state.drumrate or 1, state.drumpitch or 0), fn = function()
+        vim.open_prompt('drumstr ', ('%.2f %g'):format(state.drumrate or 1, state.drumpitch or 0))
+      end },
+      { key = 'o', label = 'original - the pad gets its file and piece back', fn = function() ctx.drum_bake(hb, nil) end },
+    }
+    vim.open_hydra({ title = (hb.kid.name or 'pad') .. ': stretch (RS5K cannot - the piece is rendered)', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
+  -- запекание: кусок a..b файла пэда — временный трек, item со скоростью / полутонами / алгоритмом,
+  -- Glue (рендер в файл проекта), трек удаляется; пэд — новый файл целиком. Оригинал — в P_EXT трека
+  -- по GUID RS5K (повторное запекание идёт от оригинала). opt = nil — вернуть оригинал
+  drum_bake = function(hb, opt)
+    local tgt = dsp_target(); if not (tgt and hb and hb.kid and hb.kid.rs5k_i) or tgt.take then return end
+    local tr, kid = tgt.track, hb.kid
+    local guid = reaper.TrackFX_GetFXGUID(tr, kid.rs5k_i) or ''
+    local key = 'P_EXT:jfdrum' .. guid:gsub('[^%w]', '')
+    local _, saved = reaper.GetSetMediaTrackInfo_String(tr, key, '', false)
+    local orig = model.DR.bake_decode(saved) or { file = kid.file, a = kid.pad_a or 0, b = kid.pad_b or 1 }
+    if not orig.file then vim.msg = 'drumrs5k: the pad has no file'; return end
+    local pi = model.rs5k_pidx(model.fxapi(tr), tr, kid.rs5k_i)
+    local function load(path, a, b)
+      reaper.TrackFX_SetNamedConfigParm(tr, kid.rs5k_i, 'FILE0', path); reaper.TrackFX_SetNamedConfigParm(tr, kid.rs5k_i, 'DONE', '')
+      if pi.start then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.start, a) end
+      if pi.stop then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.stop, b) end
+    end
+    if not opt then
+      if not saved or saved == '' then vim.msg = 'drumrs5k: the pad is not baked'; return end
+      edit.run('drumrs5k original', function() load(orig.file, orig.a, orig.b); reaper.GetSetMediaTrackInfo_String(tr, key, '', true) end)
+      model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate(); vim.msg = (kid.name or 'pad') .. ': original back'; return
+    end
+    local src = reaper.PCM_Source_CreateFromFile(orig.file)
+    if not src then vim.msg = 'drumrs5k: cannot open ' .. orig.file; return end
+    local flen = reaper.GetMediaSourceLength(src)
+    local out
+    edit.run('drumrs5k bake stretch', function()
+      local sel = {}
+      for i = 0, reaper.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = reaper.GetSelectedMediaItem(0, i) end
+      local n = reaper.CountTracks(0)
+      reaper.InsertTrackAtIndex(n, false)
+      local tmp = reaper.GetTrack(0, n)
+      local it = reaper.AddMediaItemToTrack(tmp)
+      local tk = reaper.AddTakeToMediaItem(it)
+      reaper.SetMediaItemTake_Source(tk, src)
+      local rate = math.max(0.05, opt.rate or 1)
+      reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', orig.a * flen)
+      reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate)
+      reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)
+      reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', opt.pitch or 0)
+      reaper.SetMediaItemTakeInfo_Value(tk, 'I_PITCHMODE', opt.mode or -1)
+      reaper.SetMediaItemInfo_Value(it, 'D_POSITION', 0)
+      reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', (orig.b - orig.a) * flen / rate)
+      reaper.SelectAllMediaItems(0, false); reaper.SetMediaItemSelected(it, true)
+      reaper.Main_OnCommand(41588, 0)                                  -- Item: Glue items (рендер в файл)
+      local g = reaper.GetTrackMediaItem(tmp, 0)
+      local gt = g and reaper.GetActiveTake(g)
+      if gt then out = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(gt), '') end
+      reaper.DeleteTrack(tmp)
+      for _, x in ipairs(sel) do if reaper.ValidatePtr(x, 'MediaItem*') then reaper.SetMediaItemSelected(x, true) end end
+      if out and out ~= '' then
+        load(out, 0, 1)
+        reaper.GetSetMediaTrackInfo_String(tr, key, model.DR.bake_encode({ file = orig.file, a = orig.a, b = orig.b, mode = opt.mode or -1, pitch = opt.pitch or 0, rate = rate }), true)
+      end
+    end)
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = out and ('%s: baked x%.2f %+g st -> %s'):format(kid.name or 'pad', opt.rate or 1, opt.pitch or 0, out:match('[^/]+$') or out) or 'drumrs5k: bake failed'
   end,
   -- 16 окт: drumrs5k — подпись ячеек пэдов (выпадашка: 4 значения)
   drum_cell_menu = function()
@@ -18666,6 +18847,7 @@ local function frame()
       elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
+      elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
@@ -19445,6 +19627,7 @@ local function frame()
       if B.drag.active then
         if hover.fi and hover.row then state.status = ('drop %s → %s @ %04d'):format(B.drag.e.name, hover.col and hover.col.name or '', hover.row.row)
         elseif type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac)) then state.status = 'drop ' .. B.drag.e.name .. ' → a new slice of the selected instrument (a files kit &)'
+        elseif hover.dspkit then state.status = 'drop ' .. B.drag.e.name .. (hover.dspkit.ki > 0 and ' → this pad (its sample)' or ' → a new pad of the drumrs5k')
         elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
         elseif hover.sess or (hover.matrix and hover.matrix.ri) then state.status = 'drop ' .. B.drag.e.name .. ' → a clip in this slot'
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column, the lib, the slices, the item wave or a clip' end
@@ -19458,6 +19641,10 @@ local function frame()
         if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
       elseif bd.active and hover.slxwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.slixer_load(hover.slxwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- 11 окт: файл на волну slixer — его сэмпл
+      elseif bd.active and hover.dspkit and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not bd.e.pm then
+        -- 16 окт: drumrs5k — файл на пэд: его сэмпл; на all / пустое место сетки — новый пэд
+        local pth = B.full(bd.e)
+        if hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
@@ -21262,6 +21449,15 @@ ctx.codes_convert = function(how)
   end)
   ctx.mx_refresh()
   vim.msg = n > 0 and ('codes %s: %d region(s) renamed (Cmd+Z back)'):format(how, n) or ('codes %s: nothing to rename'):format(how)
+end
+-- 16 окт: :drumstr rate semitones — запечь кусок выбранного пэда drumrs5k (алгоритм — меню str)
+ctx.drumstr_cmd = function(arg)
+  local r, p = (arg or ''):match('^%s*([%d%.]+)%s*([%+%-]?[%d%.]*)')
+  r, p = tonumber(r), tonumber(p) or 0
+  if not r or r <= 0 then vim.msg = ':drumstr rate semitones - e.g. 0.5 0 (twice as long), 1 -12 (an octave down, same length)'; return end
+  state.drumrate, state.drumpitch = r, p
+  if not ctx.drum_str_hb then vim.msg = 'drumstr: pick a pad and its str slot first'; return end
+  ctx.drum_bake(ctx.drum_str_hb, { rate = r, pitch = p, mode = state.drumalgo or -1 })
 end
 ctx.codes_cmd = function(arg)
   local a = (arg or ''):match('%S+') or ''
