@@ -322,7 +322,8 @@ local state = {
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
   snappanes = reaper.GetExtState(EXT, 'snappanes') ~= '0',
-  dimidle = reaper.GetExtState(EXT, 'dimidle') == '1',   -- 16 окт: эксперимент — трекер тусклее на 15 %, пока клавиши у REAPER
+  dimidle = reaper.GetExtState(EXT, 'dimidle') == '1',
+  glitch = reaper.GetExtState(EXT, 'glitch') ~= '0',   -- 16 окт: глитч трекера, пока клавиши у REAPER   -- 16 окт: эксперимент — трекер тусклее на 15 %, пока клавиши у REAPER
   zoomtop = reaper.GetExtState(EXT, 'zoomtop') ~= '0',   -- 16 окт: item внизу — прицел над волной   -- 16 окт: линии пейнов прилипают друг к другу
   drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),
   drumalgo = tonumber(reaper.GetExtState(EXT, 'drumalgo')) or -1,   -- 16 окт: алгоритм запекания str   -- 16 окт: drumrs5k — подпись ячеек
@@ -10827,6 +10828,7 @@ ctx = {
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
+      { key = 'glitch', label = 'glitch when inactive', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines - impossible to miss that the keys go elsewhere', get = function() return state.glitch ~= false end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
@@ -10943,7 +10945,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'sroslash', 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -17822,6 +17824,23 @@ local function frame()
   if not ctx.win_focus then
     state.status = 'REAPER has the keyboard - click the tracker to activate it'
     if state.dimidle then U.set(U.BG, 0.15); gfx.rect(0, 0, gfx.w, gfx.h, 1); gfx.a = 1 end
+    -- 16 окт: глитч, пока клавиши у REAPER (опция glitch when inactive, вкл): полосы окна рвутся вбок,
+    -- редкие цветные строки развёртки; узор сменяется рывком раз в ~150 мс (не каждый кадр — без мерцания)
+    if state.glitch ~= false and gfx.w > 40 and gfx.h > 40 then
+      local seed = math.floor(reaper.time_precise() / 0.15)
+      local function rnd(a, b) seed = (seed * 1103515245 + 12345) % 2147483648; return a + seed % (b - a + 1) end
+      rnd(0, 1)
+      for _ = 1, rnd(2, 6) do
+        local y0, hh = rnd(0, gfx.h - 14), rnd(2, 14)
+        local dx = rnd(-28, 28)
+        gfx.a = 1; gfx.blit(gfx.dest, 1, 0, 0, y0, gfx.w, hh, dx, y0, gfx.w, hh)   -- источник — то, куда рисуем (буфер 1021 или окно)
+      end
+      for _ = 1, rnd(0, 3) do
+        local cc = ({ U.CYAN, U.AMBER, U.RED, U.GREEN })[rnd(1, 4)]
+        U.set(cc, 0.35); gfx.rect(0, rnd(0, gfx.h - 2), gfx.w, 1, 1)
+      end
+      gfx.a = 1
+    end
   elseif cell and cell.kind == 'audio' then
     state.status = string.format('%s  %s vol %s  offs %.3fs  len %.3fs  rate %.3f  %s',
       cell.name, cell.note, cell.vol, cell.offs, cell.len, cell.rate, table.concat(cell.fx or {}, ' '))

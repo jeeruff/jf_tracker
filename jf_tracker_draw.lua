@@ -3819,7 +3819,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- 16 окт: f-клавиша — «f» сверху, номер под ним, своим мелким шрифтом (влезает в узкую чёрную)
           local px = math.max(7, math.min(math.floor((bh - 2) / 2), math.floor(bw * 0.9)))
           if D.fkey_px ~= px then gfx.setfont(7, 'Menlo', px, string.byte('b')); D.fkey_px = px else gfx.setfont(7) end
-          local tc = dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5)
+          local tc = U.readable(U.TEXT, fill, 7)                     -- 16 окт: ярко всегда (и у блёклой клавиатуры)
           set(tc)
           local fw = gfx.measurestr('f')
           gfx.x, gfx.y = bx + math.floor((bw - fw) / 2), ky + 1; gfx.drawstr('f')
@@ -4342,6 +4342,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   if mode ~= '' then
     if not dry then
       if reap then
+        -- 16 окт: «разодрано» (так и задумано, пользователь: «пусть и будет»): белым на чёрном, чёрные косые полосы поверх
         local bw2 = D.big_measure(mode, 2)
         set({ 0, 0, 0 }); gfx.rect(sx0 - 2, sy - 1, bw2 + 4, 2 * L.th + 2, 1)
         D.big_text(sx0, sy, mode, { 1, 1, 1 }, 2)
