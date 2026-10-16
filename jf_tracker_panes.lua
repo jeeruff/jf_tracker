@@ -48,7 +48,7 @@ PN.PANELS = {
   { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
   { id = 'clips',      label = 'clips',      key = 'C', hint = 'session', side = 'top', tab = true },   -- 10 окт: клипы сессии — своя панель (свои шапки треков), куда угодно
-  { id = 'macros',     label = 'macros',     key = 'q', hint = 'macros',  side = 'top', tab = true },   -- 9 окт: записанные / свои / встроенные макросы
+  -- 16 окт: вкладки macros нет — макросы полосой в транспорте (справа от BPM)
   { id = 'scopes',     label = 'scopes',     key = 'c', hint = 'master',  side = 'top', tab = true },
   { id = 'master',     label = 'master',     key = 'S', hint = 'master',  side = 'top', tab = true },
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
@@ -567,9 +567,6 @@ PN.LATE = {
   -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
   { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },
   { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
-  { 'macros', function(m)
-    for _, at in ipairs({ 'sample', 'retro', 'automation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
-  end },
 }
 function PN.add_new(model, raw)
   if type(raw) ~= 'string' or raw == '' then return false end
