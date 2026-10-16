@@ -3999,7 +3999,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- время и BPM крупно (опция big time and BPM)
   local big = (c.bigbpm or c.tpfull) and {
     { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
-    { 'bpm', c.bpm_edit and (c.bpm_edit ~= '' and c.bpm_edit or '...') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },
+    { 'bpm', c.bpm_edit and ((c.bpm_edit ~= '' and c.bpm_edit or '...') .. ' BPM') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },   -- 16 окт: при вводе слово BPM остаётся
     { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
   } or nil
   local bigw = 0
