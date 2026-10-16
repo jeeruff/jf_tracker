@@ -17555,11 +17555,11 @@ local function frame()
   -- кадре буфер сперва восстанавливается из неё, наложения рисуются один раз
   if gfx.dest == 1021 then
     if idle_skip and ctx.clean_w == gfx.w and ctx.clean_h == gfx.h then
-      gfx.a = 1; gfx.blit(797, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
+      gfx.a = 1; gfx.mode = 0; gfx.blit(797, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
     elseif not idle_skip then
       local d0 = gfx.dest
       if ctx.clean_w ~= gfx.w or ctx.clean_h ~= gfx.h then gfx.setimgdim(797, gfx.w, gfx.h); ctx.clean_w, ctx.clean_h = gfx.w, gfx.h end
-      gfx.dest = 797; gfx.a = 1; gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h); gfx.dest = d0
+      gfx.dest = 797; gfx.a = 1; gfx.mode = 0; gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h); gfx.dest = d0
     end
   end
   draw.pmark('post: hints, ghosts, popups')
@@ -21010,7 +21010,9 @@ local function frame()
   draw.pmark('blit, gfx.update')
   if tonumber(state.fps) or ctx.bigbuf then
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
-    gfx.dest = -1
+    -- 16 окт: непрозрачно и без сложения — gfx.a / gfx.mode последнего наложения (подсказка, рамка
+    -- с alpha) иначе выводили весь кадр полупрозрачно на чёрный экран: окно темнело целиком
+    gfx.dest = -1; gfx.a = 1; gfx.mode = 0
     gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
   end
   U.end_frame()
