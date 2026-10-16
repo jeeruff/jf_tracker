@@ -1150,6 +1150,21 @@ end
 -- M.fx_values(tr, fx, n) по запросу (кадр).
 M.DSP_MAXP = 8
 M.dspmods = nil      -- реестр кураторских модулей (jf_tracker_dspmods.lua), ставит main
+M.DR = nil           -- 16 окт: jf_tracker_drumrack.lua (drumrs5k), ставит main; M.drum_favs — избранное слотов
+-- 16 окт: индексы параметров RS5K по имени (один раз — у всех экземпляров одинаковы, не зашиваем)
+local rs5k_pi
+function M.rs5k_pidx(A, tr, fx)
+  if rs5k_pi then return rs5k_pi end
+  local t = {}
+  for p = 0, A.GetNumParams(tr, fx) - 1 do
+    local _, pn = A.GetParamName(tr, fx, p, ''); pn = (pn or ''):lower()
+    if pn == 'sample start offset' then t.start = p elseif pn == 'sample end offset' then t.stop = p
+    elseif pn == 'note range start' then t.note = p elseif pn == 'note range end' then t.note_end = p
+    elseif pn == 'volume' then t.vol = p end
+  end
+  if t.start then rs5k_pi = t end
+  return t
+end
 -- ── адаптер FX (2 окт): цепочка трека или take одним кодом ────────────────
 -- obj — MediaTrack* или MediaItem_Take*; M.fxapi(obj) даёт таблицу функций
 -- TrackFX_* / TakeFX_* с общими именами (GetCount, GetFXName, …). Отличаются
@@ -1398,6 +1413,28 @@ function build_one(tr, fx, out)
       -- слайсов и свойства выбранного (draw.kit_sel), а не колонка на каждого
       local kit = #kids > 1
       for _, kid in ipairs(kids) do if not (kid.entry and kid.entry.rs5k) then kit = false; break end end
+      -- 16 окт: drumrs5k — пэд и подконтейнером [RS5K, эффекты пэда]; у пэда — его RS5K,
+      -- файл, кусок a..b (доли файла), нота и категории эффектов (слоты)
+      if M.DR and M.DR.is_rack(kids) then
+        kit = true
+        for _, kid in ipairs(kids) do
+          local re, rid = M.DR.pad_rs5k(kid)
+          kid.rs5k_i, kid.file = rid, re and re.file
+          local pi = M.rs5k_pidx(A, tr, rid)
+          kid.pad_a = pi.start and A.GetParamNormalized(tr, rid, pi.start) or 0
+          kid.pad_b = pi.stop and A.GetParamNormalized(tr, rid, pi.stop) or 1
+          kid.note = pi.note and math.floor(A.GetParamNormalized(tr, rid, pi.note) * 127 + 0.5) or nil
+          kid.slots = {}
+          if kid.entry and kid.entry.container then
+            for gi, g in ipairs(kid.entry.kids or {}) do
+              if gi > 1 then
+                local cat = M.DR.cat_of(g.name, M.drum_favs) or ('x' .. gi)
+                kid.slots[#kid.slots + 1] = { cat = cat, i = g.i, name = M.DR.short(g.name), enabled = g.enabled }
+              end
+            end
+          end
+        end
+      end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
                         cols = kit and 2 or math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m, kit = kit or nil }
     elseif um then
@@ -2176,7 +2213,8 @@ end
 -- пики файла браузера: PCM-источник живёт в кеше (до FILE_SRC_MAX), пики — M.peaks
 local file_src, file_src_n, file_src_order = {}, 0, {}
 M.FILE_SRC_MAX = 300
-function M.file_peaks(path, npix)
+-- 16 окт: a, b — кусок файла (доли 0..1, пэд drumrs5k), spec — спектральные пики
+function M.file_peaks(path, npix, a, b, spec)
   local e = file_src[path]
   if e == nil then
     local src = R.PCM_Source_CreateFromFile(path)
@@ -2193,6 +2231,11 @@ function M.file_peaks(path, npix)
     end
   end
   if not e or e.len <= 0 then return nil end
+  if (a and a > 0) or (b and b < 1) or spec then
+    a, b = math.max(0, a or 0), math.min(1, b or 1)
+    if b - a < 1e-5 then return nil end
+    return M.peaks({ src = e.src, guid = ('%s|%.5f|%.5f'):format(e.guid, a, b), offs = a * e.len, len = (b - a) * e.len, rate = 1 }, npix, spec)
+  end
   return M.peaks(e, npix)
 end
 -- длина файла из того же кеша (после file_peaks), секунды; nil — не знаем

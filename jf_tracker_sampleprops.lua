@@ -276,6 +276,9 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
   end
   SP.slice_scroll = math.max(0, math.min(math.max(0, #rows - n), SP.slice_scroll))
   SP.slice_nvis = n
+  -- 16 окт: колонка клавиши — по самой широкой подписи (frow: f4, f11), без наслоения на Sxx
+  local kcol = U.measure('W')
+  for _, r in ipairs(rows) do if r.key then kcol = math.max(kcol, U.measure(r.key)) end end
   for i = 1, n do
     local r = rows[SP.slice_scroll + i]
     if not r then break end
@@ -288,7 +291,7 @@ function SP.draw_slices(L, x, y, w, h, rows, sel, root)
     local col_c = on and U.AMBER or ((r.has or r.k == 0) and U.TEXT or U.GREY)
     local kx = x + L.pad
     U.text(kx, ry, r.key or ' ', on and U.AMBER or U.GREY)
-    local sx = kx + U.measure('W') + L.pad
+    local sx = kx + kcol + L.pad
     local sxx = r.tag or ('S%02X'):format(r.k)   -- 13 окт: вариант лупа — L1, L2 …
     U.text(sx, ry, sxx, on and U.AMBER or U.CYAN)
     local nx = sx + U.measure('S00') + L.pad

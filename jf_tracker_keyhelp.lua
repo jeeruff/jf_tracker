@@ -200,7 +200,8 @@ KH.PAGES = {
     { k = 'Ctrl+ Ctrl-', d = 'bitmap scale x1..x4' },
   } },
   insert = { title = 'tracker INSERT (keyboard)', e = {
-    { k = 'q2w3er5t6y7ui9o0p', d = 'piano: top row + digits, q = C of the octave',
+    { k = '1 f1 2 f2 3 4 f4 ...', d = 'piano (layout frow, default): digits 1..0 - = white keys C..G, F1 F2 F4 F5 F6 F8 F9 F11 black; [ ] octave, { } velocity; F-key shortcuts are off while the keyboard plays' },
+    { k = 'q2w3er5t6y7ui9o0p', d = 'piano (layout qwerty, options): top row + digits, q = C of the octave',
       t = { 'q', '2', 'w', '3', 'e', 'r', '5', 't', '6', 'y', '7', 'u', 'i', '9', 'o', '0', 'p' } },
     { k = 'Shift+note', d = 'audition only, nothing written', t = { 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P' } },
     { k = 'Option+note', d = 'insert beside: new subcolumn, the old note keeps playing' },
@@ -272,7 +273,7 @@ KH.PAGES = {
     { k = 'd x', d = 'remove from the history' },
   } },
   inst = { title = 'lib', e = {
-    { k = 'c', d = 'convert: l slices to the lib, s an RS5K per slice, w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
+    { k = 'c', d = 'convert: l slices to the lib, s slice to drumrs5k (a pad per slice), w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track)' },
     { k = 'j k', d = 'instrument down / up' },
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
@@ -417,7 +418,7 @@ KH.PAGES = {
     { k = 'Enter', d = 'track - go to it in the tracker; instrument - pick it (the cursor goes to its track); automation item - the automation instrument with this item' },
     { k = 'Space on an instrument', d = 'pick and listen' },
     { k = 'slices', d = 'inside a sliced instrument: key  Sxx  length - the key of the octave at the cursor plays the slice (C-4 = whole, shown at the instrument); Enter / l - select it and hear it. The slices module is hidden: :pane slices show brings it back' },
-    { k = '+ -  zoom  c', d = 'slices taller with their wave (x1..x3; the zoom button - x1 / x2); c on a sliced instrument or a slice - convert: every slice its own lib instrument / an RS5K per slice' },
+    { k = '+ -  zoom  c', d = 'slices taller with their wave (x1..x3; the zoom button - x1 / x2); c on a sliced instrument or a slice - convert: every slice its own lib instrument / slice to drumrs5k (a pad per slice)' },
     { k = '## midi clips', d = 'the MIDI clips of the track - Enter on a clip: the midi instrument with this clip, a note key inserts it' },
     { k = 'dd yy p P on an instrument', d = 'as in the lib: cut / yank the instrument, put a copy after / before' },
     { k = 'Space  v  u', d = 'mark the track (and down) / invert the marks / clear them; the commands below work on the marked tracks, else on the cursor' },
@@ -629,6 +630,9 @@ KH.BARS = {
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   -- 14 окт: keys renoise — ноты двумя рядами, октава [ ], громкость { } (z x c — ноты)
+  -- 16 окт: раскладка frow — ноты цифрами и F-рядом, октава [ ], громкость { }
+  insert_fr = { { '1 f1 2', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
+             { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
              { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'help' } },
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },

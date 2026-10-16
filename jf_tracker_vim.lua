@@ -1398,6 +1398,14 @@ end
 local function keys_control(c)
   local ch = (c < 256) and string.char(c) or ''
   if ctx.keys_renoise and ctx.keys_renoise() and ctx.piano[c] then return false end   -- 13 окт: renoise — нижний ряд играет ноты
+  -- 16 окт: frow — цифры и F-ряд играют ноты (- = — тоже ноты, не LPB), октава [ ], громкость { }
+  if ctx.keys_frow and ctx.keys_frow() then
+    if ctx.piano[c] then return false end
+    if ch == '[' then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return true end
+    if ch == ']' then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return true end
+    if c == 123 or c == 125 then V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true end
+    if ch == 'z' or ch == 'x' or ch == 'c' or ch == 'C' then return true end      -- одна функция — одна клавиша: в frow это [ ] { }
+  end
   -- 14 окт: renoise — c в нотах, громкость { } (Shift к октаве [ ])
   if ctx.keys_renoise and ctx.keys_renoise() and (c == 123 or c == 125) then
     V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true
@@ -2211,7 +2219,7 @@ function V.key_impl(c)
     if V.piano then
       if V.mode == 'normal' and ((c == 13 and ctx.esc_vim and ctx.esc_vim()) or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i (12 окт: иначе Enter — смарт-панель)
       V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the top row writes notes' or ''; return end   -- описание — только с хинтами (5 окт)
-      local rn = ctx.keys_renoise and ctx.keys_renoise()   -- 13 окт: renoise — z x ноты, октава [ ]
+      local rn = (ctx.keys_renoise and ctx.keys_renoise()) or (ctx.keys_frow and ctx.keys_frow())   -- 13 окт: renoise — z x ноты, октава [ ]; 16 окт: frow — так же
       if c == (rn and '[' or 'z'):byte() then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return end
       if c == (rn and ']' or 'x'):byte() then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return end
       -- 15 окт: громкость и в KEYS (клавиатура в NORMAL): renoise — { }, иначе c C (как в INSERT)

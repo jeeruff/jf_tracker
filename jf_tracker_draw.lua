@@ -3549,8 +3549,13 @@ D.PIANO_BLACK = { { 1, '2', 1 }, { 3, '3', 2 }, { 6, '5', 4 }, { 8, '6', 5 }, { 
 -- (октава курсора), верхняя — q 2 w 3 … (октавой выше)
 D.PIANO_RENOISE = false
 function D.piano_layout(renoise)
-  D.PIANO_RENOISE = renoise and true or false
-  if renoise then
+  -- 16 окт: 'frow' — цифры белыми, F-ряд чёрными, октава [ ] (как renoise — узко)
+  D.PIANO_FROW = renoise == 'frow'
+  D.PIANO_RENOISE = (renoise and true or false) and not D.PIANO_FROW
+  if D.PIANO_FROW then
+    D.PIANO_WHITE = { { 0, '1' }, { 2, '2' }, { 4, '3' }, { 5, '4' }, { 7, '5' }, { 9, '6' }, { 11, '7' }, { 12, '8' }, { 14, '9' }, { 16, '0' }, { 17, '-' }, { 19, '=' } }
+    D.PIANO_BLACK = { { 1, 'f1', 1 }, { 3, 'f2', 2 }, { 6, 'f4', 4 }, { 8, 'f5', 5 }, { 10, 'f6', 6 }, { 13, 'f8', 8 }, { 15, 'f9', 9 }, { 18, 'f11', 11 } }
+  elseif renoise then
     D.PIANO_WHITE = { { 0, 'z' }, { 2, 'x' }, { 4, 'c' }, { 5, 'v' }, { 7, 'b' }, { 9, 'n' }, { 11, 'm' },
                       { 12, 'q' }, { 14, 'w' }, { 16, 'e' }, { 17, 'r' }, { 19, 't' }, { 21, 'y' }, { 23, 'u' } }
     D.PIANO_BLACK = { { 1, 's', 1 }, { 3, 'd', 2 }, { 6, 'g', 4 }, { 8, 'h', 5 }, { 10, 'j', 6 },
@@ -3735,7 +3740,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if p then
     local dim = p.active == false
     local lbl = ('oct %d'):format(p.octave or 4)
-    local zx = D.PIANO_RENOISE and '[- ]+' or 'z- x+'   -- 14 окт: в renoise z x — ноты, октава — [ ]
+    local zx = (D.PIANO_RENOISE or D.PIANO_FROW) and '[- ]+' or 'z- x+'   -- 14 окт: в renoise z x — ноты, октава — [ ]
     local lw = math.max(ms(lbl), ms(zx)) + 2 * L.pad
     if cc.tpfull then
       -- 15 окт: oct — подпись вертикально, цифра крупно (×2) на две строки; клавиши — строкой под vel
@@ -3761,7 +3766,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cell.vel = { x + L.pad, vy, vw }
       local bx = x + L.pad + vw + 2 * L.pad
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
-      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE or D.PIANO_FROW) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
       local bw = math.max(L.cw * 4, math.min(L.cw * 12, kx + #D.PIANO_WHITE * kwv - 1 - bx))
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
       U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
@@ -3772,7 +3777,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
-    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
+    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE or D.PIANO_FROW) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
     local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
     if kw >= 4 then
       local ky, kh = y + 2, 2 * L.rh + 3
@@ -3805,8 +3810,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(fill); gfx.rect(bx, ky, bw, bh, 1)
         set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
         out.black = out.black + 1
-        if letters and bw >= ms('W') + 2 then
-          text(bx + math.floor((bw - ms(k[2])) / 2), ky + 1, k[2], dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5))
+        local blb = k[2]
+        if ms(blb) > bw - 2 and #blb > 1 then blb = blb:sub(2) end          -- 16 окт: f11 не влезло — 11
+        if letters and bw >= ms(blb) + 2 then
+          text(bx + math.floor((bw - ms(blb)) / 2), ky + 1, blb, dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5))
           out.letters = out.letters + 1
         end
       end
@@ -3817,7 +3824,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.AMBER); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 0)
       end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
-      D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e', 'notes' }, { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' } }) or { { D.PIANO_RENOISE and '[ ]' or 'z x', 'oct' }, { 'm', 'keys' } } }
+      local nk = D.PIANO_FROW and '1 f1 2' or (D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e')
+      local ok2 = (D.PIANO_RENOISE or D.PIANO_FROW) and '[ ]' or 'z x'
+      D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { nk, 'notes' }, { ok2, 'oct' } }) or { { ok2, 'oct' }, { 'm', 'keys' } } }
     end
   end
   -- полоса транспорта (5 окт): от детального к общему — клавиатура, шаг
@@ -7342,33 +7351,110 @@ function D.frame(L, snap, rows, state, info)
             end
             return ''
           end
-          text(bx + L.pad, hy, fit(('%d$'):format(#f.kids), bw1 - 2 * L.pad), U.GREY)
-          local nrow = math.max(1, math.floor((bh - 2 * L.rh - 4) / L.rh))
-          D.kit_scroll = D.kit_scroll or {}
-          local sc = D.kit_scroll[kkey] or 0
-          local total = #f.kids + 1                           -- строка all + слайсы
-          if ks + 1 <= sc then sc = ks elseif ks + 1 > sc + nrow then sc = ks + 1 - nrow end
-          sc = math.max(0, math.min(sc, math.max(0, total - nrow)))
-          D.kit_scroll[kkey] = sc
-          for r = 1, nrow do
-            local ki = sc + r - 1                             -- 0 = all
-            if ki > #f.kids then break end
-            local kid = ki > 0 and f.kids[ki] or nil
-            local ry = hy + r * L.rh
-            local hot = not drag and mx >= bx and mx < bx + bw1 and my >= ry and my < ry + L.rh
-            local on = ki == ks
-            if on or hot then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(bx + 2, ry, bw1 - 3, L.rh, 1) end
-            if kid then
-              local nm = (kid.name or ''):match('^(%S+)') or ('S%02d'):format(ki)
-              local note = kv(ki, 'note range start'); if note == '' then note = kv(ki, 'note lo') end
-              local line = ('%-4s %-4s %s'):format(nm, note, kv(ki, 'volume'))
-              text(bx + L.pad, ry, fit((kid.enabled and '' or '(off) ') .. line, bw1 - 2 * L.pad), kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM)
-              if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
-            else
-              text(bx + L.pad, ry, fit('all  - every slice at once', bw1 - 2 * L.pad), on and U.AMBER or (hot and U.TEXT or U.CYAN))
-              if hot then hover.dspkit = { k = k, key = kkey, ki = 0 } end
+          if D.DR then
+            -- 16 окт: drumrs5k — сетка пэдов вместо списка: шапка «all · N pads · cell: …»,
+            -- ячейка — имя пэда и подпись (note / key / wave / spec); щелчок — выбрать
+            -- и прослушать (main), выбранный — янтарём, выключенный — тускло
+            local ah = ms('all') + 2 * L.pad
+            local hot_all = not drag and mx >= bx + 2 and mx < bx + 2 + ah and my >= hy and my < hy + L.rh
+            set(ks == 0 and U.tint(U.AMBER, 0.3) or (hot_all and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx + 2, hy, ah, L.rh - 1, 1)
+            set(ks == 0 and U.AMBER or U.LINE); gfx.rect(bx + 2, hy, ah, L.rh - 1, 0)
+            text(bx + 2 + L.pad, hy, 'all', ks == 0 and U.AMBER or (hot_all and U.TEXT or U.GREY))
+            if hot_all then hover.dspkit = { k = k, key = kkey, ki = 0 } end
+            local cm = info.drumcell or 'note'
+            local cl_lbl = 'cell ' .. cm
+            local cw2 = ms(cl_lbl) + 2 * L.pad
+            local cxb = bx + bw1 - cw2 - 2
+            if cxb > bx + 2 + ah + L.pad then
+              local hc = not drag and mx >= cxb and mx < cxb + cw2 and my >= hy and my < hy + L.rh
+              set(hc and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cxb, hy, cw2, L.rh - 1, 1)
+              set(hc and U.AMBER or U.LINE); gfx.rect(cxb, hy, cw2, L.rh - 1, 0)
+              text(cxb + L.pad, hy, cl_lbl, hc and U.AMBER or U.TEXT)
+              if hc then hover.dspbtn = { fx = k, f = f, what = 'kcell' } end
+              local cnt_s = ('%d pads'):format(#f.kids)
+              if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
             end
-            hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
+            local gx0, gy0 = bx + 2, hy + L.rh + 1
+            local gw, gh = bw1 - 4, by + bh - 3 - gy0
+            local G = D.DR.grid(#f.kids, gw, gh, 6 * L.cw, 2 * L.rh + 2)
+            D.kit_scroll = D.kit_scroll or {}
+            local sc = D.kit_scroll[kkey] or 0                 -- ряд сверху
+            if ks > 0 then
+              local r0 = (ks - 1) // G.cols
+              if r0 < sc then sc = r0 elseif r0 >= sc + G.fit then sc = r0 - G.fit + 1 end
+            end
+            sc = math.max(0, math.min(sc, math.max(0, G.rows - G.fit)))
+            D.kit_scroll[kkey] = sc
+            for ki, kid in ipairs(f.kids) do
+              local r, c = (ki - 1) // G.cols - sc, (ki - 1) % G.cols
+              if r >= 0 and r < G.fit then
+                local cx0, cy0 = gx0 + c * G.cw, gy0 + r * G.ch
+                local cw0, ch0 = G.cw - 2, G.ch - 2
+                local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
+                local on = ki == ks
+                set(on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL)); gfx.rect(cx0, cy0, cw0, ch0, 1)
+                set(on and U.AMBER or (hot and U.GREY or U.LINE)); gfx.rect(cx0, cy0, cw0, ch0, 0)
+                local fg = kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM
+                local nm = kid.name or ''
+                nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
+                local tag = #(kid.slots or {}) > 0 and ('+' .. #kid.slots) or ''
+                local tw = ms(tag)
+                text(cx0 + L.pad, cy0 + 1, fit((kid.enabled and '' or '(off) ') .. nm, cw0 - 2 * L.pad - (tw > 0 and tw + L.pad or 0)), fg)
+                if tw > 0 then text(cx0 + cw0 - L.pad - tw, cy0 + 1, tag, U.CYAN) end
+                local ay, ah2 = cy0 + L.rh + 1, ch0 - L.rh - 2
+                if cm == 'wave' or cm == 'spec' then
+                  local npx = cw0 - 4
+                  local pk = kid.file and npx > 4 and ah2 > 3 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b, cm == 'spec')
+                  local wcol = U.readable(U.mix(U.CYAN, U.TEXT, 0.35), U.PANEL, 3.0)
+                  local mid, hh = ay + ah2 / 2, ah2 / 2 - 1
+                  if pk and pk.n and pk.n > 0 then
+                    set(kid.enabled and wcol or U.DIM)
+                    for px = 0, npx - 1 do
+                      local idx = math.floor(px / npx * pk.n) + 1
+                      local lo, hi = pk.min[idx] or 0, pk.max[idx] or 0
+                      if cm == 'spec' and pk.spec and kid.enabled then set(D.spec_colour(pk.spec[idx])) end
+                      gfx.line(cx0 + 2 + px, mid - math.min(1, hi) * hh, cx0 + 2 + px, mid - math.max(-1, lo) * hh)
+                    end
+                  else set(U.LINE); gfx.line(cx0 + 2, mid, cx0 + 2 + npx, mid) end
+                elseif ah2 >= L.rh - 2 then
+                  local lbl
+                  if cm == 'key' then lbl = kid.note and info.drum_key and info.drum_key(kid.note) or '-'
+                  else lbl = kid.note and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[kid.note % 12 + 1] .. math.max(0, kid.note // 12 - 1)) or '---' end
+                  text(cx0 + L.pad, ay, fit(lbl, cw0 - 2 * L.pad), kid.enabled and (on and U.AMBER or U.TEXT) or U.DIM)
+                end
+                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+                hint('dspkit', cx0, cy0, cw0, ch0, { key = kkey, ki = ki })
+              end
+            end
+          else
+            text(bx + L.pad, hy, fit(('%d$'):format(#f.kids), bw1 - 2 * L.pad), U.GREY)
+            local nrow = math.max(1, math.floor((bh - 2 * L.rh - 4) / L.rh))
+            D.kit_scroll = D.kit_scroll or {}
+            local sc = D.kit_scroll[kkey] or 0
+            local total = #f.kids + 1                           -- строка all + слайсы
+            if ks + 1 <= sc then sc = ks elseif ks + 1 > sc + nrow then sc = ks + 1 - nrow end
+            sc = math.max(0, math.min(sc, math.max(0, total - nrow)))
+            D.kit_scroll[kkey] = sc
+            for r = 1, nrow do
+              local ki = sc + r - 1                             -- 0 = all
+              if ki > #f.kids then break end
+              local kid = ki > 0 and f.kids[ki] or nil
+              local ry = hy + r * L.rh
+              local hot = not drag and mx >= bx and mx < bx + bw1 and my >= ry and my < ry + L.rh
+              local on = ki == ks
+              if on or hot then set(on and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(bx + 2, ry, bw1 - 3, L.rh, 1) end
+              if kid then
+                local nm = (kid.name or ''):match('^(%S+)') or ('S%02d'):format(ki)
+                local note = kv(ki, 'note range start'); if note == '' then note = kv(ki, 'note lo') end
+                local line = ('%-4s %-4s %s'):format(nm, note, kv(ki, 'volume'))
+                text(bx + L.pad, ry, fit((kid.enabled and '' or '(off) ') .. line, bw1 - 2 * L.pad), kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM)
+                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+              else
+                text(bx + L.pad, ry, fit('all  - every slice at once', bw1 - 2 * L.pad), on and U.AMBER or (hot and U.TEXT or U.CYAN))
+                if hot then hover.dspkit = { k = k, key = kkey, ki = 0 } end
+              end
+              hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
+            end
           end
           set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1)
           -- шапка второй колонки: выбранный слайс с B / x, или all

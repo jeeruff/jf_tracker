@@ -1358,7 +1358,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local off = item_off(code)
       if off then
         local k = (oct + 1) * 12 + off - base + 1
-        key_of[k] = (ctx.key_label and ctx.key_label(string.char(code))) or string.char(code)
+        local nm = code < 256 and string.char(code) or (ctx.key_name and ctx.key_name(code)) or '?'   -- 16 окт: F-ряд (frow) — f4
+        key_of[k] = (code < 256 and ctx.key_label and ctx.key_label(nm)) or nm
       end
     end
   end

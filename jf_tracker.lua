@@ -19,6 +19,31 @@ local SELF = debug.getinfo(1, 'S').source:sub(2)
 local DIR = SELF:match('(.*)[/\\]') or '.'
 local RES = reaper.GetResourcePath()
 local EXT = 'jf_tracker'
+-- 16 окт: опция REAPER «Auto-float newly created FX windows» открывала окно на каждый
+-- добавленный трекером FX (8 пэдов drumrs5k — 8 окон). Добавление из трекера окна не
+-- открывает: новое закрываем сразу (и цепочку, если её открыл REAPER), опцию не трогаем
+do
+  local tadd, kadd = reaper.TrackFX_AddByName, reaper.TakeFX_AddByName
+  reaper.TrackFX_AddByName = function(tr, name, rec, inst)
+    local chain0 = reaper.TrackFX_GetChainVisible(tr)
+    local fx = tadd(tr, name, rec, inst)
+    if inst ~= 0 and fx and fx >= 0 then
+      local id = rec and (fx | 0x1000000) or fx
+      reaper.TrackFX_Show(tr, id, 2)
+      if chain0 == -1 and reaper.TrackFX_GetChainVisible(tr) ~= -1 then reaper.TrackFX_Show(tr, id, 0) end
+    end
+    return fx
+  end
+  reaper.TakeFX_AddByName = function(tk, name, inst)
+    local chain0 = reaper.TakeFX_GetChainVisible(tk)
+    local fx = kadd(tk, name, inst)
+    if inst ~= 0 and fx and fx >= 0 then
+      reaper.TakeFX_Show(tk, fx, 2)
+      if chain0 == -1 and reaper.TakeFX_GetChainVisible(tk) ~= -1 then reaper.TakeFX_Show(tk, fx, 0) end
+    end
+    return fx
+  end
+end
 
 local U = dofile(DIR .. '/jf_tracker_ui.lua')             -- своя копия (5 окт, релиз: без внешних зависимостей)
 local model = dofile(DIR .. '/jf_tracker_model.lua')
@@ -80,6 +105,11 @@ math.randomseed(math.floor(os.time() + (reaper.time_precise() % 1) * 1e6))   -- 
 local IK = dofile(DIR .. '/jf_tracker_instkeys.lua')      -- клавиши модуля инструментов (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-панели (2 окт)     -- контекстная справка ? (2 окт)
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
+-- 16 окт: drumrs5k — контейнер RS5K видом драм-рэка; избранное слотов — ExtState drumfav_<cat>
+model.DR = dofile(DIR .. '/jf_tracker_drumrack.lua')
+draw.DR = model.DR
+model.drum_favs = {}
+for _, cat in ipairs(model.DR.CATS) do model.drum_favs[cat] = model.DR.parse_fav(reaper.GetExtState('jf_tracker', 'drumfav_' .. cat), cat) end
 model.fxclass = dofile(DIR .. '/jf_tracker_fxclass.lua')   -- классификатор параметров, автомодуль (3 окт)
 local HELP = DIR .. '/jf_tracker_help.html'
 
@@ -287,6 +317,7 @@ local state = {
   libtab = 'audio',
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
+  drumcell = (function() local v = reaper.GetExtState(EXT, 'drumcell'); return v ~= '' and v or 'note' end)(),   -- 16 окт: drumrs5k — подпись ячеек
   sliceaudition = reaper.GetExtState(EXT, 'sliceaud2') ~= '0',   -- 10 окт: по умолчанию вкл (новый ключ — старое «0» от прежнего умолчания не держит)   -- 10 окт: auto play в зуме края   -- 10 окт: слайсер, кнопка follow   -- 10 окт: полоса прокрутки слайсера волной (выкл — обычная)   -- 10 окт: зум края слайса под волной (Nerve)   -- 10 окт: слайс мышью — двойным или одним щелчком   -- 10 окт: меню без подменю «in REAPER»   -- 10 окт: Esc как в Renoise (переключает INSERT) или как в Vim (только NORMAL)   -- 10 окт: Esc — стоп воспроизведения   -- 10 окт: жёсткие границы паттернов (по умолчанию вкл)   -- 10 окт: папки lib (kicks, snares …)
   slicepick = ({ random = 'random', seq = 'seq' })[reaper.GetExtState(EXT, 'slicepick')] or 'key',   -- 10 окт: слайс при вставке
   slicemono = reaper.GetExtState(EXT, 'slicemono') ~= '0',   -- 9 окт: mono слайсера (по умолчанию вкл)
@@ -871,6 +902,8 @@ local track_actions, region_actions, event_actions, view_actions, mono_request, 
 local MONO_ID = 9             -- id мода трекера на шине jf_mono
 ctx = {
   model = model, edit = edit, state = state, piano = keys.piano,
+  keys_frow = function() return keys.layout == 'frow' end,
+  key_name = function(code) return keys.name(code) end,   -- 16 окт: имя клавиши по коду (f4)   -- 16 окт: раскладка frow (цифры + F-ряд)
   keys_renoise = function() return keys.renoise end,   -- 13 окт: опция keys: renoise (две октавы, нижний ряд — ноты)
   peaks = function(e, n, spec) return model.peaks(e, n, spec) end,
   spec_colour = function(sp) return draw.spec_colour(sp) end,
@@ -1598,7 +1631,10 @@ ctx = {
     v = math.max(0, math.min(1, v))
     local A = model.fxapi(track)
     if f and f.kit and f.kit_all and f.kids then
-      for _, kid in ipairs(f.kids) do A.SetParamNormalized(track, kid.i, p.i, v) end
+      -- 16 окт: пэд drumrs5k бывает подконтейнером — пишем в его RS5K; эффекты пэдов (у кого есть) — нет
+      local k1 = f.kids[1]
+      if p.fx and k1 and k1.rs5k_i and p.fx ~= k1.rs5k_i and p.fx ~= k1.i then A.SetParamNormalized(track, p.fx, p.i, v); return end
+      for _, kid in ipairs(f.kids) do A.SetParamNormalized(track, kid.rs5k_i or kid.i, p.i, v) end
     else A.SetParamNormalized(track, p.fx or f.i, p.i, v) end
   end,
   dsp_value = function(k, pi, d, coarse)
@@ -4540,8 +4576,8 @@ ctx = {
   slice_key = function(k)
     local c = ctx.slk_cache
     local sh = state.slice1 and 1 or 0                  -- 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
-    if not (c and c.oct == vim.octave and c.rn == keys.renoise and c.sh == sh) then
-      c = { oct = vim.octave, t = {}, rn = keys.renoise, sh = sh }
+    if not (c and c.oct == vim.octave and c.rn == keys.renoise and c.sh == sh and c.lay == keys.layout) then
+      c = { oct = vim.octave, t = {}, rn = keys.renoise, sh = sh, lay = keys.layout }
       for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
       if sh == 1 then c.t[0] = '1' end
       ctx.slk_cache = c
@@ -4941,10 +4977,22 @@ ctx = {
     vim.open_hydra({ title = 'markers and regions', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
+  -- 16 окт: drumrs5k — подпись ячеек пэдов (выпадашка: 4 значения)
+  drum_cell_menu = function()
+    local items = {}
+    for _, m in ipairs(model.DR.CELL_MODES) do
+      local d = ({ note = 'the MIDI note of the pad (C-4)', key = 'the key that plays it (q2w3er, octave z x)', wave = 'the wave of its piece', spec = 'spectral peaks of its piece (colour = frequency)' })[m]
+      items[#items + 1] = { key = m:sub(1, 1), label = m .. ' - ' .. d .. ((state.drumcell or 'note') == m and '  (on)' or ''), fn = function()
+        state.drumcell = m; reaper.SetExtState(EXT, 'drumcell', m, true); vim.msg = 'drumrs5k cells: ' .. m
+      end }
+    end
+    vim.open_hydra({ title = 'drumrs5k cells', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   slices_render_menu = function()
     vim.open_hydra({ title = 'convert slices', items = {
       { key = 'l', label = 'to the lib - every slice its own instrument', fn = function() ctx.slices_render('lib') end },
-      { key = 's', label = 'to the sampler - an RS5K per slice on the cursor track (slice note)', fn = function() ctx.slices_render('rs5k') end },
+      { key = 's', label = 'slice to drumrs5k - a pad (RS5K) per slice in one rack on the cursor track, a key each', fn = function() ctx.slices_render('rs5k') end },
       -- 13 окт: сэмплер целиком / с лупом и sustain / список файлов в одном RS5K
       { key = 'w', label = 'sampler - the whole sample, one RS5K played by pitch', fn = function() ctx.slices_render('whole') end },
       { key = 'p', label = 'sampler with a loop - the whole sample, loop on, obeys note-offs (sustain while held)', fn = function() ctx.slices_render('loop') end },
@@ -5063,14 +5111,14 @@ ctx = {
           if ok2 and tonumber(id) then reaper.TrackFX_Show(tr, tonumber(id), 2) end
         end
         reaper.TrackFX_Show(tr, i0, 2)
-        reaper.TrackFX_SetNamedConfigParm(tr, i0, 'renamed_name', ('%s %d$'):format(root.name or 'slices', n))   -- 11 окт: «имя сэмпла 7$» — $ = слайсы
+        reaper.TrackFX_SetNamedConfigParm(tr, i0, 'renamed_name', 'drumrs5k ' .. (root.name or 'slices'))   -- 16 окт: drumrs5k — в DSP сеткой пэдов
       end
     end)
     if not packed then for f2 = i0, i0 + n - 1 do reaper.TrackFX_Show(tr, f2, 2) end end
     model.invalidate()
     -- 13 окт: сразу на новый сэмплер — ноты пишутся в него (MIDI), DSP на нём
     if n > 0 then ctx.ti_cache = nil; pcall(ctx.inst_fx_pick, col, i0, false, true) end
-    vim.msg = ('convert: %d RS5K%s on %s, slice S01 = note %d (a key each)'):format(n, packed and ' in a container' or '', col.name or 'track', base)
+    vim.msg = ('convert: %d RS5K%s on %s, slice S01 = note %d (a key each)'):format(n, packed and ' in drumrs5k' or '', col.name or 'track', base)
   end,
   slq_menu = function()
     local items = {}
@@ -10446,6 +10494,7 @@ ctx = {
       { key = 'hintpos', label = 'hints where', kind = 'cycle', values = { 'tabs', 'panes', 'status' }, desc = 'key hints (option hints on): tabs - in the tab row of every module, right of its name (the tracker keeps its row below); panes - a row under every module; status - one big row at the bottom for the focused module (hover it: all the keys)', get = function() return state.hintpos or 'tabs' end, set = function(v) state.hintpos = v; relayout() end },
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      { key = 'keylayout', label = 'keyboard layout', kind = 'cycle', values = { 'frow', 'qwerty' }, desc = 'where the keyboard (m) plays notes: frow (default) - the digits 1 2 3 4 5 6 7 8 9 0 - = are the white keys (C to G, an octave and a half), the function keys F1 F2 F4 F5 F6 F8 F9 F11 above them the black ones, [ ] octave, { } velocity; the letters stay free for commands, and while the keyboard plays (shown, or INSERT) the F-key shortcuts (panes, help, transpose) are off. qwerty - the old row q 2 w 3 e ..., z x octave, c C velocity', get = function() return keys.layout end, set = function(v) keys.set_layout(v); reaper.SetExtState(EXT, 'keylayout', v, true); draw.piano_layout(v == 'frow' and 'frow' or false) end },
       -- 15 окт: двухрядная раскладка renoise — пока выключена (пользователь: «от лукавого»): одна строка q2w3e, октава z x
       -- { key = 'keysrenoise', label = 'keys: renoise', kind = 'toggle', desc = 'note keys as in Renoise: two octaves at once - the bottom row z s x d c ... is the cursor octave, the top row q 2 w 3 e ... an octave higher; in INSERT those letters are notes (octave - [ ], move - arrows). Off - one top row (Ableton), the bottom rows control',
       --   get = function() return keys.renoise end, set = function(v) keys.set_renoise(v); reaper.SetExtState(EXT, 'keysrenoise', v and '1' or '0', true); draw.piano_layout(keys.renoise) end },
@@ -11462,7 +11511,7 @@ ctx = {
     return it
   end,
   drop_at_cursor = function(path) ctx.drop_to(vim.cur.fi, vim.cur.row, path) end,
-  file_peaks = function(path, npix) return model.file_peaks(path, npix) end,
+  file_peaks = function(path, npix, a, b, spec) return model.file_peaks(path, npix, a, b, spec) end,
   -- сэмпл RS5K из файла (бросок на волну): FILE0 + DONE, один undo
   rs5k_file = function(f, path)
     local col = dsp_target(); if not (col and f) then return end
@@ -11967,7 +12016,7 @@ ctx = {
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
-    if state.hints then vim.msg = state.piano_show and 'keyboard on (m): q 2 w 3 e ... play notes in NORMAL, z x octave' or 'keyboard hidden (m): NORMAL is plain Vim, INSERT still writes notes'
+    if state.hints then vim.msg = state.piano_show and (keys.layout == 'frow' and 'keyboard on (m): 1 F1 2 F2 3 ... play notes in NORMAL, [ ] octave, { } velocity (F-key shortcuts off)' or 'keyboard on (m): q 2 w 3 e ... play notes in NORMAL, z x octave') or 'keyboard hidden (m): NORMAL is plain Vim, INSERT still writes notes'
     else vim.msg = state.piano_show and 'keyboard on' or 'keyboard off' end   -- длинно — только с хинтами (5 окт)
     relayout()
   end,
@@ -12967,6 +13016,9 @@ ctx.ut_key = function(c)
 end
 -- if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 -- 15 окт: опция выключена — раскладка всегда одна строка q2w3e, октава z x
+-- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
+-- qwerty — прежняя строка q2w3e, октава z x
+do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or false) end
 if reaper.GetExtState(EXT, 'hint_tabs15') ~= '1' then if state.hintpos == 'panes' then state.hintpos = 'tabs' end; reaper.SetExtState(EXT, 'hint_tabs15', '1', true) end   -- 15 окт: подсказки в строку вкладок — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
@@ -15921,8 +15973,8 @@ local function frame()
       if (active or notemode) and reaper.JS_VKeys_GetState then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
         for code, off in pairs(keys.piano) do
-          local vk = string.char(code):upper():byte()
-          if ks and ks:byte(vk) ~= 0 then held[off] = true end
+          local vk = keys.vk_of(code)                    -- 16 окт: F-ряд (frow) — коды > 255, не символ
+          if vk and ks and ks:byte(vk) ~= 0 then held[off] = true end
         end
       end
       return { octave = vim.octave, held = held, last = active and vim.piano_last or nil, active = active and true or false, glow = notemode and next(held) ~= nil }
@@ -15991,6 +16043,8 @@ local function frame()
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
+    drum_key = function(n) return model.DR.key_of(n, ctx.piano, vim.octave) end,   -- 16 окт: подпись пэда drumrs5k (key)
+    drumcell = state.drumcell or 'note',
     file_len = function(path) return model.file_len(path) end,
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
@@ -16113,7 +16167,7 @@ local function frame()
     end)(),
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
-    hint_bars = state.hints and function(p) return (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
+    hint_bars = state.hints and function(p) return (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or state.toptab,   -- 15 окт: холст — свои подсказки
@@ -17169,7 +17223,7 @@ local function frame()
     local names = {}
     for _, rg in ipairs(regions or {}) do if hover.ruler >= rg.r0 and hover.ruler < rg.r1 then names[#names + 1] = 'region ' .. (rg.name ~= '' and rg.name or ('#' .. rg.idx)) end end
     for _, mk in ipairs((regions and regions.markers) or {}) do if math.floor(mk.row_f + 1e-6) == hover.ruler then names[#names + 1] = 'marker ' .. mk.name end end
-    state.status = ('ruler row %d: %s - click: go to the row, drag: time selection'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
+    state.status = ('ruler row %d: %s - click: go to the row (a marker - to the master cmd column), drag: time selection'):format(hover.ruler, #names > 0 and table.concat(names, ', ') or 'no region / marker')
   elseif hover.sidectl then
     state.status = ({ open = 'open the sidebar (lib + browser)', close = 'fold the sidebar to a strip', grip = 'drag the line: sidebar width, dblclick: auto; fold - quick toggle browser', instgrip = 'drag: lib / browser height, dblclick: auto' })[hover.sidectl]
   elseif hover.mxctl then
@@ -17177,7 +17231,7 @@ local function frame()
   elseif ctx.aied_hover and ctx.aied_hover.status and mod_pane == 'ai' and state.toptab == 'automation' then
     state.status = ctx.aied_hover.status
   elseif hover.slices == 'convert' then
-    state.status = 'convert slices: l - every slice its own lib instrument, s - an RS5K per slice on the cursor track (slice note)'
+    state.status = 'convert slices: l - every slice its own lib instrument, s - slice to drumrs5k (a pad per slice, a key each)'
   elseif hover.slices ~= nil then
     state.status = 'slices of the instrument: click - select and play, Option+J / K - step; the properties on the left edit the selected slice'
   elseif SPROP.hover and SPROP.hover.scope then state.status = 'what the properties change: sample (all its notes) / slice (the selected slice and its notes) / note (only the note under the cursor) - click: the list'
@@ -18320,6 +18374,13 @@ local function frame()
     elseif hover.ruler then
       -- линейка (9 окт, как в REAPER): щелчок — курсор в строку, протяжка — time selection
       ctx.set_focus('tracker'); vim.cur.row = hover.ruler
+      -- 16 окт: в строке маркер — курсор в колонку cmd мастера (маркер там и записан, правится как текст)
+      for _, mk in ipairs((regions and regions.markers) or {}) do
+        if math.floor(mk.row_f + 1e-6) == hover.ruler then
+          for fi, f in ipairs(L.flat or {}) do if f.ml and f.ml.kind == 'cmd' then vim.cur.fi = fi; vim.cur.field = 1; break end end
+          break
+        end
+      end
       ts_drag = { row = hover.ruler, active = false, y0 = gfx.mouse_y, keep = true }
       click = { t = now2, zone = 'ruler' }
     elseif hover.sidectl then
@@ -18604,6 +18665,7 @@ local function frame()
       elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx)   -- двойной клик не удаляет второй
       elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
+      elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
@@ -18611,6 +18673,9 @@ local function frame()
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
       if hover.dsp then ctx.set_focus('dsp') end
+      -- 16 окт: пэд drumrs5k звучит по щелчку (его нота в трек; трек взведён — см. preview)
+      local dk = hover.dspkid and hover.dspkid.kid
+      if dk and dk.note and dk.rs5k_i then local col = dsp_target(); if col then ctx.preview(col.track, dk.note, 'midi') end end
       click = { t = now2, zone = 'dspkit' }
     elseif hover.tmpl then ctx.tmpl_do(hover.tmpl); click = { t = now2, zone = 'tmpl' }   -- 11 окт: < шаблон > в шапке DSP
     elseif hover.dsptrkname then ctx.dsptrack_toggle(); click = { t = now2, zone = 'dsptrkname' }   -- 11 окт: имя трека в DSP
@@ -20170,6 +20235,15 @@ local function frame()
     end
   end
   local quit = false
+  -- 16 окт: frow — пока клавиатура играет (видна в трекере / сэмплере, или INSERT), F-клавиши без
+  -- модификаторов — ноты: хоткеи F1..F12 пропускаются, код идёт в vim
+  local fnote
+  do
+    local m = ctx.mods()
+    if keys.layout == 'frow' and c > 255 and keys.piano[c] and not (m.cmd or m.alt or m.ctrl) and not vim.picker and not vim.hydra
+       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
+       and (state.piano_show or vim.mode == 'insert') then fnote = c; c = 0 end
+  end
   -- 10 окт: транспозиция как в Renoise — F1 / F2 полутон, F11 / F12 октава; Opt — выделение,
   -- Shift+Ctrl — колонка, Shift — трек, Ctrl — паттерн (без модификатора F1 / F2 / F11 / F12 — как было)
   do
@@ -20281,6 +20355,7 @@ local function frame()
       elseif (c == 18 or c == 114) and m.cmd and not m.ctrl then ctx.rec_start('inst'); c = 0 end
     end
   end
+  if fnote then c = fnote end
   -- Cmd+Z — undo, Cmd+Shift+Z — redo: везде в трекере, в любом модуле (2 окт)
   do
     local m = ctx.mods()

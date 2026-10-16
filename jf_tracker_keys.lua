@@ -42,9 +42,44 @@ function keys.set_renoise(on)
   end
 end
 keys.set_renoise(false)
+-- 16 окт: раскладка frow — клавиатура на цифрах и F-ряду, буквы свободны для команд:
+-- 1 2 3 4 5 6 7 8 9 0 - =  = C D E F G A B C D E F G (белые, полторы октавы)
+-- F1 F2 . F4 F5 F6 . F8 F9 . F11 = C# D# . F# G# A# . C# D# . F# (чёрные над промежутками;
+-- F3 F7 F10 — промежутки E-F и B-C, чёрной нет). Октава [ ], громкость { }.
+-- Пока клавиатура играет (видна или INSERT), F-хоткеи не работают (main).
+keys.layout = 'qwerty'
+local FCODE = { [1] = 26161, [2] = 26162, [4] = 26164, [5] = 26165, [6] = 26166, [8] = 26168, [9] = 26169, [11] = 6697265 }
+local frow_white = { ['1'] = 0, ['2'] = 2, ['3'] = 4, ['4'] = 5, ['5'] = 7, ['6'] = 9, ['7'] = 11, ['8'] = 12, ['9'] = 14, ['0'] = 16, ['-'] = 17, ['='] = 19 }
+local frow_black = { [1] = 1, [2] = 3, [4] = 6, [5] = 8, [6] = 10, [8] = 13, [9] = 15, [11] = 18 }
+function keys.set_layout(name)
+  keys.layout = name == 'frow' and 'frow' or 'qwerty'
+  if keys.layout == 'qwerty' then keys.set_renoise(false); return end
+  keys.renoise = false
+  for k in pairs(keys.piano) do keys.piano[k] = nil end
+  for k in pairs(keys.plabel) do keys.plabel[k] = nil end
+  for ch, off in pairs(frow_white) do keys.piano[ch:byte()] = off; keys.plabel[off] = ch end
+  for n, off in pairs(frow_black) do keys.piano[FCODE[n]] = off; keys.plabel[off] = 'f' .. n end   -- f4 строчными: уже, чем F4
+
+end
+keys.frow = function() return keys.layout == 'frow' end
 -- код виртуальной клавиши (JS_VKeys) символа: буквы и цифры — как есть, знаки — свои коды
 local VK = { [','] = 0xBC, ['.'] = 0xBE, [';'] = 0xBA, ['/'] = 0xBF }
 function keys.vk(ch) return VK[ch] or ch:upper():byte() end
+-- 16 окт: код клавиши gfx.getchar → JS_VKeys: символ — как выше, F1..F12 (26161.. / 6697264..) — 0x70..0x7B
+VK['-'], VK['='] = 0xBD, 0xBB
+-- имя клавиши по коду gfx.getchar: символ, F-ряд — f1 … f12 (строчными, узко)
+function keys.name(code)
+  if code >= 26161 and code <= 26169 then return 'f' .. (code - 26160) end
+  if code >= 6697264 and code <= 6697266 then return 'f' .. (code - 6697254) end
+  if code >= 0 and code < 256 then return string.char(code) end
+  return nil
+end
+function keys.vk_of(code)
+  if code >= 26161 and code <= 26169 then return 0x70 + code - 26161 end
+  if code >= 6697264 and code <= 6697266 then return 0x79 + code - 6697264 end
+  if code < 256 then return keys.vk(string.char(code)) end
+  return nil
+end
 
 -- ── раскладки: русская ЙЦУКЕН → QWERTY по положению клавиш ───────────────
 -- gfx.getchar отдаёт код символа, а не клавиши: в русской раскладке вместо
