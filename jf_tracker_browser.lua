@@ -662,6 +662,14 @@ function B.read_kits()
   return out
 end
 
+-- 16 окт: пресеты инструментов — TrackTemplates/presets/<категория>/*.RTrackTemplate (ctx.presets_list)
+function B.read_presets()
+  local out = {}
+  for _, e in ipairs(ctx.presets_list and ctx.presets_list(B.prdir) or {}) do out[#out + 1] = e end
+  if #out == 0 then out[1] = { name = B.prdir and '(empty - n saves the cursor track here)' or '(no presets yet - n saves the cursor track as one)', empty = true } end
+  return out
+end
+
 function B.read_proj()
   local seen, out = {}, {}
   for i = 0, R.CountMediaItems(0) - 1 do
@@ -691,11 +699,12 @@ end
 B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
   B.pm_scroll.v = 0
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) else B.set_all(B.read_pm()) end
+  if m == 'presets' then B.prdir = nil end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) else B.set_all(B.read_pm()) end
 end
 
 -- кнопки шапки: files | db | size | hide
@@ -704,7 +713,7 @@ function B.click(what)
   if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'pvvol' then B.vol_drag = true
@@ -822,6 +831,8 @@ function B.enter()
   elseif e.pm and B.grid and PMm() then if ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end   -- сетка: Enter — открыть (внутрь — Shift+Enter)
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
+  elseif e.prdir then B.prdir = e.prdir; B.cur = 1; B.filter = ''; B.set_all(B.read_presets())   -- 16 окт: папка пресетов (pad bass …)
+  elseif e.preset then if ctx.preset_load then ctx.preset_load(e.path, e.name) end   -- пресет → цепочка FX трека курсора
   elseif (e.name or ''):lower():match('%.jfcurve$') then if ctx.curve_load then ctx.curve_load(B.full(e)) end   -- кривая → открытый automation item (6 окт)
   elseif e.empty then return
   elseif e.trk then if ctx.drop_track then ctx.drop_track(e, B.pmproj and B.pmproj.e) end
@@ -846,6 +857,10 @@ function B.up()
   if B.filter ~= '' then B.filter = ''; B.filtering = false; B.set_all(B.all); return end
   if B.mode == 'db' then
     if B.db then B.db = nil; B.cur = 1; B.refresh_db() end
+    return
+  end
+  if B.mode == 'presets' then
+    if B.prdir then B.prdir = nil; B.cur = 1; B.set_all(B.read_presets()) end
     return
   end
   if B.mode == 'pm' then
@@ -876,6 +891,8 @@ function B.describe(idx)
   end
   if e.pmdir then return 'inside project: ' .. e.name .. ' - Enter: open' end
   if e.kit then return ('lib preset %s (REAPER track template) - Enter: it replaces the lib of the cursor track (Cmd+Z back)'):format(e.name) end
+  if e.preset then return ('instrument preset %s (track template) - Enter: its fx chain on the cursor track, the items stay (Cmd+Z back); n saves the cursor track here'):format(e.name) end
+  if e.prdir then return ('presets folder %s - Enter: inside, h: back, n: save the cursor track here'):format(e.name) end
   if e.trk then return ('track "%s" (%d files) - Enter / drag: insert this track into the project (state chunk)'):format(e.name, e.nfiles or 0) end
   if e.rgn then return ('region %s [%.2f - %.2f] - Enter: subproject trimmed to region @cursor, drag: to track/row'):format(e.name, e.pos, e.fin) end
   if e.mark then return 'marker ' .. e.name end
@@ -916,7 +933,7 @@ function B.key(c)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'libs', libs = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'libs', libs = 'presets', presets = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -933,6 +950,7 @@ function B.key(c)
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
     local e = B.entries[B.cur]
     if e and not (e.dir or e.db or e.pm or e.pmdir or e.kit or e.trk or e.rgn or e.mark or e.other or e.empty) and ctx.lib_append_slice then ctx.lib_append_slice(B.full(e)) end
+  elseif ch == 'n' and B.mode == 'presets' and ctx.preset_save_menu then ctx.preset_save_menu(B.prdir)   -- 16 окт: трек курсора — пресетом
   elseif ch == 'a' and ctx.browser_send_menu then ctx.browser_send_menu()   -- 16 окт: add to: lib / drumrs5k / сэмплер / список / слайсы
   elseif ch == 'm' then B.toggle_mark()                                -- 10 окт: отметка строк
   elseif ch == 'u' then B.clear_marks()                                -- 12 окт: u — снять все отметки, как в lf (было M)
@@ -980,7 +998,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs' })) do
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' })) do
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -1164,7 +1182,7 @@ function B.draw(U, L, x, y, w, h)
       U.set(U.AMBER); gfx.rect(x + 1, ry, 2, L.rh, 1)
       if idx ~= B.cur or not B.focus then col = U.AMBER end
     end
-    local glyph = e.db and '#' or (e.pm and '@' or (e.kit and '*' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or (e.dir and '/' or ' '))))))
+    local glyph = e.db and '#' or (e.pm and '@' or ((e.kit or e.preset) and '*' or (e.trk and '=' or (e.rgn and '[' or (e.mark and '|' or ((e.dir or e.prdir) and '/' or ' '))))))
     local is_file = not (e.dir or e.db or e.pm or e.trk or e.rgn or e.mark)
     local tw = w - 2 * L.pad
     if B.wave and is_file then tw = math.floor(tw * 0.55) end

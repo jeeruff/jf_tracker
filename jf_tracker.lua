@@ -70,6 +70,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
 MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+MMX.PRS = dofile(DIR .. '/jf_tracker_presets.lua')   -- 16 окт: пресеты инструментов — шаблоны треков по папкам
 MMX.SRG = dofile(DIR .. '/jf_tracker_surge.lua')   -- 16 окт: патчи Surge XT через чанк трека
 MMX.CM = dofile(DIR .. '/jf_tracker_ctrlmouse.lua')   -- мышь с Ctrl: универсальная ручка, Cmd / Shift-выделение, XY (8 окт)
 MMX.HM.init(U, MMX.CH)
@@ -11531,6 +11532,74 @@ ctx = {
     end
     ctx.preset_cache[ident] = names
     return names
+  end,
+  -- 16 окт: пресеты инструментов (браузер, режим presets): TrackTemplates/presets/<категория>/
+  presets_root = function() return reaper.GetResourcePath() .. '/TrackTemplates/presets' end,
+  presets_list = function(dir)
+    local root = ctx.presets_root()
+    local out = {}
+    if not dir then
+      -- корень: папки категорий (свои + стандартные, ещё не созданные — тоже, пустыми)
+      local seen = {}
+      local i = 0
+      while true do
+        local sd = reaper.EnumerateSubdirectories(root, i); if not sd then break end
+        seen[sd] = true; out[#out + 1] = { name = sd, prdir = root .. '/' .. sd }; i = i + 1
+      end
+      for _, c in ipairs(MMX.PRS.CATS) do if not seen[c] then out[#out + 1] = { name = c, prdir = root .. '/' .. c } end end
+      table.sort(out, function(a, b) return a.name < b.name end)
+      i = 0
+      while true do
+        local fn = reaper.EnumerateFiles(root, i); if not fn then break end
+        if fn:match('%.RTrackTemplate$') then out[#out + 1] = { name = fn:gsub('%.RTrackTemplate$', ''), path = root .. '/' .. fn, preset = true } end
+        i = i + 1
+      end
+      return out
+    end
+    local i = 0
+    while true do
+      local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
+      if fn:match('%.RTrackTemplate$') then out[#out + 1] = { name = (fn:gsub('%.RTrackTemplate$', '')), path = dir .. '/' .. fn, preset = true } end
+      i = i + 1
+    end
+    table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+    return out
+  end,
+  -- пресет → цепочка FX трека курсора (items и остальное — как были)
+  preset_load = function(path, name)
+    local col = cur_col(); if not (col and col.track) then vim.msg = 'preset: no track'; return end
+    local f = io.open(path, 'r'); if not f then vim.msg = 'preset: cannot read ' .. path; return end
+    local tpl = f:read('*a'); f:close()
+    local _, tc = reaper.GetTrackStateChunk(col.track, '', false)
+    local nc, err = MMX.PRS.apply_fxchain(tc, tpl)
+    if not nc then vim.msg = 'preset ' .. (name or '') .. ': ' .. (err or 'failed'); return end
+    edit.run('preset ' .. (name or ''), function() reaper.SetTrackStateChunk(col.track, nc, false) end)
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = ('preset %s -> %s (fx chain; Cmd+Z back)'):format(name or '', col.name or 'track')
+  end,
+  -- n в режиме presets: папка (внутри папки — она), затем имя строкой ввода
+  preset_save_menu = function(dir)
+    local col = cur_col(); if not (col and col.track) then vim.msg = 'preset: no track'; return end
+    local function ask(d) ctx.preset_dir = d; vim.open_prompt('presetsave ', col.name or 'preset') end
+    if dir then ask(dir); return end
+    local items, root = {}, ctx.presets_root()
+    for i, e in ipairs(ctx.presets_list(nil)) do
+      if e.prdir and i <= 9 then items[#items + 1] = { key = tostring(i), label = e.name, fn = function() ask(e.prdir) end } end
+    end
+    items[#items + 1] = { key = 'r', label = 'the presets folder itself (no category)', fn = function() ask(root) end }
+    vim.open_hydra({ title = 'save ' .. (col.name or 'track') .. ' as a preset in', items = items })
+  end,
+  preset_save = function(name)
+    local col = cur_col(); if not (col and col.track) then return end
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if name == '' then vim.msg = 'presetsave: a name'; return end
+    local dir = ctx.preset_dir or ctx.presets_root()
+    reaper.RecursiveCreateDirectory(dir, 0)
+    local _, tc = reaper.GetTrackStateChunk(col.track, '', false)
+    local f = io.open(dir .. '/' .. MMX.PRS.file_name(name), 'w'); if not f then vim.msg = 'presetsave: cannot write'; return end
+    f:write(MMX.PRS.template_of(tc)); f:close()
+    if B.mode == 'presets' then B.set_all(B.read_presets()) end
+    vim.msg = ('preset saved: %s / %s (TrackTemplates/presets)'):format(dir:match('[^/]+$') or '', name)
   end,
   -- 16 окт: Surge XT — патчи .fxp (factory, 3rd party, свои), загрузка — через чанк трека (jf_tracker_surge)
   is_surge = function(f) return f and ((f.name or ''):find('Surge XT', 1, true) or (f.fxname or ''):find('Surge XT', 1, true)) ~= nil end,
