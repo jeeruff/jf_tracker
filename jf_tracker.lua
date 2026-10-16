@@ -4146,13 +4146,18 @@ ctx = {
   end,
   -- 10 окт: перенос вкладки мышью — куда упадёт: на ярлыки / в центр листа — в его стек,
   -- в крайнюю четверть листа — сплитом с той стороны; на свой ярлык — порядок в стеке
-  tab_drop_at = function(id, mx, my)
+  tab_drop_at = function(id, mx, my, whole)
     local h = L.pn and draw.panes.hit(L.pn, mx, my, {})
     local c = h and h.cell
     if not c or not c.active_id then return nil end
     local at = c.active_id
     local mine = false
     for _, t in ipairs(c.tabs or {}) do if t.id == id then mine = true end end
+    if whole and mine then return nil end                 -- 16 окт: весь пейн — на себя некуда
+    if whole and (h.kind == 'tab' or h.kind == 'tabbar') then
+      if at == 'tracker' then return nil end
+      return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
+    end
     if h.kind == 'tab' or h.kind == 'tabbar' then
       if mine then
         local idx = #c.tabs
@@ -4174,6 +4179,20 @@ ctx = {
     end
     if mine or at == 'tracker' then return nil end
     return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
+  end,
+  -- 16 окт: весь пейн (его вкладки, активная — первой) — сплитом рядом с целью или в её стек
+  pane_drop = function(ids, t)
+    local PNm = draw.panes
+    if not (ids and ids[1]) then return end
+    ctx.pane_do(function()
+      local ok
+      if t.kind == 'stack' then ok = PNm.stack(state.panes, ids[1], t.at)
+      elseif t.kind == 'split' then ok = PNm.split(state.panes, t.at, ids[1], t.dir, 0.5) end
+      if not ok then return false end
+      for k = 2, #ids do PNm.stack(state.panes, ids[k], ids[1]) end
+      return true
+    end, ('pane %s -> %s %s'):format(table.concat(ids, '|'), t.kind == 'stack' and 'the stack of' or ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[t.dir] or '', t.at))
+    ctx.pane_focus(ids[1])
   end,
   tab_drop = function(id, t)
     local PNm = draw.panes
@@ -17921,6 +17940,15 @@ local function frame()
   end
   if U.click and hover.ptab and hover.ptab.id and hover.ptab.id ~= 'tracker' and not ctx.tab_drag then
     ctx.tab_drag = { id = hover.ptab.id, x0 = gfx.mouse_x, y0 = gfx.mouse_y }   -- 10 окт: перенос вкладки мышью (порог 8 px)
+  elseif U.click and not hover.ptab and not ctx.tab_drag and L.pn then
+    -- 16 окт: пустая часть строки вкладок — весь пейн (все его вкладки) переносится туда же: сплит / стек
+    local h = draw.panes.hit(L.pn, gfx.mouse_x, gfx.mouse_y, {})
+    local c = h and h.kind == 'tabbar' and h.cell
+    if c and c.active_id and c.active_id ~= 'tracker' then
+      local ids = { c.active_id }
+      for _, t in ipairs(c.tabs or {}) do if t.id ~= c.active_id and t.id ~= 'tracker' then ids[#ids + 1] = t.id end end
+      ctx.tab_drag = { id = c.active_id, ids = ids, whole = true, x0 = gfx.mouse_x, y0 = gfx.mouse_y }
+    end
   end
   -- панели (9 окт, бета): ручка между листами — протяжка (двойной щелчок —
   -- поровну); подпись стека — активная вкладка (focus_at ниже ставит фокус)
@@ -17938,12 +17966,12 @@ local function frame()
       if gfx.mouse_cap & 1 == 1 then
         if not td.active and (math.abs(gfx.mouse_x - td.x0) > 8 or math.abs(gfx.mouse_y - td.y0) > 8) then td.active = true end
         if td.active then
-          td.target = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y)
-          state.status = 'drag tab ' .. td.id .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
+          td.target = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y, td.whole)
+          state.status = (td.whole and ('drag pane ' .. table.concat(td.ids, '|')) or ('drag tab ' .. td.id)) .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
             or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or 'nowhere - let go to cancel')
         end
       else
-        if td.active and td.target then ctx.tab_drop(td.id, td.target) end
+        if td.active and td.target then if td.whole then ctx.pane_drop(td.ids, td.target) else ctx.tab_drop(td.id, td.target) end end
         ctx.tab_drag = nil
       end
     elseif U.rclick and hover.ptab then

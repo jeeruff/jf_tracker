@@ -277,5 +277,20 @@ do
   ok('add_new: hidden by the user stays hidden', not PN.visible(m2, 'sprops'))
   tiling('screenset with new modules', m, 1600, 900)
 end
+-- 16 окт: перенос всего пейна (main pane_drop): первая вкладка — сплитом, остальные — в её стек
+do
+  local m2 = PN.DEFAULT()
+  PN.stack(m2, 'notes', 'browser')                            -- стек browser | notes
+  local st = PN.stack_of(m2, 'browser')
+  if st and #st >= 2 then
+    local ids = {}
+    for _, id in ipairs(st) do ids[#ids + 1] = id end
+    ok('whole pane: first split', PN.split(m2, 'tracker', ids[1], 'd', 0.5))
+    for k = 2, #ids do PN.stack(m2, ids[k], ids[1]) end
+    local st2 = PN.stack_of(m2, ids[1])
+    eq('whole pane: all tabs moved', st2 and #st2, #ids)
+    eq('whole pane: its own leaf', PN.find(m2, 'tracker') ~= PN.find(m2, ids[1]), true)
+  else ok('a stack with browser', false) end
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
