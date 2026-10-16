@@ -15403,7 +15403,25 @@ function ctrl_action(name, delta)
       local m = names[k]
       items[#items + 1] = { key = tostring(k % 10), label = m and ('%s  (%s)'):format(m[1], reaper.format_timestr_pos(m[2], '', 2)) or '- (no marker)', fn = function() if m then ctrl_action('mk' .. k, 0) end end }
     end
-    vim.open_hydra({ title = 'go to marker', items = items })
+    -- 16 окт: и действия — маркер на строке курсора (добавить / имя / удалить), соседний, перенумеровать, менеджер REAPER
+    local t0 = edit.row_time(vim.cur.row, state.lpb, 0)
+    local here
+    for k = 0, nm + nr - 1 do
+      local ok, isr, pos, _, mname, idx = reaper.EnumProjectMarkers3(0, k)
+      if ok and ok > 0 and not isr and math.abs(pos - t0) < 1e-4 then here = { idx = idx, name = mname } end
+    end
+    items[#items + 1] = { key = 'a', label = 'add a marker on the cursor row (' .. ('%04d'):format(vim.cur.row) .. ')', fn = function()
+      edit.run('add marker', function() reaper.AddProjectMarker2(0, false, t0, 0, '', -1, 0) end); model.invalidate(); vim.msg = 'marker added at row ' .. vim.cur.row end }
+    if here then
+      items[#items + 1] = { key = 'n', label = 'name the marker of this row (' .. (here.name ~= '' and here.name or ('#' .. here.idx)) .. ')', fn = function() vim.open_prompt('mcmd ', here.name or '') end }
+      items[#items + 1] = { key = 'd', label = 'delete the marker of this row', fn = function()
+        edit.run('delete marker', function() reaper.DeleteProjectMarker(0, here.idx, false) end); model.invalidate(); vim.msg = 'marker deleted' end }
+    end
+    items[#items + 1] = { key = '[', label = 'previous marker', fn = function() reaper.Main_OnCommand(40172, 0); vim.cur.row = math.max(0, math.floor(model.row_of_time(reaper.GetCursorPosition(), state.lpb) + 0.5)); vim.ensure_visible() end }
+    items[#items + 1] = { key = ']', label = 'next marker', fn = function() reaper.Main_OnCommand(40173, 0); vim.cur.row = math.max(0, math.floor(model.row_of_time(reaper.GetCursorPosition(), state.lpb) + 0.5)); vim.ensure_visible() end }
+    items[#items + 1] = { key = 'r', label = 'renumber all markers in timeline order', fn = function() reaper.Main_OnCommand(40898, 0); model.invalidate(); vim.msg = 'markers renumbered' end }
+    items[#items + 1] = { key = 'M', label = 'the region / marker manager of REAPER', fn = function() reaper.Main_OnCommand(40326, 0) end }
+    vim.open_hydra({ title = 'markers', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   elseif name:match('^mk%d+$') then   -- 15 окт: строка маркеров под rew — прыжок к маркеру N
     local n = tonumber(name:sub(3))
@@ -17858,6 +17876,7 @@ local function frame()
       lock = 'lock: the tracker cursor is the REAPER edit cursor and selects the track in REAPER',
       fixed = 'fixed: the cursor stays in the middle of the screen, the rows scroll under it (Impulse Tracker)',
       q_endstop = 'end stop: playback started before =END stops there (recording never stops)',
+      markers = 'markers: click - go to marker 1..0, add / name / delete the marker of the cursor row, previous / next, renumber, the marker manager',
       xfade = 'x-fade: inserted notes get a crossfade of that many ms with their neighbours (wheel - the length)',
     }
     local d = QD[hover.ctrl]

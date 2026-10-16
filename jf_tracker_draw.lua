@@ -3945,7 +3945,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if c.tpfull then
       local rec = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad   -- 16 окт: + ripple
       -- 16 окт: маркеры — одна кнопка markers (выпадашка с номерами), запись — на 4 колонки: кнопки уже
-      tbw = math.max(tbw, ms('mk') + 2 * L.pad, ms('x1.10') + 2 * L.pad, math.ceil((rec - 6) / 4))
+      tbw = math.max(tbw, ms('mark') + 2 * L.pad, ms('x1.10') + 2 * L.pad, math.ceil((rec - 6) / 4))
     end
     btot = #blist * (tbw + 2) - 2
   end
@@ -4040,7 +4040,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 16 окт: маркеры — кнопка markers (не влезло — mk), щелчок — выпадашка 1..0
       local any = false
       for k = 1, 10 do if c.marks and c.marks[k] then any = true end end
-      cellb('markers', fit(ms('markers') + 2 <= tbw and 'markers' or 'mk', tbw), colx(1), tbw, false, not any)
+      cellb('markers', fit(ms('markers') + 2 * L.pad <= tbw and 'markers' or 'mark', tbw), colx(1), tbw, false, not any)   -- 16 окт: mark (не mk)
       -- rate: значение и слайдер — вторая колонка
       local rx0 = colx(2)
       local rv = c.rate or 1
@@ -4293,6 +4293,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
   if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
+  local reap0 = mode:match('^REAPER') ~= nil                -- 16 окт: до обрезки по месту (REAP… тоже REAPER)
   -- 15 окт: цвет режима (D.MODE_COL), как у рамки поля; модуль в фокусе (LIB, UNDO…) — янтарный
   local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal' }
   local mk = MK[mode:match('^[%u%-]+') or '']
@@ -4308,7 +4309,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
       if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
     end
   end
-  if D.modefont and mode ~= '' and not mode:match('^REAPER') then   -- 16 окт: REAPER — всегда контрастным битмапом
+  if D.modefont and mode ~= '' and not reap0 then   -- 16 окт: REAPER — всегда контрастным битмапом
     -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
     local hpx = math.floor(3 * L.th * (D.MODE_FONT_SCALE[D.modefont] or 1))   -- 13 окт: в полтора раза крупнее (просьба)
     gfx.setfont(4, D.modefont, hpx)
@@ -4321,7 +4322,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   end
   while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
   -- 16 окт: REAPER (клавиши у REAPER, не у трекера) — контрастно: белым на чёрном, чёрные косые полоски поверх
-  local reap = mode:match('^REAPER') ~= nil
+  local reap = reap0
   if mode ~= '' then
     if not dry then
       if reap then
