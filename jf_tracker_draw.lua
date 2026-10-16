@@ -3141,6 +3141,9 @@ local function draw_topbar(L, info)
   elseif tab == 'visor' then
     -- visor (10 окт, jf_tracker_visor.lua): слои шейдеров ReaVisor, эффекты, master, сцены по слотам
     if info.visor_draw then hover.visor = info.visor_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
+  elseif tab == 'macros' then
+    -- macros (9 окт, jf_tracker_macros.lua): записанные регистры, свои, встроенные
+    if info.macros_draw then hover.macros = info.macros_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'harm' then
     -- harmonizer (8 окт, jf_tracker_harm.lua): лад, ступени, аккорды трека
     if info.harm_draw then hover.harm = info.harm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
@@ -4058,91 +4061,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     cx = start + b.w
   end
   -- тоглы — у правого края
-  local free1 = right
   if last and right - last.w >= cx + sep then
     local lx = right - last.w
     divider(lx - math.floor(sep / 2) - 1)
     last.draw(lx, last.w)
-    free1 = lx - sep
-  end
-  -- 16 окт: свободное место справа — макросы (вместо вкладки macros) и метр мастера внизу
-  local fx0 = cx + sep
-  if info.macstrip and free1 - fx0 >= 24 * L.cw then
-    divider(fx0 - math.floor(sep / 2) - 1)
-    D.mac_strip(L, fx0, ly, free1 - fx0, y + h - ly, info, hover)
   end
   -- 15 окт: режим — модлайном в поле трекера (D.draw_mode), в полосе его нет
   return out
-end
-
--- 16 окт: полоса макросов в транспорте: строка 1 — запись (q + буква) и последний @@, дальше и во 2-й строке —
--- фишки «клавиша имя» (те же клавиши, что в @ / \\ q: клик — проиграть у курсора); последняя строка — метр мастера
--- (Track_GetPeakInfo 1024 / 1025 = VU мастера REAPER), щелчок по числу — сброс удержания
-function D.mac_strip(L, x, y, w, h, info, hover)
-  local mx, my = gfx.mouse_x, gfx.mouse_y
-  local m = info.macstrip() or {}
-  local nrows = math.max(1, math.floor(h / L.rh))
-  local mrow = nrows >= 3 and 1 or 0                 -- строка метра
-  local crow = nrows - mrow                          -- строки фишек
-  local cx, cy, row = x, y, 1
-  local function put(wd)
-    if cx + wd > x + w then
-      row = row + 1; cx = x; cy = y + (row - 1) * L.rh
-      if row > crow then return nil end
-    end
-    local at = cx; cx = cx + wd + L.pad; return at
-  end
-  -- запись / последний
-  do
-    local t = m.rec and ('rec @' .. m.rec) or 'q rec'
-    local at = put(ms(t))
-    if at then text(at, cy, t, m.rec and U.RED or U.DIM) end
-    if m.last then
-      local t2 = '@@ ' .. m.last
-      local a2 = put(ms(t2))
-      if a2 then
-        local hot = mx >= a2 and mx < a2 + ms(t2) and my >= cy and my < cy + L.rh
-        text(a2, cy, '@@', hot and U.AMBER or U.GREY); text(a2 + ms('@@ '), cy, m.last, hot and U.AMBER or U.TEXT)
-        if hot then hover.macchip = '@' end
-      end
-    end
-  end
-  for _, it in ipairs(m.items or {}) do
-    local nm = fit(it[2], 10 * L.cw)
-    local wd = ms(it[1]) + L.pad + ms(nm) + 2 * L.pad
-    local at = put(wd)
-    if not at then break end
-    local hot = mx >= at and mx < at + wd and my >= cy and my < cy + L.rh
-    if hot then set(U.tint(U.AMBER, 0.2)); gfx.rect(at, cy, wd, L.rh - 1, 1) end
-    text(at + L.pad, cy, it[1], hot and U.AMBER or U.CYAN)
-    text(at + L.pad + ms(it[1]) + L.pad, cy, nm, hot and U.AMBER or (it[3] and U.GREY or U.TEXT))
-    if hot then hover.macchip = it[1] end
-  end
-  -- метр мастера
-  if mrow == 1 and info.master_peaks then
-    local my0 = y + (nrows - 1) * L.rh
-    local pk = info.master_peaks()
-    if pk then
-      local lbl = pk.mode or 'RMS'
-      local val = (pk.hold or -150) > -60 and ('%.1f'):format(pk.hold) or '-inf'
-      local lw = ms(lbl) + L.pad
-      local vw = ms('-00.0') + L.pad
-      text(x, my0, lbl, U.GREY)
-      local bx, bw = x + lw, math.max(8, w - lw - vw)
-      local bh = math.max(2, math.floor((L.rh - 5) / 2))
-      for k, db in ipairs({ pk.l or -150, pk.r or -150 }) do
-        local by = my0 + 2 + (k - 1) * (bh + 1)
-        set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(bx, by, bw, bh, 1)
-        local f = math.max(0, math.min(1, (db + 60) / 66))   -- −60 … +6 dB
-        if f > 0 then set(db > 0 and U.RED or (db > -6 and U.AMBER or U.CYAN)); gfx.rect(bx, by, math.floor(bw * f), bh, 1) end
-        set(U.mix(U.TEXT, U.PANEL, 0.6)); gfx.rect(bx + math.floor(bw * 60 / 66), by, 1, bh, 1)   -- 0 dB
-      end
-      local vx = x + w - ms(val)
-      local hot = mx >= vx - L.pad and mx < x + w and my >= my0 and my < my0 + L.rh
-      text(vx, my0, val, hot and U.AMBER or ((pk.hold or -150) > 0 and U.RED or U.TEXT))
-      if hot then hover.mixpk = pk.track end
-    end
-  end
 end
 
 -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)

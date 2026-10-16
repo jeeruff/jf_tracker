@@ -404,6 +404,47 @@ if state.panes and reaper.GetExtState(EXT, 'panes_mig8') ~= '1' then
   end
   reaper.SetExtState(EXT, 'panes_mig8', '1', true)
 end
+-- 11 окт (миграция 9): macros снова пропала из вкладок (скрыта пресетом / Ctrl+W c) — вернуть к item
+if state.panes and reaper.GetExtState(EXT, 'panes_mig9') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'macros') then
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
+    if host then
+      local lf = PNm.find(state.panes, host)
+      local act = lf and lf.active
+      PNm.stack(state.panes, 'macros', host)
+      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
+    end
+  end
+  reaper.SetExtState(EXT, 'panes_mig9', '1', true)
+end
+-- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
+-- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
+if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.visible(state.panes, 'macros') then
+    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
+    if host then
+      local lf = PNm.find(state.panes, host)
+      local act = lf and lf.active
+      PNm.stack(state.panes, 'macros', host)
+      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
+    end
+  end
+  reaper.SetExtState(EXT, 'panes_mig6', '1', true)
+end
+-- 9 окт (миграция 5): вкладка macros — в стек вкладок верхнего модуля
+if state.panes and reaper.GetExtState(EXT, 'panes_mig5') ~= '1' then
+  local PNm = draw.panes
+  if not PNm.find(state.panes, 'macros') and PNm.find(state.panes, 'harm') then
+    local act
+    local lf = PNm.find(state.panes, 'harm')
+    act = lf and lf.active
+    PNm.stack(state.panes, 'macros', 'harm')
+    lf = PNm.find(state.panes, 'harm'); if lf and act then lf.active = act end
+  end
+  reaper.SetExtState(EXT, 'panes_mig5', '1', true)
+end
 -- 9 окт (миграция 4): fx и pm — отдельные панели стеком с браузером
 -- (browser | pm | fx), один раз поверх текущей раскладки
 if state.panes and reaper.GetExtState(EXT, 'panes_mig4') ~= '1' then
@@ -3550,7 +3591,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'automation', 'modulation', 'midi', 'harm', 'clips', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'automation', 'modulation', 'midi', 'harm', 'clips', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     t[#t + 1] = 'grid'   -- 15 окт: всегда (была dev-опция gridtab)
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -8343,25 +8384,6 @@ ctx = {
   -- 12 LUFS-M, 16 LUFS-S max, 20 LUFS-S current); метр трекера читает тот же VU — без JSFX
   MM_MODES = { { 0, 'peak', 'peak (stereo)' }, { 2, 'peak', 'peaks (multichannel)' }, { 4, 'RMS', 'RMS (stereo)' }, { 8, 'RMS', 'RMS (combined)' },
                { 12, 'LUFS-M', 'LUFS-M - momentary loudness' }, { 16, 'LUFS-S', 'LUFS-S - short-term, readout max' }, { 20, 'LUFS-S', 'LUFS-S - short-term, readout current' } },
-  -- 16 окт: полоса макросов в транспорте — запись, последний, фишки тех же клавиш, что @ (кэш на 0.5 с: файл своих макросов)
-  macstrip = function()
-    local now = reaper.time_precise()
-    if not ctx.macstrip_c or now - ctx.macstrip_c.t > 0.5 then
-      local items = {}
-      for _, it in ipairs(ctx.mac_hydra().items) do
-        -- записанный «@a  тело» — тело (клавиша уже a), свой / встроенный «имя  описание» — имя
-        if it.fn then items[#items + 1] = { it.key, it.label:match('^@%l%s%s(.*)$') or it.label:match('^(.-)%s%s') or it.label } end
-      end
-      ctx.macstrip_c = { t = now, items = items }
-    end
-    return { rec = vim.macro and vim.macro.name or nil, last = vim.last_macro, items = ctx.macstrip_c.items }
-  end,
-  master_peaks = function()
-    local mt = reaper.GetMasterTrack(0)
-    local function db(ch) local v = reaper.Track_GetPeakInfo(mt, ch); return v > 1e-6 and 20 * math.log(v, 10) or -150 end
-    local h = math.max(reaper.Track_GetPeakHoldDB(mt, 1024, false), reaper.Track_GetPeakHoldDB(mt, 1025, false)) * 100
-    return { l = db(1024), r = db(1025), hold = h, mode = ctx.master_meter_mode(), track = mt }
-  end,
   master_meter_mode = function()
     local v = math.floor(reaper.GetMediaTrackInfo_Value(reaper.GetMasterTrack(0), 'I_VUMODE') or 0) & 30
     for _, m in ipairs(ctx.MM_MODES) do if m[1] == v then return m[2] end end
@@ -15805,7 +15827,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, macstrip = ctx.macstrip, master_peaks = ctx.master_peaks, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -15947,6 +15969,12 @@ local function frame()
         if hv.kind == 'param' or hv.kind == 'row' or hv.kind == 'mxcell' then VZ.wheel(hv, gfx.mouse_wheel > 0 and 1 or -1, gfx.mouse_cap & 8 == 8) end
         gfx.mouse_wheel = 0
       end
+      return hv
+    end,
+    macros_draw = function(Lx, x, y, w, h)
+      local rows = ctx.mac_rows()
+      ctx.mac_last = rows
+      local hv = MX.MR.draw({ U = U, L = Lx, fit = ctx.fit, hint = ctx.hint, focused = state.focus == 'top' and state.toptab == 'macros' }, x, y, w, h, rows)
       return hv
     end,
     harm_draw = function(Lx, x, y, w, h)
@@ -16857,7 +16885,6 @@ local function frame()
   elseif hover.sendvol then state.status = 'send volume - drag'
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
   elseif hover.mixmode then state.status = 'meter of the master (REAPER VU): RMS / LUFS-M / LUFS-S / peak - click: the list (native, no plugin)'
-  elseif hover.macchip then state.status = hover.macchip == '@' and 'the last macro again - click (keys: @@)' or ('macro - click: play at the tracker cursor (keys: @' .. hover.macchip .. '; q + letter records)')
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N, right click: menu'
@@ -18143,10 +18170,6 @@ local function frame()
     elseif hover.rdev then ctx.rdev_open(hover.rdev); click = { t = now2, zone = 'rdev' }   -- 11 окт: устройство в routing — в DSP
     elseif hover.rs5k then ctx.rs5k_do(hover.rs5k.f, hover.rs5k.what); click = { t = now2, zone = 'rs5k' }   -- 10 окт: кнопки RS5K
     elseif hover.mixmode then ctx.master_meter_menu()
-    elseif hover.macchip then   -- 16 окт: фишка полосы макросов — проиграть у курсора трекера (как @ клавиша)
-      if hover.macchip == '@' then ctx.mac_run('@' .. (vim.last_macro or '')) else ctx.mac_by_key(hover.macchip) end
-      ctx.macstrip_c = nil
-      click = { t = now2, zone = 'macchip' }
     elseif hover.mixpk then
       -- 10 окт: Shift+щелчок — сброс пиков / клипов у ВСЕХ треков и мастера (как Ctrl+щелчок в микшере REAPER)
       local function rst(tr) for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(tr, ch, true) end end
@@ -20588,6 +20611,11 @@ local function frame()
           end
         elseif state.toptab == 'clips' then
           if not MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then
+            if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
+          end
+        elseif state.toptab == 'macros' then
+          local r = MX.MR.key(c, ctx.mac_last or ctx.mac_rows())
+          if type(r) == 'table' then ctx.mac_do(r) elseif not r then
             if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
           end
         elseif state.toptab == 'visor' then

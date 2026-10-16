@@ -266,7 +266,7 @@ do
   local raw = 'h[0.199:v[0.192:ctrl*|0.565:matrix*|0.242:fxb*]|0.64:v[0.05:retro,modulation,scopes,master,grid,garden,sample,video*|0.8:tracker*|0.15:dsp*]|0.161:v[0.434:inst*|0.133:slices*|0.433:browser*]] H:notes,midi,harm Z:'
   local m = PN.decode(raw)
   ok('add_new: something added', PN.add_new(m, raw))
-  for _, id in ipairs({ 'sprops', 'mixer', 'visor', 'clips', 'automation' }) do ok('add_new: ' .. id .. ' visible', PN.visible(m, id)) end
+  for _, id in ipairs({ 'sprops', 'mixer', 'visor', 'clips', 'macros', 'automation' }) do ok('add_new: ' .. id .. ' visible', PN.visible(m, id)) end
   -- 12 окт: automation отделилась от modulation — встаёт в тот же стек вкладок
   do local a = PN.find(m, 'automation'); ok('add_new: automation stacked with modulation', a ~= nil and a == (PN.find(m, 'modulation'))) end
   ok('add_new: matrix stays active', PN.is_active(m, 'matrix'))
