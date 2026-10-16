@@ -15545,6 +15545,7 @@ local function frame()
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
   edit.ghost_q = ctx.slq_rows()                        -- 15 окт: playthru + q — ghost-слайсы по сетке q (0 = выкл)
+  keys.piano[49] = state.slice1 and -1 or nil          -- 15 окт: slice1 — клавиша 1 = нота на полутон ниже q (весь сэмпл)
   edit.swing_read()                                    -- свинг сетки проекта REAPER (6 окт)
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
