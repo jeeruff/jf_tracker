@@ -5231,7 +5231,8 @@ function D.frame(L, snap, rows, state, info)
           if b[4] == 'arm' then
             local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
             -- 15 окт: строчная a (без заглавных), по центру круга — не по прямоугольнику кнопки (съезжала)
-            if aa then text(cx - math.floor(ms('a') / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)
+            local al = b.cap and 'A' or 'a'   -- 16 окт: в микшере — A, как в REAPER (просьба; в шапке строчная)
+            if aa then text(cx - math.floor(ms(al) / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), al, on and U.TEXT or rc)
             else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
           else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or BTXT) end
           local key = b[4] == 'phase' and 'trkio' or 'btn'
@@ -5304,7 +5305,7 @@ function D.frame(L, snap, rows, state, info)
         local th3 = L.rh - 4
         local lx = vert and 0 or (rx + math.floor((rw - ms('sro')) / 2))
         local ly = vert and (ry + math.floor((rhh - 3 * th3) / 2) - 1) or (ry + math.floor((rhh - (L.rh - 2)) / 2))
-        for i, ch in ipairs({ 's', 'r', 'o' }) do
+        for i, ch in ipairs(D.sroslash and { '/', '/', '/' } or { 's', 'r', 'o' }) do   -- 16 окт: опция routing as /// (как в REAPER)
           local cc = has[i] and ({ U.CYAN, U.GREEN, U.AMBER })[i] or U.mix(BTXT, U.PANEL, 0.5)   -- S голубой, R зелёный, O янтарь
           if vert then text(rx + math.floor((rw - ms(ch)) / 2), ly + (i - 1) * th3, ch, cc)
           elseif rw >= 2 * ms('SRO') then text(rx + math.floor((i - 1) * rw / 3 + (rw / 3 - ms(ch)) / 2), ly, ch, cc)   -- 12 окт: широкая — буквы врозь
@@ -5714,7 +5715,8 @@ function D.frame(L, snap, rows, state, info)
           if sc then sc.draw(colx, y1 + 4 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
           if rec_d and rec_d > 0 then
             local ry = y1 + fh - rec_d - 3
-            hbtn(labels[1], sx + math.floor((fx_w - rec_d) / 2), ry, rec_d, rec_d - 2, true)
+            local rb = setmetatable({ cap = true }, { __index = labels[1] })
+            hbtn(rb, sx + math.floor((fx_w - rec_d) / 2), ry, rec_d, rec_d - 2, true)
             hbtn(labels[2], colx, ry + math.floor((rec_d - D.mcb_h) / 2), D.mcb_w, D.mcb_h, false)
           end
         end
