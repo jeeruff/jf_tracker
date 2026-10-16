@@ -6986,9 +6986,17 @@ ctx = {
       local _, p = reaper.GetTakeStretchMarker(tk, i)
       if p > 1e-4 and p < len - 1e-4 and p >= ta - 1e-6 and p < tb - 1e-6 then found = i; break end
     end
-    if ch == 'enter' and found then ch = 'x' end                       -- 16 окт: Enter — переключатель: есть маркер — убрать
+    -- 16 окт: S — всегда «поставить на строку»: маркер в строке уже есть — притянуть его к началу строки (удар на долю),
+    -- нет — поставить; убирает только x (переключатель путал: на долях после stretch S снимал маркер)
+    if ch == 'enter' and found then
+      local _, p = reaper.GetTakeStretchMarker(tk, found)
+      if math.abs(p - ta) < 1e-4 then vim.msg = 'stretch marker already on this row (J K pull it, x removes)'; return end
+      edit.run('stretch marker to the row', function() reaper.SetTakeStretchMarker(tk, found, ta); reaper.UpdateItemInProject(it) end)
+      vim.msg = 'stretch marker snapped to the row start'
+      edit.note_modified(it); model.invalidate(); return
+    end
     if ch == 'enter' then
-      if ta <= 0.002 or ta >= len - 0.002 then vim.msg = 'wave: the row is at the edge of the note'; return end
+      if ta <= 0.002 or ta >= len - 0.002 then vim.msg = 'wave: the first / last row of the note - a stretch marker goes inside it'; return end
       edit.run('stretch marker', function()
         local have0, haveL = false, false
         for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do local _, p = reaper.GetTakeStretchMarker(tk, i); if p < 1e-4 then have0 = true end; if math.abs(p - len) < 1e-4 then haveL = true end end
@@ -6997,7 +7005,7 @@ ctx = {
         reaper.SetTakeStretchMarker(tk, -1, ta)
         reaper.UpdateItemInProject(it)
       end)
-      vim.msg = 'stretch marker on this row - J K pull the hit, S / x removes'
+      vim.msg = 'stretch marker on this row - J K pull the hit, x removes'
     elseif not found then vim.msg = 'wave: no stretch marker on this row (S puts one)'; return
     elseif ch == 'x' then
       edit.run('stretch marker delete', function() reaper.DeleteTakeStretchMarkers(tk, found, 1); reaper.UpdateItemInProject(it) end)
