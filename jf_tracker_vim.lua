@@ -1434,9 +1434,13 @@ end
 -- → 'beside'; Ctrl (коды 1..26 или флаг ctrl) → 'capture'; иначе 'insert'.
 local SHIFTED = { ['@'] = '2', ['#'] = '3', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['('] = '9', [')'] = '0' }
 local OPTCH = { [339] = 'q', [8721] = 'w', [180] = 'e', [174] = 'r', [8224] = 't', [165] = 'y', [168] = 'u',
-                [710] = 'i', [248] = 'o', [960] = 'p',
-                -- 15 окт: и цифры второй октавы (диезы q2w3e…): в INSERT Option+цифра с нотой — аккорд, как буквы
-                [8482] = '2', [163] = '3', [8734] = '5', [167] = '6', [182] = '7', [170] = '9', [186] = '0' }
+                [710] = 'i', [248] = 'o', [960] = 'p' }
+                -- 16 окт: Option+цифры — снова только инструменты (15 окт были диезами аккорда — спорили с Opt+1)
+-- 16 окт: Shift+Option (раскладка US) — pitch слайса; Option+цифра больше не спорит с выбором инструмента Opt+1
+local SHOPTCH = { [338] = 'q', [8222] = 'w', [8240] = 'r', [711] = 't', [193] = 'y', [216] = 'o', [8719] = 'p',
+                  [8364] = '2', [8249] = '3', [64257] = '5', [64258] = '6', [8225] = '7', [183] = '9', [8218] = '0',
+                  [184] = 'z', [205] = 's', [731] = 'x', [206] = 'd', [199] = 'c', [9674] = 'v', [733] = 'g',
+                  [305] = 'b', [211] = 'h', [732] = 'n', [212] = 'j', [194] = 'm' }
 function V.note_key(c, mods)
   mods = mods or {}
   -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
@@ -1455,10 +1459,13 @@ function V.note_key(c, mods)
   end
   local ch = (c < 256) and string.char(c) or ''
   local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c   -- 'u'-префикс не-ASCII (5 окт)
+  if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), 'pitch' end
+  if mods.alt and mods.shift and OPTCH[cp] then return OPTCH[cp]:byte(), 'pitch' end   -- ´ ¨ ˆ: те же знаки, что у Option
   if OPTCH[cp] then return OPTCH[cp]:byte(), 'beside' end
 
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end
+  if mods.alt and mods.shift then local b = (ch:match('^%u$') and ch:lower() or ch); return b:byte() or c, 'pitch' end
   if mods.alt then return c, 'beside' end
   if mods.shift then return c, 'audition' end
   return c, 'insert'
@@ -1602,11 +1609,7 @@ function V.key_impl(c)
   do
     local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 0 }
     local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
-    local d = OPTDIG[cp] or ((mods.alt and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
-    -- 15 окт: в INSERT / слое пианино цифра с нотой (2 3 5 6 7 9 0 — диезы второй октавы) — нота (аккорд, Option+note),
-    -- инструмент по Option+цифре — в NORMAL и на цифрах без ноты
-    local dch = d and (('0'):byte() + d)
-    if d and (V.mode == 'insert' or V.piano) and ctx.piano and ctx.piano[dch] then d = nil end
+    local d = OPTDIG[cp] or ((mods.alt and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' then
       if d == 0 then d = 10 end
       if ctx.pool_select then ctx.pool_select(d) end
@@ -2036,7 +2039,8 @@ function V.key_impl(c)
     local semis = 0
     -- 4 окт: Option — питч выбранного (слайс или весь айтем), Cmd — питч всего айтема
     if how == 'whole' then sliced = false; how = 'insert' end
-    if sliced and how == 'beside' then
+    if how == 'pitch' and not sliced then how = 'beside' end   -- 16 окт: Shift+Option без нарезки — как Option
+    if sliced and how == 'pitch' then
       local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
       if selk == 0 then sliced = false; how = 'insert'
       else semis = kp - (SB - 1); kp = SB + selk - 1; how = 'insert' end
@@ -2346,7 +2350,7 @@ function V.key_impl(c)
         local slc, rest = {}, {}
         for _, h in ipairs(heads) do if h.kind == 'audio' and h.slice then slc[#slc + 1] = h else rest[#rest + 1] = h end end
         if #slc > 0 and rhow ~= 'whole' then
-          if rhow == 'beside' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
+          if rhow == 'pitch' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
           elseif pitch - V.slice_base() + 1 < 1 then V.msg = 'q is the whole sample - a slice note keeps its slice (; inserts the whole sample)'
           else E.set_fx(slc, lpb(), '0S', pitch - V.slice_base() + 1) end
         else for _, h in ipairs(slc) do rest[#rest + 1] = h end end

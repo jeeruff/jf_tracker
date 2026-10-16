@@ -743,8 +743,10 @@ do
   keysin('p'); eq('past the last slice (28 of 20): nothing', last(), 'slice:trA@30:13')
   keysin('z')
   V.last_slice = 5
-  alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑)
-  eq('Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
+  alt_down, shift_down = true, true; V.key(8222); alt_down, shift_down = false, false     -- Shift+Option+w („), 16 окт
+  eq('Shift+Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
+  alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑) — аккорд, не pitch
+  eq('Option+w on slices: not pitch', calls[#calls] ~= 'slicepitch:5:+2', true)
   keysin(';'); eq('; inserts the whole sample', last(), 'whole')
   -- арп из слайсов (4 окт): :arp live, клавиша-слайс уходит в живой арп
   V.arp_live = true; keysin('w'); V.arp_live = false
