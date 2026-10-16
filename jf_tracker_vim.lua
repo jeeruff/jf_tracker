@@ -2818,6 +2818,17 @@ end
 
 function V.picker_key(c)
   local pk = V.picker
+  -- 16 окт: папки как в lf — h l j k g G (l на имени — выбрать), / — поиск (любая другая буква — тоже)
+  if pk.groups and pk.query == '' and not pk.typing then
+    local ch = (c > 0 and c < 256) and string.char(c) or ''
+    if ch == '/' then pk.typing = true; return end
+    if ch == 'h' then c = LEFT elseif ch == 'j' then c = DOWN elseif ch == 'k' then c = UP
+    elseif ch == 'l' then c = (pk.side == 'left') and RIGHT or ENTER
+    elseif ch == 'g' then if pk.side == 'left' then V.picker_group(1) else pk.sel = 1 end; return
+    elseif ch == 'G' then if pk.side == 'left' then V.picker_group(#pk.groups) else pk.sel = math.max(1, #pk.matches) end; return end
+  end
+  if pk.typing and c == ESC and pk.query == '' then pk.typing = nil; return end   -- выход из поиска — снова lf
+  if pk.typing and c == BS and pk.query == '' then pk.typing = nil; return end
   -- 16 окт: папки — ← → / Tab между колонками; слева ↑ ↓ — папка, Enter — к именам
   if pk.groups and pk.query == '' then
     if c == LEFT then pk.side = 'left'; return
@@ -2836,7 +2847,7 @@ function V.picker_key(c)
   elseif c == BS then pk.query = pk.query:sub(1, -2); picker_filter()
   elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1)
   elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1)
-  elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); picker_filter() end
+  elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); pk.typing = pk.groups and true or nil; picker_filter() end
 end
 
 -- ── hydra (which-key) ─────────────────────────────────────────────────────

@@ -1151,6 +1151,7 @@ end
 M.DSP_MAXP = 8
 M.dspmods = nil      -- реестр кураторских модулей (jf_tracker_dspmods.lua), ставит main
 M.dsp_page = {}      -- 16 окт: страница модуля DSP с pages: имя модуля → номер
+M.dsp_fold = false   -- 16 окт: zf — модули со страницами свёрнуты (одна страница) / раскрыты (все сразу)
 M.DR = nil           -- 16 окт: jf_tracker_drumrack.lua (drumrs5k), ставит main; M.drum_favs — избранное слотов
 -- 16 окт: индексы параметров RS5K по имени (один раз — у всех экземпляров одинаковы, не зашиваем)
 local rs5k_pi
@@ -1458,12 +1459,23 @@ function build_one(tr, fx, out)
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
       -- 16 окт: страницы (pages — вкладки модуля: своё имя, группы, параметры); номер — M.dsp_page[имя]
       local lay_pages, lay_page
+      -- 16 окт (вечер): по умолчанию раскрыто — все страницы одним пейном (группы подряд); zf в DSP —
+      -- свернуть: одна страница, вертикальные вкладки справа у блока
       if lay.pages then
-        lay_page = math.max(1, math.min(#lay.pages, M.dsp_page[lay.title or short] or 1))
-        local pg = lay.pages[lay_page]
         lay_pages = {}
         for k2, p2 in ipairs(lay.pages) do lay_pages[k2] = p2.name end
-        lay = setmetatable({ params = pg.params, groups = pg.groups, cols = pg.cols or lay.cols, rows = pg.rows or lay.rows }, { __index = lay })
+        if M.dsp_fold then
+          lay_page = math.max(1, math.min(#lay.pages, M.dsp_page[lay.title or short] or 1))
+          local pg = lay.pages[lay_page]
+          lay = setmetatable({ params = pg.params, groups = pg.groups, cols = pg.cols or lay.cols, rows = pg.rows or lay.rows }, { __index = lay })
+        else
+          local ps, gs = {}, {}
+          for _, p2 in ipairs(lay.pages) do
+            for _, g in ipairs(p2.groups or {}) do gs[#gs + 1] = g end
+            for _, sp in ipairs(p2.params) do ps[#ps + 1] = sp end
+          end
+          lay = setmetatable({ params = ps, groups = gs, cols = #gs, rows = lay.rows }, { __index = lay })
+        end
       end
       local names = {}
       local np_all = np

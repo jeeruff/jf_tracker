@@ -38,7 +38,7 @@ local T = {
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' } } },
-  dsp_z = { title = 'z - router', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' } } },
+  dsp_z = { title = 'z - router / pages', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'f', 'fold / unfold module pages (Surge: all in one pane / one page, tabs on the right)' } } },
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
         { 'a', 'automate the parameter' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
         { 'm', 'map to a container macro' } } },

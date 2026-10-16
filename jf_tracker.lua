@@ -110,6 +110,7 @@ local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')      -- клавиши DSP-�
 model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 -- 16 окт: drumrs5k — контейнер RS5K видом драм-рэка; избранное слотов — ExtState drumfav_<cat>
 model.DR = dofile(DIR .. '/jf_tracker_drumrack.lua')
+model.dsp_fold = reaper.GetExtState('jf_tracker', 'dspfold') == '1'   -- 16 окт: zf — страницы модулей свёрнуты
 draw.DR = model.DR
 model.drum_favs = {}
 for _, cat in ipairs(model.DR.CATS) do model.drum_favs[cat] = model.DR.parse_fav(reaper.GetExtState('jf_tracker', 'drumfav_' .. cat), cat) end
@@ -21420,10 +21421,15 @@ local function frame()
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
-          if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big() end
+          if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
+          elseif ch == 'f' then   -- 16 окт: zf — модули со страницами (Surge): все сразу ↔ по одной, вкладки справа
+            model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
+            model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+            vim.msg = model.dsp_fold and 'zf: pages folded - one page, tabs on the right of the module' or 'zf: pages unfolded - all of them in one pane'
+          end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

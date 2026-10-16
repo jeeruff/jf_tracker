@@ -68,7 +68,7 @@ DM.modules = {
         { 'global volume', 'master' }, { 'polyphony limit', 'poly' }, { 'scene mode', 'scenes' },
         { 'active scene', 'scene' }, { 'split point', 'split' }, { 'a vca gain', 'vca' },
       } },
-      { name = 'macro', groups = { 'MACROS' }, cols = 2, rows = 8, params = {
+      { name = 'macro', groups = { 'MACRO 1-6', 'MACRO 7-8' }, cols = 2, params = {   -- 16 окт: строки как у всех (6) — раскрытый вид склеивает страницы
         { 'm1:', 'M1' }, { 'm2:', 'M2' }, { 'm3:', 'M3' }, { 'm4:', 'M4' }, { 'm5:', 'M5' }, { 'm6:', 'M6' }, { 'm7:', 'M7' }, { 'm8:', 'M8' },
       } },
     },

@@ -7198,6 +7198,9 @@ function D.frame(L, snap, rows, state, info)
       local room = right
       if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = math.max(1, math.floor((room - bx) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       local bw = bw1 * ncol
+      -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
+      local vtw = (f.pages and f.page) and (L.th + 2 * L.pad + 2) or 0
+      bw = bw + vtw
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
       local is_sel = sel.fx == k
@@ -7206,6 +7209,20 @@ function D.frame(L, snap, rows, state, info)
       set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
       if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
+      if vtw > 0 then
+        local tx0, ty = bx + bw - vtw, by + L.rh + 2
+        set(U.LINE); gfx.rect(tx0, by + L.rh + 1, 1, bh - L.rh - 3, 1)
+        for pi2, pn in ipairs(f.pages) do
+          local th2 = ms(pn) + 2 * L.pad
+          if ty + th2 > by + bh - 2 then break end
+          local on = pi2 == f.page
+          local hot = not drag and mx >= tx0 and mx < bx + bw - 1 and my >= ty and my < ty + th2
+          set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx0 + 1, ty, vtw - 3, th2 - 1, 1)
+          D.vtext(tx0 + L.pad, ty, th2, pn, on and U.AMBER or (hot and U.TEXT or U.GREY), on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG))
+          if hot then hover.dspbtn = { fx = k, f = f, what = 'kpage', page = pi2 } end
+          ty = ty + th2 + 1
+        end
+      end
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
@@ -7238,24 +7255,6 @@ function D.frame(L, snap, rows, state, info)
           text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and (pre.none and U.GREY or U.CYAN) or U.GREY))
         end
         tw = tw - ptw - L.pad
-      end
-      -- 16 окт: страницы модуля (pages) — вкладками перед пресетом; имя — что осталось (не меньше 6 знаков)
-      if f.pages and #f.pages > 1 then
-        local pw2 = 0
-        for _, pn in ipairs(f.pages) do pw2 = pw2 + ms(pn) + 2 * L.pad + 1 end
-        if tw - pw2 >= L.cw * 6 then
-          local tx2 = bx + L.pad + tw - pw2
-          for pi2, pn in ipairs(f.pages) do
-            local w2 = ms(pn) + 2 * L.pad
-            local on = pi2 == f.page
-            local hot = not drag and mx >= tx2 and mx < tx2 + w2 and my >= by + 1 and my < by + L.rh
-            set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx2, by + 1, w2, L.rh - 1, 1)
-            text(tx2 + L.pad, by + 1, pn, on and U.AMBER or (hot and U.TEXT or U.GREY))
-            if hot then hover.dspbtn = { fx = k, f = f, what = 'kpage', page = pi2 }; on_btn = true end
-            tx2 = tx2 + w2 + 1
-          end
-          tw = tw - pw2
-        end
       end
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
       if tw > 0 then

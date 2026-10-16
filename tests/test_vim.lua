@@ -1010,6 +1010,16 @@ do
   V.picker_group(2); V.picker_key(('A'):byte())
   eq('typing searches all folders', V.picker.matches[1] and V.picker.matches[1].label, 'Pads / Air')
   V.picker = nil
+  -- lf: j — папка вниз, l — внутрь, j — имя, l — выбрать; / — поиск
+  picked = nil
+  V.open_picker('lf', { { label = 'Pads / Air', name = 'Air', group = 'Pads' }, { label = 'Bass / Sub', name = 'Sub', group = 'Bass' },
+                        { label = 'Bass / Wob', name = 'Wob', group = 'Bass' } }, function(it) picked = it.name end)
+  for _, ch in ipairs({ 'j', 'l', 'j', 'l' }) do V.picker_key(ch:byte()) end
+  eq('lf keys pick', picked, 'Wob')
+  V.open_picker('lf2', { { label = 'Pads / Air', group = 'Pads' }, { label = 'Bass / Sub', group = 'Bass' }, { label = 'Bass / Wob', group = 'Bass' } }, function() end)
+  V.picker_key(('/'):byte()); V.picker_key(('j'):byte())
+  eq('/ then letters search', V.picker.query, 'j')
+  V.picker = nil
   V.open_picker('flat', { { label = 'a', group = 'x' }, { label = 'b', group = 'x' } }, function() end)
   eq('one folder - no columns', V.picker.groups, nil)
   V.picker = nil
