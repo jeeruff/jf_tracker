@@ -1893,8 +1893,8 @@ local function draw_wave(L, head, i, x, y, muted, inv)
       local a0, a1 = math.max(q0, base), math.min(q1, base + L.rh)
       if a1 > a0 and math.abs(sg.r - 1) >= 0.005 then
         local lx = cxs + math.floor(math.max(-1, math.min(1, (sg.r - 1) * 2)) * hw2)
-        set(U.mix(sg.r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)), U.BG, 0.35))
-        gfx.rect(lx, y + a0 - base, 1, a1 - a0, 1)
+        set(sg.r > 1 and U.GREEN or (U.MAGENTA or U.mix(U.RED, U.CYAN, 0.5)))   -- 16 окт: ярче (просьба), 2 px
+        gfx.rect(lx, y + a0 - base, 2, a1 - a0, 1)
         if q0 >= base and q0 < base + L.rh and (xb - xa) >= ms('0.00x') then
           text(xa + 1, y + q0 - base + 1, ('%.2fx'):format(sg.r), U.mix(U.TEXT, U.BG, 0.3))
         end
