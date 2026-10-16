@@ -3715,7 +3715,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- из NORMAL / INSERT / VISUAL, длиннее — обрезается); остальное правее
   if info and info.status_left then
     local res = 0
-    for _, mw0 in ipairs({ 'NORMAL', 'INSERT', 'VISUAL' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
+    for _, mw0 in ipairs({ 'NORMAL', 'INSERT', 'VISUAL', 'KEYS' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
     D.draw_mode(L, x + L.pad, ly + math.floor((math.min(h, 3 * L.rh) - 2 * L.th) / 2) - 2, 3 * res, info.status_left)
     x = x + res + 3 * L.pad; w = w - res - 3 * L.pad
   end
@@ -3768,7 +3768,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cell.vel = { x + L.pad, vy, vw }
       local bx = x + L.pad + vw + 2 * L.pad
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
-      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE or D.PIANO_FROW) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
       local bw = math.max(L.cw * 4, math.min(L.cw * 12, kx + #D.PIANO_WHITE * kwv - 1 - bx))
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
       U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
@@ -3779,7 +3779,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
-    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE or D.PIANO_FROW) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
+    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
     local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
     if kw >= 4 then
       local ky, kh = y + 2, 2 * L.rh + 3
@@ -3806,6 +3806,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         end
       end
       local bw, bh = math.max(3, math.min(kw - 2, math.max(ms('W') + 2, math.floor(kw * 0.6)))), math.floor(kh * 0.6)   -- 8 окт: цифра на чёрной видна и в минимальной
+      if D.PIANO_FROW then bh = math.max(bh, kh - L.rh - 1) end   -- 16 окт: frow — чёрная до строки подписей белых: f и номер столбиком
       for _, k in ipairs(D.PIANO_BLACK) do
         local bx = kx + k[3] * kw - math.floor(bw / 2) - 1
         local fill = key_fill(k[1], U.PANEL)
@@ -3813,8 +3814,23 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
         out.black = out.black + 1
         local blb = k[2]
-        if ms(blb) > bw - 2 and #blb > 1 then blb = blb:sub(2) end          -- 16 окт: f11 не влезло — 11
-        if letters and bw >= ms(blb) + 2 then
+        local fl = D.PIANO_FROW and blb:match('^f(%d+)$')
+        if fl and letters then
+          -- 16 окт: f-клавиша — «f» сверху, номер под ним, своим мелким шрифтом (влезает в узкую чёрную)
+          local px = math.max(7, math.min(math.floor((bh - 2) / 2), math.floor(bw * 0.9)))
+          if D.fkey_px ~= px then gfx.setfont(7, 'Menlo', px, string.byte('b')); D.fkey_px = px else gfx.setfont(7) end
+          local tc = dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5)
+          set(tc)
+          local fw = gfx.measurestr('f')
+          gfx.x, gfx.y = bx + math.floor((bw - fw) / 2), ky + 1; gfx.drawstr('f')
+          local nw = gfx.measurestr(fl)
+          if nw > bw - 1 then nw = gfx.measurestr(fl:sub(-1)); fl = fl:sub(-1) end
+          gfx.x, gfx.y = bx + math.floor((bw - nw) / 2), ky + 1 + px; gfx.drawstr(fl)
+          gfx.setfont(D.font_id)
+          out.letters = out.letters + 1
+          blb = nil
+        elseif ms(blb) > bw - 2 and #blb > 1 then blb = blb:sub(2) end          -- 16 окт: f11 не влезло — 11
+        if blb and letters and bw >= ms(blb) + 2 then
           text(bx + math.floor((bw - ms(blb)) / 2), ky + 1, blb, dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5))
           out.letters = out.letters + 1
         end
@@ -4295,7 +4311,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
   local reap0 = mode:match('^REAPER') ~= nil                -- 16 окт: до обрезки по месту (REAP… тоже REAPER)
   -- 15 окт: цвет режима (D.MODE_COL), как у рамки поля; модуль в фокусе (LIB, UNDO…) — янтарный
-  local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal' }
+  local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal', KEYS = 'normal' }
   local mk = MK[mode:match('^[%u%-]+') or '']
   local col = mk and D.MODE_COL[mk] or U.AMBER
   local dx = sx0

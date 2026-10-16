@@ -12489,7 +12489,7 @@ ctx = {
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
-    if state.hints then vim.msg = state.piano_show and (keys.layout == 'frow' and 'keyboard on (m): 1 F1 2 F2 3 ... play notes in NORMAL, [ ] octave, { } velocity (F-key shortcuts off)' or 'keyboard on (m): q 2 w 3 e ... play notes in NORMAL, z x octave') or 'keyboard hidden (m): NORMAL is plain Vim, INSERT still writes notes'
+    if state.hints then vim.msg = state.piano_show and (keys.layout == 'frow' and 'KEYS (m): 1 f1 2 f2 3 ... play notes, [ ] octave, { } velocity (F-key shortcuts off), m - back to NORMAL' or 'KEYS (m): q 2 w 3 e ... play notes, z x octave, m - back to NORMAL') or 'keyboard hidden (m): NORMAL is plain Vim, INSERT still writes notes'
     else vim.msg = state.piano_show and 'keyboard on' or 'keyboard off' end   -- длинно — только с хинтами (5 окт)
     relayout()
   end,
@@ -16555,7 +16555,7 @@ local function frame()
   -- набранные клавиши, фокус, очередь, сообщение); остальное — описание того,
   -- на что наведена мышь (state.status)
   local mode, _, typed = vim.status()   -- 15 окт: набранное — у курсора (info.typed), не в статус и не в слово режима
-  local left = mode ~= '' and mode or (state.focus ~= 'tracker' and '' or 'NORMAL')
+  local left = mode ~= '' and mode or (state.focus ~= 'tracker' and '' or (vim.piano and 'KEYS' or 'NORMAL'))   -- 16 окт: клавиатура включена в NORMAL — слово KEYS (ноты на цифрах / F)
   -- 8 окт: фокус в клипах — свой режим SESSION (клавиатура запускает клипы),
   -- не KEYS: слой пианино тут не действует
   if state.focus == 'session' and state.clipsview then left = '-- SESSION --'
