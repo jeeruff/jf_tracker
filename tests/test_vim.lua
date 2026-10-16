@@ -819,6 +819,23 @@ keysin(']'); eq('frow INSERT: ] octave up', V.octave, 5); keysin('[')
 V.cur.row = 2; local r2 = V.cur.row; keysin('1'); eq('frow INSERT: 1 is a note (row steps)', V.cur.row > r2, true)
 V.cur.row = 2; keysin('3j'); eq('frow INSERT: 3 is a note, not a count', V.cur.row, 4)
 FROW = nil; keys.set_layout('qwerty'); PIANO_ON = false; AUTO_KBD = true; V.key(27)
+-- 16 окт: Tab в колонке волны — к stretch-маркеру / началу ноты
+reset()
+do
+  local f = L.flat[1]
+  local h
+  for r, c in pairs(f.sub) do if c.kind == 'audio' or c.kind == 'midi' then if not h or r < h.row0 then h = c; h.row0 = h.row0 or r end end end
+  local r0 = h.row0 or 0
+  h.smk = { 0.5 }; h.rows = h.rows or 8
+  local want = r0 + math.floor(0.5 * h.rows)
+  V.cur = { fi = 1, row = r0, field = 1, sub = 'wave' }
+  local ms = V.wave_marks(1)
+  local has = false; for _, r in ipairs(ms) do if r == want then has = true end end
+  eq('wave marks: the stretch marker row', has, true)
+  V.wave_step(1); eq('wave Tab: to the marker', V.cur.row, want)
+  V.wave_step(-1); eq('wave Shift+Tab: back to the note start', V.cur.row, r0)
+  h.smk = nil
+end
 -- 5 окт: Shift+hjkl — выделение; INSERT s — выделение с возвратом; Option+s (ß) — :step
 reset(); keysin('L'); eq('L: visual from normal', V.mode, 'visual'); eq('L: anchor at the start', V.anchor and V.anchor.fi, 1)
 keysin('J'); eq('J extends a row down', V.cur.row, 1); V.key(27); eq('Esc: back to normal', V.mode, 'normal')

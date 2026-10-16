@@ -21759,6 +21759,7 @@ local function frame()
     elseif m.alt then
       ctx.toggle_focus(back and -1 or 1)
       vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
+    elseif state.focus == 'tracker' and vim.cur.sub == 'wave' then vim.wave_step(back and -1 or 1)   -- 16 окт: в колонке волны — к удару (stretch-маркер / начало ноты)
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
     elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' then ctx.acv_key(back and 25 or 9)   -- 15 окт: холст — активная кривая

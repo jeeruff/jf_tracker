@@ -963,6 +963,34 @@ end
 -- 16 окт: ` в NORMAL — прослушать весь сэмпл инструмента (был прыжок назад; есть гарпун и Ctrl+O)
 -- 16 окт: Option+Shift+2 (€ в раскладке US) — панель макросов
 function V.is_mac_key(c) return c == 8364 or c == 0x75000000 + 8364 end
+-- 16 окт: Tab / Shift+Tab в колонке волны — к следующему / предыдущему удару: stretch-маркер ноты
+-- (жёлтая метка) или начало ноты; строки — по всем нотам колонки
+function V.wave_marks(fi)
+  local f = flat()[fi]
+  local out, seen = {}, {}
+  if not f then return out end
+  local function add(r) if not seen[r] then seen[r] = true; out[#out + 1] = r end end
+  for _, sub in ipairs(subs_of(f)) do
+    for r, c in pairs(sub) do
+      if is_head(c) then
+        add(r)
+        for _, fr in ipairs(c.smk or {}) do add((c.row0 or r) + math.floor(fr * (c.rows or 1))) end
+      end
+    end
+  end
+  table.sort(out)
+  return out
+end
+function V.wave_step(dir)
+  local m = V.wave_marks(V.cur.fi)
+  local to
+  if dir > 0 then for _, r in ipairs(m) do if r > V.cur.row then to = r; break end end
+  else for i = #m, 1, -1 do if m[i] < V.cur.row then to = m[i]; break end end end
+  if not to then V.msg = dir > 0 and 'wave: no hit below' or 'wave: no hit above'; return false end
+  V.cur.row = to; ensure_visible()
+  V.msg = ('wave: hit at row %d (Tab / Shift+Tab)'):format(to)
+  return true
+end
 function V.play_whole()
   local f0 = flat()[V.cur.fi]
   local inst0 = f0 and (f0.col.pool or {})[V.inst]
