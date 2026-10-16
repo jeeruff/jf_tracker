@@ -946,7 +946,8 @@ end
 -- нота слайса 1 (4 окт): C-4 = слайс 1, дальше хроматически
 -- 5 окт (как в Renoise): q = C-4 — весь сэмпл, слайсы начинаются со следующей
 -- клавиши: slice_base — нота слайса 1 = C-4 + 1
-function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 end
+-- 15 окт: опция slice1 — q = слайс 1 (база на полутон ниже), весь сэмпл — клавиша 1
+function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 - ((ctx.state and ctx.state.slice1) and 1 or 0) end
 local function piano_pitch(c)
   local off = ctx.piano[c]
   if off == nil then return nil end
@@ -1814,6 +1815,8 @@ function V.key_impl(c)
     if chk == ':' then V.cmd_from = 'insert'; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.hexbuf = nil; return end
     if chk == '/' and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) then V.cmd_from = 'insert'; V.mode = 'search'; V.searchline = ''; V.hexbuf = nil; return end
     if chk == '?' then V.open_hydra(ctx.hydra_keys()); return end
+    -- 15 окт: опция slice1 — 1 на поле ноты = весь сэмпл (q — уже слайс 1)
+    if chk == '1' and ctx.state and ctx.state.slice1 and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) and ctx.insert_whole then ctx.insert_whole(); return end
     -- m — клавиатура вкл / выкл и в INSERT (5 окт): выключена — ноты не пишутся
     if chk == 'm' and not V.hexbuf and not V.shapebuf then
       if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end

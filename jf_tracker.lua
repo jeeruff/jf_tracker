@@ -229,7 +229,8 @@ local state = {
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
   namedrag = flag('namedrag', false),
-  typedtag = flag('typedtag', true),   -- 15 окт: набранное (3d, [E_]) — тегом прямо на ячейке курсора
+  typedtag = flag('typedtag', true),
+  slice1 = flag('slice1', false),   -- 15 окт: слайсы: 1 = весь сэмпл, q = слайс 1   -- 15 окт: набранное (3d, [E_]) — тегом прямо на ячейке курсора
   focusbeacon = flag('focusbeacon', true), dimfocus = tonumber(reaper.GetExtState(EXT, 'dimamt')) or (reaper.GetExtState(EXT, 'dimfocus') == '1' and 22 or 0),   -- 15 окт: dim unfocused — сила затемнения, % (0 = выкл; было вкл/выкл)   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
   ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
@@ -669,7 +670,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'typedtag', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -1926,7 +1927,8 @@ ctx = {
     if not (root and root.slices and #root.slices > 0) then return false end
     local cur = (ctx.ssel.item == root.item) and ctx.ssel.k or 0
     local k = math.max(0, math.min(#root.slices, cur + d))
-    ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell }
+    ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell, from_list = true }   -- 15 окт: выбран в списке — свойства правят слайс
+    if k > 0 and state.spscope ~= 'note' then state.spscope = nil end   -- выбор в списке — снова авто (слайс)
     if k > 0 then
       vim.last_slice = k
       ctx.preview_slice(col.track, root, root.slices[k], (not root.playthru and root.slices[k + 1]) or root.len)
@@ -1999,7 +2001,7 @@ ctx = {
   end,
   octave = function() return vim.octave end,
   slice_by_click = function() return state.slicemk or 'double' end,   -- 10 окт: опция slice by click                            -- подписи слайсов в слайсере (4 окт)
-  slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 end,   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
+  slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 - (state.slice1 and 1 or 0) end,   -- 15 окт: slice1 — q = слайс 1   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then return nil end
@@ -4523,9 +4525,11 @@ ctx = {
   -- 13 окт: клавиша, что играет слайс k (как подписи модуля slices: октава курсора, C-4 + k)
   slice_key = function(k)
     local c = ctx.slk_cache
-    if not (c and c.oct == vim.octave and c.rn == keys.renoise) then
-      c = { oct = vim.octave, t = {}, rn = keys.renoise }
-      for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(ch) end
+    local sh = state.slice1 and 1 or 0                  -- 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
+    if not (c and c.oct == vim.octave and c.rn == keys.renoise and c.sh == sh) then
+      c = { oct = vim.octave, t = {}, rn = keys.renoise, sh = sh }
+      for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
+      if sh == 1 then c.t[0] = '1' end
       ctx.slk_cache = c
     end
     return c.t[k]
@@ -7975,13 +7979,13 @@ ctx = {
     vim.open_hydra({ title = which == 'rec' and 'record' or 'play', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
   end,
-  sp_scope = function() return state.spscope or ((ctx.sp_sel and ctx.sp_sel.parent) and 'slice' or 'sample') end,
+  sp_scope = function() return state.spscope or ((ctx.ssel and ctx.ssel.from_list) and 'slice' or 'sample') end,   -- 15 окт: по умолчанию sample
   sp_scope_menu = function()
     local cur = ctx.sp_scope()
     local items = {}
     for _, o in ipairs({ { 's', 'sample', 'sample - the whole sample, all its notes and slices' }, { 'l', 'slice', 'slice - the selected slice and its notes' },
                          { 'n', 'note', 'note - only the note under the cursor of the tracker' } }) do
-      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.spscope = o[2] ~= 'slice' and o[2] or nil; ctx.sp_note = nil; vim.msg = 'properties change: ' .. o[3] end }
+      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.spscope = o[2]; ctx.sp_note = nil; vim.msg = 'properties change: ' .. o[3] end }
     end
     vim.open_hydra({ title = 'properties change', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
@@ -10259,6 +10263,7 @@ ctx = {
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
       { sep = true, title = 'sound and samples' },
+      flag('slice1', 'slices: 1 = whole, q = slice 1', 'a sliced sample: q 2 w 3 ... play slices 1 2 3 4 ... and the key 1 the whole sample (off: q is the whole sample, 2 is slice 1)'),
       flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
@@ -10289,7 +10294,7 @@ ctx = {
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'slice1', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
@@ -16057,7 +16062,8 @@ local function frame()
       -- 11 окт: уровень правки (кнопка в заголовке properties): sample — весь сэмпл, slice — выбранный слайс,
       -- note — нота под курсором трекера (её значения, правка только её)
       if sel_e and not sel_e.file then
-        local sc = state.spscope            -- nil — как раньше: что выбрано (слайс или сэмпл), то и правится
+        -- 15 окт: nil — sample, пока слайс не выбран прямо в списке слайсов (вставка ноты слайса область не меняет)
+        local sc = state.spscope or ((ctx.ssel and ctx.ssel.from_list) and 'slice' or 'sample')
         local root0 = sel_e.parent or sel_e
         if sc == 'sample' then sel_e = root0
         elseif sc == 'note' then
@@ -16233,7 +16239,9 @@ local function frame()
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
-      for off, ch in pairs(keys.plabel) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60)] = keys.label(ch) end
+      local sh = state.slice1 and 1 or 0                -- 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
+      for off, ch in pairs(keys.plabel) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
+      if sh == 1 then key_of[0] = '1' end
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
