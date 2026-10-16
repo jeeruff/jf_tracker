@@ -1880,7 +1880,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
     R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
     E.set_iid(it, root .. '#' .. k)                      -- все ноты слайса k — один инструмент
     finish_insert(track, lane_idx, it)
-    if E.playthru(inst_item) and (E.ghost_q or 0) > 0 then E.ghost_slices(track, lane_idx, lpb, it, slices, base, k, root) end
+    if E.playthru(inst_item) and (E.ghost_q or 0) > 0 then E.warp_slices(lpb, it, slices, base, k) end   -- 15 окт: одна нота, удары — на сетку q (stretch-маркеры)
     made = it
   end)
   return made
@@ -1914,75 +1914,47 @@ function E.ghost_prepare(track, lane_idx, t0)
   end
 end
 
--- 15 окт: ghost-слайсы. playthru + квантование слайсов (q row / 2 / beat / bar, E.ghost_q строк, ставит main):
--- нота играет сэмпл не одним куском (живой брейк уплывает с сетки, луп съезжает), а послайсово — каждый
--- следующий слайс своим item там, где он прозвучал бы при playthru (с beatsync — по его rate), привязанный
--- к сетке q (строки от LPB). Голова обрезается до первого; ghost — P_EXT:jf_ghost (трекер рисует бледно).
--- Дальше следующей ноты колонки и конца сэмпла не идёт; два на одну клетку — остаётся первый.
-function E.ghost_slices(track, lane_idx, lpb, head, slices, base, k, root)
-  local htk = R.GetActiveTake(head)
-  if not htk then return end
+-- 15 окт: playthru + квантование слайсов (q row / 2 / beat / bar, E.ghost_q строк, ставит main): нота — ОДНА,
+-- целым звуком, а начала слайсов (транзиенты) подтянуты к ближайшей клетке сетки q stretch-маркерами (нативно,
+-- как smart quantize: маркер на исходном месте, сдвигается позиция воспроизведения). Было — ghost-куски на
+-- каждую клетку: «настрочил порезав по строчке».
+function E.warp_slices(lpb, head, slices, base, k)
+  local tk = R.GetActiveTake(head)
+  if not tk or R.TakeIsMIDI(tk) then return end
   local q = E.ghost_q
-  local _, hguid = R.GetSetMediaItemInfo_String(head, 'GUID', '', false)
   local t0 = R.GetMediaItemInfo_Value(head, 'D_POSITION')
-  local hend = t0 + R.GetMediaItemInfo_Value(head, 'D_LENGTH')      -- playthru уже обрезан следующей нотой
-  local rate = R.GetMediaItemTakeInfo_Value(htk, 'D_PLAYRATE')
+  local len = R.GetMediaItemInfo_Value(head, 'D_LENGTH')
+  local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
   local bs = E.bsync_of(head)
-  local r0 = bs and bs.rate0 or rate                                  -- таблица слайсов — секунды item при исходном rate
-  local offs0 = base.offs or 0
-  local ok, chunk = R.GetItemStateChunk(head, '', false)
-  if not ok then return end
-  chunk = strip_guids(chunk)
-  local row0 = R.TimeMap2_timeToQN(0, t0) * lpb
-  local starts = {}                                                   -- { j, t }
-  local used = { [math.floor(row0 + 0.5)] = true }
+  local r0 = bs and bs.rate0 or rate                       -- таблица слайсов — секунды item при исходном rate
+  local want = {}
+  local used = { [0] = true }
   for j = k + 1, #slices do
-    local tj = t0 + (slices[j] - slices[k]) * r0 / rate
-    if tj >= hend - 1e-4 then break end
-    local rowf = R.TimeMap2_timeToQN(0, tj) * lpb
-    local rq = math.floor(rowf / q + 0.5) * q
-    local tq = row_time(rq, lpb, 0)
-    if not used[rq] and tq > t0 + 1e-4 and tq < hend - 1e-4 then used[rq] = true; starts[#starts + 1] = { j = j, t = tq } end
-  end
-  if #starts == 0 then return end
-  -- 15 окт: кусок играет СВОЙ слайс (до следующей метки, с beatsync — по rate), не до следующего ghost:
-  -- иначе хвост головы доигрывал транзиент следующего слайса раньше бита, и он звучал дважды.
-  -- beatsync: кусок РАСТЯНУТ до начала следующего (rate = исходник слайса / промежуток) — весь луп
-  -- в метроном и доигрывается без дыр; последний — до своего конца, привязанного к сетке q
-  local full = base.len or (slices[#slices] + 1)
-  local function src(j) return ((slices[j + 1] or full) - slices[j]) * r0 end     -- секунды исходника слайса j
-  local function nat(j) return src(j) / rate end
-  local function qend(t)                                                           -- конец, привязанный к сетке q
-    local rf = R.TimeMap2_timeToQN(0, t) * lpb
-    return row_time(math.max(1, math.floor(rf / q + 0.5)) * q, lpb, 0)
-  end
-  local function fit(it, tk, j, ts, te)
-    if te <= ts + 1e-4 then te = ts + nat(j) end
-    if bs and tk then
-      R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', src(j) / (te - ts))
-      R.SetMediaItemInfo_Value(it, 'D_LENGTH', te - ts)
-    else
-      R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(nat(j), te - ts))
+    local o = (slices[j] - slices[k]) * r0 / rate          -- где удар слайса j звучит в ноте
+    if o >= len - 1e-3 then break end
+    local rq = math.floor((R.TimeMap2_timeToQN(0, t0 + o) * lpb) / q + 0.5) * q
+    local n = row_time(rq, lpb, 0) - t0
+    local last = want[#want]
+    if n > 1e-3 and n < len - 1e-3 and not used[rq] and (not last or n > last.n + 1e-3) then
+      used[rq] = true; want[#want + 1] = { o = o, n = n }
     end
   end
-  fit(head, htk, k, t0, starts[1].t)
-  if bs then R.GetSetMediaItemInfo_String(head, 'P_EXT:jf_bsync', '', true) end   -- растянут вручную: bsync_fit не перетирает
-  for i, g in ipairs(starts) do
-    local te = starts[i + 1] and starts[i + 1].t or math.min(hend, qend(g.t + nat(g.j)))
-    local gi = insert_chunk(track, lane_idx, g.t, chunk)
-    local gtk = R.GetActiveTake(gi)
-    if gtk then
-      R.SetMediaItemTakeInfo_Value(gtk, 'D_STARTOFFS', offs0 + slices[g.j] * r0)
-      R.SetMediaItemTakeInfo_Value(gtk, 'D_PLAYRATE', rate)
+  if #want == 0 then return end
+  local nm = R.GetTakeNumStretchMarkers(tk)
+  if nm > 0 then R.DeleteTakeStretchMarkers(tk, 0, nm) end
+  R.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 1)                    -- растяжение без смены высоты
+  local all = { { o = 0, n = 0 } }
+  R.SetTakeStretchMarker(tk, -1, 0)
+  for _, w in ipairs(want) do R.SetTakeStretchMarker(tk, -1, w.o); all[#all + 1] = w end
+  R.SetTakeStretchMarker(tk, -1, len); all[#all + 1] = { o = len, n = len }
+  for _ = 1, 4 do                                                     -- REAPER держит маркер между соседями — несколько проходов
+    for i = 0, R.GetTakeNumStretchMarkers(tk) - 1 do
+      local _, p = R.GetTakeStretchMarker(tk, i)
+      local w = all[i + 1]
+      if w and math.abs(p - w.n) > 1e-6 then R.SetTakeStretchMarker(tk, i, w.n) end
     end
-    R.SetMediaItemInfo_Value(gi, 'D_POSITION', g.t)
-    fit(gi, gtk, g.j, g.t, te)
-    R.SetMediaItemInfo_Value(gi, 'B_MUTE', 0)
-    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_slice', tostring(g.j), true)
-    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_ghost', hguid, true)   -- 15 окт: GUID головы — dW удаляет всю группу
-    R.GetSetMediaItemInfo_String(gi, 'P_EXT:jf_bsync', '', true)       -- rate уже как у головы: не подгонять заново
-    E.set_iid(gi, root .. '#' .. g.j)
   end
+  R.UpdateItemInProject(head)
 end
 
 -- Выделение сэмпл-модуля [t0, t1) (секунды item) → item на track в строке
