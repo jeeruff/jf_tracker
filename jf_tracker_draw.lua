@@ -5024,6 +5024,7 @@ local function pn_buffered(x, y, w, h, fn)
   return res
 end
 
+D.PMN = {}
 function D.panes_frame(L, snap, state, info, hover, ph)
   L.pn_dsp = nil
   local PN, lay = D.panes, L.pn
@@ -5033,6 +5034,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   local rects = {}
   for _, c in ipairs(lay.cells) do
     local id = c.active_id
+    if id then D.PMN[id] = D.PMN[id] or ('pane: ' .. id); D.pmark(D.PMN[id]) end   -- 17 окт: jftop — время каждой панели отдельно
     if id == 'tracker' then
       rects.tracker = { c.x, c.y, c.w, c.h }
       D.pn_tracker_cell = c                        -- 11 окт: его номер в PANE рисуется поверх (D.pane_badge_tracker)
@@ -5197,6 +5199,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       end
     end
   end
+  D.pmark('panes: lines and grips')
   -- линии раздела и ручки: ручка под мышью — янтарём
   set(D.SEP)
   for _, sp in ipairs(lay.seps) do gfx.rect(sp.x, sp.y, sp.w, sp.h, 1) end

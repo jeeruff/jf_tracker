@@ -793,7 +793,18 @@ function M.invalidate() cache.key = nil; rcache.key = nil end
 
 -- ── строки вида ───────────────────────────────────────────────────────────
 -- Описания видимых строк: время, такт/доля. Считаем только для окна вида.
+-- 17 окт: кэш — строки меняются только от прокрутки, LPB, правки проекта (темп, размер); раньше ~2 вызова API
+-- на строку каждый кадр. Раз в секунду — заново (метроном мог смениться без счётчика)
+local rows_c = {}
 function M.rows(row0, n, lpb)
+  local sc, now = R.GetProjectStateChangeCount(0), R.time_precise()
+  local c = rows_c
+  if c.out and c.row0 == row0 and c.n == n and c.lpb == lpb and c.sc == sc and now - c.t < 1 then return c.out end
+  local out = M.rows_build(row0, n, lpb)
+  rows_c = { out = out, row0 = row0, n = n, lpb = lpb, sc = sc, t = now }
+  return out
+end
+function M.rows_build(row0, n, lpb)
   local out, pats = {}, {}
   for i = 1, n do
     local row = row0 + i - 1

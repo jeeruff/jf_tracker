@@ -45,14 +45,24 @@ end
 
 -- Довести текст до читаемости, сохранив оттенок: тянем к белому или чёрному
 -- в зависимости от того, тёмный фон или светлый.
+-- 17 окт: память по числовому ключу цветов (8 бит на канал) и цели: шапки зовут readable
+-- 8-12 раз на трек каждый кадр, а каждый вызов — до 11 расчётов контраста со степенями 2.4
+local RD, RDN = {}, 0
+local function ckey(c) return (math.floor(c[1] * 255 + 0.5) << 16) | (math.floor(c[2] * 255 + 0.5) << 8) | math.floor(c[3] * 255 + 0.5) end
 local function readable(fg, bg, target)
   target = target or 4.5
-  if contrast(fg, bg) >= target then return fg end
+  local k = ((ckey(fg) << 24) | ckey(bg)) * 128 + math.floor(target * 10 + 0.5)
+  local r = RD[k]
+  if r == true then return fg elseif r then return r end
+  if RDN > 4096 then RD, RDN = {}, 0 end
+  RDN = RDN + 1
+  if contrast(fg, bg) >= target then RD[k] = true; return fg end
   local goal = lum(bg) < 0.18 and {1, 1, 1} or {0, 0, 0}
   for t = 0.1, 1.0, 0.1 do
     local c = mix(fg, goal, t)
-    if contrast(c, bg) >= target then return c end
+    if contrast(c, bg) >= target then RD[k] = c; return c end
   end
+  RD[k] = goal
   return goal
 end
 

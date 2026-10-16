@@ -83,6 +83,8 @@ end
 -- раскладка для панели (как Vim undotree): строки новые сверху, у каждого узла колонка ветки;
 -- первый ребёнок продолжает колонку родителя, следующие — новые колонки справа
 function UT.layout(T)
+  -- 17 окт: кэш — дерево меняет только UT.add (seq растёт); раньше сортировка всех узлов шла каждый кадр
+  if T._lay and T._lay_seq == T.seq then return T._lay, T._lay_maxc end
   local ids = {}
   for id in pairs(T.nodes) do ids[#ids + 1] = id end
   table.sort(ids, function(a, b) return T.nodes[a].seq < T.nodes[b].seq end)
@@ -96,6 +98,7 @@ function UT.layout(T)
   end
   local rows = {}
   for i = #ids, 1, -1 do local id = ids[i]; rows[#rows + 1] = { id = id, col = col[id], node = T.nodes[id] } end
+  T._lay, T._lay_seq, T._lay_maxc = rows, T.seq, maxc
   return rows, maxc
 end
 

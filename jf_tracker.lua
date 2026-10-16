@@ -3339,6 +3339,7 @@ ctx = {
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
   quick_str = function()
     local q = state.quick
+    if q and q == ctx.qs_ok then return q end   -- 17 окт: уже переписана — миграции ниже не гонять (звалось ~4 раза за кадр)
     -- 7 окт: session и router — в начале средней колонки (и в своей раскладке)
     if q and not q:find('measure', 1, true) then   -- 7 окт: measure — в конец левой колонки
       local a, rest = q:match('^([^|]*)(|.*)$')
@@ -3368,6 +3369,7 @@ ctx = {
       q2 = q2:gsub(',,+', ','):gsub(',|', '|'):gsub('|,', '|'):gsub('^,', ''):gsub(',$', '')
       if q2 ~= q then q = q2; state.quick = q end
     end
+    ctx.qs_ok = q
     return q or ctx.QUICK_DEFAULT
   end,
   quick_has = function(key)
@@ -3417,6 +3419,24 @@ ctx = {
     return out
   end,
   jftop = function() ctrl_action('jftop', 0) end,                  -- :jftop (6 окт)
+  -- 17 окт: :shotpane <панель | window | x,y,w,h> [файл] — снимок панели в help/ (картинки справки; окно может быть не на экране:
+  -- пиксели берутся из буфера кадра)
+  shot_pane = function(arg)
+    local what, file = (arg or ''):match('^(%S+)%s*(.-)%s*$')
+    if not what then vim.msg = ':shotpane <panel | window | x,y,w,h> [file.png]'; return end
+    local r
+    local a, b, c, d = what:match('^(%d+),(%d+),(%d+),(%d+)$')
+    if a then r = { tonumber(a), tonumber(b), tonumber(c), tonumber(d) }
+    elseif what == 'window' then r = { 0, 0, gfx.w, gfx.h }
+    else
+      local cell = L and L.pn and L.pn.by_panel and L.pn.by_panel[what]
+      if cell and cell.x then r = { cell.x, cell.y, cell.w, cell.h } end
+    end
+    if not r then vim.msg = 'shotpane: no visible panel ' .. what .. ' (Ctrl+W g + letter shows it)'; return end
+    ctx.shot_rect = r
+    ctx.shot_path = file ~= '' and (DIR .. '/help/' .. file:gsub('[^%w%._%-]', '_')) or nil
+    ctx.shot_at = reaper.time_precise() + 0.35   -- 17 окт: через пару кадров — без строки команды в кадре
+  end,
   -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
   -- swing на транспорте открывает выпадашку, колесо ±1 %, :swing N | on | off
   swing_label = function()
@@ -4660,7 +4680,7 @@ ctx = {
     if not (c and c.oct == vim.octave and c.rn == keys.renoise and c.sh == sh and c.lay == keys.layout) then
       c = { oct = vim.octave, t = {}, rn = keys.renoise, sh = sh, lay = keys.layout }
       for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
-      if sh == 1 then c.t[0] = '1' end
+      if sh == 1 then c.t[0] = keys.frow() and '`' or '1' end   -- 17 окт: frow — весь сэмпл на `
       ctx.slk_cache = c
     end
     return c.t[k]
@@ -13648,7 +13668,12 @@ ctx.ut_state = function()
   elseif path ~= ST.path then ctx.UTM.set_path(ST, path) end
   return ST
 end
-ctx.ut_poll = function() local ST = ctx.ut_state(); ctx.UTM.poll(ST); return ST end
+ctx.ut_poll = function()
+  local ST = ctx.ut_state()
+  local now = reaper.time_precise()
+  if now - (ST.poll_t or 0) > 0.25 then ST.poll_t = now; ctx.UTM.poll(ST) end   -- 17 окт: опрос undo REAPER 4 раза в секунду, не каждый кадр
+  return ST
+end
 edit.ut_hook = function(label) ctx.UTM.hook(ctx.ut_state(), label) end   -- не poll: он добавил бы ту же правку второй раз
 edit.before_undo = function() ctx.UTM.before_undo(ctx.ut_state()) end
 edit.after_undo = function() if SL.active then SL.resync() end end   -- 15 окт: слайсер — нарезка с item после отката
@@ -13719,7 +13744,8 @@ ctx.ut_draw_big = function(Lx, x, y, w, h, foc, hv)
     U.set(cur and U.AMBER or bcol(r.col, reach))
     gfx.rect(cx(r.col) - d, cy(i) - d, 2 * d + 1, 2 * d + 1, (n.live or cur) and 1 or 0)
     local tcol = cur and U.AMBER or (reach and U.TEXT or U.DIM)
-    if (n.t or 0) > 0 then U.text(tx, ry, os.date('%H:%M:%S', n.t), U.GREY) end
+    if not n.tms then n.tms = (n.t or 0) > 0 and os.date('%H:%M:%S', n.t) or '' end
+    if n.tms ~= '' then U.text(tx, ry, n.tms, U.GREY) end
     local prev = rows[i + 1]
     local dt = prev and (n.t or 0) > 0 and (prev.node.t or 0) > 0 and (n.t - prev.node.t) or 0
     local ds = UTM.delta(dt)
@@ -13827,7 +13853,8 @@ ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
     U.set(col)
     gfx.rect(cx(r.col) - d, cy(i) - d, 2 * d + 1, 2 * d + 1, (n.live or cur) and 1 or 0)
     local lab = (n.label or ''):gsub('^jf_tracker: ', '')
-    local tm = (n.t or 0) > 0 and os.date('%H:%M:%S', n.t) or ''
+    if not n.tms then n.tms = (n.t or 0) > 0 and os.date('%H:%M:%S', n.t) or '' end   -- 17 окт: раз на узел, не каждый кадр
+    local tm = n.tms
     local tx = x + gw + Lx.pad
     local tw = U.measure(tm)
     local rw = w - sbw                                   -- 15 окт: место под полосу прокрутки
@@ -13889,13 +13916,27 @@ local function ac_cache(si)
   AC.cache[sec.id] = c
   return c
 end
-local function ac_fav() return ctx.ACM.set_decode(reaper.GetExtState(EXT, 'actfav')) end
-local function ac_recent() return ctx.ACM.list_decode(reaper.GetExtState(EXT, 'actrecent')) end
+-- 17 окт: избранное и недавние — из ExtState раз в секунду (и сразу после своей записи: AC.ext_t = 0), не 4 раза за кадр
+local function ac_ext()
+  local AC = ctx.AC
+  local now = reaper.time_precise()
+  if not AC.ext or now - (AC.ext_t or 0) > 1 then
+    local f, r = reaper.GetExtState(EXT, 'actfav'), reaper.GetExtState(EXT, 'actrecent')
+    if not AC.ext or AC.ext.f ~= f or AC.ext.r ~= r then AC.ext = { f = f, r = r, fav = ctx.ACM.set_decode(f), rec = ctx.ACM.list_decode(r) } end
+    AC.ext_t = now
+  end
+  return AC.ext
+end
+local function ac_fav() return ac_ext().fav end
+local function ac_recent() return ac_ext().rec end
 local function ac_groups(c)
-  local fav, rec = ac_fav(), ac_recent()
+  local ex = ac_ext()
+  if c.gex == ex and c.G then return c.G, ex.fav, ex.rec end   -- 17 окт: список групп — раз на смену списка / избранного
+  local fav, rec = ex.fav, ex.rec
   local nf = 0; for _ in pairs(fav) do nf = nf + 1 end
   local g = { { name = 'all', n = #c.list }, { name = 'favourites', n = nf }, { name = 'recent', n = #rec } }
   for _, x in ipairs(c.groups) do g[#g + 1] = x end
+  c.G, c.gex, c.gneed = g, ex, nil
   return g, fav, rec
 end
 -- вид — кэш по секции, группе, запросу и версиям избранного / недавних (10 000 строк не фильтровать каждый кадр)
@@ -13905,7 +13946,8 @@ local function ac_view()
   local G, fav, rec = ac_groups(c)
   AC.gi = math.max(1, math.min(#G, AC.gi))
   local g = G[AC.gi].name
-  local key = table.concat({ ac_sec().id, g, AC.query, reaper.GetExtState(EXT, 'actfav'), reaper.GetExtState(EXT, 'actrecent'), c.t }, '\1')
+  local ex = ac_ext()
+  local key = table.concat({ ac_sec().id, g, AC.query, ex.f, ex.r, c.t }, '\1')
   if AC.vkey ~= key then AC.vkey, AC.view = key, ctx.ACM.filter(c.list, AC.query, g, fav, rec) end
   return AC.view, G, fav
 end
@@ -13940,6 +13982,7 @@ ctx.act_run = function(it)
     reaper.MIDIEditor_LastFocused_OnCommand(it.id, sec.id == 32061)
   else vim.msg = 'actions: ' .. sec.label .. ' actions run from its own window (REAPER has no call for them)'; return end
   reaper.SetExtState(EXT, 'actrecent', table.concat(ctx.ACM.recent_push(ac_recent(), it.key, 30), ','), true)
+  ctx.AC.ext_t = 0
   model.invalidate()
   vim.msg = 'REAPER: ' .. it.label
 end
@@ -13980,7 +14023,16 @@ ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
   local by = fy + rh + 4
   local nv = math.max(1, math.floor((y + h - by) / rh))
   -- группы слева
-  local gw = math.max(cw * 10, math.min(math.floor(w * 0.26), cw * 22))
+  -- 17 окт: ширина групп — по самому длинному имени со счётчиком, не больше трети панели (узкая панель резала имена)
+  local c0 = ac_cache()
+  local mk = U.measure('W')
+  if not c0.gneed or c0.gneed_k ~= mk then
+    local gn = 0
+    for _, g in ipairs(G) do gn = math.max(gn, U.measure(g.name) + U.measure(tostring(g.n)) + 4 * pad) end
+    c0.gneed, c0.gneed_k = gn, mk
+  end
+  local gneed = c0.gneed
+  local gw = math.max(cw * 8, math.min(gneed, math.floor(w * 0.34)))
   local gcol = foc and AC.col == 'groups'
   AC.gscroll = math.max(0, math.min(AC.gscroll, #G - nv))
   if AC.gi <= AC.gscroll then AC.gscroll = AC.gi - 1 elseif AC.gi > AC.gscroll + nv then AC.gscroll = AC.gi - nv end
@@ -14023,7 +14075,9 @@ ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
     local sw = scs ~= '' and U.measure(scs) or 0
     local star = fav[it.key] and '* ' or ''
     local nx = lx + dotw
-    U.text(nx, ry, ctx.fit(star .. it.label, lx + lw - sbw - nx - (sw > 0 and (sw + 2 * pad) or pad)), i == AC.sel and U.AMBER or U.TEXT)
+    local lab = it.label
+    if AC.gi > 3 then lab = lab:gsub('^[^:]*:%s*', '') end   -- 17 окт: группа выбрана — её префикс («Item: ») не повторять
+    U.text(nx, ry, ctx.fit(star .. lab, lx + lw - sbw - nx - (sw > 0 and (sw + 2 * pad) or pad)), i == AC.sel and U.AMBER or U.TEXT)
     if sw > 0 then U.text(lx + lw - sbw - pad - sw, ry, scs, U.CYAN) end
     if hot and press then
       AC.down = true
@@ -14068,7 +14122,7 @@ ctx.act_key = function(c)
     vim.msg = 'actions: ' .. ac_sec().label
   elseif ch == 'f' and it then
     if fav[it.key] then fav[it.key] = nil else fav[it.key] = true end
-    reaper.SetExtState(EXT, 'actfav', ctx.ACM.set_encode(fav), true)
+    reaper.SetExtState(EXT, 'actfav', ctx.ACM.set_encode(fav), true); AC.ext_t = 0
     vim.msg = (fav[it.key] and 'favourite: ' or 'not a favourite: ') .. it.label
   elseif ch == 'y' and it then
     local id = it.named ~= '' and ('_' .. it.named) or tostring(it.id)
@@ -17735,7 +17789,7 @@ local function frame()
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
       local sh = (state.slice1 or keys.frow()) and 1 or 0   -- 16 окт: frow — 1 = слайс 1; 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
       for off, ch in pairs(keys.plabel) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
-      if sh == 1 then key_of[0] = '1' end
+      if sh == 1 then key_of[0] = keys.frow() and '`' or '1' end   -- 17 окт: frow — весь сэмпл на `
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
       for kk, t0 in ipairs(root.slices or {}) do
         local child = ctx.slice_child(col, root, kk)
@@ -17923,14 +17977,12 @@ local function frame()
   -- 16 окт: кадры без перерисовки (fps-буфер) — наложения ниже (призраки, рамки, меню, полупрозрачное)
   -- ложились поверх прошлых и копились: экран темнел. Чистый кадр — копией в 797; в пропущенном
   -- кадре буфер сперва восстанавливается из неё, наложения рисуются один раз
-  if gfx.dest == 1021 then
-    if idle_skip and ctx.clean_w == gfx.w and ctx.clean_h == gfx.h then
-      gfx.a = 1; gfx.mode = 0; gfx.blit(797, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
-    elseif not idle_skip then
-      local d0 = gfx.dest
-      if ctx.clean_w ~= gfx.w or ctx.clean_h ~= gfx.h then gfx.setimgdim(797, gfx.w, gfx.h); ctx.clean_w, ctx.clean_h = gfx.w, gfx.h end
-      gfx.dest = 797; gfx.a = 1; gfx.mode = 0; gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h); gfx.dest = d0
-    end
+  -- 17 окт: копия чистого кадра стоила ~2 мс (весь кадр retina каждый кадр). Теперь пропущенный кадр не рисует
+  -- наложения в буфер вовсе: они идут в пустышку 797 (1×1, всё отсекается), логика их (наведение, клики) работает,
+  -- а на экран идёт буфер прошлого полного кадра — с его наложениями, нарисованными один раз
+  if gfx.dest == 1021 and idle_skip then
+    if not ctx.dummy_img then gfx.setimgdim(797, 1, 1); ctx.dummy_img = true end
+    gfx.dest = 797
   end
   draw.pmark('post: hints, ghosts, popups')
   draw.pane_badge_tracker(L, state.pane_mode)
@@ -21353,12 +21405,15 @@ local function frame()
   -- (файл jf_tracker_shot.png в ресурсах REAPER + отчёт в журнал debug);
   -- прямоугольник линейки, без неё — всё окно. Пиксели — из готового кадра
   -- (gfx.getpixel), PNG — своим кодером (без внешних программ)
+  if ctx.shot_at and reaper.time_precise() >= ctx.shot_at then ctx.shot_at = nil; ctx.shot_req = 'pane' end
   if ctx.shot_req then
     local req = ctx.shot_req; ctx.shot_req = nil
     MX.PNG = MX.PNG or dofile(DIR .. '/jf_tracker_png.lua')
     local x, y, w, h = 0, 0, gfx.w, gfx.h
     local M = ctx.meas
-    if M and M.a and M.b then
+    local SR = ctx.shot_rect; ctx.shot_rect = nil   -- 17 окт: :shotpane — прямоугольник панели / заданный
+    if SR then x, y, w, h = SR[1], SR[2], SR[3], SR[4]; M = nil
+    elseif M and M.a and M.b then
       x, y = math.floor(math.min(M.a[1], M.b[1])), math.floor(math.min(M.a[2], M.b[2]))
       w, h = math.floor(math.abs(M.b[1] - M.a[1])) + 1, math.floor(math.abs(M.b[2] - M.a[2])) + 1
     end
@@ -21372,6 +21427,7 @@ local function frame()
       -- (час без нуля, перед AM — узкий неразрывный пробел U+202F) + _jftracker
       local hh = tonumber(os.date('%I'))
       local path = ('%s/Pictures/Screenshots/Screenshot %s at %d.%s\u{202F}%s_jftracker.png'):format(os.getenv('HOME') or '', os.date('%Y-%m-%d'), hh, os.date('%M.%S'), os.date('%p'))
+      if ctx.shot_path then path = ctx.shot_path; ctx.shot_path = nil end   -- 17 окт: :shotpane … file — в help/
       local fh = ok and io.open(path, 'wb')
       if fh then
         fh:write(MX.PNG.encode(w, h, rgb)); fh:close()
