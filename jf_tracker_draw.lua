@@ -7226,6 +7226,24 @@ function D.frame(L, snap, rows, state, info)
         end
         tw = tw - ptw - L.pad
       end
+      -- 16 окт: страницы модуля (pages) — вкладками перед пресетом; имя — что осталось (не меньше 6 знаков)
+      if f.pages and #f.pages > 1 then
+        local pw2 = 0
+        for _, pn in ipairs(f.pages) do pw2 = pw2 + ms(pn) + 2 * L.pad + 1 end
+        if tw - pw2 >= L.cw * 6 then
+          local tx2 = bx + L.pad + tw - pw2
+          for pi2, pn in ipairs(f.pages) do
+            local w2 = ms(pn) + 2 * L.pad
+            local on = pi2 == f.page
+            local hot = not drag and mx >= tx2 and mx < tx2 + w2 and my >= by + 1 and my < by + L.rh
+            set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx2, by + 1, w2, L.rh - 1, 1)
+            text(tx2 + L.pad, by + 1, pn, on and U.AMBER or (hot and U.TEXT or U.GREY))
+            if hot then hover.dspbtn = { fx = k, f = f, what = 'kpage', page = pi2 }; on_btn = true end
+            tx2 = tx2 + w2 + 1
+          end
+          tw = tw - pw2
+        end
+      end
       text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
       if tw > 0 then
         for _, b in ipairs(bxs) do

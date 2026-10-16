@@ -1150,6 +1150,7 @@ end
 -- M.fx_values(tr, fx, n) по запросу (кадр).
 M.DSP_MAXP = 8
 M.dspmods = nil      -- реестр кураторских модулей (jf_tracker_dspmods.lua), ставит main
+M.dsp_page = {}      -- 16 окт: страница модуля DSP с pages: имя модуля → номер
 M.DR = nil           -- 16 окт: jf_tracker_drumrack.lua (drumrs5k), ставит main; M.drum_favs — избранное слотов
 -- 16 окт: индексы параметров RS5K по имени (один раз — у всех экземпляров одинаковы, не зашиваем)
 local rs5k_pi
@@ -1455,7 +1456,18 @@ function build_one(tr, fx, out)
       out[#out + 1] = ue
     elseif lay then
       -- кураторский модуль: параметры по подстроке имени, в порядке реестра
+      -- 16 окт: страницы (pages — вкладки модуля: своё имя, группы, параметры); номер — M.dsp_page[имя]
+      local lay_pages, lay_page
+      if lay.pages then
+        lay_page = math.max(1, math.min(#lay.pages, M.dsp_page[lay.title or short] or 1))
+        local pg = lay.pages[lay_page]
+        lay_pages = {}
+        for k2, p2 in ipairs(lay.pages) do lay_pages[k2] = p2.name end
+        lay = setmetatable({ params = pg.params, groups = pg.groups, cols = pg.cols or lay.cols, rows = pg.rows or lay.rows }, { __index = lay })
+      end
       local names = {}
+      local np_all = np
+      np = lay.scan and math.min(np, lay.scan) or np          -- 16 окт: Surge — 2858 параметров, сцена A — в первых 700
       for pi = 0, np - 1 do local _, pn = A.GetParamName(tr, fx, pi, ''); names[pi] = (pn or ''):lower() end
       local wa, wb, e_xy_x, e_xy_y, e_view_p
       -- ReaEQ (7 окт): полосы по именам параметров, в порядке появления
@@ -1515,6 +1527,8 @@ function build_one(tr, fx, out)
       local e = { i = fx, name = renamed or lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
                   groups = lay.groups, rows = lay.rows,                -- 9 окт: колонка = группа с заголовком
                   heads = next(heads) and heads or nil, colw = lay.colw }   -- 13 окт: секции потоком, ширина колонки (знаков)
+      e.np = np_all
+      if lay_pages then e.pages, e.page = lay_pages, lay_page end   -- 16 окт: вкладки модуля
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему
       if lay.view then e.view, e.view_p = lay.view, e_view_p end
       -- XY-пэд (TG33 vector): индексы параметров X / Y

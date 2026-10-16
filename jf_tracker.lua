@@ -19130,6 +19130,8 @@ local function frame()
       elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
+      elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
+        model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end

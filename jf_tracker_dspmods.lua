@@ -12,6 +12,68 @@ local DM = {}
 
 DM.modules = {
   {
+    -- 16 окт: Surge XT (сцена A) — главное на первой странице, остальное вкладками (pages);
+    -- параметров 2858, ищем только в первых 700 (scan: глобальные + сцена A). Патчи — строка < пресет >
+    match = 'surge xt',
+    title = 'Surge XT',
+    cols = 4, rows = 6, scan = 700,
+    pages = {
+      { name = 'main', groups = { 'OSC 1', 'FILTER', 'AMP EG', 'OUT' }, params = {
+        { 'a osc 1 type', 'type' }, { 'a osc 1 pitch', 'pitch' }, { 'a osc 1 shape', 'shape' },
+        { 'a osc 1 unison detune', 'detune' }, { 'a osc 1 unison voices', 'voices' }, { 'a osc 1 volume', 'level' },
+        { 'a filter 1 type', 'type' }, { 'a filter 1 cutoff', 'cutoff' }, { 'a filter 1 resonance', 'reso' },
+        { 'a filter 1 feg mod amount', 'env amt' }, { 'a filter 1 keytrack', 'keytrk' }, { 'a waveshaper drive', 'drive' },
+        { 'a amp eg attack', 'attack', exact = true }, { 'a amp eg decay', 'decay', exact = true }, { 'a amp eg sustain', 'sustain' },
+        { 'a amp eg release', 'release', exact = true }, { 'a filter eg attack', 'f att', exact = true }, { 'a filter eg decay', 'f dec', exact = true },
+        { 'a volume', 'volume', exact = true }, { 'a pan', 'pan', exact = true }, { 'a portamento', 'glide' },
+        { 'a noise volume', 'noise' }, { 'a osc drift', 'drift' }, { 'global volume', 'master' },
+      } },
+      { name = 'osc', groups = { 'OSC 2', 'OSC 3', 'MIX', 'FM' }, params = {
+        { 'a osc 2 type', 'type' }, { 'a osc 2 octave', 'octave' }, { 'a osc 2 pitch', 'pitch' },
+        { 'a osc 2 shape', 'shape' }, { 'a osc 2 unison detune', 'detune' }, { 'a osc 2 sync', 'sync' },
+        { 'a osc 3 type', 'type' }, { 'a osc 3 octave', 'octave' }, { 'a osc 3 pitch', 'pitch' },
+        { 'a osc 3 shape', 'shape' }, { 'a osc 3 unison detune', 'detune' }, { 'a osc 3 sync', 'sync' },
+        { 'a osc 1 volume', 'osc 1' }, { 'a osc 2 volume', 'osc 2' }, { 'a osc 3 volume', 'osc 3' },
+        { 'a ring modulation 1x2 volume', 'ring 12' }, { 'a ring modulation 2x3 volume', 'ring 23' }, { 'a noise color', 'noise col' },
+        { 'a fm routing', 'routing' }, { 'a fm depth', 'depth' }, { 'a osc 1 octave', 'osc1 oct' },
+        { 'a osc 1 width 1', 'width 1' }, { 'a osc 1 width 2', 'width 2' }, { 'a osc 1 sub mix', 'sub mix' },
+      } },
+      { name = 'filter', groups = { 'FILTER 1', 'FILTER 2', 'FILTER EG', 'ROUTE' }, params = {
+        { 'a filter 1 type', 'type' }, { 'a filter 1 subtype', 'subtype' }, { 'a filter 1 cutoff', 'cutoff' },
+        { 'a filter 1 resonance', 'reso' }, { 'a filter 1 feg mod amount', 'env amt' }, { 'a filter 1 keytrack', 'keytrk' },
+        { 'a filter 2 type', 'type' }, { 'a filter 2 subtype', 'subtype' }, { 'a filter 2 cutoff', 'cutoff' },
+        { 'a filter 2 resonance', 'reso' }, { 'a filter 2 feg mod amount', 'env amt' }, { 'a filter 2 keytrack', 'keytrk' },
+        { 'a filter eg attack', 'attack', exact = true }, { 'a filter eg decay', 'decay', exact = true }, { 'a filter eg sustain', 'sustain' },
+        { 'a filter eg release', 'release', exact = true }, { 'a filter eg envelope mode', 'mode' }, { 'a highpass', 'highpass' },
+        { 'a filter balance', 'balance' }, { 'a feedback', 'feedback' }, { 'a waveshaper type', 'shaper' },
+        { 'a waveshaper drive', 'drive' }, { 'a pre-filter gain', 'pre gain' }, { 'a filter 2 offset mode', 'f2 offset' },
+      } },
+      { name = 'lfo', groups = { 'LFO 1', 'LFO 1 EG', 'LFO 2', 'LFO 2 EG' }, params = {
+        { 'a lfo 1 type', 'type' }, { 'a lfo 1 rate', 'rate' }, { 'a lfo 1 phase', 'phase' },
+        { 'a lfo 1 amplitude', 'amount' }, { 'a lfo 1 deform', 'deform' }, { 'a lfo 1 trigger mode', 'trigger' },
+        { 'a lfo 1 delay', 'delay' }, { 'a lfo 1 attack', 'attack' }, { 'a lfo 1 hold', 'hold' },
+        { 'a lfo 1 decay', 'decay' }, { 'a lfo 1 sustain', 'sustain' }, { 'a lfo 1 release', 'release' },
+        { 'a lfo 2 type', 'type' }, { 'a lfo 2 rate', 'rate' }, { 'a lfo 2 phase', 'phase' },
+        { 'a lfo 2 amplitude', 'amount' }, { 'a lfo 2 deform', 'deform' }, { 'a lfo 2 trigger mode', 'trigger' },
+        { 'a lfo 2 delay', 'delay' }, { 'a lfo 2 attack', 'attack' }, { 'a lfo 2 hold', 'hold' },
+        { 'a lfo 2 decay', 'decay' }, { 'a lfo 2 sustain', 'sustain' }, { 'a lfo 2 release', 'release' },
+      } },
+      { name = 'fx', groups = { 'FX A1', 'FX A2', 'SENDS', 'GLOBAL' }, params = {
+        { 'fx a1 fx type', 'type' }, { 'fx a1 param 1', 'p1', exact = true }, { 'fx a1 param 2', 'p2', exact = true },
+        { 'fx a1 param 3', 'p3', exact = true }, { 'fx a1 param 4', 'p4', exact = true }, { 'fx a1 param 5', 'p5', exact = true },
+        { 'fx a2 fx type', 'type' }, { 'fx a2 param 1', 'p1', exact = true }, { 'fx a2 param 2', 'p2', exact = true },
+        { 'fx a2 param 3', 'p3', exact = true }, { 'fx a2 param 4', 'p4', exact = true }, { 'fx a2 param 5', 'p5', exact = true },
+        { 'send fx 1 return', 'ret 1' }, { 'send fx 2 return', 'ret 2' }, { 'send fx 3 return', 'ret 3' },
+        { 'send fx 4 return', 'ret 4' }, { 'fx disable', 'fx off' }, { 'fx chain bypass', 'bypass' },
+        { 'global volume', 'master' }, { 'polyphony limit', 'poly' }, { 'scene mode', 'scenes' },
+        { 'active scene', 'scene' }, { 'split point', 'split' }, { 'a vca gain', 'vca' },
+      } },
+      { name = 'macro', groups = { 'MACROS' }, cols = 2, rows = 8, params = {
+        { 'm1:', 'M1' }, { 'm2:', 'M2' }, { 'm3:', 'M3' }, { 'm4:', 'M4' }, { 'm5:', 'M5' }, { 'm6:', 'M6' }, { 'm7:', 'M7' }, { 'm8:', 'M8' },
+      } },
+    },
+  },
+  {
     -- slixer (9 окт): пульт — колонка = группа (заголовок над ней), по 6
     -- строк; переключатели — словами (labels), не квадратиками
     -- первая колонка (9 окт, часть 2) — волна деки: срезы, выбранный —
