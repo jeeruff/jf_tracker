@@ -5662,7 +5662,50 @@ ctx = {
     local f = io.open(ctx.mac_file(), 'w'); if not f then vim.msg = 'macros: cannot write the file'; return end
     f:write(MX.MR.serialize(list)); f:close()
   end,
-  mac_rows = function() return MX.MR.rows(vim.regs, ctx.mac_saved()) end,
+  mac_rows = function() return MX.MR.rows(vim.regs, ctx.mac_saved(), nil, ctx.mac_shared()) end,
+  -- 16 окт: обмен — папка Data/jf_tracker_macros, файлы .jfm (читаются раз в 2 с, не каждый кадр)
+  mac_dir = function() return reaper.GetResourcePath() .. '/Data/jf_tracker_macros' end,
+  mac_shared = function()
+    local now = reaper.time_precise()
+    if ctx.mac_sh and now - ctx.mac_sh.t < 2 then return ctx.mac_sh.list end
+    local list, dir = {}, ctx.mac_dir()
+    local i = 0
+    while true do
+      local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
+      if fn:lower():match('%.jfm$') then
+        local f = io.open(dir .. '/' .. fn, 'r')
+        if f then local m = MX.MR.jfm_decode(f:read('*a')); f:close(); if m then m.file = fn; list[#list + 1] = m end end
+      end
+      i = i + 1
+    end
+    table.sort(list, function(a, b) return a.name < b.name end)
+    ctx.mac_sh = { t = now, list = list }
+    return list
+  end,
+  -- правка поля выбранного макроса строкой ввода (:macset поле текст); встроенный / чужой — сперва копией в свои
+  mac_set = function(arg)
+    local fld, txt = (arg or ''):match('^%s*(%a+)%s?(.*)$')
+    local r = ctx.mac_edit_row
+    if not (fld and r) then vim.msg = 'macset: pick a macro in the macros tab first'; return end
+    if r.kind == 'rec' and fld == 'body' then vim.regs['@' .. r.name] = MX.MR.decode(txt); vim.msg = '@' .. r.name .. ' changed'; return end
+    local list, hit = ctx.mac_saved(), nil
+    for _, m in ipairs(list) do if r.kind == 'saved' and m.name == r.name and m.body == r.body then hit = m end end
+    if not hit then
+      hit = { name = r.kind == 'rec' and ('macro ' .. r.name) or r.name, body = r.body, desc = r.desc }
+      list[#list + 1] = hit
+    end
+    if fld == 'body' then hit.body = txt ~= '' and txt or hit.body
+    elseif fld == 'name' then hit.name = txt ~= '' and txt or hit.name
+    elseif fld == 'desc' then hit.desc = txt ~= '' and txt or nil
+    elseif fld == 'key' then
+      local k = txt:match('^%s*(%l)%s*$')
+      for _, m in ipairs(list) do if m.key == k and m ~= hit then m.key = nil end end
+      hit.key = k
+    end
+    ctx.mac_write(list); ctx.mac_keys_load()
+    ctx.mac_edit_row = { kind = 'saved', name = hit.name, body = hit.body }
+    vim.msg = ('macro %s: %s set'):format(hit.name, fld)
+  end,
   -- меню \ q: записанные — своей буквой регистра, остальные — 1..9, A..Z
   mac_hydra = function()
     local items, used, pool = {}, {}, '123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -5783,6 +5826,38 @@ ctx = {
       end
     elseif a.kind == 'save' then
       vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'macsave ' .. r.name .. ' '
+    elseif a.kind == 'edit' or a.kind == 'name' or a.kind == 'desc' or a.kind == 'reg' then
+      -- 16 окт: поле — строкой ввода с нынешним значением
+      ctx.mac_edit_row = r
+      local fld = ({ edit = 'body', name = 'name', desc = 'desc', reg = 'key' })[a.kind]
+      local cur = ({ body = r.body, name = r.name, desc = r.desc, key = r.key })[fld] or ''
+      vim.open_prompt('macset ' .. fld .. ' ', cur)
+    elseif a.kind == 'share' then
+      local dir = ctx.mac_dir()
+      reaper.RecursiveCreateDirectory(dir, 0)
+      local fn = MX.MR.file_name(r.kind == 'rec' and ('macro_' .. r.name) or r.name)
+      local f = io.open(dir .. '/' .. fn, 'w')
+      if not f then vim.msg = 'share: cannot write ' .. fn; return end
+      f:write(MX.MR.jfm_encode({ name = r.kind == 'rec' and ('macro ' .. r.name) or r.name, body = r.body, desc = r.desc, key = r.key, by = r.by }))
+      f:close(); ctx.mac_sh = nil
+      vim.msg = 'shared: Data/jf_tracker_macros/' .. fn .. ' - send this file; others put it in the same folder'
+    elseif a.kind == 'import' then
+      if r.kind ~= 'shared' then vim.msg = 'import: pick a shared (.jfm) macro'; return end
+      local list = ctx.mac_saved()
+      for _, m in ipairs(list) do if m.key == r.key then r.key = nil end end   -- регистр занят своим — без регистра
+      list[#list + 1] = { name = r.name, body = r.body, desc = r.desc and (r.desc .. (r.by and (' (by ' .. r.by .. ')') or '')) or (r.by and ('by ' .. r.by)), key = r.key }
+      ctx.mac_write(list); ctx.mac_keys_load()
+      vim.msg = 'imported into saved: ' .. r.name
+    elseif a.kind == 'new' then
+      local list = ctx.mac_saved()
+      local nm, k = 'new', 1
+      local function taken(x) for _, m in ipairs(list) do if m.name == x then return true end end end
+      while taken(nm .. ' ' .. k) do k = k + 1 end
+      list[#list + 1] = { name = nm .. ' ' .. k, body = ':' }
+      ctx.mac_write(list)
+      ctx.mac_edit_row = { kind = 'saved', name = nm .. ' ' .. k, body = ':' }
+      vim.open_prompt('macset body ', ':')
+      vim.msg = 'new macro: type its body - :command, or vim keys (<13> Enter)'
     end
   end,
   -- 9 окт: Shift+M / Shift+S — mute / solo трека курсора (один undo)
@@ -18920,6 +18995,18 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
+    elseif hover.macros and (hover.macros.btn or hover.macros.i) then
+      -- 16 окт: вкладка macros — строка: выбрать (двойной — проиграть), кнопка редактора — её действие
+      local hm = hover.macros
+      state.focus = 'top'
+      if hm.btn then
+        local kind = hm.btn
+        ctx.mac_do({ kind = kind, row = hm.row })
+      else
+        MX.MR.sel = hm.i
+        if dbl and click.zone == 'macrow' then ctx.mac_do({ kind = 'play', row = hm.row }) end
+      end
+      click = { t = now2, zone = hm.btn and 'macbtn' or 'macrow' }
     elseif hover.dspkit then
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki

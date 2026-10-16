@@ -1136,6 +1136,7 @@ local function run_cmd(line)
   elseif cmd == 'dsp' then if arg:match('^%s*big') then ctx.dsp_big() else ctx.toggle_dsp() end
   elseif cmd == 'punch' then ctx.punch()
   elseif cmd == 'patternize' then if ctx.patternize_cmd then ctx.patternize_cmd(arg) end   -- 12 окт: = меню матрицы
+  elseif cmd == 'macset' then if ctx.mac_set then ctx.mac_set(arg) end   -- 16 окт: поле макроса из редактора вкладки macros
   elseif cmd == 'drumstr' then if ctx.drumstr_cmd then ctx.drumstr_cmd(arg) end   -- 16 окт: drumrs5k — запечь растяжку пэда: rate semitones
   elseif cmd == 'codes' then if ctx.codes_cmd then ctx.codes_cmd(arg) end   -- 12 окт: конвертер кодов паттернов (= меню матрицы c h d)
   elseif cmd == 'shiftrec' then if ctx.shift_rec then ctx.shift_rec() end   -- 12 окт: = кнопка shift под rec
