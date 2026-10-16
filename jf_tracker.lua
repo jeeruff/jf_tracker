@@ -5416,6 +5416,26 @@ ctx = {
     items[#items + 1] = { '/', 'by name - type to filter, Enter plays' }
     return { title = '@ - play a macro', items = items }
   end,
+  -- 16 окт: @ — панель макросов у курсора (смарт-панель): клавиша макроса — сразу проиграть (как @a / @1),
+  -- @ ещё раз — последний, h j k l + Enter, мышь; счётчик — повторы (3@ … — три раза)
+  mac_panel = function(n)
+    n = math.max(1, n or 1)
+    local items = {}
+    for _, it in ipairs(ctx.mac_hydra().items) do
+      if it.fn then
+        local nm = it.label:match('^@%l%s%s(.*)$') or it.label:match('^(.-)%s%s') or it.label
+        local desc = it.label:match('^.-%s%s(.*)$') or ''
+        items[#items + 1] = { label = it.key .. '  ' .. ctx.fit(nm, L.cw * 16), t = it.key:upper(), tip = it.label, fn = it.fn }   -- набор панели — в верхнем регистре
+      end
+    end
+    if #items == 0 then vim.msg = 'no macros yet - q + letter records one'; return end
+    local function play(fn) for _ = 1, n do fn() end; ctx.macstrip_c = nil end
+    local last = vim.last_macro
+    if last then table.insert(items, 1, { label = '@  ' .. last .. ' (last)', t = '@', tip = 'the last macro again (@@)', fn = function() ctx.mac_run('@' .. last) end }) end
+    ctx.smart_open({ title = ('@ - macros%s (key plays, Enter, Esc)'):format(n > 1 and (' x' .. n) or ''), items = items, cols = math.min(4, #items), sel = 1,
+      on_key = function(c) if c == ('@'):byte() and last then MX.SMART.close(); play(function() ctx.mac_run('@' .. last) end); return true end end,
+      on_pick = function(it) if it.fn then play(it.fn) end end })
+  end,
   mac_by_key = function(ch)
     if ch == '/' then
       local items = {}

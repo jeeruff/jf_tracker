@@ -91,6 +91,7 @@ function SM.key(c)
 end
 function SM.key_in(c, p, n, cols)
   local ch = c > 0 and c < 256 and string.char(c) or ''
+  if p.on_key and p.on_key(c) then return true end   -- 16 окт: своя клавиша вызывающего (макросы: @@ — последний)
   -- 12 окт: печатный символ, который продолжает значение, — набор (сильнее навигации: 9E, C#4, 0U)
   if ch:match('^[%w#]$') and type_char(p, ch) then return true end
   if c == 8 then                                -- Backspace — символ набора назад

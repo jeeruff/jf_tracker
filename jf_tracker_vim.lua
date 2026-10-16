@@ -2195,6 +2195,8 @@ function V.key_impl(c)
       if (rn and (c == 123 or c == 125)) or (not rn and (c == 99 or c == 67)) then
         V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
       end
+      -- 16 окт: @ — макросы и при клавиатуре в NORMAL (Shift+2 было прослушиванием ноты — @ не работал)
+      if c == 64 and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
       if ctx.piano and ctx.piano[base] then
@@ -2584,6 +2586,7 @@ function V.key_impl(c)
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
+  elseif ch == '@' and ctx.mac_panel then ctx.mac_panel(n); V.count = nil; return   -- 16 окт: @ — большая панель макросов у курсора
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
     if V.macro then
