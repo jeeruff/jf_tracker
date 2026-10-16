@@ -3628,7 +3628,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   D.strip_cols = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  set(D.SEP); gfx.rect(x, y, w, 1, 1)
+  if L.tppos ~= 'tracker' then set(D.SEP); gfx.rect(x, y, w, 1, 1) end   -- 16 окт: под трекером линию даёт его низ — была двойная
   local ly = y + 3
   local x_all, w_all = x, w
   -- 16 окт: модлайна нет — слово режима снова в полосе, слева (ширина постоянная: по самому широкому
@@ -4042,11 +4042,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         or ({ 'note', 'vol', 'delay' })[vc.field or 1] or ('fx ' .. ((vc.field or 1) - 3))
       local l1 = (f.col.name ~= '' and f.col.name) or 'track'
       local l2 = ('%04d'):format(math.max(0, vc.row or 0))
-      local lw = math.max(ms(fit(l1, 14 * L.cw)), ms('col ') + ms(fname), ms('row ') + ms(l2), 10 * L.cw)
+      local cl = ms('col') + L.pad          -- пробел в битмапе — нулевой ширины: отступ L.pad
+      local lw = math.max(ms(fit(l1, 14 * L.cw)), cl + ms(fname), cl + ms(l2), 10 * L.cw)
       order[#order + 1] = { w = lw, draw = function(gx)
         text(gx, ly, fit(l1, lw), U.TEXT)
-        text(gx, ly + L.rh, 'col', U.GREY); text(gx + ms('col '), ly + L.rh, fit(fname, lw - ms('col ')), U.TEXT)
-        if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + ms('row '), ly + 2 * L.rh, l2, U.TEXT) end
+        text(gx, ly + L.rh, 'col', U.GREY); text(gx + cl, ly + L.rh, fit(fname, lw - cl), U.TEXT)
+        if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + cl, ly + 2 * L.rh, l2, U.TEXT) end
       end }
     end
   end
