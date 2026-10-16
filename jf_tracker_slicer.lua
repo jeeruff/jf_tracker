@@ -1383,7 +1383,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local lab = side == 'a' and ('< %.2fs'):format(secs) or ('%.2fs >'):format(secs)
       local tw = U.measure(lab) + 2 * L.pad
       local bx = side == 'a' and (x + 8) or (x + w - tw - 8)
-      local by = wy + wh - rh - 6
+      local by = wy + math.floor((wh - rh) / 2)   -- 16 окт: посередине волны по высоте (внизу налезала на подписи нот)
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + tw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
       if hot then S.more_hot = side end
       -- край волны штрихами: там продолжается файл
