@@ -17295,6 +17295,25 @@ local function frame()
   end
   -- which-key (7 окт, быстрая опция whichkey): ждём вторую клавишу — у курсора
   -- (там, куда уже смотрят глаза) список того, что можно нажать дальше
+  -- 16 окт: PANE s / v / T + буква — рамкой, куда встанет панель: s — нижняя половина текущей,
+  -- v — правая, T — вся (вкладкой в её стек)
+  if state.pane_mode and L and L.pn and (ctx.pn_pend == 's' or ctx.pn_pend == 'v' or ctx.pn_pend == 'T') then
+    local cell = L.pn.by_panel and L.pn.by_panel[ctx.pane_cur()]
+    if cell and cell.x then
+      local x, y, w, h = cell.x, cell.y, cell.w, cell.h
+      if ctx.pn_pend == 's' then y, h = y + math.floor(h / 2), h - math.floor(h / 2)
+      elseif ctx.pn_pend == 'v' then x, w = x + math.floor(w / 2), w - math.floor(w / 2) end
+      U.set(U.CYAN, 0.18); gfx.rect(x, y, w, h, 1); gfx.a = 1
+      U.set(U.CYAN); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
+      local lbl = ({ s = 'new panel below - its letter', v = 'new panel on the right - its letter', T = 'a tab in this stack - its letter' })[ctx.pn_pend]
+      local tw = U.measure(lbl)
+      if tw + 4 * L.pad < w and h > 2 * L.rh then
+        local lx, ly = x + math.floor((w - tw) / 2), y + math.floor((h - L.rh) / 2)
+        U.set(U.BG); gfx.rect(lx - L.pad, ly - 1, tw + 2 * L.pad, L.rh + 2, 1)
+        U.text(lx, ly, lbl, U.CYAN)
+      end
+    end
+  end
   local pop = vim.popup()
   if not pop and (state.whichkey or state.pane_mode) then
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
