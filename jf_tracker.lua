@@ -13158,6 +13158,127 @@ ctx.clip_preview = function(Lx, x, y, w, h, reg)
     ry = ry + Lx.rh
   end
 end
+-- 16 окт: аудио буфера — файл и кусок первой аудио-ячейки (из её чанка: FILE, SOFFS, LENGTH, PLAYRATE)
+ctx.clip_audio = function(reg)
+  if not reg or reg.kind == 'env' then return nil end
+  if reg._aud ~= nil then return reg._aud or nil end
+  for _, c in ipairs(reg.cells or {}) do
+    if c.chunk then
+      local path = c.chunk:match('FILE "([^"]+)"')
+      local soffs = tonumber(c.chunk:match('\nSOFFS ([%d%.%-e]+)') or '') or 0
+      local len = tonumber(c.chunk:match('\nLENGTH ([%d%.e]+)') or '') or c.len or 0
+      local rate = tonumber(c.chunk:match('PLAYRATE ([%d%.e]+)') or '') or 1
+      if path and not path:match('^/') and not path:match('^%a:') then   -- относительный — от папки проекта
+        local _, rp = reaper.EnumProjects(-1)
+        local dir = rp and rp:match('^(.*)[/\\]')
+        if dir then path = dir .. '/' .. path end
+      end
+      if path then
+        model.file_peaks(path, 4)
+        local flen = model.file_len(path) or 0
+        if flen > 0 then
+          reg._aud = { path = path, a = math.max(0, soffs / flen), b = math.min(1, (soffs + len * rate) / flen), name = c.name or path:match('[^/]+$') }
+          return reg._aud
+        end
+      end
+    end
+  end
+  reg._aud = false
+  return nil
+end
+-- волна буфера строкой (вид как у lib: пики, или спектр — цвет по частоте)
+ctx.clip_wave = function(reg, x, y, w, h)
+  local au = ctx.clip_audio(reg)
+  if not au or w < 8 or h < 3 then return end
+  local spec = state.cbwave == 'spec'
+  local pk = model.file_peaks(au.path, w, au.a, au.b, spec)
+  local cy, hh = y + h / 2, h / 2 - 1
+  local wc = U.readable(U.mix(U.CYAN, U.TEXT, 0.35), U.PANEL, 3.0)
+  U.set(wc)
+  if pk and pk.n and pk.n > 0 then
+    for px = 0, w - 1 do
+      local idx = math.floor(px / w * pk.n) + 1
+      local lo, hi = pk.min[idx] or 0, pk.max[idx] or 0
+      if spec and pk.spec then U.set(draw.spec_colour(pk.spec[idx])) end
+      gfx.line(x + px, cy - math.min(1, hi) * hh, x + px, cy - math.max(-1, lo) * hh)
+    end
+  else gfx.line(x, cy, x + w, cy) end
+end
+-- буфер — временными items на временном треке (позиции — строки буфера от 0); → трек, items
+ctx.clip_temp = function(reg, name)
+  local n = reaper.CountTracks(0)
+  reaper.InsertTrackAtIndex(n, false)
+  local tr = reaper.GetTrack(0, n)
+  reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', name or 'jf clipboard', true)
+  local items = {}
+  for _, c in ipairs(reg.cells or {}) do
+    if c.chunk then
+      local it = reaper.AddMediaItemToTrack(tr)
+      reaper.SetItemStateChunk(it, c.chunk, false)
+      reaper.SetMediaItemInfo_Value(it, 'D_POSITION', edit.row_time(c.drow or 0, state.lpb, 0) - edit.row_time(0, state.lpb, 0) + 3600)
+      items[#items + 1] = it
+    end
+  end
+  return tr, items
+end
+-- склеить items в один файл (Glue); → путь файла, item
+ctx.clip_glue = function(items)
+  reaper.SelectAllMediaItems(0, false)
+  for _, it in ipairs(items) do reaper.SetMediaItemSelected(it, true) end
+  reaper.Main_OnCommand(41588, 0)
+  local g = reaper.GetSelectedMediaItem(0, 0)
+  local tk = g and reaper.GetActiveTake(g)
+  local path = tk and reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '')
+  return path ~= '' and path or nil, g
+end
+-- действия буфера: listen / file / drum / edit / pm
+ctx.clip_act = function(what)
+  local e = ctx.CB.hist[ctx.CB.sel]
+  local reg = e and e.reg
+  if not reg then vim.msg = 'clipboard: nothing picked'; return end
+  local au = ctx.clip_audio(reg)
+  if what == 'listen' then
+    if not au then vim.msg = 'clipboard: listen - audio buffers only'; return end
+    ctx.preview_from(au.path, au.a); vim.msg = 'listen: ' .. (au.name or ''); return
+  end
+  if not au then vim.msg = 'clipboard: ' .. what .. ' - audio buffers only (MIDI: paste it, then glue)'; return end
+  local sel = {}
+  for i = 0, reaper.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = reaper.GetSelectedMediaItem(0, i) end
+  local out, keep_tr
+  edit.run('clipboard ' .. what, function()
+    local tr, items = ctx.clip_temp(reg, what == 'edit' and 'jf clipboard edit' or 'jf clipboard')
+    if what == 'pm' then
+      reaper.SelectAllMediaItems(0, false)
+      for _, it in ipairs(items) do reaper.SetMediaItemSelected(it, true) end
+      reaper.Main_OnCommand(41996, 0)                               -- Item: Move items to new subproject
+      local it = reaper.GetTrackMediaItem(tr, 0)
+      local tk = it and reaper.GetActiveTake(it)
+      out = tk and reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '')
+    else
+      local path, g = ctx.clip_glue(items)
+      out = path
+      if what == 'edit' and g then
+        reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1)
+        reaper.Main_OnCommand(40109, 0)                               -- Item: Open items in primary external editor
+        keep_tr = true
+      end
+    end
+    if not keep_tr then reaper.DeleteTrack(tr) end
+    reaper.SelectAllMediaItems(0, false)
+    for _, x in ipairs(sel) do if reaper.ValidatePtr(x, 'MediaItem*') then reaper.SetMediaItemSelected(x, true) end end
+  end)
+  model.invalidate()
+  if not out or out == '' then vim.msg = 'clipboard ' .. what .. ': failed'; return end
+  local fn = out:match('[^/]+$') or out
+  if what == 'file' then vim.msg = 'saved as a file: ' .. fn .. ' (the project media folder) - the browser finds it'
+  elseif what == 'drum' then ctx.drum_add_files({ out })
+  elseif what == 'edit' then vim.msg = 'external editor: ' .. fn .. ' - on the muted track «jf clipboard edit» (REAPER takes the edits back there)'
+  elseif what == 'pm' then
+    state.pm_target = out
+    vim.open_prompt('pmtag ', '')
+    vim.msg = 'subproject ' .. fn .. ' - type its tags (space between), Enter'
+  end
+end
 -- 16 окт: π (Opt+P) — умная вставка: буферы панелью у курсора, цифра / щелчок — вставить, π ещё раз — последний
 ctx.clip_panel = function()
   local CB = ctx.CB
@@ -13176,11 +13297,30 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
   local CB = ctx.CB
   U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
   if #CB.hist == 0 then U.text(x, y, ctx.fit('clipboard: yank something (yy, y + motion) - it shows here', w), U.GREY); return end
-  -- 16 окт: широко (zz) — справа содержимое выбранного буфера
+  local mx0, my0 = gfx.mouse_x, gfx.mouse_y
+  -- 16 окт: широко (zz) — справа: кнопки действий, крупная волна выбранного и его строки
   if w >= Lx.cw * 60 then
     local lw = math.floor(w * 0.38)
     U.set(U.LINE); gfx.rect(x + lw + Lx.pad, y, 1, h, 1)
-    ctx.clip_preview(Lx, x + lw + 2 * Lx.pad, y, w - lw - 2 * Lx.pad, h, CB.hist[CB.sel] and CB.hist[CB.sel].reg)
+    local px, pw = x + lw + 2 * Lx.pad, w - lw - 2 * Lx.pad
+    local bx = px
+    ctx.cb_hot = nil
+    for _, b in ipairs({ { 'listen', 'listen', 'Space' }, { state.cbwave == 'spec' and 'spec' or 'peaks', 'wave', 'w' }, { 'file', 'file', 's' },
+                         { 'drumrs5k', 'drum', 'a' }, { 'editor', 'edit', 'e' }, { 'pm', 'pm', 'm' } }) do
+      local bw = U.measure(b[1]) + 2 * Lx.pad
+      if bx + bw > px + pw then break end
+      local hot = mx0 >= bx and mx0 < bx + bw and my0 >= y and my0 < y + Lx.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
+      U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
+      U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or U.TEXT)
+      if hot then ctx.cb_hot = b end
+      bx = bx + bw + 2
+    end
+    local sreg = CB.hist[CB.sel] and CB.hist[CB.sel].reg
+    local wh = math.min(6 * Lx.rh, math.floor(h / 3))
+    U.set(U.PANEL); gfx.rect(px, y + Lx.rh + 2, pw, wh, 1)
+    ctx.clip_wave(sreg, px, y + Lx.rh + 2, pw, wh)
+    ctx.clip_preview(Lx, px, y + Lx.rh + wh + 6, pw, h - Lx.rh - wh - 6, sreg)
     w = lw
   end
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -13193,11 +13333,20 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + Lx.rh
     local cur = e.reg == vim.regs['"']
     if i == CB.sel or hot then U.set(U.tint(U.AMBER, (i == CB.sel and foc) and 0.3 or 0.15)); gfx.rect(x, ry, w, Lx.rh, 1) end
-    U.text(x, ry, ctx.fit(('%s %s  %s'):format(cur and '>' or ' ', e.t, ctx.clip_label(e.reg)), w), cur and U.AMBER or U.TEXT)
-    if hot and gfx.mouse_cap & 1 == 1 and not ctx.cb_down then
+    -- 16 окт: справа в строке — волна буфера (как превью lib)
+    local ww = ctx.clip_audio(e.reg) and math.floor(w * 0.35) or 0
+    U.text(x, ry, ctx.fit(('%s %s  %s'):format(cur and '>' or ' ', e.t, ctx.clip_label(e.reg)), w - ww - Lx.pad), cur and U.AMBER or U.TEXT)
+    if ww > 8 then ctx.clip_wave(e.reg, x + w - ww, ry + 1, ww, Lx.rh - 2) end
+    if hot and gfx.mouse_cap & 1 == 1 and not ctx.cb_down and not ctx.cb_hot then
       ctx.cb_down = true; CB.sel = i; vim.regs['"'] = e.reg; CB.last = e.reg; ctx.set_focus('clipboard')
       vim.msg = 'clipboard: register ' .. ctx.clip_label(e.reg) .. ' - p in the tracker pastes it'
     end
+  end
+  -- кнопки действий (зум): щелчок
+  if ctx.cb_hot and gfx.mouse_cap & 1 == 1 and not ctx.cb_down then
+    ctx.cb_down = true
+    local what = ctx.cb_hot[2]
+    if what == 'wave' then state.cbwave = state.cbwave == 'spec' and 'peaks' or 'spec' else ctx.clip_act(what) end
   end
   if gfx.mouse_cap & 1 == 0 then ctx.cb_down = nil end
 end
@@ -21643,6 +21792,12 @@ local function frame()
           vim.regs['"'] = CB.hist[CB.sel].reg; CB.last = vim.regs['"']
           if ch == 'p' or ch == 'P' then ctx.set_focus('tracker'); vim.key(c) else vim.msg = 'clipboard: register ' .. ctx.clip_label(CB.hist[CB.sel].reg) .. ' - p in the tracker pastes it' end
         elseif (ch == 'd' or ch == 'x') and CB.hist[CB.sel] then table.remove(CB.hist, CB.sel); CB.sel = math.max(1, math.min(#CB.hist, CB.sel))
+        elseif ch == ' ' then ctx.clip_act('listen')   -- 16 окт: действия буфера
+        elseif ch == 'w' then state.cbwave = state.cbwave == 'spec' and 'peaks' or 'spec'; vim.msg = 'clipboard wave: ' .. state.cbwave
+        elseif ch == 's' then ctx.clip_act('file')
+        elseif ch == 'a' then ctx.clip_act('drum')
+        elseif ch == 'e' then ctx.clip_act('edit')
+        elseif ch == 'm' then ctx.clip_act('pm')
         elseif ch == 'z' then   -- 16 окт: zz — клипборд на всё окно (справа — содержимое буфера)
           if ctx.cb_z then ctx.cb_z = nil; ctx.zz_zoom() else ctx.cb_z = true end
         else ctx.cb_z = nil; return vim.key(c) end
