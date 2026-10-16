@@ -273,6 +273,18 @@ KH.PAGES = {
     { k = 'zz', d = 'the whole window: every branch in its own colour, the time of each step and the gap since the one before (+5m - amber: a pause), a timeline below - each step a mark on the lane of its branch; click a mark - select, double click - go; zz - back' },
     { k = 'file', d = 'the tree lives next to the project: Name.jf-undo (only appended); an unsaved project keeps it in memory until the first save' },
   } },
+  actions = { title = 'actions - the REAPER actions, wider than its Actions window (Ctrl+W g A)', e = {
+    { k = 'j k  g G  C-d C-u', d = 'move; h l - the groups on the left / the list (as lf)' },
+    { k = '/', d = 'find: letters in order, words in any order (pnc finds Pan Centre); whole words and word starts go first; Esc clears' },
+    { k = 'Enter / dblclick', d = 'run the action (main; the MIDI editor sections - in the last MIDI editor); it goes to recent (shared with \\ a)' },
+    { k = '[ ]', d = 'section: main, midi editor, event list, inline midi, media explorer (also the tabs on top)' },
+    { k = 'groups', d = 'all, favourites, recent, then by the word before the colon (Script, Item, Track, SWS ...) - the biggest first' },
+    { k = 'f', d = 'favourite on / off (* before the name)' },
+    { k = 'a  x', d = 'add a shortcut (the REAPER dialog) / remove the first one (asks)' },
+    { k = 'y', d = 'copy the command id (_RS... for scripts - survives a restart; a number for native ones)' },
+    { k = 'the row', d = 'green square - a toggle that is on, hollow - off; the shortcuts of REAPER on the right in cyan' },
+    { k = 'r', d = 'reload the list (after installing scripts)' },
+  } },
   clipboard = { title = 'clipboard: the history of yanks (the newest on top)', e = {
     { k = 'j k  g G', d = 'move' },
     { k = 'Enter', d = 'make it the register - p in the tracker pastes it (click too)' },
@@ -644,6 +656,7 @@ KH.BARS = {
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
              { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'help' } },
+  actions = { { 'j k', 'move' }, { 'h l', 'groups / list' }, { '/', 'find' }, { 'Enter', 'run' }, { '[ ]', 'section' }, { 'f', 'favourite' }, { 'a x', 'shortcut' }, { 'y', 'copy id' }, { 'Esc', 'tracker' } },
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
@@ -683,7 +696,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'sample', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'retro', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

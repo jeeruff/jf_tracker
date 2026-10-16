@@ -2261,7 +2261,7 @@ ctx = {
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' or f == 'undotree' then return f
+    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' or f == 'undotree' or f == 'actions' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
@@ -10113,6 +10113,7 @@ ctx = {
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
     elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0
     elseif key == 'undotree' then return (ctx.ut_state().scroll or 0)   -- 15 окт
+    elseif key == 'actions' then return ctx.AC.scroll or 0   -- 16 окт
     elseif key == 'fxb' then return FB.scroll or 0 elseif key == 'macros' then return MX.MR.scroll or 0 elseif key == 'notes' then return NT.scroll or 0 elseif key == 'keyhelp' then return KH.scroll or 0 end
     return 0
   end,
@@ -10125,6 +10126,7 @@ ctx = {
     elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
     elseif key == 'fxb' then FB.scroll = v; FB.cur = math.max(v + 1, math.min(v + (r and r.nvis or 1), FB.cur))
     elseif key == 'keyhelp' then KH.scroll = v
+    elseif key == 'actions' then local AC = ctx.AC; AC.scroll = v; local nv = r and r.nvis or 1; AC.sel = math.max(v + 1, math.min(v + nv, AC.sel))   -- 16 окт
     elseif key == 'undotree' then   -- 15 окт: дерево undo держит прокрутку за выделенным — выделение в видимое
       local ST = ctx.ut_state(); ST.scroll = v
       local rows = ctx.UTM.layout(ST.T)
@@ -13858,6 +13860,248 @@ ctx.ut_key = function(c)
   if n then vim.msg = ('%s%s'):format((n.label or ''):gsub('^jf_tracker: ', ''), (n.live and '') or (n.snap and '  (another branch - Enter restores its snapshot)' or '  (another branch, no snapshot)')) end
   return true
 end
+do   -- 16 окт: свои local — в блоке (предел 200 local главного чанка)
+-- 16 окт: панель actions (A в PANE, Ctrl+W g A) — расширенный список действий REAPER: секции,
+-- группы по префиксу (слева, как lf), тогл-состояние, шорткаты, избранное и недавние (общие с \ a)
+ctx.ACM = dofile(DIR .. '/jf_tracker_actions.lua')
+ctx.AC = { sec = 1, gi = 1, sel = 1, scroll = 0, gscroll = 0, col = 'list', query = '', typing = false, cache = {}, sc = {}, tg = {}, tg_t = 0 }
+local function ac_sec() return ctx.ACM.SECTIONS[ctx.AC.sec] or ctx.ACM.SECTIONS[1] end
+local function ac_cache(si)
+  local AC, sec = ctx.AC, ctx.ACM.SECTIONS[si or ctx.AC.sec]
+  local c = AC.cache[sec.id]
+  if c and reaper.time_precise() - c.t < 300 then return c end
+  local list = {}
+  local sp = reaper.SectionFromUniqueID and reaper.SectionFromUniqueID(sec.id)
+  if sp and reaper.kbd_enumerateActions then
+    local i = 0
+    while i < 200000 do
+      local id, name = reaper.kbd_enumerateActions(sp, i)
+      if not id or id <= 0 then break end
+      if name and name ~= '' then
+        local nm = reaper.ReverseNamedCommandLookup and reaper.ReverseNamedCommandLookup(id) or ''
+        list[#list + 1] = { label = name, id = id, named = nm or '', key = ctx.ACM.key_of(id, nm) }
+      end
+      i = i + 1
+    end
+  end
+  table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
+  c = { list = list, t = reaper.time_precise(), groups = ctx.ACM.groups(list) }
+  AC.cache[sec.id] = c
+  return c
+end
+local function ac_fav() return ctx.ACM.set_decode(reaper.GetExtState(EXT, 'actfav')) end
+local function ac_recent() return ctx.ACM.list_decode(reaper.GetExtState(EXT, 'actrecent')) end
+local function ac_groups(c)
+  local fav, rec = ac_fav(), ac_recent()
+  local nf = 0; for _ in pairs(fav) do nf = nf + 1 end
+  local g = { { name = 'all', n = #c.list }, { name = 'favourites', n = nf }, { name = 'recent', n = #rec } }
+  for _, x in ipairs(c.groups) do g[#g + 1] = x end
+  return g, fav, rec
+end
+-- вид — кэш по секции, группе, запросу и версиям избранного / недавних (10 000 строк не фильтровать каждый кадр)
+local function ac_view()
+  local AC = ctx.AC
+  local c = ac_cache()
+  local G, fav, rec = ac_groups(c)
+  AC.gi = math.max(1, math.min(#G, AC.gi))
+  local g = G[AC.gi].name
+  local key = table.concat({ ac_sec().id, g, AC.query, reaper.GetExtState(EXT, 'actfav'), reaper.GetExtState(EXT, 'actrecent'), c.t }, '\1')
+  if AC.vkey ~= key then AC.vkey, AC.view = key, ctx.ACM.filter(c.list, AC.query, g, fav, rec) end
+  return AC.view, G, fav
+end
+local function ac_shortcuts(id)
+  local AC, sec = ctx.AC, ac_sec()
+  local k = sec.id .. ':' .. id
+  if AC.sc[k] == nil then
+    local t = {}
+    if reaper.CountActionShortcuts then
+      for i = 0, reaper.CountActionShortcuts(sec.id, id) - 1 do
+        local ok, d = reaper.GetActionShortcutDesc(sec.id, id, i, '')
+        if ok and d and d ~= '' then t[#t + 1] = d end
+      end
+    end
+    AC.sc[k] = table.concat(t, '  ')
+  end
+  return AC.sc[k]
+end
+local function ac_toggle(id)
+  local AC = ctx.AC
+  local now = reaper.time_precise()
+  if now - AC.tg_t > 0.25 then AC.tg, AC.tg_t = {}, now end   -- 4 раза в секунду, не каждый кадр
+  if AC.tg[id] == nil then AC.tg[id] = reaper.GetToggleCommandStateEx(ac_sec().id, id) end
+  return AC.tg[id]
+end
+ctx.act_run = function(it)
+  if not it then return end
+  local sec = ac_sec()
+  if sec.id == 0 then reaper.Main_OnCommand(it.id, 0)
+  elseif sec.id == 32060 or sec.id == 32061 then
+    if not reaper.MIDIEditor_GetActive() then vim.msg = 'actions: ' .. sec.label .. ' - open a MIDI editor first'; return end
+    reaper.MIDIEditor_LastFocused_OnCommand(it.id, sec.id == 32061)
+  else vim.msg = 'actions: ' .. sec.label .. ' actions run from its own window (REAPER has no call for them)'; return end
+  reaper.SetExtState(EXT, 'actrecent', table.concat(ctx.ACM.recent_push(ac_recent(), it.key, 30), ','), true)
+  model.invalidate()
+  vim.msg = 'REAPER: ' .. it.label
+end
+ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
+  local AC, ACM = ctx.AC, ctx.ACM
+  U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
+  local rh, cw, pad = Lx.rh, Lx.cw, Lx.pad
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local down = gfx.mouse_cap & 1 == 1
+  local press = hv and down and not AC.down
+  if not down then AC.down = nil end
+  -- секции
+  local tx = x
+  for i, s in ipairs(ACM.SECTIONS) do
+    local tw = U.measure(s.label) + 2 * pad
+    if tx + tw > x + w then break end
+    local on = i == AC.sec
+    local hot = mx >= tx and mx < tx + tw and my >= y and my < y + rh
+    U.set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.PANEL)); gfx.rect(tx, y, tw, rh - 1, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(tx, y, tw, rh - 1, 0)
+    U.text(tx + pad, y, s.label, on and U.AMBER or U.TEXT)
+    if hot and press then AC.down = true; AC.sec, AC.gi, AC.sel, AC.scroll = i, 1, 1, 0; ctx.set_focus('actions') end
+    tx = tx + tw + 2
+  end
+  -- поиск
+  local fy = y + rh + 2
+  local act = AC.typing or AC.query ~= ''
+  local fhot = mx >= x and mx < x + w and my >= fy and my < fy + rh
+  U.set(act and U.AMBER or (fhot and U.TEXT or U.LINE)); gfx.rect(x, fy, w, rh, 0)
+  local fq = '/' .. AC.query .. (AC.typing and '_' or '')
+  U.text(x + pad, fy, ctx.fit(fq, w - 2 * pad), act and U.AMBER or U.GREY)
+  if not act then
+    local gx = x + pad + U.measure('/') + pad
+    U.text(gx, fy, ctx.fit('find: letters in order, words in any order', x + w - pad - gx), U.DIM)
+  end
+  if fhot and press then AC.down = true; AC.typing = true; ctx.set_focus('actions') end
+  local view, G, fav = ac_view()
+  local by = fy + rh + 4
+  local nv = math.max(1, math.floor((y + h - by) / rh))
+  -- группы слева
+  local gw = math.max(cw * 10, math.min(math.floor(w * 0.26), cw * 22))
+  local gcol = foc and AC.col == 'groups'
+  AC.gscroll = math.max(0, math.min(AC.gscroll, #G - nv))
+  if AC.gi <= AC.gscroll then AC.gscroll = AC.gi - 1 elseif AC.gi > AC.gscroll + nv then AC.gscroll = AC.gi - nv end
+  for k = 1, nv do
+    local i = AC.gscroll + k
+    local g = G[i]; if not g then break end
+    local ry = by + (k - 1) * rh
+    local hot = mx >= x and mx < x + gw and my >= ry and my < ry + rh
+    if i == AC.gi then U.set(U.tint(U.AMBER, gcol and 0.3 or 0.15)); gfx.rect(x, ry, gw - 2, rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.1)); gfx.rect(x, ry, gw - 2, rh, 1) end
+    local ns = tostring(g.n)
+    local nw = U.measure(ns)
+    U.text(x + pad, ry, ctx.fit(g.name, gw - 3 * pad - nw - 2), i == AC.gi and U.AMBER or (i <= 3 and U.TEXT or U.GREY))
+    U.text(x + gw - pad - nw - 2, ry, ns, U.DIM)
+    if hot and press then AC.down = true; AC.gi, AC.sel, AC.scroll, AC.col = i, 1, 0, 'groups'; ctx.set_focus('actions') end
+  end
+  U.set(U.LINE); gfx.rect(x + gw, by, 1, nv * rh, 1)
+  -- таблица справа: тогл · имя · шорткаты
+  local lx, lw = x + gw + pad, w - gw - pad
+  local sbw = #view > nv and ((draw.SBW or 3) + 4) or 0
+  AC.scroll = math.max(0, math.min(AC.scroll, #view - nv))
+  AC.sel = math.max(1, math.min(math.max(1, #view), AC.sel))
+  if AC.sel <= AC.scroll then AC.scroll = AC.sel - 1 elseif AC.sel > AC.scroll + nv then AC.scroll = AC.sel - nv end
+  if #view == 0 then U.text(lx, by, ctx.fit(AC.query ~= '' and 'nothing found' or 'empty', lw), U.DIM) end
+  local lcol = foc and AC.col == 'list'
+  local dotw = U.measure('o') + pad
+  local scmax = math.floor(lw * 0.32)
+  for k = 1, nv do
+    local i = AC.scroll + k
+    local it = view[i]; if not it then break end
+    local ry = by + (k - 1) * rh
+    local hot = mx >= lx and mx < lx + lw - sbw and my >= ry and my < ry + rh
+    if i == AC.sel then U.set(U.tint(U.AMBER, lcol and 0.3 or 0.15)); gfx.rect(lx, ry, lw - sbw, rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.1)); gfx.rect(lx, ry, lw - sbw, rh, 1) end
+    local ts = ac_toggle(it.id)
+    if ts == 1 then U.set(U.GREEN); gfx.rect(lx + 2, ry + math.floor(rh / 2) - 2, 5, 5, 1)
+    elseif ts == 0 then U.set(U.DIM); gfx.rect(lx + 2, ry + math.floor(rh / 2) - 2, 5, 5, 0) end
+    local sc = ac_shortcuts(it.id)
+    local scs = sc ~= '' and ctx.fit(sc, scmax) or ''
+    local sw = scs ~= '' and U.measure(scs) or 0
+    local star = fav[it.key] and '* ' or ''
+    local nx = lx + dotw
+    U.text(nx, ry, ctx.fit(star .. it.label, lx + lw - sbw - nx - (sw > 0 and (sw + 2 * pad) or pad)), i == AC.sel and U.AMBER or U.TEXT)
+    if sw > 0 then U.text(lx + lw - sbw - pad - sw, ry, scs, U.CYAN) end
+    if hot and press then
+      AC.down = true
+      local now = reaper.time_precise()
+      if AC.sel == i and now - (AC.click or 0) < 0.35 then ctx.act_run(it) end
+      AC.sel, AC.col, AC.click = i, 'list', now; ctx.set_focus('actions')
+    end
+  end
+  if draw.vbar then draw.vbar('actions', lx, by, lw, nv * rh, AC.scroll, nv, #view) end
+  AC.nv = nv
+end
+ctx.act_key = function(c)
+  local AC = ctx.AC
+  local ch = c < 256 and string.char(c) or ''
+  if AC.typing then
+    if c == 27 then AC.typing = false; if AC.query ~= '' then AC.query = '' end
+    elseif c == 13 then AC.typing = false; AC.col = 'list'
+    elseif c == 8 then AC.query = AC.query:sub(1, -2); AC.sel, AC.scroll = 1, 0
+    elseif c == keys.down then AC.sel = AC.sel + 1
+    elseif c == keys.up then AC.sel = math.max(1, AC.sel - 1)
+    elseif c >= 32 and c < 127 then AC.query = AC.query .. ch; AC.sel, AC.scroll = 1, 0 end
+    return true
+  end
+  local view, G, fav = ac_view()
+  local it = view[AC.sel]
+  local inG = AC.col == 'groups'
+  if c == 27 then
+    if AC.query ~= '' then AC.query = '' else ctx.set_focus('tracker') end
+  elseif ch == '/' then AC.typing = true
+  elseif ch == 'j' or c == keys.down then if inG then AC.gi = math.min(#G, AC.gi + 1); AC.sel, AC.scroll = 1, 0 else AC.sel = AC.sel + 1 end
+  elseif ch == 'k' or c == keys.up then if inG then AC.gi = math.max(1, AC.gi - 1); AC.sel, AC.scroll = 1, 0 else AC.sel = math.max(1, AC.sel - 1) end
+  elseif ch == 'g' then if inG then AC.gi = 1 else AC.sel = 1 end
+  elseif ch == 'G' then if inG then AC.gi = #G else AC.sel = #view end
+  elseif c == 4 then AC.sel = AC.sel + math.floor((AC.nv or 10) / 2)   -- Ctrl+D / Ctrl+U — полстраницы
+  elseif c == 21 then AC.sel = math.max(1, AC.sel - math.floor((AC.nv or 10) / 2))
+  elseif ch == 'h' or c == keys.left then AC.col = 'groups'
+  elseif ch == 'l' or c == keys.right then AC.col = 'list'
+  elseif c == 13 then if inG then AC.col = 'list' else ctx.act_run(it) end
+  elseif ch == '[' or ch == ']' then
+    local n = #ctx.ACM.SECTIONS
+    AC.sec = (AC.sec - 1 + (ch == ']' and 1 or -1)) % n + 1; AC.gi, AC.sel, AC.scroll = 1, 1, 0
+    vim.msg = 'actions: ' .. ac_sec().label
+  elseif ch == 'f' and it then
+    if fav[it.key] then fav[it.key] = nil else fav[it.key] = true end
+    reaper.SetExtState(EXT, 'actfav', ctx.ACM.set_encode(fav), true)
+    vim.msg = (fav[it.key] and 'favourite: ' or 'not a favourite: ') .. it.label
+  elseif ch == 'y' and it then
+    local id = it.named ~= '' and ('_' .. it.named) or tostring(it.id)
+    if reaper.CF_SetClipboard then reaper.CF_SetClipboard(id); vim.msg = 'copied the command id: ' .. id else vim.msg = 'command id: ' .. id .. ' (copy needs SWS)' end
+  elseif ch == 'a' and it then
+    if reaper.DoActionShortcutDialog then
+      local sec = ac_sec()
+      reaper.DoActionShortcutDialog(reaper.GetMainHwnd(), sec.id, it.id, reaper.CountActionShortcuts(sec.id, it.id))
+      AC.sc[sec.id .. ':' .. it.id] = nil
+    end
+  elseif ch == 'x' and it then
+    local sec = ac_sec()
+    local sc = ac_shortcuts(it.id)
+    if sc == '' then vim.msg = 'no shortcut on ' .. it.label
+    else
+      OPT.ask.open('remove the shortcut?', it.label .. ': ' .. sc:match('^(.-)  ') or sc, {
+        { key = 'k', label = 'keep', fn = function() vim.msg = 'shortcut kept' end },
+        { key = 'd', label = 'remove', fn = function()
+          reaper.DeleteActionShortcut(sec.id, it.id, 0); AC.sc[sec.id .. ':' .. it.id] = nil
+          vim.msg = 'shortcut removed (a - add one again)' end },
+      })
+    end
+  elseif ch == 'r' then AC.cache = {}; AC.sc = {}; AC.vkey = nil; vim.msg = 'actions: list reloaded'
+  else return false end
+  AC.sel = math.max(1, math.min(math.max(1, #view), AC.sel))
+  local cur = view[AC.sel]
+  if cur and AC.col == 'list' and c ~= 13 and ch ~= 'f' and ch ~= 'y' and ch ~= 'x' and ch ~= 'r' then
+    local id = cur.named ~= '' and ('_' .. cur.named) or tostring(cur.id)
+    vim.msg = cur.label .. '  (' .. id .. ')'
+  end
+  return true
+end
+end
 -- if reaper.GetExtState(EXT, 'keysrenoise') == '1' then keys.set_renoise(true); draw.piano_layout(true) end   -- 13 окт: раскладка renoise
 -- 15 окт: опция выключена — раскладка всегда одна строка q2w3e, октава z x
 -- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
@@ -17061,6 +17305,7 @@ local function frame()
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
     clip_draw = function(Lx, x, y, w, h, foc, hv) ctx.clip_draw(Lx, x, y, w, h, foc, hv) end,
     ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
+    act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
     slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -22007,6 +22252,9 @@ local function frame()
         elseif ch == '-' then ctrl_action(sel, -1)
         elseif sel == 'bpm' and ch:match('%d') then state.bpm_edit = ch
         else return vim.key(c) end
+      elseif state.focus == 'actions' then   -- 16 окт: панель actions
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if not ctx.act_key(c) then return vim.key(c) end
       elseif state.focus == 'undotree' then   -- 15 окт: дерево undo
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not ctx.ut_key(c) then return vim.key(c) end
