@@ -9930,6 +9930,39 @@ ctx = {
     PV.live(items)                                  -- звучащее превью — сразу с новым питчем / rate / громкостью (6 окт)
     model.invalidate()
   end,
+  -- 15 окт: клик по числу свойства — ввод значения с клавиатуры (в единицах строки: dB, st, ct, x, ms, s)
+  sp_value_prompt = function(e, k)
+    local v = SPROP.value and SPROP.value(e, k) or ''
+    vim.open_prompt('spset ' .. k .. ' ', (v:match('^%s*([%+%-]?[%d%.]+)') or v))
+  end,
+  sp_set_value = function(arg)
+    local k, txt = (arg or ''):match('^(%S+)%s*(.*)$')
+    local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
+    if not (k and e and e.item and e.take and reaper.ValidatePtr(e.item, 'MediaItem*')) then return end
+    local it, tk = e.item, e.take
+    local items = e.note_scope and { e.item } or ctx.inst_group(e)
+    local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
+    local t = (txt or ''):lower()
+    local n = tonumber(t:match('[%+%-]?%d*%.?%d+'))
+    if k == 'pan' then
+      if t:match('^%s*c') then n = 0 elseif t:match('l') and n then n = -n elseif t:match('r') and n then n = n end
+    end
+    if not n then vim.msg = 'value: a number, like 1.5 or -3'; return end
+    local p = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
+    if k == 'vol' then P('D_VOL', 10 ^ (n / 20), 'mul', 'sample volume')
+    elseif k == 'tvol' then P('take:D_VOL', 10 ^ (n / 20), 'mul', 'take volume')
+    elseif k == 'pan' then P('take:D_PAN', math.max(-1, math.min(1, n / 100)), 'add', 'sample pan')
+    elseif k == 'st' then P('take:D_PITCH', math.floor(n + 0.5) + (p - math.floor(p + 0.5)), 'add', 'sample transpose')
+    elseif k == 'cent' then P('take:D_PITCH', math.floor(p + 0.5) + n / 100, 'add', 'sample finetune')
+    elseif k == 'rate' then if e.bsync then ctx.bsync_set(e, nil) end; P('take:D_PLAYRATE', math.max(0.05, math.min(20, n)), 'mul', 'sample rate')
+    elseif k == 'fin' then P('D_FADEINLEN', math.max(0, n / 1000), 'abs', 'sample fade')
+    elseif k == 'fout' then P('D_FADEOUTLEN', math.max(0, n / 1000), 'abs', 'sample fade')
+    elseif k == 'snap' then P('D_SNAPOFFSET', math.max(0, n), 'abs', 'snap offset')
+    elseif k == 'offs' then P('take:D_STARTOFFS', math.max(0, n), 'abs', 'start offset')
+    else vim.msg = 'value: this row takes no number'; return end
+    PV.live(items); model.invalidate()
+    vim.msg = ('%s = %s'):format(k, txt)
+  end,
   -- rate: лог-шкала ×0.2 … ×5, метки на простых отношениях (5 окт)
   RATE_LO = math.log(0.2, 2), RATE_HI = math.log(5, 2),
   RATE_MARKS = { 0.2, 0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1, 1.5, 2, 3, 4, 5 },
@@ -16874,7 +16907,7 @@ local function frame()
   elseif SPROP.hover and not SPROP.hover.title and ctx.sp_live() then
     local rk = SPROP.ROWS[SPROP.hover.row].k
     local extra = ({ bsync = '  |  beatsync: L - on (beats from the length), H L / wheel - beats, R - off', norm = '  |  normalize: L or click - to peak 0 dB' })[rk] or ''
-    state.status = ('sample %s - H L / drag: change, wheel: scroll, click: toggle / open, dblclick or R: reset, J K: row (Sample tab focused)'):format(SPROP.ROWS[SPROP.hover.row].label) .. extra
+    state.status = ('sample %s - H L / drag: change (Shift: fine), click the number: type it, click: toggle / open, dblclick or R: reset, J K: row'):format(SPROP.ROWS[SPROP.hover.row].label) .. extra
   elseif hover.hsb then
     state.status = 'tracks: drag the bar, click beside it - a page; trackpad sideways / Shift+wheel scroll, Cmd+sideways - width zoom, Cmd+wheel - LPB zoom'
   elseif hover.trsbtn then
@@ -18065,8 +18098,14 @@ local function frame()
       local DBL_RESET = { bsync = true }   -- 15 окт: beatsync — двойной клик = по умолчанию (выкл), как у ползунков
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
       elseif e and dbl and same and TOG[SPROP.hover.k] and not DBL_RESET[SPROP.hover.k] then   -- второй клик двойного — уже щёлкнул первым
-      elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
-      elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
+      elseif e and dbl and same then
+        if vim.prompt then vim.mode = vim.cmd_from or 'normal'; vim.cmdline = nil; vim.prompt = nil end   -- 15 окт: первый клик открыл ввод — двойной его закрывает
+        ctx.sp_reset(e, SPROP.hover.k)
+      elseif e and SPROP.hover.val then ctx.sp_value_prompt(e, SPROP.hover.k)   -- 15 окт: клик по числу — ввод с клавиатуры
+      elseif e and SPROP.hover.bar then
+        local fr0 = (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w)
+        SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w, fr = fr0, lx = gfx.mouse_x }   -- 15 окт: fr — для Shift (тонко)
+        ctx.sp_set_frac(e, SPROP.hover.k, fr0)   -- слайдер (5 окт)
       elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
       elseif e and SPROP.hover.k == 'bsync' then ctx.bsync_toggle(e)
       elseif e and TOG[SPROP.hover.k] then ctx.sp_adjust(e, SPROP.hover.k, 1) end
@@ -19424,9 +19463,12 @@ local function frame()
   if SPROP.drag then
     if gfx.mouse_cap & 1 == 1 then
       if gfx.mouse_x ~= SPROP.drag.lx then
+        -- 15 окт: от прошлой точки, Shift — вдесятеро тоньше (раньше — абсолютно от мыши, Shift не работал)
+        local dx = gfx.mouse_x - (SPROP.drag.lx or gfx.mouse_x)
         SPROP.drag.lx = gfx.mouse_x
+        SPROP.drag.fr = math.max(0, math.min(1, (SPROP.drag.fr or 0) + dx / math.max(1, SPROP.drag.w) * ((gfx.mouse_cap & 8 == 8) and 0.1 or 1)))
         local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])   -- 15 окт: как у клавиш — запись выбранной области (слайс / нота), не всегда инструмент
-        if e then ctx.sp_set_frac(e, SPROP.drag.k, (gfx.mouse_x - SPROP.drag.x) / math.max(1, SPROP.drag.w)) end
+        if e then ctx.sp_set_frac(e, SPROP.drag.k, SPROP.drag.fr) end
       end
     else SPROP.drag = nil end
   end

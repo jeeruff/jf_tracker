@@ -1198,6 +1198,7 @@ local function run_cmd(line)
   elseif cmd == 'repeat' then if ctx.repeat_pattern then ctx.repeat_pattern((arg or ''):match('all') ~= nil) end   -- 9 окт: как Ctrl+Opt+J (all — все треки)
   elseif cmd == 'mac' then if ctx.mac_run then ctx.mac_run(arg) end   -- 9 окт: :mac имя — проиграть макрос
   elseif cmd == 'macsave' then if ctx.mac_save then ctx.mac_save(arg) end   -- 9 окт: :macsave a имя — регистр в свои макросы
+  elseif cmd == 'spset' then if ctx.sp_set_value then ctx.sp_set_value(arg) end   -- 15 окт: ввод значения свойства сэмпла (клик по числу)
   elseif cmd == 'arcforget' then if ctx.arc_forget then ctx.arc_forget() end   -- 15 окт: arc — забыть назначения эффекта
   elseif cmd == 'mackey' then if ctx.mac_key then ctx.mac_key(arg) end   -- 15 окт: :mackey имя x — макрос на регистр @x
   elseif cmd == 'dedouble' then

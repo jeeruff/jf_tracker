@@ -171,7 +171,8 @@ function SP.draw(L, x, y, w, h, e, focused)
     else
       U.text(x + lw, ry, ctx.fit(vt, w - lw - L.pad), foc and U.AMBER or U.TEXT)
     end
-    if hot then SP.hover = { row = i, k = r.k, bar = SP.slider and SP.slider.k == r.k and SP.slider or nil } end
+    -- 15 окт: val — мышь над числом значения (числовые строки): клик — ввод с клавиатуры
+    if hot then SP.hover = { row = i, k = r.k, bar = SP.slider and SP.slider.k == r.k and SP.slider or nil, val = fr ~= nil and mx >= x + lw and mx < x + lw + vw - L.pad or nil } end
     if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end
   end
 end
