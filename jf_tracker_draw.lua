@@ -4067,9 +4067,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   -- 16 окт: свободное место справа — макросы (вместо вкладки macros) и метр мастера внизу
   local fx0 = cx + sep
-  if info.macstrip and free1 - fx0 >= 24 * L.cw then
+  if info.macstrip and free1 - fx0 >= 10 * L.cw then   -- 16 окт: 24 знака не набиралось
     divider(fx0 - math.floor(sep / 2) - 1)
-    D.mac_strip(L, fx0, ly, free1 - fx0, y + h - ly, info, hover)
+    D.mac_strip(L, fx0, ly, free1 - fx0, y + h - ly, info, hover, 'meter')   -- 16 окт: макросы — в модлайне
   end
   -- 15 окт: режим — модлайном в поле трекера (D.draw_mode), в полосе его нет
   return out
@@ -4078,12 +4078,13 @@ end
 -- 16 окт: полоса макросов в транспорте: строка 1 — запись (q + буква) и последний @@, дальше и во 2-й строке —
 -- фишки «клавиша имя» (те же клавиши, что в @ / \\ q: клик — проиграть у курсора); последняя строка — метр мастера
 -- (Track_GetPeakInfo 1024 / 1025 = VU мастера REAPER), щелчок по числу — сброс удержания
-function D.mac_strip(L, x, y, w, h, info, hover)
+function D.mac_strip(L, x, y, w, h, info, hover, only)   -- only: 'meter' | 'chips' | nil (оба)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local m = info.macstrip() or {}
   local nrows = math.max(1, math.floor(h / L.rh))
-  local mrow = nrows >= 3 and 1 or 0                 -- строка метра
-  local crow = nrows - mrow                          -- строки фишек
+  local mrow = (only ~= 'chips' and nrows >= 3) and 1 or 0   -- строка метра
+  local crow = only == 'meter' and 0 or (nrows - mrow)          -- строки фишек
+  if only == 'meter' then mrow = 1; nrows = math.max(1, math.min(nrows, 2)) end
   local cx, cy, row = x, y, 1
   local function put(wd)
     if cx + wd > x + w then
@@ -4093,7 +4094,7 @@ function D.mac_strip(L, x, y, w, h, info, hover)
     local at = cx; cx = cx + wd + L.pad; return at
   end
   -- запись / последний
-  do
+  if crow > 0 then
     local t = m.rec and ('rec @' .. m.rec) or 'q rec'
     local at = put(ms(t))
     if at then text(at, cy, t, m.rec and U.RED or U.DIM) end
@@ -4107,7 +4108,7 @@ function D.mac_strip(L, x, y, w, h, info, hover)
       end
     end
   end
-  for _, it in ipairs(m.items or {}) do
+  for _, it in ipairs(crow > 0 and m.items or {}) do
     local nm = fit(it[2], 10 * L.cw)
     local wd = ms(it[1]) + L.pad + ms(nm) + 2 * L.pad
     local at = put(wd)
@@ -6584,6 +6585,14 @@ function D.frame(L, snap, rows, state, info)
       local room = W - L.pad - wx
       if room <= ms('W') then break end
       text(wx, ty, fit(sg[1], room), U.TEXT); wx = wx + math.min(room, ms(sg[1])) + 2 * L.pad
+    end
+    -- 16 окт: макросы — в модлайне справа (с середины, чтобы не прыгали за длиной сегментов)
+    if info.macstrip then
+      local mx0 = math.max(wx + 3 * L.pad, tx0 + math.floor((W - tx0) * 0.5))
+      if W - L.pad - mx0 >= 10 * L.cw then
+        set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(mx0 - 2 * L.pad, my0 + 3, 1, L.mode_h - 6, 1)
+        D.mac_strip(L, mx0, ty, W - L.pad - mx0, L.rh, info, hover, 'chips')
+      end
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
