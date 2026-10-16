@@ -6145,11 +6145,11 @@ function D.frame(L, snap, rows, state, info)
               local fx0, fw0 = x0, w0
               if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
               if fr ~= 'off' then
+                -- 16 окт: только верх и низ (начало / конец item); боковые кромки рядом с линией между треками
+                -- давали 3-4 линии подряд — между треками одна линия
                 set(col)
-                gfx.rect(fx0, cy0, fw0, cy1 - cy0, 0)                         -- кайма 2 px
-                gfx.rect(fx0 + 1, cy0 + 1, math.max(0, fw0 - 2), math.max(0, cy1 - cy0 - 2), 0)
-                if y0 < by0 then set(U.BG); gfx.rect(fx0, by0, fw0, 2, 1) end   -- срез сверху: без верхней кромки
-                if y1 > by1 then set(U.BG); gfx.rect(fx0, by1 - 2, fw0, 2, 1) end
+                if y0 >= by0 then gfx.rect(fx0, cy0, fw0, 2, 1) end
+                if y1 <= by1 then gfx.rect(fx0, cy1 - 2, fw0, 2, 1) end
               end
               -- 13 окт: пустой MIDI-клип — «#» в его первой строке (Del / x на ней — удалить клип)
               if it.empty and y0 >= by0 and y0 < by1 then
