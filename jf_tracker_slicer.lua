@@ -1504,6 +1504,15 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local W2 = S.zwin or 0.04
     local t0 = zt - W2                     -- край — по центру окна
     U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
+    -- 16 окт: прицел — бледная сетка трекера (такты / доли / строки) и stretch-маркеры ноты, в секундах окна (по маркерам)
+    local zgrid = S.cross and zlab and zlab:match('^cursor') and ctx.aim_grid and ctx.aim_grid(S.cross, t0, t0 + 2 * W2)
+    if zgrid then
+      for _, g in ipairs(zgrid.rows) do
+        local gx = x + math.floor((g.te - t0) / (2 * W2) * w)
+        U.set(U.mix(U.TEXT, U.BG, g.kind == 'bar' and 0.45 or (g.kind == 'beat' and 0.65 or 0.82)))
+        gfx.rect(gx, zy, 1, ZH, 1)
+      end
+    end
     local smp, n = zoom_samples(e, t0, 2 * W2)
     local zc, zh2 = zy + ZH / 2, ZH / 2 - 2
     -- 10 окт: зум повторяет вид волны — sgram: кусок спектрограммы фоном; spec: окраска по частоте
@@ -1560,6 +1569,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local zsl = (S.active and S.entry and S.entry.item == e.item) and S.slices or (e.slices or {})
     for k2, t2 in ipairs(zsl) do
       if k2 ~= zk and t2 > t0 and t2 < t0 + 2 * W2 then U.set(U.CYAN); gfx.rect(x + math.floor((t2 - t0) / (2 * W2) * w), zy, 1, ZH, 1) end
+    end
+    if zgrid then
+      for _, m in ipairs(zgrid.smk) do
+        local gx = x + math.floor((m - t0) / (2 * W2) * w)
+        U.set(U.mix(U.AMBER, U.BG, 0.3)); gfx.rect(gx, zy, 2, ZH, 1)
+        local hz = math.max(3, math.floor(rh / 3))
+        U.set(U.AMBER); gfx.triangle(gx - hz, zy + ZH / 2, gx + 1, zy + ZH / 2 - hz, gx + hz + 1, zy + ZH / 2, gx + 1, zy + ZH / 2 + hz)
+      end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
     trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)

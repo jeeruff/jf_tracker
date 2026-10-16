@@ -7018,6 +7018,36 @@ ctx = {
     edit.note_modified(it)
     model.invalidate()
   end,
+  -- 16 окт: сетка трекера и stretch-маркеры ноты в окне прицела [t0, t1] (секунды показанного инструмента)
+  aim_grid = function(c, t0, t1)
+    if not (c and c.n and c.e) then return nil end
+    local A = ctx.AIM
+    local tp0, tp1 = A.proj_of(c.n, c.e, t0), A.proj_of(c.n, c.e, t1)
+    if tp1 < tp0 then tp0, tp1 = tp1, tp0 end
+    local lpb = state.lpb
+    local r0, r1 = math.floor(model.row_of_time(tp0, lpb)), math.ceil(model.row_of_time(tp1, lpb))
+    local rows = {}
+    if r1 - r0 <= 400 then
+      for r = r0, r1 do
+        local tp = edit.row_time(r, lpb, 0)
+        local te = A.e_time(c.n, c.e, tp)
+        if te >= t0 and te <= t1 then
+          local beat = r % lpb == 0
+          local bim = beat and reaper.TimeMap2_timeToBeats(0, tp) or 1    -- доля внутри такта: 0 — начало такта
+          local bar = beat and math.abs(bim) < 1e-4
+          rows[#rows + 1] = { te = te, kind = bar and 'bar' or (beat and 'beat' or 'row') }
+        end
+      end
+    end
+    local smk = {}
+    for _, m in ipairs(c.n.smk or {}) do
+      if m.p > 1e-4 and m.p < c.n.len - 1e-4 then
+        local te = A.e_time(c.n, c.e, c.n.pos + m.p)
+        if te >= t0 and te <= t1 then smk[#smk + 1] = te end
+      end
+    end
+    return { rows = rows, smk = smk }
+  end,
   -- 16 окт: кнопка stretch слайсера — stretch-маркеры на границах слайсов (секунды item) и на краях; старые — заменяются
   slices_to_smk = function(item, slices)
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end
