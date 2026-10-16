@@ -104,6 +104,7 @@ local function reset()
   V.regs = {}; V.macro = nil; V.cmdbuf = {}; V.last_edit = nil; V.cmdline = nil; V.octave = 4; V.step = 1; V.inst = 1
   V.init({
     keys_renoise = function() return RENOISE end,
+    keys_frow = function() return FROW end,   -- 16 окт: раскладка frow
     edit = E, state = state, piano = keys.piano, SM = dofile(DIR .. '/jf_tracker_smart.lua'),
     esc_vim = function() return ESC_VIM end,   -- 10 окт: опция Esc mode
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
@@ -809,6 +810,15 @@ reset(); AUTO_KBD = false; PIANO_ON = true; V.mode = 'insert'; V.cur.row = 0
 local nd = #calls; keysin('d3'); eq('keys INSERT: d3 waits, no note', #calls, nd); keysin('w')
 eq('keys INSERT: d3w deletes', (last() or ''):match('^delete') ~= nil, true); eq('keys INSERT: back in INSERT', V.mode, 'insert')
 PIANO_ON = false; AUTO_KBD = true
+-- 16 окт: frow, клавиатура вкл, INSERT: буквы — команды Vim (w движется, x удаляет), цифры — ноты, [ ] — октава
+reset(); AUTO_KBD = false; PIANO_ON = true; FROW = true; keys.set_layout('frow'); V.mode = 'insert'; V.cur.row = 0
+keysin('w'); local wr = V.cur.row; eq('frow INSERT: still INSERT after w', V.mode, 'insert')
+V.mode = 'normal'; V.cur.row = 0; keysin('w'); eq('frow INSERT: w moves as in NORMAL', wr, V.cur.row); V.mode = 'insert'
+local nx = #calls; keysin('x'); eq('frow INSERT: x deletes', table.concat(calls, ' ', nx + 1):match('delete') ~= nil, true); eq('frow INSERT: INSERT after x', V.mode, 'insert')
+keysin(']'); eq('frow INSERT: ] octave up', V.octave, 5); keysin('[')
+V.cur.row = 2; local r2 = V.cur.row; keysin('1'); eq('frow INSERT: 1 is a note (row steps)', V.cur.row > r2, true)
+V.cur.row = 2; keysin('3j'); eq('frow INSERT: 3 is a note, not a count', V.cur.row, 4)
+FROW = nil; keys.set_layout('qwerty'); PIANO_ON = false; AUTO_KBD = true; V.key(27)
 -- 5 окт: Shift+hjkl — выделение; INSERT s — выделение с возвратом; Option+s (ß) — :step
 reset(); keysin('L'); eq('L: visual from normal', V.mode, 'visual'); eq('L: anchor at the start', V.anchor and V.anchor.fi, 1)
 keysin('J'); eq('J extends a row down', V.cur.row, 1); V.key(27); eq('Esc: back to normal', V.mode, 'normal')

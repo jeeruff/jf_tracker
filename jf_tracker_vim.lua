@@ -989,7 +989,8 @@ end
 -- 5 окт (как в Renoise): q = C-4 — весь сэмпл, слайсы начинаются со следующей
 -- клавиши: slice_base — нота слайса 1 = C-4 + 1
 -- 15 окт: опция slice1 — q = слайс 1 (база на полутон ниже), весь сэмпл — клавиша 1
-function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 - ((ctx.state and ctx.state.slice1) and 1 or 0) end
+local function slice1_on() if ctx.slice1_on then return ctx.slice1_on() end; return ctx.state and ctx.state.slice1 end   -- 16 окт: frow — всегда
+function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 - (slice1_on() and 1 or 0) end
 local function piano_pitch(c)
   local off = ctx.piano[c]
   if off == nil then return nil end
@@ -1432,17 +1433,29 @@ end
 -- Возвращает 'quit' при выходе, иначе nil.
 -- INSERT: управляющие клавиши нижних рядов (Ableton-стиль + Vim-движение, 2 окт).
 -- Возвращает true, если клавиша съедена. Пианино — верхний ряд, сюда не попадает.
+-- 16 окт: клавиша INSERT как команда NORMAL, потом снова INSERT (оператор d… дождётся движения и вернёт)
+local function ins_as_normal(c2)
+  V.mode = 'normal'
+  local r = V.key_impl(c2)
+  if V.mode == 'normal' then
+    if V.pending or V.op then V.back_insert = true else V.mode = 'insert' end
+  end
+  return r
+end
 local function keys_control(c)
   local ch = (c < 256) and string.char(c) or ''
   if ctx.keys_renoise and ctx.keys_renoise() and ctx.piano[c] then return false end   -- 13 окт: renoise — нижний ряд играет ноты
-  -- 16 окт: frow — цифры и F-ряд играют ноты (- = — тоже ноты, не LPB), октава [ ], громкость { }
+  -- 16 окт: frow — цифры и F-ряд играют ноты (- = — тоже ноты, не LPB), октава [ ], громкость { };
+  -- буквы свободны — всё остальное в INSERT это команды Vim (как в NORMAL), цифры — не счётчик, а ноты
   if ctx.keys_frow and ctx.keys_frow() then
     if ctx.piano[c] then return false end
-    if V.SHIFTED and V.SHIFTED[ch] and ctx.piano[V.SHIFTED[ch]:byte()] then return false end   -- Shift+нота (+ _ ! $ *) — прослушать, не LPB
+    local nb = V.note_key and V.note_key(c, ctx.mods and ctx.mods() or {})
+    if nb and ctx.piano[nb] then return false end      -- Shift / Option / Shift+Option + нота — прослушать, рядом, pitch
     if ch == '[' then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return true end
     if ch == ']' then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return true end
     if c == 123 or c == 125 then V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true end
-    if ch == 'z' or ch == 'x' or ch == 'c' or ch == 'C' then return true end      -- одна функция — одна клавиша: в frow это [ ] { }
+    if c == ('`'):byte() or c == ('~'):byte() then return false end   -- note-off — у INSERT свой
+    ins_as_normal(c); return true
   end
   -- 14 окт: renoise — c в нотах, громкость { } (Shift к октаве [ ])
   if ctx.keys_renoise and ctx.keys_renoise() and (c == 123 or c == 125) then
@@ -2124,7 +2137,7 @@ function V.key_impl(c)
     end
     if sliced and kp - SB + 1 == 0 then                              -- q (slice1: 1): весь сэмпл — обычный путь ноты
       sliced = false
-      if ctx.state and ctx.state.slice1 then kp = kp + 1 end           -- 15 окт: 1 — на полутон ниже q, сэмпл без транспоза
+      if slice1_on() then kp = kp + 1 end           -- 15 окт: 1 — на полутон ниже q, сэмпл без транспоза
     end
     if sliced then
       local k = kp - SB + 1

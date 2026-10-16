@@ -2098,7 +2098,8 @@ ctx = {
   end,
   octave = function() return vim.octave end,
   slice_by_click = function() return state.slicemk or 'double' end,   -- 10 окт: опция slice by click                            -- подписи слайсов в слайсере (4 окт)
-  slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 - (state.slice1 and 1 or 0) end,   -- 15 окт: slice1 — q = слайс 1   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
+  slice1_on = function() return state.slice1 or keys.frow() end,   -- 16 окт: frow — клавиша 1 = слайс 1 всегда, весь сэмпл — `
+  slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 - ((state.slice1 or keys.frow()) and 1 or 0) end,   -- 15 окт: slice1 — q = слайс 1   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
   region_rows = function()
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then return nil end
@@ -4655,7 +4656,7 @@ ctx = {
   -- 13 окт: клавиша, что играет слайс k (как подписи модуля slices: октава курсора, C-4 + k)
   slice_key = function(k)
     local c = ctx.slk_cache
-    local sh = state.slice1 and 1 or 0                  -- 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
+    local sh = (state.slice1 or keys.frow()) and 1 or 0   -- 16 окт: frow — 1 = слайс 1; 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
     if not (c and c.oct == vim.octave and c.rn == keys.renoise and c.sh == sh and c.lay == keys.layout) then
       c = { oct = vim.octave, t = {}, rn = keys.renoise, sh = sh, lay = keys.layout }
       for off, ch in pairs(keys.plabel) do c.t[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
@@ -10956,7 +10957,7 @@ ctx = {
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
       { sep = true, title = 'sound and samples' },
-      flag('slice1', 'slices: 1 = whole, q = slice 1', 'a sliced sample: q 2 w 3 ... play slices 1 2 3 4 ... and the key 1 the whole sample (off: q is the whole sample, 2 is slice 1)'),
+      flag('slice1', 'slices: 1 = whole, q = slice 1', 'a sliced sample: q 2 w 3 ... play slices 1 2 3 4 ... and the key 1 the whole sample (off: q is the whole sample, 2 is slice 1); layout frow - always: 1 = slice 1, ` - the whole sample'),
       flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
@@ -16663,7 +16664,7 @@ local function frame()
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
   edit.ghost_q = ctx.slq_rows()                        -- 15 окт: playthru + q — ghost-слайсы по сетке q (0 = выкл)
-  keys.piano[49] = state.slice1 and -1 or nil          -- 15 окт: slice1 — клавиша 1 = нота на полутон ниже q (весь сэмпл)
+  if not keys.frow() then keys.piano[49] = state.slice1 and -1 or nil end   -- 16 окт: в frow 1 — нота C (белая), не трогать; 15 окт: slice1 — клавиша 1 = нота на полутон ниже q (весь сэмпл)
   edit.swing_read()                                    -- свинг сетки проекта REAPER (6 окт)
   draw.icons = false                                     -- Nerd-иконки убраны (3 окт)
   draw.envpoints = state.envpoints ~= false
@@ -17363,7 +17364,7 @@ local function frame()
       local k = (ctx.ssel.item == root.item) and (ctx.ssel.k or 0) or 0
       local key_of = {}
       -- клавиша → слайс: C-4 (q) = 0 = весь сэмпл, дальше слайсы 1, 2 … (5 окт, как в Renoise)
-      local sh = state.slice1 and 1 or 0                -- 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
+      local sh = (state.slice1 or keys.frow()) and 1 or 0   -- 16 окт: frow — 1 = слайс 1; 15 окт: slice1 — q = слайс 1, весь сэмпл — 1
       for off, ch in pairs(keys.plabel) do key_of[(vim.octave + 1) * 12 + off - (model.SLICE_BASE or model.BASE_NOTE or 60) + sh] = keys.label(ch) end
       if sh == 1 then key_of[0] = '1' end
       local rows = { { k = 0, t0 = 0, len = root.len or 0, has = true, name = root.name, key = key_of[0] } }   -- имя item вместо whole (5 окт)
