@@ -5509,6 +5509,8 @@ function D.frame(L, snap, rows, state, info)
         end   -- узкий master не перестраивает треки (9 окт)
         local und = tonumber(D.mix_under) or 0
         local fh = (und > 0 and not (c.master and not side)) and (H - und * L.rh) or H
+        -- 16 окт: как в микшере REAPER — запись (o) под фейдером, размером с кноб панорамы; фейдер короче
+        local rec_d = (mixcol and not compact) and math.min(2 * L.rh - 2, fx_w) or 0
         if compact then D.mini_strip(col, sx, fx_w, y1, y1 + fh - 2, info, hover, mx, my, L) else
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
@@ -5556,7 +5558,7 @@ function D.frame(L, snap, rows, state, info)
         else
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
         end
-        local ty0, ty1 = y1 + 4 * L.rh + 7, y1 + fh - 4                 -- строка над метром — макс. пик
+        local ty0, ty1 = y1 + 4 * L.rh + 7, y1 + fh - 4 - (rec_d > 0 and (rec_d + 4) or 0)   -- строка над метром — макс. пик
         local th = math.max(8, ty1 - ty0)
         -- тёмная коробка, внутри метр как в DSP (две полоски L R в рамках),
         -- шкала dB слева (+6 0 -6 -12 -24 -48), ручка [-] поверх;
@@ -5702,12 +5704,19 @@ function D.frame(L, snap, rows, state, info)
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
         end   -- compact / фейдер
         if mixcol then
-          for k = 1, 6 do
-            local b = labels[k]
-            hbtn(b, sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h, b[4] == 'arm')   -- 16 окт: запись круглая, как в шапке
+          -- 16 окт: раскладка как в микшере REAPER — сверху m s ~ ø sro, внизу под фейдером (o) запись, рядом i
+          local colx = sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0)
+          for k, li in ipairs({ 3, 4, 6, 5 }) do
+            local b = labels[li]
+            hbtn(b, colx, y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h, false)
           end
           local sc = D.sro_col
-          if sc then sc.draw(sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + 6 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
+          if sc then sc.draw(colx, y1 + 4 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
+          if rec_d and rec_d > 0 then
+            local ry = y1 + fh - rec_d - 3
+            hbtn(labels[1], sx + math.floor((fx_w - rec_d) / 2), ry, rec_d, rec_d - 2, true)
+            hbtn(labels[2], colx, ry + math.floor((rec_d - D.mcb_h) / 2), D.mcb_w, D.mcb_h, false)
+          end
         end
         -- эффекты (часть микшера): сбоку от фейдера, если влезают короткие
         -- имена (от 5 знаков), на всю высоту полосы; иначе — под фейдером
