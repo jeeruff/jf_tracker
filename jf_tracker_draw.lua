@@ -2530,22 +2530,40 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local T0, G0 = U.TEXT, U.GREY
   U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
   -- 4 окт (компактнее): имени нет — оно на вкладке трека в шапке DSP; кнопки — первой строкой
-  local yy = y + 2
-  -- кнопки
+  local yy = y + 3   -- 16 окт: на px ниже — кнопки не на линии рамки
+  -- кнопки — как в шапке трека (16 окт): строчные, запись (o) и фаза (ø) круглые, i · m s · fx ~
   local bx = x + L.pad
   local mon = col.recmon or 0
-  local btns = { { 'R', col.armed, D.ARM, 'arm' }, { 'I', mon > 0, U.CYAN, 'monitor', mon == 2 },
-                 { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' },
-                 { 'ø', io.phase, U.AMBER, 'phase', nil, true }, { 'FX', not io.fxen, U.RED, 'fxen', nil, true } }
+  local bh = L.rh - 3
+  local btns = { { 'r', col.armed, D.ARM, 'arm', nil, false, round = true }, { 'i', mon > 0, U.CYAN, 'monitor', mon == 2 },
+                 { 'm', col.muted, U.AMBER, 'mute', gap = true }, { 's', col.solo, U.GREEN, 'solo' },
+                 { 'ø', io.phase, U.AMBER, 'phase', nil, true, round = true, gap = true }, { 'fx', not io.fxen, U.RED, 'fxen', nil, true },
+                 { '~', #(col.envs or {}) > 0, U.CYAN, 'auto' } }
   for _, b in ipairs(btns) do
-    -- ø фазы — буква (4 окт: был круг с чертой); не-ASCII рисует системный моно
-    local bw = math.max(L.btn_w, ms(b[1]) + 4)
+    if b.gap then bx = bx + L.pad end
+    local bw = b.round and bh or math.max(L.btn_w, ms(b[1]) + 4)
     if bx + bw > x + w - L.pad then break end
     local on = b[2]
-    set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, L.rh - 2, 1)
-    set(on and b[3] or U.DIM); gfx.rect(bx, yy, bw, L.rh - 2, 0)
-    text(bx + math.floor((bw - ms(b[1])) / 2), yy, b[1], on and b[3] or U.readable(G0, U.PANEL, 4.5))   -- на заливке кнопки (7 окт)
-    if mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh then
+    local hot = mx >= bx and mx < bx + bw and my >= yy and my < yy + bh + 1
+    if b[4] == 'phase' then   -- 16 окт: ø — просто буква, без кнопки-фона
+      text(bx + math.floor((bw - ms('ø')) / 2), yy + math.floor((bh - (L.th or bh)) / 2) - (D.SPACE or 0), 'ø', (hot or on) and U.AMBER or U.readable(G0, rbg, 4.5))
+    elseif b.round then
+      local r = math.floor((bh - 1) / 2)
+      local cx, cy = bx + math.floor(bw / 2), yy + math.floor(bh / 2)
+      local rc = b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or (on and b[3] or U.readable(G0, U.PANEL, 4.5))
+      set(on and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.circle(cx, cy, r, 1, 1)
+      set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
+      if b[4] == 'arm' then
+        local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
+        if aa then text(cx - math.floor(ms('a') / 2), cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)
+        else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
+      else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or rc) end
+    else
+      set((on and not b[5]) and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.rect(bx, yy, bw, bh, 1)
+      set(hot and U.AMBER or (on and b[3] or U.DIM)); gfx.rect(bx, yy, bw, bh, 0)
+      text(bx + math.floor((bw - ms(b[1])) / 2), yy + math.floor((bh - (L.th or bh)) / 2) - (D.SPACE or 0), b[1], on and b[3] or U.readable(G0, U.PANEL, 4.5))
+    end
+    if hot then
       if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
     end
     bx = bx + bw + 1
@@ -5194,6 +5212,14 @@ function D.frame(L, snap, rows, state, info)
         local tyc = by + math.floor((bh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0)
         local on = b[2]
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
+        -- 16 окт: ø — просто буква, без кнопки-фона
+        if b[4] == 'phase' then
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          text(x + math.floor((bwk - ms('ø')) / 2), tyc, 'ø', (hot or on) and U.AMBER or BTXT)
+          if hot then hover.trkio = { col = col, what = 'phase' } end
+          hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
+          return
+        end
         -- 15 окт: круглые — запись (кружок внутри; A — автоарм при выборе трека) и фаза (ø)
         if round then
           local r = math.floor((bh - 1) / 2)
@@ -5252,10 +5278,17 @@ function D.frame(L, snap, rows, state, info)
       local by2 = hy + (L.lane_row - 1) * L.rh
       local x2 = bx
       local function row2(w) if mixcol or L.hr_info > 0 or x2 + w > c.x + c.w - 1 then return nil end; local x = x2; x2 = x2 + w + 1; return x end
-      for _, b in ipairs(rest) do
-        local x = row2(bwh)
-        if not x then break end
-        hbtn(b, x, by2, bwh, bhh, b[4] == 'phase')
+      -- 16 окт: порядок второй строки — sro, ø, … ; ~ (автоматизация) — у правого края шапки (рисуется ниже, после sro)
+      local function draw_rest()
+        for _, b in ipairs(rest) do
+          if b[4] == 'auto' then
+            local x = c.x + c.w - L.pad - bwh
+            if not mixcol and L.hr_info == 0 and x >= x2 then hbtn(b, x, by2, bwh, bhh, false) end
+          else
+            local x = row2(bwh)
+            if x then hbtn(b, x, by2, bwh, bhh, b[4] == 'phase') end
+          end
+        end
       end
       -- route (9 окт): SRO вместо слова — S сенды, R ресивы, O аппаратные
       -- выходы; буква светится, если есть. Щелчок — окно маршрутизации трека.
@@ -5293,8 +5326,9 @@ function D.frame(L, snap, rows, state, info)
         local lim = mixcol and (c.x + c.w - 1) or (trim_x - hw1 - L.pad)
         local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, lim - rx))   -- 12 окт: SRO шире, сколько влезает
         if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false)
-        elseif not D.sro_col then local w2 = ms('SRO') + 4; local x = row2(w2); if x then sro(x, by2, w2, bhh, false) end end   -- 16 окт: вторая строка
+        elseif not D.sro_col then local w2 = ms('SRO') + 4; local x = row2(w2); if x then sro(x, by2, w2, bhh, false) end end   -- 16 окт: вторая строка — первой
       end
+      draw_rest()   -- 16 окт: после sro — ø и ~ справа
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live
