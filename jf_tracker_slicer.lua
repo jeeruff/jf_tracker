@@ -1097,7 +1097,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if S.dpanel and S.active and S.entry and S.entry.item == e.item then
     local dpw = math.min(math.floor(w * 0.30), L.cw * 34)
     local ph = wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0)
-    S.dt_hot = S.dt_draw(U, L, x, wy, dpw, ph)
+    S.dt_hot = S.dt_draw(U, L, x, zy_top or wy, dpw, ph)   -- 16 окт: прицел наверху — панель от его верха
     x, w = x + dpw + 2, w - dpw - 2
   end
   -- окно вида (3 окт, зум): va..vb секунд e; колесо над волной — зум у мыши,
@@ -1756,7 +1756,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   end
   -- 12 окт: строка под прицелом — слева подсказка, справа в линию spam / 0-cross / t-snap / quant
   do
-    local fy = wy + wh + (ZH > 0 and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2
+    local fy = wy + wh + ((ZH > 0 and not ztop) and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2   -- 16 окт: прицел наверху — его высота уже в wy (строка уезжала за модуль)
     local st = ctx.state or {}
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
