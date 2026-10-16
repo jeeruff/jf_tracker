@@ -7148,6 +7148,22 @@ function D.frame(L, snap, rows, state, info)
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2) / L.rh))
         return math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
       end
+      -- 16 окт: секции потоком (f.heads) — колонок столько, сколько займёт поток при этой высоте
+      if f.heads and not f.container then
+        local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2) / L.rh))
+        local col, row = 0, 0
+        for pi = 1, #f.params do
+          if f.heads[pi] then
+            local n = 1
+            while f.params[pi + n] and not f.heads[pi + n] do n = n + 1 end
+            if row > 0 and (row >= nfit2 - 1 or (row + 1 + n > nfit2 and 1 + n <= nfit2)) then col, row = col + 1, 0 end
+            row = row + 1
+          end
+          if row >= nfit2 then col, row = col + 1, 0 end
+          row = row + 1
+        end
+        return col + 1
+      end
       return f.cols or 1
     end
     -- первый видимый блок — D.dsp_first (полоса прокрутки); выбор другого эффекта

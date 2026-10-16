@@ -19,7 +19,8 @@ MR.BUILTIN = {
   { name = 'scramble',    body = ':scramble',     desc = 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' },
   { name = 'arp up',      body = ':arp up',       desc = 'the chord on the cursor row becomes an arpeggio up over its length' },
   { name = 'arp random',  body = ':arp random',   desc = 'the chord on the cursor row - a random arpeggio' },
-  { name = 'repeat down', body = ':repeat',       desc = 'repeat the part of the region above the cursor down to the region end' },
+  { name = 'repeat down', body = ':repeat',       desc = 'the cursor track: what is above the cursor in the pattern repeats down to its end (Ctrl+Opt+J)' },
+  { name = 'repeat all',  body = ':repeat all',   desc = 'every track: what is above the cursor row in the pattern repeats down to its end (:repeat all)' },   -- 16 окт
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
   { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
   { name = 'dedouble',    body = ':dedouble',     desc = 'doubled notes (same note at the same time) on the cursor row of the track - one is kept; VISUAL - in the selection' },

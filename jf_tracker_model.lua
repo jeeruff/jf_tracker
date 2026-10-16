@@ -1464,18 +1464,23 @@ function build_one(tr, fx, out)
       if lay.pages then
         lay_pages = {}
         for k2, p2 in ipairs(lay.pages) do lay_pages[k2] = p2.name end
+        -- группа страницы → заголовок секции перед своими rows параметрами: пропавший параметр не
+        -- сдвигает соседние группы, колонки текут по высоте блока (секции потоком, 13 окт)
+        local function sections(p2, ps)
+          local per = p2.rows or lay.rows or 6
+          for gi, g in ipairs(p2.groups or {}) do
+            ps[#ps + 1] = { head = g }
+            for k2 = (gi - 1) * per + 1, math.min(#p2.params, gi * per) do ps[#ps + 1] = p2.params[k2] end
+          end
+        end
+        local ps = {}
         if M.dsp_fold then
           lay_page = math.max(1, math.min(#lay.pages, M.dsp_page[lay.title or short] or 1))
-          local pg = lay.pages[lay_page]
-          lay = setmetatable({ params = pg.params, groups = pg.groups, cols = pg.cols or lay.cols, rows = pg.rows or lay.rows }, { __index = lay })
+          sections(lay.pages[lay_page], ps)
         else
-          local ps, gs = {}, {}
-          for _, p2 in ipairs(lay.pages) do
-            for _, g in ipairs(p2.groups or {}) do gs[#gs + 1] = g end
-            for _, sp in ipairs(p2.params) do ps[#ps + 1] = sp end
-          end
-          lay = setmetatable({ params = ps, groups = gs, cols = #gs, rows = lay.rows }, { __index = lay })
+          for _, p2 in ipairs(lay.pages) do sections(p2, ps) end
         end
+        lay = setmetatable({ params = ps, groups = false, cols = lay.cols, rows = false }, { __index = lay })
       end
       local names = {}
       local np_all = np
