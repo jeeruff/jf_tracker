@@ -4135,14 +4135,30 @@ local function klingon(w)
   end
   return table.concat(out)
 end
-D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {} }
+-- 16 окт: глаголица — буквами из церковнославянского столбца (кириллица → U+2C00…)
+local GLAG = { ['А'] = 0, ['Б'] = 1, ['В'] = 2, ['Г'] = 3, ['Д'] = 4, ['Е'] = 5, ['Ё'] = 5, ['Э'] = 5, ['Ж'] = 6, ['Ѕ'] = 7, ['З'] = 8,
+  ['И'] = 9, ['Й'] = 10, ['І'] = 11, ['К'] = 13, ['Л'] = 14, ['М'] = 15, ['Н'] = 16, ['О'] = 17, ['П'] = 18, ['Р'] = 19,
+  ['С'] = 20, ['Т'] = 21, ['У'] = 22, ['Ф'] = 23, ['Х'] = 24, ['Щ'] = 27, ['Ц'] = 28, ['Ч'] = 29, ['Ш'] = 30, ['Ъ'] = 31,
+  ['Ь'] = 32, ['Ѣ'] = 33, ['Я'] = 33, ['Ю'] = 35 }
+local function glagolitic(w)
+  local out = {}
+  for _, cp in utf8.codes(w) do
+    local ch = utf8.char(cp)
+    if ch == 'Ы' then out[#out + 1] = utf8.char(0x2C00 + 31, 0x2C00 + 11)
+    elseif GLAG[ch] then out[#out + 1] = utf8.char(0x2C00 + GLAG[ch])
+    else out[#out + 1] = ch end
+  end
+  return table.concat(out)
+end
+D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {} }
 for k, v in pairs(MW) do
   D.MODE_SCRIPT['Ponomar'][k], D.MODE_SCRIPT['Songti SC'][k], D.MODE_SCRIPT['Diwan Thuluth'][k] = v[1], v[2], v[3]
   D.MODE_SCRIPT['pIqaD qolqoS'][k] = klingon(v[4])
+  D.MODE_SCRIPT['Noto Sans Glagolitic'][k] = glagolitic(v[1])
 end
 -- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
 -- 15 окт: множитель размера — у шрифта мелкое очко при той же высоте строки (арабский был вдвое мельче)
-D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3 }
+D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 function D.draw_mode(L, sx0, sy0, sw, str, dry)
@@ -5187,14 +5203,24 @@ function D.frame(L, snap, rows, state, info)
       local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
       by = by - 1
       local ph_x = trim_x - 1 - bwh
+      -- 16 окт: не влезло в строку кнопок — во вторую, свободную строку над − + (узкий трек: m s ø ~ sro не пропадают)
+      local rest = {}
       for k, b in ipairs(c.master and {} or labels) do
         local x = bx + (k - 1) * (bwh + 1) + (k >= 3 and gap or 0)
         local bwk = bwh
         if b[4] == 'phase' then x = ph_x end
         if b[4] == 'auto' then x, bwk = trim_x, trim_w end
-        if (b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad then break end
-        if x + bwk > c.x + c.w - 1 then break end
-        if not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
+        if ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
+          rest[#rest + 1] = b
+        elseif not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
+      end
+      local by2 = hy + (L.lane_row - 1) * L.rh
+      local x2 = bx
+      local function row2(w) if mixcol or L.hr_info > 0 or x2 + w > c.x + c.w - 1 then return nil end; local x = x2; x2 = x2 + w + 1; return x end
+      for _, b in ipairs(rest) do
+        local x = row2(bwh)
+        if not x then break end
+        hbtn(b, x, by2, bwh, bhh, b[4] == 'phase')
       end
       -- route (9 окт): SRO вместо слова — S сенды, R ресивы, O аппаратные
       -- выходы; буква светится, если есть. Щелчок — окно маршрутизации трека.
@@ -5231,7 +5257,8 @@ function D.frame(L, snap, rows, state, info)
         local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad)
         local lim = mixcol and (c.x + c.w - 1) or (trim_x - hw1 - L.pad)
         local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, lim - rx))   -- 12 окт: SRO шире, сколько влезает
-        if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false) end
+        if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false)
+        elseif not D.sro_col then local w2 = ms('SRO') + 4; local x = row2(w2); if x then sro(x, by2, w2, bhh, false) end end   -- 16 окт: вторая строка
       end
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
