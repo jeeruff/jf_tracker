@@ -595,6 +595,8 @@ function S.key(c)
     S.msg = (ch == 'u' and 'undo: ' or 'redo: ') .. tostring(R.Undo_CanUndo2(0) or '')
     return true
   end
+  -- 15 окт: 4 8 — нарезка на 4 / 8 равных кусков (клавиши свободны: не ноты)
+  if (ch == '4' or ch == '8') and not S.dpend and S.entry and S.entry.item and not S.entry.file then S.button('eq' .. ch); return true end
   if S.dpend then
     S.dpend = nil
     if c ~= 27 then S.delete_key(c) else S.msg = '' end

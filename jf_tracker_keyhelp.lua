@@ -497,6 +497,7 @@ KH.PAGES = {
     { k = 'q 2 w 3 e', d = 'listen: q - the whole sample, 2 w 3 e ... - slices 1 2 3 4; keys renoise - here only this top row plays, the bottom row (s x v d n z) stays the slicer commands' },
     { k = 'gw', d = 'go to a hex position on the wave: gw, the frame as on the ruler above the wave (hex, from the sample start), Enter - the wave cursor at the nearest transient, Shift+Enter - exactly there; [ ] then set the sample start / end at it' },
     { k = '[ ]', d = 'sample start / end: at the edge of the span dragged on the wave, else at the wave cursor (gw), else at the marker of the selected slice ([ - the sample starts there, ] - it ends there: the slice before it is the last) - cuts it for all notes of the instrument (as the blue ia / ib handles)' },
+    { k = '4 8', d = 'slice the sample into 4 / 8 equal parts (the 4 / 8 buttons; s menu - other counts)' },
     { k = 'D', d = 'selection to lib' },
     { k = 'Space', d = 'preview selection' },
     { k = 'j k', t = { 'j', 'k', 'J', 'K' }, d = 'properties: row down / up' },
