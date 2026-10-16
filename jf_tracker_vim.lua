@@ -2243,6 +2243,16 @@ function V.key_impl(c)
       if (rn and (c == 123 or c == 125)) or (not rn and (c == 99 or c == 67)) then
         V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
       end
+      -- 16 окт: ` в NORMAL с клавиатурой — прослушать весь сэмпл инструмента (в INSERT ` — note-off)
+      if c == ('`'):byte() and V.mode == 'normal' then
+        local f0 = flat()[V.cur.fi]
+        local inst0 = f0 and (f0.col.pool or {})[V.inst]
+        if f0 and ctx.inst_fx and ctx.inst_fx(f0.col) then inst0 = nil end
+        local root = inst0 and (inst0.parent or inst0)
+        if f0 and ctx.preview then ctx.preview(f0.col.track, (ctx.model and ctx.model.BASE_NOTE) or 60, root and root.item, V.cur.row, 1) end
+        V.msg = root and ('whole sample: ' .. (root.name or '')) or 'whole sample: no sample instrument here'
+        return
+      end
       -- 16 окт: @ — макросы и при клавиатуре в NORMAL (Shift+2 было прослушиванием ноты — @ не работал)
       if c == 64 and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}

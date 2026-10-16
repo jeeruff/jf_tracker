@@ -175,6 +175,7 @@ KH.PAGES = {
     { k = 'Ctrl+Opt+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another; + Cmd: the whole window is a pan pad for that track - sideways pan / balance, up wider, middle 0, down narrower / reversed (dual pan: L and R apart up, crossed down)' },
     { k = 'Cmd+Shift+1..9', d = 'select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)' },
     { k = 'F11', d = 'fullscreen <-> docked (quick option title: title bar on / off)' },
+    { k = '`', d = 'NORMAL with the keyboard on: play the whole sample of the instrument (INSERT: ` is note-off)' },
     { k = 'm', d = 'keyboard on / off: on - it has priority, 1 f1 2 f2 3 ... play notes (layout qwerty: q 2 w 3 e), [ ] octave (qwerty: z x), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'zm', d = 'mixer on / off' },
     { k = 'zx', d = 'crossfade editor of REAPER: the note under the cursor and the notes of the track overlapping it' },
