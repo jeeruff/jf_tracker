@@ -4003,7 +4003,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
   } or nil
   local bigw = 0
-  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
+  -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
+  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', 2)) end; bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
   local function draw_big(bx)
     local bx0 = bx
     for _, b in ipairs(big) do
