@@ -13654,7 +13654,131 @@ ctx.ut_go = function(id)
   local msg = ctx.UTM.go(ctx.ut_state(), id, edit.undo, edit.redo)
   if msg then vim.msg = msg end
 end
+-- 16 окт: zz — дерево undo на всё окно: все ветви (своим цветом, колонки без предела), время и
+-- интервал от прошлого шага у каждого узла; внизу шкала времени — узел меткой на дорожке ветви
+ctx.ut_draw_big = function(Lx, x, y, w, h, foc, hv)
+  local ST = ctx.ut_poll()
+  local T, UTM = ST.T, ctx.UTM
+  U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
+  local rows, maxc = UTM.layout(T)
+  local rh, cw = Lx.rh, Lx.cw
+  local nb = maxc + 1
+  local t0, t1 = UTM.span(T)
+  local nlive = 0
+  for _, r in ipairs(rows) do if r.node.live then nlive = nlive + 1 end end
+  local head = ('undo tree   %d steps   %d branch%s   %d on the REAPER stack%s   j k node  Enter go  zz back')
+    :format(#rows - 1, nb, nb == 1 and '' or 'es', nlive - 1, t0 and ('   ' .. os.date('%d.%m %H:%M', t0) .. ' - ' .. os.date('%H:%M', t1)) or '')
+  U.text(x, y, ctx.fit(head, w), U.GREY)
+  local PAL = { U.TEXT, U.CYAN, U.GREEN, U.RED, U.mix(U.CYAN, U.GREEN, 0.5), U.mix(U.RED, U.AMBER, 0.5) }
+  local function bcol(c, live) local k = PAL[c % #PAL + 1]; return live and k or U.mix(k, U.PANEL, 0.55) end
+  -- шкала внизу; список — между шапкой и шкалой
+  local th = math.max(4 * rh, math.floor(h * 0.22))
+  local ty = y + h - th
+  local ly = y + rh + 4
+  local lh = ty - ly - math.floor(rh / 2)
+  local nv = math.max(1, math.floor(lh / rh))
+  local si = 1
+  for i, r in ipairs(rows) do if r.id == ST.sel then si = i end end
+  ST.scroll = math.max(0, math.min(ST.scroll or 0, #rows - nv))
+  if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
+  local gcw = math.max(6, math.min(2 * cw, math.floor(w * 0.4 / nb)))
+  local gw = nb * gcw
+  local sbw = #rows > nv and ((draw.SBW or 3) + 4) or 0
+  local rowof = {}
+  for i, r in ipairs(rows) do rowof[r.id] = i end
+  local function cy(i) return ly + (i - ST.scroll - 1) * rh + math.floor(rh / 2) end
+  local function cx(c) return x + c * gcw + math.floor(gcw / 2) end
+  for i, r in ipairs(rows) do
+    local n = r.node
+    local pi = n.parent ~= nil and rowof[n.parent]
+    if pi then
+      local y0, y1 = math.max(ly, cy(i)), math.min(ly + nv * rh - 1, cy(pi))
+      local pc = rows[pi].col
+      U.set(bcol(r.col, n.live))
+      if y1 > y0 then gfx.rect(cx(r.col), y0, 1, y1 - y0, 1) end
+      if pc ~= r.col and cy(pi) >= ly and cy(pi) < ly + nv * rh then gfx.rect(math.min(cx(pc), cx(r.col)), cy(pi), math.abs(cx(r.col) - cx(pc)) + 1, 1, 1) end
+    end
+  end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  ST.hot = nil
+  local tmw, dw = U.measure('00:00:00'), U.measure('+00m')
+  local tx = x + gw + Lx.pad
+  for i = ST.scroll + 1, math.min(#rows, ST.scroll + nv) do
+    local r = rows[i]
+    local n = r.node
+    local ry = ly + (i - ST.scroll - 1) * rh
+    local hot = mx >= x and mx < x + w - sbw and my >= ry and my < ry + rh
+    if hot then ST.hot = r.id end
+    if r.id == ST.sel then U.set(U.tint(U.AMBER, foc and 0.3 or 0.15)); gfx.rect(x, ry, w - sbw, rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w - sbw, rh, 1) end
+    local cur = r.id == T.cur
+    local reach = n.live or n.snap
+    local d = math.max(3, math.floor(rh / 3))
+    U.set(cur and U.AMBER or bcol(r.col, reach))
+    gfx.rect(cx(r.col) - d, cy(i) - d, 2 * d + 1, 2 * d + 1, (n.live or cur) and 1 or 0)
+    local tcol = cur and U.AMBER or (reach and U.TEXT or U.DIM)
+    if (n.t or 0) > 0 then U.text(tx, ry, os.date('%H:%M:%S', n.t), U.GREY) end
+    local prev = rows[i + 1]
+    local dt = prev and (n.t or 0) > 0 and (prev.node.t or 0) > 0 and (n.t - prev.node.t) or 0
+    local ds = UTM.delta(dt)
+    if ds ~= '' then U.text(tx + tmw + cw, ry, ds, dt >= 300 and U.AMBER or U.DIM) end
+    local lx = tx + tmw + dw + 2 * cw
+    local lab = (n.label or ''):gsub('^jf_tracker: ', '')
+    local tag = (not n.live) and (n.snap and '  (branch, snapshot)' or '  (branch, no snapshot)') or ''
+    U.text(lx, ry, ctx.fit((cur and '> ' or '') .. lab .. tag, x + w - sbw - lx - Lx.pad), tcol)
+  end
+  if draw.vbar then draw.vbar('undotree', x, ly, w, nv * rh, ST.scroll, nv, #rows) end
+  -- шкала времени: дорожка на ветвь (не влезают — по кругу), подписи времени — без наложений
+  U.set(U.LINE); gfx.rect(x, ty, w, 1, 1)
+  if t0 and t1 and t1 > t0 then
+    local ax0, ax1 = x + Lx.pad, x + w - Lx.pad
+    local aw = ax1 - ax0
+    local ay = ty + th - rh - 3
+    local nl = math.max(1, math.min(nb, math.floor((ay - ty - 4) / 4)))
+    local lane = math.max(3, math.floor((ay - ty - 4) / nl))
+    local function tx_of(t) return ax0 + math.floor((t - t0) / (t1 - t0) * aw + 0.5) end
+    local labw = U.measure('00:00') + 2 * cw
+    local tk, step = UTM.ticks(t0, t1, math.max(1, math.floor(aw / labw)))
+    local fmt = (step or 60) < 60 and '%H:%M:%S' or ((step or 0) >= 86400 and '%d.%m' or '%H:%M')
+    if fmt == '%H:%M:%S' then tk, step = UTM.ticks(t0, t1, math.max(1, math.floor(aw / (U.measure('00:00:00') + 2 * cw)))) end
+    local lastx = -1e9
+    for _, t in ipairs(tk) do
+      local px = tx_of(t)
+      U.set(U.DIM); gfx.rect(px, ty + 2, 1, ay - ty - 2, 1)
+      local s = os.date(fmt, t)
+      local sw = U.measure(s)
+      local lx = math.max(x, math.min(x + w - sw, px - math.floor(sw / 2)))
+      if lx > lastx + cw then U.text(lx, ay + 2, s, U.GREY); lastx = lx + sw end
+    end
+    U.set(U.LINE); gfx.rect(ax0, ay, aw, 1, 1)
+    local best, bd = nil, 1e9
+    local inside = my >= ty and my < y + h and mx >= x and mx < x + w
+    for _, r in ipairs(rows) do
+      local n = r.node
+      if (n.t or 0) > 0 then
+        local px = tx_of(n.t)
+        local ly2 = ty + 3 + (r.col % nl) * lane
+        local cur = r.id == T.cur
+        if r.id == ST.sel then U.set(U.tint(U.AMBER, 0.5)); gfx.rect(px, ty + 1, 1, ay - ty - 1, 1) end
+        U.set(cur and U.AMBER or bcol(r.col, n.live or n.snap))
+        gfx.rect(px - (cur and 1 or 0), ly2, cur and 3 or 2, lane - 1, 1)
+        if inside and math.abs(px - mx) < bd then bd, best = math.abs(px - mx), r.id end
+      end
+    end
+    if inside and best and bd < 3 * cw then ST.hot = best end
+  else
+    U.text(x + Lx.pad, ty + rh, 'timeline: the steps have no time yet', U.DIM)
+  end
+  if hv and ST.hot and gfx.mouse_cap & 1 == 1 and not ctx.ut_down then
+    ctx.ut_down = true
+    local now = reaper.time_precise()
+    if ST.sel == ST.hot and now - (ctx.ut_click or 0) < 0.35 then ctx.ut_go(ST.hot) end
+    ST.sel = ST.hot; ctx.ut_click = now; ctx.set_focus('undotree')
+  end
+  if gfx.mouse_cap & 1 == 0 then ctx.ut_down = nil end
+end
 ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
+  if state.panes and state.panes.zoom == 'undotree' then return ctx.ut_draw_big(Lx, x, y, w, h, foc, hv) end
   local ST = ctx.ut_poll()
   local T, UTM = ST.T, ctx.UTM
   U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)

@@ -86,5 +86,20 @@ do
   local L2, sn2 = UT.load(R.files['p.jf-undo'])
   eq('s: file nodes', L2.seq, S.T.seq); eq('s: file snap N', sn2[4], 'N'); eq('s: file cur', L2.cur, S.T.cur)
 end
+-- 16 окт: большой вид — шкала времени
+do
+  local T = UT.new()
+  UT.add(T, 'a', 1000); UT.add(T, 'b', 1130); UT.add(T, 'c', 4600)
+  local t0, t1 = UT.span(T)
+  eq('span: from the first timed node', t0, 1000); eq('span: to the last', t1, 4600)
+  local tk, step = UT.ticks(t0, t1, 6)
+  eq('ticks: round step that fits', step, 600)
+  eq('ticks: no more than maxn', #tk <= 6, true)
+  eq('ticks: aligned to the step', tk[1] % 600, 0)
+  eq('ticks: inside the span', tk[1] >= t0 and tk[#tk] <= t1, true)
+  eq('ticks: empty span', #UT.ticks(5, 5, 4), 0)
+  eq('delta: seconds', UT.delta(12), '+12s'); eq('delta: minutes', UT.delta(300), '+5m')
+  eq('delta: hours', UT.delta(7300), '+2h'); eq('delta: none', UT.delta(0), '')
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

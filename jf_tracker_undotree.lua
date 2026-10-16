@@ -99,6 +99,36 @@ function UT.layout(T)
   return rows, maxc
 end
 
+-- 16 окт: большой вид (zz) — шкала времени: границы по узлам с временем, шаг меток «круглый»,
+-- чтобы подписи не налезали (maxn — сколько подписей помещается)
+function UT.span(T)
+  local t0, t1
+  for _, n in pairs(T.nodes) do
+    local t = n.t or 0
+    if t > 0 then t0 = (not t0 or t < t0) and t or t0; t1 = (not t1 or t > t1) and t or t1 end
+  end
+  return t0, t1
+end
+local STEPS = { 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 604800 }
+function UT.ticks(t0, t1, maxn)
+  if not (t0 and t1) or t1 <= t0 or (maxn or 0) < 1 then return {}, nil end
+  local step = STEPS[#STEPS]
+  for _, s in ipairs(STEPS) do if (t1 - t0) / s <= maxn then step = s; break end end
+  local out = {}
+  local t = math.ceil(t0 / step) * step
+  while t <= t1 and #out < 200 do out[#out + 1] = t; t = t + step end
+  return out, step
+end
+-- интервал от прошлого шага: +12s / +5m / +2h / +3d
+function UT.delta(dt)
+  dt = math.floor(dt or 0)
+  if dt < 1 then return '' end
+  if dt < 60 then return '+' .. dt .. 's' end
+  if dt < 3600 then return '+' .. math.floor(dt / 60) .. 'm' end
+  if dt < 86400 then return '+' .. math.floor(dt / 3600) .. 'h' end
+  return '+' .. math.floor(dt / 86400) .. 'd'
+end
+
 -- ── файл событий ──────────────────────────────────────────────────────────
 local function esc(s) return (tostring(s or ''):gsub('[\n\r\t]', ' ')) end
 function UT.ev_node(n) return ('N\t%d\t%d\t%d\t%s\n'):format(n.id, n.parent or -1, math.floor(n.t or 0), esc(n.label)) end

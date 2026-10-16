@@ -270,6 +270,7 @@ KH.PAGES = {
     { k = 'j k  g G', d = 'move over the nodes (newest on top); the status says what the node is' },
     { k = 'Enter / dblclick', d = 'go there: on the current line - plain REAPER undo / redo steps; on another branch - its snapshot is restored (one new undo step, u - back)' },
     { k = 'the tree', d = 'every REAPER undo step is a node; undo and then a new edit makes a branch - the old line stays in the tree (its states were snapshotted when you left them); filled square - on the REAPER history, hollow - another branch, dim - no snapshot' },
+    { k = 'zz', d = 'the whole window: every branch in its own colour, the time of each step and the gap since the one before (+5m - amber: a pause), a timeline below - each step a mark on the lane of its branch; click a mark - select, double click - go; zz - back' },
     { k = 'file', d = 'the tree lives next to the project: Name.jf-undo (only appended); an unsaved project keeps it in memory until the first save' },
   } },
   clipboard = { title = 'clipboard: the history of yanks (the newest on top)', e = {
@@ -643,7 +644,7 @@ KH.BARS = {
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { '?', 'help' } },
   insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
              { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'help' } },
-  undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
+  undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { '?', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
