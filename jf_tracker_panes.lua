@@ -537,7 +537,14 @@ function PN.pin_mixer(model)
     end
     return false
   end
-  if par and par.ax == 'v' and ix and ix > 1 and holds(par.kids[ix - 1]) then return false end
+  -- 16 окт (ночь): стек мог оказаться в горизонтальном узле (рядом встали properties у вкладки item) —
+  -- поднимаемся по предкам до вертикального ряда, где сосед сверху держит трекер
+  local node, p2, i2 = lf, par, ix
+  while p2 do
+    if p2.ax == 'v' and i2 and i2 > 1 and holds(p2.kids[i2 - 1]) then return false end
+    node = p2
+    p2, i2 = parent_of(model, node)
+  end
   detach(model, 'mixer')
   insert_beside(model, PN.find(model, 'tracker'), leaf('mixer'), 'd', 0.28)
   return bump(model)

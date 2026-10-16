@@ -292,5 +292,14 @@ do
     eq('whole pane: its own leaf', PN.find(m2, 'tracker') ~= PN.find(m2, ids[1]), true)
   else ok('a stack with browser', false) end
 end
+-- 16 окт: миксер вкладкой в стек, который ушёл в h-узел (рядом properties у item) — остаётся
+do
+  local m3 = PN.decode('h[0.187:v[0.3:ctrl*|0.7:matrix*]|0.682:v[0.5:tracker*|0.5:h[0.6:dsp,sample,retro*|0.4:sprops*]]|0.131:v[1:inst*]] H:mixer Z:')
+  PN.stack(m3, 'mixer', 'dsp')
+  eq('mixer stays in a nested stack under the tracker', PN.pin_mixer(m3), false)
+  local m4 = PN.decode('h[0.5:v[0.5:tracker*|0.5:dsp*]|0.5:v[1:inst*]] H:mixer Z:')
+  PN.split(m4, 'inst', 'mixer', 'd')
+  eq('mixer far from the tracker goes back', PN.pin_mixer(m4), true)
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
