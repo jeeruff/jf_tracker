@@ -10752,9 +10752,25 @@ ctx = {
     ctx.set_region_len(rg, reaper.TimeMap2_QNToTime(0, rg.qn0 + qlen))
   end,
   -- запись: arm трека курсора, выбор входа, умный выбор входа (jf_smart_set_input)
-  rec_arm = function()
+  rec_arm = function(n)
     local col = cur_col(); if not col then return end
-    edit.run('rec arm', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_RECARM', col.armed and 0 or 1) end)
+    if (n or 1) <= 1 then
+      edit.run('rec arm', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_RECARM', col.armed and 0 or 1) end)
+      return
+    end
+    -- 16 окт: 6ta — N треков от курсора (по номерам REAPER): все по первому — вкл, если он выкл
+    local i0 = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER'))
+    local nums = {}; for k = 0, n - 1 do nums[#nums + 1] = i0 + k end
+    ctx.rec_arm_list(nums)
+  end,
+  -- 16 окт: t123a — запись у треков с этими номерами (как в REAPER); все — в одно положение: вкл, если первый выкл
+  rec_arm_list = function(nums)
+    local trs = {}
+    for _, k in ipairs(nums) do local tr = reaper.GetTrack(0, k - 1); if tr then trs[#trs + 1] = tr end end
+    if #trs == 0 then vim.msg = 'arm: no such tracks'; return end
+    local on = reaper.GetMediaTrackInfo_Value(trs[1], 'I_RECARM') == 0 and 1 or 0
+    edit.run('rec arm ' .. #trs, function() for _, tr in ipairs(trs) do reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', on) end end)
+    vim.msg = ('rec arm %s: tracks %s'):format(on == 1 and 'on' or 'off', table.concat(nums, ' '))
   end,
   -- smart input — отдельный скрипт; нет его — кнопки нет (5 окт, релиз)
   smart_input_path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua',

@@ -2381,6 +2381,16 @@ function V.key_impl(c)
       elseif ch == 'o' and ctx.take_fx_open then ctx.take_fx_open() end
       finish_move(); V.count = nil; return
     elseif p == 't' then
+      -- 16 окт: t + цифры — номера треков (как в REAPER, 0 = 10), потом a: t123a — запись у треков 1 2 3
+      if c >= ('0'):byte() and c <= ('9'):byte() then
+        V.tlist = (V.tlist or '') .. string.char(c); V.pending = 't'; V.msg = 't' .. V.tlist .. '  (a - arm these tracks)'; return
+      end
+      local tl = V.tlist; V.tlist = nil
+      if tl and c == ('a'):byte() and ctx.rec_arm_list then
+        local nums = {}
+        for d in tl:gmatch('%d') do nums[#nums + 1] = d == '0' and 10 or tonumber(d) end
+        ctx.rec_arm_list(nums); finish_move(); V.count = nil; return
+      elseif tl then V.msg = 't' .. tl .. ': only a (arm) takes track numbers'; finish_move(); V.count = nil; return end
       if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
       -- 10 окт: td / tx / tp — удалить / вырезать / вставить N треков (5td — пять)
       elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('p'):byte()) and ctx.tracks_op and ctx.tracks_op(c == ('d'):byte() and 'delete' or (c == ('x'):byte() and 'cut' or 'paste'), n) then finish_edit()
@@ -2393,7 +2403,7 @@ function V.key_impl(c)
         local col = ctx.cur_col and ctx.cur_col()
         if ch == 'n' and ctx.rename_track_prompt then ctx.rename_track_prompt(); V.count = nil; return   -- режим cmd уже включён
         elseif ch == 'c' and ctx.track_colour then ctx.track_colour()
-        elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm()
+        elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm(V.count)   -- 16 окт: 6ta — шесть треков от курсора
         elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)
         elseif ch == 'I' and ctx.smart_input and col then ctx.smart_input(col)   -- 10 окт: tI — активный вход (jf_smart_set_input)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
