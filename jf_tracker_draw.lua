@@ -4309,7 +4309,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
       if w1 and tr[w1] then mode = tr[w1] .. mode:sub(#w1 + 1) end
     end
   end
-  if D.modefont and mode ~= '' then
+  if D.modefont and mode ~= '' and not mode:match('^REAPER') then   -- 16 окт: REAPER — всегда контрастным битмапом
     -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
     local hpx = math.floor(3 * L.th * (D.MODE_FONT_SCALE[D.modefont] or 1))   -- 13 окт: в полтора раза крупнее (просьба)
     gfx.setfont(4, D.modefont, hpx)
@@ -4321,7 +4321,23 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
     mode = ''
   end
   while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
-  if mode ~= '' then if not dry then D.big_text(sx0, sy, mode, col, 2) end; dx = sx0 + D.big_measure(mode, 2) end
+  -- 16 окт: REAPER (клавиши у REAPER, не у трекера) — контрастно: белым на чёрном, чёрные косые полоски поверх
+  local reap = mode:match('^REAPER') ~= nil
+  if mode ~= '' then
+    if not dry then
+      if reap then
+        local bw2 = D.big_measure(mode, 2)
+        set({ 0, 0, 0 }); gfx.rect(sx0 - 2, sy - 1, bw2 + 4, 2 * L.th + 2, 1)
+        D.big_text(sx0, sy, mode, { 1, 1, 1 }, 2)
+        set({ 0, 0, 0 })
+        for k = -2 * L.th, bw2 + 2 * L.th, 5 do
+          for t = 0, 1 do gfx.line(sx0 + k + t, sy + 2 * L.th, sx0 + k + t + 2 * L.th, sy) end
+        end
+        set({ 1, 1, 1 }); gfx.rect(sx0 - 2, sy - 1, bw2 + 4, 2 * L.th + 2, 0)
+      else D.big_text(sx0, sy, mode, col, 2) end
+    end
+    dx = sx0 + D.big_measure(mode, 2)
+  end
   return dx - sx0, 2 * L.th
 end
 
