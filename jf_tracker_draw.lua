@@ -5281,7 +5281,8 @@ function D.frame(L, snap, rows, state, info)
       -- 16 окт: порядок второй строки — sro, ø, … ; ~ (автоматизация) — у правого края шапки (рисуется ниже, после sro)
       local function draw_rest()
         for _, b in ipairs(rest) do
-          if b[4] == 'auto' then
+          if b.done then b.done = nil
+          elseif b[4] == 'auto' then
             local x = c.x + c.w - L.pad - bwh
             if not mixcol and L.hr_info == 0 and x >= x2 then hbtn(b, x, by2, bwh, bhh, false) end
           else
@@ -5326,9 +5327,13 @@ function D.frame(L, snap, rows, state, info)
         local lim = mixcol and (c.x + c.w - 1) or (trim_x - hw1 - L.pad)
         local rw = math.max(ms('SRO') + 4, math.min(2 * ms('SRO') + 4, lim - rx))   -- 12 окт: SRO шире, сколько влезает
         if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false)
-        elseif not D.sro_col then local w2 = ms('SRO') + 4; local x = row2(w2); if x then sro(x, by2, w2, bhh, false) end end   -- 16 окт: вторая строка — первой
+        elseif not D.sro_col then
+          -- 16 окт: вторая строка — ø под p (панорама), за ним sro; ~ — у правого края (draw_rest)
+          for _, b in ipairs(rest) do if b[4] == 'phase' then local x = row2(math.max(ms('ø') + 4, L.btn_w)); if x then hbtn(b, x, by2, math.max(ms('ø') + 4, L.btn_w), bhh, true) end; b.done = true end end
+          local w2 = ms('SRO') + 4; local x = row2(w2); if x then sro(x, by2, w2, bhh, false) end
+        end
       end
-      draw_rest()   -- 16 окт: после sro — ø и ~ справа
+      draw_rest()   -- 16 окт: остальное второй строки и ~ справа
       -- строки 3 и 4: громкость и панорама — горизонтальные слайдеры как в DSP;
       -- панорама: stereo pan (5) — pan + width, dual pan (6) — L + R в одной строке
       local live = info.trs_live
