@@ -1380,7 +1380,7 @@ end
 function E.bsync_set(items, rep, n)
   local tk = rep and R.GetActiveTake(rep)
   if not tk then return end
-  run(n and ('beatsync %d beats'):format(n) or 'beatsync off', function()
+  run(n and ('beatsync %g beats'):format(n) or 'beatsync off', function()   -- 15 окт: %g — и дробные (паттерн x1.5, /4)
     local old = E.bsync_of(rep)
     local r0 = old and old.rate0 or R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
     local pp0 = old and old.pp0 or math.floor(R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH'))

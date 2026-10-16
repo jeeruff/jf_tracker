@@ -16,7 +16,7 @@ local U, ctx
 SP.ROWS = {
   { k = 'vol', label = 'volume' }, { k = 'pan', label = 'pan' },
   { k = 'st', label = 'transpose' }, { k = 'cent', label = 'finetune' },
-  { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'ppitch', label = 'keep pitch' },
+  { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'bspat', label = 'beatsync to' },   -- 15 окт: кнопки длины от паттерна { k = 'ppitch', label = 'keep pitch' },
   { k = 'mode', label = 'stretch' },
   { k = 'loop', label = 'loop' },
   { k = 'fin', label = 'fade in' }, { k = 'fout', label = 'fade out' },
@@ -29,6 +29,7 @@ SP.ROWS = {
 }
 
 function SP.init(u, c) U, ctx = u, c end
+SP.BSPAT = { { 'pattern', 1 }, { '/4', 0.25 }, { '/2', 0.5 }, { 'x1.5', 1.5 }, { 'x2', 2 }, { 'x3', 3 }, { 'x4', 4 } }   -- 15 окт: beatsync = паттерн × доля
 
 local function pan_txt(p) if math.abs(p or 0) < 0.005 then return 'C' end; return ((p < 0) and 'L' or 'R') .. math.floor(math.abs(p) * 100 + 0.5) end
 
@@ -40,7 +41,9 @@ function SP.value(e, k)
   if k == 'st' then return ('%+d st'):format(st) end
   if k == 'cent' then return ('%+d ct'):format(math.floor((p - st) * 100 + 0.5)) end
   if k == 'rate' then return ('%.3f'):format(e.rate or 1) .. (e.bsync and ' (bsync)' or '') end
-  if k == 'bsync' then return e.bsync and ('%d beats'):format(e.bsync) or 'off' end   -- 10 окт: без «(L: on)» в значении — клавиши в статусе
+  -- 15 окт: и в строках трекера (от LPB) — шаги, как в паттерне
+  if k == 'bsync' then local lpb = (ctx.lpb and ctx.lpb()) or 4; return e.bsync and ('%g beats · %g rows'):format(e.bsync, e.bsync * lpb) or 'off' end   -- 10 окт: без «(L: on)» в значении — клавиши в статусе
+  if k == 'bspat' then return '' end
   if k == 'ppitch' then return e.ppitch and 'on' or 'off' end
   if k == 'mode' then return ctx.pitch_mode_name(e.pmode or -1) end
   if k == 'loop' then return e.loop and 'on' or 'off' end
@@ -147,6 +150,24 @@ function SP.draw(L, x, y, w, h, e, focused)
     elseif hot0 then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
     U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), foc and U.AMBER or U.GREY)
     -- слайдер (5 окт): у чисел — дорожка между подписью и значением, тянуть мышью
+    -- 15 окт: beatsync to — кнопки: длина сэмпла = паттерн (регион курсора) × доля
+    if r.k == 'bspat' then
+      local bxx = x + lw
+      local bh0
+      for _, b in ipairs(SP.BSPAT) do
+        local bw = U.measure(b[1]) + 2 * L.pad
+        if bxx + bw > x + w then break end
+        local bh = mx >= bxx and mx < bxx + bw and my >= ry and my < ry + L.rh
+        U.set(bh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bxx, ry + 1, bw - 2, L.rh - 2, 1)
+        U.set(bh and U.AMBER or U.LINE); gfx.rect(bxx, ry + 1, bw - 2, L.rh - 2, 0)
+        U.text(bxx + L.pad - 1, ry, b[1], bh and U.AMBER or U.TEXT)
+        if bh then bh0 = b[2] end
+        bxx = bxx + bw
+      end
+      if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then SP.hover = { row = i, k = r.k, bspat = bh0 } end
+      if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end
+      goto row_done
+    end
     local vt = SP.value(e, r.k)
     local fr, centered = nil, false
     if ctx.sp_frac then fr, centered = ctx.sp_frac(e, r.k) end
@@ -174,6 +195,7 @@ function SP.draw(L, x, y, w, h, e, focused)
     -- 15 окт: val — мышь над числом значения (числовые строки): клик — ввод с клавиатуры
     if hot then SP.hover = { row = i, k = r.k, bar = SP.slider and SP.slider.k == r.k and SP.slider or nil, val = fr ~= nil and mx >= x + lw and mx < x + lw + vw - L.pad or nil } end
     if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end
+    ::row_done::
   end
 end
 

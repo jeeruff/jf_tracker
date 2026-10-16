@@ -7878,7 +7878,7 @@ ctx = {
     local items = ctx.inst_group(e)
     edit.bsync_set(items, e.item, n)
     model.invalidate()
-    vim.msg = n and ('beatsync %s: %d beats, %d note(s) fitted to the tempo where they sit'):format(e.name, n, #items) or ('beatsync off: %s, %d note(s) back to rate %.3f'):format(e.name, #items, reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(e.item), 'D_PLAYRATE'))
+    vim.msg = n and ('beatsync %s: %g beats, %d note(s) fitted to the tempo where they sit'):format(e.name, n, #items) or ('beatsync off: %s, %d note(s) back to rate %.3f'):format(e.name, #items, reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(e.item), 'D_PLAYRATE'))
   end,
   bsync_toggle = function(e)
     if not e then local col = cur_col(); e = col and col.pool[vim.inst] end
@@ -7886,6 +7886,14 @@ ctx = {
     if e.bsync then ctx.bsync_set(e, nil); return end
     local span = e.len * (e.rate or 1)
     ctx.bsync_set(e, edit.bsync_guess(span, reaper.GetCursorPosition()))
+  end,
+  -- 15 окт: beatsync = длина паттерна (регион курсора) × f
+  bsync_pattern = function(e, f)
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if not rg then vim.msg = 'beatsync to pattern: the cursor is not inside a pattern (region)'; return end
+    local beats = (rg.r1 - rg.r0) / (state.lpb or 4) * f
+    if beats <= 0 then return end
+    ctx.bsync_set(e, beats)
   end,
   bsync_adjust = function(e, d)
     if not e.bsync then if d > 0 then ctx.bsync_toggle(e) end return end
@@ -9886,6 +9894,7 @@ ctx = {
     if k == 'st' then return (math.floor(p + 0.5) + 24) / 48, true end
     if k == 'cent' then return ((p - math.floor(p + 0.5)) * 100 + 50) / 100, true end
     if k == 'rate' then return ctx.rate_frac(reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')), true end
+    if k == 'bsync' then return e.bsync and math.max(0, math.min(1, math.log(e.bsync, 2) / 7)) or 0 end   -- 15 окт: 1..128 битов, лог
     if k == 'fin' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEINLEN') / math.max(1e-3, len) end
     if k == 'fout' then return reaper.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN') / math.max(1e-3, len) end
     if k == 'snap' then return reaper.GetMediaItemInfo_Value(it, 'D_SNAPOFFSET') / math.max(1e-3, len) end
@@ -9922,6 +9931,10 @@ ctx = {
     elseif k == 'fin' then P('D_FADEINLEN', fr * len, 'abs', 'sample fade')
     elseif k == 'fout' then P('D_FADEOUTLEN', fr * len, 'abs', 'sample fade')
     elseif k == 'snap' then P('D_SNAPOFFSET', fr * len, 'abs', 'snap offset')
+    elseif k == 'bsync' then   -- 15 окт: ползунок beatsync — 1..128 битов, целые
+      local n = math.max(1, math.floor(2 ^ (fr * 7) + 0.5))
+      if n ~= e.bsync then ctx.bsync_set(e, n); e.bsync = n end
+      return
     elseif k == 'offs' then
       local src = reaper.GetMediaItemTake_Source(tk)
       local sl = src and reaper.GetMediaSourceLength(src) or 0
@@ -9933,6 +9946,7 @@ ctx = {
   -- 15 окт: клик по числу свойства — ввод значения с клавиатуры (в единицах строки: dB, st, ct, x, ms, s)
   sp_value_prompt = function(e, k)
     local v = SPROP.value and SPROP.value(e, k) or ''
+    if k == 'bsync' then v = e.bsync and ('%g'):format(e.bsync * (state.lpb or 4)) or '' end   -- в строках (16b — в битах)
     vim.open_prompt('spset ' .. k .. ' ', (v:match('^%s*([%+%-]?[%d%.]+)') or v))
   end,
   sp_set_value = function(arg)
@@ -9959,6 +9973,10 @@ ctx = {
     elseif k == 'fout' then P('D_FADEOUTLEN', math.max(0, n / 1000), 'abs', 'sample fade')
     elseif k == 'snap' then P('D_SNAPOFFSET', math.max(0, n), 'abs', 'snap offset')
     elseif k == 'offs' then P('take:D_STARTOFFS', math.max(0, n), 'abs', 'start offset')
+    elseif k == 'bsync' then   -- 15 окт: в строках (от LPB); 16b — в битах
+      local beats = t:match('b') and n or n / (state.lpb or 4)
+      if beats <= 0 then ctx.bsync_set(e, nil) else ctx.bsync_set(e, beats) end
+      return
     else vim.msg = 'value: this row takes no number'; return end
     PV.live(items); model.invalidate()
     vim.msg = ('%s = %s'):format(k, txt)
@@ -12265,6 +12283,7 @@ edit.inst_ref = function(it)
   local e = i and snap.pool and snap.pool[i]
   return e and e.item or nil
 end
+ctx.lpb = function() return state.lpb or 4 end   -- 15 окт: свойства — beatsync в строках
 SPROP.init(U, ctx)
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
 draw.tl_insts = ctx.track_insts                           -- 13 окт: плагины-инструменты в дереве
@@ -18102,6 +18121,7 @@ local function frame()
         if vim.prompt then vim.mode = vim.cmd_from or 'normal'; vim.cmdline = nil; vim.prompt = nil end   -- 15 окт: первый клик открыл ввод — двойной его закрывает
         ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.val then ctx.sp_value_prompt(e, SPROP.hover.k)   -- 15 окт: клик по числу — ввод с клавиатуры
+      elseif e and SPROP.hover.bspat then ctx.bsync_pattern(e, SPROP.hover.bspat)   -- 15 окт: beatsync = паттерн × доля
       elseif e and SPROP.hover.bar then
         local fr0 = (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w)
         SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w, fr = fr0, lx = gfx.mouse_x }   -- 15 окт: fr — для Shift (тонко)
