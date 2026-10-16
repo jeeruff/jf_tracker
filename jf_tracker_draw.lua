@@ -5704,7 +5704,7 @@ function D.frame(L, snap, rows, state, info)
         if mixcol then
           for k = 1, 6 do
             local b = labels[k]
-            hbtn(b, sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h)
+            hbtn(b, sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h, b[4] == 'arm')   -- 16 окт: запись круглая, как в шапке
           end
           local sc = D.sro_col
           if sc then sc.draw(sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0), y1 + 6 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
