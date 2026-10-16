@@ -1457,6 +1457,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать
   -- линию слайса (отпустил — сохранено), колесо — шире / уже
   S.zoom_hot = nil
+  -- 15 окт: beatsync — линейка битов по низу волны: N рисок на длину сэмпла, такт (4) — длиннее; без цифр (подписи нот рядом)
+  if e.bsync and e.bsync > 0 and len > 0 then
+    local nb = math.floor(e.bsync + 0.5)
+    for k = 0, nb do
+      local t = len * k / nb
+      if t >= va - 1e-6 and t <= vb + 1e-6 then
+        local px = tx(t)
+        local bar = k % 4 == 0
+        U.set(bar and U.AMBER or U.GREY); gfx.rect(px, wy + wh - (bar and 8 or 4), 1, bar and 8 or 4, 1)
+      end
+    end
+  end
   -- 10 окт: плейхед — белая линия в волне (и в зуме, и на полоске-обзоре ниже)
   local pht, pt0
   if ctx.item_playpos and e.item then pht, pt0 = ctx.item_playpos(e.item) end

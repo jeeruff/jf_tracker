@@ -9987,6 +9987,9 @@ ctx = {
     elseif k == 'fin' then P('D_FADEINLEN', 0, 'abs', 'sample fade reset')
     elseif k == 'fout' then P('D_FADEOUTLEN', 0, 'abs', 'sample fade reset')
     elseif k == 'bsync' then ctx.bsync_set(e, nil)
+    elseif k == 'rate' then   -- 15 окт: rate — по умолчанию x1 (beatsync — сначала выкл: иначе он задаёт rate)
+      if e.bsync then ctx.bsync_set(e, nil) end
+      P('take:D_PLAYRATE', 1, 'mul', 'sample rate reset')
     elseif k == 'tvol' then P('take:D_VOL', 1, 'mul', 'take volume reset')
     elseif k == 'offs' then P('take:D_STARTOFFS', 0, 'abs', 'start offset reset')
     elseif k == 'snap' then P('D_SNAPOFFSET', 0, 'abs', 'snap offset reset')
@@ -11536,12 +11539,19 @@ ctx = {
   -- 10 окт: плейхед в слайсере: превью этого item (нота, Shift+нота, MIDI) или транспорт поверх самого item
   item_playpos = function(item)
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return nil end
+    -- 15 окт: ось слайсера — секунды item при ИСХОДНОМ rate (beatsync его меняет): позицию — к нему, иначе плейхед отставал
+    local k = 1
+    local bs = edit.bsync_of and edit.bsync_of(item)
+    if bs and bs.rate0 and bs.rate0 > 0 then
+      local tk = reaper.GetActiveTake(item)
+      if tk then k = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') / bs.rate0 end
+    end
     local t, t0 = PV.item_pos(item)
-    if t then return t, t0 end
+    if t then return t * k, t0 end
     if reaper.GetPlayState() & 1 == 1 and reaper.GetMediaItemInfo_Value(item, 'B_MUTE') == 0 then
       local p0 = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
       local d = reaper.GetPlayPosition() - p0
-      if d >= 0 and d <= reaper.GetMediaItemInfo_Value(item, 'D_LENGTH') then return d, nil end
+      if d >= 0 and d <= reaper.GetMediaItemInfo_Value(item, 'D_LENGTH') then return d * k, nil end
     end
   end,
   preview_vol = function() return PV.vol end,
@@ -18052,8 +18062,9 @@ local function frame()
       -- 15 окт: переключатели — одним кликом (beatsync не было в списке: клик молчал, двойной — «сброс» = выкл);
       -- второй клик двойного по переключателю не сбрасывает; ползунки — двойной клик = значение по умолчанию
       local TOG = { ppitch = true, loop = true, fx = true, norm = true, mute = true, lock = true, swing = true, pthru = true, sus = true, bsync = true }
+      local DBL_RESET = { bsync = true }   -- 15 окт: beatsync — двойной клик = по умолчанию (выкл), как у ползунков
       if e and dbl and same and SPROP.hover.k == 'fx' then edit.take_chain_window(e.take)   -- окно take FX REAPER
-      elseif e and dbl and same and TOG[SPROP.hover.k] then   -- второй клик двойного — уже щёлкнул первым
+      elseif e and dbl and same and TOG[SPROP.hover.k] and not DBL_RESET[SPROP.hover.k] then   -- второй клик двойного — уже щёлкнул первым
       elseif e and dbl and same then ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.bar then SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w }; ctx.sp_set_frac(e, SPROP.hover.k, (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w))   -- слайдер (5 окт)
       elseif e and (SPROP.hover.k == 'mode' or SPROP.hover.k == 'chan' or SPROP.hover.k == 'finshape' or SPROP.hover.k == 'foutshape') then ctx.sp_menu(e, SPROP.hover.k)   -- выпадашка (5 окт)
