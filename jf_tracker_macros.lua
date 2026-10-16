@@ -19,7 +19,7 @@ MR.BUILTIN = {
   { name = 'scramble',    body = ':scramble',     desc = 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' },
   { name = 'arp up',      body = ':arp up',       desc = 'the chord on the cursor row becomes an arpeggio up over its length' },
   { name = 'arp random',  body = ':arp random',   desc = 'the chord on the cursor row - a random arpeggio' },
-  { name = 'repeat down', body = ':repeat',       desc = 'the cursor track: what is above the cursor in the pattern repeats down to its end (Ctrl+Opt+J)' },
+  { name = 'repeat down', body = ':repeat',       keys = 'Ctrl+Opt+J', desc = 'the cursor track: what is above the cursor in the pattern repeats down to its end' },
   { name = 'repeat all',  body = ':repeat all',   desc = 'every track: what is above the cursor row in the pattern repeats down to its end (:repeat all)' },   -- 16 окт
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
   { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
@@ -64,8 +64,8 @@ function MR.parse(text)
     local name, rest = line:match('^([^\t#][^\t]*)\t(.+)$')
     if name and rest then
       -- 15 окт: третья колонка — буква регистра (@x); 16 окт: четвёртая — описание
-      local body, key, desc = rest:match('^([^\t]+)\t?(%l?)\t?([^\t]*)$')
-      if body then list[#list + 1] = { name = name, body = body, key = key ~= '' and key or nil, desc = desc ~= '' and desc or nil } end
+      local body, key, desc, hk = rest:match('^([^\t]+)\t?(%l?)\t?([^\t]*)\t?([^\t]*)$')
+      if body then list[#list + 1] = { name = name, body = body, key = key ~= '' and key or nil, desc = desc ~= '' and desc or nil, hotkey = hk ~= '' and hk or nil } end   -- 16 окт: пятая — хоткей
     end
   end
   return list
@@ -73,11 +73,34 @@ end
 function MR.serialize(list)
   local out = { '# jf_tracker macros: name<TAB>body[<TAB>key[<TAB>description]]; body ":command" or vim keys (<13> = Enter, <27> = Esc); key - a register letter, @key plays it' }
   for _, m in ipairs(list) do
-    local tail = (m.key or m.desc) and ('\t' .. (m.key or '')) or ''
-    if m.desc and m.desc ~= '' then tail = tail .. '\t' .. (m.desc:gsub('[\t\n]', ' ')) end
+    local tail = (m.key or m.desc or m.hotkey) and ('\t' .. (m.key or '')) or ''
+    if (m.desc and m.desc ~= '') or m.hotkey then tail = tail .. '\t' .. ((m.desc or ''):gsub('[\t\n]', ' ')) end
+    if m.hotkey then tail = tail .. '\t' .. m.hotkey end
     out[#out + 1] = (m.name:gsub('[\t\n]', ' ')) .. '\t' .. (m.body:gsub('\n', ' ')) .. tail
   end
   return table.concat(out, '\n') .. '\n'
+end
+
+-- 16 окт: хоткей макроса — «модификаторы-код»: C ctrl, A option, M cmd, S shift ('CA-106'); подпись — словами
+function MR.hk_encode(c, m)
+  return ((m.ctrl and 'C' or '') .. (m.alt and 'A' or '') .. (m.cmd and 'M' or '') .. (m.shift and 'S' or '')) .. '-' .. tostring(c)
+end
+local SPECIAL = { [13] = 'Enter', [9] = 'Tab', [8] = 'BS', [32] = 'Space', [27] = 'Esc', [30064] = 'Up', [1685026670] = 'Down', [1818584692] = 'Left', [1919379572] = 'Right' }
+function MR.hk_label(hk, namefn)
+  local mods, code = (hk or ''):match('^(%u*)%-(%d+)$')
+  code = tonumber(code)
+  if not code then return nil end
+  local w = {}
+  if mods:find('C') then w[#w + 1] = 'Ctrl' end
+  if mods:find('A') then w[#w + 1] = 'Opt' end
+  if mods:find('M') then w[#w + 1] = 'Cmd' end
+  if mods:find('S') then w[#w + 1] = 'Shift' end
+  local nm = SPECIAL[code]
+  if not nm and code >= 1 and code <= 26 and mods:find('C') then nm = string.char(code + 64) end   -- Ctrl+буква приходит кодом 1..26
+  if not nm and namefn then nm = namefn(code) end
+  if not nm and code >= 32 and code < 127 then nm = string.char(code):upper() end
+  w[#w + 1] = nm or ('#' .. code)
+  return table.concat(w, '+')
 end
 
 -- 16 окт: обмен — файл .jfm (текст, по строке на поле): name / desc / by / key / body
@@ -119,7 +142,7 @@ function MR.rows(regs, saved, builtin, shared)
   for _, r in ipairs(rec) do rows[#rows + 1] = r end
   rows[#rows + 1] = { hdr = 'saved  (s on a recorded one, or edit the file)' }
   if #(saved or {}) == 0 then rows[#rows + 1] = { empty = 'none yet' } end
-  for _, m in ipairs(saved or {}) do rows[#rows + 1] = { kind = 'saved', name = m.name, label = m.name .. (m.key and ('  @' .. m.key) or ''), body = m.body, key = m.key, desc = m.desc } end
+  for _, m in ipairs(saved or {}) do rows[#rows + 1] = { kind = 'saved', name = m.name, label = m.name .. (m.key and ('  @' .. m.key) or ''), body = m.body, key = m.key, desc = m.desc, hotkey = m.hotkey } end
   -- 16 окт: shared — файлы .jfm папки обмена (i — в свои)
   if shared then
     rows[#rows + 1] = { hdr = 'shared  (.jfm files in Data/jf_tracker_macros - i imports into saved)' }
@@ -127,7 +150,7 @@ function MR.rows(regs, saved, builtin, shared)
     for _, m in ipairs(shared) do rows[#rows + 1] = { kind = 'shared', name = m.name, body = m.body, key = m.key, desc = m.desc, by = m.by, file = m.file } end
   end
   rows[#rows + 1] = { hdr = 'built-in' }
-  for _, m in ipairs(builtin or MR.BUILTIN) do rows[#rows + 1] = { kind = 'builtin', name = m.name, body = m.body, desc = m.desc } end
+  for _, m in ipairs(builtin or MR.BUILTIN) do rows[#rows + 1] = { kind = 'builtin', name = m.name, body = m.body, desc = m.desc, keys = m.keys, hotkey = m.hotkey } end
   return rows
 end
 local function selectable(r) return r and r.kind ~= nil end
@@ -138,9 +161,9 @@ function MR.fix_sel(rows)
 end
 
 -- 16 окт: кнопки редактора — клавиша → действие (одна функция — одна клавиша)
-MR.BUTTONS = { { 'play', 'play', 'Enter' }, { 'new', 'new', 'a' }, { 'edit', 'edit', 'e' }, { 'name', 'name', 'n' }, { 'key', 'reg', 'r' },
+MR.BUTTONS = { { 'play', 'play', 'Enter' }, { 'new', 'new', 'a' }, { 'edit', 'edit', 'e' }, { 'name', 'name', 'n' }, { 'hotkey', 'hotkey', 'K' }, { 'reg', 'reg', 'r' },
                { 'desc', 'desc', 't' }, { 'share', 'share', 'S' }, { 'import', 'import', 'i' }, { 'del', 'delete', 'd' } }
-MR.KEYS = { a = 'new', e = 'edit', n = 'name', r = 'reg', t = 'desc', S = 'share', i = 'import' }
+MR.KEYS = { a = 'new', e = 'edit', n = 'name', r = 'reg', t = 'desc', S = 'share', i = 'import', K = 'hotkey' }
 -- клавиши вкладки: действие { kind = 'play' | 'delete' | 'save' | …, row } / true — съели / nil
 function MR.key(c, rows)
   local ch = c > 0 and c < 256 and string.char(c) or ''
@@ -229,6 +252,8 @@ function MR.draw(d, x, y, w, h, rows)
       field('name', r.kind == 'rec' and ('@' .. r.name) or r.name, U.AMBER)
       field('kind', KIND[r.kind])
       field('register', r.kind == 'rec' and ('@' .. r.name) or (r.key and ('@' .. r.key) or '- (r sets one, then @x plays it)'), r.key and U.CYAN or U.GREY)
+      local hkl = r.hotkey and MR.hk_label(r.hotkey, d.key_name) or r.keys
+      field('hotkey', hkl or '- (K, then press the keys)', hkl and U.CYAN or U.DIM)
       field('desc', r.desc or '- (t writes one)', r.desc and U.TEXT or U.DIM)
       if r.by then field('by', r.by) end
       if r.file then field('file', r.file, U.GREY) end

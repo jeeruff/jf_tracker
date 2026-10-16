@@ -5676,6 +5676,7 @@ ctx = {
     reaper.RecursiveCreateDirectory(reaper.GetResourcePath() .. '/Data', 0)
     local f = io.open(ctx.mac_file(), 'w'); if not f then vim.msg = 'macros: cannot write the file'; return end
     f:write(MX.MR.serialize(list)); f:close()
+    ctx.mac_hk = nil                                       -- 16 окт: хоткеи — заново
   end,
   mac_rows = function() return MX.MR.rows(vim.regs, ctx.mac_saved(), nil, ctx.mac_shared()) end,
   -- 16 окт: обмен — папка Data/jf_tracker_macros, файлы .jfm (читаются раз в 2 с, не каждый кадр)
@@ -5696,6 +5697,27 @@ ctx = {
     table.sort(list, function(a, b) return a.name < b.name end)
     ctx.mac_sh = { t = now, list = list }
     return list
+  end,
+  -- 16 окт: хоткеи макросов — таблица «код → строка» (пересобирается при записи файла)
+  mac_hk_map = function()
+    if ctx.mac_hk then return ctx.mac_hk end
+    local map = {}
+    for _, m in ipairs(ctx.mac_saved()) do if m.hotkey then map[m.hotkey] = { kind = 'saved', name = m.name, body = m.body } end end
+    ctx.mac_hk = map
+    return map
+  end,
+  mac_set_hotkey = function(r, hk)
+    if not r then return end
+    local list, hit = ctx.mac_saved(), nil
+    for _, m in ipairs(list) do if r.kind == 'saved' and m.name == r.name and m.body == r.body then hit = m end end
+    if not hit then   -- встроенный / записанный / чужой — копией в свои (хоткей живёт в файле своих)
+      hit = { name = r.kind == 'rec' and ('macro ' .. r.name) or r.name, body = r.body, desc = r.desc }
+      list[#list + 1] = hit
+    end
+    if hk then for _, m in ipairs(list) do if m.hotkey == hk and m ~= hit then m.hotkey = nil end end end   -- один хоткей — один макрос
+    hit.hotkey = hk
+    ctx.mac_write(list)
+    vim.msg = hk and ('macro %s: hotkey %s'):format(hit.name, MX.MR.hk_label(hk, keys.name)) or ('macro %s: hotkey removed'):format(hit.name)
   end,
   -- правка поля выбранного макроса строкой ввода (:macset поле текст); встроенный / чужой — сперва копией в свои
   mac_set = function(arg)
@@ -5847,6 +5869,9 @@ ctx = {
       local fld = ({ edit = 'body', name = 'name', desc = 'desc', reg = 'key' })[a.kind]
       local cur = ({ body = r.body, name = r.name, desc = r.desc, key = r.key })[fld] or ''
       vim.open_prompt('macset ' .. fld .. ' ', cur)
+    elseif a.kind == 'hotkey' then
+      ctx.mac_hk_capture = r
+      vim.msg = ('hotkey for %s: press the keys (with Ctrl / Opt / Cmd / Shift), Esc - remove it'):format(r.kind == 'rec' and ('@' .. r.name) or r.name)
     elseif a.kind == 'share' then
       local dir = ctx.mac_dir()
       reaper.RecursiveCreateDirectory(dir, 0)
@@ -10613,7 +10638,7 @@ ctx = {
       vim.msg = 'hold needs js_ReaScriptAPI - inserted with the step length'
       return
     end
-    spec.vk = (spec.key or ''):upper():byte() or 0
+    spec.vk = (spec.key and spec.key ~= '') and keys.vk(spec.key) or 0   -- 16 окт: - = (frow) — свои коды VK
     spec.t0 = reaper.time_precise()
     spec.extra = 0
     spec.row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0))
@@ -10626,7 +10651,7 @@ ctx = {
   -- следующая — в аккорд (порядок нажатия для played); кадр пишет шаги
   arp_live_key = function(spec)
     if not reaper.JS_VKeys_GetState then vim.msg = 'arp live needs js_ReaScriptAPI'; return end
-    local vk = (spec.key or ''):upper():byte() or 0
+    local vk = (spec.key and spec.key ~= '') and keys.vk(spec.key) or 0
     local a = state.arpl
     if not a then
       local o = vim.arp_opt or { order = 'up', oct = 1, gate = 100 }
@@ -16656,7 +16681,7 @@ local function frame()
     macros_draw = function(Lx, x, y, w, h)
       local rows = ctx.mac_rows()
       ctx.mac_last = rows
-      local hv = MX.MR.draw({ U = U, L = Lx, fit = ctx.fit, hint = ctx.hint, focused = state.focus == 'top' and state.toptab == 'macros' }, x, y, w, h, rows)
+      local hv = MX.MR.draw({ U = U, L = Lx, fit = ctx.fit, hint = ctx.hint, focused = state.focus == 'top' and state.toptab == 'macros', key_name = keys.name }, x, y, w, h, rows)
       return hv
     end,
     harm_draw = function(Lx, x, y, w, h)
@@ -20702,6 +20727,18 @@ local function frame()
   if c > 0 and MX.SMART.p then MX.SMART.key(c); c = 0 end
   -- 11 окт: Shift+Space — play / 2 (половинная скорость; стоп — скорость назад); медленная запись — кнопка slow
   -- 12 окт: Ctrl+Cmd+Space — игра x0.5, Opt+Cmd+Space — x2 (было Shift+Space = x0.5; одна функция — одна клавиша)
+  -- 16 окт: хоткеи макросов — K во вкладке macros ловит следующее нажатие (Esc — снять); своё
+  -- нажатие хоткея в любом модуле проигрывает макрос (кроме набора команды / поиска / меню)
+  if c > 0 and ctx.mac_hk_capture then
+    local r = ctx.mac_hk_capture; ctx.mac_hk_capture = nil
+    ctx.mac_set_hotkey(r, c == 27 and nil or MX.MR.hk_encode(c, ctx.mods()))
+    c = 0
+  end
+  if c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    local map = ctx.mac_hk_map()
+    local r = map[MX.MR.hk_encode(c, ctx.mods())]
+    if r then ctx.mac_do({ kind = 'play', row = r }); c = 0 end
+  end
   if c == 32 and ctx.mods().cmd and (ctx.mods().ctrl or ctx.mods().alt) and not ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     ctx.half_play(ctx.mods().ctrl and 0.5 or 2); c = 0
   end
@@ -20981,7 +21018,7 @@ local function frame()
   if c > 0 and keys.piano[c] and reaper.JS_VKeys_GetUp and not ctx.mods().cmd
      and (vim.mode == 'insert' or vim.piano or (state.focus == 'top' and state.toptab == 'sample')) then
     local nk, now = ctx.note_key_last, reaper.time_precise()
-    local vk = keys.vk(string.char(c))                -- 13 окт: , . ; / — свои коды (раскладка renoise)
+    local vk = keys.vk_of(c) or 0                     -- 13 окт: , . ; / — свои коды (раскладка renoise); 16 окт: F-ряд (frow) — коды > 255
     -- 5 окт: быстрые нажатия терялись — отпускание случалось ДО обработки
     -- прошлого нажатия (медленный кадр) и не попадало в окно. Окно отпусканий
     -- начинается за длительность того кадра (+20 мс) до обработки
