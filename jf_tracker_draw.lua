@@ -6043,9 +6043,15 @@ function D.frame(L, snap, rows, state, info)
         local G = f.G or L
         local inst_ok = not (f.env or f.compact or f.folded) and G.x_inst and true or false   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
         for _, fld in ipairs(vo(fi)) do
+          -- 16 окт: колонка волны — шаг перед нотой (h с ноты, l из соседней подколонки встают на неё)
+          if fld == 1 and (G.w_wave or 0) > 0 and not (f.env or f.compact or f.folded) then
+            idx = idx + 1
+            if fi == vc.fi and vc.sub == 'wave' then cur_i = idx end
+            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'wave' } end
+          end
           idx = idx + 1
           local half = type(fld) == 'number' and fld >= 4 and not (f.env or f.compact or f.folded)   -- 12 окт: поле команды — два шага (код | значение)
-          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and vc.sub ~= 'pan' and not (half and vc.sub == 'val') then cur_i = idx end
+          if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and vc.sub ~= 'pan' and vc.sub ~= 'wave' and not (half and vc.sub == 'val') then cur_i = idx end
           if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = half and 'code' or nil } end
           if half then
             idx = idx + 1

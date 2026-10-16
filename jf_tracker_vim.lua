@@ -531,7 +531,15 @@ function motion(c, n, op)
     local sub = (fld or 1) >= 4 and 'val' or nil
     if fld == 2 and fi == cur.fi then local sv = V.cur; V.cur = { fi = fi, row = cur.row, field = 2 }; if V.pan_field_ok() then sub = 'pan' end; V.cur = sv end
     return { fi = fi, row = cur.row, field = fld, sub = sub }
-  elseif c == ('l'):byte() or c == RIGHT then local fi, fld = step_field(1, n); return { fi = fi, row = cur.row, field = fld }
+  elseif c == ('l'):byte() or c == RIGHT then
+    local fi, fld = step_field(1, n)
+    -- 16 окт: в новую подколонку с колонкой волны — сперва на волну (как h с ноты): шаг линейки прыжков
+    if fi ~= cur.fi and (fld or 1) == 1 then
+      local sv = V.cur; V.cur = { fi = fi, row = cur.row, field = 1 }
+      local w = V.wave_field_ok(); V.cur = sv
+      if w then return { fi = fi, row = cur.row, field = 1, sub = 'wave' } end
+    end
+    return { fi = fi, row = cur.row, field = fld }
   elseif c == ('H'):byte() or c == ('L'):byte() then
     local F = flat(); local f = F[cur.fi]; if not f then return nil end
     local ci = f.ci + (c == ('H'):byte() and -n or n)
