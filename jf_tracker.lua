@@ -1691,7 +1691,15 @@ ctx = {
     local cell = f and f.sub and f.sub[vim.cur.row]
     if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
     local item = cell and cell.item
-    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'dW: no item under cursor'; return false end
+    -- 15 окт: пусто под курсором — ближайший item ниже в колонке (как dW в Vim — до следующего слова)
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) and f and f.sub then
+      local best
+      for r, c in pairs(f.sub) do
+        if r > vim.cur.row and c and c.item and c.kind ~= 'cont' and c.kind ~= 'off' and (not best or r < best) then best = r end
+      end
+      if best then item = f.sub[best].item end
+    end
+    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'dW: no item under the cursor or below'; return false end
     local tr = reaper.GetMediaItemTrack(item)
     -- 15 окт: ghost-слайсы (playthru + q) — одна группа с головой: dW по голове или по куску удаляет все
     local _, gid = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_ghost', '', false)
