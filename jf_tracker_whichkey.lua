@@ -10,7 +10,7 @@ local WK = {}
 local MOTIONS = {
   { 'w', 'next event' }, { 'b', 'prev event' }, { 'e', 'event end' },
   { 'j k', 'rows' }, { 'h l', 'fields' }, { '{ }', 'bars' },
-  { '0 $', 'row start/end' }, { 'gg G', 'top / end' }, { 'H L', 'screen' },
+  { '0 $', 'row start/end' }, { 'gg G', 'top / end' }, { 'H L', 'prev / next track' },
   { '1..9', 'count: d3j' },
 }
 
@@ -37,7 +37,7 @@ local T = {
         { 'l', 'fixed lanes on / off' }, { 'f', 'add fx (fzf)' }, { 'R', 'routing (S R O)' }, { 'T', 'track template (list) - after this track' }, { 'F', 'into a folder: the track to the left becomes it' }, { 'j k', 'move right / left (3tj)' } } },
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
-  ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' } } },
+  ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' }, { 'Opt+Shift+2', 'big panel' } } },
   dsp_z = { title = 'z - router / pages', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'f', 'fold / unfold module pages (Surge: all in one pane / one page, tabs on the right)' } } },
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
         { 'a', 'automate the parameter' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },

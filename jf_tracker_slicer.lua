@@ -570,7 +570,7 @@ function S.delete_key(c)
     if S.wcur and S.wcur_e == (e and e.item) then for i, u in ipairs(S.slices) do if u <= S.wcur + 1e-6 then k = i end end end
     if not k then k = (ctx.ssel and e and ctx.ssel.item == e.item) and ctx.ssel.k or nil end
   else k = S.piano_slice and S.piano_slice(c) end
-  if not k or k < 1 or not S.slices[k] then S.msg = 'd: a slice key (2 w 3 e ...) or d - the slice under the wave cursor'; return end
+  if not k or k < 1 or not S.slices[k] then S.msg = 'd: a slice key (1 f1 2 ...; qwerty 2 w 3 e) or d - the slice under the wave cursor'; return end
   S.remove(k)
 end
 -- ближайший транзиент к t (детекция по требованию); нет — t
@@ -599,7 +599,7 @@ function S.key(c)
       local exact = mods.shift
       S.wcur = exact and t or S.snap_trans(t); S.wcur_e = S.entry.item
       S.gbuf = nil
-      S.msg = ('wave cursor %X%s - [ ] set the sample start / end here'):format(S.frame_of(S.entry, S.wcur), exact and '' or ' (snapped to a transient; Shift+Enter - exact)')
+      S.msg = ('wave cursor %X%s - g[ g] set the sample start / end here'):format(S.frame_of(S.entry, S.wcur), exact and '' or ' (snapped to a transient; Shift+Enter - exact)')
     elseif ch:match('^%x$') then S.gbuf = S.gbuf .. ch:upper()
     end
     if S.gbuf then S.msg = 'gw ' .. S.gbuf .. '_  hex frame, Enter - to the nearest transient, Shift+Enter - exact, Esc' end
@@ -617,7 +617,7 @@ function S.key(c)
     if c ~= 27 then S.delete_key(c) else S.msg = '' end
     return true
   end
-  if ch == 'd' and S.entry and not S.entry.file then S.dpend = true; S.msg = 'd: a slice key (2 w 3 e ...) deletes it, d - the slice under the wave cursor'; return true end
+  if ch == 'd' and S.entry and not S.entry.file then S.dpend = true; S.msg = 'd: a slice key (1 f1 2 ...; qwerty 2 w 3 e) deletes it, d - the slice under the wave cursor'; return true end
   if ch == '$' and S.entry and not S.entry.file then S.cut_here(); return true end
   if S.gpend then
     S.gpend = nil
@@ -1000,8 +1000,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   U.text(x, y, ctx.fit(title, vx - x - L.pad), U.TEXT)
   local hint = editing
     and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  g[ g]: edges'
-         or '2/4/8 1(16) 3(32) 6(64) equal  t transients (+ - sens)  x clear  v view')
-    or 'dblclick / :slice / \\is — edit slices;  q whole, 2 w 3 e ... slices 1 2 3 4 (INSERT)  drag: select → drop on track'
+         or 's: 2/4/8 1(16) 3(32) 6(64) equal, t transients  + - sens  x clear  v view')
+    or 'dblclick / :slice / \\is — edit slices;  1 f1 2 ... slices 1 2 3, ` whole (qwerty: q whole, 2 w 3 e)  drag: select → drop on track'
   -- громкость item и нормализация — справа в строке подсказки (1 окт)
   local hover_vol, hover_norm
   local hint_w = w
@@ -1461,7 +1461,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.rect(px0, wy, 1, wh, 1); gfx.rect(math.max(px0, px1 - 1), wy, 1, wh, 1)
   end
   local foot = (editing and S.msg ~= '' and S.msg ~= ('%d slices stored'):format(#S.slices)) and S.msg
-    or ((#slices > 0 and ctx.state and ctx.state.hints) and 'q whole  2 w 3 e ... slices  Opt+key pitch' or '')   -- 13 окт: подсказка клавиш — только при хинтах   -- 10 окт: коротко — число слайсов и так видно
+    or ((#slices > 0 and ctx.state and ctx.state.hints) and '1 f1 2 ... slices  ` whole  Opt+key pitch' or '')   -- 13 окт: подсказка клавиш — только при хинтах   -- 10 окт: коротко — число слайсов и так видно
   if sel then foot = ('sel %.3fs - %.3fs (%.3fs)  Enter: insert @cursor  D: lib  drag: to a track / the lib as a slice   '):format(math.min(sel.a, sel.b), math.max(sel.a, sel.b), math.abs(sel.b - sel.a)) .. foot end
   if span < len - 1e-6 then foot = ('zoom %.2f-%.2fs  wheel: zoom, sideways: scroll   '):format(va, vb) .. foot end
   -- зум края (10 окт, Nerve): окрестность края ±S.zwin крупно; тянуть — точно двигать

@@ -2261,13 +2261,13 @@ ctx = {
     local f = state.focus
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'matrix' or f == 'inst' or f == 'browser' or f == 'fxb' or f == 'notes' or f == 'ctrl' or f == 'tracks' or f == 'clipboard' or f == 'undotree' or f == 'actions' then return f
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
       if t == 'garden' then return 'orca' end                   -- Garden убран: только Orca
       if t == 'scope' then return 'master' end
       return KH.PAGES[t] and t or 'tracker'
+    elseif KH.PAGES[f] then return f   -- 17 окт: у slices / sprops / nmod / session и прочих — своя страница, не tracker
     end
     return 'tracker'
   end,
@@ -5262,7 +5262,7 @@ ctx = {
   drum_cell_menu = function()
     local items = {}
     for _, m in ipairs(model.DR.CELL_MODES) do
-      local d = ({ note = 'the MIDI note of the pad (C-4)', key = 'the key that plays it (q2w3er, octave z x)', wave = 'the wave of its piece', spec = 'spectral peaks of its piece (colour = frequency)' })[m]
+      local d = ({ note = 'the MIDI note of the pad (C-4)', key = 'the key that plays it (1 f1 2 f2 3, octave [ ])', wave = 'the wave of its piece', spec = 'spectral peaks of its piece (colour = frequency)' })[m]
       items[#items + 1] = { key = m:sub(1, 1), label = m .. ' - ' .. d .. ((state.drumcell or 'note') == m and '  (on)' or ''), fn = function()
         state.drumcell = m; reaper.SetExtState(EXT, 'drumcell', m, true); vim.msg = 'drumrs5k cells: ' .. m
       end }
@@ -5491,7 +5491,7 @@ ctx = {
   end,
   slicepick_cycle = function()
     state.slicepick = ({ key = 'random', random = 'seq', seq = 'key' })[state.slicepick or 'key']
-    vim.msg = 'slices: ' .. ({ key = 'by key (q 2 w ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
+    vim.msg = 'slices: ' .. ({ key = 'by key (1 f1 2 ... = slice 1 2 3 ...)', random = 'random - any slice key inserts a random slice', seq = 'sequence - any slice key inserts the next slice' })[state.slicepick]
   end,
   -- ── разделители lib (10 окт): хранит проект (ProjExtState jf_tracker/libseps,
   -- строки «gkey<TAB>узор»); строка узора — после инструмента с этим ключом
@@ -8103,7 +8103,7 @@ ctx = {
   help_big = function()
     if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end
     state.khelp_big = not state.khelp_big
-    vim.msg = state.khelp_big and 'help: / search, j k scroll, J K section, Esc or F1 - close, Shift+F1 - tutorial' or ''
+    vim.msg = state.khelp_big and 'help: / search, j k scroll, J K section, Esc or F1 - close, :tutorial - the tour' or ''
   end,
   -- ? (6 окт): действия REAPER в стиле трекера — fzf на всю матрицу,
   -- недавние сверху (ExtState jf_tracker/act_recent)
@@ -8748,8 +8748,8 @@ ctx = {
     ls_line = 'listen line: the row the cursor lands on plays, all tracks, one row long (stopped transport). = option step listen',
     pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
     lpb = 'LPB, lines per beat: how many rows make one beat (4 - a row is a 16th note, 8 - a 32nd). More rows = finer grid. Click / wheel - change',
-    inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; a , . in INSERT do the same',
-    oct = 'octave of the note keys (q w e ... = C D E ...): z - lower, x - higher; wheel changes it too',
+    inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; ( ) or Opt+J / K do the same (qwerty INSERT: , .)',
+    oct = 'octave of the note keys (1 2 3 ... = C D E ...): [ - lower, ] - higher (qwerty: z x); wheel changes it too',
     sig = 'time signature: beats per bar / beat length (4/4, 3/4, 7/8 ...). Click - type it',
     metro = 'metronome on / off; click - the menu (pattern, pre-roll, settings)',
     beats = 'where the play position is: bar and beat; the squares are the beats of this bar',
@@ -8757,7 +8757,7 @@ ctx = {
     ratebar = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2',
     swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
     swingbar = 'swing amount: drag left / right from the middle',
-    velbar = 'velocity of the inserted notes 1..127: drag; { } (renoise) or c C - step 8',
+    velbar = 'velocity of the inserted notes 1..127: drag; { } (qwerty: c C) - step 8',
     mk1 = 'go to marker 1', mk2 = 'go to marker 2', mk3 = 'go to marker 3', mk4 = 'go to marker 4', mk5 = 'go to marker 5', mk6 = 'go to marker 6', mk7 = 'go to marker 7', mk8 = 'go to marker 8', mk9 = 'go to marker 9', mk10 = 'go to marker 10 (0)',
     human = 'human: every inserted note a little different - timing, pitch, velocity / volume; click - 0 / 25 / 50 / 100 %',
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
@@ -12785,14 +12785,14 @@ ctx = {
   end,
   hydra_keys = function()
     local K = {
-      { 'hjkl', 'field / row' }, { 'HL', 'track' }, { 'wbe', 'event' }, { 'gg G {}', 'start / end, bar' },
-      { 'x dd d{m}', 'delete' }, { 'yy p', 'copy / paste' }, { 'c s m', 'replace / split / mute' },
+      { 'hjkl', 'field / row' }, { 'Opt+HL', 'track' }, { 'wbe', 'event' }, { 'gg G {}', 'start / end, bar' },
+      { 'x dd d{m}', 'delete' }, { 'yy p', 'copy / paste' }, { 'c s M', 'replace / split / mute' },
       { '^A ^X', 'field +-1' }, { 'r', 'set value' }, { 'u ^R .', 'undo / redo / repeat' },
-      { 'q @', 'macros' }, { 'v V', 'selection' }, { 'za zM zR', 'fold' }, { 'i a', 'INSERT / envelopes' },
+      { 'q @', 'macros' }, { 'v V', 'selection' }, { 'za zM', 'fold' }, { 'zr zR', 'router' }, { 'i a', 'INSERT / envelopes' },
       { '> < N>', 'loop: item to region end / region to item end / period N rows' },
-      { 'Cmd 1..0 `', 'instrument / note-off (INSERT)' }, { '[ ] ( )', 'octave / instrument' },
+      { 'Opt 1..0 `', 'instrument / whole sample (` in INSERT - note-off)' }, { '[ ] ( )', 'octave / instrument' },
       { '/ n N *', 'search' }, { ':', 'command (Tab completes)' }, { '\\', 'hydra of actions' },
-      { 'F Space Enter', 'follow / play / edit cursor' }, { 'Tab S-Tab', 'focus' }, { 'o', 'reveal in REAPER' },
+      { 'F Space Enter', 'follow / play / edit cursor' }, { 'Tab', 'next track' }, { 'Opt+Tab', 'next pane' }, { 'o', 'reveal in REAPER' },
       { 'BS Ins', 'delete / insert time (Shift: all)' }, { 'F1', 'help' },
     }
     local items = {}
@@ -18443,7 +18443,7 @@ local function frame()
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
   elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes == 'drag' and 'notes: drag the header to move the window' or hover.notes == 'resize' and 'notes: drag the corner to resize' or hover.notes:match('^zoom') and 'notes text size' or hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
-  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (?); pressed keys light up; Tab into it to search'
+  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (the help button; F1 - the whole help); pressed keys light up'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
