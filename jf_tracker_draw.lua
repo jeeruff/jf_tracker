@@ -1773,6 +1773,7 @@ function D.field_rect(L, fld)
   if fld == 'inst' then return L.x_inst or L.x_note, ms('00') end      -- поле инструмента (5 окт)
   if fld == 'slc' then return L.x_slc or L.x_note, L.w_slc or ms('S00') end   -- 11 окт: поле слайса
   if fld == 'pan' then return L.x_pan or L.x_vol, L.w_pan or ms('00') end      -- 14 окт: поле пана
+  if fld == 'wave' then return L.x_wave, L.w_wave end                          -- 16 окт: колонка волны
   if fld == 1 then return L.x_note, L.w_note
   elseif fld == 2 then return L.x_vol, L.w_vol
   elseif fld == 3 then return L.x_del, L.w_del
@@ -4093,7 +4094,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local vc = info.vcur
     local f = vc and L.flat and L.flat[vc.fi]
     if f and f.col then
-      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
+      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'wave' and 'wave') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
         or ({ 'note', 'vol', 'delay' })[vc.field or 1] or ('fx ' .. ((vc.field or 1) - 3))
       local l1 = (f.col.name ~= '' and f.col.name) or 'track'
       local l2 = ('%04d'):format(math.max(0, vc.row or 0))
@@ -6459,6 +6460,7 @@ function D.frame(L, snap, rows, state, info)
             if inv == 1 and vc.sub == 'inst' and (f.G or L).x_inst then inv = 'inst' end   -- курсор на номере инструмента
             if inv == 1 and vc.sub == 'slc' and (f.G or L).x_slc then inv = 'slc' end     -- 11 окт: курсор на слайсе
             if inv == 2 and vc.sub == 'pan' and (f.G or L).x_pan then inv = 'pan' end     -- 14 окт: курсор на пане
+            if inv == 1 and vc.sub == 'wave' and ((f.G or L).w_wave or 0) > 0 then inv = 'wave' end   -- 16 окт: курсор в волне
             D.fx_half = (type(inv) == 'number' and inv >= 4 and not c.folded and not f.env) and (vc.sub == 'val' and 'val' or 'code') or nil   -- 12 окт
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
@@ -6471,6 +6473,7 @@ function D.frame(L, snap, rows, state, info)
                 elseif half then   -- 12 окт: половина поля команды
                   local fx = D.field_rect(G, inv_f); local w2 = ms('00')
                   if half == 'val' then gfx.rect(x + fx + w2 - 1, y, w2 + 2, L.rh, 1) else gfx.rect(x + fx - 1, y, w2 + 1, L.rh, 1) end
+                elseif inv_f == 'wave' then local fx, fw = D.field_rect(G, 'wave'); set(U.AMBER); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 0)   -- 16 окт: рамкой — волна видна
                 else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
               end
               if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
@@ -6603,7 +6606,7 @@ function D.frame(L, snap, rows, state, info)
     if f and f.col then
       segs[#segs + 1] = { (f.col.name ~= '' and f.col.name) or 'track' }
       local fld = vc.field or 1
-      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
+      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'wave' and 'wave') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
         or ({ 'note', 'vol', 'delay' })[fld] or ('fx ' .. (fld - 3))
       segs[#segs + 1] = { fname, 'col' }   -- 16 окт: подпись col (было field)
       local row = math.max(0, vc.row or 0)

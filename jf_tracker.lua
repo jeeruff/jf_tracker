@@ -6965,6 +6965,52 @@ ctx = {
     if not ctx.AIM.inside(c.n, t) then return nil end
     return { item = c.item, rf = model.row_of_time(t, state.lpb) }
   end,
+  -- 16 окт: колонка волны с клавиатуры — a поставить stretch-маркер на строке, x убрать, J K — удар строки на n строк
+  -- вниз / вверх (звук тянется, соседей не перепрыгнуть)
+  wave_key = function(ch, h, row, n)
+    local it = h and h.item
+    if not (it and reaper.ValidatePtr(it, 'MediaItem*')) or h.kind ~= 'audio' then vim.msg = 'wave: not an audio note'; return end
+    local tk = reaper.GetActiveTake(it); if not tk then return end
+    local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local ta, tb = edit.row_time(row, state.lpb, 0) - p0, edit.row_time(row + 1, state.lpb, 0) - p0
+    local found
+    for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+      local _, p = reaper.GetTakeStretchMarker(tk, i)
+      if p > 1e-4 and p < len - 1e-4 and p >= ta - 1e-6 and p < tb - 1e-6 then found = i; break end
+    end
+    if ch == 'a' then
+      if found then vim.msg = 'wave: this row already has a stretch marker (J K move it, x removes)'; return end
+      if ta <= 0.002 or ta >= len - 0.002 then vim.msg = 'wave: the row is at the edge of the note'; return end
+      edit.run('stretch marker', function()
+        local have0, haveL = false, false
+        for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do local _, p = reaper.GetTakeStretchMarker(tk, i); if p < 1e-4 then have0 = true end; if math.abs(p - len) < 1e-4 then haveL = true end end
+        if not have0 then reaper.SetTakeStretchMarker(tk, -1, 0) end
+        if not haveL then reaper.SetTakeStretchMarker(tk, -1, len) end
+        reaper.SetTakeStretchMarker(tk, -1, ta)
+        reaper.UpdateItemInProject(it)
+      end)
+      vim.msg = 'stretch marker on this row - J K pull the hit, x removes'
+    elseif not found then vim.msg = 'wave: no stretch marker on this row (a puts one)'; return
+    elseif ch == 'x' then
+      edit.run('stretch marker delete', function() reaper.DeleteTakeStretchMarkers(tk, found, 1); reaper.UpdateItemInProject(it) end)
+      vim.msg = 'stretch marker removed'
+    else
+      local d = (ch == 'J' and 1 or -1) * (n or 1)
+      local _, p = reaper.GetTakeStretchMarker(tk, found)
+      local np = edit.row_time(row + d, state.lpb, 0) - p0 + (p - ta)          -- тот же сдвиг внутри строки
+      local nm = reaper.GetTakeNumStretchMarkers(tk)
+      local lo, hi = 0.002, len - 0.002
+      if found > 0 then local _, pp = reaper.GetTakeStretchMarker(tk, found - 1); lo = pp + 0.002 end
+      if found < nm - 1 then local _, pn = reaper.GetTakeStretchMarker(tk, found + 1); hi = pn - 0.002 end
+      np = math.max(lo, math.min(hi, np))
+      edit.run('stretch marker move', function() reaper.SetTakeStretchMarker(tk, found, np); reaper.UpdateItemInProject(it) end)
+      vim.cur.row = math.max(0, row + d)
+      vim.msg = ('stretch marker %+d row(s)'):format(d)
+    end
+    edit.note_modified(it)
+    model.invalidate()
+  end,
   -- 16 окт: кнопка stretch слайсера — stretch-маркеры на границах слайсов (секунды item) и на краях; старые — заменяются
   slices_to_smk = function(item, slices)
     if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end

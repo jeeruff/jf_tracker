@@ -478,6 +478,13 @@ function motion(c, n, op)
   local L = ctx.layout()
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
   elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(0, cur.row - n), linewise = true }
+  -- 16 окт: колонка волны (режим column) — подполе слева от ноты: h с ноты — в волну, l — назад на ноту
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and (cur.field or 1) == 1 and not cur.sub and V.wave_field_ok() then
+    return { fi = cur.fi, row = cur.row, field = 1, sub = 'wave' }
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'wave' then
+    return { fi = cur.fi, row = cur.row, field = 1 }
+  elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'wave' then
+    local fi, fld = step_field(-1, 1); return { fi = fi, row = cur.row, field = fld }
   -- 14 окт: колонка пана — подполе громкости: vol → pan → дальше; h с поля за ним — на пан
   elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and (cur.field or 1) == 2 and cur.sub ~= 'pan' and V.pan_field_ok() then
     return { fi = cur.fi, row = cur.row, field = 2, sub = 'pan' }
@@ -1482,6 +1489,15 @@ function V.key_impl(c)
   -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)
   if V.picker then V.picker_key(c); return end
   if V.hydra then V.hydra_key(c); return end
+  -- 16 окт: курсор в колонке волны — stretch-маркеры с клавиатуры: a поставить, x убрать, J K — удар строки на строку вниз / вверх
+  if V.cur.sub == 'wave' and not V.pending and not V.op and (V.mode == 'normal' or V.mode == 'insert') and ctx.wave_key then
+    local wch = (c < 256) and string.char(c) or ''
+    if wch == 'a' or wch == 'x' or wch == 'J' or wch == 'K' then
+      local hs = V.covering(V.cur.fi, V.cur.row)
+      if hs and hs[1] then ctx.wave_key(wch, hs[1], V.cur.row, V.count or 1) else V.msg = 'wave: no audio note on this row' end
+      V.count = nil; return
+    end
+  end
   -- 15 окт: Esc при набранном счётчике (или d в лейне мастера) — только сброс набора, режим не меняется
   if c == ESC and not V.pending and (V.count or V.mlpend) then V.count, V.mlpend = nil, nil; V.msg = ''; return end
   -- слайсер (оверлей) перехватывает всё остальное — кроме выбора инструмента /
@@ -3170,6 +3186,12 @@ function V.pan_field_ok()
   if not f or f.env or f.compact or f.folded or f.ml then return false end
   local G = f.G or ctx.layout()
   return G.x_pan and true or false
+end
+function V.wave_field_ok()   -- 16 окт: колонка волны есть у этой подколонки
+  local f = flat()[V.cur.fi]
+  if not f or f.env or f.compact or f.folded then return false end
+  local G = f.G or ctx.layout()
+  return (G.w_wave or 0) > 0
 end
 function V.inst_field_ok()
   local f = flat()[V.cur.fi]
