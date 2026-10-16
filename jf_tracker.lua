@@ -17440,7 +17440,42 @@ local function frame()
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
   elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_mixup = 'mixer above the tracker, in the headers', q_mixdn = 'mixer under the tracker', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
   elseif hover.ctrl and ctx.CTRL_TIP[hover.ctrl] then state.status = ctx.CTRL_TIP[hover.ctrl]   -- 12 окт: что делает ячейка транспорта, коротко
-  elseif hover.ctrl then state.status = 'click / wheel: ' .. hover.ctrl
+  elseif hover.ctrl then
+    -- 16 окт: ячейки главного модуля — что делает опция по-человечески (встроенные — здесь,
+    -- остальные — описание из окна Options), а не «click / wheel: имя»
+    local QD = {
+      q_mx = 'matrix: the arrangement of patterns on the left (regions as cells) - show / hide',
+      q_ruler = 'ruler: a timeline row over the tracks (beats) - on / off; more kinds in the markers menu',
+      q_hints = 'hints: every module shows its main keys in its tab row, the status explains what is under the mouse',
+      q_listen = 'listen: moving the cursor plays the row under it (step listen)',
+      debug = 'debug: writes keys with their handler, clicks and errors to REAPER/jf_tracker_debug.log, and shows the dev notes tab',
+      q_scopes = 'scopes: a small oscilloscope in every track header (a bridge plugin on the tracks and the master)',
+      q_input = 'input: the input row in the track headers - what the track records from (audio / MIDI)',
+      q_captions = 'col names: the name row over the note / vol / fx columns of every track',
+      q_names = 'names: item names on their first row in the tracker',
+      q_wave = 'wave: the waveform of audio items in the tracker (the mode stays - note field, background or its own column)',
+      q_colors = 'colours: items take their REAPER colour in the tracker',
+      q_envs = 'envs: envelope columns of the tracks (automation as rows of values)',
+      q_meters = 'meters: level meters in the track headers',
+      q_dsp = 'dsp: the effect chain of the cursor track under the tracker',
+      q_side = 'browser: the file browser (< > - left under the matrix / right under the lib)',
+      q_preview = 'preview: picking a sample in the lib or the browser plays it',
+      q_keys = 'kcast: the keys you press, shown big over the tracker (for videos and lessons; - + size)',
+      oneclick = 'one click: clicking an element (a slice, a pattern, an fx) also opens its module',
+      autofocus = 'autofocus: when the cursor lands on an element, its module opens by itself',
+      perf = 'performance: the frame time of every part of the drawing, to find what is slow',
+      follow = 'follow: the tracker scrolls with the playback',
+      lock = 'lock: the tracker cursor is the REAPER edit cursor and selects the track in REAPER',
+      fixed = 'fixed: the cursor stays in the middle of the screen, the rows scroll under it (Impulse Tracker)',
+      q_endstop = 'end stop: playback started before =END stops there (recording never stops)',
+      xfade = 'x-fade: inserted notes get a crossfade of that many ms with their neighbours (wheel - the length)',
+    }
+    local d = QD[hover.ctrl]
+    if not d then
+      local qi = ctx.qitems and ctx.qitems[hover.ctrl]
+      if qi then d = qi.label .. ': ' .. (qi.desc or '') end
+    end
+    state.status = d or ('click / wheel: ' .. hover.ctrl)
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
     for _, e in ipairs(hover.btn.col.envs or {}) do names[#names + 1] = e.name end

@@ -65,6 +65,7 @@
   .drop::first-letter { font-family: "UnifrakturMaguntia", "Luminari", "Apple Chancery", serif; float: left; font-size: 3.4em;
     line-height: 0.82; padding: 6px 10px 0 0; color: var(--amber); }
   footer { margin-top: 56px; color: var(--grey); font-size: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  pre.ex { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: var(--panel, #1c1c1c); padding: 8px 12px; overflow-x: auto; }
 </style>
 </head>
 <body>
@@ -75,7 +76,7 @@
   <a href="#signs">signs</a> <a href="#why">why</a> <a href="#start">first steps</a> <a href="#screen">on screen</a>
   <a href="#normal">NORMAL</a> <a href="#insert">INSERT</a> <a href="#edits">edits, drawn</a> <a href="#visual">VISUAL</a> <a href="#rec">rec</a> <a href="#cmd">: commands</a>
   <a href="#matrix">matrix</a> <a href="#lib">lib and slices</a> <a href="#item">item tab</a> <a href="#browser">browser</a>
-  <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#values">values by hand</a> <a href="#transport">transport</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
+  <a href="#mod">modulation</a> <a href="#dsp">DSP</a> <a href="#values">values by hand</a> <a href="#transport">transport</a> <a href="#ripple">ripple</a> <a href="#map">tracker → REAPER</a> <a href="#arch">architecture</a>
 </div>
 
 <!-- 15 окт: глоссарий знаков — первым: управление строго буквами, а где нужен знак — вот что он значит -->
@@ -434,6 +435,24 @@ instrument, velocity. Click or wheel changes a value; a click on the signature a
 one pattern. The keyboard on the left shows what the note keys play and hides with <kbd>m</kbd>; the strip stays. One look, no
 options for its position or style. The mode word is the modeline, its own row under the tracker field; the status line is
 always the bottom row of the window.</p>
+
+<h2 id="ripple">Ripple</h2>
+<figure>
+  <img src="help/ripple.png" alt="the transport strip, the rip button at the right end">
+  <figcaption><code>rip</code> at the right end of the transport strip: grey — off, cyan — on, <code>rip*</code> — all tracks.</figcaption>
+</figure>
+<p>Ripple is REAPER's own: when something is deleted, everything after it moves up to close the gap. A click on
+<code>rip</code> opens the choice: <kbd>o</kbd> off, <kbd>t</kbd> per track (only that track moves), <kbd>a</kbd> all tracks
+(the whole song moves, markers too). It works in the arrange view as well, it is the same switch.</p>
+<p>In the tracker <kbd>x</kbd> on a note with ripple on deletes the note <em>and its rows</em>:</p>
+<pre class="ex">before                 x, ripple off          x, ripple on
+00 C-4 kick            00 C-4 kick            00 C-4 kick
+01 ...                 01 ...                 01 ...
+02 D-4 snare  &lt;- x     02 ...                 02 E-4 hat
+03 ...                 03 ...                 03 ...
+04 E-4 hat             04 E-4 hat             04 ...
+                       (a hole at 02-03)      (the hat moved up)</pre>
+<p>Without ripple <kbd>x</kbd> only takes the note away and the rows stay empty.</p>
 
 <h2 id="map">Tracker → REAPER</h2>
 <table>
