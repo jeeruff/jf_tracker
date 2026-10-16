@@ -4464,6 +4464,14 @@ ctx = {
           local ok2, id = reaper.TrackFX_GetNamedConfigParm(tr, fx, 'container_item.' .. k)
           id = ok2 and tonumber(id)
           if id then
+            -- 16 окт: пэд drumrs5k с эффектами — подконтейнер [RS5K, …]: инструмент — его первый ребёнок
+            local okp, pc = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_count')
+            if okp and tonumber(pc) and tonumber(pc) > 0 then
+              local okf, fid = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_item.0')
+              local _, fnm = reaper.TrackFX_GetFXName(tr, tonumber(fid) or id, '')
+              local okfo, fo = reaper.TrackFX_GetNamedConfigParm(tr, tonumber(fid) or id, 'original_name')
+              if okf and ((okfo and fo or '') .. (fnm or '')):lower():find('reasamplomatic', 1, true) then id = tonumber(fid) end
+            end
             local _, kr = reaper.TrackFX_GetFXName(tr, id, '')
             local okn2, ko = reaper.TrackFX_GetNamedConfigParm(tr, id, 'original_name')
             local kraw = (okn2 and ko ~= '' and not (kr or ''):match('^%w+i?:')) and ko or (kr or '')

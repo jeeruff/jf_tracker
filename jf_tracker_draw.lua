@@ -214,6 +214,8 @@ end
 -- строка режется на ASCII-куски (битмап, слот 0) и глифы (TTF, слот 2,
 -- размер = высота битмапа). D.hybrid ставит main (:font 0 + :icons).
 D.hybrid = false
+-- 16 окт: знак MIDI в lib — µ (битмап без глифов его не рисует — там u)
+function D.mu() return (D.ttf or D.hybrid) and 'µ' or 'u' end
 -- не-ASCII (кириллица, Δ, ø) в битмап-режиме — TTF-шрифт на выбор (4 окт,
 -- опция letters font): k — кегль к высоте строки битмапа (заглавные вровень,
 -- по пробе), bold — жирный рядом с толстым битмапом, odd — нечётный кегль
@@ -1483,8 +1485,8 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
         if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, rhh, 1) end
         -- зум: волна куска строкой ниже подписи (как было в модуле slices)
         if rhh > L.rh and info.mini_wave and e then info.mini_wave(e, t0, t1, ix, ry + L.rh, x + w - ix - L.pad - 3, rhh - L.rh - 2, son and U.AMBER or U.mix(U.TEXT, U.BG, 0.3)) end
-      elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('## midi clips  %d'):format(rw.n); colr = U.GREY
-      elseif rw.k == 'mc' then lbl = '# ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
+      elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. (D.mu() .. ' midi clips  %d'):format(rw.n); colr = U.GREY
+      elseif rw.k == 'mc' then lbl = D.mu() .. ' ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
       elseif rw.k == 'i' or rw.k == 'c' then
         if e and e.rgb then rawset_col(e.rgb); gfx.rect(ix - 5, ry + 2, 2, L.rh - 4, 1) end
         local mk = rw.k == 'i' and (rw.nk > 0 and ((TL.open[rw.key] and '- ') or '+ ') or '  ') or ''
@@ -3582,7 +3584,7 @@ function D.transport_buttons(c)
     return { { 'tp_rew', 'rew', nil, nil, '<<' }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil, nil, '||' },
              { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil, nil, playing and '[]' or '>' },
              { 'rec', 'rec', c.recording and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' },
-             { 'loop', 'loop', c.loop and U.CYAN or nil, nil, D.ttf and '∞' or 'oo' } }
+             { 'loop', 'loop', c.loop and U.CYAN or nil, nil, (D.ttf or D.hybrid) and '∞' or 'oo' } }
   end
   if not c.tpbuttons then
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
@@ -3966,8 +3968,18 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if bi == 1 then cut(bx, by, 1, 1, fr); if not sub_on then cut(bx, by + bh - 1, 1, -1, fr) end end
       if bi == #blist then cut(bx + bw - 1, by, -1, 1, fr); if not sub_on then cut(bx + bw - 1, by + bh - 1, -1, -1, fr) end end
       local sym = b[5] or ''
+      if b[1] == 'loop' and (D.ttf or D.hybrid) then
+        -- 16 окт: ∞ лупа — крупнее строки (свой шрифт, слот 6; создаётся раз на размер), по центру кнопки
+        local px = math.max(10, math.floor(bh * 1.25))
+        if D.inf_px ~= px then gfx.setfont(6, 'Helvetica', px); D.inf_px = px else gfx.setfont(6) end
+        local gw, gh = gfx.measurestr('∞'), gfx.texth
+        set(tc); gfx.x, gfx.y = bx + math.floor((bw - gw) / 2), by + math.floor((bh - gh) / 2) + 1
+        gfx.drawstr('∞')
+        gfx.setfont(D.font_id)
+      else
       -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
       text(bx + math.floor((bw - ms(sym ~= '' and sym or b[2])) / 2), by, sym ~= '' and sym or b[2], tc)   -- 15 окт: слов (rew, play …) нет — при наведении они в статусе
+      end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
       bx = bx + bw + 2
@@ -4608,7 +4620,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local sel = info.midi_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, fit(('%02d ## midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
+      text(ix + 6, y + 1, fit(('%02d ' .. D.mu() .. ' midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
     elseif row.instfx then
@@ -4618,6 +4630,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if sel then set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local kd = row.kind or 'fx'
+      if kd == 'kit' then kd = '#' end                   -- 16 окт: # — drumrs5k / кит RS5K
       if row.col and row.col.rgb then set(row.col.rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1) end   -- чужой трек — его цветом
       local kw = math.min(ms(kd), math.floor(w * 0.35))
       text(ix + 6, y + 1, fit((row.num and ('%02d '):format(row.num) or '-- ') .. row.name, w - 12 - kw - L.pad), sel and U.CYAN or (row.col and U.GREY or U.TEXT))
@@ -4663,7 +4676,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local pre = ('%02d '):format(e.num or i)
       local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
-      if not child then body = (e.kit and '& ' or '') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ((e.kit and ms('& ')) or 0))) end
+      if not child then body = (e.kit and '& ' or '@ ') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
       local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
       local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf)))
@@ -4758,7 +4771,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
-    text(ix + 6, iy + 2 + 2 * L.rh, fit('& files kit  /N slices  ~~ automation  ## midi clips  (muted)', w - 12), U.GREY)
+    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  N$ slices  # drumrs5k  ~~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
   end
   D.pool_dbg = table.concat(dbg, ' | ')
 end
