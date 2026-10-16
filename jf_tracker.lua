@@ -12205,7 +12205,7 @@ ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
 ctx.MODEFONTS = { 'off', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
   -- 16 окт: ещё — системные и уже установленные в ~/Library/Fonts (проверено fc-list)
-  'Noto Sans Glagolitic', 'Savoye LET', 'Brush Script MT', 'SignPainter', 'Bradley Hand', 'Party LET', 'Academy Engraved LET', 'Bodoni 72 Smallcaps', 'Didot', 'Superclarendon', 'Marker Felt',
+  'Noto Sans Glagolitic', 'Savoye LET', 'Brush Script MT', 'SignPainter', 'Bradley Hand', 'Academy Engraved LET', 'Bodoni 72 Smallcaps', 'Didot', 'Superclarendon', 'Marker Felt',
   'Eau de rose', 'Discognate', 'DemonCubicBlock NKP Shade', 'P0T-NOoDLE', 'mOsOul', 'MicroKnight', 'Topaz a600a1200a400', 'DepartureMono Nerd Font', '3270 Nerd Font' }
 ctx.modefonts = function() return ctx.MODEFONTS end
 ctx.modefont_get = function() return state.modefont or 'off' end
