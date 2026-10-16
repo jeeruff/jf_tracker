@@ -89,6 +89,8 @@ KH.PAGES = {
     { k = 'Enter  gs  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with a left or middle click or h j k l + Enter; VISUAL - the whole block' },
     { k = ':xf', d = 'modifiers (15 Oct) on VISUAL / the track in the region: stretch k, reverse, rotate n, shuffle, gravity g, bounce r, fib, tuplet n, golden, vel k (also built-in macros)' },
     { k = ':mackey', d = ':mackey name x - a hotkey for the macro: @x plays it; :keys - all keys and commands as text (Data/jf_tracker_keys.md)' },
+    { k = 'π (Opt+P)', t = {}, d = 'smart paste: the clipboard buffers at the cursor - a digit / Enter pastes that one, π again - the last yank (layout qwerty: with the keyboard / INSERT π is still the note p beside)' },
+    { k = 'clipboard zz', t = {}, d = 'the clipboard pane on the whole window: buffers left, the picked one row by row right (notes, samples, velocity per track; envelope points); Enter / p - use it' },
     { k = 'macros tab', t = {}, d = 'list left, the editor of the picked one right (buttons = keys): Enter play, a new, e edit the body, n name, K hotkey (press the keys, Esc removes; it plays the macro anywhere), r register (@x), t description, S share (a .jfm file in Data/jf_tracker_macros), i import a shared one into saved, d delete; dblclick plays' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },

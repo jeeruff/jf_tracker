@@ -13116,10 +13116,67 @@ ctx.clip_label = function(r)
     or (c and ((c.kind == 'midi' and c.pitch and model.note_name(c.pitch)) or c.name or 'audio') or 'empty')
   return ('%s  %d ev  %d row(s)'):format(what, #cs, r and r.rows or 0)
 end
+-- 16 окт: содержимое буфера строками (зум клипборда): строка — ячейки по трекам (смещение колонки),
+-- нота / сэмпл и громкость; огибающая — точки
+ctx.clip_preview = function(Lx, x, y, w, h, reg)
+  if not reg then return end
+  U.text(x, y, ctx.fit(ctx.clip_label(reg), w), U.AMBER)
+  local ry = y + Lx.rh + 2
+  if reg.kind == 'env' then
+    for i, pt in ipairs(reg.pts or {}) do
+      if ry + Lx.rh > y + h then break end
+      U.text(x, ry, ctx.fit(('%04d  %.3f'):format(math.floor((pt.row or pt[1] or 0) + 0.5), pt.v or pt[2] or 0), w), U.TEXT)
+      ry = ry + Lx.rh
+    end
+    return
+  end
+  local by = {}
+  local c0, c1 = 0, 0
+  for _, c in ipairs(reg.cells or {}) do
+    by[c.drow] = by[c.drow] or {}
+    by[c.drow][c.dfi or 0] = c
+    c0, c1 = math.min(c0, c.dfi or 0), math.max(c1, c.dfi or 0)
+  end
+  local nw = U.measure('0000') + 2 * Lx.pad
+  local cw = math.max(U.measure('C#4 127'), math.floor((w - nw) / (c1 - c0 + 1)))
+  for r = 0, (reg.rows or 1) - 1 do
+    if ry + Lx.rh > y + h then break end
+    U.text(x, ry, ('%04d'):format(r), by[r] and U.GREY or U.DIM)
+    for k = c0, c1 do
+      local c = by[r] and by[r][k]
+      local cx = x + nw + (k - c0) * cw
+      if cx + cw > x + w + 1 then break end
+      local t = c and ((c.pitch and (model.note_name(c.pitch) .. ' ' .. (c.vel or ''))) or (c.name or 'audio')) or '...'
+      U.text(cx, ry, ctx.fit(t, cw - Lx.pad), c and (c.pitch and U.TEXT or U.CYAN) or U.DIM)
+    end
+    ry = ry + Lx.rh
+  end
+end
+-- 16 окт: π (Opt+P) — умная вставка: буферы панелью у курсора, цифра / щелчок — вставить, π ещё раз — последний
+ctx.clip_panel = function()
+  local CB = ctx.CB
+  if #CB.hist == 0 then vim.msg = 'paste: the clipboard is empty (yy, y + motion)'; return end
+  local items = {}
+  for i, e in ipairs(CB.hist) do
+    if i > 9 then break end
+    items[#items + 1] = { label = i .. '  ' .. e.t .. '  ' .. ctx.fit(ctx.clip_label(e.reg), L.cw * 22), t = tostring(i), tip = ctx.clip_label(e.reg), reg = e.reg }
+  end
+  local function paste(reg) vim.regs['"'] = reg; CB.last = reg; ctx.set_focus('tracker'); vim.key(('p'):byte()) end
+  ctx.smart_open({ title = 'paste from (π again - the last one, digit / Enter, Esc)', items = items, cols = 1, sel = 1,
+    on_key = function(c) if c == 960 or c == 0x75000000 + 960 then MX.SMART.close(); paste(CB.hist[1].reg); return true end end,
+    on_pick = function(it) paste(it.reg) end })
+end
 ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
   local CB = ctx.CB
   U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
   if #CB.hist == 0 then U.text(x, y, ctx.fit('clipboard: yank something (yy, y + motion) - it shows here', w), U.GREY); return end
+  -- 16 окт: широко (zz) — справа содержимое выбранного буфера
+  if w >= Lx.cw * 60 then
+    local lw = math.floor(w * 0.38)
+    U.set(U.LINE); gfx.rect(x + lw + Lx.pad, y, 1, h, 1)
+    ctx.clip_preview(Lx, x + lw + 2 * Lx.pad, y, w - lw - 2 * Lx.pad, h, CB.hist[CB.sel] and CB.hist[CB.sel].reg)
+    w = lw
+  end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local nv = math.max(1, math.floor(h / Lx.rh))
   local top = math.max(0, math.min(CB.sel - 1, #CB.hist - nv))
@@ -20788,6 +20845,11 @@ local function frame()
     ctx.mac_set_hotkey(r, c == 27 and nil or MX.MR.hk_encode(c, ctx.mods()))
     c = 0
   end
+  -- 16 окт: π (Opt+P) — умная вставка из буферов; в qwerty при клавиатуре / INSERT π — нота p рядом, не трогаем
+  if (c == 960 or c == 0x75000000 + 960) and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search'
+     and not (keys.layout == 'qwerty' and (vim.mode == 'insert' or vim.piano)) then
+    ctx.clip_panel(); c = 0
+  end
   if c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local map = ctx.mac_hk_map()
     local r = map[MX.MR.hk_encode(c, ctx.mods())]
@@ -21486,7 +21548,9 @@ local function frame()
           vim.regs['"'] = CB.hist[CB.sel].reg; CB.last = vim.regs['"']
           if ch == 'p' or ch == 'P' then ctx.set_focus('tracker'); vim.key(c) else vim.msg = 'clipboard: register ' .. ctx.clip_label(CB.hist[CB.sel].reg) .. ' - p in the tracker pastes it' end
         elseif (ch == 'd' or ch == 'x') and CB.hist[CB.sel] then table.remove(CB.hist, CB.sel); CB.sel = math.max(1, math.min(#CB.hist, CB.sel))
-        else return vim.key(c) end
+        elseif ch == 'z' then   -- 16 окт: zz — клипборд на всё окно (справа — содержимое буфера)
+          if ctx.cb_z then ctx.cb_z = nil; ctx.zz_zoom() else ctx.cb_z = true end
+        else ctx.cb_z = nil; return vim.key(c) end
       elseif state.focus == 'tracks' then   -- 11 окт: Track Manager
         if not draw.TL.typing and (vim.mode == 'cmd' or vim.mode == 'search') then return vim.key(c) end
         if not ctx.tlist_key(c) then return vim.key(c) end
