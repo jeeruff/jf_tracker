@@ -265,6 +265,7 @@ local state = {
   namedrag = flag('namedrag', false),
   typedtag = flag('typedtag', true),
   slice1 = flag('slice1', false),   -- 15 окт: слайсы: 1 = весь сэмпл, q = слайс 1   -- 15 окт: набранное (3d, [E_]) — тегом прямо на ячейке курсора
+  panecol = flag('panecol', true),   -- 17 окт: цвета панелей — у каждой вкладки свой
   focusbeacon = flag('focusbeacon', true), dimfocus = tonumber(reaper.GetExtState(EXT, 'dimamt')) or (reaper.GetExtState(EXT, 'dimfocus') == '1' and 22 or 0),   -- 15 окт: dim unfocused — сила затемнения, % (0 = выкл; было вкл/выкл)   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
   ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
@@ -306,7 +307,7 @@ local state = {
   edgezoom = reaper.GetExtState(EXT, 'edgezoom') ~= '0',
   wavebar = reaper.GetExtState(EXT, 'wavebar') ~= '0',
   waveinv = reaper.GetExtState(EXT, 'waveinv') == '1',
-  tababc = reaper.GetExtState(EXT, 'tababc') == '1',
+  tababc = reaper.GetExtState(EXT, 'tababc') ~= '0',   -- 17 окт: по умолчанию вкл
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
@@ -711,7 +712,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'panecol', 'pancol', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -10993,6 +10994,7 @@ ctx = {
       { key = 'meterstyle', label = 'meter style', kind = 'cycle', values = { 'blocks', 'pt' }, desc = 'blocks: pseudographic L R cells; pt: ProTracker bars, see-through (PT-mode uses them)', get = function() return state.meterstyle or 'blocks' end, set = function(v) state.meterstyle = v end },
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
+      flag('panecol', 'pane colours', 'every pane its own colour: the tab titles, the frame line and the selected tab out of focus - easier to tell the panes apart; the focused one stays amber'),
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
       { key = 'dimfocus', label = 'dim unfocused', kind = 'num', min = 0, max = 60, step = 2, fmt = '%d %%', desc = 'how much darker the modules without the keyboard focus are (0 = off; digits type the value)', get = function() return state.dimfocus or 0 end, set = function(v) state.dimfocus = v end },   -- 15 окт: слайдер
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
@@ -11035,7 +11037,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
-      { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'sroslash', 'masterpos', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -17870,6 +17872,12 @@ local function frame()
     ctx.dbg_cap = cap
   end
   end
+  -- 17 окт: пропущенный кадр — всё ниже в пустышку 797. Было ниже строки effects: она (и клипы, зона, макро)
+  -- в пропущенных кадрах дорисовывалась в буфер прошлого кадра — поверх опций, справки, меню
+  if gfx.dest == 1021 and idle_skip then
+    if not ctx.dummy_img then gfx.setimgdim(797, 1, 1); ctx.dummy_img = true end
+    gfx.dest = 797
+  end
 
   if ev_drag and ev_drag.active then draw.ghost(('%d event(s) %+d'):format(#ev_drag.heads, ev_drag.drow or 0)) end
   SL.draw_drag(U, L)
@@ -18018,10 +18026,7 @@ local function frame()
   -- 17 окт: копия чистого кадра стоила ~2 мс (весь кадр retina каждый кадр). Теперь пропущенный кадр не рисует
   -- наложения в буфер вовсе: они идут в пустышку 797 (1×1, всё отсекается), логика их (наведение, клики) работает,
   -- а на экран идёт буфер прошлого полного кадра — с его наложениями, нарисованными один раз
-  if gfx.dest == 1021 and idle_skip then
-    if not ctx.dummy_img then gfx.setimgdim(797, 1, 1); ctx.dummy_img = true end
-    gfx.dest = 797
-  end
+  -- (переключение на пустышку 797 — выше, сразу после тела кадра)
   draw.pmark('post: hints, ghosts, popups')
   draw.pane_badge_tracker(L, state.pane_mode)
   HN.draw(U, L)

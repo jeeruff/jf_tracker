@@ -5025,6 +5025,25 @@ local function pn_buffered(x, y, w, h, fn)
 end
 
 D.PMN = {}
+-- 17 окт: цвет панели (опция pane colours): свой оттенок у каждой, шаг по золотому сечению — соседние
+-- вкладки стопки не похожи; контраст к фону панели как у текста; rec — цвет записи. Кэш — до смены темы
+function D.pane_col(id)
+  if D.PCOL_BG ~= U.PANEL then D.PCOL, D.PCOL_BG = {}, U.PANEL end
+  local c = D.PCOL[id]
+  if c then return c end
+  if id == 'retro' then c = D.ARM
+  else
+    local idx = 1
+    for i, p in ipairs(D.panes.PANELS) do if p.id == id then idx = i; break end end
+    local h, sat, v = (0.08 + idx * 0.618034) % 1, 0.55, 0.92
+    local k = math.floor(h * 6); local f = h * 6 - k
+    local p1, q, t = v * (1 - sat), v * (1 - f * sat), v * (1 - (1 - f) * sat)
+    local rgb = ({ { v, t, p1 }, { q, v, p1 }, { p1, v, t }, { p1, q, v }, { t, p1, v }, { v, p1, q } })[k % 6 + 1]
+    c = U.readable(rgb, U.PANEL, 3.0)
+  end
+  D.PCOL[id] = c
+  return c
+end
 function D.panes_frame(L, snap, state, info, hover, ph)
   L.pn_dsp = nil
   local PN, lay = D.panes, L.pn
@@ -5052,7 +5071,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local th = c.tab.h
         local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
         local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
-        set(fon and D.FOCUS or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
+        local pcol = state.panecol and D.pane_col or nil   -- 17 окт: цвета панелей
+        set(fon and D.FOCUS or (pcol and U.mix(pcol(id), U.PANEL, 0.55)) or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
         for _, t in ipairs(c.tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
@@ -5064,13 +5084,15 @@ function D.panes_frame(L, snap, state, info, hover, ph)
               local bx, bw = tx - L.pad // 2 - 1, ms(lbl) + L.pad + 2
               -- 15 окт: вкладка в фокусе — акцентом (жёлтым), активные в других стопках — контрастно, но тише
               local soft = U.TEXT   -- 15 окт: выбранная вне фокуса — сам заголовок полным TEXT (было тише — терялся)
+              if pcol and on and not fon then soft = pcol(t.id) end   -- выбранная вне фокуса — рамка и фон её цветом
               set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.20)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
-              set(on and (fon and U.AMBER or soft) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
+              set(on and (fon and U.AMBER or soft) or (pcol and U.mix(pcol(t.id), U.PANEL, 0.6)) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
             else
               set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
             end
             local col = on and (fon and U.AMBER or U.TEXT) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
+            if pcol and not (on and fon) then col = (on or hot) and pcol(t.id) or U.mix(pcol(t.id), U.PANEL, 0.25) end
             text(tx, c.y + 1, lbl, col)
             if hot then hover.ptab = { id = t.id } end
             hint('ptab', t.x, t.y, t.w, t.h, t.id)

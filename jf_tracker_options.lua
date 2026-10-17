@@ -726,7 +726,7 @@ function O.draw(L, W, H)
       if not O.items[i] then break end
       local col, rr = (r - 1) // nvis, (r - 1) % nvis
       local x, w = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
-      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = math.min(w, O.roww or w) }
+      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = O.tab == 'hotkeys' and w or math.min(w, O.roww or w) }   -- 17 окт: хоткеи — во всю ширину (описания резались)
     end
   end
   O.masonry_on = masonry and true or nil
@@ -845,7 +845,13 @@ function O.draw(L, W, H)
         end
       elseif it.hk then
         -- хоткей (5 окт): модуль узкой колонкой, описание — своей колонкой до края
-        local mw = L.cw * 12
+        -- 17 окт: колонка модуля — по самому длинному имени (не больше 26 знаков; было 12 — «panes (tmux»)
+        if O.hk_mw_n ~= #O.items or O.hk_mw_cw ~= L.cw then
+          local m = 0
+          for _, e in ipairs(O.items) do if e.hk then m = math.max(m, U.measure(tostring(e.value or ''))) end end
+          O.hk_mw, O.hk_mw_n, O.hk_mw_cw = math.min(m + 2 * L.pad, L.cw * 26), #O.items, L.cw
+        end
+        local mw = math.max(L.cw * 12, O.hk_mw)
         U.text(vx, y + 1, ctx.fit(vt, mw - L.pad), U.GREY)
         U.text(vx + mw, y + 1, ctx.fit(it.desc or '', bx + bw - L.pad - (O.sbw or 0) - vx - mw), U.TEXT)
       else
