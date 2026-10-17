@@ -2125,6 +2125,8 @@ function V.key_impl(c)
       local mods2 = ctx.mods and ctx.mods() or {}
       local scope = (mods2.ctrl and (c == ('~'):byte() or mods2.shift)) and 'all' or (c == ('~'):byte() and 'track' or 'sub')
       V.note_off_scope(scope)
+      -- 17 окт: ` в NORMAL — весь сэмпл, в INSERT — note-off: подсказать, как вставить весь сэмпл
+      if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Cmd+1 (Cmd + a slice key - from that slice to the end)' end
       V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
@@ -2155,7 +2157,10 @@ function V.key_impl(c)
     local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
     local semis = 0
     -- 4 окт: Option — питч выбранного (слайс или весь айтем), Cmd — питч всего айтема
-    if how == 'whole' then sliced = false; how = 'insert' end
+    -- 17 окт: Cmd + клавиша слайса — весь сэмпл ОТ этого слайса (до конца, как playthru, только эта нота);
+    -- Cmd+1 — от первого; без нарезки — весь сэмпл, как было
+    local thru = false
+    if how == 'whole' then if sliced then thru = true else sliced = false end; how = 'insert' end
     -- 16 окт: кнопка $pitch — простая нота на нарезанном пишет ВЫБРАННЫЙ слайс на высоте клавиши (как Shift+Option)
     if sliced and (how == nil or how == 'insert') and ctx.slicepitch_on and ctx.slicepitch_on() then how = 'pitch' end
     if how == 'pitch' and not sliced then how = 'beside' end   -- 16 окт: Shift+Option без нарезки — как Option
@@ -2208,12 +2213,14 @@ function V.key_impl(c)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
       end
       if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end
+      E.thru_once = thru
       local okI, it = pcall(E.insert_slice, f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
-      E.cap_row = nil
+      E.cap_row, E.thru_once = nil, nil
       if not okI then error(it, 0) end
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
-      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, semis) end
+      if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not (inst0.playthru or thru) and inst0.slices[k + 1]) or inst0.len, semis) end
+      if thru then V.msg = ('slice %d to the end of the sample (Cmd + a slice key)'):format(k) end
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг

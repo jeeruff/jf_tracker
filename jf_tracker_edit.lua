@@ -1924,9 +1924,10 @@ end
 function E.slice_len(inst_item, slices, base, k, track, lane_idx, pos, keep)
   local a = slices[k]
   local full = base.len or R.GetMediaItemInfo_Value(inst_item, 'D_LENGTH')
-  local b = E.playthru(inst_item) and full or (slices[k + 1] or full)
+  local thru = E.playthru(inst_item) or E.thru_once   -- 17 окт: thru_once — Cmd + слайс, одна нота до конца сэмпла
+  local b = thru and full or (slices[k + 1] or full)
   local len = b - a
-  if E.playthru(inst_item) and track then
+  if thru and track then
     local nx = next_start(track, lane_idx, pos, keep)
     if nx then len = math.min(len, nx - pos) end
   end
@@ -3177,7 +3178,16 @@ local function env_shift(tr, t0, t1, dt, limit, mode)
   end
 end
 
-function E.time_delete(tracks, t0, t1, limit, notes)
+-- 17 окт: сдвиг ноты на nrows строк по сетке со свингом: строка и задержка внутри неё сохраняются
+-- (ровно на время строки — нечётная со свингом уезжала на чётную со «свинговой» задержкой 14, 5A …)
+local function row_shift(it, pos, lpb, nrows)
+  local r = math.floor(R.TimeMap2_timeToQN(0, pos) * lpb + 1e-6)
+  if E.swing_time(r + 1, lpb, it) <= pos + 1e-6 then r = r + 1 end
+  if r > 0 and E.swing_time(r, lpb, it) > pos + 1e-6 then r = r - 1 end
+  return E.swing_time(r + nrows, lpb, it) + (pos - E.swing_time(r, lpb, it))
+end
+E.row_shift = row_shift
+function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows)
   local dt = t1 - t0
   if dt <= 0 then return end
   run(('delete time %.3fs'):format(dt), function()
@@ -3192,7 +3202,7 @@ function E.time_delete(tracks, t0, t1, limit, notes)
         local tk = R.GetActiveTake(it)
         local audio = notes and not (tk and R.TakeIsMIDI(tk))   -- notes: строки трекера (Backspace), не длина региона
         if pos < limit - EPS and fin > t0 + EPS then
-          if pos >= t1 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos - dt)
+          if pos >= t1 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', (lpb and nrows) and row_shift(it, pos, lpb, -nrows) or (pos - dt))
           elseif audio and pos < t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(t0 - pos, (fin - pos) - math.min(dt, fin - t0)))
           elseif audio then R.DeleteTrackMediaItem(tr, it)
           elseif notes and tk and R.TakeIsMIDI(tk) and pos < t1 - EPS then
@@ -3244,7 +3254,7 @@ function E.time_delete(tracks, t0, t1, limit, notes)
   end)
 end
 
-function E.time_insert(tracks, t0, dt, limit, notes)
+function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
   if dt <= 0 then return end
   run(('insert time %.3fs'):format(dt), function()
     for _, tr in ipairs(tracks) do
@@ -3261,7 +3271,8 @@ function E.time_insert(tracks, t0, dt, limit, notes)
           local target = it
           if pos < t0 - EPS then target = R.SplitMediaItem(it, t0) end   -- правая часть едет
           if target then
-            local np = R.GetMediaItemInfo_Value(target, 'D_POSITION') + dt
+            local p0 = R.GetMediaItemInfo_Value(target, 'D_POSITION')
+            local np = (lpb and nrows and target == it) and row_shift(it, p0, lpb, nrows) or (p0 + dt)
             local len = R.GetMediaItemInfo_Value(target, 'D_LENGTH')
             if np >= limit - EPS then R.DeleteTrackMediaItem(tr, target)
             else

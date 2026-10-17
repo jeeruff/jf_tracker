@@ -88,7 +88,7 @@ function E.save() calls[#calls + 1] = 'save' end
 function E.play_stop() calls[#calls + 1] = 'play' end
 function E.cursor_to(t) calls[#calls + 1] = 'cursor:' .. t end
 function E.arpeggiate(track, lane, lpb, row, heads, opt) calls[#calls + 1] = ('arp:%s@%d:%s:%d:%d:%.2f'):format(names(heads), row, opt.order, opt.step, opt.oct, opt.gate); return 4 end
-function E.insert_slice(track, lane, lpb, row, item, k) calls[#calls + 1] = ('slice:%s@%d:%d'):format(track, row, k); return { slice = k } end
+function E.insert_slice(track, lane, lpb, row, item, k) calls[#calls + 1] = ('slice:%s@%d:%d%s'):format(track, row, k, E.thru_once and ':thru' or ''); return { slice = k } end
 function E.slice_pitch(it, semis) calls[#calls + 1] = ('slicepitch:%d:%+d'):format(it.slice, semis) end
 function E.swap_events(a, b) calls[#calls + 1] = ('swap:%s:%s'):format(a.name, b.name); return true end
 function E.scramble(heads) calls[#calls + 1] = 'scramble:' .. names(heads); return #heads end
@@ -753,9 +753,9 @@ do
   -- арп из слайсов (4 окт): :arp live, клавиша-слайс уходит в живой арп
   V.arp_live = true; keysin('w'); V.arp_live = false
   eq('arp live on a sliced sample takes slice 2 (pitch 62)', last(), 'arplive:62@' .. V.cur.row)
-  -- 4 окт: Cmd+нота — весь айтем с питчем, Ctrl+нота — удержание
+  -- 17 окт: Cmd + клавиша слайса — этот слайс до конца сэмпла (было 4 окт: весь айтем с питчем); Ctrl+нота — удержание
   cmd_down = true; keysin('w'); cmd_down = false
-  eq('Cmd+w on a sliced sample = the whole item at D', last():match('^ins:trA@%d+:62:') ~= nil, true)
+  eq('Cmd+w on a sliced sample = slice 2 to the end', last():match('^slice:trA@%d+:2:thru$') ~= nil, true)
   ctrl_down = true; V.key(23); ctrl_down = false     -- Ctrl+w
   eq('Ctrl+w = held slice 2', last(), 'hold:s2')
   V.key(27)
