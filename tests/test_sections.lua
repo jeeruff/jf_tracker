@@ -90,5 +90,33 @@ eq('codes: coded names untouched', m['AB'], nil)
 local cnt = 0; for _ in pairs(m) do cnt = cnt + 1 end
 eq('codes: aliases (same name) - one code', cnt, 1)
 
+-- 17 окт: сценарии вечера — секция drop над A1..D1 (:section drop), вставка A2..D2 за ней, зона session
+do
+  local R2 = { rg(1, 'A1', 0, 1), rg(2, 'B1', 1, 2), rg(3, 'C1', 2, 3), rg(4, 'D1', 3, 4), rg(6, 'drop', 0, 4), rg(5, '=SESSION', 4.3, 8) }
+  R2[6].session = true
+  local pats, secs = S.split(R2)
+  eq(':section drop - a section', #secs, 1); eq('section name', secs[1] and secs[1].name, 'drop')
+  eq('patterns stay slots (4 + session)', #pats, 5)
+  eq('=SESSION is never a section', R2[6].section, nil)
+  eq(':section with a code is refused (A1 verse is a pattern code)', S.code_of('A1 verse') ~= nil, true)
+  eq(':section drop has no code', S.code_of('drop'), nil)
+  -- вставка A2..D2 после секции: края секции не растут (новые паттерны не её)
+  local cen = S.census(pats, secs)
+  local R3 = { rg(1, 'A1', 0, 1), rg(2, 'B1', 1, 2), rg(3, 'C1', 2, 3), rg(4, 'D1', 3, 4), rg(6, 'drop', 0, 4),
+               rg(7, 'A2', 4, 5), rg(8, 'B2', 5, 6), rg(9, 'C2', 6, 7), rg(10, 'D2', 7, 8) }
+  local p3, s3 = S.split(R3)
+  eq('after paste: still one section', #s3, 1)
+  eq('after paste: no section edge fix', #S.resync(cen, p3, s3), 0)
+  -- удалили D1 из секции — её конец подтягивается к C1
+  local R4 = { rg(1, 'A1', 0, 1), rg(2, 'B1', 1, 2), rg(3, 'C1', 2, 3), rg(6, 'drop', 0, 4) }
+  local p4, s4 = S.split(R4)
+  local fx = S.resync(cen, p4, s4)
+  eq('slot deleted: the section shrinks to its patterns', fx[1] and fx[1].rgnend, 3)
+  -- стопка двух C1 в одном месте (баг :unstack) — оба паттерны, не секции
+  local R5 = { rg(1, 'C1', 2, 3), rg(2, 'C1', 2, 3) }
+  local p5, s5 = S.split(R5)
+  eq('stacked C1: not a section', #s5, 0); eq('stacked C1: two slots', #p5, 2)
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

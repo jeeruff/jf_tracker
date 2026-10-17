@@ -111,7 +111,7 @@ end
 function O.open_about(fn)
   local a = fn()
   O.logo, O.about, O.title = a.logo, a.text or {}, a.title
-  O.page, O.ascroll, O.active = 'about', 0, true
+  O.page, O.ascroll, O.active, O.ab_log = 'about', 0, true, nil   -- 17 окт: about открывается с начала (не в changelog)
 end
 function O.close() O.active = false; O.drag = nil end
 
@@ -146,6 +146,14 @@ function O.adjust(it, d)
   end
 end
 
+-- 17 окт: about ↔ changelog: в changelog текст с строки «changes», логотипа нет
+function O.toggle_log()
+  O.ab_log = not O.ab_log
+  O.ascroll = 0
+  if O.ab_log then
+    for i, l in ipairs(O.wrapped or {}) do if l[1] == 'changes' then O.ascroll = i - 1; break end end
+  end
+end
 function O.key(c)
   local ch = c < 256 and string.char(c) or ''
   if O.page == 'about' then
@@ -153,7 +161,8 @@ function O.key(c)
     if c == 27 or ch == 'q' or c == 13 then O.close()
     elseif ch == 'j' or c == 1685026670 then O.ascroll = math.min(math.max(0, n - 1), O.ascroll + 1)
     elseif ch == 'k' or c == 30064 then O.ascroll = math.max(0, O.ascroll - 1)
-    elseif ch == 'g' then O.ascroll = 0 end
+    elseif ch == 'g' then O.ascroll = 0
+    elseif ch == 'c' and not O.title then O.toggle_log() end
     return true
   end
   local shift = ctx.mods and ctx.mods().shift
@@ -254,6 +263,7 @@ function O.rclick()
 end
 
 function O.click(mx, my)
+  if O.page == 'about' and O.log_hot then O.toggle_log(); return end   -- 17 окт: кнопка changelog
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
   if O.close_hot and O.page ~= 'about' then O.close(); return end
   if O.tab_hot then O.set_tab(O.tab_hot); return end
@@ -293,10 +303,20 @@ local function draw_about(L, W, H)
   O.hover = nil                       -- клик по about не должен переключать опции под ним
   U.set(U.BG); gfx.rect(bx, by, bw, bh, 1)
   U.set(U.TEXT); gfx.rect(bx, by, bw, bh, 0)
-  U.text(bx + L.pad, by + 2, ctx.fit((O.title or 'about') .. '   j k / wheel: scroll   Esc: close', bw - 2 * L.pad), U.AMBER)
+  -- 17 окт: кнопка changelog (c) справа в шапке — только список изменений, без логотипа и вступления
+  local lb = O.ab_log and 'about' or 'changelog'
+  local lbw = U.measure(lb) + 2 * L.pad
+  local lbx = bx + bw - lbw - L.pad
+  O.log_hot = not O.title and gfx.mouse_x >= lbx and gfx.mouse_x < lbx + lbw and gfx.mouse_y >= by + 1 and gfx.mouse_y < by + rh + 1 or nil
+  U.text(bx + L.pad, by + 2, ctx.fit((O.title or 'about') .. '   j k / wheel: scroll   c: ' .. lb .. '   Esc: close', lbx - bx - 2 * L.pad), U.AMBER)
+  if not O.title then
+    U.set(O.log_hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(lbx, by + 1, lbw, rh, 1)
+    U.set(O.ab_log and U.AMBER or U.LINE); gfx.rect(lbx, by + 1, lbw, rh, 0)
+    U.text(lbx + L.pad, by + 2, lb, O.log_hot and U.AMBER or U.TEXT)
+  end
   U.set(U.LINE); gfx.rect(bx, by + rh + 2, bw, 1, 1)
   local y = by + rh + 2 + L.pad
-  if O.logo and LGO then
+  if O.logo and LGO and not O.ab_log then
     -- чёрная плашка с полем в клетку, как в генераторах ANSI; рисуется один
     -- раз в картинку 1022 (дизеринг попиксельный), дальше только blit
     local cw, ch = LGO.cell(O.logo, bw - 2 * L.pad - 4 * L.cw, L.cw, rh)
