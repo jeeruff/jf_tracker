@@ -83,7 +83,7 @@ KH.PAGES = {
     { k = 'W B', d = 'next / previous item start of the track (audio / MIDI items, not single notes or commands)' },
     { k = 'env: w b e dd y p', d = 'envelope points are events: motions, delete / yank / paste points (value + shape)', t = {} },
     { k = 'gg G', d = 'first row / last row' },
-    { k = 'Esc', d = 'toggles INSERT (as the edit mode in Renoise): NORMAL -> INSERT, INSERT -> NORMAL; option Esc mode = vim - only back to NORMAL' },
+    { k = 'Esc', d = 'smart: while playing - stop, the cursor on the play position (Space - stop and back); stopped - toggles INSERT (as the edit mode in Renoise); options smart Esc, Esc mode = vim - only back to NORMAL' },
     { k = 'Ctrl+O / Ctrl+I', d = 'jumps: back / forward to where you were before a jump (f label, harpoon, gg, G)' },
     { k = "'a '1..'9 '' 'd", d = "harpoon: pin the place under the cursor - a track row (tracker), a cell (matrix) or a parameter (DSP); jump to pin 1..9 (the focus goes to its module), list the pins by module (fzf), unpin; works in the tracker, the matrix and DSP; per project" },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
