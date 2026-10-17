@@ -1540,37 +1540,52 @@ local SHOPTCH = { [338] = 'q', [8222] = 'w', [8240] = 'r', [711] = 't', [193] = 
                   [8364] = '2', [8249] = '3', [64257] = '5', [64258] = '6', [8225] = '7', [183] = '9', [8218] = '0',
                   [184] = 'z', [205] = 's', [731] = 'x', [206] = 'd', [199] = 'c', [9674] = 'v', [733] = 'g',
                   [305] = 'b', [211] = 'h', [732] = 'n', [212] = 'j', [194] = 'm' }
+-- 17 окт: Option+цифра (US) и Option+нижний ряд renoise — те же клавиши нот
+local OPTDIGCH = { [161] = '1', [8482] = '2', [163] = '3', [162] = '4', [8734] = '5', [167] = '6', [182] = '7', [8226] = '8',
+                   [170] = '9', [186] = '0', [8211] = '-', [8800] = '=',
+                   [937] = 'z', [223] = 's', [8776] = 'x', [8706] = 'd', [231] = 'c', [8730] = 'v', [169] = 'g', [8747] = 'b',
+                   [729] = 'h', [732] = 'n', [8710] = 'j', [181] = 'm', [8804] = ',', [172] = 'l', [8805] = '.', [8230] = ';', [247] = '/' }
+-- 17 окт: модификаторы на нотной клавише — одна схема (пользователь):
+--   Shift — прослушать; Option — выбранный слайс на высоте клавиши (без нарезки — нота рядом, аккорд);
+--   Option+Shift — прослушать это; Ctrl — слайс от клавиши до конца сэмпла (playthru одной ноты; без нарезки —
+--   нота с удержанием); Ctrl+Shift — прослушать это; Cmd — не нота (Cmd+цифра — канал, Cmd+F1 F2 — микротон)
 function V.note_key(c, mods)
   mods = mods or {}
-  -- Cmd (3 окт): нота с удержанием — длина = сколько держали (+ j / ↓ шаги);
-  -- Cmd+Shift — то же, но сэмпл растягивается на эту длину
-  -- Cmd (4 окт): нота — питч ВСЕГО айтема (у нарезанного тоже)
-  if mods.cmd then
-    local base = c
-    local cb = (base < 256) and string.char(base) or ''
-    if SHIFTED[cb] then base = SHIFTED[cb]:byte() elseif cb:match('^[QWERTYUIOP]$') then base = cb:lower():byte() end
-    return base, 'whole'
-  end
-  -- Ctrl (4 окт): нота с удержанием — длина = сколько держали (+ j / ↓)
-  if mods.ctrl then
-    local base = (c >= 1 and c <= 26) and (c + 96) or c
-    return base, 'hold'
-  end
-  -- 16 окт: frow — Shift+F-клавиша (чёрная) — прослушать, как Shift+буква / цифра
-  if mods.shift and mods.alt and c > 255 and ctx.piano and ctx.piano[c] then return c, 'pitch' end   -- Shift+Option+F — слайс по высоте
-  if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end
-  local ch = (c < 256) and string.char(c) or ''
   local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c   -- 'u'-префикс не-ASCII (5 окт)
-  if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), 'pitch' end
-  if mods.alt and mods.shift and OPTCH[cp] then return OPTCH[cp]:byte(), 'pitch' end   -- ´ ¨ ˆ: те же знаки, что у Option
-  if OPTCH[cp] then return OPTCH[cp]:byte(), 'beside' end
-
+  local ch = (c < 256) and string.char(c) or ''
+  local function unshift(b)
+    local cb = (b < 256) and string.char(b) or ''
+    if SHIFTED[cb] then return SHIFTED[cb]:byte() end
+    if cb:match('^%u$') then return cb:lower():byte() end
+    return b
+  end
+  if mods.cmd then return c, 'cmd' end
+  if mods.ctrl then
+    local base = (c >= 1 and c <= 26) and (c + 96) or unshift(c)
+    return base, mods.shift and 'thru_aud' or 'thru'
+  end
+  if mods.alt then
+    local m = SHOPTCH[cp] or OPTCH[cp] or OPTDIGCH[cp]
+    local base = m and m:byte() or unshift(c)
+    return base, (mods.shift or SHOPTCH[cp]) and 'pitch_aud' or 'pitch'
+  end
+  if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), 'pitch_aud' end
+  if OPTCH[cp] then return OPTCH[cp]:byte(), 'pitch' end
+  if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end   -- frow: Shift+F (чёрная)
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end
-  if mods.alt and mods.shift then local b = (ch:match('^%u$') and ch:lower() or ch); return b:byte() or c, 'pitch' end
-  if mods.alt then return c, 'beside' end
+  if mods.shift and ch:match('^%u$') then return ch:lower():byte(), 'audition' end
   if mods.shift then return c, 'audition' end
   return c, 'insert'
+end
+-- 17 окт: нотная клавиша с Ctrl / Option в INSERT при клавиатуре (поле ноты) — нота, не хоткей: шаг Ctrl+цифра,
+-- инструмент Option+цифра, Ctrl+h j k l, Ctrl - + и др. пропускают её (транспоз F — при выключенной клавиатуре)
+function V.mod_note(c)
+  if not (V.mode == 'insert' and V.piano and (V.cur.field or 1) == 1 and ctx.piano) then return false end
+  local m = ctx.mods and ctx.mods() or {}
+  if m.cmd or not (m.ctrl or m.alt) then return false end
+  local b = V.note_key(c, m)
+  return ctx.piano[b] ~= nil
 end
 
 function V.key_impl(c)
@@ -1727,7 +1742,7 @@ function V.key_impl(c)
     local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 0 }
     local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local d = OPTDIG[cp] or ((mods.alt and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
-    if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
       if d == 0 then d = 10 end
       if ctx.pool_select then ctx.pool_select(d) end
       V.count = nil; return
@@ -1752,15 +1767,14 @@ function V.key_impl(c)
     end
   end
   -- 10 окт: Ctrl+цифра — длина шага (step 0..9; 0 — курсор стоит), step auto выкл
-  if mods.ctrl and not mods.alt and not mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then
+  if mods.ctrl and not mods.alt and not mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
     V.step = c - ('0'):byte(); V.step_auto = false; V.step_next = false
     V.msg = 'step ' .. V.step .. (V.step == 0 and ' - the cursor stays' or ' row(s)')
     V.count = nil; return
   end
   -- 10 окт: ⌘+цифра — прыжок на канал N (1..9, 0 = 10) в любом режиме (было —
   -- инструмент, теперь он только на Option+цифре); Ctrl+O — назад
-  if mods.cmd and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search'
-     and not ((V.mode == 'insert' or V.piano) and ctx.piano[c]) then      -- в INSERT / слое пианино ⌘+цифра — нота с удержанием
+  if mods.cmd and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then   -- 17 окт: и в INSERT (Cmd — не нота)
     local k = c - ('0'):byte(); if k == 0 then k = 10 end
     local to
     for i, f in ipairs(flat()) do if f.ci == k and not f.env then to = i; break end end
@@ -1774,6 +1788,7 @@ function V.key_impl(c)
     V.count = nil; return
   end
   local hk = HJKL[c]
+  if hk and V.mod_note(c) then hk = nil end   -- 17 окт: renoise h j l — ноты (Ctrl / Option + нота)
   -- 10 окт: Shift+Opt+J / K — транспоз выбранного инструмента −1 / +1 полутон (счётчик — на N)
   if mods.alt and mods.shift and not mods.ctrl and not mods.cmd and (hk == 'j' or hk == 'k' or c == DOWN or c == UP) and V.mode ~= 'cmd' and V.mode ~= 'search' then
     if ctx.inst_transpose then ctx.inst_transpose(((hk == 'k' or c == UP) and 1 or -1) * n) end
@@ -2130,7 +2145,7 @@ function V.key_impl(c)
       local scope = tilde and (mods2.ctrl and 'track' or 'all') or 'sub'
       V.note_off_scope(scope)
       -- 17 окт: ` в NORMAL — весь сэмпл, в INSERT — note-off: подсказать, как вставить весь сэмпл
-      if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Cmd+1 (Cmd + a slice key - from that slice to the end)' end
+      if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Ctrl+1 (Ctrl + a slice key - from that slice to the end)' end
       V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
@@ -2140,6 +2155,7 @@ function V.key_impl(c)
     -- рядом (новая подколонка), Ctrl — захват звука канала (F5, пока прослушка)
     local how, mods = 'insert', (ctx.mods and ctx.mods() or {})
     c, how = V.note_key(c, mods)
+    if how == 'cmd' then return end   -- 17 окт: Cmd — не нота (Cmd+цифра — канал, выше; Cmd+буква — ничего)
     -- нарезанный инструмент (4 окт, как Renoise): обычная MIDI-клавиатура
     -- q 2 w 3 e r 5 t …, слайс = нота: C-4 = 1, C#4 = 2 …; z / x — по 12.
     -- Option + клавиша — последний слайс с питчем этой ноты (q = исходный)
@@ -2160,18 +2176,25 @@ function V.key_impl(c)
     local SB = V.slice_base()
     local sliced = inst0 and inst0.slices and #inst0.slices > 0 and kp
     local semis = 0
-    -- 4 окт: Option — питч выбранного (слайс или весь айтем), Cmd — питч всего айтема
-    -- 17 окт: Cmd + клавиша слайса — весь сэмпл ОТ этого слайса (до конца, как playthru, только эта нота);
-    -- Cmd+1 — от первого; без нарезки — весь сэмпл, как было
+    -- 17 окт: схема модификаторов (V.note_key): Ctrl — слайс до конца сэмпла (Ctrl+1 — весь), Ctrl+Shift — прослушать;
+    -- без нарезки Ctrl — нота с удержанием. Option — выбранный слайс на высоте клавиши, Option+Shift — прослушать;
+    -- без нарезки Option — нота рядом (аккорд)
     local thru = false
-    if how == 'whole' then if sliced then thru = true else sliced = false end; how = 'insert' end
-    -- 16 окт: кнопка $pitch — простая нота на нарезанном пишет ВЫБРАННЫЙ слайс на высоте клавиши (как Shift+Option)
-    if sliced and (how == nil or how == 'insert') and ctx.slicepitch_on and ctx.slicepitch_on() then how = 'pitch' end
-    if how == 'pitch' and not sliced then how = 'beside' end   -- 16 окт: Shift+Option без нарезки — как Option
+    if how == 'thru' or how == 'thru_aud' then
+      if sliced then thru = true; how = how == 'thru_aud' and 'audition' or 'insert'
+      else how = how == 'thru_aud' and 'audition' or 'hold' end
+    end
+    local paud = how == 'pitch_aud'
+    if paud then how = 'pitch' end
+    -- 16 окт: кнопка $pitch — простая нота на нарезанном пишет ВЫБРАННЫЙ слайс на высоте клавиши (как Option)
+    if sliced and (how == nil or how == 'insert') and not thru and ctx.slicepitch_on and ctx.slicepitch_on() then how = 'pitch' end
+    if how == 'pitch' and not sliced then how = paud and 'audition' or 'beside' end   -- без нарезки: Option — рядом
     if sliced and how == 'pitch' then
       local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
-      if selk == 0 then sliced = false; how = 'insert'
-      else semis = kp - (SB - 1); kp = SB + selk - 1; how = 'insert' end
+      -- 17 окт: опция slice pitch from 6 — 0 полутонов на 6-й белой (A): на одной октаве и вниз, и вверх
+      local ctr = (st.slicepitch0 == '6') and 9 or 0
+      if selk == 0 then sliced = false; how = paud and 'audition' or 'insert'
+      else semis = kp - (SB - 1) - ctr; kp = SB + selk - 1; how = paud and 'audition' or 'insert' end
     end
     if sliced and kp - SB + 1 == 0 then                              -- q (slice1: 1): весь сэмпл — обычный путь ноты
       sliced = false
@@ -2199,7 +2222,7 @@ function V.key_impl(c)
         return
       end
       if how == 'audition' or how == 'capture' then
-        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, semis) end
+        if t0s and ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, t0s, (not (inst0.playthru or thru) and inst0.slices[k + 1]) or inst0.len, semis) end
         if how == 'capture' then V.msg = 'Ctrl+note: capture of the channel output is planned (F5) - auditioned only' end
         return
       end
@@ -2224,7 +2247,7 @@ function V.key_impl(c)
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not (inst0.playthru or thru) and inst0.slices[k + 1]) or inst0.len, semis) end
-      if thru then V.msg = ('slice %d to the end of the sample (Cmd + a slice key)'):format(k) end
+      if thru then V.msg = ('slice %d to the end of the sample (Ctrl + a slice key)'):format(k) end
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
@@ -2330,6 +2353,9 @@ function V.key_impl(c)
       if V.is_mac_key(c) and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}
       local base, how = V.note_key(c, mods)
+      if how == 'cmd' then base = -1 end   -- 17 окт: Cmd — не нота (Cmd+цифра — канал)
+      local thru0 = how == 'thru' or how == 'thru_aud'   -- 17 окт: Ctrl — слайс до конца сэмпла
+      if how == 'pitch_aud' then how = 'pitch' end
       if ctx.piano and ctx.piano[base] then
         local f0 = flat()[V.cur.fi]
         local inst0 = f0 and (f0.col.pool or {})[V.inst]
@@ -2341,11 +2367,12 @@ function V.key_impl(c)
         local SB0 = V.slice_base()
         local sliced0 = inst0 and inst0.slices and #inst0.slices > 0 and kp0
         local psemis, k = 0, nil
-        if sliced0 and how ~= 'whole' then
+        if thru0 then how = sliced0 and 'insert' or 'hold' end
+        if sliced0 then
           if how == 'pitch' or ((how == nil or how == 'insert') and ctx.slicepitch_on and ctx.slicepitch_on()) then how = 'beside' end   -- 16 окт: $pitch / Shift+Option
           if how == 'beside' then
             local selk = (ctx.selected_slice and ctx.selected_slice(inst0)) or V.last_slice or 1
-            if selk > 0 then k = selk; psemis = kp0 - (SB0 - 1) end
+            if selk > 0 then k = selk; psemis = kp0 - (SB0 - 1) - ((st.slicepitch0 == '6') and 9 or 0) end
           else k = kp0 - SB0 + 1; if k == 0 then k = nil end end             -- q: весь сэмпл
         end
         if k and (k < 1 or k > #inst0.slices) then V.msg = ('no slice %d'):format(k); return end
@@ -2357,7 +2384,7 @@ function V.key_impl(c)
             if ctx.hold_start then ctx.hold_start({ track = f0.col.track, lane_idx = f0.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch, slice = k,
               item = inst0 and inst0.item, entry = inst0, vel = V.vel, stretch = how == 'hold_stretch', key = chq }) end
           elseif k then
-            if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], (not inst0.playthru and inst0.slices[k + 1]) or inst0.len, psemis) end
+            if ctx.preview_slice then ctx.preview_slice(f0.col.track, inst0, inst0.slices[k], (not (inst0.playthru or thru0) and inst0.slices[k + 1]) or inst0.len, psemis) end
           elseif ctx.preview then ctx.preview(f0.col.track, pitch, inst0 and inst0.item, V.cur.row, 1, nil, chq) end   -- chq — клавиша: луп удержания до отпускания
         end
         return
@@ -2483,7 +2510,8 @@ function V.key_impl(c)
         local heads = V.heads_in(f0, f1, r0, r1)
         local slc, rest = {}, {}
         for _, h in ipairs(heads) do if h.kind == 'audio' and h.slice then slc[#slc + 1] = h else rest[#rest + 1] = h end end
-        if #slc > 0 and rhow ~= 'whole' then
+        if rhow == 'pitch_aud' then rhow = 'pitch' end
+        if #slc > 0 and rhow ~= 'cmd' then
           if rhow == 'pitch' then E.run('slice pitch', function() for _, h in ipairs(slc) do if E.slice_pitch then E.slice_pitch(h.item, pitch - V.slice_base()) end end end)
           elseif pitch - V.slice_base() + 1 < 1 then V.msg = 'the key below slice 1 is the whole sample - a slice note keeps its slice (` in NORMAL plays it, :whole writes it)'
           else E.set_fx(slc, lpb(), '0S', pitch - V.slice_base() + 1) end

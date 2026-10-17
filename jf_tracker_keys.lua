@@ -52,8 +52,9 @@ local FCODE = { [1] = 26161, [2] = 26162, [4] = 26164, [5] = 26165, [6] = 26166,
 local frow_white = { ['1'] = 0, ['2'] = 2, ['3'] = 4, ['4'] = 5, ['5'] = 7, ['6'] = 9, ['7'] = 11, ['8'] = 12, ['9'] = 14, ['0'] = 16, ['-'] = 17, ['='] = 19 }
 local frow_black = { [1] = 1, [2] = 3, [4] = 6, [5] = 8, [6] = 10, [8] = 13, [9] = 15, [11] = 18 }
 function keys.set_layout(name)
-  keys.layout = name == 'frow' and 'frow' or 'qwerty'
+  keys.layout = (name == 'frow' or name == 'renoise') and name or 'qwerty'
   if keys.layout == 'qwerty' then keys.set_renoise(false); return end
+  if keys.layout == 'renoise' then keys.set_renoise(true); return end   -- 17 окт: снова третьим значением опции
   keys.renoise = false
   for k in pairs(keys.piano) do keys.piano[k] = nil end
   for k in pairs(keys.plabel) do keys.plabel[k] = nil end

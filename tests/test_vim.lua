@@ -315,7 +315,8 @@ keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
 keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
-ctrl_down = true; V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); V.key(51); eq('10 окт: Ctrl+3 = step 3', V.step, 3); ctrl_down = false
+ctrl_down = true; V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); V.key(49); eq('10 окт: Ctrl+1 = step 1 (1 is not a note in qwerty)', V.step, 1)
+V.key(51); eq('17 окт: Ctrl+3 in INSERT with the keyboard = a held note, not the step', last(), 'hold:75'); ctrl_down = false
 V.step_next = true; ctrl_down = true; V.key(52); eq('13 окт: Ctrl+4 из next - шаг числом', V.step_next, false); eq('  step 4', V.step, 4); ctrl_down = false
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
@@ -745,19 +746,22 @@ do
   keysin('p'); eq('past the last slice (28 of 20): nothing', last(), 'slice:trA@30:13')
   keysin('z')
   V.last_slice = 5
-  alt_down, shift_down = true, true; V.key(8222); alt_down, shift_down = false, false     -- Shift+Option+w („), 16 окт
-  eq('Shift+Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
-  alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑) — аккорд, не pitch
-  eq('Option+w on slices: not pitch', calls[#calls] ~= 'slicepitch:5:+2', true)
+  -- 17 окт: Option + нота — выбранный слайс на высоте клавиши; Option+Shift — только прослушать
+  alt_down = true; V.key(8721); alt_down = false     -- Option+w (∑)
+  eq('Option+w = last slice +2 st', calls[#calls], 'slicepitch:5:+2')
+  local nc2 = #calls
+  alt_down, shift_down = true, true; V.key(8222); alt_down, shift_down = false, false     -- Shift+Option+w („)
+  eq('Shift+Option+w: nothing inserted', calls[#calls] ~= 'slicepitch:5:+2' or #calls == nc2, true)
   keysin(';'); eq('; inserts the whole sample', last(), 'whole')
   -- арп из слайсов (4 окт): :arp live, клавиша-слайс уходит в живой арп
   V.arp_live = true; keysin('w'); V.arp_live = false
   eq('arp live on a sliced sample takes slice 2 (pitch 62)', last(), 'arplive:62@' .. V.cur.row)
-  -- 17 окт: Cmd + клавиша слайса — этот слайс до конца сэмпла (было 4 окт: весь айтем с питчем); Ctrl+нота — удержание
+  -- 17 окт: Ctrl + клавиша слайса — этот слайс до конца сэмпла; Cmd — не нота
+  local nc3 = #calls
   cmd_down = true; keysin('w'); cmd_down = false
-  eq('Cmd+w on a sliced sample = slice 2 to the end', last():match('^slice:trA@%d+:2:thru$') ~= nil, true)
+  eq('Cmd+w in INSERT: no note', #calls, nc3)
   ctrl_down = true; V.key(23); ctrl_down = false     -- Ctrl+w
-  eq('Ctrl+w = held slice 2', last(), 'hold:s2')
+  eq('Ctrl+w on a sliced sample = slice 2 to the end', last():match('^slice:trA@%d+:2:thru$') ~= nil, true)
   V.key(27)
   pool[1].slices = nil
 end
