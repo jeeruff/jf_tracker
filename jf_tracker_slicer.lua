@@ -628,6 +628,19 @@ function S.key(c)
     if ch == '{' or ch == '}' then S.more_do(ch == '{' and 'a' or 'b'); return true end
   elseif ch == 'g' and S.entry and not S.entry.file then S.gpend = true; S.msg = 'g: w - go to a hex position on the wave, [ ] - the sample starts / ends here, { } - give back the file before / after it'; return true end
   local a, b = S.span()
+  -- 17 окт: прицел активен — клавиши его кнопок (подписаны на кнопках): S smk, 0 0-cross, t t-snap, q quant
+  -- (s cut, Q squant — ниже, как были); раньше цифр-нот: 0 при прицеле — 0-cross
+  if S.cross and not a and ctx.state then
+    local tg = ({ ['0'] = 'cut0x', t = 'cutsnap', q = 'cutquant' })[ch]
+    if tg then
+      local st = ctx.state
+      st[tg] = not st[tg]
+      local nm = ({ cut0x = '0-cross', cutsnap = 't-snap', cutquant = 'quant' })[tg]
+      S.msg = nm .. (st[tg] and ' on' or ' off') .. (tg == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
+      return true
+    end
+    if ch == 'S' and ctx.smk_at then ctx.smk_at(S.cross, S.cut_point(S.cross.t + S.cross.dt)); return true end
+  end
   -- 14 окт: s — меню нарезки и в раскладке renoise (15 окт: весь нижний ряд renoise здесь — команды)
   local pk = S.entry and not S.entry.file and piano_slice(c)
   if pk then
@@ -1754,6 +1767,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- 12 окт: строка под прицелом — слева подсказка, справа в линию spam / 0-cross / t-snap / quant
   do
     local fy = wy + wh + ((ZH > 0 and not ztop) and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2   -- 16 окт: прицел наверху — его высота уже в wy (строка уезжала за модуль)
+    -- 17 окт: прицел наверху — его кнопки на нём (справа внизу), а не под слайсами
+    local by2 = (ztop and zy_top) and (zy_top + ZH - rh - 1) or fy
+    local KEYS = S.cross and { act_cut = 's', act_smk = 'S', act_sq = 'Q', cut0x = '0', cutsnap = 't', cutquant = 'q' } or nil   -- прицел активен — клавиши на кнопках
     local st = ctx.state or {}
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
@@ -1767,23 +1783,31 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       act_cut = 'cut (s): cut the note under the cursor at the aimed point - the sound after it becomes the next note',
       act_smk = 'smk (S): a stretch marker at the aimed point, snapped to the row start - the hit lands on the grid',
       act_sq = 'squant (Q): smart quantize - the hits of the sample move to the nearest rows with stretch markers, the sound stays whole',
-      cut0x = '0-cross: cuts and markers move to the nearest zero crossing - no click at the edge',
-      cutsnap = 't-snap: the aimed point snaps to the nearest transient of the sample',
-      cutquant = 'quant (with t-snap): the snapped transient also goes to the nearest row of the grid (with swing)',
+      cut0x = '0-cross (0 while aiming): cuts and markers move to the nearest zero crossing - no click at the edge',
+      cutsnap = 't-snap (t while aiming): the aimed point snaps to the nearest transient of the sample',
+      cutquant = 'quant (q while aiming, with t-snap): the snapped transient also goes to the nearest row of the grid (with swing)',
     }
     local bx = x + w
     S.cut_hot = nil
     for k = #BT, 1, -1 do
       local b = BT[k]
-      local bw2 = U.measure(b[2]) + 2 * L.pad
+      local kk = KEYS and KEYS[b[1]]
+      local pre = (kk and b.act) and (kk .. ' ') or ''   -- действия — клавиша перед словом, тоглы — первая буква и есть клавиша
+      local poff = pre ~= '' and (U.measure(kk) + L.pad) or 0   -- пробел в конце measure не считает
+      local bw2 = poff + U.measure(b[2]) + 2 * L.pad
       bx = bx - bw2 - (k < #BT and 2 or 0)
       local on = not b.act and st[b[1]] and (b[1] ~= 'cutquant' or st.cutsnap)
       local col = b[3] or U.AMBER
-      local hot2 = mx2 >= bx and mx2 < bx + bw2 and my2 >= fy and my2 < fy + rh
+      local hot2 = mx2 >= bx and mx2 < bx + bw2 and my2 >= by2 and my2 < by2 + rh
       if hot2 then S.cut_hot = b[1]; foot = S.CUT_DESC[b[1]] or foot end
-      U.set(on and U.tint(col, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx, fy, bw2, rh - 1, 1)
-      U.set(on and col or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx, fy, bw2, rh - 1, 0)
-      U.text(bx + L.pad, fy, b[2], on and col or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT)))
+      U.set(on and U.tint(col, 0.3) or (hot2 and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx, by2, bw2, rh - 1, 1)
+      U.set(on and col or (hot2 and U.AMBER or U.LINE)); gfx.rect(bx, by2, bw2, rh - 1, 0)
+      local tcol = on and col or ((b[1] == 'cutquant' and not st.cutsnap) and U.DIM or (hot2 and U.AMBER or U.TEXT))
+      if pre ~= '' then U.text(bx + L.pad, by2, kk, U.AMBER); U.text(bx + L.pad + poff, by2, b[2], tcol)
+      else
+        U.text(bx + L.pad, by2, b[2], tcol)
+        if kk and not on then U.text(bx + L.pad, by2, kk, U.AMBER) end   -- первая буква — клавиша
+      end
       if hot2 and press and b.act then
         local need = b[1] ~= 'act_sq'
         if need and not S.cross then S.msg = b[2] .. ': aim at a note first (the cursor on a note of this sample)'
@@ -1795,7 +1819,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
       end
     end
-    local troom = math.max(0, bx - x - L.pad)
+    local troom = math.max(0, (by2 ~= fy and (x + w) or bx) - x - L.pad)
     if zoomed0 and troom > 20 * L.cw then   -- 17 окт: при зуме — полоса-обзор после текста (тексту — не больше половины)
       local tw = math.min(U.measure(foot) + L.pad, math.floor(troom * 0.5))
       if foot == '' then tw = 0 end
