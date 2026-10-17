@@ -43,6 +43,8 @@ end
 function MX.block()
   local a = MX.anchor or MX.cur
   -- колонки номера / имени (ci −1 / 0) в блок не входят — только треки
+  -- 17 окт: блок целиком в колонке имён (Shift+J K на именах) — слоты целиком: все треки
+  if a.ci <= 0 and MX.cur.ci <= 0 then return math.min(a.ri, MX.cur.ri), math.max(a.ri, MX.cur.ri), 1, math.max(1, MX.ncols or 1) end
   return math.min(a.ri, MX.cur.ri), math.max(a.ri, MX.cur.ri), math.max(1, math.min(a.ci, MX.cur.ci)), math.max(1, a.ci, MX.cur.ci)
 end
 
@@ -280,6 +282,7 @@ function MX.box(x, y, w, h)
   gfx.rect(x, y + 1, 1, h - 2, 1); gfx.rect(x + w - 1, y + 1, 1, h - 2, 1)
 end
 function MX.draw(L, snap, regions, info, Y, Wd, Hd)
+  MX.ncols = snap and snap.cols and #snap.cols or MX.ncols   -- 17 окт: блок на именах — все треки
   do   -- 9 окт: ширина имени региона на следующий кадр (MX.width) — по всем регионам, не по видимым
     local w = 0
     local s0, same = nil, true
