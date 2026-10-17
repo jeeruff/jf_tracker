@@ -1065,8 +1065,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       bx = bx + U.measure(st) + 2 * L.pad
     end
     -- 12 окт: полоса прокрутки зума — в ряду кнопок, за follow (пользователь: не отнимать высоту у волны и прицела)
-    local sx1 = brow == 0 and (x + hint_w) or (x + w)
-    if sx1 - (bx + L.pad) >= 10 * L.cw then sbrect = { x = bx + L.pad, y = y + rh + brow * rh, w = sx1 - bx - L.pad - 2 } end
+    -- 17 окт: полоса ушла в нижнюю строку (ovbar)
   else
     U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
@@ -1079,7 +1078,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
   local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
-  local SBH = (zoomed0 and not sbrect) and (wavebar and math.max(30, math.floor(rh * 2.2)) or 8) or 0   -- в ряду кнопок места нет — под волной, как раньше
+  local SBH = 0   -- 17 окт: обзор — в нижней строке, под волной места не берёт
   S.cross_update(e)
   local zt, zlab, zk = S.edge_focus(e, zone, S.active and S.entry and S.entry.item == e.item)
   local ZH = 0
@@ -1716,10 +1715,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     S.zd_prev = down
   end
   -- полоска-обзор (10 окт): весь item, рамка — что видно сейчас; тянуть / щёлкнуть — прокрутка
-  if SBH > 0 or (sbrect and zoomed0) then
-    local sy = wy + wh + ((ZH > 0 and not ztop) and (ZH + 3) or 1)
-    local x, w, SBH = x, w, SBH
-    if sbrect then x, w, sy, SBH = sbrect.x, sbrect.w, sbrect.y, rh end
+  -- 17 окт: полоса — в нижней строке модуля (между подсказкой и cut … quant), волна высоту не теряет
+  local function ovbar(x, sy, w, SBH)
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
     U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)
@@ -1798,8 +1795,15 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         S.msg = b[2] .. (st[b[1]] and ' on' or ' off') .. (b[1] == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
       end
     end
-    if foot ~= S.msg and U.hint_text then U.hint_text(x, fy, foot, math.max(0, bx - x - L.pad), U.PANEL)   -- 15 окт: стандарт подсказок
-    else U.text(x, fy, ctx.fit(foot, math.max(0, bx - x - L.pad)), U.GREY) end   -- 10 окт: подсказка — приглушённо
+    local troom = math.max(0, bx - x - L.pad)
+    if zoomed0 and troom > 20 * L.cw then   -- 17 окт: при зуме — полоса-обзор после текста (тексту — не больше половины)
+      local tw = math.min(U.measure(foot) + L.pad, math.floor(troom * 0.5))
+      if foot == '' then tw = 0 end
+      ovbar(x + tw + L.pad, fy, troom - tw - L.pad, rh - 1)
+      troom = tw
+    end
+    if foot ~= S.msg and U.hint_text then U.hint_text(x, fy, foot, troom, U.PANEL)   -- 15 окт: стандарт подсказок
+    else U.text(x, fy, ctx.fit(foot, troom), U.GREY) end   -- 10 окт: подсказка — приглушённо
   end
   if hover_view then return { e = e, view = hover_view } end
   if hover_sbtn then return { e = e, sbtn = hover_sbtn } end
