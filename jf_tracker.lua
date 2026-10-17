@@ -3323,7 +3323,7 @@ ctx = {
   -- выбранный слайс (4 окт): последний выделенный мышкой / Option+J K / сыгранный;
   -- 0 — весь айтем. Option+нота играет и пишет его с питчем
   selected_slice = function(root) if root and ctx.ssel.item == root.item then return ctx.ssel.k or 0 end return nil end,
-  select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell } end end,
+  select_slice = function(root, k) if root then ctx.ssel = { item = root.item, k = k, cell = ctx.ssel.cell }; SL.slice_t = reaper.time_precise() end end,   -- 17 окт: время касания — прицел на слайс
   set_last_slice = function(k) vim.last_slice = k end,
   mx_zoom = function() MX.toggle_zoom() end,
   -- кнопка zoom (9 окт): обычный вид → sel (в трекере только треки
@@ -12741,6 +12741,7 @@ ctx = {
     -- mixfocus (рамка — у mixer, Cmd+hjkl от него, k j громкость / h l пан трека курсора)
     local mixf = f == 'mixer'
     if mixf then f = 'tracker' end
+    if f == 'tracker' and state.focus ~= 'tracker' then SL.cursor_t = reaper.time_precise() end   -- 17 окт: вернулся в трекер — прицел снова на ноте под курсором
     state.mixfocus = (mixf and L and L.pn and L.pn.by_panel and L.pn.by_panel.mixer) and true or nil
     -- 13 окт: ушли из микшера (щелчок в трекер, другой модуль) — режим слайдера всегда снимается (залипал после щелчка по фейдеру)
     if state.mixfocus then ctx.mixer_arm() elseif state.kslider and not state.kslider.ctrl then state.kslider = nil end

@@ -900,6 +900,10 @@ end
 function S.cross_update(e)
   local c = ctx.cursor_cross and ctx.cursor_cross(e)
   if not c then S.cross = nil; return end
+  -- 17 окт: прицел — у последнего касания: курсор сдвинулся (или фокус вернулся в трекер) — нота под курсором;
+  -- слайс выбран / сыгран позже — прицел на его крае (и его клавиши / кнопки — тоже не про ноту курсора)
+  if c.key ~= S.cross_key then S.cross_key = c.key; S.cursor_t = R.time_precise() end
+  if (S.slice_t or 0) > (S.cursor_t or 0) then S.cross = nil; return end
   c.e = e
   if not S.cross or S.cross.key ~= c.key then c.dt = 0; S.cross = c
   else local dt = S.cross.dt; S.cross = c; c.dt = dt end
