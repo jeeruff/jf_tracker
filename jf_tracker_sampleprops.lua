@@ -148,7 +148,7 @@ function SP.draw(L, x, y, w, h, e, focused)
     local foc = sel or hot0                                   -- 6 окт: фокус / мышь — имя, значение, дорожка жёлтым
     if sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, L.rh, 1)
     elseif hot0 then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
-    U.text(x + L.pad, ry, ctx.fit(r.label, lw - L.pad), foc and U.AMBER or U.GREY)
+    SP.jump_label(x + L.pad, ry, r.label, foc and U.AMBER or U.GREY, lw - L.pad)   -- 17 окт: буква-прыжок светлее
     -- слайдер (5 окт): у чисел — дорожка между подписью и значением, тянуть мышью
     -- 15 окт: beatsync to — кнопки: длина сэмпла = паттерн (регион курсора) × доля
     if r.k == 'bspat' then
@@ -448,8 +448,39 @@ function SP.draw_info(L, x, y, w, h, info, playing)
 end
 
 -- клавиши; true — съедена
-function SP.key(c, e)
+-- 17 окт: буква-прыжок строки списка — первая буква подписи, кроме клавиш хода / значения (h j k l g) и меток f;
+-- нажал — курсор на следующую строку с этой буквой (по кругу). Буква подсвечена чуть светлее подписи
+SP.JUMP_RESERVED = { h = true, j = true, k = true, l = true, g = true, f = true }
+function SP.jump_char(label)
+  for i = 1, #label do
+    local ch = label:sub(i, i):lower()
+    if ch:match('%a') and not SP.JUMP_RESERVED[ch] then return ch, i end
+  end
+end
+-- следующая строка после sel с буквой ch (rows — список { label }); nil — нет такой
+function SP.jump(rows, sel, ch)
+  local n = #rows
+  for d = 1, n do
+    local i = (sel - 1 + d) % n + 1
+    if SP.jump_char(rows[i].label) == ch then return i end
+  end
+end
+-- подпись с подсвеченной буквой-прыжком
+function SP.jump_label(x, y, label, col, maxw)
+  local t = ctx.fit(label, maxw)
+  U.text(x, y, t, col)
+  local ch, i = SP.jump_char(label)
+  if ch and i <= #t then
+    local px = x + U.measure(label:sub(1, i - 1) .. '.') - U.measure('.')   -- пробел в конце measure не считает
+    U.text(px, y, label:sub(i, i), U.mix(col, U.TEXT, 0.6))
+  end
+end
+function SP.key(c, e, jump)
   local ch = c < 256 and string.char(c) or ''
+  if jump and ch:match('^%l$') then
+    local i = SP.jump(SP.ROWS, SP.sel, ch)
+    if i then SP.sel = i; return true end
+  end
   -- 5 окт: j k — строка, h l — значение (как Vim); заглавные — то же
   if ch == 'J' or ch == 'j' then SP.sel = math.min(#SP.ROWS, SP.sel + 1)
   elseif ch == 'K' or ch == 'k' then SP.sel = math.max(1, SP.sel - 1)

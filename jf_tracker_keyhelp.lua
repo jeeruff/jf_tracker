@@ -46,7 +46,8 @@ KH.PAGES = {
     { k = 'Ctrl+Shift+H L', d = 'the note under the cursor: its start a row earlier / later (the source offset follows, as trim)' },
     { k = 'pan column', d = 'option pan column: a pan field after the volume (l from vol); two hex digits: 00 left, 80 centre, FF right; BS - centre' },
     { k = 'Ctrl+Opt + -', d = 'continue: the command above in this column (or the volume) again with value +1 / -1, on this row, the cursor a step on' },
-    { k = 'Ctrl+Enter', d = 'the note under the cursor: all its properties in a box (only this note): j k row, h l value, Enter list, R reset, Esc close' },
+    { k = 'Ctrl+Enter', d = 'the note under the cursor: all its properties in a box (only this note): j k row, h l value, a letter - jumps to the row (its lighter letter), Enter list, R reset, Esc close; Shift+Space - listen' },
+    { k = 'Shift+Space', d = 'play the note under the cursor (its track solo, with fx); Shift+Option+Space - at x0.5; works with the note properties open' },
     { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
     -- 15 окт: опция keys: renoise выключена (закомментирована в опциях)

@@ -1078,7 +1078,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       bx = bx + U.measure(st) + 2 * L.pad
     end
     -- 12 окт: полоса прокрутки зума — в ряду кнопок, за follow (пользователь: не отнимать высоту у волны и прицела)
-    -- 17 окт: полоса ушла в нижнюю строку (ovbar)
+    -- 17 окт: место полосы в ряду кнопок — она здесь, когда прицел внизу (нижняя строка — его кнопки)
+    local sx1 = brow == 0 and (x + hint_w) or (x + w)
+    if sx1 - (bx + L.pad) >= 10 * L.cw then sbrect = { x = bx + L.pad, y = y + rh + brow * rh, w = sx1 - bx - L.pad - 2 } end
   else
     U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
@@ -1820,7 +1822,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
     local troom = math.max(0, (by2 ~= fy and (x + w) or bx) - x - L.pad)
-    if zoomed0 and troom > 20 * L.cw then   -- 17 окт: при зуме — полоса-обзор после текста (тексту — не больше половины)
+    -- 17 окт: полоса-обзор всегда: прицел наверху (его кнопки на нём) — в нижней строке; иначе — в ряду кнопок сверху
+    if by2 == fy and sbrect then ovbar(sbrect.x, sbrect.y, sbrect.w, rh - 1)
+    elseif troom > 20 * L.cw then   -- после текста (тексту — не больше половины)
       local tw = math.min(U.measure(foot) + L.pad, math.floor(troom * 0.5))
       if foot == '' then tw = 0 end
       ovbar(x + tw + L.pad, fy, troom - tw - L.pad, rh - 1)

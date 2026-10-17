@@ -13180,6 +13180,7 @@ ctx.np_key = function(c)
   elseif ch == 'l' or ch == 'L' or c == keys.right then ctx.sp_adjust(e, r.k, 1); NP.key = nil
   elseif c == 13 then if not ctx.sp_menu(e, r.k) then ctx.sp_adjust(e, r.k, 1) end; NP.key = nil
   elseif ch == 'R' then ctx.sp_reset(e, r.k); NP.key = nil
+  elseif ch:match('^%l$') then local i = SPROP.jump(R2, NP.sel, ch); if i then NP.sel = i end   -- 17 окт: буква — прыжок на строку
   end
   model.invalidate()
 end
@@ -13204,7 +13205,7 @@ ctx.np_draw = function()
     local ry = y + L.pad + i * L.rh
     local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
     if i == NP.sel or hot then U.set(U.tint(U.AMBER, i == NP.sel and 0.3 or 0.15)); gfx.rect(x + 2, ry, w - 4, L.rh, 1) end
-    U.text(x + L.pad, ry, r.label, (i == NP.sel) and U.AMBER or U.GREY)
+    SPROP.jump_label(x + L.pad, ry, r.label, (i == NP.sel) and U.AMBER or U.GREY, lw)
     U.text(x + lw, ry, ctx.fit(SPROP.value(e, r.k) or '', vw), U.TEXT)
     if hot and U.click then NP.sel = i; U.click = false end
     if hot and gfx.mouse_wheel ~= 0 then ctx.sp_adjust(e, r.k, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0; NP.key = nil end
@@ -21680,6 +21681,30 @@ local function frame()
   end
   -- 12 окт: Enter без модификаторов — смарт-панель в любом режиме (дубль Ctrl+Enter убран); кроме конца
   -- набора числа и входа в INSERT при Esc mode = vim (NORMAL с клавиатурой)
+  -- 17 окт: Shift+Space — проиграть ноту под курсором (трек соло, с FX, на длину ноты; до 8 с) — и при открытых
+  -- свойствах ноты: поменял — сразу послушал
+  -- Shift+Option+Space — то же на x0.5 (Option — звук; скорость вернёт slow_rec_tick после стопа). Opt+Space на маке — код 160
+  if (c == 32 or c == 160) and ctx.mods().shift and not ctx.mods().cmd and not ctx.mods().ctrl and not vim.picker and not vim.hydra
+     and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.focus == 'tracker' or state.focus == 'sprops' or ctx.NP) then
+    local slow = ctx.mods().alt or c == 160
+    if slow and reaper.GetPlayState() & 1 == 0 and not ctx.slowrec then
+      ctx.slowrec = { prev = reaper.Master_GetPlayRate(0), play = true, rate = 0.5 }
+      reaper.CSurf_OnPlayRateChange(0.5)
+    end
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
+    local it = (ctx.NP and ctx.NP.item) or (cell and cell.item)
+    if it and reaper.ValidatePtr(it, 'MediaItem*') then
+      local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      ctx.mx_cell_preview(reaper.GetMediaItem_Track(it), p0, p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), 'note')
+      vim.msg = slow and 'Shift+Option+Space: the note under the cursor at x0.5' or 'Shift+Space: the note under the cursor (Shift+Option - x0.5)'
+    elseif f and f.col and f.col.track then
+      ctx.mx_cell_preview(f.col.track, edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0), 'note')
+      vim.msg = 'Shift+Space: no note here - the row of the track'
+    end
+    c = 0
+  end
   -- 13 окт: свойства ноты — Ctrl+Enter на ноте, пока открыта — клавиши её
   if ctx.NP and c > 0 and not vim.picker and not vim.hydra then ctx.np_key(c); c = 0 end
   if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then ctx.np_open(); c = 0 end
@@ -22281,7 +22306,7 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end   -- 13 окт: строка : ела h j k l
         if c == 27 then ctx.set_focus('tracker')
         elseif c == 118 then ctx.sprops_fit()            -- v — лист растёт, пока все свойства не влезут
-        elseif not SPROP.key(c, se) then vim.key(c) end
+        elseif not SPROP.key(c, se, true) then vim.key(c) end   -- 17 окт: буква — прыжок на строку
       elseif state.focus == 'slices' and state.slices_on then
         -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер
         local ch = c < 256 and string.char(c) or ''
