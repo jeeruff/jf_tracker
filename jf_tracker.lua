@@ -7704,7 +7704,9 @@ ctx = {
     if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
     local tk = reaper.GetActiveTake(c.item); if not tk then return end
     local t = ctx.AIM.proj_of(c.n, c.e, te)
-    if not ctx.AIM.inside(c.n, t) then vim.msg = 'smk: the aim point is outside the note'; return end
+    -- 17 окт: t-snap притянул к транзиенту на самом краю ноты (начало слайса) — маркер ставится в точку прицела без привязки
+    if not ctx.AIM.inside(c.n, t) then t = ctx.AIM.proj_of(c.n, c.e, c.t + (c.dt or 0)) end
+    if not ctx.AIM.inside(c.n, t) then vim.msg = 'smk: the aim is on the edge of the note - move it inside ({ } or the row below)'; return end
     local pos0 = reaper.GetMediaItemInfo_Value(c.item, 'D_POSITION')
     local len = reaper.GetMediaItemInfo_Value(c.item, 'D_LENGTH')
     local r = math.floor(model.row_of_time(t, state.lpb) + 0.5)
