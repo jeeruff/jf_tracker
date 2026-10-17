@@ -1736,16 +1736,18 @@ function V.key_impl(c)
   -- 13 окт: вставить пустую строку (Mac без Insert): Option+Backspace — на месте курсора
   -- (Shift — на всех треках); Ctrl+Option+Cmd+J — под курсором, K — над ним
   if V.mode ~= 'cmd' and V.mode ~= 'search' and ctx.time_edit and not env_of(V.cur.fi) then
-    local ins_at
-    if c == BS and mods.alt and not mods.ctrl and not mods.cmd then ins_at = V.cur.row
+    -- 17 окт: Shift — все треки (общее правило: ⌫, Opt+⌫, Shift+` note-off)
+    local ins_at, all
+    if c == BS and mods.alt and not mods.ctrl and not mods.cmd then ins_at = V.cur.row; all = mods.shift or false
     elseif mods.ctrl and mods.alt and mods.cmd and (c == 10 or c == 11 or c == ('j'):byte() or c == ('k'):byte() or c == 8710 or c == 730) then
       ins_at = (c == 10 or c == ('j'):byte() or c == 8710) and V.cur.row + 1 or V.cur.row
+      all = mods.shift or false
     end
     if ins_at then
       local nr = V.count or 1
-      ctx.time_edit('insert', V.cur.fi, ins_at, nr, mods.shift or false)
+      ctx.time_edit('insert', V.cur.fi, ins_at, nr, all)
       V.count = nil
-      V.msg = ('inserted %d empty row(s) %s'):format(nr, mods.shift and 'on all tracks' or 'on the track')
+      V.msg = ('inserted %d empty row(s) %s'):format(nr, all and 'on all tracks' or 'on the track')
       return
     end
   end
@@ -2013,7 +2015,7 @@ function V.key_impl(c)
     -- 13 окт: Backspace на поле ноты — удалить строку: всё ниже поднимается (трек; Shift — все треки),
     -- как в NORMAL; Delete — только событие под курсором
     if c == BS and fld == 1 and ctx.time_edit then
-      ctx.time_edit('delete', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false)
+      ctx.time_edit('delete', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false)   -- Shift — все треки
       V.hexbuf = nil; return
     end
     if c == DEL and fld == 1 and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
@@ -2120,10 +2122,12 @@ function V.key_impl(c)
     end
     if not V.piano then return as_normal(c) end      -- поле ноты без клавиатуры: ноты не пишутся
     if keys_control(c) then return end
-    -- note-off (9 окт): ` — подколонка курсора, ~ — весь трек, Ctrl+~ — все треки (Ctrl+` — шаг next, 13 окт)
+    -- note-off (9 окт): ` — подколонка курсора; 17 окт: ~ (Shift+`) — все треки (Shift = все треки, как у ⌫),
+    -- Ctrl+~ — весь трек (было: ~ трек, Ctrl+~ все); Ctrl+` — шаг next (13 окт)
     if c == ('`'):byte() or c == ('~'):byte() then
       local mods2 = ctx.mods and ctx.mods() or {}
-      local scope = (mods2.ctrl and (c == ('~'):byte() or mods2.shift)) and 'all' or (c == ('~'):byte() and 'track' or 'sub')
+      local tilde = c == ('~'):byte() or mods2.shift
+      local scope = tilde and (mods2.ctrl and 'track' or 'all') or 'sub'
       V.note_off_scope(scope)
       -- 17 окт: ` в NORMAL — весь сэмпл, в INSERT — note-off: подсказать, как вставить весь сэмпл
       if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Cmd+1 (Cmd + a slice key - from that slice to the end)' end
@@ -2738,7 +2742,7 @@ function V.key_impl(c)
   elseif (c == BS or c == INS) and not env_of(V.cur.fi) then
     -- Backspace: удалить время строки (трек курсора; Shift — все треки) в
     -- рамках региона; Insert (или :instime) — вставить время. Счётчик = строк.
-    local all = ctx.mods and ctx.mods().shift or false
+    local all = ctx.mods and ctx.mods().shift or false   -- Shift — все треки
     if ctx.time_edit then ctx.time_edit(c == BS and 'delete' or 'insert', V.cur.fi, V.cur.row, n, all) end
     finish_edit()
   elseif env_of(V.cur.fi) and (ch == 'x' or c == BS or c == DEL or c == ctrl('a') or c == ctrl('x')) then

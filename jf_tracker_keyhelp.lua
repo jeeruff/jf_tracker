@@ -228,7 +228,7 @@ KH.PAGES = {
     { k = 'd', d = 'Vim delete operator (d3w, dd), back to INSERT after' },
     { k = 'qwerty: M S', t = { 'M', 'S' }, d = 'mute / solo the cursor track' },
     { k = 'qwerty: f', t = { 'f' }, d = 'next fx field (note > fx1 > fx2 ...)' },
-    { k = '` ~ C-~', d = 'note-off: ` this subcolumn, ~ (Shift+`) the whole track, Ctrl+~ every track; :off / :off all; on the command field ` stops what runs there (dim) - 0D.. -> 0D00' },
+    { k = '` ~ C-~', d = 'note-off: ` this subcolumn, ~ (Shift+`) every track (Shift = all tracks, as Shift+BS), Ctrl+~ the whole track; :off / :off all; on the command field ` stops what runs there (dim) - 0D.. -> 0D00' },
     { k = 'Esc', d = 'back to NORMAL' },
     { k = 'F1', d = 'the whole help (with frow F1 is a note in INSERT - Esc first; ? - REAPER actions)' },
   } },

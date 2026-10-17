@@ -22048,7 +22048,7 @@ local function frame()
     c = 0
   end
   -- 13 окт: Ctrl+` — шаг next (на следующий объект трека) вкл / выкл, в любом режиме;
-  -- note-off всех треков в INSERT — Ctrl+~
+  -- note-off: ~ (Shift+`) — все треки, Ctrl+~ — весь трек (17 окт)
   if c == 96 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().shift and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     vim.step_next = not vim.step_next; vim.step_auto = false
     vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track (Ctrl+` back)' or tostring(vim.step))
