@@ -17080,6 +17080,7 @@ local function frame()
   end
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
+  if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
     T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
@@ -22011,6 +22012,12 @@ local function frame()
   local quit = false
   -- 16 окт: Ctrl+Cmd+F12 — перезапуск трекера из файлов (как :reload)
   if c == 6697266 and ctx.mods().ctrl and ctx.mods().cmd then ctx.reloading = true; quit = true; c = 0 end
+  -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
+  if c > 0 and ctx.PADS and ctx.PADS.on and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix')
+     and vim.mode == 'normal' and not vim.picker and not vim.hydra and not vim.pending and not vim.op then
+    local m = ctx.mods()
+    if not (m.cmd or m.ctrl or m.alt or m.shift) then ctx.pad_launch(keys.piano[c]); c = 0 end
+  end
   -- 16 окт: frow — пока клавиатура играет (видна в трекере / сэмплере, или INSERT), F-клавиши без
   -- модификаторов — ноты: хоткеи F1..F12 пропускаются, код идёт в vim
   local fnote
@@ -22935,6 +22942,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'fill' then MX.fill = not MX.fill
   elseif b == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
   elseif b == 'trim' then ctx.mx_trim()
+  elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'menu' then ctx.mx_menu()
   elseif b == 'rglen-' or b == 'rglen+' then ctx.region_len_step(b == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
   elseif b == 'ruler' then ctx.mx_ruler_toggle()
@@ -22995,6 +23003,65 @@ ctx.patternize = function(cuts, how)
   end)
   ctx.mx_refresh()
   vim.msg = n > 0 and ('patternize %s: %d pattern(s) A1… (empty spans only; Cmd+Z back)'):format(how, n) or ('patternize %s: nothing to do - the project is already patterns'):format(how)
+end
+-- 17 окт: pads (MPC): паттерны на нотных клавишах. :pads — вкл / выкл, :pads quant | sudden — режим,
+-- :pads rec — запись порядка сыгранных; ещё раз :pads rec — дописать его в конец песни (связанные повторы)
+ctx.PADS = dofile(DIR .. '/jf_tracker_padseq.lua')
+ctx.pad_list = function() return ctx.PADS.list(ctx.sequence()) end
+ctx.pad_key = function(name)
+  local P = ctx.PADS
+  if not P.on then return nil end
+  for i, rg in ipairs(ctx.pad_list()) do
+    if rg.name == name then local ch = keys.plabel[i - 1]; return ch and keys.label(ch) or nil end
+  end
+end
+ctx.pad_launch = function(off)
+  local P = ctx.PADS
+  local dst = P.pick(ctx.pad_list(), off)
+  if not dst then vim.msg = ('pads: no pattern on this key (%d patterns)'):format(#ctx.pad_list()); return end
+  if reaper.GetPlayState() & 1 == 0 then
+    reaper.SetEditCurPos(dst.pos, false, false); reaper.OnPlayButton()
+    vim.msg = 'pads: ' .. dst.name
+  elseif P.mode == 'sudden' then
+    local pp = reaper.GetPlayPosition()
+    reaper.SetEditCurPos(P.sudden_pos(alias.region_at(regions, pp), pp, dst), false, true)
+    MX.queued = nil
+    vim.msg = 'pads: ' .. dst.name .. ' now'
+  else
+    MX.queued = dst
+    vim.msg = 'pads: ' .. dst.name .. ' after this one'
+  end
+end
+ctx.pads_write = function()
+  local P = ctx.PADS
+  local names = P.names()
+  P.log = {}
+  if #names == 0 then vim.msg = 'pads rec: nothing played'; return end
+  local by = {}
+  for _, rg in ipairs(ctx.pad_list()) do by[rg.name] = rg end
+  local t = 0
+  for _, rg in ipairs(ctx.real_seq()) do if not rg.session and not rg.lib and rg.rgnend > t then t = rg.rgnend end end
+  local n = 0
+  ctx.slot_op('pads: write the played order', function()
+    for _, nm in ipairs(names) do
+      local src = by[nm]
+      if src then alias.put_alias(src, t); t = t + (src.rgnend - src.pos); n = n + 1 end
+    end
+  end)
+  model.invalidate(); regions = model.regions(state.lpb)
+  vim.msg = ('pads rec: %d pattern(s) written after the song (linked repeats; u - undo)'):format(n)
+end
+ctx.pads_cmd = function(arg)
+  local P = ctx.PADS
+  arg = (arg or ''):match('%a+') or ''
+  if arg == 'quant' or arg == 'sudden' then P.mode = arg; P.on = true
+  elseif arg == 'rec' then
+    if P.rec then P.rec = false; ctx.pads_write(); return end
+    P.on, P.rec, P.log = true, true, {}
+  elseif arg == 'off' then P.on, P.rec = false, false
+  else P.on = not P.on; if not P.on then P.rec = false end end
+  vim.msg = P.on and ('pads on (%s%s): the note keys play the patterns - %s; :pads quant | sudden | rec | off'):format(P.mode, P.rec and ', REC' or '',
+    P.mode == 'sudden' and 'at once, the same place inside' or 'when the playing one ends') or 'pads off'
 end
 -- 17 окт: :section имя — секция (регион без кода) поверх слотов блока матрицы (Shift+J K на именах), иначе слота курсора
 ctx.section_make = function(name)

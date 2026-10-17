@@ -258,6 +258,7 @@ KH.PAGES = {
     { k = '[ ]', d = 'length -1 / +1 bar (later slots move)' },
     { k = '{ }', d = 'length -1 / +1 step' },
     { k = 'C-S-h C-S-l', d = 'pattern of the slot: previous / next (as Ctrl+Left / Right in Renoise)', t = {} },
+    { k = ':pads', d = 'MPC style (the pads button): the note keys play the patterns of the song - 1 f1 2 ... = the 1st 2nd 3rd pattern, the key shows by its name; :pads quant - after the playing one ends, :pads sudden - at once at the same place inside; :pads rec - record the order, again - write it after the song as linked repeats; :pads off' },
     { k = 'h past the first track', m = 'cursor to the region name and number', d = 'the cursor goes to the region name (Enter / i - rename) and to its number < NN > (Enter - next pattern)' },
     { k = 'Ctrl+h j k l', d = 'move like h j k l' },
     { k = 'Ctrl+Up Down', m = 'duplicate the slot above / below', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },
