@@ -20277,6 +20277,11 @@ local function frame()
       click = { t = now2, zone = hover.browser == 'pvvol' and 'pvvol' or 'browserbtn' }
     elseif hover.browser then
       ctx.set_focus('browser')
+      local m0 = ctx.mods()
+      if type(hover.browser) == 'number' and (m0.cmd or m0.shift) and B.entries[hover.browser] then   -- 17 окт: Cmd — точечно, Shift — отрезок
+        if m0.cmd then B.mark_at(hover.browser); if ctx.msg then ctx.msg(('%d marked - Enter: all into the lib, u: unmark all'):format(B.nmarked())) end
+        else B.mark_range(B.cur, hover.browser) end
+      end
       B.cur = hover.browser
       if dbl and click.zone == 'browser' and click.row == hover.browser then
         -- 10 окт: двойной щелчок — в lib (как Enter); Option + двойной — слайсом выбранного инструмента (как Opt+Enter)

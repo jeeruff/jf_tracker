@@ -271,15 +271,34 @@ local function fz(hay, q)
   end
   return score - #hay * 0.01
 end
+-- 17 окт: длина файла (с) — для фильтра >2s / <0.5s; кэш по пути, файл открывается один раз
+B.lencache = {}
+local function file_len(e)
+  if e.dir or not e.path then return nil end
+  local v = B.lencache[e.path]
+  if v == nil then
+    v = false
+    local src = R.PCM_Source_CreateFromFile and R.PCM_Source_CreateFromFile(e.path)
+    if src then v = R.GetMediaSourceLength(src) or false; R.PCM_Source_Destroy(src) end
+    B.lencache[e.path] = v
+  end
+  return v or nil
+end
+B.file_len = file_len
 local function fmatch(e, terms)
   local hay = (e.label or e.name):lower()
   local base = (e.name:match('[^/]+$') or e.name):lower()
   local total = 0
   for _, t0 in ipairs(terms) do
     local t, neg = t0, false
-    if t:sub(1, 1) == '!' then neg, t = true, t:sub(2) end
+    if t:sub(1, 1) == '!' or (t:sub(1, 1) == '-' and #t > 1) then neg, t = true, t:sub(2) end   -- 17 окт: -drum = !drum
     local sc
-    if t == '' then sc = 0
+    local cmp, num = t:match('^([<>])(%d*%.?%d+)s?$')   -- 17 окт: >2s / <0.5s — по длине файла (папки не проходят)
+    if cmp then
+      local l = file_len(e)
+      sc = (l and ((cmp == '>' and l > tonumber(num)) or (cmp == '<' and l < tonumber(num)))) and 0 or nil
+    elseif t == '' then sc = 0
+    elseif neg then sc = hay:find(t, 1, true) and 0 or nil   -- 17 окт: «без» — по подстроке (нечёткое «без» выкидывало лишнее)
     elseif t:sub(1, 1) == "'" then sc = hay:find(t:sub(2), 1, true) and 10 or nil
     elseif t:sub(1, 1) == '^' then sc = (base:sub(1, #t - 1) == t:sub(2)) and 10 or nil
     elseif #t > 1 and t:sub(-1) == '$' then local s = t:sub(1, -2); sc = (base:sub(-#s) == s) and 10 or nil
@@ -335,6 +354,7 @@ function B.set_all(list)
     local src = (B.mode == 'files' and B.path) and B.folder_index(B.path) or list
     local terms = {}
     for t in q:gmatch('%S+') do terms[#terms + 1] = t end
+    table.sort(terms, function(a, b) local la, lb = a:match('^[<>]') ~= nil, b:match('^[<>]') ~= nil; return (not la) and lb end)   -- 17 окт: длина — последней (файл открывается только у совпавших по словам)
     local hits = {}
     for _, e in ipairs(src) do
       local sc = fmatch(e, terms)
@@ -804,6 +824,22 @@ function B.toggle_mark()
   end
   B.cur = math.min(#B.entries, B.cur + 1)
 end
+-- 17 окт: мышью — Cmd+щелчок отмечает / снимает строку, Shift+щелчок — отрезок от прошлой строки (отметки, как m)
+function B.mark_at(i, on)
+  local e = B.entries[i]
+  if not markable(e) then return end
+  local k = B.mkey(e)
+  if on == nil then on = not B.sel[k] end
+  if on and not B.sel[k] then B.sel[k] = true; B.sel_order[#B.sel_order + 1] = { key = k, e = e, full = B.full(e) }
+  elseif not on and B.sel[k] then
+    B.sel[k] = nil
+    for j, o in ipairs(B.sel_order) do if o.key == k then table.remove(B.sel_order, j); break end end
+  end
+end
+function B.mark_range(a, b)
+  for i = math.min(a, b), math.max(a, b) do B.mark_at(i, true) end
+  if ctx.msg then ctx.msg(('%d marked - Enter: all into the lib, u: unmark all'):format(#B.sel_order)) end
+end
 function B.clear_marks()
   B.sel, B.sel_order = {}, {}
   if ctx.msg then ctx.msg('marks cleared') end
@@ -1118,9 +1154,11 @@ function B.draw(U, L, x, y, w, h)
       end
     end
     if bx > x + L.pad + 2 and (B.filter ~= '' or B.filtering) then
-      -- поиск: та же строка, после кнопок
+      -- 17 окт: поиск — своей строкой под кнопками (было в той же, после закладок — резался)
+      y = y + L.rh + 2; h = h - L.rh - 2
       local scope = 'in folder'
-      U.text(bx, y + 1, ctx.fit('/' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries), x + w - L.pad - bx), U.AMBER)
+      local hint2 = B.filter == '' and '   words  -drum without  >2s <0.5s length  ^start end$' or ''
+      U.text(x + L.pad + 2, y + 1, ctx.fit('/' .. B.filter .. (B.filtering and '_' or '') .. ('  %s: %d'):format(scope, #B.entries) .. hint2, w - 2 * L.pad - 2), U.AMBER)
       y = y + L.rh + 2; h = h - L.rh - 2
     end
   end

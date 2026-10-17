@@ -370,6 +370,8 @@ KH.PAGES = {
     { k = ':z words  :zi', d = 'zoxide: jump to the most used / recent folder matching the words (last word - in the folder name); :zi - pick from the visited folders' },
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },
+    { k = 'find words', d = 'in the search: words in any order, -drum - without it, >2s / <0.5s - by the file length, ^start, end$, \'exact' },
+    { k = 'Cmd / Shift+click', d = 'mark one row / mark the rows from the cursor to it (as m); Enter puts every marked file into the lib' },
     { k = 'm u', d = 'mark the row (and step down) / unmark all (u, as in lf); marks stay across folders - Enter puts every marked file into the lib in marking order' },
     { k = 'presets', t = {}, d = 'browser tab presets (t cycles to it): instrument presets as REAPER track templates in TrackTemplates/presets/<pad bass lead keys ...>; Enter - its fx chain on the cursor track (any synth, the items stay), n - save the cursor track there (folder, then name), h - back' },
     { k = 'a', d = 'add the marked files (or the one under the cursor) to: l the lib, d drumrs5k (a pad per file), s an RS5K per file, m one RS5K list, c slices of the selected instrument; drag a file onto a pad - its sample, onto all / the empty grid - a new pad' },
