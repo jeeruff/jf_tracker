@@ -2648,6 +2648,10 @@ function V.key_impl(c)
         if ctx.clear_track() then finish_edit() else finish_move() end
         V.count = nil; return
       end
+      if p == 'd' and c == ('R'):byte() then   -- 17 окт: dR — регион на всех треках
+        if ctx.clear_region_all and ctx.clear_region_all() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
       if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
       -- 10 окт: dP — все items и автоматизация выбранных треков во всём проекте
       if p == 'd' and c == ('P'):byte() then
@@ -3265,7 +3269,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | R region, all tracks | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',

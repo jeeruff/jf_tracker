@@ -2185,6 +2185,27 @@ ctx = {
       all and ('all tracks' .. (rg and (' in ' .. (rg.name ~= '' and rg.name or 'the pattern')) or '')) or f.col.name, n)
     return n > 0
   end,
+  -- 17 окт: dR — регион курсора на всех треках: всё, что в нём начинается (Shift = все треки, как dr для трека)
+  clear_region_all = function()
+    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if not rg then vim.msg = 'dR: the cursor is not in a pattern'; return false end
+    local n = 0
+    edit.run('clear the region on all tracks', function()
+      for _, c in ipairs(snap.cols) do
+        local tr = c.track
+        if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+          for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+            local it = reaper.GetTrackMediaItem(tr, i)
+            local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+            if pos >= rg.pos - 1e-6 and pos < rg.rgnend - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
+          end
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('dR: %s cleared on all tracks - %d item(s) (u - undo)'):format(rg.name ~= '' and rg.name or 'the region', n)
+    return n > 0
+  end,
   -- dP (10 окт): выбранные в REAPER треки (нет выбора — трек курсора): все
   -- items и вся автоматизация во всём проекте — точки огибающих и automation
   -- items (огибающие остаются пустыми); трек LIB не трогается. Один undo
