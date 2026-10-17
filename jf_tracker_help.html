@@ -48,7 +48,7 @@
   .rows { font: 14px/1.5 "JetBrains Mono", Menlo, monospace; background: var(--code); border-radius: 6px; padding: 12px 14px; white-space: pre; overflow-x: auto; }
   .rows .g { color: var(--grey); } .rows .a { color: var(--amber); }
   figure { margin: 18px 0; }
-  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); min-height: 80px; }
+  figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
   figcaption { color: var(--grey); font-size: 14px; margin-top: 6px; }
   ol.legend { columns: 2; column-gap: 28px; padding-left: 20px; font-size: 15px; }
   ol.legend li { break-inside: avoid; margin-bottom: 6px; }
@@ -238,7 +238,7 @@ a note never opens a panel. Counts like <kbd>3j</kbd> work again when the keyboa
 <h2 id="insert">INSERT</h2>
 <figure>
   <img src="help/strip.png" alt="the keyboard and transport strip">
-  <figcaption>The strip under the tracker: the mode word, octave, the little piano (each key with its key name), velocity, <code>$pitch</code> and <code>pedal</code>, the pitch and mod wheels, then the cursor, step, LPB and the transport.</figcaption>
+  <figcaption>The strip under the tracker: the mode word, octave, the little piano (each key with its key name), velocity, <code>$pitch</code> and <code>pedal</code>, the pitch and mod wheels, then the cursor, step, LPB, the transport and on the right the play position, tempo, time signature, metronome and swing.</figcaption>
 </figure>
 <p>With the default layout <b>frow</b> INSERT is NORMAL plus the notes: the digits and the F row write, every other key does what it does in NORMAL and you stay in INSERT; <kbd>[</kbd> <kbd>]</kbd> octave, <kbd>{</kbd> <kbd>}</kbd> velocity, <kbd>(</kbd> <kbd>)</kbd> instrument. The old <b>qwerty</b> layout (options → keyboard layout) keeps its own INSERT keys:</p>
 <div class="rows"> <span class="a">2 3   5 6 7   9 0</span>          <span class="g">black keys</span>
