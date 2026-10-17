@@ -2273,6 +2273,42 @@ function E.humanize(it, tk)
   R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * 0.010))   -- 15 окт: и тайминг ±10 мс
 end
 
+-- 17 окт: humanizer (макрос) — у уже стоящих нот, по флагам opt: time (±10 мс), pitch (±8 центов), vol (±1.5 dB,
+-- MIDI — velocity ±12), pan (±10 %), attack (fade-in 0..6 мс), len (±4 %); amt — доля (1 = как выше). Один undo
+function E.humanize_notes(heads, lpb, opt, amt)
+  amt = amt or 1
+  local function r() return (math.random() * 2 - 1) * amt end
+  local n = 0
+  run('humanize', function()
+    for _, h in ipairs(heads) do
+      if h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then
+        local it = h.item
+        local tk = R.GetActiveTake(it)
+        if opt.time then R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * 0.010)) end
+        if opt.pitch and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * 0.08) end
+        if opt.vol then R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * 1.5 / 20)) end
+        if opt.pan and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', math.max(-1, math.min(1, R.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + r() * 0.10))) end
+        if opt.attack then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', math.abs(r()) * 0.006) end
+        if opt.len then R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(0.005, R.GetMediaItemInfo_Value(it, 'D_LENGTH') * (1 + r() * 0.04))) end
+        n = n + 1
+      elseif h.kind == 'midi' then
+        local i, nt = midi_note(h, lpb)
+        if i then
+          local sp, ep, vel = nt.sppq, nt.eppq, nt.vel or 100
+          local ppq = R.MIDI_GetPPQPosFromProjQN(h.take, 1) - R.MIDI_GetPPQPosFromProjQN(h.take, 0)
+          local ppms = ppq * R.TimeMap2_GetDividedBpmAtTime(0, R.MIDI_GetProjTimeFromPPQPos(h.take, sp)) / 60000
+          if opt.time then local d = math.floor(r() * 10 * ppms + 0.5); sp, ep = math.max(0, sp + d), ep + d end
+          if opt.len then ep = math.max(sp + 1, sp + math.floor((ep - sp) * (1 + r() * 0.04) + 0.5)) end
+          if opt.vol then vel = math.max(1, math.min(127, math.floor(vel + r() * 12 + 0.5))) end
+          R.MIDI_SetNote(h.take, i, nt.sel, nt.muted, sp, ep, nt.ch, nt.pitch, vel, false)
+          n = n + 1
+        end
+      end
+    end
+  end)
+  return n
+end
+
 -- ── арпеджиатор (3 окт, :arp) ─────────────────────────────────────────────
 -- Аккорд на строке row (heads — ноты, начинающиеся в ней: MIDI и аудио) →
 -- арпеджио на всю длину аккорда: шаг opt.step строк, порядок opt.order

@@ -35,6 +35,10 @@ MR.BUILTIN = {
   { name = 'fibonacci',   body = ':xf fib',        desc = 'the notes sit on Fibonacci rows from the first one: 0 1 2 3 5 8 13 ...' },
   { name = 'tuplet 3',    body = ':xf tuplet 3',   desc = 'the first 3 notes evenly over the block (a triplet over the rows)' },
   { name = 'golden fade', body = ':xf golden',     desc = 'volume: every next note is 0.618 of the one before (golden ratio)' },
+  -- 17 окт: humanizer — уже стоящие ноты чуть разные, как живые (VISUAL — блок, иначе трек курсора в регионе)
+  { name = 'humanize',          body = ':human all',     desc = 'every note a little different: timing +-10 ms, pitch +-8 cents, volume +-1.5 dB, pan, attack, length (:human all 50% - softer)' },
+  { name = 'humanize no pitch', body = ':human nopitch', desc = 'the same without the pitch: timing, volume, pan, attack, length' },
+  { name = 'humanize no time',  body = ':human notime',  desc = 'the same without the timing - the grid stays: pitch, volume, pan, attack, length' },
 }
 
 -- клавиши ↔ строка
