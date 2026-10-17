@@ -732,9 +732,15 @@ function D.layout(snap, state, nregions)
     if #(snap.master.envs or {}) == 0 then ew = L.env_w + 1 end
     L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
   end
+  -- 17 окт: мастер сложен (кнопка fold в его шапке; опция auto fold master — сам, когда треки не влезают):
+  -- два символа — стерео-метр и подавление компрессора / лимитера мастера, колонок нет
+  L.mfold = L.mtrack and (state.mfold or (state.mfoldauto and D.mfold_auto)) or false
+  L.master_w_full = L.master_w
+  if L.mfold then L.master_w = 2 * ms('W') + 2 * L.pad + 2 end
   L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.rg_w or 0)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
+  L.hs_cut = nil
   L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
@@ -745,7 +751,7 @@ function D.layout(snap, state, nregions)
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
       or (state.thide ~= nil and state.thide[col.guid] == true)                 -- 11 окт: скрыт в track list
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
-    local vis = (not hidden) and ci >= first and cx < L.cols_r
+    local vis = (not hidden) and ci >= first and cx < L.cols_r and not L.hs_cut   -- 17 окт: после не влезшего — не показывать
     -- PT-mode (3 окт): ровно 4 канала от прокрутки
     if state.ptmode and not hidden and ci >= first then
       L.pt_avail = L.pt_avail + 1
@@ -823,6 +829,12 @@ function D.layout(snap, state, nregions)
     c.w = lx - (c.x or 0)
     -- 8 окт: колонка не влезла целиком — режем по границе трекера (шапка и
     -- строка эффектов выходили за линию модуля); подколонки за краем — без x
+    -- 17 окт: не влез целиком и он не первый видимый — не показывать (и всё после него): к нему ведёт
+    -- полоса прокрутки треков; раньше он рисовался обрезанным («drum» у мастера)
+    if vis and c.x and c.x + c.w > L.cols_r - 2 and #L.cols > 0 then
+      for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do local f = L.flat[k]; if f.ci == ci then f.x = nil end end
+      vis = false; L.hs_cut = true; lx = cx
+    end
     if vis and c.x and c.x + c.w > L.cols_r - 2 then
       local lim = L.cols_r - 2
       c.w = math.max(0, lim - c.x)
@@ -840,7 +852,12 @@ function D.layout(snap, state, nregions)
     if hidden then for _, f in ipairs(L.flat) do if f.ci == ci then f.x = nil end end end
   end
   -- 11 окт: колонка мастера — справа, в своём углу; огибающие — элементы L.flat (курсор, точки), как у трека
-  if L.mtrack then
+  -- 17 окт: auto fold master — треки не влезли: сложить на следующей раскладке; развернуть, только если справа
+  -- хватит места на полную ширину мастера (иначе сложил-развернул по кругу)
+  if L.mfold then D.mfold_auto = L.hs_cut or (L.cols_r - cx) < (L.master_w_full - L.master_w) + 2
+  else D.mfold_auto = L.hs_cut or false end
+  if L.mtrack and L.mfold then L.mcol = nil
+  elseif L.mtrack then
     local mc = snap.master
     local ci = #snap.cols + 1
     local c = { col = mc, ci = ci, x = L.cols_r + 1, lanes = {}, envs = {}, mls = {}, master = true, mtrack = true }
@@ -5251,6 +5268,54 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   D.pn_rects = rects
 end
 
+-- 17 окт: сложенный мастер — шапка M и кнопка (развернуть), в теле стерео-метр L R во всю высоту и красная полоса
+-- подавления сверху (максимум GainReduction_dB среди эффектов мастера: ReaComp, ReaLimit, плагины с этим полем)
+function D.mfold_draw(L, snap, hover)
+  if not (L.mfold and snap.master and snap.master.track) then return end
+  local tr = snap.master.track
+  if not reaper.ValidatePtr(tr, 'MediaTrack*') then return end
+  local x, w = L.cols_r + 1, L.master_w - 2
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hy, hh = L.header_y, L.header_h
+  local keep = D.clip; D.clip = { x, x + w + 1 }   -- своя колонка: клип модуля рядом резал подписи
+  local function done() D.clip = keep end
+  set(D.HDR); gfx.rect(x, hy, w, hh, 1)
+  text(x + L.pad, hy + 1, 'M', U.AMBER)
+  local by = hy + L.rh + 2
+  local bw = math.max(ms('>') + 4, w - 2)
+  local hot = mx >= x and mx < x + bw and my >= by and my < by + L.rh
+  set(hot and D.CURROW or U.PANEL); gfx.rect(x + 1, by, bw, L.rh - 2, 1)
+  set(U.DIM); gfx.rect(x + 1, by, bw, L.rh - 2, 0)
+  text(x + 3, by, '<', hot and U.AMBER or U.TEXT)
+  if hot then hover.mfold = true end
+  -- метр: два столбика во всю высоту тела, снизу вверх (-60..0 dB), выше 0 — красный
+  local y0, h0 = L.body_y, L.body_h
+  set(U.BG); gfx.rect(x, y0, w, h0, 1)
+  local mw = math.max(2, math.floor((w - 6) / 3))
+  local function db(v) return v > 0 and 20 * math.log(v, 10) or -150 end
+  for ch = 0, 1 do
+    local v = reaper.Track_GetPeakInfo(tr, ch)
+    local f = math.max(0, math.min(1, (db(v) + 60) / 60))
+    local bx = x + 2 + ch * (mw + 1)
+    set(U.LINE); gfx.rect(bx, y0, mw, h0, 1)
+    local hgt = math.floor(f * h0)
+    set(v >= 1 and U.RED or (f > 0.85 and U.AMBER or U.GREEN)); gfx.rect(bx, y0 + h0 - hgt, mw, hgt, 1)
+  end
+  local gr = 0
+  for k = 0, reaper.TrackFX_GetCount(tr) - 1 do
+    local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, k, 'GainReduction_dB')
+    local g = ok and tonumber(v)
+    if g then gr = math.max(gr, math.abs(g)) end
+  end
+  local gx = x + 2 + 2 * (mw + 1)
+  set(U.LINE); gfx.rect(gx, y0, mw, h0, 1)
+  if gr > 0.05 then
+    local hgt = math.floor(math.min(1, gr / 20) * h0)            -- 0..20 dB подавления — сверху вниз
+    set(U.RED); gfx.rect(gx, y0, mw, hgt, 1)
+  end
+  if mx >= x and mx < x + w and my >= y0 and my < y0 + h0 then hover.mfold_meter = gr end
+  done()
+end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -5318,7 +5383,7 @@ function D.frame(L, snap, rows, state, info)
   -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
   -- (там было пусто); та же отрисовка, что у трека, без шапки
   local hcols = L.cols
-  if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol then   -- 11 окт: колонка мастера есть — полоса микшера у неё
+  if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol and not L.mfold then   -- 11 окт: колонка мастера есть — полоса микшера у неё
     hcols = { table.unpack(L.cols) }
     hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and L.master_w or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
@@ -5374,6 +5439,18 @@ function D.frame(L, snap, rows, state, info)
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     else
       text(c.x + L.pad, hy + 1, fit('master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана
+      -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
+      if c.mtrack then
+        local fw = ms('fold') + 4
+        local fx = c.x + c.w - fw - 2
+        if fx > c.x + ms('master') + 2 * L.pad then
+          local fhot = mx >= fx and mx < fx + fw and my >= hy and my < hy + L.rh
+          set(fhot and D.CURROW or U.PANEL); gfx.rect(fx, hy + 1, fw, L.rh - 2, 1)
+          set(U.DIM); gfx.rect(fx, hy + 1, fw, L.rh - 2, 0)
+          text(fx + 2, hy + 1, 'fold', fhot and U.AMBER or U.GREY)
+          if fhot then hover.mfold = true end
+        end
+      end
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     -- 9 окт: полосы отступа вложенного трека нет (лишний серый разделитель) — вложенность видна по отступу имени
@@ -6892,6 +6969,7 @@ function D.frame(L, snap, rows, state, info)
       text(wx, ty, fit(sg[1], room), U.TEXT); wx = wx + math.min(room, ms(sg[1])) + 2 * L.pad
     end
   end
+  D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
