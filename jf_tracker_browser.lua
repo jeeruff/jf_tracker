@@ -711,7 +711,31 @@ function B.read_proj()
     end
   end
   table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
-  return out
+  -- 17 окт: бэкапы проекта сверху — автосохранения REAPER (.rpp-bak в AutoSaves / рядом / !unsaved), новые первыми
+  local baks = {}
+  local _, pfile = R.EnumProjects(-1, '')
+  local pdir = pfile and pfile:match('^(.*)/[^/]+$')
+  local base = pfile and (pfile:match('([^/]+)%.[Rr][Pp][Pp]$') or '')
+  local dirs = {}
+  if pdir then dirs[#dirs + 1] = pdir .. '/AutoSaves'; dirs[#dirs + 1] = pdir end
+  if R.get_config_var_string then local ok, v = R.get_config_var_string('autosavedir_unsaved'); if ok and v ~= '' and not pdir then dirs[#dirs + 1] = v end end
+  for _, d in ipairs(dirs) do
+    local i = 0
+    while true do
+      local f = R.EnumerateFiles(d, i)
+      if not f then break end
+      if f:lower():match('%.rpp%-bak$') and (not base or base == '' or f:sub(1, #base) == base) then
+        local stamp = f:match('(%d%d%d%d%-%d%d%-%d%d_%d%d%d%d)') or ''
+        baks[#baks + 1] = { name = ('backup %s'):format(stamp ~= '' and (stamp:sub(1, 10) .. ' ' .. stamp:sub(12, 13) .. ':' .. stamp:sub(14, 15)) or f), path = d .. '/' .. f, bak = true, dir = false, stamp = stamp ~= '' and stamp or f }
+      end
+      i = i + 1
+    end
+  end
+  table.sort(baks, function(a, b) return a.stamp > b.stamp end)
+  local res = {}
+  for k = 1, math.min(#baks, 40) do res[#res + 1] = baks[k] end
+  for _, e in ipairs(out) do res[#res + 1] = e end
+  return res
 end
 
 -- вкладка fx (7 окт, опция browser left): список эффектов внутри браузера —
@@ -860,6 +884,9 @@ end
 function B.enter()
   local e = B.entries[B.cur]
   if not e then return end
+  if e.bak then   -- 17 окт: бэкап — открыть (REAPER спросит, сохранить ли текущий)
+    R.Main_openProject(e.path); if ctx.msg then ctx.msg('opened ' .. e.name .. ' - File > Save as to keep it as the project') end; return
+  end
   if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
   elseif e.pmfolder then B.pmfolder = e.pmfolder; B.pm = nil; B.cur = 1; B.filter = ''; B.set_all(B.read_pm())   -- папка проектов (без jf_pm)
@@ -918,6 +945,7 @@ end
 function B.describe(idx)
   local e = B.entries[idx]
   if not e then return '' end
+  if e.bak then return e.name .. ' - an autosave of this project; Enter / double click: open it (REAPER asks to save the current one)' end
   if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
   if e.dir then return '' end                                       -- 5 окт: без имени / пути папки
   if e.pm and e.card and PMm() then return PMm().describe(e) end
