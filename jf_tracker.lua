@@ -3084,6 +3084,28 @@ ctx = {
         -- имя — вариант исходного (B1 → B2); следующие пустые — встык за ним (длинный не режется тактом)
         local clip, real = state.mx_clip, ctx.real_seq()
         local tgt, t_next = {}, nil
+        -- 17 окт: зона =SESSION (клипы) и её items — до вставки: новые паттерны на неё наедут — она уедет за них
+        local zone, zitems
+        do
+          local i = 0
+          while true do
+            local ret, isr, zp, ze, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+            if not ret or ret == 0 then break end
+            if isr and nm == model.SESSION_REGION then zone = { pos = zp, rgnend = ze, idx = idx, col = col }; break end
+            i = i + 1
+          end
+          if zone then
+            zitems = {}
+            for ti = 0, reaper.CountTracks(0) - 1 do
+              local tr = reaper.GetTrack(0, ti)
+              for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+                local it = reaper.GetTrackMediaItem(tr, k)
+                local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+                if p >= zone.pos - 1e-6 and p < zone.rgnend - 1e-6 then zitems[#zitems + 1] = it end
+              end
+            end
+          end
+        end
         for dr = 1, clip.nr do
           local rg = seq[MX.cur.ri + dr - 1]
           if rg and rg.gap then
@@ -3096,6 +3118,20 @@ ctx = {
             tgt[dr] = { pos = pos, rgnend = pos + len, name = nm }
             t_next = pos + len; made = made + 1
           else tgt[dr] = rg; t_next = nil end
+        end
+        -- новые паттерны заходят на зону session — сначала зона с клипами за них (через такт), потом вставка
+        if zone and t_next and made > 0 then
+          local last = 0
+          for dr = 1, clip.nr do if tgt[dr] and tgt[dr].rgnend > last then last = tgt[dr].rgnend end end
+          if last > zone.pos + 1e-6 then
+            local _, meas = reaper.TimeMap2_timeToBeats(0, last - 1e-6)
+            local z0 = reaper.TimeMap2_beatsToTime(0, 0, math.floor(meas) + 2)
+            local dt = z0 - zone.pos
+            for k = #zitems, 1, -1 do local it = zitems[k]; reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + dt) end
+            reaper.SetProjectMarker3(0, zone.idx, true, zone.pos + dt, zone.rgnend + dt, model.SESSION_REGION, zone.col or 0)
+            state.ss_zone_new = nil
+            vim.msg = 'session zone moved after the new patterns'
+          end
         end
         local view = setmetatable({}, { __index = function(_, i) local d = i - MX.cur.ri + 1; if d >= 1 and d <= clip.nr then return tgt[d] end; return seq[i] end })
         n = alias.cells_paste(view, snap, MX.cur.ri, math.max(1, MX.cur.ci), clip)
