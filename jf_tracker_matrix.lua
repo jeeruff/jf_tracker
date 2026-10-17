@@ -759,6 +759,24 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
   end
+  -- 17 окт: секция — рамка её цвета вокруг всех её слотов (номер, имя, ячейки треков)
+  do
+    local box = {}
+    for i = 1, nvis do
+      local ri = MX.scroll + i
+      local sc = sec_of[ri]
+      if sc then
+        local b = box[sc]
+        if not b then b = { y0 = top + (i - 1) * rh, sc = sc }; box[sc] = b end
+        b.y1 = top + i * rh
+      end
+    end
+    local xr = math.min(W - 4, L.mx_label_w + (ncols - MX.hs) * L.mx_cell_w)
+    for sc, b in pairs(box) do
+      U.set((info.region_rgb and info.region_rgb(sc.color)) or U.CYAN)
+      gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
+    end
+  end
   -- 9 окт, как в Renoise: край клетки (верх / низ, 3 px) — потянуть, и клетка
   -- повторится в следующих слотах (алиасы; Option — уникальные копии)
   do

@@ -22941,6 +22941,21 @@ ctx.patternize = function(cuts, how)
   ctx.mx_refresh()
   vim.msg = n > 0 and ('patternize %s: %d pattern(s) A1… (empty spans only; Cmd+Z back)'):format(how, n) or ('patternize %s: nothing to do - the project is already patterns'):format(how)
 end
+-- 17 окт: :section имя — секция (регион без кода) поверх слотов блока матрицы (Shift+J K на именах), иначе слота курсора
+ctx.section_make = function(name)
+  name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  if name == '' then vim.msg = 'section: give it a name - :section verse'; return end
+  if model.SEC.code_of(name) then vim.msg = 'section: a name without a pattern code (not "A1 ...")'; return end
+  local seq = ctx.sequence()
+  local r0, r1 = MX.cur.ri, MX.cur.ri
+  if MX.anchor then r0, r1 = MX.block() end
+  local a, b
+  for ri = r0, r1 do local rg = seq[ri]; if rg and not rg.gap then a = a or rg.pos; b = rg.rgnend end end
+  if not a then vim.msg = 'section: select pattern slots first (Shift+J K on the names)'; return end
+  edit.run('section ' .. name, function() reaper.AddProjectMarker2(0, true, a, b, name, -1, 0) end)
+  MX.anchor = nil; model.invalidate(); regions = model.regions(state.lpb)
+  vim.msg = ('section "%s" over slots %d..%d (a frame around them)'):format(name, r0, r1)
+end
 -- 17 окт: :unstack — регионы с одним началом (стопка: два C1 на одном такте звучат разом, повтор — нет):
 -- лишний маркер долой, а за оригиналом — связанный повтор (как A); один undo
 ctx.unstack = function()
