@@ -824,11 +824,12 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           if hot2 then hover.sess = { ri = ri, ci = vi } end
           if ctx.hint then ctx.hint('sess', cx, ky, cw, L.rh, { ri = ri, ci = vi }) end
           if ri == (last_clip[vi] or 0) + 1 then
-            -- 11 окт: запись — красная плашка без рамки (рамку съедали метки f над ней)
+            -- 17 окт: запись — как кнопка > (тёмный фон, рамка и буква красным); была инверсная плашка
             local rw = U.measure('o') + 4
             local rhot = mx >= bx and mx < bx + rw and my >= byb and my < byb + L.rh
-            U.set(rhot and U.RED or U.mix(U.BG, U.RED, 0.75)); gfx.rect(bx, byb, rw, L.rh - 1, 1)
-            U.text(bx + 2, byb, 'o', rhot and U.TEXT or U.BG)
+            U.set(rhot and U.tint(U.RED, 0.45) or U.BG); gfx.rect(bx, byb, rw, L.rh - 1, 1)
+            U.set(U.RED); gfx.rect(bx, byb, rw, L.rh - 1, 0)
+            U.text(bx + 2, byb, 'o', rhot and U.TEXT or U.RED)
             if rhot then hover.ssrecbtn = { ri = ri, ci = vi } end
             -- 11 окт: без метки f: она забирала место метки клипа, и f + буква начинало запись
           end
