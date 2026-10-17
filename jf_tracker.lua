@@ -13041,6 +13041,22 @@ edit.after = function(desc)
     local s0 = model.marker_pos(model.START_MARKER)
     local s1 = model.marker_pos(model.END_MARKER)
     local lib = regions and regions.lib_pos
+    -- 17 окт: правка за =END (до библиотеки =LIB) — =END сам едет на конец этого такта, дальше — новый паттерн
+    if s1 and t >= s1 - 1e-6 and (not lib or t < lib - 1e-6) then
+      local qn = reaper.TimeMap2_timeToQN(0, t)
+      local _, _, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
+      local e = reaper.TimeMap2_QNToTime(0, qme or (qn + 4))
+      if lib and e > lib then e = lib end
+      local i = 0
+      while true do
+        local ret, isr, pos, _, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+        if not ret or ret == 0 then break end
+        if not isr and nm == model.END_MARKER then reaper.SetProjectMarker3(0, idx, false, e, 0, nm, col or 0); break end
+        i = i + 1
+      end
+      s1 = e
+      model.invalidate()
+    end
     local covered = false
     local next_pos
     for _, rg in ipairs(regions or {}) do
