@@ -452,6 +452,9 @@ function A.cells_copy(regions, snap, r0, r1, c0, c1, linked)
     end
     clip.cells[dr] = clip.cells[dr] or {}
     clip.cells[dr][dc] = list
+    -- 17 окт: длина и имя слота — вставка в пустой слот создаёт паттерн той же длины (вариант имени)
+    clip.lens = clip.lens or {}; clip.names = clip.names or {}
+    clip.lens[dr] = rg.rgnend - rg.pos; clip.names[dr] = rg.name
   end)
   return clip
 end

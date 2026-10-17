@@ -3055,8 +3055,29 @@ ctx = {
     elseif what == 'paste' then
       if not state.mx_clip then vim.msg = 'matrix: clipboard empty (Ctrl+C)'; return end
       local n
-      edit.run('matrix paste', function() n = alias.cells_paste(seq, snap, MX.cur.ri, math.max(1, MX.cur.ci), state.mx_clip) end)
-      vim.msg = ('matrix: pasted %d item(s)'):format(n or 0)
+      local made = 0
+      edit.run('matrix paste', function()
+        -- 17 окт: пустые слоты (gap, «bar») под вставкой — сначала паттерны: длина как у скопированного слота,
+        -- имя — вариант исходного (B1 → B2); следующие пустые — встык за ним (длинный не режется тактом)
+        local clip, real = state.mx_clip, ctx.real_seq()
+        local tgt, t_next = {}, nil
+        for dr = 1, clip.nr do
+          local rg = seq[MX.cur.ri + dr - 1]
+          if rg and rg.gap then
+            local pos = t_next or rg.pos
+            local len = (clip.lens and clip.lens[dr]) or (rg.rgnend - rg.pos)
+            local src = clip.names and clip.names[dr]
+            local nm = (src and src ~= '') and alias.free_name(real, src) or model.SEC.next_family(real)
+            reaper.AddProjectMarker2(0, true, pos, pos + len, nm, -1, 0)
+            real[#real + 1] = { name = nm, pos = pos, rgnend = pos + len }
+            tgt[dr] = { pos = pos, rgnend = pos + len, name = nm }
+            t_next = pos + len; made = made + 1
+          else tgt[dr] = rg; t_next = nil end
+        end
+        local view = setmetatable({}, { __index = function(_, i) local d = i - MX.cur.ri + 1; if d >= 1 and d <= clip.nr then return tgt[d] end; return seq[i] end })
+        n = alias.cells_paste(view, snap, MX.cur.ri, math.max(1, MX.cur.ci), clip)
+      end)
+      vim.msg = ('matrix: pasted %d item(s)%s'):format(n or 0, made > 0 and (' - %d new pattern(s)'):format(made) or '')
     end
     MX.anchor = nil
   end,
@@ -3638,8 +3659,32 @@ ctx = {
   end,
   -- слот последовательности → следующий/предыдущий паттерн по номеру
   -- 10 окт: номер паттерна в слот — Enter на номере (ci −1) → :pat N
+  -- 17 окт: Enter на колонке паттерна — выпадашка паттернов (номер, имя): выбор ставит его в слот; на пустом
+  -- такте — повтор выбранного паттерна (связанный, как A); раньше — строка :pat N
   slot_pat_prompt = function()
-    vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'pat '
+    local seq = ctx.sequence()
+    local slot = seq[MX.cur.ri]
+    if not slot then return end
+    local list = model.patterns(regions)
+    if #list == 0 then vim.msg = 'no patterns yet - n names this bar, + adds one'; return end
+    local items, sel = {}, 1
+    for i, p in ipairs(list) do
+      items[#items + 1] = { label = ('%02d %s'):format(p.num, p.name), v = p, tip = ('%s - %d slot(s)'):format(p.name, p.n or 0) }
+      if not slot.gap and p.name == slot.name then sel = i end
+    end
+    ctx.smart_open({ title = (slot.gap and 'free bar %d: put a pattern here (linked repeat)' or 'slot %d: its pattern'):format(MX.cur.ri) .. ' (Enter)',
+      items = items, cols = 1, sel = sel, on_pick = function(it)
+        local p = it.v
+        if slot.gap then
+          if not (p.src and p.src.rgnend) then vim.msg = 'pattern without a region'; return end
+          local n
+          ctx.slot_op('matrix put ' .. p.name, function() n = alias.put_alias(p.src, slot.pos) end)
+          vim.msg = ('free bar %d: %s - %d item(s), linked (U - make unique)'):format(MX.cur.ri, p.name, n or 0)
+        elseif alias.set_slot(regions, slot, p) then
+          vim.msg = ('slot %d → %02d %s'):format(MX.cur.ri, p.num, p.name)
+        end
+        model.invalidate(); regions = model.regions(state.lpb)
+      end })
   end,
   slot_set_pattern = function(n)
     local seq = ctx.sequence()
@@ -6387,6 +6432,21 @@ ctx = {
       for i, a in ipairs(list) do t[#t + 1] = (i == cur and '*' or '') .. i .. ' ' .. a.name end
       vim.msg = #t > 0 and ('arr: ' .. table.concat(t, '  ')) or 'arr: none yet - \\ P a n'
     end
+  end,
+  -- 17 окт: список аранжировок у мыши: выбор — переключить; ниже — rename / new / dup / delete
+  arr_menu = function()
+    local list, cur = ctx.arr_load()
+    local items, sel = {}, 1
+    for i, a in ipairs(list) do items[#items + 1] = { label = ('%d %s'):format(i, a.name), v = i, on = i == cur }; if i == cur then sel = i end end
+    for _, o in ipairs({ { 'rename', 'name' }, { 'new', 'new' }, { 'dup', 'dup' }, { 'delete', 'del' } }) do
+      items[#items + 1] = { label = o[1], v = o[2], dim = true }
+    end
+    ctx.smart_at = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y }
+    ctx.smart_open({ title = 'arrangements (Enter)', items = items, cols = 1, sel = sel, on_pick = function(it)
+      if type(it.v) == 'number' then ctx.arr(tostring(it.v))
+      elseif it.v == 'name' then ctx.arr_rename_prompt()
+      else ctx.arr(it.v) end
+    end })
   end,
   -- harpoon (9 окт, как в Neovim): закреплённые места песни, до 9 на проект.
   -- Вид метки — модуль в фокусе: trk — трек + строка, mx — ячейка матрицы
@@ -22785,7 +22845,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'add' then ctx.mx_add()
   elseif b == 'arrprev' then ctx.arr('prev')
   elseif b == 'arrnext' then ctx.arr('next')
-  elseif b == 'arrname' then ctx.arr_rename_prompt()
+  elseif b == 'arrname' then ctx.arr_menu()   -- 17 окт: щелчок по имени — список аранжировок (переименовать — в нём)
   elseif b == 'arrnew' then ctx.arr('new')
   elseif b == 'arrdup' then ctx.arr('dup')
   elseif b == 'arrclear' then

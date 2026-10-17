@@ -244,7 +244,7 @@ KH.PAGES = {
     { k = 'w b e', m = 'next / previous slot with a pattern', d = 'next / previous slot with a pattern (free bars .. skipped) / the last bar before the next slot' },
     { k = '0 ^ $', d = 'name column / last track' },
     { k = 'D BS Del', m = 'delete the slot / cut the cell', d = 'on the slot number or name - delete the slot (like dd); on a cell - cut it (like x)' },
-    { k = 'Enter', m = 'pattern number / rename', d = 'on the slot number: type the pattern number (:pat N); on the name - rename; Ctrl+Shift+H / L - previous / next pattern' },
+    { k = 'Enter', m = 'pattern list / rename', d = 'on the slot number: the list of patterns - pick one for the slot (on a free bar - a linked repeat of it; :pat N types it); on the name - rename; Ctrl+Shift+H / L - previous / next pattern; a click on the arrangement name - the list of arrangements' },
     { k = 'o O', d = 'new empty 1-bar slot after / before' },
     { k = 'dd', d = 'delete slot: region + its time (goes to register)', t = { 'dd', 'd' } },
     { k = 'yy', d = 'yank slot into register', t = { 'yy', 'y' } },
