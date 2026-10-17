@@ -2145,6 +2145,26 @@ function V.key_impl(c)
         V.fx_stop(V.cur.fi, V.cur.row)
         V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
       end
+      -- 17 окт: набор не закончен — Enter дописывает нулями (0D1 → 0D10, 0D → 0D00, vol 8 → 80) и пишет;
+      -- не цифра на значении (w и т.п.) — набор отменяется, ничего не пишется
+      if V.hexbuf and fld >= 2 and not (fld >= 4 and V.cur.sub ~= 'val') then
+        if c == 13 then
+          local he2
+          for _ = 1, 4 do
+            if not V.hexbuf then break end
+            he2 = hex_entry(48, fld, heads)
+            if he2 then break end
+          end
+          V.hexbuf = nil
+          if he2 == true then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
+          return
+        end
+        if c < 256 and string.char(c):match('^%a$') and not string.char(c):upper():match('^[0-9A-F]$') and not string.char(c):match('^[hjklHJKL]$') then
+          V.msg = (V.hexbuf or '') .. ': cancelled'; V.hexbuf = nil
+          if V.fx_back then V.cur.sub = nil; V.fx_back = nil end
+          return
+        end
+      end
       local b0, m0 = V.hexbuf, V.msg
       local he = hex_entry(c, fld, heads)
       if he == 'none' then return end
