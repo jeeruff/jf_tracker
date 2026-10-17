@@ -21149,6 +21149,7 @@ local function frame()
       if B.drag.active then
         if hover.fi and hover.row then state.status = ('drop %s → %s @ %04d'):format(B.drag.e.name, hover.col and hover.col.name or '', hover.row.row)
         elseif type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac)) then state.status = 'drop ' .. B.drag.e.name .. ' → a new slice of the selected instrument (a files kit &)'
+        elseif hover.dspkit and B.is_marked(B.drag.e) and B.nmarked() > 1 then state.status = ('drop %d marked files → %s'):format(B.nmarked(), hover.dspkit.ki > 0 and 'the pads from this one on (more - new pads)' or 'new pads of the drumrs5k')
         elseif hover.dspkit then state.status = 'drop ' .. B.drag.e.name .. (hover.dspkit.ki > 0 and ' → this pad (its sample)' or ' → a new pad of the drumrs5k')
         elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
         elseif hover.sess or (hover.matrix and hover.matrix.ri) then state.status = 'drop ' .. B.drag.e.name .. ' → a clip in this slot'
@@ -21166,7 +21167,20 @@ local function frame()
       elseif bd.active and hover.dspkit and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not bd.e.pm then
         -- 16 окт: drumrs5k — файл на пэд: его сэмпл; на all / пустое место сетки — новый пэд
         local pth = B.full(bd.e)
-        if hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
+        -- 17 окт: тащат отмеченный файл, отмечено несколько — все: по пэдам с этого и дальше, лишние — новыми пэдами
+        local many = {}
+        if B.is_marked(bd.e) and B.nmarked() > 1 then for _, o in ipairs(B.sel_order) do if o.full then many[#many + 1] = o.full end end end
+        if #many > 1 then
+          local rest = {}
+          local kids = hover.dspkit.ki > 0 and hover.dspkid and hover.dspkid.f and hover.dspkid.f.kids or nil
+          local ki0 = hover.dspkit.ki
+          for j, f in ipairs(many) do
+            local kid = kids and kids[ki0 + j - 1]
+            if kid and kid.rs5k_i then ctx.drum_pad_file(kid, f) else rest[#rest + 1] = f end
+          end
+          if #rest > 0 then ctx.drum_add_files(rest) end
+          vim.msg = ('drumrs5k: %d file(s) - %d into pads from this one, %d new pad(s)'):format(#many, #many - #rest, #rest)
+        elseif hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
