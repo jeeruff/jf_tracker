@@ -6114,12 +6114,12 @@ function D.frame(L, snap, rows, state, info)
         local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
         text(ln.x + L.pad, hy + L.lane_row * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
       end
-      if not c.folded then
+      if not c.folded and not c.master then
         if nx + bw2 <= ln.x + ln.w then
           pm(nx, 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
         end
         local fx0 = ln.x + ln.w - bw2 - 1
-        if li == #c.lanes and fx0 > nx + bw2 + L.pad then
+        if li == #c.lanes and fx0 > nx + bw2 + L.pad and not c.master then   -- 17 окт: у мастера колонок эффектов нет (кнопки ложились на cmd / visor); его a+ — ниже
           pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = { d = d, col = col } end)   -- 12 окт: и трек кнопки
           -- 6 окт: лейнов огибающих нет — a+ (добавить лейн автоматизации) левее
           local aw = ms('a+') + 4
