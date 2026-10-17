@@ -1478,8 +1478,8 @@ local function keys_control(c)
   -- буквы свободны — всё остальное в INSERT это команды Vim (как в NORMAL), цифры — не счётчик, а ноты
   if ctx.keys_frow and ctx.keys_frow() then
     if ctx.piano[c] then return false end
-    local nb = V.note_key and V.note_key(c, ctx.mods and ctx.mods() or {})
-    if nb and ctx.piano[nb] then return false end      -- Shift / Option / Shift+Option + нота — прослушать, рядом, pitch
+    local nb, nhow = V.note_key(c, ctx.mods and ctx.mods() or {})
+    if nb and ctx.piano[nb] and nhow ~= 'cmd' then return false end   -- Option / Ctrl+Shift + нота (Shift — с опцией preview)
     if ch == '[' then V.octave = math.max(0, V.octave - 1); V.msg = 'octave ' .. V.octave; return true end
     if ch == ']' then V.octave = math.min(8, V.octave + 1); V.msg = 'octave ' .. V.octave; return true end
     if c == 123 or c == 125 then V.vel = math.max(1, math.min(127, (V.vel or 100) + (c == 125 and 8 or -8))); V.msg = 'velocity ' .. V.vel; return true end
@@ -1568,10 +1568,15 @@ function V.note_key(c, mods)
   if mods.alt then
     local m = SHOPTCH[cp] or OPTCH[cp] or OPTDIGCH[cp]
     local base = m and m:byte() or unshift(c)
-    return base, (mods.shift or SHOPTCH[cp]) and 'pitch_aud' or 'pitch'
+    if mods.shift or SHOPTCH[cp] then return base, (ctx.state and ctx.state.shiftlisten) and 'pitch_aud' or 'cmd' end
+    return base, 'pitch'
   end
-  if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), 'pitch_aud' end
+  -- 17 окт: прослушивание Shift (и Option+Shift) — только с опцией Shift+keys preview (по умолчанию выкл,
+  -- как в Renoise: послушать — выйти из INSERT, клавиши играют в KEYS); без неё Shift+клавиша — команда / хоткей
+  local aud = ctx.state and ctx.state.shiftlisten
+  if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), aud and 'pitch_aud' or 'cmd' end
   if OPTCH[cp] then return OPTCH[cp]:byte(), 'pitch' end
+  if not aud and (mods.shift or SHIFTED[ch] or ch:match('^%u$')) then return c, 'cmd' end
   if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end   -- frow: Shift+F (чёрная)
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end

@@ -214,7 +214,7 @@ KH.PAGES = {
     { k = '1 f1 2 f2 3 4 f4 ...', d = 'piano (layout frow, default): digits 1..0 - = white keys C..G, F1 F2 F4 F5 F6 F8 F9 F11 black; [ ] octave, { } velocity; F-key shortcuts are off while the keyboard plays; the letters stay Vim - in INSERT too (w x dd p ... act as in NORMAL, then INSERT again), digits are notes, not a count' },
     { k = 'q2w3er5t6y7ui9o0p', d = 'piano (layout qwerty, options): top row + digits, q = C of the octave',
       t = { 'q', '2', 'w', '3', 'e', 'r', '5', 't', '6', 'y', '7', 'u', 'i', '9', 'o', '0', 'p' } },
-    { k = 'Shift+note', d = 'audition only, nothing written', t = { 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P' } },
+    { k = 'Shift+note', d = 'with the option Shift+keys preview: listen only, nothing written (off by default - leave INSERT to listen, the keyboard plays in KEYS)', t = { 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P' } },
     { k = 'Option+note', d = 'sliced: the selected slice at that pitch (option slice pitch from: 1 or 6); not sliced - beside: a new subcolumn, the old note keeps playing; Option+Shift - listen' },
     { k = 'Ctrl+Shift+note', d = 'sliced: that slice to the end of the sample (Ctrl+Shift+1 - the whole sample); Ctrl+digit itself is the step' },
     { k = 'frow: letters', t = {}, d = 'with frow every letter is a NORMAL command (h j k l w x dd p ...), then back to INSERT; [ ] octave, { } velocity, ( ) or Opt+J / K instrument; the qwerty: lines below are for the qwerty layout' },

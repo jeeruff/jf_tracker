@@ -307,8 +307,11 @@ keysin('iq');      eq('i q → C-4 at 0 on A', last(), 'ins:trA@0:60:1'); eq('st
 eq('note over kick overwrites (kick deleted first)', calls[#calls - 1], 'delete:kick')
 V.cur.row = 8; alt_down = true; keysin('q'); alt_down = false
 eq('Option+note beside snare: no delete', calls[#calls - 1] ~= 'delete:snare', true); eq('Option+note inserted', last(), 'ins:trA@8:60:1')
+V.cur.row = 8; local nc0 = #calls; keysin('Q'); eq('17 окт: Shift+note without the preview option - no audition, no note', #calls, nc0)
+state.shiftlisten = true
 V.cur.row = 8; local nc = #calls; keysin('Q'); eq('Shift+note only auditions', last(), 'prev:60'); eq('Shift+note: nothing inserted', #calls, nc + 1)
 keysin('#'); eq('Shift+3 auditions D#', last(), 'prev:63')
+state.shiftlisten = nil
 local ncq = #calls; ctrl_down = true; V.key(17); ctrl_down = false; eq('17 окт: Ctrl+q - not a note (no held note)', #calls, ncq)
 V.cur.row = 1
 keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
