@@ -97,6 +97,8 @@ KH.PAGES = {
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
     { k = 'd', d = 'd + motion deletes events: dw d3j dG d}; dd - the rows (3dd), td - the track', t = { 'd' } },
+    { k = 'dae', d = 'delete all automation of the cursor track in the song (points and automation items; the lib after =LIB stays)' },
+    { k = 'dal daj dak dah', d = 'delete notes of the cursor track: dal on the cursor row (every subcolumn), daj below it, dak above it, dah all but the cursor row' },
     { k = 'dd dt', d = 'delete the events of the row - nothing below moves (3dd - three rows; x - one event) / remove the time selection from the project (later items move)', t = { 'dd', 'dt' } },
     { k = 'dW', d = 'delete the whole item under the cursor' },
     { k = 'dp', d = 'delete up to the pause: the run of events of the cursor lane from the cursor down to the first empty row (like d} in Vim); on an empty row - the next run' },

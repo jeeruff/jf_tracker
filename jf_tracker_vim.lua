@@ -2583,7 +2583,10 @@ function V.key_impl(c)
       V.count = nil; return
     elseif p == 'da' then
       -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)
-      if c == ('w'):byte() and ctx.clear_track(true) then finish_edit() else finish_move() end
+      if c == ('w'):byte() and ctx.clear_track(true) then finish_edit()
+      elseif (c == ('e'):byte() or c == ('l'):byte() or c == ('j'):byte() or c == ('k'):byte() or c == ('h'):byte())
+        and ctx.clear_track_part and ctx.clear_track_part(string.char(c)) then finish_edit()   -- 17 окт: dae dal daj dak dah
+      else finish_move() end
       V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
       -- 10 окт: dd — строки (5dd — пять, как в Vim); трек удаляет td (было dd с 4 окт)
@@ -3243,7 +3246,7 @@ local PENDING_HINT = {
   z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
-  da = 'da: w all items of the track (the lib after =LIB stays) | Esc',
+  da = 'da: w all items of the track | e all automation | l notes of the row | j below | k above | h all but the row (the lib after =LIB stays) | Esc',
   ['@'] = '@: a..z play macro | @ repeat last',
 }
 function V.pending_hint()

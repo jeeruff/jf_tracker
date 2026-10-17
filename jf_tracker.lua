@@ -2126,6 +2126,53 @@ ctx = {
     vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'daw' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
   end,
+  -- 17 окт: da + что — трек курсора в песне (=START..=END; lib за =LIB цела): e — вся автоматизация (точки и
+  -- automation items), l — ноты строки курсора (все подколонки трека), j — ниже строки, k — выше, h — все, кроме строки
+  clear_track_part = function(what)
+    local f = L.flat[vim.cur.fi]
+    if not (f and f.col) then return false end
+    local tr = f.col.track
+    local t0 = model.marker_pos(model.START_MARKER) or 0
+    local t1 = model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
+    local ra, rb = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
+    local n, label = 0, nil
+    if what == 'e' then
+      label = 'automation'
+      edit.run('delete the automation of the track', function()
+        for k = 0, reaper.CountTrackEnvelopes(tr) - 1 do
+          local env = reaper.GetTrackEnvelope(tr, k)
+          local np = reaper.CountEnvelopePoints(env)
+          reaper.DeleteEnvelopePointRange(env, t0 - 1e-6, t1 - 1e-6)
+          n = n + np - reaper.CountEnvelopePoints(env)
+          local ok, ch = reaper.GetEnvelopeStateChunk(env, '', false)
+          if ok and ch:find('POOLEDENVINST', 1, true) then
+            local out, cut = {}, 0
+            for line in (ch .. '\n'):gmatch('([^\n]*)\n') do
+              local p = tonumber(line:match('^%s*POOLEDENVINST%s+%S+%s+(%S+)'))
+              if p and p >= t0 - 1e-6 and p < t1 - 1e-6 then cut = cut + 1 else out[#out + 1] = line end
+            end
+            if cut > 0 then reaper.SetEnvelopeStateChunk(env, table.concat(out, '\n'), false); n = n + cut end
+          end
+        end
+      end)
+    else
+      local spans = ({ l = { { ra, rb } }, j = { { rb, t1 } }, k = { { t0, ra } }, h = { { t0, ra }, { rb, t1 } } })[what]
+      if not spans then return false end
+      label = ({ l = 'notes of the cursor row', j = 'notes below the cursor', k = 'notes above the cursor', h = 'notes except the cursor row' })[what]
+      edit.run('delete ' .. label, function()
+        for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+          local it = reaper.GetTrackMediaItem(tr, i)
+          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          for _, sp in ipairs(spans) do
+            if pos >= math.max(t0, sp[1]) - 1e-6 and pos < math.min(t1, sp[2]) - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1; break end
+          end
+        end
+      end)
+    end
+    model.invalidate()
+    vim.msg = ('da%s: %s of %s - %d deleted (u - undo)'):format(what, label, f.col.name, n)
+    return n > 0
+  end,
   -- dP (10 окт): выбранные в REAPER треки (нет выбора — трек курсора): все
   -- items и вся автоматизация во всём проекте — точки огибающих и automation
   -- items (огибающие остаются пустыми); трек LIB не трогается. Один undo
