@@ -1073,5 +1073,25 @@ do
   V.picker = nil
 end
 
+-- 17 окт: умное выделение — v в VISUAL по кругу (LPB из стаба, такт 16 строк, регион 0..31)
+do
+  V.key(27); V.mode = 'normal'; V.cur.fi, V.cur.row = 1, 21
+  local L0 = state.lpb
+  keysin('v')
+  keysin('v'); local f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel 1: column in the beat', ('%d-%d %d-%d'):format(f0, f1, r0, r1), ('1-1 %d-%d'):format(math.floor(21 / L0) * L0, math.floor(21 / L0) * L0 + L0 - 1))
+  keysin('v'); f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel 2: column in the bar', ('%d-%d %d-%d'):format(f0, f1, r0, r1), '1-1 16-31')
+  keysin('v'); f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel 3: the bar, all tracks', (f1 > 1 or f0 == 1) and r0 == 16 and r1 == 31, true)
+  keysin('v'); f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel 4: the half of the pattern', ('%d-%d'):format(r0, r1), '16-31')
+  keysin('v'); f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel 5: the whole pattern', ('%d-%d'):format(r0, r1), '0-31')
+  keysin('v'); f0, f1, r0, r1 = V.visual_range()
+  eq('smart sel: back to the beat column', f0 == f1 and r1 - r0 + 1 == L0, true)
+  V.key(27)
+end
+
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

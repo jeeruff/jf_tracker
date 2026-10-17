@@ -116,7 +116,7 @@ KH.PAGES = {
     { k = 'F12', d = 'reload the audio device (as choosing it again; options - audio)' },
     { k = '⌥R ⌘R', d = 'record into the tracker from the cursor / a new sound into the lib; then Space keep, Enter keep + back, Esc delete' },
     { k = 'q @', d = 'record macro (q a .. q) / play: @a register, @1..9 @A..Z saved and built-in (the @ popup lists them, same keys as \\ q), @@ the last, @/ by name (type to filter); Opt+Shift+2 - the big macros panel at the cursor; with the keyboard on Shift+2 is a note - use Opt+Shift+2 or hide the keyboard (m) for @' },
-    { k = 'v V', d = 'visual block / visual lines' },
+    { k = 'v V', d = 'visual block / visual lines; v again - smart select, wider each time (as Paketti): the column in the beat, in the bar, the bar on all tracks, half the pattern, the whole pattern, round again' },
     { k = 'H J K L', d = 'select: visual block from here, Shift+hjkl extends it (tracks: Option+h l)' },
     { k = 'za zM', d = 'fold track: wave + notes, envelopes as a thin line / all <-> open all (:fold, :unfold)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },

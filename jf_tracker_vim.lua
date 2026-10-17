@@ -2712,6 +2712,7 @@ function V.key_impl(c)
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; finish_edit(); done = true
     elseif c == ('r'):byte() then V.pending = 'r'; return
     elseif c == ('V'):byte() then V.mode = 'vline'; done = true
+    elseif c == ('v'):byte() and V.mode == 'visual' then V.smart_expand(); done = true   -- 17 окт: v ещё раз — шире (Paketti)
     elseif c == ('v'):byte() then V.mode = 'visual'; done = true
     end
     if done then V.count = nil; ensure_visible(); return end
@@ -2751,7 +2752,7 @@ function V.key_impl(c)
   elseif ch == '>' then ctx.loop('item', V.count); V.count = nil; finish_edit(); return
   elseif ch == '<' then ctx.loop('region'); V.count = nil; finish_edit(); return
   elseif ch == 'A' then ctx.automation_picker(); V.count = nil; return
-  elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
+  elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }; V.sx = nil
   elseif ch == 'V' then V.mode = 'vline'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil; return
   -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
@@ -3192,6 +3193,37 @@ function V.transpose_smart(scope)
       if type(it.v) == 'string' and it.v:match('^scope:') then V.transpose_smart(it.v:sub(7)); return nil end
       if type(it.v) == 'number' and it.v ~= 0 then V.transpose_scope(scope, it.v) end
     end })
+end
+-- 17 окт: умное выделение (как Paketti): v в VISUAL по кругу — колонка в доле → колонка в такте → такт (все
+-- треки) → половина паттерна (региона курсора) → весь паттерн → снова колонка в доле. Отсчёт — от клетки, где начали
+local SX = { 'column in the beat', 'column in the bar', 'the bar, all tracks', 'half the pattern', 'the whole pattern' }
+function V.smart_expand()
+  local o = V.sx or { fi = (V.anchor or V.cur).fi, row = (V.anchor or V.cur).row, step = 0 }
+  V.sx = o
+  local L0 = lpb()
+  local rg0, rg1
+  if ctx.region_rows then rg0, rg1 = ctx.region_rows() end
+  for _ = 1, #SX do
+    o.step = o.step % #SX + 1
+    if o.step <= 3 or rg0 then break end            -- нет региона — полпаттерна / паттерна нет, дальше по кругу
+  end
+  local f0, f1, r0, r1 = o.fi, o.fi, o.row, o.row
+  if o.step == 1 then r0 = math.floor(o.row / L0) * L0; r1 = r0 + L0 - 1
+  elseif o.step == 2 or o.step == 3 then
+    local b0, b1 = ctx.bar_of_row(o.row); r0, r1 = b0, b1 - 1
+    if o.step == 3 then f0, f1 = 1, nflat() end
+  else
+    f0, f1 = 1, nflat()
+    r0, r1 = rg0, rg1
+    if o.step == 4 then
+      local mid = rg0 + math.floor((rg1 - rg0 + 1) / 2)
+      if o.row < mid then r1 = mid - 1 else r0 = mid end
+    end
+  end
+  V.mode = 'visual'
+  V.anchor = { fi = f0, row = r0 }
+  V.cur.fi, V.cur.row = f1, r1
+  V.msg = ('select: %s (v - wider, Esc - off)'):format(SX[o.step])
 end
 function V.visual_range()
   local a, b = V.anchor or V.cur, V.cur
