@@ -309,14 +309,14 @@ V.cur.row = 8; alt_down = true; keysin('q'); alt_down = false
 eq('Option+note beside snare: no delete', calls[#calls - 1] ~= 'delete:snare', true); eq('Option+note inserted', last(), 'ins:trA@8:60:1')
 V.cur.row = 8; local nc = #calls; keysin('Q'); eq('Shift+note only auditions', last(), 'prev:60'); eq('Shift+note: nothing inserted', #calls, nc + 1)
 keysin('#'); eq('Shift+3 auditions D#', last(), 'prev:63')
-ctrl_down = true; V.key(17); ctrl_down = false; eq('Ctrl+q = note held (4 окт)', last(), 'hold:60')
+local ncq = #calls; ctrl_down = true; V.key(17); ctrl_down = false; eq('17 окт: Ctrl+q - not a note (no held note)', #calls, ncq)
 V.cur.row = 1
 keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
 keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
-ctrl_down = true; V.key(17); eq('Ctrl+q = hold C', last(), 'hold:72'); V.key(49); eq('10 окт: Ctrl+1 = step 1 (1 is not a note in qwerty)', V.step, 1)
-V.key(51); eq('17 окт: Ctrl+3 in INSERT with the keyboard = a held note, not the step', last(), 'hold:75'); ctrl_down = false
+ctrl_down = true; V.key(49); eq('10 окт: Ctrl+1 = step 1', V.step, 1)
+V.key(51); eq('17 окт: Ctrl+3 in INSERT with the keyboard = the step (Ctrl+digit is always the step)', V.step, 3); ctrl_down = false; V.step = 1
 V.step_next = true; ctrl_down = true; V.key(52); eq('13 окт: Ctrl+4 из next - шаг числом', V.step_next, false); eq('  step 4', V.step, 4); ctrl_down = false
 V.key(27);         eq('esc → normal', V.mode, 'normal')
 keysin(':step 2'); V.key(13); eq('step 2', V.step, 2)
@@ -760,8 +760,8 @@ do
   local nc3 = #calls
   cmd_down = true; keysin('w'); cmd_down = false
   eq('Cmd+w in INSERT: no note', #calls, nc3)
-  ctrl_down = true; V.key(23); ctrl_down = false     -- Ctrl+w
-  eq('Ctrl+w on a sliced sample = slice 2 to the end', last():match('^slice:trA@%d+:2:thru$') ~= nil, true)
+  ctrl_down, shift_down = true, true; V.key(23); ctrl_down, shift_down = false, false     -- Ctrl+Shift+w
+  eq('Ctrl+Shift+w on a sliced sample = slice 2 to the end', last():match('^slice:trA@%d+:2:thru$') ~= nil, true)
   V.key(27)
   pool[1].slices = nil
 end
@@ -1073,26 +1073,28 @@ do
   V.picker = nil
 end
 
--- 17 окт: умное выделение — a шире / i уже в VISUAL, курсор на месте (LPB из стаба, такт 16 строк, регион 0..31)
+-- 17 окт: умное выделение — первый a: колонка на весь паттерн; a шире, i уже; курсор на месте (такт 16, регион 0..31)
 do
   V.key(27); V.mode = 'normal'; V.cur.fi, V.cur.row = 1, 21
   local L0 = state.lpb
-  keysin('v')
+  local function rng() local f0, f1, r0, r1 = V.visual_range(); return ('%d-%d %d-%d'):format(f0, f1, r0, r1) end
+  keysin('v'); keysin('a')
+  eq('smart sel: first - the column, the whole pattern', rng(), '1-1 0-31')
   keysin('a'); local f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel 1: column in the beat', ('%d-%d %d-%d'):format(f0, f1, r0, r1), ('1-1 %d-%d'):format(math.floor(21 / L0) * L0, math.floor(21 / L0) * L0 + L0 - 1))
+  eq('smart sel: wider - the bar, all tracks', r0 == 16 and r1 == 31 and f0 == 1 and f1 >= 1, true)
   keysin('a'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel 2: column in the bar', ('%d-%d %d-%d'):format(f0, f1, r0, r1), '1-1 16-31')
+  eq('smart sel: wider - half the pattern', ('%d-%d'):format(r0, r1), '16-31')
   keysin('a'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel 3: the bar, all tracks', (f1 > 1 or f0 == 1) and r0 == 16 and r1 == 31, true)
-  keysin('a'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel 4: the half of the pattern', ('%d-%d'):format(r0, r1), '16-31')
-  keysin('a'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel 5: the whole pattern', ('%d-%d'):format(r0, r1), '0-31')
-  keysin('a'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel: back to the beat column', f0 == f1 and r1 - r0 + 1 == L0, true)
+  eq('smart sel: wider - the whole pattern', ('%d-%d'):format(r0, r1), '0-31')
   eq('smart sel: the cursor stays', V.cur.row, 21)
-  keysin('i'); keysin('i'); f0, f1, r0, r1 = V.visual_range()
-  eq('smart sel: i narrower (back to the half)', ('%d-%d'):format(r0, r1), '16-31')
+  V.key(27); V.mode = 'normal'; V.cur.fi, V.cur.row = 1, 21
+  keysin('v'); keysin('i')
+  eq('smart sel: i first - the column too', rng(), '1-1 0-31')
+  keysin('i'); eq('smart sel: narrower - the column in the bar', rng(), '1-1 16-31')
+  keysin('i'); eq('smart sel: narrower - the column in the beat', rng(), ('1-1 %d-%d'):format(math.floor(21 / L0) * L0, math.floor(21 / L0) * L0 + L0 - 1))
+  ctrl_down, shift_down = true, true; V.key(10); ctrl_down, shift_down = false, false   -- Ctrl+Shift+J
+  local g0, g1, q0, q1 = V.visual_range()
+  eq('visual: Ctrl+Shift+J moves the selection a row down', ('%d-%d'):format(q0, q1), ('%d-%d'):format(math.floor(21 / L0) * L0 + 1, math.floor(21 / L0) * L0 + L0))
   V.key(27)
 end
 

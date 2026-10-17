@@ -1560,9 +1560,10 @@ function V.note_key(c, mods)
     return b
   end
   if mods.cmd then return c, 'cmd' end
+  -- 17 окт (2): Ctrl+цифра — всегда шаг; Ctrl+нота — не нота (удержание убрано), Ctrl+Shift+нота — слайс до конца
   if mods.ctrl then
     local base = (c >= 1 and c <= 26) and (c + 96) or unshift(c)
-    return base, mods.shift and 'thru_aud' or 'thru'
+    return base, mods.shift and 'thru' or 'cmd'
   end
   if mods.alt then
     local m = SHOPTCH[cp] or OPTCH[cp] or OPTDIGCH[cp]
@@ -1584,7 +1585,7 @@ function V.mod_note(c)
   if not (V.mode == 'insert' and V.piano and (V.cur.field or 1) == 1 and ctx.piano) then return false end
   local m = ctx.mods and ctx.mods() or {}
   if m.cmd or not (m.ctrl or m.alt) then return false end
-  -- 17 окт: Ctrl - / + — всегда шаг ±1 (в frow - = — ноты, Ctrl+= стал «слайсом до конца»)
+  if m.ctrl and not m.shift then return false end   -- 17 окт (2): Ctrl+цифра / - + — шаг, не нота
   if m.ctrl and (c == 45 or c == 61 or c == 95 or c == 43 or c == 31) then return false end
   local b = V.note_key(c, m)
   return ctx.piano[b] ~= nil
@@ -1809,6 +1810,19 @@ function V.key_impl(c)
   end
   -- 17 окт: Ctrl+Shift+J / K — конец ноты под курсором на строку позже / раньше, H / L — начало раньше / позже
   -- (время — Ctrl; Opt+Shift — звук: транспоз / playrate инструмента). note_edge с 13 окт не был подключён
+  -- 17 окт: в VISUAL Ctrl+Shift+h j k l — двигать само выделение (рамку) на колонку / строку, размер тот же
+  if hk and mods.ctrl and mods.shift and not mods.alt and not mods.cmd and (V.mode == 'visual' or V.mode == 'vline') then
+    local f0, f1, r0, r1 = V.visual_range()
+    local df = (hk == 'h' and -1 or (hk == 'l' and 1 or 0)) * n
+    local dr = (hk == 'k' and -1 or (hk == 'j' and 1 or 0)) * n
+    if V.mode == 'vline' then df = 0 end
+    df = math.max(1 - f0, math.min(nflat() - f1, df)); dr = math.max(-r0, dr)
+    V.cur.fi, V.cur.row = V.cur.fi + df, V.cur.row + dr
+    if V.vbox then
+      V.vbox = { f0 + df, f1 + df, r0 + dr, r1 + dr, at = { fi = V.cur.fi, row = V.cur.row } }
+    elseif V.anchor then V.anchor = { fi = V.anchor.fi + df, row = V.anchor.row + dr } end
+    V.count = nil; ensure_visible(); return
+  end
   if hk and mods.ctrl and mods.shift and not mods.alt and not mods.cmd and (V.mode == 'normal' or V.mode == 'insert') and not V.mod_note(c) then
     if hk == 'j' or hk == 'k' then V.note_edge('end', hk == 'j' and n or -n) else V.note_edge('start', hk == 'l' and n or -n) end
     V.count = nil; return
@@ -2153,7 +2167,7 @@ function V.key_impl(c)
       local scope = tilde and (mods2.ctrl and 'track' or 'all') or 'sub'
       V.note_off_scope(scope)
       -- 17 окт: ` в NORMAL — весь сэмпл, в INSERT — note-off: подсказать, как вставить весь сэмпл
-      if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Ctrl+1 (Ctrl + a slice key - from that slice to the end)' end
+      if c == ('`'):byte() and slice1_on() then V.msg = (V.msg ~= '' and (V.msg .. ' - ') or '') .. 'note-off; the whole sample: Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice to the end)' end
       V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
     end
     if c == ('['):byte() then V.octave = math.max(0, V.octave - 1); return end
@@ -2188,9 +2202,9 @@ function V.key_impl(c)
     -- без нарезки Ctrl — нота с удержанием. Option — выбранный слайс на высоте клавиши, Option+Shift — прослушать;
     -- без нарезки Option — нота рядом (аккорд)
     local thru = false
-    if how == 'thru' or how == 'thru_aud' then
-      if sliced then thru = true; how = how == 'thru_aud' and 'audition' or 'insert'
-      else how = how == 'thru_aud' and 'audition' or 'hold' end
+    if how == 'thru' then
+      if sliced then thru = true; how = 'insert'
+      else V.msg = 'Ctrl+Shift+note: a slice to the end - only on a sliced sound'; return end
     end
     local paud = how == 'pitch_aud'
     if paud then how = 'pitch' end
@@ -2255,7 +2269,7 @@ function V.key_impl(c)
       if it and semis ~= 0 and E.slice_pitch then E.slice_pitch(it, semis) end
       E.beside = false
       if st.preview and ctx.preview_slice and t0s then ctx.preview_slice(f0.col.track, inst0, t0s, (not (inst0.playthru or thru) and inst0.slices[k + 1]) or inst0.len, semis) end
-      if thru then V.msg = ('slice %d to the end of the sample (Ctrl + a slice key)'):format(k) end
+      if thru then V.msg = ('slice %d to the end of the sample (Ctrl+Shift + a slice key)'):format(k) end
       if V.step_auto and it and E.item_end and E.row_of_time then
         local t_end = E.item_end(it)
         local r = math.max(V.cur.row + 1, (E.row_of_time(t_end, lpb())))   -- слайс короче строки — всё равно шаг
@@ -3199,27 +3213,31 @@ function V.transpose_smart(scope)
 end
 -- 17 окт: умное выделение (как Paketti): v в VISUAL по кругу — колонка в доле → колонка в такте → такт (все
 -- треки) → половина паттерна (региона курсора) → весь паттерн → снова колонка в доле. Отсчёт — от клетки, где начали
-local SX = { 'column in the beat', 'column in the bar', 'the bar, all tracks', 'half the pattern', 'the whole pattern' }
+local SX = { 'column in the beat', 'column in the bar', 'the column', 'the bar, all tracks', 'half the pattern', 'the whole pattern' }
+local SX_START = 3   -- 17 окт: первый шаг — колонка вертикально (весь паттерн), a — шире, i — уже (доля / такт)
 function V.smart_expand(dir)
   dir = dir or 1
-  local o = V.sx or { fi = V.cur.fi, row = V.cur.row, step = 0 }   -- от клетки курсора; курсор не двигается
+  local o = V.sx
+  local first = not o
+  if first then o = { fi = V.cur.fi, row = V.cur.row, step = SX_START - dir } end   -- от клетки курсора; курсор не двигается
   V.sx = o
   local L0 = lpb()
   local rg0, rg1
   if ctx.region_rows then rg0, rg1 = ctx.region_rows() end
   for _ = 1, #SX do
     o.step = (o.step - 1 + dir) % #SX + 1
-    if o.step <= 3 or rg0 then break end            -- нет региона — полпаттерна / паттерна нет, дальше по кругу
+    if o.step == 1 or o.step == 2 or o.step == 4 or rg0 then break end   -- нет региона — колонки / полпаттерна / паттерна нет
   end
   local f0, f1, r0, r1 = o.fi, o.fi, o.row, o.row
   if o.step == 1 then r0 = math.floor(o.row / L0) * L0; r1 = r0 + L0 - 1
-  elseif o.step == 2 or o.step == 3 then
+  elseif o.step == 2 or o.step == 4 then
     local b0, b1 = ctx.bar_of_row(o.row); r0, r1 = b0, b1 - 1
-    if o.step == 3 then f0, f1 = 1, nflat() end
+    if o.step == 4 then f0, f1 = 1, nflat() end
+  elseif o.step == 3 then r0, r1 = rg0, rg1          -- колонка курсора на весь паттерн
   else
     f0, f1 = 1, nflat()
     r0, r1 = rg0, rg1
-    if o.step == 4 then
+    if o.step == 5 then
       local mid = rg0 + math.floor((rg1 - rg0 + 1) / 2)
       if o.row < mid then r1 = mid - 1 else r0 = mid end
     end

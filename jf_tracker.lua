@@ -21983,14 +21983,8 @@ local function frame()
   -- не «˙»), поэтому смотрим физическую клавишу; код — как от Option+h в US
   if c > 0 and reaper.JS_VKeys_GetState then
     local m = ctx.mods()
-    -- 13 окт: Option+Shift+H J K L — край ноты под курсором (vim.note_edge), физические клавиши
-    -- 13 окт: только NORMAL — в INSERT / KEYS Option+нота это вставка с питчем
-    if m.alt and m.shift and not m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
-      local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
-      for vk, a in pairs({ [72] = { 'start', -1 }, [76] = { 'start', 1 }, [74] = { 'end', 1 }, [75] = { 'end', -1 } }) do
-        if ks and ks:byte(vk) ~= 0 then vim.note_edge(a[1], a[2]); c = 0; break end
-      end
-    end
+    -- 17 окт: край ноты — Ctrl+Shift+H J K L (vim); Option+Shift+H J K L — транспоз / playrate инструмента (было
+    -- здесь: край ноты в NORMAL без клавиатуры — одна клавиша значила разное с клавиатурой и без)
     -- 13 окт: Shift+Option+Cmd+J / K — slip: звук внутри ноты под курсором на строку вниз / вверх (нота на месте)
     if c ~= 0 and m.alt and m.shift and m.cmd and not m.ctrl and state.focus == 'tracker' and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra then
       local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
