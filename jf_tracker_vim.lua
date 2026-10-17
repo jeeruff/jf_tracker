@@ -2150,10 +2150,20 @@ function V.key_impl(c)
       if V.hexbuf and fld >= 2 and not (fld >= 4 and V.cur.sub ~= 'val') then
         if c == 13 then
           local he2
-          for _ = 1, 4 do
-            if not V.hexbuf then break end
-            he2 = hex_entry(48, fld, heads)
-            if he2 then break end
+          -- 17 окт: опция hex fill: right (по умолчанию) — набранное — младшие разряды (3 → 03), left — старшие (3 → 30)
+          if (ctx.state and ctx.state.hexfill) ~= 'left' then
+            local buf = V.hexbuf
+            local code = fld >= 4 and buf:sub(1, 2) or ''
+            local dig = fld >= 4 and buf:sub(3) or buf
+            dig = ('0'):rep(math.max(0, 2 - #dig)) .. dig
+            V.hexbuf = fld >= 4 and code or nil
+            for k = 1, #dig do he2 = hex_entry(dig:byte(k), fld, heads); if he2 then break end end
+          else
+            for _ = 1, 4 do
+              if not V.hexbuf then break end
+              he2 = hex_entry(48, fld, heads)
+              if he2 then break end
+            end
           end
           V.hexbuf = nil
           if he2 == true then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
