@@ -736,7 +736,7 @@ function D.layout(snap, state, nregions)
   -- два символа — стерео-метр и подавление компрессора / лимитера мастера, колонок нет
   L.mfold = L.mtrack and (state.mfold or (state.mfoldauto and D.mfold_auto)) or false
   L.master_w_full = L.master_w
-  if L.mfold then L.master_w = 2 * ms('W') + 2 * L.pad + 2 end
+  if L.mfold then L.master_w = 4 * ms('W') + 2 * L.pad + 2 end   -- 17 окт: шире (2 знака — узко)
   L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.rg_w or 0)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
@@ -5383,7 +5383,7 @@ function D.frame(L, snap, rows, state, info)
   -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
   -- (там было пусто); та же отрисовка, что у трека, без шапки
   local hcols = L.cols
-  if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol and not L.mfold then   -- 11 окт: колонка мастера есть — полоса микшера у неё
+  if L.mix_bottom and snap and snap.master and snap.master.vol and (L.mstrip_w or L.label_w) >= 6 * L.cw and not L.mcol then   -- 17 окт: и при сложенном мастере (в микшере он нужен)   -- 11 окт: колонка мастера есть — полоса микшера у неё
     hcols = { table.unpack(L.cols) }
     hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and L.master_w or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
