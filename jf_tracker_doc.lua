@@ -136,7 +136,7 @@ function DOC.key(c)
   if c == 27 or ch == 'q' then
     if DOC.query then DOC.query = nil; DOC.hits = {}; return true end
     return 'leave'
-  elseif ch == 'o' then return 'browser'   -- 17 окт: тот же раздел в браузере (там картинки)
+  elseif ch == 'o' then return 'browser'   -- 17 окт: help.html в браузере (там картинки)
   elseif ch == '/' then DOC.typing = true; DOC.query = ''; DOC.hits = {}
   elseif ch == 'n' then if #DOC.hits > 0 then go_hit(DOC.hit % #DOC.hits + 1) end
   elseif ch == 'N' then if #DOC.hits > 0 then go_hit((DOC.hit - 2) % #DOC.hits + 1) end
@@ -188,7 +188,7 @@ function DOC.draw(L, x, y, w, h)
   local qx = x + L.pad + U.measure(head) + 3 * L.pad
   local qs
   if DOC.typing or DOC.query then qs = ('/%s%s  %d hits%s'):format(DOC.query or '', DOC.typing and '_' or '', #DOC.hits, #DOC.hits > 0 and ('  n N  ' .. DOC.hit .. ' of ' .. #DOC.hits) or '')
-  else qs = '/ search the help   j k lines   J K section   o in the browser   Esc close   Shift+F1 tutorial' end
+  else qs = '' end   -- 17 окт: клавиши — только в статусе внизу (была двойная легенда)
   U.text(qx, y + 2, ctx.fit(qs, x + w - qx - L.pad), (DOC.typing or DOC.query) and U.TEXT or U.GREY)
   local top = y + L.rh + 6
   U.set(U.LINE); gfx.rect(x, top - 3, w, 1, 1)

@@ -822,10 +822,9 @@ local function toggle_dock(apply_title)
   if nd & 1 == 1 then reaper.SetExtState(EXT, 'dock_last', tostring(nd), true) end
 end
 
-local function open_help(anchor)
-  -- 17 окт: с якорем — file:// (у пути с # иначе ищется файл «help.html#mixer»)
-  local url = anchor and ('file://' .. HELP:gsub(' ', '%%20') .. '#' .. anchor) or HELP
-  if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url) else os.execute('open "' .. url .. '"') end
+local function open_help()
+  -- 17 окт: только путь — file://…#раздел CF_ShellExecute на macOS молча не открывает
+  if reaper.CF_ShellExecute then reaper.CF_ShellExecute(HELP) else os.execute('open "' .. HELP .. '"') end
 end
 
 -- выбрать слот пула трека курсора (+ прослушать 1 с)
@@ -8102,10 +8101,11 @@ ctx = {
   end,
   -- F1 (6 окт): большая справка поверх окна — все страницы, поиск; учиться
   -- трекеру, не выходя из REAPER (html — пунктом меню, потом станет зеркалом)
+  HELP_KEYS = 'help: / search, j k lines, J K section, o in the browser, Esc close, Shift+F1 tutorial',   -- 17 окт: легенда F1 — только в статусе
   help_big = function()
     if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end
     state.khelp_big = not state.khelp_big
-    vim.msg = state.khelp_big and 'help: / search, j k lines (on into the next section), J K section, o - in the browser, Esc or F1 - close, :tutorial - the tour' or ''
+    vim.msg = state.khelp_big and ctx.HELP_KEYS or ''
   end,
   -- ? (6 окт): действия REAPER в стиле трекера — fzf на всю матрицу,
   -- недавние сверху (ExtState jf_tracker/act_recent)
@@ -8735,6 +8735,15 @@ ctx = {
       for i, e in ipairs(pool) do items[#items + 1] = { label = ('%02d %s'):format(i, e.name or ''), t = ('%02d'):format(i), v = i }; if vim.inst == i then sel = #items end end
       title = 'instrument of new notes - ' .. col.name
       pick = function(it) pool_select(it.v) end
+    elseif id == 'freeze' then   -- 17 окт: f на freeze — длины цифрами; смена во время игры — с конца текущего цикла
+      items[#items + 1] = { label = 'off', v = 'off', tip = 'loop and repeat back as they were' }
+      for _, len in ipairs(ctx.FRZ_LENS) do items[#items + 1] = { label = ctx.frz_label(len), v = len }; if ctx.frz and ctx.frz.len == len then sel = #items end end
+      if not ctx.frz then sel = 1 end
+      title = 'freeze: loop length (playing - from the end of the current loop)'
+      pick = function(it)
+        if it.v == 'off' then if ctx.frz then ctx.freeze_toggle() end
+        elseif ctx.frz then ctx.freeze_len(it.v / (state.frzlen or 1)) else ctx.freeze_toggle(it.v) end
+      end
     else return false end
     local r = draw.strip_cell and draw.strip_cell[id]
     if r then ctx.smart_at = { x = r[1], y = r[2] - 4, top = r[2] } end
@@ -8768,7 +8777,7 @@ ctx = {
     rec = 'record (Option+R): the cursor track, from the cursor row',
     loop = 'loop on / off: playback repeats the time selection (the loop)',
     tp_start = 'to the project start', tp_end = 'to the project end',
-    freeze = 'freeze: a short loop around the play position (wheel - its length 1/32 .. 2 bars, shown on the button); again - back as it was',
+    freeze = 'freeze: a short loop around the play position, like a DJ repeater. f + its label - the lengths (1/32 .. 2 bars, digits pick), wheel - shorter / longer; while playing a new length starts when the current loop ends. Click - on / off (back as it was)',
     slowplay = 'play at /2 - half speed (Ctrl+Cmd+Space); again or Space - stop, x1 back',
     fastplay = 'play at x2 - double speed (Opt+Cmd+Space); again or Space - stop, x1 back',
     shiftrec = 'shift rec: waits for a MIDI note, then records from the cursor row at the project rate (record slow at x0.5 - it plays back fast); again - cancel',
@@ -8787,8 +8796,16 @@ ctx = {
   end,
   slow_label = function(r) return ({ [0.5] = '1/2', [0.25] = '1/4' })[r] or (math.abs(r - 2 / 3) < 1e-3 and '2/3') or (math.abs(r - 1 / 3) < 1e-3 and '1/3') or ('x%.2f'):format(r) end,
   -- freeze: луп на len четвертей вокруг плейхеда (по сетке длины), repeat вкл; ещё раз — луп и repeat как были
-  freeze_set = function(len)
+  FRZ_LENS = { 0.125, 0.25, 0.5, 1, 2, 4, 8 },
+  freeze_set = function(len, now)
     local f = ctx.frz
+    -- 17 окт: играет и длина меняется — ждать конца текущего цикла (короче — плейхед был бы за лупом)
+    if not now and f.len and f.len ~= len and reaper.GetPlayState() & 1 == 1 then
+      f.pend = len; f.ppos = reaper.GetPlayPosition2()
+      vim.msg = ('freeze %s - from the end of this loop'):format(ctx.frz_label(len))
+      return
+    end
+    f.pend = nil
     local a = f.qa
     reaper.GetSet_LoopTimeRange2(0, true, true, reaper.TimeMap2_QNToTime(0, a), reaper.TimeMap2_QNToTime(0, a + len), false)
     f.len = len
@@ -8816,12 +8833,22 @@ ctx = {
   freeze_len = function(mul)
     local len = math.max(0.125, math.min(8, (state.frzlen or 1) * mul))
     state.frzlen = len
-    if ctx.frz then ctx.freeze_set(len) end
     vim.msg = 'freeze ' .. ctx.frz_label(len)
+    if ctx.frz then ctx.freeze_set(len) end
+  end,
+  -- 17 окт: отложенная длина freeze — плейхед вернулся в начало лупа (обёрнулся) или вышел за него
+  freeze_poll = function()
+    local f = ctx.frz
+    if not (f and f.pend) then return end
+    if reaper.GetPlayState() & 1 == 0 then ctx.freeze_set(f.pend, true); return end
+    local pos = reaper.GetPlayPosition2()
+    local b = reaper.TimeMap2_QNToTime(0, f.qa + (f.len or f.pend))
+    if pos < (f.ppos or pos) - 1e-4 or pos >= b then ctx.freeze_set(f.pend, true)
+    else f.ppos = pos end
   end,
   freeze_menu = function()
     local items = {}
-    for k, len in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8 }) do
+    for k, len in ipairs(ctx.FRZ_LENS) do
       items[#items + 1] = { key = tostring(k), label = 'freeze ' .. ctx.frz_label(len) .. ((state.frzlen or 1) == len and '  (on)' or ''), fn = function()
         if ctx.frz then ctx.freeze_len(len / (state.frzlen or 1)) else ctx.freeze_toggle(len) end end }
     end
@@ -17091,6 +17118,7 @@ local function frame()
     end
   end
   if not idle_skip then HN.reset() end
+  if ctx.frz and ctx.frz.pend then ctx.freeze_poll() end   -- 17 окт: длина freeze — с конца цикла (каждый тик, не только кадр)
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
   edit.xfade.on, edit.xfade.len, edit.xfade.mode = state.xfade, (state.xfade_ms or 10) / 1000, state.xfademode or 'vol'
   edit.ghost_q = ctx.slq_rows()                        -- 15 окт: playthru + q — ghost-слайсы по сетке q (0 = выкл)
@@ -22151,7 +22179,8 @@ local function frame()
       -- большая справка: клавиши — ей (поиск, страницы, прокрутка); Esc / Enter — закрыть
       local r = ctx.DOC.key(c)
       if r == 'leave' then state.khelp_big = false
-      elseif r == 'browser' then open_help(ctx.DOC.anchor()); vim.msg = 'help: opened in the browser' end
+      elseif r == 'browser' then open_help(); vim.msg = 'help: opened in the browser (jf_tracker_help.html)'
+      elseif not ctx.DOC.typing then vim.msg = ctx.HELP_KEYS end
       c = 0
     elseif state.khelp and state.focus == 'dsp' and not typing then
       if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0
