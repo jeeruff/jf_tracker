@@ -14094,6 +14094,16 @@ ctx.HELP_SEC = { tracker = 'normal', insert = 'insert', matrix = 'matrix', sessi
   sample = 'item', sprops = 'item', nmod = 'mod', automation = 'mod', modulation = 'mod', mixer = 'mixer', undotree = 'undo',
   clipboard = 'clipboard', actions = 'actions', browser = 'browser', dsp = 'dsp', pane = 'panes', retro = 'rec', visual = 'visual',
   ctrl = 'transport', master = 'transport', autocanvas = 'mod' }
+-- 17 окт: проиграть ноту (item) на её полную длину: ретриггер (0R) укорачивает голову до первого повтора —
+-- исходная длина в P_EXT:jf_len, повторы звучат внутри неё
+ctx.play_note_item = function(it)
+  if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then return end
+  local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local _, l0 = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_len', '', false)
+  if tonumber(l0) then len = math.max(len, tonumber(l0)) end
+  ctx.mx_cell_preview(reaper.GetMediaItem_Track(it), p0, p0 + len, 'note')
+end
 ctx.help_pane_on = function() return L and L.pn and L.pn.by_panel and L.pn.by_panel.help ~= nil end
 ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
   if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, HELP) end
@@ -21798,8 +21808,7 @@ local function frame()
     if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
     local it = (ctx.NP and ctx.NP.item) or (cell and cell.item)
     if it and reaper.ValidatePtr(it, 'MediaItem*') then
-      local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-      ctx.mx_cell_preview(reaper.GetMediaItem_Track(it), p0, p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), 'note')
+      ctx.play_note_item(it)
       vim.msg = slow and 'Shift+Option+Space: the note under the cursor at x0.5' or 'Shift+Space: the note under the cursor (Shift+Option - x0.5)'
     elseif f and f.col and f.col.track then
       ctx.mx_cell_preview(f.col.track, edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0), 'note')

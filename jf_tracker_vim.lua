@@ -3478,7 +3478,26 @@ function V.smart()
     local function vals(letter, curx)
       local its, cs, sl = SM.values(256, curx, true, 'delete ' .. letter .. 'xx', SM.FX_MEAN and SM.FX_MEAN[letter])
       local desc = SM.FX_DESC[letter] or ''
+      -- 17 окт: прослушать значение — команда пишется в ноту и нота звучит с ней (ретриггер — копии, их не
+      -- услышать без записи); Esc без выбора — прежнее значение назад
+      local heard = false
+      local function restore()
+        if not heard then return end
+        local hs = fc and { fc.head } or heads()
+        local off = (fc and fc.off > 0 and V.fx_rowable(letter)) and fc.off or nil
+        if have and have:sub(1, 2) == letter then E.set_fx(hs, lpb(), letter, tonumber(have:sub(3), 16), off)
+        else E.clear_fx(hs, lpb(), letter, off) end
+      end
       return { title = ('%sxx  %s  %s'):format(letter, desc, where), items = its, cols = cs, sel = sl,
+               on_sel = function(it)
+                 if type(it.v) ~= 'number' then return end
+                 local hs = fc and { fc.head } or heads()
+                 local off = (fc and fc.off > 0 and V.fx_rowable(letter)) and fc.off or nil
+                 E.set_fx(hs, lpb(), letter, it.v, off); heard = true
+                 if ctx.model and ctx.model.invalidate then ctx.model.invalidate() end
+                 if ctx.play_note_item and hs[1] and hs[1].item then ctx.play_note_item(hs[1].item) end
+               end,
+               on_close = restore,
                on_pick = function(it)
                  local hs = fc and { fc.head } or heads()
                  local off = (fc and fc.off > 0 and V.fx_rowable(letter)) and fc.off or nil

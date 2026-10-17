@@ -22,7 +22,11 @@ local function notify(p, i)
 end
 
 function SM.active() return SM.p ~= nil end
-function SM.close() SM.p, SM.rect, SM.hot, SM.hot_prev, SM.typed = nil, nil, nil, nil, nil end
+function SM.close()
+  local p = SM.p
+  SM.p, SM.rect, SM.hot, SM.hot_prev, SM.typed = nil, nil, nil, nil, nil
+  if p and p.on_close and not p.picked then pcall(p.on_close) end   -- 17 окт: закрыли без выбора (Esc) — вызывающий откатит прослушанное
+end
 
 function SM.open(p, anchor)
   if not p or not p.items or #p.items == 0 then SM.close(); return false end
@@ -74,6 +78,7 @@ local function pick(i)
   local p = SM.p
   local it = p and p.items[i]
   if not it then return end
+  p.picked = true
   local nxt = p.on_pick and p.on_pick(it)
   if type(nxt) == 'table' then SM.open(nxt) else SM.close() end
 end
