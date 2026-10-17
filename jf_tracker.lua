@@ -14601,7 +14601,7 @@ function view_actions()
     { 'Wave view ... (zw)', key = 'v', fn = function() ctx.wave_menu() end },   -- 12 окт
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
-    { 'Dock / fullscreen (F11)', key = 'd', fn = toggle_dock },
+    { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
     { 'Help (F1)', key = 'h', fn = function() ctx.help_big() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { (state.khelp and '!' or '') .. 'Help panel of the focused module', key = 'K', fn = function() ctx.toggle_help() end },
@@ -21847,8 +21847,9 @@ local function frame()
     local m = ctx.mods()
     -- 16 окт: клавиатура включена — F-хоткеи молчат в любом модуле (нотой — только в трекере / сэмплере)
     if keys.layout == 'frow' and c > 255 and keys.piano[c] and not m.cmd and not (m.shift and not m.ctrl and not state.shiftlisten) and not vim.picker and not vim.hydra   -- 17 окт: Ctrl / Option + F — тоже ноты (транспоз F — при выключенной клавиатуре)
-       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.piano_show or vim.mode == 'insert') then
-      fnote = (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample')) and c or false; c = 0
+       and vim.mode ~= 'cmd' and vim.mode ~= 'search' and (state.piano_show or vim.mode == 'insert')
+       and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample')) then   -- 17 окт: в других модулях F-хоткеи работают
+      fnote = c; c = 0
     end
   end
   -- 10 окт: транспозиция как в Renoise — F1 / F2 полутон, F11 / F12 октава; Opt — выделение,
@@ -21868,7 +21869,7 @@ local function frame()
     end
   end
   if c == keys.f1 then ctx.help_big(); c = 0 end   -- 10 окт: Shift+F1 — транспоз трека (туториал — в меню и :tutorial)
-  if c == keys.f11 then toggle_dock(); c = 0 end
+  if c == keys.f11 and ctx.mods().cmd then toggle_dock(); c = 0 end   -- 17 окт: весь экран — Cmd+F11 (Cmd = окно; F11 в frow — нота)
   -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
   -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
