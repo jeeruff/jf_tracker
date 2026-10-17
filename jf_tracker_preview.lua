@@ -327,7 +327,7 @@ function P.midi(t0, t1)
   R.OnPlayButton()
   -- 12 окт: стоп — когда позиция воспроизведения дошла до t1, а не по часам: REAPER до ~180 мс готовит звук
   -- заранее (позиция стоит), и короткая строка останавливалась раньше, чем звучала (line молчал)
-  P.stop_pos = t1
+  P.tstop_pos = t1   -- 17 окт: своя переменная транспорта (общая с превью слайса затирала его конец — слайс играл дальше)
   stop_at = R.time_precise() + math.max(0.1, (t1 - t0) / math.max(0.1, R.Master_GetPlayRate(0))) + 1.0   -- страховка, если позиция не пойдёт (17 окт: x0.5 — вдвое дольше)
   return true
 end
@@ -374,9 +374,9 @@ function P.tick()
   for k, v in pairs(P.voices) do
     if v.stop_at and now >= v.stop_at then for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end; if P.geo == v.geo then P.geo = nil end; P.voices[k] = nil end
   end
-  if stop_at and P.stop_pos and R.GetPlayState() & 1 == 1 and R.GetPlayPosition() >= P.stop_pos - 0.002 then stop_at = R.time_precise() end
+  if stop_at and P.tstop_pos and R.GetPlayState() & 1 == 1 and R.GetPlayPosition() >= P.tstop_pos - 0.002 then stop_at = R.time_precise() end
   if stop_at and R.time_precise() >= stop_at then
-    stop_at = nil; P.stop_pos = nil
+    stop_at = nil; P.tstop_pos = nil
     R.OnStopButton()
     if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end
   end
@@ -385,7 +385,7 @@ end
 function P.stop()
   stop_audio()
   voices_stop()
-  P.stop_pos = nil
+  P.stop_pos, P.tstop_pos = nil, nil
   if stop_at then stop_at = nil; R.OnStopButton(); if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end end
 end
 
