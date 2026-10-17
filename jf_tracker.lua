@@ -16593,7 +16593,7 @@ local function mx_bar_label(t)
   local qn = reaper.TimeMap2_timeToQN(0, t)
   local m, qms = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
   local beat = math.floor(qn - (qms or qn) + 1e-6) + 1
-  v = ('%d.%d'):format((m or 0) + 1, beat)
+  v = ('%d.%d'):format(m or 1, beat)   -- 17 окт: QNToMeasures уже с 1 (было +1: матрица на такт впереди REAPER и трекера)
   mxr.lbl[t] = v
   return v
 end
