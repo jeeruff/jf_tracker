@@ -5149,6 +5149,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'clipboard' and info.clip_draw then
         info.clip_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'clipboard', hover)
+      elseif id == 'help' and info.help_draw then   -- 17 окт: справка модуля в фокусе
+        info.help_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'help', hover)
       elseif id == 'actions' and info.act_draw then   -- 16 окт
         info.act_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'actions', hover)
       elseif id == 'undotree' and info.ut_draw then

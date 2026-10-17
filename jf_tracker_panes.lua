@@ -37,7 +37,8 @@ PN.PANELS = {
   { id = 'tracks',     label = 'tracks',     key = 'k', hint = 'tracks',  side = 'left' },    -- 11 окт: Track Manager (как в REAPER): видимость и M S R матрицей
   { id = 'clipboard',  label = 'clipboard',  key = 'y', hint = 'clipboard', side = 'right' },   -- 13 окт: история yank — выбрать, что вставит p
   { id = 'undotree',   label = 'undo',       key = 'U', hint = 'undotree', side = 'right' },    -- 15 окт: дерево undo (как undotree в Vim)
-  { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
+  { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
+  { id = 'help',       label = 'help',       key = 'H', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)

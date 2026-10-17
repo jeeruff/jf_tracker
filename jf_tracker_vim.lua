@@ -2603,8 +2603,8 @@ function V.key_impl(c)
     elseif p == 'da' then
       -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)
       if c == ('w'):byte() and ctx.clear_track(true) then finish_edit()
-      elseif (c == ('e'):byte() or c == ('l'):byte() or c == ('j'):byte() or c == ('k'):byte() or c == ('h'):byte())
-        and ctx.clear_track_part and ctx.clear_track_part(string.char(c)) then finish_edit()   -- 17 окт: dae dal daj dak dah
+      elseif ctx.clear_track_part and string.char(c):lower():match('^[eljkh]$')
+        and ctx.clear_track_part(string.char(c):lower(), string.char(c):match('%u') ~= nil) then finish_edit()   -- 17 окт: dae dal daj dak dah; заглавная — все треки (daE — в паттерне)
       else finish_move() end
       V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
@@ -3272,7 +3272,7 @@ local PENDING_HINT = {
   z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
-  da = 'da: w all items of the track | e all automation | l notes of the row | j below | k above | h all but the row (the lib after =LIB stays) | Esc',
+  da = 'da: w all items | e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',
   ['@'] = '@: a..z play macro | @ repeat last',
 }
 function V.pending_hint()

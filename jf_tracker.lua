@@ -2130,17 +2130,22 @@ ctx = {
   end,
   -- 17 окт: da + что — трек курсора в песне (=START..=END; lib за =LIB цела): e — вся автоматизация (точки и
   -- automation items), l — ноты строки курсора (все подколонки трека), j — ниже строки, k — выше, h — все, кроме строки
-  clear_track_part = function(what)
+  -- 17 окт: all (заглавная: daE daL daJ daK daH) — все треки; daE — в паттерне (регион курсора; вне — песня)
+  clear_track_part = function(what, all)
     local f = L.flat[vim.cur.fi]
     if not (f and f.col) then return false end
-    local tr = f.col.track
+    local trs = {}
+    if all then for _, c in ipairs(snap.cols) do if c.track and not c.master then trs[#trs + 1] = c.track end end else trs[1] = f.col.track end
     local t0 = model.marker_pos(model.START_MARKER) or 0
     local t1 = model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
+    local rg = (all and what == 'e') and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
+    if rg then t0, t1 = rg.pos, rg.rgnend end
     local ra, rb = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
     local n, label = 0, nil
     if what == 'e' then
       label = 'automation'
       edit.run('delete the automation of the track', function()
+        for _, tr in ipairs(trs) do
         for k = 0, reaper.CountTrackEnvelopes(tr) - 1 do
           local env = reaper.GetTrackEnvelope(tr, k)
           local np = reaper.CountEnvelopePoints(env)
@@ -2156,12 +2161,14 @@ ctx = {
             if cut > 0 then reaper.SetEnvelopeStateChunk(env, table.concat(out, '\n'), false); n = n + cut end
           end
         end
+        end
       end)
     else
       local spans = ({ l = { { ra, rb } }, j = { { rb, t1 } }, k = { { t0, ra } }, h = { { t0, ra }, { rb, t1 } } })[what]
       if not spans then return false end
       label = ({ l = 'notes of the cursor row', j = 'notes below the cursor', k = 'notes above the cursor', h = 'notes except the cursor row' })[what]
       edit.run('delete ' .. label, function()
+        for _, tr in ipairs(trs) do
         for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
           local it = reaper.GetTrackMediaItem(tr, i)
           local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
@@ -2169,10 +2176,12 @@ ctx = {
             if pos >= math.max(t0, sp[1]) - 1e-6 and pos < math.min(t1, sp[2]) - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1; break end
           end
         end
+        end
       end)
     end
     model.invalidate()
-    vim.msg = ('da%s: %s of %s - %d deleted (u - undo)'):format(what, label, f.col.name, n)
+    vim.msg = ('da%s: %s of %s - %d deleted (u - undo)'):format(all and what:upper() or what, label,
+      all and ('all tracks' .. (rg and (' in ' .. (rg.name ~= '' and rg.name or 'the pattern')) or '')) or f.col.name, n)
     return n > 0
   end,
   -- dP (10 окт): выбранные в REAPER треки (нет выбора — трек курсора): все
@@ -14079,6 +14088,42 @@ ctx.act_run = function(it)
   model.invalidate()
   vim.msg = 'REAPER: ' .. it.label
 end
+-- 17 окт: панель help — всегда рядом: коротко о модуле в фокусе (первые строки его раздела help.html) и его
+-- клавиши (страница keyhelp, нажатые вспыхивают). В фокусе — поиск по ней (KH.key), Esc — назад
+ctx.HELP_SEC = { tracker = 'normal', insert = 'insert', matrix = 'matrix', session = 'matrix', inst = 'lib', slices = 'lib',
+  sample = 'item', sprops = 'item', nmod = 'mod', automation = 'mod', modulation = 'mod', mixer = 'mixer', undotree = 'undo',
+  clipboard = 'clipboard', actions = 'actions', browser = 'browser', dsp = 'dsp', pane = 'panes', retro = 'rec', visual = 'visual',
+  ctrl = 'transport', master = 'transport', autocanvas = 'mod' }
+ctx.help_pane_on = function() return L and L.pn and L.pn.by_panel and L.pn.by_panel.help ~= nil end
+ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
+  if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, HELP) end
+  local DOC = ctx.DOC
+  local sid = ctx.HELP_SEC[KH.page]
+  local sec
+  for _, sc in ipairs(DOC.secs or {}) do if sc.id == sid then sec = sc; break end end
+  local dy = 0
+  if sec and h > 8 * Lx.rh then
+    local key = sid .. '|' .. w
+    if ctx.help_wkey ~= key then
+      ctx.help_wkey = key
+      local out = {}
+      for _, ln in ipairs(sec.lines or {}) do
+        local plain = ln:gsub('[\1-\4]', '')
+        if plain:match('%S') then
+          for _, part in ipairs(DOC.wrap(plain, w - 2 * Lx.pad, U.measure)) do out[#out + 1] = part; if #out >= 3 then break end end
+        end
+        if #out >= 3 then break end
+      end
+      ctx.help_desc = out
+    end
+    U.text(x, y, ctx.fit(sec.title, w), U.CYAN)
+    for i, ln in ipairs(ctx.help_desc or {}) do U.text(x, y + i * Lx.rh, ctx.fit(ln, w), U.GREY) end
+    dy = (#(ctx.help_desc or {}) + 1) * Lx.rh + 4
+    U.set(U.LINE); gfx.rect(x, y + dy - 3, w, 1, 1)
+  end
+  local r = KH.draw(U, Lx, x - Lx.pad, y + dy, w + 2 * Lx.pad, h - dy, reaper.time_precise(), foc, ctx.fit)
+  return r
+end
 ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
   local AC, ACM = ctx.AC, ctx.ACM
   U.set(U.PANEL); gfx.rect(x - Lx.pad, y - 2, w + 2 * Lx.pad, h + 4, 1)
@@ -16713,7 +16758,7 @@ local function frame()
     edit.rescued = nil
   end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
-  if state.khelp and state.focus ~= 'dsp' then KH.pinned = false; KH.page = ctx.help_page() end
+  if (state.khelp or ctx.help_pane_on()) and state.focus ~= 'dsp' and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
   draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop) or false
   draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
@@ -17454,6 +17499,7 @@ local function frame()
     clip_draw = function(Lx, x, y, w, h, foc, hv) ctx.clip_draw(Lx, x, y, w, h, foc, hv) end,
     ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
     act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
+    help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
     slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -22272,9 +22318,12 @@ local function frame()
         local r = KH.key(c)
         if r == 'leave' then ctx.set_focus(KH.from or 'tracker'); c = 0 elseif r then c = 0 end
       end
+    elseif state.focus == 'help' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then   -- 17 окт: панель help — поиск, страницы, Esc
+      local r = KH.key(c)
+      if r == 'leave' then ctx.set_focus('tracker'); c = 0 elseif r then c = 0 end
     elseif c == 63 and not typing then
       ctx.actions_picker(); c = 0                          -- ? (6 окт): действия REAPER; справка — F1
-    elseif state.khelp and not typing then
+    elseif (state.khelp or ctx.help_pane_on()) and not typing then
       KH.press(ctx.help_page(), c, reaper.time_precise())
     end
   end
