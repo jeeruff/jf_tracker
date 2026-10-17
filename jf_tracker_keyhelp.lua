@@ -828,6 +828,14 @@ local function rnd(seed, k)
 end
 
 -- (x, y, w, h) — прямоугольник панели; now — время; focused — фокус на справке
+-- 17 окт: цвет остывающей искры f = 0..1: горячий (ярче янтаря подсказки) → янтарь → уголь → фон
+function KH.ember(U, f)
+  local hot = U.mix(U.AMBER, { 1, 0.97, 0.82 }, 0.65)
+  local coal = U.mix(U.mix(U.RED, U.AMBER, 0.35), U.PANEL, 0.35)
+  if f < 0.2 then return U.mix(hot, U.AMBER, f / 0.2) end
+  if f < 0.55 then return U.mix(U.AMBER, coal, (f - 0.2) / 0.35) end
+  return U.mix(coal, U.PANEL, (f - 0.55) / 0.45)
+end
 function KH.draw(U, L, x, y, w, h, now, focused, fit)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local P = KH.PAGES[KH.page] or KH.PAGES.tracker
@@ -900,9 +908,11 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
         local px = cx + math.cos(ang) * v * t
         local py = cy + math.sin(ang) * v * t * 0.6 + 40 * t * t
         if px >= x and px < x + w - cw and py >= y + 2 and py < y + h - L.rh then
-          local fade = t / BOOM_T
+          -- 17 окт: искра остывает — вспышка ярче подсказки (почти белая) → янтарь → тёмный уголь → гаснет в фон;
+          -- у каждой своя скорость (гаснут не разом)
+          local fade = math.min(1, t / BOOM_T * (0.75 + 0.5 * rnd(KH.flash.seed, p + 90)))
           local ch = t < 0.12 and '*' or (t < 0.4 and (p % 3 == 0 and '+' or '.') or '.')
-          U.text(math.floor(px), math.floor(py - L.rh / 2), ch, U.mix(U.AMBER, U.PANEL, fade))
+          U.text(math.floor(px), math.floor(py - L.rh / 2), ch, KH.ember(U, fade))
         end
       end
     end
