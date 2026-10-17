@@ -5753,14 +5753,14 @@ function D.frame(L, snap, rows, state, info)
             if hot then hover.btn = { col = col, what = 'routeview' } end   -- 9 окт: диаграмма всех треков
             hint('btn', rx, ry, rw, L.rh, { col = col, what = 'routeview' })
             -- SRO мастера — его собственная маршрутизация (попап, как у треков)
-            local sx2, sw2 = rx + rw + 2, ms('SRO') + 4
+            local sx2, sw2 = rx + rw + 2, ms(D.sroslash and '///' or 'SRO') + 4
             if sx2 + sw2 <= c.x + c.w - 1 then
               local has = { reaper.GetTrackNumSends(col.track, 0) > 0, reaper.GetTrackNumSends(col.track, -1) > 0, hw }
               local hot2 = mx >= sx2 and mx < sx2 + sw2 and my >= ry and my < ry + L.rh
               set(hot2 and D.CURROW or U.PANEL); gfx.rect(sx2, ry + 1, sw2, L.rh - 1, 1)
               set((has[1] or has[2] or has[3]) and U.CYAN or U.DIM); gfx.rect(sx2, ry + 1, sw2, L.rh - 1, 0)
               local lx = sx2 + 2
-              for i, ch in ipairs({ 'S', 'R', 'O' }) do
+              for i, ch in ipairs(D.sroslash and { '/', '/', '/' } or { 'S', 'R', 'O' }) do   -- 17 окт: опция routing as /// и у мастера
                 local k3 = ({ U.CYAN, U.GREEN, U.AMBER })[i]
                 text(lx, ry, ch, has[i] and k3 or U.mix(k3, U.PANEL, 0.68)); lx = lx + ms(ch)   -- 16 окт: пусто — бледным своим цветом
               end
