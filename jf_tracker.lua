@@ -22910,6 +22910,28 @@ ctx.patternize = function(cuts, how)
   ctx.mx_refresh()
   vim.msg = n > 0 and ('patternize %s: %d pattern(s) A1… (empty spans only; Cmd+Z back)'):format(how, n) or ('patternize %s: nothing to do - the project is already patterns'):format(how)
 end
+-- 17 окт: :unstack — регионы с одним началом (стопка: два C1 на одном такте звучат разом, повтор — нет):
+-- лишний маркер долой, а за оригиналом — связанный повтор (как A); один undo
+ctx.unstack = function()
+  local real = ctx.real_seq()
+  local seen, stack = {}, {}
+  for _, rg in ipairs(real) do
+    local k = ('%.6f'):format(rg.pos)
+    if seen[k] then stack[#stack + 1] = { dup = rg, src = seen[k] } else seen[k] = rg end
+  end
+  if #stack == 0 then vim.msg = 'unstack: no stacked patterns'; return end
+  local n = 0
+  ctx.slot_op('unstack patterns', function()
+    for k = #stack, 1, -1 do
+      local st = stack[k]
+      reaper.DeleteProjectMarker(0, st.dup.idx, true)
+      alias.put_alias(st.src, st.src.rgnend)
+      n = n + 1
+    end
+  end)
+  model.invalidate(); regions = model.regions(state.lpb)
+  vim.msg = ('unstack: %d stacked pattern(s) now play after the original (linked repeats; u - undo)'):format(n)
+end
 ctx.mx_menu = function(pick)
   local function bars(nb)
     return function()
@@ -22953,6 +22975,7 @@ ctx.mx_menu = function(pick)
       ctx.patternize(cuts, 'by markers')
     end },
     -- 12 окт: конвертер кодов паттернов
+    { key = 'u', label = 'unstack: patterns that start at the same place play one after the other', fn = function() ctx.unstack() end },
     { key = 'c', label = 'codes: old names get codes (intro -> C1 intro)', fn = function() ctx.codes_convert('codes') end },
     { key = 'h', label = 'codes: to hex (A12 -> AC)', fn = function() ctx.codes_convert('hex') end },
     { key = 'd', label = 'codes: to decimal (AC -> A12)', fn = function() ctx.codes_convert('dec') end },
