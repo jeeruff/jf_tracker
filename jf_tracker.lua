@@ -822,8 +822,10 @@ local function toggle_dock(apply_title)
   if nd & 1 == 1 then reaper.SetExtState(EXT, 'dock_last', tostring(nd), true) end
 end
 
-local function open_help()
-  if reaper.CF_ShellExecute then reaper.CF_ShellExecute(HELP) else os.execute('open "' .. HELP .. '"') end
+local function open_help(anchor)
+  -- 17 окт: с якорем — file:// (у пути с # иначе ищется файл «help.html#mixer»)
+  local url = anchor and ('file://' .. HELP:gsub(' ', '%%20') .. '#' .. anchor) or HELP
+  if reaper.CF_ShellExecute then reaper.CF_ShellExecute(url) else os.execute('open "' .. url .. '"') end
 end
 
 -- выбрать слот пула трека курсора (+ прослушать 1 с)
@@ -8103,7 +8105,7 @@ ctx = {
   help_big = function()
     if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end
     state.khelp_big = not state.khelp_big
-    vim.msg = state.khelp_big and 'help: / search, j k scroll, J K section, Esc or F1 - close, :tutorial - the tour' or ''
+    vim.msg = state.khelp_big and 'help: / search, j k lines (on into the next section), J K section, o - in the browser, Esc or F1 - close, :tutorial - the tour' or ''
   end,
   -- ? (6 окт): действия REAPER в стиле трекера — fzf на всю матрицу,
   -- недавние сверху (ExtState jf_tracker/act_recent)
@@ -17848,7 +17850,9 @@ local function frame()
   -- строка effects (7 окт): под шапками — эффекты трека в одну строку и
   -- сенды (> трек, голубым); щелчок — DSP / окно маршрутизации, f — прыжки
   draw.pmark('post: effects row')
-  if state.fxrow and (L.fxrow_h or 0) > 0 and snap and L.cols then
+  -- 17 окт: под большими видами (F1, pm, session big) не рисовать — лезла поверх справки
+  local big_on = state.khelp_big or state.pm_big or state.ss_big
+  if state.fxrow and not big_on and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.set(U.LINE); for _, c in ipairs(L.cols) do if c.x then gfx.rect(c.x, y0, 1, L.fxrow_h, 1) end end   -- 8 окт: разделители треков, как в теле
@@ -17867,7 +17871,7 @@ local function frame()
   -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔
   -- session; в фокусе session — клип-мод: клавиатура QWERTY запускает клипы
   draw.pmark('post: session clips')
-  if state.clipsview and (L.sess_h or 0) > 0 and snap and L.cols then
+  if state.clipsview and not big_on and (L.sess_h or 0) > 0 and snap and L.cols then
     local x0, y0, w0, h0 = L.matrix_w, L.sess_y, L.win_w - L.matrix_w, L.sess_h
     if not HN.active then
       local keep = {}
@@ -17912,7 +17916,7 @@ local function frame()
   end
   -- полиметрия в строках (7 окт): зона сессии видна — в колонке каждого играющего
   -- клипа янтарная линия на начале его цикла (у 4/4 и 5/4 — свои швы)
-  if model.SHOW_ZONE and not state.ss_big and L.body_h > 0 and snap and L.cols then
+  if model.SHOW_ZONE and not big_on and L.body_h > 0 and snap and L.cols then
     local r0 = state.row0 or 0
     local t_top, t_bot = edit.row_time(r0, state.lpb, 0), edit.row_time(r0 + (L.nrows or 0), state.lpb, 0)
     for _, c in ipairs(L.cols) do
@@ -17937,7 +17941,7 @@ local function frame()
   -- 7 окт: верхняя панель (вкладка автоматизации) и шапки треков остаются —
   -- роутер занимает матрицу, тело трекера, DSP, lib и браузер под шапками
   -- 9 окт: диаграмма маршрутизации всех треков (routing на мастере) — поверх тела
-  if state.routeview and not idle_skip and snap then
+  if state.routeview and not big_on and not idle_skip and snap then
     local x0, y0 = L.matrix_w, L.body_y                 -- тело трекера: над микшером (колонки — его же)
     local w0, h0 = L.win_w - L.matrix_w, L.body_h
     if not HN.active then
@@ -17950,7 +17954,7 @@ local function frame()
     local mx, my = gfx.mouse_x, gfx.mouse_y
     if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end
   end
-  if state.router_big and not idle_skip then
+  if state.router_big and not big_on and not idle_skip then
     local root, _, title = ctx.db_tree()
     if root then
       -- 7 окт: слева — список эффектов (бросать в роутер / af), браузер файлов
@@ -17973,7 +17977,7 @@ local function frame()
       if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end
     end
   end
-  if state.macro and L.body_h > 0 then
+  if state.macro and not big_on and L.body_h > 0 then
     draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,
       beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
     hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
@@ -22146,7 +22150,8 @@ local function frame()
     if state.khelp_big then
       -- большая справка: клавиши — ей (поиск, страницы, прокрутка); Esc / Enter — закрыть
       local r = ctx.DOC.key(c)
-      if r == 'leave' then state.khelp_big = false end
+      if r == 'leave' then state.khelp_big = false
+      elseif r == 'browser' then open_help(ctx.DOC.anchor()); vim.msg = 'help: opened in the browser' end
       c = 0
     elseif state.khelp and state.focus == 'dsp' and not typing then
       if c == 63 and KH.query == '' then ctx.toggle_help(); c = 0

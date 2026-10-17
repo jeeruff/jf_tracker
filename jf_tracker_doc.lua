@@ -136,21 +136,30 @@ function DOC.key(c)
   if c == 27 or ch == 'q' then
     if DOC.query then DOC.query = nil; DOC.hits = {}; return true end
     return 'leave'
+  elseif ch == 'o' then return 'browser'   -- 17 окт: тот же раздел в браузере (там картинки)
   elseif ch == '/' then DOC.typing = true; DOC.query = ''; DOC.hits = {}
   elseif ch == 'n' then if #DOC.hits > 0 then go_hit(DOC.hit % #DOC.hits + 1) end
   elseif ch == 'N' then if #DOC.hits > 0 then go_hit((DOC.hit - 2) % #DOC.hits + 1) end
-  elseif ch == 'j' or c == 1685026670 then DOC.scroll = DOC.scroll + 1
-  elseif ch == 'k' or c == 30064 then DOC.scroll = math.max(0, DOC.scroll - 1)
-  elseif ch == 'J' or ch == ']' or c == 1919379572 or c == 9 then DOC.sec = DOC.sec % n + 1; DOC.scroll = 0
-  elseif ch == 'K' or ch == '[' or c == 1818584692 then DOC.sec = (DOC.sec - 2) % n + 1; DOC.scroll = 0
-  elseif ch == 'g' then DOC.scroll = 0
-  elseif ch == 'G' then DOC.scroll = 1e9
-  elseif ch == ' ' or c == 1885824110 then DOC.scroll = DOC.scroll + (DOC.page or 10)
-  elseif c == 1885828464 then DOC.scroll = math.max(0, DOC.scroll - (DOC.page or 10))
+  -- 17 окт: j k — строка-курсор (короткий раздел не прокручивается — клавиши казались мёртвыми);
+  -- на краю раздела — в соседний: справку можно читать подряд одним j
+  elseif ch == 'j' or c == 1685026670 then
+    if (DOC.line or 1) < (DOC.nlines or 1) then DOC.line = (DOC.line or 1) + 1
+    elseif n > 0 then DOC.sec = DOC.sec % n + 1; DOC.scroll = 0; DOC.line = 1 end
+  elseif ch == 'k' or c == 30064 then
+    if (DOC.line or 1) > 1 then DOC.line = DOC.line - 1
+    elseif n > 0 then DOC.sec = (DOC.sec - 2) % n + 1; DOC.scroll = 0; DOC.line = 1e9 end
+  elseif ch == 'J' or ch == ']' or c == 1919379572 or c == 9 then DOC.sec = DOC.sec % n + 1; DOC.scroll = 0; DOC.line = 1
+  elseif ch == 'K' or ch == '[' or c == 1818584692 then DOC.sec = (DOC.sec - 2) % n + 1; DOC.scroll = 0; DOC.line = 1
+  elseif ch == 'g' then DOC.scroll = 0; DOC.line = 1
+  elseif ch == 'G' then DOC.scroll = 1e9; DOC.line = 1e9
+  elseif ch == ' ' or c == 1885824110 then DOC.line = (DOC.line or 1) + (DOC.page or 10)
+  elseif c == 1885828464 then DOC.line = math.max(1, (DOC.line or 1) - (DOC.page or 10))
   else return false end
   return true
 end
-function DOC.wheel(d) DOC.scroll = math.max(0, DOC.scroll + (d > 0 and -3 or 3)) end
+-- якорь текущего раздела в html (id у <h2>)
+function DOC.anchor() local s = (DOC.secs or {})[DOC.sec]; return s and s.id ~= 'intro' and s.id or nil end
+function DOC.wheel(d) DOC.line = math.max(1, (DOC.line or 1) + (d > 0 and -3 or 3)) end
 
 -- текст строки с метками: [клавиша] — янтарь, {заголовок} — циан
 local function draw_marked(x, y, s, maxx)
@@ -179,7 +188,7 @@ function DOC.draw(L, x, y, w, h)
   local qx = x + L.pad + U.measure(head) + 3 * L.pad
   local qs
   if DOC.typing or DOC.query then qs = ('/%s%s  %d hits%s'):format(DOC.query or '', DOC.typing and '_' or '', #DOC.hits, #DOC.hits > 0 and ('  n N  ' .. DOC.hit .. ' of ' .. #DOC.hits) or '')
-  else qs = '/ search the help   j k scroll   J K section   Esc close   Shift+F1 tutorial' end
+  else qs = '/ search the help   j k lines   J K section   o in the browser   Esc close   Shift+F1 tutorial' end
   U.text(qx, y + 2, ctx.fit(qs, x + w - qx - L.pad), (DOC.typing or DOC.query) and U.TEXT or U.GREY)
   local top = y + L.rh + 6
   U.set(U.LINE); gfx.rect(x, top - 3, w, 1, 1)
@@ -214,7 +223,11 @@ function DOC.draw(L, x, y, w, h)
   local lines = DOC.wrapped
   local nvis = math.max(1, math.floor((y + h - top) / L.rh) - 1)
   DOC.page = nvis - 2
-  if DOC.want_line then DOC.scroll = math.max(0, (DOC.linemap[DOC.want_line] or 1) - 3); DOC.want_line = nil end
+  if DOC.lsec ~= DOC.sec then DOC.lsec = DOC.sec; if not DOC.line or DOC.line < 1e9 then DOC.line = 1 end end   -- раздел мышью
+  if DOC.want_line then DOC.line = DOC.linemap[DOC.want_line] or 1; DOC.scroll = math.max(0, DOC.line - 3); DOC.want_line = nil end
+  DOC.nlines = #lines
+  DOC.line = math.max(1, math.min(DOC.line or 1, #lines))
+  if DOC.line <= DOC.scroll then DOC.scroll = DOC.line - 1 elseif DOC.line > DOC.scroll + nvis then DOC.scroll = DOC.line - nvis end
   DOC.scroll = math.max(0, math.min(DOC.scroll, math.max(0, #lines - nvis)))
   U.text(tx, top, s.title, U.AMBER)
   local q = DOC.query and DOC.query ~= '' and DOC.query:lower() or nil
@@ -223,6 +236,7 @@ function DOC.draw(L, x, y, w, h)
     if not ln then break end
     local ly = top + i * L.rh
     if q and ln:gsub('[\1-\4]', ''):lower():find(q, 1, true) then U.set(U.tint(U.AMBER, 0.18)); gfx.rect(tx - 2, ly, tw + 4, L.rh, 1) end
+    if DOC.scroll + i == DOC.line then U.set(U.PANEL); gfx.rect(tx - 2, ly, tw + 4, L.rh, 1); U.set(U.AMBER); gfx.rect(tx - 2, ly, 1, L.rh, 1) end
     draw_marked(tx, ly + 1, ln, tx + tw)
   end
   if ctx.vbar then ctx.vbar('doc', x + w - 3, top + L.rh, 2, nvis * L.rh, DOC.scroll, nvis, #lines) end
