@@ -933,7 +933,7 @@ function V.note_edge(edge, d)
     end
   end
   ctx.edit.item_drag_end()
-  V.msg = n > 0 and ('note %s %s a row (Opt+Shift+J K - the end, H L - the start)'):format(edge, d > 0 and 'later by' or 'earlier by')
+  V.msg = n > 0 and ('note %s %s %d row(s) (Ctrl+Shift+J K - the end, H L - the start)'):format(edge, d > 0 and 'later by' or 'earlier by', math.abs(d))
           or 'note edge: no audio note under the cursor (MIDI notes: drag)'
 end
 -- 13 окт: slip — источник внутри аудио-ноты под курсором на строку (d = 1: звук вниз, -1: вверх)
@@ -1584,6 +1584,8 @@ function V.mod_note(c)
   if not (V.mode == 'insert' and V.piano and (V.cur.field or 1) == 1 and ctx.piano) then return false end
   local m = ctx.mods and ctx.mods() or {}
   if m.cmd or not (m.ctrl or m.alt) then return false end
+  -- 17 окт: Ctrl - / + — всегда шаг ±1 (в frow - = — ноты, Ctrl+= стал «слайсом до конца»)
+  if m.ctrl and (c == 45 or c == 61 or c == 95 or c == 43 or c == 31) then return false end
   local b = V.note_key(c, m)
   return ctx.piano[b] ~= nil
 end
@@ -1803,6 +1805,12 @@ function V.key_impl(c)
   -- все треки — :repeat all (Shift+Opt+J с 10 окт — транспоз)
   if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
     if ctx.repeat_pattern then ctx.repeat_pattern(false) end
+    V.count = nil; return
+  end
+  -- 17 окт: Ctrl+Shift+J / K — конец ноты под курсором на строку позже / раньше, H / L — начало раньше / позже
+  -- (время — Ctrl; Opt+Shift — звук: транспоз / playrate инструмента). note_edge с 13 окт не был подключён
+  if hk and mods.ctrl and mods.shift and not mods.alt and not mods.cmd and (V.mode == 'normal' or V.mode == 'insert') and not V.mod_note(c) then
+    if hk == 'j' or hk == 'k' then V.note_edge('end', hk == 'j' and n or -n) else V.note_edge('start', hk == 'l' and n or -n) end
     V.count = nil; return
   end
   if hk and (mods.ctrl or mods.alt or mods.cmd) and V.mode ~= 'cmd' and V.mode ~= 'search' then
