@@ -2715,7 +2715,7 @@ function V.key_impl(c)
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; finish_edit(); done = true
     elseif c == ('r'):byte() then V.pending = 'r'; return
     elseif c == ('V'):byte() then V.mode = 'vline'; done = true
-    elseif c == ('v'):byte() and V.mode == 'visual' then V.smart_expand(); done = true   -- 17 окт: v ещё раз — шире (Paketti)
+    elseif (c == ('a'):byte() or c == ('i'):byte()) and V.mode == 'visual' then V.smart_expand(c == ('a'):byte() and 1 or -1); done = true   -- 17 окт: a шире / i уже (Paketti; v — режим)
     elseif c == ('v'):byte() then V.mode = 'visual'; done = true
     end
     if done then V.count = nil; ensure_visible(); return end
@@ -2755,7 +2755,7 @@ function V.key_impl(c)
   elseif ch == '>' then ctx.loop('item', V.count); V.count = nil; finish_edit(); return
   elseif ch == '<' then ctx.loop('region'); V.count = nil; finish_edit(); return
   elseif ch == 'A' then ctx.automation_picker(); V.count = nil; return
-  elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }; V.sx = nil
+  elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }; V.sx, V.vbox = nil, nil
   elseif ch == 'V' then V.mode = 'vline'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil; return
   -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
@@ -3200,14 +3200,15 @@ end
 -- 17 окт: умное выделение (как Paketti): v в VISUAL по кругу — колонка в доле → колонка в такте → такт (все
 -- треки) → половина паттерна (региона курсора) → весь паттерн → снова колонка в доле. Отсчёт — от клетки, где начали
 local SX = { 'column in the beat', 'column in the bar', 'the bar, all tracks', 'half the pattern', 'the whole pattern' }
-function V.smart_expand()
-  local o = V.sx or { fi = (V.anchor or V.cur).fi, row = (V.anchor or V.cur).row, step = 0 }
+function V.smart_expand(dir)
+  dir = dir or 1
+  local o = V.sx or { fi = V.cur.fi, row = V.cur.row, step = 0 }   -- от клетки курсора; курсор не двигается
   V.sx = o
   local L0 = lpb()
   local rg0, rg1
   if ctx.region_rows then rg0, rg1 = ctx.region_rows() end
   for _ = 1, #SX do
-    o.step = o.step % #SX + 1
+    o.step = (o.step - 1 + dir) % #SX + 1
     if o.step <= 3 or rg0 then break end            -- нет региона — полпаттерна / паттерна нет, дальше по кругу
   end
   local f0, f1, r0, r1 = o.fi, o.fi, o.row, o.row
@@ -3224,11 +3225,13 @@ function V.smart_expand()
     end
   end
   V.mode = 'visual'
-  V.anchor = { fi = f0, row = r0 }
-  V.cur.fi, V.cur.row = f1, r1
-  V.msg = ('select: %s (v - wider, Esc - off)'):format(SX[o.step])
+  V.vbox = { f0, f1, r0, r1, at = { fi = V.cur.fi, row = V.cur.row } }   -- рамка выделения; курсор на месте
+  V.msg = ('select: %s (a - wider, i - narrower, Esc - off)'):format(SX[o.step])
 end
 function V.visual_range()
+  local vb = V.vbox
+  if vb and V.mode == 'visual' and vb.at.fi == V.cur.fi and vb.at.row == V.cur.row then return vb[1], vb[2], vb[3], vb[4] end
+  V.vbox, V.sx = nil, nil                           -- курсор ушёл — обычное выделение от якоря
   local a, b = V.anchor or V.cur, V.cur
   local f0, f1 = math.min(a.fi, b.fi), math.max(a.fi, b.fi)
   if V.mode == 'vline' then f0, f1 = 1, nflat() end
