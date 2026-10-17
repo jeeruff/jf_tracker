@@ -48,6 +48,7 @@ local function type_char(p, ch)
   local s0 = SM.typed_from or p.sel
   for i, it in ipairs(p.items) do
     local t = typed_of(it)
+    if it.ta and it.ta:sub(1, #b) == b then t = it.ta end   -- 17 окт: короткий набор команды: M = 0M, S I = SI (S — 0S)
     if t ~= '' and t:sub(1, #b) == b then
       if t == b and not exact then exact = i end
       if #t > #b then longer = true end
@@ -171,7 +172,12 @@ function SM.draw(d)
         text(tx, cy + 1, it.label, col)
         text(tx + ms(it.label) + ms(' '), cy + 1, it.sub, sel and C.TEXT or C.GREY)
       else
-        text(cx + math.floor((cw - ms(it.label)) / 2), cy + 1, it.label, col)
+        local lx = cx + math.floor((cw - ms(it.label)) / 2)
+        text(lx, cy + 1, it.label, col)
+        if it.hl and not sel then   -- 17 окт: буквы набора — светлее
+          local a, b = it.hl[1], it.hl[2]
+          text(lx + ms(it.label:sub(1, a - 1) .. '.') - ms('.'), cy + 1, it.label:sub(a, b), C.AMBER)
+        end
       end
     end
     if sel then set(C.AMBER); gfx.rect(cx, cy, cw - 1, crh, 0)
@@ -299,7 +305,13 @@ SM.FX_MEAN = {
 }
 function SM.fx_letters()
   local items = {}
-  for _, e in ipairs(SM.FX) do items[#items + 1] = { label = e[1] .. ' ' .. (SM.FX_NAME[e[1]] or ''), t = e[1], v = e[1], tip = e[1] .. 'xx  ' .. e[2] } end
+  -- 17 окт: буква эффекта — сразу на него: 0x — одна буква (M = 0M), S_ Z_ — две (S I = SI; S и Enter — 0S); буквы светлее
+  for _, e in ipairs(SM.FX) do
+    local code = e[1]
+    local ta = code:sub(1, 1) == '0' and code:sub(2) or code
+    items[#items + 1] = { label = code .. ' ' .. (SM.FX_NAME[code] or ''), t = code, ta = ta, v = code, tip = code .. 'xx  ' .. e[2],
+                          hl = code:sub(1, 1) == '0' and { 2, 2 } or { 1, 2 } }
+  end
   return items, 4, 1
 end
 
