@@ -1046,7 +1046,6 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- [rec] в левом углу ряда (3 окт): запись в item — режим вкладки (кольцо
   -- jf_rec); есть всегда — и у файла браузера
   local bx = x
-  local sbrect                         -- 12 окт: место полосы прокрутки в ряду кнопок
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
@@ -1077,10 +1076,6 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.text(bx + L.pad, y + rh + brow * rh + 1, st, U.GREY)
       bx = bx + U.measure(st) + 2 * L.pad
     end
-    -- 12 окт: полоса прокрутки зума — в ряду кнопок, за follow (пользователь: не отнимать высоту у волны и прицела)
-    -- 17 окт: место полосы в ряду кнопок — она здесь, когда прицел внизу (нижняя строка — его кнопки)
-    local sx1 = brow == 0 and (x + hint_w) or (x + w)
-    if sx1 - (bx + L.pad) >= 10 * L.cw then sbrect = { x = bx + L.pad, y = y + rh + brow * rh, w = sx1 - bx - L.pad - 2 } end
   else
     U.text(bx, y + rh, ctx.fit(hint, x + hint_w - bx), U.GREY)
   end
@@ -1088,6 +1083,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- функцией, что колонка волны трека (ctx.spec_colour); спектрограмма
   -- убрана 1 окт
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
+  -- 17 окт: полоса-обзор — всегда наверху, на всю ширину, над прицелом и его кнопками; высота — 3 строки (у волны)
+  local BH, bar_y, bar_x, bar_w = 3 * rh, nil, x, w
+  if wh > BH + 8 * rh then bar_y = wy; wy = wy + BH + 2; wh = wh - BH - 2 end
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
   -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
@@ -1822,14 +1820,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       end
     end
     local troom = math.max(0, (by2 ~= fy and (x + w) or bx) - x - L.pad)
-    -- 17 окт: полоса-обзор всегда: прицел наверху (его кнопки на нём) — в нижней строке; иначе — в ряду кнопок сверху
-    if by2 == fy and sbrect then ovbar(sbrect.x, sbrect.y, sbrect.w, rh - 1)
-    elseif troom > 20 * L.cw then   -- после текста (тексту — не больше половины)
-      local tw = math.min(U.measure(foot) + L.pad, math.floor(troom * 0.5))
-      if foot == '' then tw = 0 end
-      ovbar(x + tw + L.pad, fy, troom - tw - L.pad, rh - 1)
-      troom = tw
-    end
+    if bar_y then ovbar(bar_x, bar_y, bar_w, BH) end   -- 17 окт: полоса-обзор — наверху (см. bar_y)
     if foot ~= S.msg and U.hint_text then U.hint_text(x, fy, foot, troom, U.PANEL)   -- 15 окт: стандарт подсказок
     else U.text(x, fy, ctx.fit(foot, troom), U.GREY) end   -- 10 окт: подсказка — приглушённо
   end

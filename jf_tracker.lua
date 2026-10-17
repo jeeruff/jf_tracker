@@ -8758,9 +8758,9 @@ ctx = {
   CTRL_TIP = {
     listen = 'listen: what sounds while you edit - insert (what you type in), step (the cursor row, this track), sel (a selection), line (the cursor row, all tracks)',
     ls_ins = 'listen insert: a note you insert plays its sample at once (off - silent; Shift+note always just plays). = quick option preview',
-    ls_step = 'listen step: the row the cursor lands on plays on the cursor track only (stopped transport)',
+    ls_step = 'listen step (Opt+Cmd+Space): the row the cursor lands on plays on the cursor track only (stopped transport)',
     ls_sel = 'listen sel: a selection (v / V) plays its rows on its tracks only (the other tracks quiet while it plays)',
-    ls_line = 'listen line: the row the cursor lands on plays, all tracks, one row long (stopped transport). = option step listen',
+    ls_line = 'listen line (Shift+Cmd+Space): the row the cursor lands on plays, all tracks, one row long (stopped transport). = option step listen',
     pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
     lpb = 'LPB, lines per beat: how many rows make one beat (4 - a row is a 16th note, 8 - a 32nd). More rows = finer grid. Click / wheel - change',
     inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; ( ) or Opt+J / K do the same (qwerty INSERT: , .)',
@@ -8783,7 +8783,7 @@ ctx = {
     tp_start = 'to the project start', tp_end = 'to the project end',
     freeze = 'freeze: a short loop around the play position, like a DJ repeater. f + its label - the lengths (1/32 .. 2 bars, digits pick), wheel - shorter / longer; while playing a new length starts when the current loop ends. Click - on / off (back as it was)',
     slowplay = 'play at /2 - half speed (Ctrl+Cmd+Space); again or Space - stop, x1 back',
-    fastplay = 'play at x2 - double speed (Opt+Cmd+Space); again or Space - stop, x1 back',
+    fastplay = 'play at x2 - double speed; again or Space - stop, x1 back',
     shiftrec = 'shift rec: waits for a MIDI note, then records from the cursor row at the project rate (record slow at x0.5 - it plays back fast); again - cancel',
     dub = 'dub: copy the loop forward and keep going (rclick - copy / move / random mutes)',
     punch = 'punch: records only inside the time selection (cursor region)',
@@ -21676,8 +21676,13 @@ local function frame()
     local r = map[MX.MR.hk_encode(c, ctx.mods())]
     if r then ctx.mac_do({ kind = 'play', row = r }); c = 0 end
   end
-  if c == 32 and ctx.mods().cmd and (ctx.mods().ctrl or ctx.mods().alt) and not ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    ctx.half_play(ctx.mods().ctrl and 0.5 or 2); c = 0
+  -- 17 окт: Ctrl+Cmd+Space — игра x0.5; Opt+Cmd+Space — listen step вкл / выкл (строка курсора на треке курсора),
+  -- Shift+Cmd+Space — listen line (строка, все треки); x2 — кнопкой под play (было Opt+Cmd+Space)
+  if (c == 32 or c == 160) and ctx.mods().cmd and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    local m = ctx.mods()
+    if m.ctrl and not m.alt and not m.shift then ctx.half_play(0.5); c = 0
+    elseif m.alt and not m.ctrl and not m.shift then ctrl_action('ls_step', 0); c = 0
+    elseif m.shift and not m.ctrl and not m.alt then ctrl_action('ls_line', 0); c = 0 end
   end
   -- 12 окт: Enter без модификаторов — смарт-панель в любом режиме (дубль Ctrl+Enter убран); кроме конца
   -- набора числа и входа в INSERT при Esc mode = vim (NORMAL с клавиатурой)
