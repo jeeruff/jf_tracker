@@ -5027,14 +5027,19 @@ end
 D.PMN = {}
 -- 17 окт: цвет панели (опция pane colours): свой оттенок у каждой, шаг по золотому сечению — соседние
 -- вкладки стопки не похожи; контраст к фону панели как у текста; rec — цвет записи. Кэш — до смены темы
-function D.pane_col(id)
-  if D.PCOL_BG ~= U.PANEL then D.PCOL, D.PCOL_BG = {}, U.PANEL end
+-- shades — светлее / темнее акцента темы (U.CYAN — от цвета выбранного трека темы)
+function D.pane_col(id, mode)
+  if D.PCOL_BG ~= U.PANEL or D.PCOL_M ~= mode then D.PCOL, D.PCOL_BG, D.PCOL_M = {}, U.PANEL, mode end
   local c = D.PCOL[id]
   if c then return c end
-  if id == 'retro' then c = D.ARM
+  local idx = 1
+  for i, p in ipairs(D.panes.PANELS) do if p.id == id then idx = i; break end end
+  if mode == 'shades' then
+    local f = (idx * 0.618034) % 1
+    c = f < 0.5 and U.mix(U.CYAN, U.PANEL, (0.5 - f) * 1.1) or U.mix(U.CYAN, U.TEXT, (f - 0.5) * 1.6)
+    c = U.readable(c, U.PANEL, 2.2)
+  elseif id == 'retro' then c = D.ARM
   else
-    local idx = 1
-    for i, p in ipairs(D.panes.PANELS) do if p.id == id then idx = i; break end end
     local h, sat, v = (0.08 + idx * 0.618034) % 1, 0.55, 0.92
     local k = math.floor(h * 6); local f = h * 6 - k
     local p1, q, t = v * (1 - sat), v * (1 - f * sat), v * (1 - (1 - f) * sat)
@@ -5071,7 +5076,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local th = c.tab.h
         local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
         local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
-        local pcol = state.panecol and D.pane_col or nil   -- 17 окт: цвета панелей
+        local pm = state.panecol ~= 'off' and state.panecol or nil   -- 17 окт: цвета панелей
+        local pcol = pm and function(pid) return D.pane_col(pid, pm) end or nil
         set(fon and D.FOCUS or (pcol and U.mix(pcol(id), U.PANEL, 0.55)) or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
         for _, t in ipairs(c.tabs) do
