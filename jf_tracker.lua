@@ -4382,7 +4382,21 @@ ctx = {
   end,
   -- 10 окт: перенос вкладки мышью — куда упадёт: на ярлыки / в центр листа — в его стек,
   -- в крайнюю четверть листа — сплитом с той стороны; на свой ярлык — порядок в стеке
-  tab_drop_at = function(id, mx, my, whole)
+  -- 18 окт: цель, после которой правило (mixer под трекером, properties у item) вернуло бы панель, —
+  -- не цель: пробный бросок на копии раскладки; подсветки нет, статус говорит почему
+  tab_drop_at = function(id, mx, my, whole, ids)
+    local t = ctx.tab_drop_raw(id, mx, my, whole)
+    if not t then return nil end
+    local PNm = draw.panes
+    local m = PNm.decode(PNm.encode(state.panes))
+    local ok
+    if whole then ok = ctx.pane_apply(m, ids or { id }, t) else ok = ctx.tab_apply(m, id, t) end
+    if not ok then return nil end
+    if PNm.pin_mixer(m) then return nil, 'mixer lives right under the tracker (its strips follow the tracker columns): below the tracker or a tab in the stack under it' end
+    if PNm.pin_sprops(m) then return nil, 'properties stay beside the item tab' end
+    return t
+  end,
+  tab_drop_raw = function(id, mx, my, whole)
     local h = L.pn and draw.panes.hit(L.pn, mx, my, {})
     local c = h and h.cell
     if not c or not c.active_id then return nil end
@@ -4417,43 +4431,48 @@ ctx = {
     return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
   end,
   -- 16 окт: весь пейн (его вкладки, активная — первой) — сплитом рядом с целью или в её стек
-  pane_drop = function(ids, t)
+  -- операции броска над моделью m (настоящей или пробной копией); true — что-то поменяли
+  pane_apply = function(m, ids, t)
     local PNm = draw.panes
-    if not (ids and ids[1]) then return end
-    ctx.pane_do(function()
-      local ok
-      if t.kind == 'stack' then ok = PNm.stack(state.panes, ids[1], t.at)
-      elseif t.kind == 'split' then ok = PNm.split(state.panes, t.at, ids[1], t.dir, 0.5) end
-      if not ok then return false end
-      for k = 2, #ids do PNm.stack(state.panes, ids[k], ids[1]) end
+    local ok
+    if t.kind == 'stack' then ok = PNm.stack(m, ids[1], t.at)
+    elseif t.kind == 'split' then ok = PNm.split(m, t.at, ids[1], t.dir, 0.5) end
+    if not ok then return false end
+    for k = 2, #ids do PNm.stack(m, ids[k], ids[1]) end
+    return true
+  end,
+  tab_apply = function(m, id, t)
+    local PNm = draw.panes
+    if t.kind == 'stack' then return PNm.stack(m, id, t.at)
+    elseif t.kind == 'split' then
+      if t.at == id then return PNm.unstack(m, id, t.dir) end
+      return PNm.split(m, t.at, id, t.dir, 0.5)
+    elseif t.kind == 'order' then
+      local lf = PNm.find(m, id)
+      if not lf then return false end
+      local from
+      for k, pid in ipairs(lf.panes) do if pid == id then from = k end end
+      local to = math.max(1, math.min(#lf.panes, t.index))
+      if not from or from == to then return false end
+      table.remove(lf.panes, from); table.insert(lf.panes, to, id)
+      lf.active = to
+      m.v = (m.v or 0) + 1
       return true
-    end, ('pane %s -> %s %s'):format(table.concat(ids, '|'), t.kind == 'stack' and 'the stack of' or ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[t.dir] or '', t.at))
+    end
+    return false
+  end,
+  -- 16 окт: весь пейн (его вкладки, активная — первой) — сплитом рядом с целью или в её стек
+  pane_drop = function(ids, t)
+    if not (ids and ids[1]) then return end
+    ctx.pane_do(function() return ctx.pane_apply(state.panes, ids, t) end,
+      ('pane %s -> %s %s'):format(table.concat(ids, '|'), t.kind == 'stack' and 'the stack of' or ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[t.dir] or '', t.at))
     ctx.pane_focus(ids[1])
   end,
   tab_drop = function(id, t)
-    local PNm = draw.panes
-    if t.kind == 'stack' then
-      ctx.pane_do(function() return PNm.stack(state.panes, id, t.at) end, id .. ' → stack of ' .. t.at)
-    elseif t.kind == 'split' then
-      if t.at == id then
-        ctx.pane_do(function() return PNm.unstack(state.panes, id, t.dir) end, id .. ' out of the stack')
-      else
-        ctx.pane_do(function() return PNm.split(state.panes, t.at, id, t.dir, 0.5) end, id .. ' split beside ' .. t.at)
-      end
-    elseif t.kind == 'order' then
-      ctx.pane_do(function()
-        local lf = PNm.find(state.panes, id)
-        if not lf then return false end
-        local from
-        for k, pid in ipairs(lf.panes) do if pid == id then from = k end end
-        local to = math.max(1, math.min(#lf.panes, t.index))
-        if not from or from == to then return false end
-        table.remove(lf.panes, from); table.insert(lf.panes, to, id)
-        lf.active = to
-        state.panes.v = state.panes.v + 1
-        return true
-      end, state.tababc and 'tabs a-z is on - the order is alphabetical' or (id .. ' moved in the stack'))
-    end
+    local msg = t.kind == 'stack' and (id .. ' → stack of ' .. t.at)
+      or t.kind == 'split' and (t.at == id and (id .. ' out of the stack') or (id .. ' split beside ' .. t.at))
+      or (state.tababc and 'tabs a-z is on - the order is alphabetical' or (id .. ' moved in the stack'))
+    ctx.pane_do(function() return ctx.tab_apply(state.panes, id, t) end, msg)
   end,
   -- 10 окт: перенос по направлению: сосед там — стек вкладок (2+), панель встаёт в него вкладкой;
   -- иначе — обычный перенос листа (сплит / обмен)
@@ -18707,7 +18726,9 @@ local function frame()
   local cell = hover.cell
   if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
   -- 16 окт: клавиши у REAPER (окно трекера не в фокусе) — сказать в статусе; опция dim when inactive — плёнка 15 %
-  if not ctx.win_focus then
+  if ctx.tab_drag and ctx.tab_drag.msg then
+    state.status = ctx.tab_drag.msg              -- 18 окт: перенос вкладки — его статус, не подсказка наведения
+  elseif not ctx.win_focus then
     state.status = 'REAPER has the keyboard - click the tracker to activate it'
     if state.dimidle then U.set(U.BG, 0.15); gfx.rect(0, 0, gfx.w, gfx.h, 1); gfx.a = 1 end
     -- 16 окт: глитч, пока клавиши у REAPER (опция glitch when inactive, вкл): полосы окна рвутся вбок,
@@ -19172,9 +19193,11 @@ local function frame()
       if gfx.mouse_cap & 1 == 1 then
         if not td.active and (math.abs(gfx.mouse_x - td.x0) > 8 or math.abs(gfx.mouse_y - td.y0) > 8) then td.active = true end
         if td.active then
-          td.target = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y, td.whole)
-          state.status = (td.whole and ('drag pane ' .. table.concat(td.ids, '|')) or ('drag tab ' .. td.id)) .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
-            or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or 'nowhere - let go to cancel')
+          local why
+          td.target, why = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y, td.whole, td.ids)
+          td.msg = (td.whole and ('drag pane ' .. table.concat(td.ids, '|')) or ('drag tab ' .. td.id)) .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
+            or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or (why and ('not here - ' .. why)) or 'nowhere - let go to cancel')
+          state.status = td.msg
         end
       else
         if td.active and td.target then if td.whole then ctx.pane_drop(td.ids, td.target) else ctx.tab_drop(td.id, td.target) end end
