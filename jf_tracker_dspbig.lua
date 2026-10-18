@@ -260,6 +260,9 @@ function DB.click(hv, now)
   local dbl = DB.last_click.guid == n.guid and now - DB.last_click.t < 0.35
   DB.last_click = { t = now, guid = n.guid }
   DB.sel = n.guid
+  -- 18 окт: Option+щелчок — удалить устройство (как d по нему; один undo)
+  if gfx.mouse_cap & 16 == 16 then DB.delete(n); ops.msg('deleted: ' .. (n.name or '') .. ' (Opt+click; u - undo)'); return true end
+  if gfx.mouse_cap & 8 == 8 then ops.bypass(n.addr); ops.msg('bypass: ' .. (n.name or '') .. ' (Shift+click)'); return true end   -- 18 окт: Shift+щелчок — байпас (как b)
   if dbl then ops.show(n.addr) end
   return true
 end

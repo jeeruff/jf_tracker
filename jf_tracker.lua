@@ -1763,6 +1763,15 @@ ctx = {
   end,
   fxb_add = function(it, pos)
     it = it or FB.selected()
+    local ins = ctx.fxb_insert; ctx.fxb_insert = nil
+    if ins and it and not pos then   -- 18 окт: точка вставки роутера (+ / = по клику)
+      if edit.fx_insert(ins.o, ins.parent, ins.pos, it.data, ins.pv) then
+        FB.push_recent(it); ctx.fxb_save(); ctx.db_cache = nil
+        vim.msg = '+ ' .. FB.short(it.label) .. ' ' .. ins.what
+      end
+      if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
+      return
+    end
     local col = dsp_target()
     if not (it and col) then vim.msg = 'fx: nothing selected'; return end
     edit.fx_add(col.track, it.data, pos)
@@ -13525,6 +13534,15 @@ do   -- правки DSP big — через edit (undo), дерево после
       local parent, pos, pv = MX.DB.insert_point(n, par)
       if parent and not parent.parent.root then vim.msg = 'dsp big: adding inside a nested container is not supported yet'; return end
       if not n then local root = ctx.db_tree(); pos = first and 0 or (root and #root.kids or 0) end
+      -- 18 окт: панели — браузер эффектов с точкой вставки (Enter вставит сюда), не всплывашка
+      if state.panes_ui and state.panes then
+        ctx.fxb_insert = { o = o, parent = parent and parent.k or nil, pos = pos, pv = pv, par = par, what = par and ('parallel to ' .. (n and n.name or '')) or (first and 'at the start' or ('after ' .. (n and n.name or ''))) }
+        if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+        FB.query, FB.cur, FB.scroll = '', 1, 0
+        ctx.pane_cmd('fxb show')
+        vim.msg = 'fx: type to search, Enter inserts ' .. ctx.fxb_insert.what .. ', Esc back'
+        return
+      end
       vim.open_picker(par and 'add fx in parallel' or (first and 'add fx at the start' or 'add fx after'), ctx.fx_list(), function(it)
         if edit.fx_insert(o, parent and parent.k or nil, pos, it.data, pv) then vim.msg = '+ ' .. it.label .. (par and ' (parallel)' or '') end
         after()
@@ -21839,7 +21857,9 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       if not fxb_drag.active and (math.abs(gfx.mouse_x - fxb_drag.x0) > 6 or math.abs(gfx.mouse_y - fxb_drag.y0) > 6) then fxb_drag.active = true end
       if fxb_drag.active then
-        state.status = hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
+        state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
+          or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
+          or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
           or (hover.dbig and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbnode and (' after the row of ' .. hover.dbnode.name .. ' (Shift - parallel to it)') or ' at the end of the chain')))
           or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
@@ -21848,15 +21868,29 @@ local function frame()
       -- состояние броска снимается ДО действия (6 окт): ошибка в действии
       -- иначе оставляла бросок «висеть», и он повторялся каждый кадр (34 Air4)
       local drop = fxb_drag; fxb_drag = nil
-      local col = drop.active and hover.dsp_into and dsp_target()
+      -- 18 окт: роутер — = под узлом (параллельно ему) и + между звеньями: свои цели, раньше щели списка DSP
+      local rt = drop.active and (hover.dbpar or hover.dbplus) and dsp_target()
+      if rt then
+        local n, par, first = hover.dbpar, hover.dbpar ~= nil, false
+        if not n then n = hover.dbplus.after; first = hover.dbplus.first and true or false end
+        local parent, pos, pv = MX.DB.insert_point(n, par)
+        if not n then local root = ctx.db_tree(); pos = first and 0 or (root and #root.kids or 0) end
+        if parent and not parent.parent.root then vim.msg = 'router: adding inside a nested container is not supported yet'
+        elseif edit.fx_insert(rt.track, parent and parent.k or nil, pos, drop.it.data, pv) then
+          FB.push_recent(drop.it); ctx.fxb_save(); ctx.db_cache = nil
+          vim.msg = '+ ' .. FB.short(drop.it.label) .. (par and (' parallel to ' .. (n.name or '')) or (first and ' at the start' or (' after ' .. (n and n.name or ''))))
+        end
+        hover.dsp_into, hover.dsp_gap, hover.dbig = nil, nil, nil
+      end
+      local col = drop.active and not rt and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]
       if cf then
         if edit.fx_add_into(col.track, cf.i, drop.it.data, hover.dsp_into_par) then
           FB.push_recent(drop.it); ctx.fxb_save()
           vim.msg = '+ ' .. FB.short(drop.it.label) .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
         else vim.msg = 'could not add into the container' end
-      elseif drop.active and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap)
-      elseif drop.active and hover.dbig then
+      elseif drop.active and not rt and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap)
+      elseif drop.active and not rt and hover.dbig then
         -- роутер (7 окт): на узел — после его ряда (Shift — параллельно узлу), мимо узлов — в конец
         local t = dsp_target()
         if t then
