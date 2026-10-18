@@ -836,7 +836,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       -- 18 окт: полоса цвета секции слева во всю её высоту, имя — вертикально
       local sw = MX.sec_w or 0
       if sw > 0 then
-        U.set(U.tint(c, 0.55)); gfx.rect(2, b.y0 + 1, sw - 2, b.y1 - b.y0 - 2, 1)
+        local hot = gfx.mouse_x >= 0 and gfx.mouse_x < sw and gfx.mouse_y >= b.y0 and gfx.mouse_y < b.y1
+        if hot then hover.secloop = sc end   -- 18 окт: двойной щелчок — луп на всю секцию
+        U.set(U.tint(c, hot and 0.75 or 0.55)); gfx.rect(2, b.y0 + 1, sw - 2, b.y1 - b.y0 - 2, 1)
         if ctx.vtext then ctx.vtext(2 + math.floor((sw - 2 - L.th) / 2), b.y0 + 3, b.y1 - b.y0 - 6, sc.name, U.readable and U.readable(U.TEXT, U.tint(c, 0.55), 4.5) or U.TEXT, U.tint(c, 0.55)) end
       end
       U.set(c)

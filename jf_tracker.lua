@@ -18784,6 +18784,7 @@ local function frame()
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
   elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
+  elseif hover.matrix and hover.matrix.secloop then state.status = 'section ' .. (hover.matrix.secloop.name or '') .. ' - double-click: loop the whole section'
   elseif hover.matrix and hover.matrix.tsel then state.status = 'loop zone - double-click: loop this slot, drag: several slots, Cmd+click: pick slots (the loop jumps between them), Shift+click: extend'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
@@ -20333,6 +20334,12 @@ local function frame()
       end
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
       click = { t = now2, zone = 'mxrep' }
+    elseif hover.matrix and hover.matrix.secloop then
+      -- 18 окт: полоса секции: двойной щелчок — луп на всю секцию
+      local sc = hover.matrix.secloop
+      if dbl and click.zone == 'mxsec' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
+      else vim.msg = 'section ' .. (sc.name or '') .. ': double-click - loop the whole section' end
+      click = { t = now2, zone = 'mxsec' }
     elseif hover.matrix and hover.matrix.tsel then
       -- 18 окт: колонка линейки — луп: двойной щелчок — этот слот, протяжка — несколько, Cmd — выборочно, Shift — продлить
       local ri = hover.matrix.tsel
