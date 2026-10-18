@@ -5167,9 +5167,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
-      if id == 'matrix' then
-        if info.perf_draw then info.perf_draw(L, ct.x, ct.y, ct.w, ct.h)
-        elseif MX then
+      if id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
+      elseif id == 'matrix' then
+        if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
             return MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)

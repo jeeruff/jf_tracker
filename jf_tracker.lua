@@ -16485,7 +16485,15 @@ function ctrl_action(name, delta)
     ctx.PERF.prof = draw.prof
     ctx.PERF.reset = function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
     if ctx.PERF.active then state.mx_hidden = false; ctx.PERF.t = 0 end
-    vim.msg = ctx.PERF.active and 'performance in the matrix: n - REAPER performance meter, j k scroll, Esc (matrix focused) closes' or 'performance closed'
+    -- 18 окт: панели — performance своей панелью (вкладка рядом с матрицей), не на месте матрицы
+    if state.panes_ui and state.panes then
+      local PNm, m = draw.panes, state.panes
+      if ctx.PERF.active then
+        if not PNm.visible(m, 'perf') then ctx.pane_do(function() return PNm.stack(m, 'perf', PNm.find(m, 'matrix') and 'matrix' or 'browser') end, 'performance pane') end
+        ctx.pane_focus('perf')
+      else ctx.pane_do(function() return PNm.hide(m, 'perf') end, 'performance pane hidden'); if state.focus == 'perf' then ctx.set_focus('tracker') end end
+    end
+    vim.msg = ctx.PERF.active and ((ctx.PERF.jftop and 'jftop' or 'performance') .. ' pane: n - REAPER performance meter, t - jftop / performance, j k scroll, Esc - back') or 'performance closed'
   elseif name == 'swingbar' then
     -- 9 окт: слайдер свинга — щелчок / протяжка: значение по x (ctx.swdrag), колесо — ±1 %
     if delta == 0 then ctx.swdrag = true
@@ -17209,7 +17217,7 @@ local function frame()
   end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if (state.khelp or ctx.help_pane_on()) and state.focus ~= 'dsp' and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
-  draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop) or false
+  draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
   draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
   U.begin_frame()
@@ -17895,7 +17903,14 @@ local function frame()
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
-    perf_draw = (ctx.PERF and ctx.PERF.active) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
+    perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
+    perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
+      ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
+      ctx.PERF.active = true; ctx.PERF.seen = reaper.time_precise()
+      ctx.PERF.prof = draw.prof
+      ctx.PERF.reset = ctx.PERF.reset or function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
+      ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit)
+    end,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
@@ -22977,7 +22992,7 @@ local function frame()
         if mr == 'leave' then state.macro = false; vim.msg = 'macro off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end
         if mr then vim.cur.row = mr; return end
       end
-      if state.focus == 'matrix' and ctx.PERF and ctx.PERF.active and ctx.PERF.key(c) then   -- производительность на месте матрицы (6 окт)
+      if state.focus == 'matrix' and ctx.PERF and ctx.PERF.active and not state.panes_ui and ctx.PERF.key(c) then   -- производительность на месте матрицы (6 окт)
       elseif state.focus == 'matrix' and #seq == 0 and c == 43 then ctx.mx_add()     -- пустая матрица: + добавляет первый регион
       elseif state.focus == 'matrix' and MX.mkedit then
         -- поле такта маркера на линии =START / =END (5 окт)
@@ -23085,6 +23100,12 @@ local function frame()
       elseif state.focus == 'actions' then   -- 16 окт: панель actions
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not ctx.act_key(c) then return vim.key(c) end
+      elseif state.focus == 'perf' then   -- 18 окт: панель performance
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local pch = c > 0 and c < 256 and string.char(c) or ''
+        if c == 27 then ctx.set_focus('tracker')
+        elseif not (ctx.PERF and pch ~= '' and ('nrtjkq'):find(pch, 1, true) and ctx.PERF.key(c)) then return vim.key(c) end   -- только свои клавиши: : и прочее — дальше
+        if ctx.PERF then ctx.PERF.active = true end
       elseif state.focus == 'undotree' then   -- 15 окт: дерево undo
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not ctx.ut_key(c) then return vim.key(c) end
