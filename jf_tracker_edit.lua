@@ -4076,7 +4076,14 @@ end
 
 -- ── громкость / панорама трека из шапки (2 окт) ──────────────────────────
 -- Во время протяжки — без undo (каждый кадр), точка undo — на отпускании.
-function E.track_value(tr, key, v) R.SetMediaTrackInfo_Value(tr, key, v) end
+-- 18 окт: width слышен только в режиме stereo pan — правка ширины в другом режиме (кроме dual pan) включает его
+function E.track_value(tr, key, v)
+  if key == 'D_WIDTH' then
+    local m = math.floor(R.GetMediaTrackInfo_Value(tr, 'I_PANMODE'))
+    if m ~= 5 and m ~= 6 then R.SetMediaTrackInfo_Value(tr, 'I_PANMODE', 5) end
+  end
+  R.SetMediaTrackInfo_Value(tr, key, v)
+end
 -- свойства сэмпла из панели (undo на каждое изменение)
 -- свойство инструмента (3 окт): правка в панели item идёт во ВСЕ его копии.
 -- rep — представитель (по нему считается новое значение v); остальные:

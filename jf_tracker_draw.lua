@@ -5911,25 +5911,12 @@ function D.frame(L, snap, rows, state, info)
           local d2 = math.min(2 * L.rh - 2, math.floor((fx_w - 2) / 2))
           knob(sx, pyy, d2, (lv('panl', col.panL or -1) + 1) / 2, 'panl')
           knob(sx + fx_w - d2, pyy, d2, (lv('panr', col.panR or 1) + 1) / 2, 'panr')
-        elseif not bigf and state.panknob ~= false and col.panmode == 5 and fx_w >= kd + 8 then
-          local wbw = math.max(4, math.min(8, fx_w - kd - 3))
-          local kx = sx + math.floor((fx_w - kd - wbw - 3) / 2)
-          knob(kx, pyy, kd, (lv('pan', col.pan or 0) + 1) / 2, 'pan')
-          local wx, wy, wh = kx + kd + 3, pyy, kd
+        elseif not bigf and state.panknob ~= false and col.panmode ~= 6 then
+          -- 18 окт: над кнобом пана — слайдер width (правка в режиме без ширины включает stereo pan — edit.track_value)
           local wv = lv('width', col.width or 1)
-          local whot = mx >= wx - 1 and mx < wx + wbw + 1 and my >= wy and my < wy + wh
-          set(U.mix(U.BG, { 0, 0, 0 }, 0.55)); gfx.rect(wx, wy, wbw, wh, 1)
-          set(whot and U.AMBER or U.LINE); gfx.rect(wx, wy, wbw, wh, 0)
-          local mid = wy + math.floor(wh / 2)
-          local fh2 = math.floor(math.abs(wv) * (wh / 2 - 1) + 0.5)
-          set(wv < 0 and U.RED or (whot and U.AMBER or U.TEXT))
-          if wv >= 0 then gfx.rect(wx + 1, mid - fh2, wbw - 2, fh2, 1) else gfx.rect(wx + 1, mid, wbw - 2, fh2, 1) end
-          set(U.LINE); gfx.rect(wx, mid, wbw, 1, 1)
-          if whot then hover.trs = { col = col, what = 'width', knob = true, sv = (wv + 1) / 2 } end
-          hint('trs', wx, wy, wbw, wh, { col = col, what = 'width' })
-        elseif not bigf and state.panknob ~= false and col.panmode ~= 5 and col.panmode ~= 6 then
-          local d = kd
-          knob(sx + math.floor((fx_w - d) / 2), pyy, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
+          slider(sx, pyy, fx_w, (wv + 1) / 2, true, 'w', math.floor(wv * 100 + 0.5) .. '', 'width', nil, true)
+          local d = math.min(kd, 2 * L.rh - 2)
+          knob(sx + math.floor((fx_w - d) / 2), pyy + L.rh, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
         elseif col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
@@ -5939,7 +5926,8 @@ function D.frame(L, snap, rows, state, info)
         else
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
         end
-        local ty0, ty1 = y1 + 4 * L.rh + 7, y1 + fh - 4 - (rec_d > 0 and (rec_d + 4) or 0)   -- строка над метром — макс. пик
+        local wrow = (not bigf and state.panknob ~= false and col.panmode ~= 6) and L.rh or 0   -- 18 окт: строка width над паном
+        local ty0, ty1 = y1 + 4 * L.rh + 7 + wrow, y1 + fh - 4 - (rec_d > 0 and (rec_d + 4) or 0)   -- строка над метром — макс. пик
         local th = math.max(8, ty1 - ty0)
         -- тёмная коробка, внутри метр как в DSP (две полоски L R в рамках),
         -- шкала dB слева (+6 0 -6 -12 -24 -48), ручка [-] поверх;

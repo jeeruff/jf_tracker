@@ -1243,3 +1243,4 @@
 - 18 окт: матрица: Tr — time selection в секцию с быстрым именем (intro verse chorus drop break …, своё — :tsec), кнопка timesel — меню (секция, играть лупом, снять)
 - окно ноты (Ctrl+Enter) → Enter на stretch / fade shape / channels: меню справа от окна, щелчок по нему не закрывает окно
 - опция look / dot colours: пустые точки полей цветом поля; подпись col у клавиатуры цветом колонки
+- микшер: слайдер w (width) над кнобом пана; тянуть в режиме balance — трек сам переходит в stereo pan; dual pan — как было (L R)
