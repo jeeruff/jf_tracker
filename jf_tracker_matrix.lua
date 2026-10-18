@@ -301,6 +301,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   -- пустой проект (нет регионов) — матрица всё равно видна: кнопки, + (2 окт)
   local grid = MX.grid(snap, regions)
+  MX.ts0, MX.ts1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)   -- 18 окт: полоска выделения слотов
   local W = Wd or L.matrix_w                -- 9 окт, панели: ширина и верх / низ листа (x — 0, сдвиг буфером)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover = {}
@@ -531,6 +532,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
   end
+  MX.row_y, MX.row_h = {}, rh   -- 18 окт: свежие на кадр (MX.row_at — протяжка выделения)
   for i = 1, nvis do
     local ri = MX.scroll + i
     local rg = regions[ri]
@@ -554,6 +556,18 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
+    -- 18 окт: полоска выделения слева у слота = time selection / луп REAPER (как скобка «[» у номеров трекера):
+    -- щелчок — слот, протяжка — несколько, Shift — продлить; выделенные — светлая спина, усы у первого и последнего
+    do
+      local ts0, ts1 = MX.ts0 or 0, MX.ts1 or 0
+      local inside = ts1 > ts0 + 1e-6 and rg.pos < ts1 - 1e-6 and rg.rgnend > ts0 + 1e-6
+      local hot_ts = my >= y and my < y + rh and mx >= 0 and mx < 6
+      if hot_ts then hover.tsel = ri end
+      U.set(hot_ts and U.AMBER or (inside and { 0.85, 0.85, 0.85 } or U.LINE))
+      gfx.rect(0, y + 1, 3, rh - 1, 1)
+      if inside and ts0 >= rg.pos - 1e-6 then gfx.rect(0, y + 1, 8, 2, 1) end
+      if inside and ts1 <= rg.rgnend + 1e-6 then gfx.rect(0, y + rh - 2, 8, 2, 1) end
+    end
     -- 18 окт: vismetro, колонки размера не видно (свёрнута / узко) — счётчик долей яркой плашкой слева у играющей строки
     if playing and MX.vismetro and (L.mx_sig_w or 0) == 0 and info.play_row and not rg.gap then
       local n = (info.sig_at and info.sig_at(rg.pos)) or 4
@@ -825,7 +839,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local xr = math.min(W - 4, L.mx_label_w + (ncols - MX.hs) * L.mx_cell_w)
     for sc, b in pairs(box) do
       U.set((info.region_rgb and info.region_rgb(sc.color)) or U.CYAN)
-      gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
+      gfx.rect(4, b.y0, xr - 3, b.y1 - b.y0, 0)   -- 18 окт: левее — полоска выделения слотов
     end
   end
   -- 9 окт, как в Renoise: край клетки (верх / низ, 3 px) — потянуть, и клетка
@@ -866,6 +880,10 @@ end
 -- MX.queued в кадре). Так edit-курсор и плейхед живут отдельно.
 MX.queued = nil
 
+-- 18 окт: слот под экранной y (по строкам прошлого кадра)
+function MX.row_at(y)
+  for ri, ry in pairs(MX.row_y or {}) do if y >= ry and y < ry + (MX.row_h or 1) then return ri end end
+end
 function MX.goto_cell(regions, snap, ri, ci)
   if ci == 0 and MX.fold then ci = MX.cur.ci > 0 and -1 or 1 end   -- свёрнута: имени нет — через него
   if ci ~= MX.cur.ci then MX.cur.sub = nil; MX.lenbuf = nil end

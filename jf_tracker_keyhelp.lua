@@ -128,6 +128,7 @@ KH.PAGES = {
     { k = 'zf', d = 'DSP: modules with pages (Surge XT) - all pages in one pane (default) / one page with vertical tabs on the right of the module' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
+    { k = '- +', d = 'zoom rows: LPB down / up (as Cmd + wheel) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
     { k = 'z. z,', d = 'the cursor track wider / narrower (its own width)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
     { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r edit the text (:vis / :mcmd), Enter - visor: pick with previews, x delete; w b e - next / previous marker', t = {} },
@@ -259,7 +260,7 @@ KH.PAGES = {
     { k = '{ }', d = 'length -1 / +1 step' },
     { k = 'C-S-h C-S-l', d = 'pattern of the slot: previous / next (as Ctrl+Left / Right in Renoise)', t = {} },
     { k = ':patternkb', d = 'MPC style (the patternkb button; = :pads): the note keys play the patterns of the song - 1 f1 2 ... = the 1st 2nd 3rd pattern, the key shows by its name; quant - seamless when the playing one ends (REAPER smooth seek), sudden - at once at the same place inside (a short gap: the render-ahead buffer refills); rec - record the order, again - write it after the song as linked repeats; off' },
-    { k = ':pl', d = 'playlist (the playlist button - a block on top of the matrix): the order as text - A1 A1 B1x2 C1:16 D1+8 D1/2 verse 4: pattern / section name or region number; xN repeat, :N the first N rows, /N a part, +N skip N rows; Tab completes names; play (seamless on whole patterns), write (after the song), new dup name del next prev - named playlists in the project' },
+    { k = ':pl', d = 'playlist (the playlist button - a block on top of the matrix): the order as text - A1 A1 B1x2 C1:16 D1-8 D1/2 B2+8 verse 4: pattern / section name or region number; xN repeat, :N the first N rows, /N a part, -N skip N rows, +N then its first N rows again; Tab completes names; play (seamless on whole patterns), write (after the song), new dup name del next prev - named playlists in the project' },
     { k = 'vismetro', d = 'matrix button: the size column always shown, the playing pattern counts its beats there - 1/4 2/4 3/4 4/4' },
     { k = 'autoarm', d = 'master header button: auto-arm on every track (the selected track is armed for recording), again - off; lit when all have it' },
     { k = 'h past the first track', m = 'cursor to the region name and number', d = 'the cursor goes to the region name (Enter / i - rename) and to its number < NN > (Enter - next pattern)' },
@@ -752,6 +753,14 @@ function KH.match(page, tok, prev)
   return nil
 end
 
+-- 18 окт: действие не с клавиатуры (зум мышью) — вспыхнуть записью с этой клавишей, как при нажатии
+function KH.flash_key(page, key, now)
+  local P = KH.PAGES[page]
+  if not P then return end
+  for i, e in ipairs(P.e) do
+    if e.k == key then KH.flash = { page = page, i = i, t0 = now, seed = (math.floor(now * 1000) % 9973) + i }; return true end
+  end
+end
 -- клавиша нажата в модуле page — подсветить её функцию
 function KH.press(page, c, now)
   local tok = KH.token(c)

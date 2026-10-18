@@ -7184,10 +7184,10 @@ function D.frame(L, snap, rows, state, info)
       gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.rl + 2, y0, L.label_w - L.rl - 3, y1 - y0, 1)
       gfx.a = 0.05; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1)
       gfx.a = 1
-      local sx = tx0 + math.max(L.rl, 5) - 3                 -- спина скобки; усы — влево: «]»
+      local sx = tx0 + math.max(L.rl, 5) - 3                 -- спина скобки; 18 окт: усы — вправо, «[» (просьба)
       gfx.rect(sx, y0, 2, y1 - y0, 1)
-      if info.timesel[1] >= row0 then gfx.rect(sx - 5, y0, 7, 2, 1) end
-      if info.timesel[2] <= row0 + nr then gfx.rect(sx - 5, y1 - 2, 7, 2, 1) end
+      if info.timesel[1] >= row0 then gfx.rect(sx, y0, 7, 2, 1) end
+      if info.timesel[2] <= row0 + nr then gfx.rect(sx, y1 - 2, 7, 2, 1) end
     end
   end
   -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии

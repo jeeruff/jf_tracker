@@ -3,13 +3,14 @@
 -- Текст — слова через пробел (или , ; |):  intro A1 A1x2 B1:16 C1+8 D1/2 verse x4 4
 --   имя паттерна (A1) или секции (verse — все её паттерны по порядку), число — регион REAPER с этим номером;
 --   xN / *N — повторить N раз; :N — играть первые N строк (сокращение); /N — первую 1/N часть;
---   +N — пропустить первые N строк (проскок). Можно вместе: A1+8:8x2.
+--   -N — пропустить первые N строк (проскок); +N — после паттерна доиграть ещё раз его первые N строк.
+--   Можно вместе: A1-8:8x2, B1+8.
 -- Плейлисты именованные, хранятся в проекте; играются (бесшовно на целых паттернах) или пишутся после песни.
 -- Без reaper.* — тест tests/test_playlist.lua.
 
 local PL = { lists = {}, cur = 1 }
 
-local MOD = '[x%*:/%+]'
+local MOD = '[x%*:/%+%-]'
 
 -- слово → ссылка и модификаторы; nil, ошибка — если модификаторы не разобрать
 function PL.word(tok)
@@ -18,10 +19,10 @@ function PL.word(tok)
   local m = {}
   local rest = mods:gsub('(' .. MOD .. ')(%d+)', function(op, n)
     n = tonumber(n)
-    if op == 'x' or op == '*' then m.rep = n elseif op == ':' then m.len = n elseif op == '/' then m.div = n else m.skip = n end
+    if op == 'x' or op == '*' then m.rep = n elseif op == ':' then m.len = n elseif op == '/' then m.div = n elseif op == '-' then m.skip = n else m.add = n end
     return ''
   end)
-  if rest ~= '' then return nil, ('"%s": what is "%s"? (xN :N /N +N)'):format(tok, rest) end
+  if rest ~= '' then return nil, ('"%s": what is "%s"? (xN :N /N -N +N)'):format(tok, rest) end
   return ref, m
 end
 
@@ -46,6 +47,8 @@ function PL.parse(text, find)
           local len = m.len or (m.div and math.max(1, math.floor(rows / m.div))) or (rows - from)
           len = math.max(1, math.min(len, rows - from))
           steps[#steps + 1] = { rg = p.rg, rows = rows, from = from, len = len, tok = #toks }
+          -- +N: хвост — первые N строк того же паттерна ещё раз
+          if m.add and m.add > 0 then steps[#steps + 1] = { rg = p.rg, rows = rows, from = 0, len = math.min(rows, m.add), tok = #toks } end
         end
       end
     end

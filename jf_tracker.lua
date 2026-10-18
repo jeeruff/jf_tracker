@@ -16949,6 +16949,12 @@ local function frame()
     if gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0 or (gfx.mouse_cap & 3 ~= 0 and mxy ~= prof.mxy) then prof.input = true end
     prof.mxy = mxy
   end
+  -- 18 окт: LPB сменился (зум колесом, кнопками, клавишами) — в справке вспыхивает его клавиша
+  if ctx.lpb_seen and ctx.lpb_seen ~= state.lpb then
+    local now = reaper.time_precise()
+    if not (KH.flash and now - KH.flash.t0 < 0.3) and not KH.flash_key(KH.page or 'tracker', '- +', now) and KH.page == 'matrix' then KH.flash_key('matrix', 'wheel', now) end
+  end
+  ctx.lpb_seen = state.lpb
   PV.trace = state.debug and ctx.dlog or nil   -- 18 окт: debug — старт / стоп превью слайса с причиной
   PV.tick()
   ctx.notes_dev_poll()
@@ -17031,6 +17037,19 @@ local function frame()
     })
   end
   if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
+  -- 18 окт: протяжка по полоске выделения матрицы — выделение от слота нажатия до слота под мышью
+  if ctx.mx_tsel then
+    if gfx.mouse_cap & 1 == 0 then ctx.mx_tsel = nil
+    else
+      local ri = MX.row_at(gfx.mouse_y)
+      if ri and ri ~= ctx.mx_tsel.last and seq[ri] and seq[ctx.mx_tsel.a] then
+        ctx.mx_tsel.last = ri
+        local A, B = seq[math.min(ri, ctx.mx_tsel.a)], seq[math.max(ri, ctx.mx_tsel.a)]
+        reaper.GetSet_LoopTimeRange(true, false, A.pos, B.rgnend, false); reaper.GetSet_LoopTimeRange(true, true, A.pos, B.rgnend, false)
+        vim.msg = ('selection: slots %d..%d (time selection + loop)'):format(math.min(ri, ctx.mx_tsel.a), math.max(ri, ctx.mx_tsel.a))
+      end
+    end
+  end
   peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
   local is_playing = playing()
   -- упреждение курсора (3 окт, опция cursor lead): позиция читается в начале
@@ -18708,6 +18727,7 @@ local function frame()
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
   elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
+  elseif hover.matrix and hover.matrix.tsel then state.status = 'selection strip - click: this slot is the time selection and loop, drag: several slots, Shift+click: extend, click the only selected one: clear'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column, session (z)'
@@ -20256,6 +20276,25 @@ local function frame()
       end
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
       click = { t = now2, zone = 'mxrep' }
+    elseif hover.matrix and hover.matrix.tsel then
+      -- 18 окт: полоска выделения слотов — time selection и луп REAPER по слотам
+      local ri = hover.matrix.tsel
+      local rg = seq[ri]
+      if rg then
+        local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+        if gfx.mouse_cap & 8 == 8 and t1 > t0 then
+          local a, b = math.min(t0, rg.pos), math.max(t1, rg.rgnend)
+          reaper.GetSet_LoopTimeRange(true, false, a, b, false); reaper.GetSet_LoopTimeRange(true, true, a, b, false)
+          ctx.mx_tsel = nil
+        elseif math.abs(t0 - rg.pos) < 1e-6 and math.abs(t1 - rg.rgnend) < 1e-6 then
+          reaper.GetSet_LoopTimeRange(true, false, 0, 0, false); reaper.GetSet_LoopTimeRange(true, true, 0, 0, false)
+          vim.msg = 'selection cleared'; ctx.mx_tsel = nil
+        else
+          reaper.GetSet_LoopTimeRange(true, false, rg.pos, rg.rgnend, false); reaper.GetSet_LoopTimeRange(true, true, rg.pos, rg.rgnend, false)
+          ctx.mx_tsel = { a = ri, last = ri }
+        end
+      end
+      click = { t = now2, zone = 'mxtsel' }
     elseif hover.matrix and hover.matrix.vis then
       -- 11 окт: клетка visor матрицы — сцена / пресет в начало слота (событие v:)
       local rg = seq[hover.matrix.vis.ri]
@@ -23121,7 +23160,7 @@ ctx.pads_cmd = function(arg)
     P.mode == 'sudden' and 'at once, the same place inside' or 'when the playing one ends') or 'pads off'
 end
 -- 18 окт: playlist (region playlist) — порядок паттернов текстом прямо в матрице (кнопка playlist): имена паттернов /
--- секций с автодополнением (Tab), номера регионов, xN повтор, :N / /N сокращение, +N проскок. Именованные, в проекте.
+-- секций с автодополнением (Tab), номера регионов, xN повтор, :N / /N сокращение, -N проскок, +N — ещё раз первые N строк. Именованные, в проекте.
 -- play — по порядку: целые паттерны встык через GoToRegion (без паузы), сокращённые / с проскоком — прыжком;
 -- write — дописать после песни (повторы связанные, сокращённые — свой паттерн)
 ctx.PL = dofile(DIR .. '/jf_tracker_playlist.lua')
@@ -23266,7 +23305,7 @@ ctx.pl_write = function()
 end
 ctx.plist_toggle = function()
   MX.plist = not MX.plist
-  if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'playlist: :pl A1 A1 B1x2 C1:16 … (Tab completes names) - or click the text line' end end
+  if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'playlist: :pl A1 A1 B1x2 C1:16 D1-8 B2+8 … (Tab completes names) - or click the text line' end end
 end
 ctx.pl_edit = function()
   local l = ctx.pl_cur()
@@ -23345,7 +23384,7 @@ ctx.plist_draw = function(Lx, x, y, w)
   local lines = 1
   local area_y = ty
   if not toks or #toks == 0 then
-    U.text(tx, ty + 1, ctx.fit('click - type the order: A1 A1 B1x2 C1:16 D1+8 verse … (Tab completes)', w - 2 * pad), U.DIM)
+    U.text(tx, ty + 1, ctx.fit('click - type the order: A1 A1 B1x2 C1:16 D1-8 B2+8 verse … (Tab completes)', w - 2 * pad), U.DIM)
   else
     local sp = Lx.cw   -- пробел битмап-шрифта измеряется в 0
     for i, t in ipairs(toks) do
