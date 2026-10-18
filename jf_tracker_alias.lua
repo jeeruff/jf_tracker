@@ -537,6 +537,23 @@ function A.ensure_lib(regions)
 end
 
 -- сдвинуть всё, что начинается после t (включая маркеры/регионы), на delta
+-- 18 окт: сдвиг собранных маркеров / регионов. После каждого Set REAPER пересортировывает их по позиции —
+-- номер перечисления из первого прохода мог указать уже на соседа (регион оставался, а время уходило →
+-- два паттерна в одной точке). Каждый ищется заново по тому, кто он: регион?, номер, позиция, конец, имя
+local function move_marks(list, delta)
+  for _, m in ipairs(list) do
+    local j = 0
+    while true do
+      local ret, isrgn, pos, rgnend, name, idx = R.EnumProjectMarkers3(0, j)
+      if not ret or ret == 0 then j = nil; break end
+      if isrgn == m.isrgn and idx == m.idx and name == m.name and math.abs(pos - m.pos) < EPS
+        and (not isrgn or math.abs(rgnend - m.rgnend) < EPS) then break end
+      j = j + 1
+    end
+    if j then R.SetProjectMarkerByIndex(0, j, m.isrgn, m.pos + delta, m.isrgn and (m.rgnend + delta) or 0, m.idx, m.name, m.color) end
+  end
+end
+
 function A.shift_after(t, delta)
   if math.abs(delta) < 1e-9 then return end
   for _, tr in ipairs(tracks()) do
@@ -551,14 +568,12 @@ function A.shift_after(t, delta)
   while true do
     local ret, isrgn, pos, rgnend, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
-    if pos >= t - EPS then list[#list + 1] = { i = i, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
+    if pos >= t - EPS then list[#list + 1] = { i = i, idx = idx, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
     i = i + 1
   end
   -- при сдвиге вперёд идём с конца, чтобы не наехать
   table.sort(list, function(a, b) if delta > 0 then return a.pos > b.pos end return a.pos < b.pos end)
-  for _, m in ipairs(list) do
-    R.SetProjectMarkerByIndex(0, m.i, m.isrgn, m.pos + delta, m.isrgn and (m.rgnend + delta) or 0, -1, m.name, m.color)
-  end
+  move_marks(list, delta)
 end
 
 -- только маркеры/регионы от t: items двигает E.time_insert/time_delete
@@ -573,13 +588,11 @@ function A.shift_markers(t, delta, keep)
     local ret, isrgn, pos, rgnend, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
     local kept = keep and not isrgn and keep[name] and math.abs(pos - t) < EPS
-    if pos >= t - EPS and not kept then list[#list + 1] = { i = i, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
+    if pos >= t - EPS and not kept then list[#list + 1] = { i = i, idx = idx, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
     i = i + 1
   end
   table.sort(list, function(a, b) if delta > 0 then return a.pos > b.pos end return a.pos < b.pos end)
-  for _, m in ipairs(list) do
-    R.SetProjectMarkerByIndex(0, m.i, m.isrgn, m.pos + delta, m.isrgn and (m.rgnend + delta) or 0, -1, m.name, m.color)
-  end
+  move_marks(list, delta)
 end
 
 -- индекс маркера в EnumProjectMarkers3 по idx региона

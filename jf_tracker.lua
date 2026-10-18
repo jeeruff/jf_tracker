@@ -8015,10 +8015,44 @@ ctx = {
   slot_op = function(desc, fn)
     local hook = edit.after
     edit.after = nil
+    local before = ctx.pat_overlaps()
     local ok, r = pcall(edit.run, desc, fn)
     edit.after = hook
+    -- 18 окт: запрет — два паттерна не начинаются в одной точке; новое наложение → действие откатывается
+    if ok then
+      local bad
+      for k, v in pairs(ctx.pat_overlaps()) do if not before[k] then bad = v; break end end
+      if bad then
+        reaper.Undo_DoUndo2(0)
+        model.invalidate(); regions = model.regions(state.lpb)
+        ctx.mx_refresh()
+        vim.msg = ('%s: undone - %s and %s would start at the same place'):format(desc, bad[1], bad[2])
+        return
+      end
+    end
     ctx.mx_refresh()
     if not ok then error(r) end
+  end,
+  -- паттерны (регионы с кодом: не секции, не =служебные), начинающиеся в одной точке: { ['A1|B1'] = { 'A1', 'B1' } }
+  -- ключ — пара имён, не позиция: старое наложение, уехавшее при сдвиге, новым не считается
+  pat_overlaps = function()
+    local at, out = {}, {}
+    local i = 0
+    while true do
+      local ret, isrgn, pos, _, name = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isrgn and not name:match('^=') and model.SEC.code_of(name) then
+        local k = ('%.4f'):format(pos)
+        for _, other in ipairs(at[k] or {}) do
+          local a2, b2 = other, name
+          if b2 < a2 then a2, b2 = b2, a2 end
+          out[a2 .. '|' .. b2] = { a2, b2 }
+        end
+        at[k] = at[k] or {}; table.insert(at[k], name)
+      end
+      i = i + 1
+    end
+    return out
   end,
   slot_yank = function(ri)
     local sl = alias.slot_snapshot(seq, snap, ri or MX.cur.ri)
@@ -24343,7 +24377,7 @@ ctx.sec_show = function(sc)
 end
 ctx.sec_repeat = function(sc, linked)
   local nm = ctx.sec_free_name(sc.name)
-  edit.run('section repeat ' .. (sc.name or ''), function()
+  ctx.slot_op('section repeat ' .. (sc.name or ''), function()
     local t1 = ctx.sec_insert(sc, sc.rgnend, linked)
     reaper.AddProjectMarker2(0, true, sc.rgnend, t1, nm, -1, sc.color or 0)
   end)
@@ -24369,12 +24403,12 @@ ctx.sec_move = function(sc, ri, how)
   if how == 'move' and t >= sc.pos - 1e-6 and t <= sc.rgnend + 1e-6 then vim.msg = 'section: already here'; return end
   if how == 'move' then
     local ok
-    edit.run('section move ' .. (sc.name or ''), function() ok = alias.move_span(sc.pos, sc.rgnend, t) end)
+    ctx.slot_op('section move ' .. (sc.name or ''), function() ok = alias.move_span(sc.pos, sc.rgnend, t) end)
     ctx.mx_refresh()
     vim.msg = ok and ('section %s moved before slot %d (u - undo)'):format(sc.name or '', ri) or 'section: nothing moved'
   else
     local nm = ctx.sec_free_name(sc.name)
-    edit.run('section ' .. how .. ' ' .. (sc.name or ''), function()
+    ctx.slot_op('section ' .. how .. ' ' .. (sc.name or ''), function()
       local t1 = ctx.sec_insert(sc, t, how == 'alias')
       reaper.AddProjectMarker2(0, true, t, t1, nm, -1, sc.color or 0)
     end)
