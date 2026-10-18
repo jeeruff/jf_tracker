@@ -10518,6 +10518,7 @@ ctx = {
   end,
   -- прокрутка списков полосой / колесом (4 окт): lib, browser, matrix
   vbar_get = function(key)
+    if key == 'palette' then return MX.pal_scroll or 0 end   -- 18 окт
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
     elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0
     elseif key == 'undotree' then return (ctx.ut_state().scroll or 0)   -- 15 окт
@@ -10529,6 +10530,7 @@ ctx = {
     local r = draw.vbars[key]
     local mx = r and math.max(0, r.total - r.nvis) or v
     v = math.max(0, math.min(mx, v))
+    if key == 'palette' then MX.pal_scroll = v end   -- 18 окт
     if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
     elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1)
     elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
@@ -22696,8 +22698,13 @@ local function frame()
   -- 13 окт: Ctrl+` — шаг next (на следующий объект трека) вкл / выкл, в любом режиме;
   -- note-off: ~ (Shift+`) — все треки, Ctrl+~ — весь трек (17 окт)
   if c == 96 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().shift and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    vim.step_next = not vim.step_next; vim.step_auto = false
-    vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track (Ctrl+` back)' or tostring(vim.step))
+    if ctx.mods().alt then   -- 18 окт: Ctrl+Opt+` — step auto (до конца вставленного звука)
+      vim.step_auto = not vim.step_auto; vim.step_next = false
+      vim.msg = 'step: ' .. (vim.step_auto and 'auto - to the end of the inserted item / slice (Ctrl+Opt+` back)' or tostring(vim.step))
+    else
+      vim.step_next = not vim.step_next; vim.step_auto = false
+      vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track (Ctrl+` back)' or tostring(vim.step))
+    end
     c = 0
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
@@ -23647,13 +23654,20 @@ ctx.palette_draw = function(Lx, x, y, w)
         local parts = ctx.pal_parts[key]
         if not parts then parts = ctx.mx_cell_parts(col.track, src.pos, src.rgnend); ctx.pal_parts[key] = parts end
         local hot = mx >= cx and mx < cx + Lx.mx_cell_w and my >= ry and my < ry + rh
-        if #parts > 0 then ctx.mx_cell_parts_draw(parts, cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3, true)
-        else U.set(U.DIM); MX.box(cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3) end
+        if #parts > 0 then ctx.mx_cell_parts_draw(parts, cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3, true) end
+        U.set(#parts > 0 and U.GREY or U.DIM); MX.box(cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3)   -- 18 окт: рамка у каждой клетки
+        -- 18 окт: клетки сжаты в квадраты — подпись A1-1 (паттерн, номер трека): превью мелкое, имя читается
+        if #parts > 0 and Lx.mx_cell_w <= 2 * rh then
+          local lab = ctx.fit(p.name .. '-' .. ci, Lx.mx_cell_w - 4)
+          U.set(U.BG); gfx.rect(cx + 2, ry + 2, U.measure(lab) + 2, Lx.rh - 1, 1)
+          U.text(cx + 3, ry + 2, lab, U.TEXT)
+        end
         if hot then U.set(U.AMBER); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); hover.palcell = { p = p, ci = ci } end
       end
     end
   end
   if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
+  if ctx.vbar then ctx.vbar('palette', x, y0, w, nvis * rh, MX.pal_scroll, nvis, #list) end   -- 18 окт: скроллбар палитры
   -- зажатая прослушка палитры: отпустил кнопку — стоп
   if ctx.mx_solo and ctx.mx_solo_owner == 'palette' and gfx.mouse_cap & 1 == 0 then ctx.mx_cell_preview_end() end
   return Lx.rh + 1 + nvis * rh + 2, hover
