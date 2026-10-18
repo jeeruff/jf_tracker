@@ -342,7 +342,8 @@ end
 -- Лайв (2 окт): один проход по items трека, регион item — бинарным поиском
 -- по отсортированным регионам (было регионы × треки × items × items).
 -- only (10 окт) — набор items, которые можно резать (созданные / сдвинутые правкой); nil — все
-function A.trim(regions, only)
+-- dry (18 окт) — только посчитать, что вылезает за границы (кнопка trim видна, когда есть что резать)
+function A.trim(regions, only, dry)
   local regs = {}
   for _, rg in ipairs(regions) do if not rg.lib then regs[#regs + 1] = rg end end
   if #regs == 0 then return 0 end
@@ -367,12 +368,13 @@ function A.trim(regions, only)
       if pos >= rg.pos - EPS and pos < rg.rgnend - EPS and (not cut or rg.rgnend < cut) then cut = rg.rgnend end
     end
     if cut then
-      if fin > cut + EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut - pos); n = n + 1 end
+      if fin > cut + EPS then if not dry then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut - pos) end; n = n + 1 end
       return
     end
     -- вне регионов: входит в следующий из-за его начала — разрезать на границе
     local nx = regs[k + 1]
     if nx and fin > nx.pos + EPS and depth < 64 then
+      if dry then n = n + 1; return end
       local right = R.SplitMediaItem(it, nx.pos)
       if right then n = n + 1; fix(right, nx.pos, fin, depth + 1) end
     end

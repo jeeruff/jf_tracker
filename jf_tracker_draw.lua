@@ -6453,7 +6453,9 @@ function D.frame(L, snap, rows, state, info)
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       -- 9 окт: кнопка — clips (клипы в теле трекера); session — зона, где клипы записаны
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
-      local x1 = small(bx, hy + 1 + L.rh, 'clips', 'session', info.clipsview, 'viewbtn')
+      -- 18 окт: клипы в теле трекера выключены (REAPER не для нелинейной игры; сессия — потом в матрице)
+      -- local x1 = small(bx, hy + 1 + L.rh, 'clips', 'session', info.clipsview, 'viewbtn')
+      local x1 = bx
       local x2 = small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
       -- 8 окт: param — рядом с effects (одно место; было в строке effects и в
       -- уголке микшера); не влезает слово — «p»

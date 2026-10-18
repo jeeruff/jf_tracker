@@ -46,7 +46,13 @@ function SP.key(c)
   if c == 13 then return 'apply' end
   if ch:match('^%d$') then type_digit(ch); return true end
   if c == 9 or ch == '/' then SP.field = SP.field == 'n' and 'd' or 'n'; SP.buf = ''; return true end
-  if c == 8 then SP.buf = ''; return true end
+  if c == 8 then                                               -- BS — последняя цифра активной половины (45 → 4)
+    local v = SP.field == 'n' and SP.n or SP.d
+    local rest = tostring(v):sub(1, -2)
+    if rest ~= '' and SP.field == 'n' then SP.n = tonumber(rest) end
+    SP.buf = rest
+    return true
+  end
   if ch == 'h' or c == 1818584692 then SP.n = math.max(1, SP.n - 1); SP.buf = ''; return true end
   if ch == 'l' or c == 1919379572 then SP.n = math.min(64, SP.n + 1); SP.buf = ''; return true end
   if ch == 'j' or ch == 'k' or c == 1685026670 or c == 30064 then

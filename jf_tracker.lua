@@ -220,7 +220,7 @@ local state = {
   ss_px = tonumber(reaper.GetExtState(EXT, 'ss_px')),
   lside_frac = tonumber(reaper.GetExtState(EXT, 'lside_frac')),   -- раздел матрица | браузер слева (8 окт)   -- высота clips над матрицей (тянется мышью)
   ssbsync = flag('ssbsync', true),
-  clipsview = flag('clipsview', false),             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
+  clipsview = false,   -- 18 окт: клипы в трекере выключены (было flag('clipsview', false))             -- тело трекера — клипы сессии (сцены × треки), 6 окт                  -- аудио-клип в сессию — с beatsync (6 окт)
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
   measure = false,                                -- линейка мышью (7 окт, быстрая опция; не сохраняется)
   modgap = tonumber(reaper.GetExtState(EXT, 'modgap')),   -- зазор между модулями, px (7 окт)
@@ -3147,10 +3147,20 @@ ctx = {
     MX.anchor = nil
   end,
   -- матрица: обрезать items по границам регионов (кнопка trim / t / :trim)
+  -- 18 окт: сколько краёв items вылезает за границы паттернов (пробный trim; раз в снимок, не чаще 2 раз в секунду)
+  trim_need = function()
+    local c = ctx.trim_c
+    local now = reaper.time_precise()
+    if c and (c.snap == snap or now - c.t < 0.5) then return c.n end
+    local n = (#seq > 0) and alias.trim(ctx.real_seq(), nil, true) or 0
+    ctx.trim_c = { snap = snap, t = now, n = n }
+    return n
+  end,
   mx_trim = function()
     if #seq == 0 then vim.msg = 'no regions'; return end
     local n = 0
     edit.run('matrix trim', function() n = alias.trim(ctx.real_seq()) end)
+    ctx.trim_c = nil
     vim.msg = ('trim: %d item edge(s) cut to region bounds'):format(n)
   end,
   -- `o` — показать событие под курсором в REAPER: выделить item, зум на него,
@@ -10119,6 +10129,8 @@ ctx = {
   end,
   -- zs / быстрая опция clips: тело трекера ↔ клипы сессии
   clips_toggle = function()
+    -- 18 окт: клипы в теле трекера выключены — вход закрыт, код ниже оставлен
+    state.clipsview = false; vim.msg = 'clips in the tracker are off for now'; do return end
     state.clipsview = not state.clipsview
     reaper.SetExtState(EXT, 'clipsview', state.clipsview and '1' or '0', true)
     if state.clipsview then
@@ -11165,7 +11177,7 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
-      flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
+-- 18 окт: выключено --       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
@@ -11315,7 +11327,7 @@ ctx = {
       { 'headers and mixer', { 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
-      { 'session', { 'clipsview', 'mxlaunch', 'ssbsync', 'ssbars' } },
+      { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
     }

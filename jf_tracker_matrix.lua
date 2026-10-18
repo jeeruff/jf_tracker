@@ -70,6 +70,7 @@ local function btns()
   local out = {}
   for _, b in ipairs(BTNS) do
     local hide = (b[1] == 'sync' and ctx and ctx.autosync_on and ctx.autosync_on()) or (b[1] == 'loops' and not (ctx and ctx.dev_on and ctx.dev_on()))
+      or (b[1] == 'trim' and ctx and ctx.trim_need and ctx.trim_need() == 0)   -- 18 окт: trim — только когда items вылезают за границы паттернов
     if not hide then out[#out + 1] = b end
   end
   return out
