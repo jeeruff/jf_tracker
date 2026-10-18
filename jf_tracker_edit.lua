@@ -3162,6 +3162,37 @@ function E.scopes(cols, on)
   end)
 end
 
+-- 18 окт: измерители уровня между эффектами (gain staging роутера): jf_tracker_probe в начале цепочки и перед
+-- каждым последовательным рядом, и в конце (внутрь параллельного ряда — нет). Слоты 0..255 по порядку цепочки.
+-- on = false — все сняты. Один undo-шаг
+E.PROBE = 'jf_tracker_probe'
+local function is_probe(tr, i) local _, nm = R.TrackFX_GetFXName(tr, i, ''); return (nm or ''):find(E.PROBE, 1, true) ~= nil end
+function E.probes(tr, on)
+  if not (tr and R.ValidatePtr(tr, 'MediaTrack*')) then return 0 end
+  local n = 0
+  run(on and 'gain meters on' or 'gain meters off', function()
+    for i = R.TrackFX_GetCount(tr) - 1, 0, -1 do if is_probe(tr, i) then R.TrackFX_Delete(tr, i) end end
+    if not on then return end
+    local cnt = R.TrackFX_GetCount(tr)
+    local cuts = {}
+    for i = 0, cnt - 1 do
+      local ok, par = R.TrackFX_GetNamedConfigParm(tr, i, 'parallel')
+      if i == 0 or not (ok and (tonumber(par) or 0) > 0) then cuts[#cuts + 1] = i end
+    end
+    cuts[#cuts + 1] = cnt
+    for k = #cuts, 1, -1 do
+      local fx = R.TrackFX_AddByName(tr, E.PROBE, false, -1000 - cuts[k])
+      if fx >= 0 then R.TrackFX_Show(tr, fx, 2) end
+    end
+    local slot = 0
+    for i = 0, R.TrackFX_GetCount(tr) - 1 do
+      if is_probe(tr, i) then R.TrackFX_SetParam(tr, i, 0, slot); slot = slot + 1 end
+    end
+    n = slot
+  end)
+  return n
+end
+
 -- ретро-буфер jf_rec на треке: добавить со свободным слотом (0..63)
 function E.retro_add(track, cols)
   local used = {}

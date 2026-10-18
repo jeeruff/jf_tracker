@@ -8176,7 +8176,7 @@ ctx = {
     if kind == 'note' and (current or '') ~= '' then items[#items + 1] = { label = '- no note', clear = true } end
     for _, nm in ipairs(used) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
     for _, nm in ipairs(base) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
-    vim.open_picker(title .. '  -  pick, or type your own (Enter); " 2" etc. - a postfix', items, function(it) on_done(it.clear and '' or it.label) end)
+    vim.open_picker(title, items, function(it) on_done(it.clear and '' or it.label) end)
     vim.picker.free = true
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
@@ -9577,6 +9577,24 @@ ctx = {
       vim.msg = 'router in DSP: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, d delete, zz back'
     end
   end,
+  -- 18 окт: gain staging — измерители jf_tracker_probe на треке роутера (вход / выход каждого ряда)
+  gain_toggle = function(off)
+    local t = dsp_target()
+    if ctx.gain_tr and (off or MX.DB.meter) then
+      if reaper.ValidatePtr(ctx.gain_tr, 'MediaTrack*') then edit.probes(ctx.gain_tr, false) end
+      ctx.gain_tr, MX.DB.meter = nil, nil; ctx.db_cache = nil; model.invalidate()
+      vim.msg = 'gain meters off (taken off the chain)'; return
+    end
+    if off then return end
+    if not (t and t.track) or t.take then vim.msg = 'gain: a track chain (not take fx)'; return end
+    local n = edit.probes(t.track, true)
+    ctx.gain_tr = t.track; ctx.db_cache = nil; model.invalidate()
+    MX.DB.meter = function(slot)
+      local b = 20000 + slot * 4
+      return reaper.gmem_read(b), reaper.gmem_read(b + 1)
+    end
+    vim.msg = ('gain meters on: %d jf_tracker_probe between the rows (sound unchanged); gain again - off'):format(n)
+  end,
   -- большой роутер (7 окт, zR): на всё окно, узлы — устройства со слайдерами
   router_big = function()
     state.router_big = not state.router_big
@@ -9593,6 +9611,7 @@ ctx = {
       if state.rb_top then state.top, state.toptab = state.rb_top[1], state.rb_top[2] end
       if state.rb_bmode then B.mode = state.rb_bmode; state.rb_bmode = nil end
       state.rb_saved, state.rb_top = nil, nil
+      if ctx.gain_tr and not state.dsp_big then ctx.gain_toggle(true) end   -- 18 окт: роутер закрыт — измерители сняты
       relayout(); ctx.set_focus(state.dsp and 'dsp' or 'tracker'); vim.msg = 'router big: back'
     end
   end,
@@ -18610,6 +18629,7 @@ local function frame()
         end
         HN.targets = keep
       end
+      if ctx.gain_tr then local gt = dsp_target(); if gt and gt.track ~= ctx.gain_tr and not gt.take then ctx.gain_toggle(true); ctx.gain_toggle() end end   -- другой трек — измерители за ним
       U.set(U.BG); gfx.rect(x0, y0, w0, h0, 1)   -- 18 окт: свой фон — строки трекера (линии регионов) не просвечивают
       local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title, false, true)
       local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -19600,6 +19620,7 @@ local function frame()
     else MX.DB.pdrag = nil end
   end
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
+  if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
   if U.click and (hover.dbplus or hover.dbpar) then
     ctx.set_focus('dsp')
     if hover.dbpar then ctx.db_ops.add(hover.dbpar, true)

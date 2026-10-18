@@ -1375,7 +1375,10 @@ function build_track_fx(tr)
   local out = {}
   local A = M.fxapi(tr)
   if not A.GetCount then return out end
-  for fx = 0, A.GetCount(tr) - 1 do build_one(tr, fx, out) end
+  for fx = 0, A.GetCount(tr) - 1 do
+    local _, nm = A.GetFXName(tr, fx, '')
+    if not (nm or ''):find('jf_tracker_probe', 1, true) then build_one(tr, fx, out) end   -- 18 окт: измерители роутера — не эффекты списка
+  end
   return out
 end
 function build_one(tr, fx, out)

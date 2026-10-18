@@ -54,15 +54,26 @@ function DB.read(obj, fa)
       for k = 0, tonumber(cnt) - 1 do
         local ok2, a2 = fa.GetNamedConfigParm(obj, addr, 'container_item.' .. k)
         if ok2 and tonumber(a2) then
-          local kid = node(tonumber(a2)); kid.parent = n; kid.k = k; n.kids[#n.kids + 1] = kid
+          local kid = node(tonumber(a2)); kid.parent = n; kid.k = k; kid.ki = k; n.kids[#n.kids + 1] = kid
         end
       end
     end
     return n
   end
   local root = { kids = {}, root = true }
+  -- 18 окт: измерители jf_tracker_probe (gain staging) — не узлы: слот перед узлом — его вход (p_in),
+  -- после прошлого — его выход (p_out). k — позиция в REAPER, ki — номер в списке kids (0..)
+  local prev, pend
   for i = 0, fa.GetCount(obj) - 1 do
-    local n = node(i); n.parent = root; n.k = i; root.kids[#root.kids + 1] = n
+    local _, raw = fa.GetFXName(obj, i, '')
+    if (raw or ''):find('jf_tracker_probe', 1, true) then
+      local slot = math.floor((fa.GetParamNormalized(obj, i, 0) or 0) * 255 + 0.5)
+      if prev then prev.p_out = slot end
+      pend = slot
+    else
+      local n = node(i); n.parent = root; n.k = i; n.ki = #root.kids; n.p_in = pend; pend = nil
+      root.kids[#root.kids + 1] = n; prev = n
+    end
   end
   return root
 end
@@ -199,7 +210,7 @@ function DB.key(c, root, obj)
   elseif ch == 's' then DB.solo(n)
   elseif ch == '=' then DB.unity(n)
   elseif ch == '|' then
-    if n.k == 0 then ops.msg('the first fx of a chain is always serial')
+    if (n.ki or n.k) == 0 then ops.msg('the first fx of a chain is always serial')
     else ops.parallel(n.addr, (n.par or 0) > 0 and 0 or 1) end
   else return false end
   return true
@@ -208,13 +219,13 @@ end
 -- удалить: флаг parallel переходит к следующему звену, иначе оно
 -- прилипнет к прошлому ряду (ловушка из разбора ParaNormal)
 function DB.delete(n, obj)
-  local nx = n.parent.kids[n.k + 2]
+  local nx = n.parent.kids[(n.ki or n.k) + 2]
   local after = DB.move_sel_after_delete(n)
   ops.remove(n.addr, ((n.par or 0) == 0 and nx and (nx.par or 0) > 0) and nx.addr or nil)
   DB.sel = after
 end
 function DB.move_sel_after_delete(n)
-  local sib = n.parent.kids[n.k + 2] or n.parent.kids[n.k]
+  local sib = n.parent.kids[(n.ki or n.k) + 2] or n.parent.kids[n.ki or n.k]
   if sib then return sib.guid end
   return not n.parent.root and n.parent.guid or nil
 end
@@ -331,7 +342,17 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
   if compact then top = y + 2
   else
   -- шапка: что за цепочка; подсказки (9 окт) — в строке статуса (KH.BARS router / dspbig)
-  U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w - 2 * L.pad), U.AMBER)
+  -- 18 окт: кнопка gain — измерители уровня между эффектами (gain staging)
+  local glab = 'gain'
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local gbw = U.measure(glab) + 2 * L.pad
+  local gbx, gby = x + w - L.pad - gbw, y + L.pad
+  local ghot = mx >= gbx and mx < gbx + gbw and my >= gby and my < gby + L.rh
+  U.set(DB.meter and U.tint(U.CYAN, 0.25) or (ghot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(gbx, gby, gbw, L.rh, 1)
+  U.set(DB.meter and U.CYAN or U.LINE); gfx.rect(gbx, gby, gbw, L.rh, 0)
+  U.text(gbx + L.pad, gby + 1, glab, DB.meter and U.CYAN or (ghot and U.AMBER or U.TEXT))
+  if ghot then hover.dbgain = true end
+  U.text(x + L.pad, y + L.pad, ctx.fit((big and 'router big - ' or 'router - ') .. (title or ''), w - 3 * L.pad - gbw), U.AMBER)
   top = y + L.rh + 3 * L.pad
   end
   local bh = h - (top - y) - (compact and 2 or L.pad)
@@ -456,6 +477,37 @@ function DB.draw_in(L, x, y, w, h, root, title, glass, big, compact)
       U.text(bx + 2, by, lab, hot and U.AMBER or U.GREY)
       if hot then hover[key] = data; hover.dbnode = nil; hover.dbtip = tip end
       if ctx.hint then ctx.hint(key, bx, by, bw, bh, data) end
+    end
+    -- 18 окт: gain staging — у ряда слева метр входа, справа выхода (измерители jf_tracker_probe), над рядом — разница dB
+    if DB.meter then
+      local function db(v) return v and v > 1e-7 and 20 * math.log(v, 10) or -150 end
+      local function vmeter(mx0, y0, hh, slot)
+        local l, r = DB.meter(slot)
+        if not l then return nil end
+        for c, v in ipairs({ l, r }) do
+          local d = db(v)
+          local f = math.max(0, math.min(1, (d + 60) / 66))
+          local bx = mx0 + (c - 1) * 3
+          U.set(U.mix(U.LINE, U.BG, 0.4)); gfx.rect(bx, y0, 2, hh, 1)
+          local fh = math.floor(f * hh + 0.5)
+          U.set(d > 0 and U.RED or (d > -6 and U.AMBER or U.GREEN)); gfx.rect(bx, y0 + hh - fh, 2, fh, 1)
+        end
+        return math.max(l, r)
+      end
+      for _, st in ipairs(root.stages or {}) do
+        local n1, n2 = st[1], st[#st]
+        local y0, y1, x1 = n1.y, n1.y, n1.x + n1.w
+        for _, n in ipairs(st) do y1 = math.max(y1, n.y + n.h); x1 = math.max(x1, n.x + n.w) end
+        local pin = n1.p_in and vmeter(n1.x - 8, y0, y1 - y0, n1.p_in)
+        local pout = n2.p_out and vmeter(x1 + 3, y0, y1 - y0, n2.p_out)
+        if pin and pout and pin > 1e-5 and pout > 1e-5 then
+          local dd = db(pout) - db(pin)
+          if math.abs(dd) >= 0.5 then
+            local s = ('%+.1f'):format(dd)
+            U.text(x1 - U.measure(s), y0 - L.rh, s, dd > 3 and U.AMBER or (dd < -3 and U.CYAN or U.GREY))
+          end
+        end
+      end
     end
     for _, j in ipairs(joints) do
       lbtn(j.x, j.y, '+', 'dbplus', j, j.first and 'add an effect at the start of the chain' or ('add an effect after ' .. (j.after and j.after.name or '')))
