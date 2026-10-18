@@ -143,7 +143,7 @@ reaper = {
   AddMediaItemToTrack = function() local it = { pos = 0, len = 1 }; items[#items + 1] = it; return it end,
   DeleteTrackMediaItem = function(_, it) for i, x in ipairs(items) do if x == it then table.remove(items, i); return end end end,
   SplitMediaItem = function(it, t) local r = { pos = t, len = it.pos + it.len - t, chunk = it.chunk }; it.len = t - it.pos; items[#items + 1] = r; return r end,
-  GetSetMediaItemInfo_String = function(it, k, v) it[k] = v; return true, v end,
+  GetSetMediaItemInfo_String = function(it, k, v, set) if set == false then return true, it[k] or '' end; it[k] = v; return true, v end,
   ValidatePtr = function() return false end, genGuid = function() return '{g}' end,
   GetActiveTake = function(it) return it end,
   SetMediaItemTakeInfo_Value = function(it, k, v) it['take:' .. k] = v end,
@@ -184,12 +184,16 @@ A.session_plant('tr', { pos = 0, rgnend = 2 }, 100, 108, 104, nil, 't', { 102, 1
 got = {}; for _, it in ipairs(items) do if it.pos >= 100 then got[#got + 1] = it.pos end end
 eq('win only', table.concat(got, ','), '102')
 -- clear с keep: item 101..103 (пересекает keep1 = 102) режется, 104.. удаляется, 100..101 (до keep0 = 101.5) удаляется
-items = { { pos = 100, len = 1 }, { pos = 101, len = 2 }, { pos = 104, len = 1 }, { pos = 50, len = 1 } }
+local S = 'P_EXT:jf_session'
+items = { { pos = 100, len = 1, [S] = '1' }, { pos = 101, len = 2, [S] = '1' }, { pos = 104, len = 1, [S] = '1' }, { pos = 50, len = 1, [S] = '1' } }
 local ncl = A.session_clear('tr', 100, 108, 101.5, 102)
 got = {}; for _, it in ipairs(items) do got[#got + 1] = it.pos .. '+' .. it.len end; table.sort(got)
 eq('clear keep: kept and trimmed', table.concat(got, ' '), '101+1 50+1'); eq('clear count', ncl, 3)
-items = { { pos = 100, len = 1 }, { pos = 107.5, len = 2 }, { pos = 50, len = 1 } }
+items = { { pos = 100, len = 1, [S] = '1' }, { pos = 107.5, len = 2, [S] = '1' }, { pos = 50, len = 1, [S] = '1' } }
 eq('clear all in zone', A.session_clear('tr', 100, 108), 2); eq('clear all: outside stays', #items == 1 and items[1].pos, 50)
+-- 18 окт: items песни (без метки) в зоне не трогаются
+items = { { pos = 100, len = 1 }, { pos = 101, len = 1, [S] = '1' } }
+eq('clear: song items stay', A.session_clear('tr', 100, 108), 1); eq('clear: the song item', #items == 1 and items[1].pos, 100)
 
 -- луп клипа с кроссфейдом (A.plant_loop): шаг (lb − la) / rate, копия длиннее на xf, фейды
 reaper.GetActiveTake = function(it) return it end

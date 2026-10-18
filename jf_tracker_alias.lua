@@ -276,6 +276,8 @@ function A.session_clear(tr, z0, z1, keep0, keep1, lane)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
     if lane and R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') ~= lane then fin = -1 end   -- другой лейн не трогать (7 окт)
+    -- 18 окт: только items сессии (P_EXT:jf_session) — зона, наехавшая на песню, стирала ноты паттерна
+    if fin > z0 + EPS and pos < z1 - EPS and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)) == '' then fin = -1 end
     if fin > z0 + EPS and pos < z1 - EPS then
       local keep = keep0 and fin > keep0 + EPS and pos < keep1 - EPS
       if not keep then R.DeleteTrackMediaItem(tr, it); n = n + 1

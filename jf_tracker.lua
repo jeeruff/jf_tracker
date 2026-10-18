@@ -4373,6 +4373,11 @@ ctx = {
   -- операция над деревом: снимок для u (20 шагов), пересчёт раскладки
   -- 10 окт: zz в любом модуле (кроме трекера — там Vim) — панель в фокусе на всё окно, повтор — назад
   zz_zoom = function()
+    -- 18 окт: session на всё окно — zz закрывает его (фокус session уводил zz в зум трекера: «tracker zoomed»)
+    if state.ss_big then
+      if state.panes and state.panes.zoom == 'tracker' then draw.panes.zoom(state.panes, 'tracker') end   -- снять зум, попавший туда этой ошибкой
+      ctx.ss_big(); return true
+    end
     if not (state.panes_ui and L and L.pn) then vim.msg = 'zz: panes are off (options: panes)'; return end
     local id = ctx.pane_cur()
     if not id then return false end   -- 10 окт: трекер тоже — zz в трекере = трекер на всё окно
@@ -8559,6 +8564,7 @@ ctx = {
       { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
+      { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
       { key = 'z', label = 'session: clips over the whole window', fn = function() if ctx.ss_big then ctx.ss_big() end end },
     }
     if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
@@ -9531,7 +9537,7 @@ ctx = {
       if not ret or ret == 0 then break end
       if isrgn and name == model.SESSION_REGION then
         local _, _, _, _, _, idx = reaper.EnumProjectMarkers3(0, i)
-        return { pos = pos, rgnend = rgnend, session = true, name = name, idx = idx }
+        return ctx.ss_zone_clear_song({ pos = pos, rgnend = rgnend, session = true, name = name, idx = idx })
       end
       i = i + 1
     end
@@ -9540,16 +9546,59 @@ ctx = {
     local c = state.ss_zone_new
     if c and reaper.time_precise() - c.t < 5 then return c end
     if not reaper.AddProjectMarker2 then return nil end
-    local t = math.max(reaper.GetProjectLength(0), regions.end_pos or 0)
-    for _, rg in ipairs(regions) do if rg.rgnend > t then t = rg.rgnend end end
-    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
-    local z0 = reaper.TimeMap2_beatsToTime(0, 0, meas + 2)
+    local z0 = ctx.ss_zone_home()
     -- длина: НОК клипов (qn, 7 окт) или session bars
-    local z1 = qn and reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, z0) + qn) or reaper.TimeMap2_beatsToTime(0, 0, meas + 2 + (state.ssbars or 8))
+    local _, meas = reaper.TimeMap2_timeToBeats(0, z0)
+    local z1 = qn and reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, z0) + qn) or reaper.TimeMap2_beatsToTime(0, 0, meas + (state.ssbars or 8))
     local idx = reaper.AddProjectMarker2(0, true, z0, z1, model.SESSION_REGION, -1, 0)
     model.invalidate()
     state.ss_zone_new = { pos = z0, rgnend = z1, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = idx }
     return state.ss_zone_new
+  end,
+  -- начало новой зоны: через такт после всего проекта
+  ss_zone_home = function(skip)
+    local t = math.max(reaper.GetProjectLength(0), regions.end_pos or 0)
+    for _, rg in ipairs(regions) do if rg.rgnend > t and not rg.session then t = rg.rgnend end end
+    if skip then t = math.max(t, skip) end
+    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
+    return reaper.TimeMap2_beatsToTime(0, 0, meas + 2)
+  end,
+  -- 18 окт: зона наехала на регион песни (паттерны выросли, темп, перенос) — клипы садились поверх нот
+  -- и сдвинутыми (зона не на такте). Зона с её items (только P_EXT:jf_session) — уезжает за проект
+  ss_zone_clear_song = function(z)
+    local hit
+    local i = 0
+    while true do
+      local ret, isr, p, e, nm = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isr and nm ~= model.SESSION_REGION and not nm:match('^=') and p < z.rgnend - 1e-6 and e > z.pos + 1e-6 then hit = nm; break end
+      i = i + 1
+    end
+    if not hit then return z end
+    if playing() then return z end                       -- не дёргать под играющим транспортом: уедет после стопа
+    local q0 = reaper.TimeMap2_timeToQN(0, z.pos)
+    local qlen = reaper.TimeMap2_timeToQN(0, z.rgnend) - q0
+    local nz0 = ctx.ss_zone_home(z.rgnend)
+    local nq0 = reaper.TimeMap2_timeToQN(0, nz0)
+    reaper.Undo_BeginBlock()
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for k = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+        if tag ~= '' and p >= z.pos - 1e-6 and p < z.rgnend - 1e-6 then
+          reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.TimeMap2_QNToTime(0, nq0 + reaper.TimeMap2_timeToQN(0, p) - q0))
+        end
+      end
+    end
+    local nz1 = reaper.TimeMap2_QNToTime(0, nq0 + qlen)
+    reaper.SetProjectMarker3(0, z.idx, true, nz0, nz1, model.SESSION_REGION, 0)
+    reaper.Undo_EndBlock('session zone moved off the song', -1)
+    model.invalidate()
+    state.ss_zone_new = nil
+    vim.msg = ('session zone was over %s - moved after the project (only the clips moved)'):format(hit)
+    return { pos = nz0, rgnend = nz1, session = true, name = model.SESSION_REGION, idx = z.idx }
   end,
   -- зона под need долей (7 окт, полиметрия): длиннее — регион растёт, луп
   -- транспорта следом, играющим клипам досаживается хвост [старый конец,
