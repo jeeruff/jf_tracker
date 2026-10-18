@@ -3768,15 +3768,23 @@ ctx = {
     local list = model.patterns(regions)
     if #list == 0 then vim.msg = 'no patterns yet - n names this bar, + adds one'; return end
     local items, sel = {}, 1
-    for i, p in ipairs(list) do
-      items[#items + 1] = { label = ('%02d %s'):format(p.num, p.name), v = p, tip = ('%s - %d slot(s)'):format(p.name, p.n or 0) }
-      if not slot.gap and p.name == slot.name then sel = i end
+    for _, p in ipairs(list) do
+      if not p.name:match('^=') and not (p.src and p.src.session) then   -- 18 окт: служебные (=SESSION …) — не паттерны
+        items[#items + 1] = { label = ('%02d %s'):format(p.num, p.name), v = p, tip = ('%s - %d slot(s)'):format(p.name, p.n or 0) }
+        if not slot.gap and p.name == slot.name then sel = #items end
+      end
     end
+    -- 18 окт: у строки слота, не в углу
+    local ry = MX.row_y and MX.row_y[MX.cur.ri]
+    if ry then ctx.smart_at = { x = (MX.cur_rect and MX.cur_rect.x) or 40, y = ry + L.rh + 2, top = ry } end
     ctx.smart_open({ title = (slot.gap and 'free bar %d: put a pattern here (linked repeat)' or 'slot %d: its pattern'):format(MX.cur.ri) .. ' (Enter)',
       items = items, cols = 1, sel = sel, on_pick = function(it)
         local p = it.v
         if slot.gap then
           if not (p.src and p.src.rgnend) then vim.msg = 'pattern without a region'; return end
+          -- 18 окт: такой же длины — такт сам становится этим паттерном (регион поверх, содержимое — от оригинала);
+          -- раньше повтор вставлялся ПЕРЕД тактом и всё сдвигалось, а ноты такта оставались рядом
+          if math.abs((p.src.rgnend - p.src.pos) - (slot.rgnend - slot.pos)) < 1e-3 then ctx.bar_link(slot, p.src); return end
           local n
           ctx.slot_op('matrix put ' .. p.name, function() n = alias.put_alias(p.src, slot.pos) end)
           vim.msg = ('free bar %d: %s - %d item(s), linked (U - make unique)'):format(MX.cur.ri, p.name, n or 0)
@@ -8842,15 +8850,7 @@ ctx = {
           { key = 'n', label = ('keep these notes as a new pattern %s'):format(var), fn = function()
               edit.run('add region', function() reaper.AddProjectMarker2(0, true, bar.pos, bar.rgnend, var, -1, 0) end)
               ctx.mx_refresh(); vim.msg = 'region: ' .. var .. ' (its own notes)' end },
-          { key = 'l', label = ('make it %s - a linked repeat, its cells replaced by %s'):format(text, text), fn = function()
-              ctx.slot_op('bar becomes ' .. text, function()
-                reaper.AddProjectMarker2(0, true, bar.pos, bar.rgnend, text, -1, src.color or 0)
-                model.invalidate(); regions = model.regions(state.lpb)
-                local s2
-                for _, r3 in ipairs(regions) do if r3.idx == src.idx then s2 = r3 end end
-                alias.sync(regions, s2 or src)
-              end)
-              vim.msg = 'region: ' .. text .. ' (linked, the content of ' .. text .. ')' end },
+          { key = 'l', label = ('make it %s - a linked repeat, its cells replaced by %s'):format(text, text), fn = function() ctx.bar_link(bar, src) end },
         })
         return
       end
@@ -24259,6 +24259,17 @@ ctx.plist_draw = function(Lx, x, y, w)
 end
 -- 18 окт: секция в матрице — щелчок по её полосе: меню; протяжка за середину — перенос (Opt — копия, Cmd — алиас),
 -- за край — начало / конец по слотам
+-- 18 окт: свободный такт становится связанным повтором src: регион поверх, содержимое синхронизируется ОТ src (без хука)
+ctx.bar_link = function(bar, src)
+  ctx.slot_op('bar becomes ' .. src.name, function()
+    reaper.AddProjectMarker2(0, true, bar.pos, bar.rgnend, src.name, -1, src.color or 0)
+    model.invalidate(); regions = model.regions(state.lpb)
+    local s2
+    for _, r3 in ipairs(regions) do if r3.idx == src.idx then s2 = r3 end end
+    alias.sync(regions, s2 or src)
+  end)
+  vim.msg = ('this bar is now %s (linked, the content of %s; U - make unique)'):format(src.name, src.name)
+end
 -- 18 окт: базовая октава: SLICE_BASE (слайс 1 / первый пэд), октава клавиатуры
 ctx.set_baseoct = function(o)
   state.baseoct = math.max(0, math.min(6, o or 3))
