@@ -901,38 +901,40 @@ function KH.ember(U, f)
   if f < 0.55 then return U.mix(U.AMBER, coal, (f - 0.2) / 0.35) end
   return U.mix(coal, U.PANEL, (f - 0.55) / 0.45)
 end
-function KH.draw(U, L, x, y, w, h, now, focused, fit)
+-- 18 окт: < > (история совершённых действий) и закладки 1..5 справа в строке y; → левый край кнопок
+function KH.buttons(U, L, x, y, w)
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local P = KH.PAGES[KH.page] or KH.PAGES.tracker
-  -- шапка: ? HELP · страница · поиск
-  local head = ('F1 help: %s'):format(P.title)
-  U.text(x + L.pad, y + 3, head, U.AMBER)
-  local qx = x + L.pad + U.measure(head) + 3 * L.pad
-  -- 18 окт: справа — < > (история совершённых действий) и закладки 1..5 (щелчок: пустая — запомнить, есть — перейти; Shift — перезаписать)
   local down = gfx.mouse_cap & 1 == 1
   local press = down and not KH.mdown
   KH.mdown = down
   local bx = x + w - L.pad
-  local bw1 = U.measure('W') + 2
   local function hbtn(label, on, dim)
     local bw = U.measure(label) + 4
     bx = bx - bw - 1
-    local hot = mx >= bx and mx < bx + bw and my >= y + 2 and my < y + 2 + L.rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(bx, y + 2, bw, L.rh, 1)
-    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, y + 2, bw, L.rh, 0)
-    U.text(bx + 2, y + 3, label, hot and U.AMBER or (on and U.TEXT or (dim and U.DIM or U.GREY)))
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(bx, y, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
+    U.text(bx + 2, y + 1, label, hot and U.AMBER or (on and U.TEXT or (dim and U.DIM or U.GREY)))
     return hot and press
   end
-  local wide = w > U.measure(head) + 12 * bw1
-  if wide then
-    for n = 5, 1, -1 do
-      if hbtn(tostring(n), KH.marks[n] and KH.marks[n].page == KH.page, not KH.marks[n]) then KH.mark(n, gfx.mouse_cap & 8 == 8) end
-    end
-    bx = bx - L.pad
-    if hbtn('>', KH.hpos ~= nil, KH.hpos == nil) then KH.step(1) end
-    if hbtn('<', false, #KH.hist == 0) then KH.step(-1) end
+  for n = 5, 1, -1 do
+    if hbtn(tostring(n), KH.marks[n] and KH.marks[n].page == KH.page, not KH.marks[n]) then KH.mark(n, gfx.mouse_cap & 8 == 8) end
   end
-  local qend = (wide and bx or (x + w)) - L.pad
+  bx = bx - L.pad
+  if hbtn('>', KH.hpos ~= nil, KH.hpos == nil) then KH.step(1) end
+  if hbtn('<', false, #KH.hist == 0) then KH.step(-1) end
+  return bx
+end
+-- bare (18 окт, панель help): без «F1 help: страница» (заголовок раздела уже выше) и без кнопок (они в его строке)
+function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local P = KH.PAGES[KH.page] or KH.PAGES.tracker
+  -- шапка: ? HELP · страница · поиск
+  local head = bare and '' or ('F1 help: %s'):format(P.title)
+  if not bare then U.text(x + L.pad, y + 3, head, U.AMBER) end
+  local qx = bare and (x + L.pad) or (x + L.pad + U.measure(head) + 3 * L.pad)
+  local qend = x + w - L.pad
+  if not bare and w > U.measure(head) + 12 * (U.measure('W') + 2) then qend = KH.buttons(U, L, x, y + 2, w) - L.pad end
   local qs, qc
   if KH.query ~= '' then qs, qc = '/' .. KH.query .. (focused and '_' or ''), U.TEXT
   else

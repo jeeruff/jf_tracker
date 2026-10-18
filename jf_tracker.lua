@@ -14268,12 +14268,13 @@ ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
       end
       ctx.help_desc = out
     end
-    U.text(x, y, ctx.fit(sec.title, w), U.CYAN)
+    local bx0 = KH.buttons(U, Lx, x - Lx.pad, y - 1, w + 2 * Lx.pad)   -- 18 окт: < > 1..5 — в строке заголовка раздела
+    U.text(x, y, ctx.fit(sec.title, math.max(0, bx0 - x - Lx.pad)), U.CYAN)
     for i, ln in ipairs(ctx.help_desc or {}) do U.text(x, y + i * Lx.rh, ctx.fit(ln, w), U.TEXT) end   -- 18 окт: ярче (просьба)
     dy = (#(ctx.help_desc or {}) + 1) * Lx.rh + 4
     U.set(U.LINE); gfx.rect(x, y + dy - 3, w, 1, 1)
   end
-  local r = KH.draw(U, Lx, x - Lx.pad, y + dy, w + 2 * Lx.pad, h - dy, reaper.time_precise(), foc, ctx.fit)
+  local r = KH.draw(U, Lx, x - Lx.pad, y + dy, w + 2 * Lx.pad, h - dy, reaper.time_precise(), foc, ctx.fit, dy > 0)
   -- 18 окт: колесо над справкой — прокрутка её строк (по 3 за щелчок колеса)
   if gfx.mouse_wheel ~= 0 and gfx.mouse_x >= x - Lx.pad and gfx.mouse_x < x + w + Lx.pad and gfx.mouse_y >= y and gfx.mouse_y < y + h then
     KH.scroll = math.max(0, (KH.scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
