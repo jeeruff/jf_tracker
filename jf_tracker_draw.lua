@@ -4285,16 +4285,17 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   return out
 end
 
+-- 18 окт: ВИМЪ / ВИЙ / КЛАВИСИНЪ (просьба)
 -- 13 окт: у письменностей — своё слово режима (старославянский, китайский, арабский, клингонский pIqaD)
 -- 15 окт: все слова режима, включая модуль в фокусе (UNDO, LIB, DSP…); клингонский — латиницей
 -- клингонского, в pIqaD переводит klingon() ниже; слова без перевода — латиница как есть
 local MW = {
   --            Ponomar            Songti SC     Diwan Thuluth        клингонский
-  NORMAL     = { 'ОБЫЧНО',          '常规',       'عادي',             'motlh' },
+  NORMAL     = { 'ВИМЪ',            '常规',       'عادي',             'motlh' },
   INSERT     = { 'ВСТАВКА',         '插入',       'إدراج',            'lIch' },
-  VISUAL     = { 'ЗРѢНІЕ',          '选择',       'تحديد',            'legh' },
+  VISUAL     = { 'ВИЙ',             '选择',       'تحديد',            'legh' },
   ['V-LINE'] = { 'СТРОКА',          '行选',       'سطر',              'tlhegh' },
-  KEYS       = { 'КЛАВИШИ',         '键盘',       'مفاتيح',           'leQ' },
+  KEYS       = { 'КЛАВИСИНЪ',       '键盘',       'مفاتيح',           'leQ' },
   UNDO       = { 'ВОЗВРАТЪ',        '撤销',       'تراجع',            'chegh' },
   PANE       = { 'ОКНО',            '窗格',       'لوحة',             'Qorwagh' },
   SLIDER     = { 'ДВИЖОКЪ',         '推子',       'منزلق',            'joD' },
@@ -4404,6 +4405,8 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
     -- 13 окт: декоративный шрифт режима (опция mode font): высота — две строки, слово целиком
     local hpx = math.floor(3 * L.th * (D.MODE_FONT_SCALE[D.modefont] or 1))   -- 13 окт: в полтора раза крупнее (просьба)
     gfx.setfont(4, D.modefont, hpx)
+    -- 18 окт: длинное слово (КЛАВИСИНЪ) — сначала мельче, до полутора строк; обрезка — только если и так не влезло
+    while gfx.measurestr(mode) > math.floor(sw / 3) and hpx > math.floor(1.5 * L.th) do hpx = hpx - 1; gfx.setfont(4, D.modefont, hpx) end
     while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
     local mw, mh = gfx.measurestr(mode)
     if not dry then set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode) end
