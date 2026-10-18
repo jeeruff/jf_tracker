@@ -1941,7 +1941,7 @@ function V.key_impl(c)
     local inmode = V.mode == 'normal' or V.mode == 'insert' or V.mode == 'visual' or V.mode == 'vline'
     if inmode and not V.pending and not V.op and not V.hexbuf and not V.shapebuf then
       if c == 223 or (chs == 's' and mods.alt) then
-        V.cmd_from = V.mode == 'insert' and 'insert' or 'normal'; V.mode = 'cmd'; V.cmdline = 'step '; return
+        V.open_prompt('step ', ''); return
       end
       -- Shift+стрелки = Shift+hjkl (6 окт)
       local sha = mods.shift and ({ [LEFT] = 'h', [DOWN] = 'j', [UP] = 'k', [RIGHT] = 'l' })[c]
@@ -3395,6 +3395,8 @@ end
 
 -- 13 окт: окно ввода имени: pre — команда (её не видно), text — нынешнее имя (выделено)
 function V.open_prompt(pre, text)
+  -- 18 окт: выпадашка (текущее в строке, варианты, своё набором) вместо строки «:pre текст» — ctx.ask_prompt
+  if ctx.ask_prompt and not V.raw_prompt then V.picker = nil; return ctx.ask_prompt(pre, text) end
   V.cmd_from = (V.mode == 'cmd') and (V.cmd_from or 'normal') or V.mode
   V.mode = 'cmd'; V.cmdline = pre .. (text or '')
   V.prompt = { pre = pre, pos = utf8.len(text or '') or #(text or ''), fresh = true }

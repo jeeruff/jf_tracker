@@ -1070,7 +1070,7 @@ ctx = {
   insert_hydra = function()
     local _, _, inst = ctx.ins_target()
     local items = {
-      { key = 'n', label = 'note … (:note C-4 [rows])', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'note ' end },
+      { key = 'n', label = 'note … (:note C-4 [rows])', fn = function() vim.open_prompt('note ', '') end },
       { key = 'w', label = 'whole sample' .. (inst and (': ' .. (inst.name or '')) or '') .. ' (;  :whole)', fn = function() ctx.insert_whole() end },
     }
     if inst and inst.slices and #inst.slices > 0 then
@@ -1084,8 +1084,8 @@ ctx = {
       end }
     end
     items[#items + 1] = { key = 'e', label = 'automation …', sub = function() return { title = 'automation (cursor on an envelope column)', items = {
-      { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ramp ' end },
-      { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fade ' end },
+      { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.open_prompt('ramp ', '') end },
+      { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.open_prompt('fade ', '') end },
       { key = 'c', label = 'curve (LFO / podkat / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
       { key = 'p', label = 'pick a parameter to automate (fzf)', fn = function() ctx.automation_picker() end },
     } } end }
@@ -1151,7 +1151,7 @@ ctx = {
   screensets_hydra = function()
     local _, order = ctx.ss_read()
     local keysq = '1234567890'
-    local items = { { key = 's', label = 'save the current view as …', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'ssave ' end } }
+    local items = { { key = 's', label = 'save the current view as …', fn = function() vim.open_prompt('ssave ', '') end } }
     -- готовые виды и свои слоты (4 окт): pt-mode, большой сэмпл, макро;
     -- user1..3 — загрузить, пустой — сохранить в него текущий вид
     items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
@@ -1399,7 +1399,7 @@ ctx = {
   -- браузер: * / :mkdir — новая папка в текущей
   browser_mkdir_prompt = function()
     if B.mode ~= 'files' then vim.msg = 'mkdir: only in files'; return end
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'mkdir '
+    vim.open_prompt('mkdir ', '')
     vim.msg = 'new folder in ' .. B.path
   end,
   browser_mkdir = function(name) B.mkdir(name) end,
@@ -3648,7 +3648,7 @@ ctx = {
     for _, g in ipairs({ { 'q', '1/4', 0.25 }, { 'w', '1/8', 0.125 }, { 'e', '1/16', 0.0625 }, { 'r', '1/32', 0.03125 } }) do
       items[#items + 1] = { key = g[1], label = 'grid ' .. g[2] .. (math.abs(d - g[3]) < 1e-6 and '  *' or ''), fn = function() edit.swing_set(nil, nil, g[3]); vim.msg = ctx.swing_text() end }
     end
-    items[#items + 1] = { key = 'c', label = 'custom … (:swing N, -100..100)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'swing ' end }
+    items[#items + 1] = { key = 'c', label = 'custom … (:swing N, -100..100)', fn = function() vim.open_prompt('swing ', '') end }
     vim.open_hydra({ title = 'swing - ' .. ctx.swing_label(), items = items })
     state.popup_at = { kind = 'strip', id = 'swing' }
   end,
@@ -7218,7 +7218,7 @@ ctx = {
       for i, nm in ipairs(names) do if nm == st.preset then cur = i end end
       local nx = cur == 0 and (a.dir > 0 and 1 or #names) or ((cur - 1 + a.dir) % #names + 1)
       ctx.visor_do({ kind = 'preset', name = names[nx] })
-    elseif k == 'psave' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'vzsave ' .. (st.preset or '')
+    elseif k == 'psave' then vim.open_prompt('vzsave ', st.preset or '')
     elseif k == 'input' then
       local v, what, range = VZ.value_text(VZ.last_env)
       if not v then vim.msg = 'visor: pick a parameter (J K) or a matrix cell (M, h j k l) first'; return end
@@ -7352,7 +7352,7 @@ ctx = {
   end,
   ai_edit_open = function(a)
     ctx.AIE = ctx.AIE or dofile(DIR .. '/jf_tracker_aiedit.lua')
-    ctx.AIE.on_save = function() vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'curvesave ' end
+    ctx.AIE.on_save = function() vim.open_prompt('curvesave ', '') end
     ctx.AIE.on_load = function() ctx.curve_browse() end
     ctx.AIE.on_pick = function(b)                                  -- другой лейн пула (6 окт)
       if not b.take then for i, c in ipairs(ctx.ai_list()) do if c == b then ctx.ai_sel = i end end end
@@ -8146,7 +8146,18 @@ ctx = {
       ctx.mx_name(code and (code .. (nm ~= '' and (' ' .. nm) or '')) or nm)
     end)
   end,
-  -- 18 окт: выбор имени выпадашкой: kind — 'region' | 'note' | 'track'; сверху — то, что уже чаще всего в проекте
+  -- 18 окт: общая выпадашка ввода (вместо строки :команды): текущее — в строке (набор заменяет, BS стирает),
+  -- ниже — варианты, своё — набором; on_done(текст)
+  choice_pick = function(title, current, labels, on_done)
+    local items, seen = {}, {}
+    if (current or '') ~= '' then items[1] = { label = current }; seen[current] = true end
+    for _, l in ipairs(labels or {}) do if l ~= '' and not seen[l] then seen[l] = true; items[#items + 1] = { label = l } end end
+    vim.open_picker(title, items, function(it) on_done(it.label) end)
+    vim.picker.free, vim.picker.allow_empty = true, true
+    if (current or '') ~= '' then vim.picker.query, vim.picker.fresh = current, true end
+    if #items == 0 then vim.picker.rows = 1 end
+  end,
+  -- выбор имени выпадашкой: kind — 'region' | 'note' | 'track'; сверху — то, что уже чаще всего в проекте
   name_pick = function(kind, title, current, on_done)
     ctx.NAMES = ctx.NAMES or dofile(DIR .. '/jf_tracker_names.lua')
     local cnt, order = {}, {}
@@ -8798,7 +8809,7 @@ ctx = {
     if not rg then vim.msg = 'no region'; return end
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'len '
+    vim.open_prompt('len ', '')
     vim.msg = ('len: N steps (lpb %d) | Ns seconds | Nb bars; now %d steps = %.3fs'):format(state.lpb, rg.r1 - rg.r0, rg.rgnend - rg.pos)
   end,
   mx_name = function(text)
@@ -8936,7 +8947,7 @@ ctx = {
   kit_save_prompt = function()
     local _, pname = reaper.EnumProjects(-1, '')
     local nm = (pname and pname ~= '' and pname:match('([^/]+)%.[Rr][Pp][Pp]$')) or 'kit'
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'libsave ' .. nm
+    vim.open_prompt('libsave ', nm)
   end,
   -- 11 окт: ПКМ по rec / play транспорта — меню как в REAPER, в стиле трекера. Действия REAPER —
   -- по номеру, подпись — имя действия из самого REAPER; номер не совпал с ожидаемым словом — пункта нет
@@ -9522,7 +9533,7 @@ ctx = {
     local cur = {}
     for _, t in ipairs(card and card.tags_extra or {}) do cur[#cur + 1] = t end
     state.pm_target = e.path
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pmtag ' .. table.concat(cur, ' ')
+    vim.open_prompt('pmtag ', table.concat(cur, ' '))
   end,
   pm_set_tags = function(text)
     local path = state.pm_target
@@ -10001,7 +10012,7 @@ ctx = {
       local c = cur_col(); for k, f in ipairs(c and c.fx or {}) do if f.i == fx then dsp_sel.fx = k end end
       ctx.set_focus('dsp')
     end)
-    add('Rename … (:fxname)', function() state.fxname_target = { track = tr, addr = fx }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end)
+    add('Rename … (:fxname)', function() state.fxname_target = { track = tr, addr = fx }; vim.open_prompt('fxname ', '') end)
     add('Remove FX', function() edit.fx_remove(tr, fx) end)
     add('Add FX … (fzf)', function() ctx.fx_picker() end)
   end,
@@ -11511,7 +11522,7 @@ ctx = {
     -- профили (5 окт): сохранить / загрузить / удалить набор опций
     items[#items + 1] = { sep = true, title = 'profiles', group = 'options' }
     items[#items + 1] = { label = 'save the options as a profile', kind = 'action', value = ':optsave', desc = 'all options into Data/jf_tracker_profiles/<name>.txt', fn = function()
-      OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'optsave ' end }
+      OPT.close(); vim.open_prompt('optsave ', '') end }
     for _, name in ipairs(ctx.list_files(ctx.profile_dir(), 'txt')) do
       items[#items + 1] = { label = name, kind = 'action', value = 'load', desc = 'load the profile ' .. name .. ' (delete: :optdel ' .. name .. ')', fn = function() ctx.opt_load(name) end }
     end
@@ -13205,7 +13216,7 @@ ctx = {
           { key = '4', label = 'period 4 rows', fn = function() ctx.loop('item', 4) end },
           { key = '6', label = 'period 6 rows', fn = function() ctx.loop('item', 6) end },
           { key = '8', label = 'period 8 rows', fn = function() ctx.loop('item', 8) end },
-          { key = 'n', label = 'period N rows … (:loop N)', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'loop ' end },
+          { key = 'n', label = 'period N rows … (:loop N)', fn = function() vim.open_prompt('loop ', '') end },
         } } end },
       { key = 'x', label = 'x-fade (' .. (state.xfade and 'on' or 'off') .. ', ' .. state.xfade_ms .. ' ms)', sub = function() return { title = 'x-fade', items = {
           { key = 'x', label = (state.xfade and 'turn OFF' or 'turn ON') .. ' x-fade on insert', fn = ctx.xfade_toggle },
@@ -15384,7 +15395,7 @@ function ctx.context_items(hover)
       if kd.parallel > 0 then add('Serial: after the previous plugin', function() edit.fx_parallel(col.track, kd.i, 0) end, 's')
       else add('Parallel to the previous plugin', function() edit.fx_parallel(col.track, kd.i, 1) end, 'p') end
       add('Move out of the container', function() edit.fx_move_out(col.track, kd.i, f.i); vim.msg = kd.name .. ' moved out of ' .. f.name end, 'm')
-      add('Rename ' .. kd.name .. ' … (:fxname)', function() state.fxname_target = { track = col.track, addr = kd.i }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end, 'n')
+      add('Rename ' .. kd.name .. ' … (:fxname)', function() state.fxname_target = { track = col.track, addr = kd.i }; vim.open_prompt('fxname ', '') end, 'n')
       add('Remove ' .. kd.name, function() edit.fx_remove(col.track, kd.i) end, 'x')
       add('--', function() end)
     end
@@ -15399,7 +15410,7 @@ function ctx.context_items(hover)
       add('Preset … (container presets)', function() ctx.dsp_preset(k, 'pick') end, 'r')
       add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
-      add('Rename container … (:fxname)', function() state.fxname_target = { track = col.track, addr = f.i }; vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'fxname ' end, 'n')
+      add('Rename container … (:fxname)', function() state.fxname_target = { track = col.track, addr = f.i }; vim.open_prompt('fxname ', '') end, 'n')
       add('--', function() end)
     end
     if col and f then
@@ -23496,7 +23507,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'plist' then ctx.plist_toggle()
   elseif b == 'plprev' then ctx.pl_cmd('prev')
   elseif b == 'plnext' then ctx.pl_cmd('next')
-  elseif b == 'plname' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pl name ' .. ((ctx.pl_cur() or {}).name or '')
+  elseif b == 'plname' then vim.open_prompt('pl name ', (ctx.pl_cur() or {}).name or '')
   elseif b == 'plplay' then if ctx.pl_playing() then ctx.pl_cmd('stop') else ctx.pl_play() end
   elseif b == 'plwrite' then ctx.pl_write()
   elseif b == 'plnew' then ctx.pl_cmd('new')
@@ -24206,6 +24217,46 @@ ctx.sec_move = function(sc, ri, how)
     ctx.mx_refresh()
     vim.msg = ('section %s %s at slot %d as %s'):format(sc.name or '', how == 'alias' and 'linked (alias)' or 'copied', ri, nm)
   end
+end
+-- 18 окт: vim.open_prompt — выпадашка, не строка команды: заголовок и варианты по команде, выбор выполняет «pre значение»
+ctx.ASK = {
+  ['len '] = { 'pattern length - steps, Nb bars, Ns seconds', { '16', '32', '64', '128', '256', '1b', '2b', '4b', '8b', '16b' } },
+  ['step '] = { 'step after input', { '0', '1', '2', '3', '4', '6', '8', '16', 'auto', 'next' } },
+  ['swing '] = { 'swing, %', { '0', '10', '20', '33', '50', '66', '1/16', '1/8', 'off' } },
+  ['loop '] = { 'loop period, rows', { '4', '8', '16', '32', '64' } },
+  ['rgbpm '] = { 'tempo of this pattern', { '90', '100', '110', '120', '128', '140', '150', '160', '170', '174', '180' } },
+  ['note '] = { 'note [rows]', { 'C-4', 'C-3', 'C-5', 'C-4 4', 'C-4 16' } },
+  ['ramp '] = { 'ramp to a value [length]', { 'FF', '80', '00', 'FF 1b', '00 1b' } },
+  ['fade '] = { 'fade', { 'in', 'out' } },
+  ['tname '] = { 'track name', 'track' },
+  ['iname '] = { 'instrument name', 'inst' },
+  ['iprop name '] = { 'item name', 'item' },
+  ['fxname '] = { 'effect name', {} },
+  ['arr name '] = { 'arrangement name', { 'main', 'alt', 'live', 'break', 'short', 'long' } },
+  ['tsec '] = { 'section name', 'section' },
+  ['ssave '] = { 'save the view as', { 'mix', 'edit', 'live', 'sample', 'arrange' } },
+  ['optsave '] = { 'save the options as', { 'default', 'live', 'studio' } },
+  ['presetsave '] = { 'preset name', {} },
+  ['libsave '] = { 'kit name', {} },
+  ['vzsave '] = { 'visor preset name', {} },
+  ['curvesave '] = { 'curve name', {} },
+  ['mkdir '] = { 'new folder', { 'samples', 'loops', 'stems', 'bounces', 'renders' } },
+  ['pmtag '] = { 'project tags', {} },
+  ['pl name '] = { 'playlist name', { 'main', 'live', 'short', 'long', 'alt' } },
+  ['drumstr '] = { 'drum stretch: rate pitch', { '1 0', '0.5 0', '2 0', '1 -12', '1 12' } },
+}
+ctx.ask_prompt = function(pre, text)
+  local a = ctx.ASK[pre]
+  if not a then
+    for k, v in pairs(ctx.ASK) do if pre:sub(1, #k) == k then a = v end end
+  end
+  local title = a and a[1] or (pre:gsub('%s+$', ''):gsub('^spset ', 'sample: '):gsub('^macset ', 'macro: '):gsub('^mcmd', 'marker'))
+  local labels = a and a[2] or {}
+  if type(labels) == 'string' then
+    ctx.NAMES = ctx.NAMES or dofile(DIR .. '/jf_tracker_names.lua')
+    labels = labels == 'section' and ctx.SEC_NAMES or ctx.NAMES.list(labels)
+  end
+  ctx.choice_pick(title, text or '', labels, function(v) vim.run_cmd(pre .. v) end)
 end
 -- :sec … — секция слота курсора матрицы
 ctx.sec_cmd = function(arg)
