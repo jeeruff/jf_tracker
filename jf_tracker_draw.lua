@@ -1956,6 +1956,24 @@ D.fx_slots, D.fx_dim = {}, {}   -- 12 окт: слоты команд строк
 D.FX_COL = setmetatable({}, { __index = function(_, k) return FXG[k] and D[FXG[k]] end })
 local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '....' end
 
+-- 18 окт: цвет поля (как у его значения): громкость, delay, команды, слайс, пан; нота и инструмент — текстом (nil)
+function D.field_rgb(fld)
+  if fld == 2 or fld == 'vol' then return D.RN_VOL elseif fld == 3 or fld == 'delay' then return D.RN_DELAY
+  elseif fld == 'slc' then return D.RN_OTHER elseif fld == 'pan' then return D.RN_PAN or U.CYAN
+  elseif type(fld) == 'number' and fld >= 4 then return D.RN_OTHER end
+end
+-- 18 окт (опция dot colours): пустые точки поля — оттенком его цвета; кэш на базовый цвет строки (акцент меняет его)
+D.dot_cache = setmetatable({}, { __mode = 'k' })
+function D.dot_col(fld, col)
+  if not D.dotcolor or (col ~= D.EMPTY and col ~= D.EMPTY_UNDER) then return col end
+  local fc = D.field_rgb(fld)
+  if not fc then return col end
+  local m = D.dot_cache[col]
+  if not m then m = {}; D.dot_cache[col] = m end
+  local r = m[fc]
+  if not r then r = U.mix(col, fc, 0.5); m[fc] = r end
+  return r
+end
 local function draw_cell(L, cell, x, y, ty, inv)
   -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
   if L.wave_only then
@@ -1967,7 +1985,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     return
   end
   local ghost = cell and cell.ghost   -- 15 окт: ghost-слайс (playthru + q) — бледно, как подсказка
-  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or (ghost and U.DIM or col) end
+  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or (ghost and U.DIM or D.dot_col(fld, col)) end
   -- инверсное поле: текст с непрозрачной подложкой цвета заливки
   local text_ = text
   -- 12 окт: курсор на половине поля команды (код | значение): инверсна только эта половина
@@ -4229,13 +4247,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if f and f.col then
       local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'wave' and 'wave') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
         or ({ 'note', 'vol', 'delay' })[vc.field or 1] or ('fx ' .. ((vc.field or 1) - 3))
+      local fcol = not f.env and (D.field_rgb(vc.sub or vc.field or 1) or (vc.sub == 'inst' and U.TEXT))
       local l1 = (f.col.name ~= '' and f.col.name) or 'track'
       local l2 = ('%04d'):format(math.max(0, vc.row or 0))
       local cl = ms('col') + L.pad          -- пробел в битмапе — нулевой ширины: отступ L.pad
       local lw = math.max(ms(fit(l1, 14 * L.cw)), cl + ms(fname), cl + ms(l2), 10 * L.cw)
       order[#order + 1] = { w = lw, draw = function(gx)
         text(gx, ly, fit(l1, lw), U.TEXT)
-        text(gx, ly + L.rh, 'col', U.GREY); text(gx + cl, ly + L.rh, fit(fname, lw - cl), U.TEXT)
+        text(gx, ly + L.rh, 'col', U.GREY); text(gx + cl, ly + L.rh, fit(fname, lw - cl), fcol or U.TEXT)   -- 18 окт: цветом колонки
         if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + cl, ly + 2 * L.rh, l2, U.TEXT) end
       end }
     end

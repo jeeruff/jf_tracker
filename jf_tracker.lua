@@ -263,6 +263,7 @@ local state = {
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
+  dotcolor = flag('dotcolor', false),   -- 18 окт: пустые точки — цветом поля
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
   namedrag = flag('namedrag', false),
   typedtag = flag('typedtag', true),
@@ -719,7 +720,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -11204,6 +11205,7 @@ ctx = {
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
+      flag('dotcolor', 'dot colours', 'empty dots of a field in its colour (volume yellow, delay blue, commands and slice lilac, pan green), dimmed'),
       { sep = true, title = 'sound and samples' },
       flag('slice1', 'slices: 1 = whole, q = slice 1', 'a sliced sample: q 2 w 3 ... play slices 1 2 3 4 ... and the key 1 the whole sample (off: q is the whole sample, 2 is slice 1); layout frow - always: 1 = slice 1, ` - the whole sample'),
       flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
@@ -11231,7 +11233,7 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute' } },
+      { 'look', { 'fps', 'title', 'sbw', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
@@ -17157,6 +17159,7 @@ local function frame()
   draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
   draw.vbars = {}                         -- скролл-бары списков: заполняет отрисовка кадра (4 окт)
   draw.itemnames = state.itemnames
+  draw.dotcolor = state.dotcolor   -- 18 окт
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
   ctx.chord_publish()                     -- 8 окт: линия аккордов для jf_tracker_chordfollow (только при правке)
