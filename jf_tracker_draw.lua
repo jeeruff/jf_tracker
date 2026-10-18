@@ -5740,7 +5740,8 @@ function D.frame(L, snap, rows, state, info)
         local hot = mx >= wx0 - 2 and mx < wx0 + ww + 2 and my >= sy and my < sy + L.rh
         local acc = hot and U.AMBER or U.TEXT
         text(sx, sy, label, U.GREY)
-        U.dslider(wx0, cy, ww, frac, centered, acc, hot, L.rh)   -- 13 окт: ромбик
+        -- 18 окт: панорама — цвет стороны (как в REAPER): левая половина фиолетовая, правая зелёная
+        U.dslider(wx0, cy, ww, frac, centered, acc, hot, L.rh, what == 'pan' or what == 'panl' or what == 'panr')   -- 13 окт: ромбик
         if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end

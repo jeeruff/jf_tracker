@@ -95,12 +95,27 @@ local function set(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 U.set = set
 
 -- 13 окт: слайдер-ромбик: тонкая дорожка, тонкая заливка (от центра или от края) и ромбик на значении
-function U.dslider(sx, cy, sw, fr, centered, col, hot, rh)
+-- 18 окт: стороны панорамы — L фиолетовый, R зелёный (как в REAPER)
+U.PAN_L = function() return U.mix(U.RED, U.CYAN, 0.45) end
+U.PAN_R = function() return U.GREEN end
+function U.dslider(sx, cy, sw, fr, centered, col, hot, rh, lr)
   fr = math.max(0, math.min(1, fr or 0))
   local px = sx + math.floor(fr * (sw - 1) + 0.5)
+  local r = math.max(3, math.floor(((rh or 12) - 6) / 2))
+  -- lr (панорама): левая половина дорожки — цвет L, правая — R; заливка и ручка — цвет стороны ручки
+  if lr and centered then
+    local mid = sx + math.floor(sw / 2)
+    local cl, cr = U.PAN_L(), U.PAN_R()
+    set(U.mix(cl, U.BG, 0.55)); gfx.rect(sx, cy, mid - sx, 1, 1)
+    set(U.mix(cr, U.BG, 0.55)); gfx.rect(mid, cy, sx + sw - mid, 1, 1)
+    set(U.LINE); gfx.rect(mid, cy - r, 1, 2 * r + 1, 1)
+    local side = px < mid and cl or (px > mid and cr or col)
+    set(side, 0.8); gfx.rect(math.min(mid, px), cy - 1, math.max(1, math.abs(px - mid)), 3, 1)
+    U.diamond(px, cy, r, hot and U.AMBER or side, hot)
+    return
+  end
   -- 15 окт: дорожка видна всегда (U.DIM терялся на тёмном фоне, у пана в центре заливки нет) — цветом ручки, приглушённо
   set(U.readable(U.mix(col, U.BG, 0.55), U.BG, 2.0)); gfx.rect(sx, cy, sw, 1, 1)
-  local r = math.max(3, math.floor(((rh or 12) - 6) / 2))
   if centered then
     local mid = sx + math.floor(sw / 2)
     set(U.LINE); gfx.rect(mid, cy - r, 1, 2 * r + 1, 1)
