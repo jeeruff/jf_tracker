@@ -99,6 +99,8 @@ local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
+KH.marks_load(reaper.GetExtState('jf_tracker', 'khmarks'))   -- 18 окт: закладки справки
+KH.on_marks = function() reaper.SetExtState('jf_tracker', 'khmarks', KH.marks_str(), true) end
 local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
 local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
@@ -14267,11 +14269,16 @@ ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
       ctx.help_desc = out
     end
     U.text(x, y, ctx.fit(sec.title, w), U.CYAN)
-    for i, ln in ipairs(ctx.help_desc or {}) do U.text(x, y + i * Lx.rh, ctx.fit(ln, w), U.GREY) end
+    for i, ln in ipairs(ctx.help_desc or {}) do U.text(x, y + i * Lx.rh, ctx.fit(ln, w), U.TEXT) end   -- 18 окт: ярче (просьба)
     dy = (#(ctx.help_desc or {}) + 1) * Lx.rh + 4
     U.set(U.LINE); gfx.rect(x, y + dy - 3, w, 1, 1)
   end
   local r = KH.draw(U, Lx, x - Lx.pad, y + dy, w + 2 * Lx.pad, h - dy, reaper.time_precise(), foc, ctx.fit)
+  -- 18 окт: колесо над справкой — прокрутка её строк (по 3 за щелчок колеса)
+  if gfx.mouse_wheel ~= 0 and gfx.mouse_x >= x - Lx.pad and gfx.mouse_x < x + w + Lx.pad and gfx.mouse_y >= y and gfx.mouse_y < y + h then
+    KH.scroll = math.max(0, (KH.scroll or 0) + (gfx.mouse_wheel > 0 and -3 or 3))
+    gfx.mouse_wheel = 0
+  end
   return r
 end
 ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
@@ -16955,6 +16962,11 @@ local function frame()
     if not (KH.flash and now - KH.flash.t0 < 0.3) and not KH.flash_key(KH.page or 'tracker', '- +', now) and KH.page == 'matrix' then KH.flash_key('matrix', 'wheel', now) end
   end
   ctx.lpb_seen = state.lpb
+  if ctx.vz_seen and ctx.vz_seen ~= MX.vz then   -- 18 окт: зум матрицы — его клавиша в справке
+    local now = reaper.time_precise()
+    if not (KH.flash and now - KH.flash.t0 < 0.3) then KH.flash_key('matrix', 'Cmd+wheel', now) end
+  end
+  ctx.vz_seen = MX.vz
   PV.trace = state.debug and ctx.dlog or nil   -- 18 окт: debug — старт / стоп превью слайса с причиной
   PV.tick()
   ctx.notes_dev_poll()

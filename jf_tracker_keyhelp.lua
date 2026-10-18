@@ -20,6 +20,10 @@ KH.pinned = false        -- страницу выбрали стрелками �
 KH.scroll = 0
 KH.flash = nil           -- { page=, i=, t0=, seed= }
 KH.last = nil            -- { tok=, t= } — для двухклавишных dd / yy / gg
+KH.hist, KH.hpos = {}, nil  -- 18 окт: совершённые действия { page, i } по порядку; hpos — листаем стрелками < > (nil — живое)
+KH.marks = {}             -- 18 окт: закладки 1..5 { page, scroll }
+KH.sel = nil              -- { page, i } — запись, к которой вернулись стрелками (рамкой)
+KH.on_marks = nil         -- main: сохранить закладки
 
 local LEFT, RIGHT, UP, DOWN = 1818584692, 1919379572, 30064, 1685026670
 
@@ -33,6 +37,7 @@ KH.PAGES = {
     { k = 'lib', t = {}, d = 'the sounds you play (right panel): every audio item of the project, one entry per sound; library entries sit on their track after the =LIB marker' },
     { k = 'linked', t = {}, d = 'notes of a lib entry are linked copies: change it in the item panel and all its notes follow; a stretched note becomes unique (or apply to all)' },
     { k = 'item', t = {}, d = 'item tab (top): the selected lib entry - wave, slices, properties, preview, beatsync' },
+    { k = 'help < >', t = {}, d = 'the help pane: its head shows the last action done (keys, zoom by the mouse); < > - back / forward over the actions done, past the last - live again; 1..5 - bookmarks: an empty one keeps the page and scroll, a kept one goes there, Shift+click overwrites; the wheel scrolls' },
     { k = 'macro', t = {}, d = ':macro - zoom out: a row is a beat (LPB 1); :macro again - back to the previous LPB' },
     { k = 'pt', t = {}, d = ':pt - PT-mode, a dumbed-down ProTracker view: exactly 4 channels from the scroll, note / sample / vol / one command, no waves or envelopes, LPB 4, bitmap x4 (smaller if 4 do not fit), scopes on top; :pt new creates CH1..CH4 in the project; :pt again restores everything' },
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
@@ -277,6 +282,7 @@ KH.PAGES = {
     { k = 'f', m = 'fill: lit cells or an empty grid', d = 'fill: cells show their content (lit) or stay an empty grid - only the view' },
     { k = 't', m = 'trim: cut items past their region', d = 'trim: cut items that run past their region (the button trim)' },
     { k = 'R', m = 'ruler of bars on / off', d = 'ruler of bars on the left on / off (button ruler)' },
+    { k = 'Cmd+wheel', t = {}, d = 'zoom: slots taller / shorter - the rows of the pattern inside (as in the tracker; option zoom with: split - Option + wheel)' },   -- 18 окт: зум вспыхивает здесь
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Opt+Tab', d = 'back to the tracker / next pane' },
   } },
@@ -758,7 +764,7 @@ function KH.flash_key(page, key, now)
   local P = KH.PAGES[page]
   if not P then return end
   for i, e in ipairs(P.e) do
-    if e.k == key then KH.flash = { page = page, i = i, t0 = now, seed = (math.floor(now * 1000) % 9973) + i }; return true end
+    if e.k == key then KH.flash = { page = page, i = i, t0 = now, seed = (math.floor(now * 1000) % 9973) + i }; KH.remember(page, i); return true end
   end
 end
 -- клавиша нажата в модуле page — подсветить её функцию
@@ -770,6 +776,50 @@ function KH.press(page, c, now)
   KH.last = { tok = tok, t = now }
   if i then
     KH.flash = { page = page, i = i, t0 = now, seed = (math.floor(now * 1000) % 9973) + i }
+    KH.remember(page, i)
+  end
+end
+-- 18 окт: история совершённых действий (повтор того же подряд — одна запись); новое действие — снова живое
+function KH.remember(page, i)
+  local h = KH.hist
+  local last = h[#h]
+  if not (last and last.page == page and last.i == i) then h[#h + 1] = { page = page, i = i }; if #h > 60 then table.remove(h, 1) end end
+  KH.hpos, KH.sel = nil, nil
+end
+-- стрелки < >: назад / вперёд по истории; за последним — снова живое (страница следует за модулем)
+function KH.step(d)
+  local h = KH.hist
+  if #h == 0 then return end
+  local p = (KH.hpos or (#h + 1)) + d
+  if p > #h then KH.hpos, KH.sel, KH.pinned = nil, nil, false; return end
+  p = math.max(1, p)
+  KH.hpos = p
+  local e = h[p]
+  KH.page, KH.pinned, KH.query = e.page, true, ''
+  KH.sel, KH.want = { page = e.page, i = e.i }, e.i
+end
+-- закладка n: пустая (или Shift) — запомнить страницу и прокрутку, есть — перейти
+function KH.mark(n, save)
+  if save or not KH.marks[n] then
+    KH.marks[n] = { page = KH.page, scroll = KH.scroll }
+    if KH.on_marks then KH.on_marks() end
+    return 'saved'
+  end
+  local m = KH.marks[n]
+  if KH.PAGES[m.page] then KH.page, KH.scroll, KH.pinned, KH.query, KH.sel = m.page, m.scroll or 0, true, '', nil end
+  return 'go'
+end
+function KH.marks_str()
+  local o = {}
+  for n = 1, 5 do local m = KH.marks[n]; o[#o + 1] = m and (m.page .. ':' .. (m.scroll or 0)) or '' end
+  return table.concat(o, ',')
+end
+function KH.marks_load(s)
+  local n = 0
+  for part in ((s or '') .. ','):gmatch('([^,]*),') do
+    n = n + 1
+    local pg, sc = part:match('^([%w_]+):(%d+)$')
+    KH.marks[n] = pg and { page = pg, scroll = tonumber(sc) } or nil
   end
 end
 
@@ -858,8 +908,41 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
   local head = ('F1 help: %s'):format(P.title)
   U.text(x + L.pad, y + 3, head, U.AMBER)
   local qx = x + L.pad + U.measure(head) + 3 * L.pad
-  local qs = KH.query ~= '' and ('/' .. KH.query .. (focused and '_' or '')) or (focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up')
-  U.text(qx, y + 3, fit(qs, math.max(0, x + w - qx - L.pad)), KH.query ~= '' and U.TEXT or U.GREY)
+  -- 18 окт: справа — < > (история совершённых действий) и закладки 1..5 (щелчок: пустая — запомнить, есть — перейти; Shift — перезаписать)
+  local down = gfx.mouse_cap & 1 == 1
+  local press = down and not KH.mdown
+  KH.mdown = down
+  local bx = x + w - L.pad
+  local bw1 = U.measure('W') + 2
+  local function hbtn(label, on, dim)
+    local bw = U.measure(label) + 4
+    bx = bx - bw - 1
+    local hot = mx >= bx and mx < bx + bw and my >= y + 2 and my < y + 2 + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(bx, y + 2, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, y + 2, bw, L.rh, 0)
+    U.text(bx + 2, y + 3, label, hot and U.AMBER or (on and U.TEXT or (dim and U.DIM or U.GREY)))
+    return hot and press
+  end
+  local wide = w > U.measure(head) + 12 * bw1
+  if wide then
+    for n = 5, 1, -1 do
+      if hbtn(tostring(n), KH.marks[n] and KH.marks[n].page == KH.page, not KH.marks[n]) then KH.mark(n, gfx.mouse_cap & 8 == 8) end
+    end
+    bx = bx - L.pad
+    if hbtn('>', KH.hpos ~= nil, KH.hpos == nil) then KH.step(1) end
+    if hbtn('<', false, #KH.hist == 0) then KH.step(-1) end
+  end
+  local qend = (wide and bx or (x + w)) - L.pad
+  local qs, qc
+  if KH.query ~= '' then qs, qc = '/' .. KH.query .. (focused and '_' or ''), U.TEXT
+  else
+    -- последнее совершённое действие (или то, к которому вернулись стрелками)
+    local h = KH.hist[KH.hpos or #KH.hist]
+    local he = h and KH.PAGES[h.page] and KH.PAGES[h.page].e[h.i]
+    if he then qs, qc = (KH.hpos and ('%d/%d '):format(KH.hpos, #KH.hist) or 'last: ') .. he.k .. ' - ' .. he.d, U.TEXT
+    else qs, qc = focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up', U.GREY end
+  end
+  U.text(qx, y + 3, fit(qs, math.max(0, qend - qx)), qc)
   local rows = KH.rows()
   local top = y + 3 + L.rh + 2
   local nr = math.max(1, math.floor((y + h - top - 2) / L.rh))
@@ -882,6 +965,11 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
     if rr < KH.scroll then KH.scroll = rr elseif rr >= KH.scroll + nr then KH.scroll = rr - nr + 1 end
     local _ = first + last
   end
+  if KH.want and KH.query == '' then
+    local rr = (KH.want - 1) % math.max(1, math.ceil(#rows / ncols))
+    if rr < KH.scroll then KH.scroll = rr elseif rr >= KH.scroll + nr then KH.scroll = rr - nr + 1 end
+    KH.want = nil
+  end
   if KH.scroll > maxscroll then KH.scroll = maxscroll end
   local nrt = math.max(1, math.ceil(#rows / ncols))     -- строк в колонке (до прокрутки)
   local hover
@@ -901,6 +989,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit)
         if t < 0.45 then kc, dc = U.BG, U.BG end
         flash_rect = { ex, ey, colw - L.pad, L.rh }
       end
+      if KH.sel and KH.sel.page == r.page and KH.sel.i == r.i then U.set(U.AMBER); gfx.rect(ex - 2, ey, colw - L.pad, L.rh, 0) end   -- 18 окт: вернулись стрелками
       local klabel = (r.tag and (r.tag .. ':') or '') .. r.e.k
       if r.tag then U.text(ex, ey + 1, fit(r.tag .. ':', kw), fl and kc or U.GREY); U.text(ex + U.measure(r.tag .. ':'), ey + 1, fit(r.e.k, kw - U.measure(r.tag .. ':')), kc)
       else U.text(ex, ey + 1, fit(klabel, kw - L.pad), kc) end
