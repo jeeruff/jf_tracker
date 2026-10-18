@@ -1024,7 +1024,7 @@ end
 -- клавиши: slice_base — нота слайса 1 = C-4 + 1
 -- 15 окт: опция slice1 — q = слайс 1 (база на полутон ниже), весь сэмпл — клавиша 1
 local function slice1_on() if ctx.slice1_on then return ctx.slice1_on() end; return ctx.state and ctx.state.slice1 end   -- 16 окт: frow — всегда
-function V.slice_base() return ((ctx.model and ctx.model.BASE_NOTE) or 60) + 1 - (slice1_on() and 1 or 0) end
+function V.slice_base() return ((ctx.model and (ctx.model.SLICE_BASE or ctx.model.BASE_NOTE)) or 60) + 1 - (slice1_on() and 1 or 0) end   -- 18 окт: база слайсов — опция base octave
 local function piano_pitch(c)
   local off = ctx.piano[c]
   if off == nil then return nil end

@@ -267,6 +267,7 @@ local state = {
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
   namedrag = flag('namedrag', false),
   typedtag = flag('typedtag', true),
+  baseoct = math.max(0, math.min(6, tonumber(reaper.GetExtState(EXT, 'baseoct')) or 3)),   -- 18 окт: базовая октава C0..C6 (C3): слайсы и пэды от неё, клавиатура с неё
   slice1 = flag('slice1', false),   -- 15 окт: слайсы: 1 = весь сэмпл, q = слайс 1   -- 15 окт: набранное (3d, [E_]) — тегом прямо на ячейке курсора
   slicepitch0 = reaper.GetExtState(EXT, 'slicepitch0') == '6' and '6' or '1',
   shiftlisten = reaper.GetExtState(EXT, 'shiftlisten') == '1',
@@ -1024,7 +1025,7 @@ ctx = {
       if it and rows then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', edit.row_time(vim.cur.row + rows, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)) end
     end)
     vim.last_slice = k
-    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name(model.BASE_NOTE + k), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
+    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name((model.SLICE_BASE or model.BASE_NOTE) + k), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
     ctx.ins_advance(rows)
   end,
   insert_whole = function(rows)
@@ -1066,7 +1067,7 @@ ctx = {
         spark = spark .. BL[math.max(1, math.min(5, math.floor(m * 5) + 1))]
       end
     end
-    return ('slice %-2d %-4s %5.2f rows  %s'):format(k, model.note_name(model.BASE_NOTE + k), rows, spark), rate
+    return ('slice %-2d %-4s %5.2f rows  %s'):format(k, model.note_name((model.SLICE_BASE or model.BASE_NOTE) + k), rows, spark), rate
   end,
   insert_hydra = function()
     local _, _, inst = ctx.ins_target()
@@ -11367,6 +11368,7 @@ ctx = {
       { key = 'focusclick', label = 'focus by mouse', kind = 'cycle', values = { 'option', 'click' }, desc = 'option: a plain click works in a module but keeps the keyboard focus, Option+click moves it; click: every click moves the focus', get = function() return state.focusclick or 'option' end, set = function(v) state.focusclick = v end },
       { key = 'hexfill', label = 'hex fill', kind = 'cycle', values = { 'right', 'left' }, desc = 'Enter on a value typed only in part (a command, vol, delay): right - the typed digits are the low ones, 3 -> 03 (default); left - the high ones, 3 -> 30', get = function() return state.hexfill or 'right' end, set = function(v) state.hexfill = v end },
       { key = 'escmode', label = 'Esc mode', kind = 'cycle', values = { 'renoise', 'vim' }, desc = 'renoise (default): Esc switches NORMAL <-> INSERT, as the edit mode in Renoise; vim: Esc only goes back to NORMAL (pressing it again stays there), INSERT - i, or Enter with the keyboard on', get = function() return state.escmode or 'renoise' end, set = function(v) state.escmode = v end },
+      { key = 'baseoct', label = 'base octave', kind = 'cycle', values = { 'C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6' }, desc = 'where the slices and the pads start (slice 1 / the first pad on its C) and the octave the note keyboard starts in; C3 by default ([ ] still move the keyboard)', get = function() return 'C' .. state.baseoct end, set = function(v) ctx.set_baseoct(tonumber(v:match('%d')) or 3) end },
       { key = 'keylayout', label = 'keyboard layout', kind = 'cycle', values = { 'frow', 'qwerty', 'renoise' }, desc = 'where the keyboard (m) plays notes: frow (default) - the digits 1 2 3 4 5 6 7 8 9 0 - = are the white keys (C to G, an octave and a half), the function keys F1 F2 F4 F5 F6 F8 F9 F11 above them the black ones, [ ] octave, { } velocity; the letters stay free for commands, and while the keyboard plays (shown, or INSERT) the F-key shortcuts (panes, help, transpose) are off. qwerty (Ableton) - one row q 2 w 3 e ..., z x octave, c C velocity; renoise - two octaves as in Renoise: the bottom row z s x d c ... the cursor octave, the top row q 2 w 3 e ... an octave higher, [ ] octave, { } velocity (those letters are notes in INSERT). In INSERT with the keyboard on, Shift / Option / Ctrl on a note key change the note (listen, slice pitch, slice to the end), not the shortcuts - turn the keyboard off (m) for Ctrl+digit step, Option+digit instrument, Option / Ctrl+F transpose', get = function() return keys.layout end, set = function(v) keys.set_layout(v); reaper.SetExtState(EXT, 'keylayout', v, true); draw.piano_layout(v == 'frow' and 'frow' or v == 'renoise') end },
       flag('shiftlisten', 'Shift+keys preview', 'Shift + a note key listens without writing (Option+Shift - the slice pitch). Off (default, as in Renoise): Shift on the note keys is a command / shortcut again (Shift+F1 transpose, Shift+letters in Vim); to listen, leave INSERT - the keyboard plays in KEYS'),
       { key = 'slicepitch0', label = 'slice pitch from', kind = 'cycle', values = { '1', '6' }, desc = 'Option + a note key plays the selected slice at that key: 1 - the key 1 (C) is the original pitch, the keys above go up; 6 - the key 6 (A, the middle of the row) is the original pitch, so one row goes down and up', get = function() return state.slicepitch0 or '1' end, set = function(v) state.slicepitch0 = v end },
@@ -19732,9 +19734,11 @@ local function frame()
     if kid and (ctx.mods().alt or ctx.mods().shift) then ctx.pad_mute_solo(km.f, km.ki, ctx.mods().shift)
     else
       draw.kit_scroll = draw.kit_scroll or {}
-      draw.kit_scroll[km.key] = math.max(0, km.row - math.floor((km.fit or 4) / 2))
+      draw.kit_scroll[km.key] = math.max(0, math.min(32 - (km.fit or 4), km.row - math.floor((km.fit or 4) / 2)))
       if kid then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[km.key] = km.ki; ctx.set_focus('dsp') end
-      vim.msg = kid and ('pad %d: %s'):format(km.ki, kid.name or '') or ('pads %d-%d'):format(draw.kit_scroll[km.key] * 4 + 1, (draw.kit_scroll[km.key] + (km.fit or 4)) * 4)
+      local b0 = draw.kit_scroll[km.key] * 4
+      local function nn(n) return ({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[n % 12 + 1] .. math.max(0, n // 12 - 1) end
+      vim.msg = kid and ('pad %s: %s'):format(nn(km.note or 0), kid.name or '') or ('notes %s - %s'):format(nn(b0), nn(b0 + (km.fit or 4) * 4 - 1))
     end
     U.click = false
   end
@@ -24255,6 +24259,16 @@ ctx.plist_draw = function(Lx, x, y, w)
 end
 -- 18 окт: секция в матрице — щелчок по её полосе: меню; протяжка за середину — перенос (Opt — копия, Cmd — алиас),
 -- за край — начало / конец по слотам
+-- 18 окт: базовая октава: SLICE_BASE (слайс 1 / первый пэд), октава клавиатуры
+ctx.set_baseoct = function(o)
+  state.baseoct = math.max(0, math.min(6, o or 3))
+  reaper.SetExtState(EXT, 'baseoct', tostring(state.baseoct), true)
+  model.SLICE_BASE = 12 * (state.baseoct + 1)
+  vim.octave = state.baseoct
+  draw.slice_base_note = model.SLICE_BASE
+  vim.msg = ('base octave C%d: slices and pads start on C%d, the keyboard octave %d'):format(state.baseoct, state.baseoct, state.baseoct)
+end
+model.SLICE_BASE = 12 * (state.baseoct + 1); draw.slice_base_note = model.SLICE_BASE; vim.octave = state.baseoct   -- при запуске
 -- 18 окт: строка конца паттерна под строкой row (nil — вне паттерна): граница step next
 ctx.pattern_end_row = function(row)
   local rg = alias.region_at(regions, edit.row_time(row, state.lpb, 0))

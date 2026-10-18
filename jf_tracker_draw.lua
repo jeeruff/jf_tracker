@@ -7780,30 +7780,45 @@ function D.frame(L, snap, rows, state, info)
             gw = gw - mw
             local mapx = gx0 + 1                               -- 18 окт: карта слева (просьба), пэды правее
             gx0 = gx0 + mw
-            local G = { cols = 4, rows = math.max(1, math.ceil(#f.kids / 4)), cw = gw // 4 }
+            -- 18 окт (2): кубик = нота MIDI 0..127, снизу вверх по 4 в ряду (как пэды MPC / drum rack): ряд — 4 ноты,
+            -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
+            local G = { cols = 4, cw = gw // 4 }
             G.ch = math.max(2 * L.rh + 2, gh // 4)
             G.fit = math.max(1, math.min(4, gh // G.ch))
+            local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
+            local by_note = {}
+            for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not by_note[pn] then by_note[pn] = ki2 end end
             D.kit_scroll = D.kit_scroll or {}
-            local sc = D.kit_scroll[kkey] or 0                 -- ряд сверху
-            if ks > 0 then
-              local r0 = (ks - 1) // G.cols
-              if r0 < sc then sc = r0 elseif r0 >= sc + G.fit then sc = r0 - G.fit + 1 end
+            local wb = D.kit_scroll[kkey]                     -- нижний ряд окна (ряд = 4 ноты)
+            if not wb then
+              local lo
+              for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not lo or pn < lo then lo = pn end end
+              wb = (lo or (D.slice_base_note or 48)) // 4     -- нижний пэд, без пэдов — базовая октава (C3)
             end
-            sc = math.max(0, math.min(sc, math.max(0, math.max(G.rows, 32) - G.fit)))
-            D.kit_scroll[kkey] = sc
-            -- карта: 4 колонки × 32 ряда, ряд = 4 пэда
+            if ks > 0 then
+              local kr = pos(ks) // 4
+              if kr < wb then wb = kr elseif kr >= wb + G.fit then wb = kr - G.fit + 1 end
+            end
+            wb = math.max(0, math.min(wb, 32 - G.fit))
+            D.kit_scroll[kkey] = wb
+            local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+            local function nname(n) return NN[n % 12 + 1] .. math.max(0, n // 12 - 1) end
+            -- карта: 4 колонки × 32 ряда снизу вверх
             do
               local mx0, my0 = mapx + 2, gy0
-              -- 18 окт: жёлтый — выбранный (его семплер справа), оранжевый — занятый, серый — пустой,
+              -- жёлтый — выбранный (его семплер справа), оранжевый — занятый, серый — пустой,
               -- красный — выключен (mute), зелёный мигает — соло (включён один из нескольких)
               local non = 0
               for _, kd2 in ipairs(f.kids) do if kd2.enabled then non = non + 1 end end
               local blink = math.floor(reaper.time_precise() * 3) % 2 == 0
               for r = 0, 31 do
+                local cym = my0 + (31 - r) * (cube + 1)
+                if r % 3 == 0 and r > 0 then set(U.mix(U.LINE, U.PANEL, 0.3)); gfx.rect(mx0 - 1, cym + cube + 1, 4 * (cube + 1), 1, 1) end   -- октава
                 for c = 0, 3 do
-                  local ki = r * 4 + c + 1
-                  local kid = f.kids[ki]
-                  local cxm, cym = mx0 + c * (cube + 1), my0 + r * (cube + 1)
+                  local note = r * 4 + c
+                  local ki = by_note[note]
+                  local kid = ki and f.kids[ki]
+                  local cxm = mx0 + c * (cube + 1)
                   local solo = kid and kid.enabled and non == 1 and #f.kids > 1
                   local col2 = not kid and U.mix(U.LINE, U.PANEL, 0.5)
                     or (solo and (blink and U.GREEN or U.mix(U.GREEN, U.PANEL, 0.5)))
@@ -7814,24 +7829,29 @@ function D.frame(L, snap, rows, state, info)
                   if not drag and kid and mx >= cxm and mx < cxm + cube + 1 and my >= cym and my < cym + cube + 1 then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
                 end
               end
-              set(U.AMBER); gfx.rect(mx0 - 2, my0 + sc * (cube + 1) - 1, 4 * (cube + 1) + 3, G.fit * (cube + 1) + 1, 0)   -- видимое окно
+              set(U.AMBER); gfx.rect(mx0 - 2, my0 + (31 - (wb + G.fit - 1)) * (cube + 1) - 1, 4 * (cube + 1) + 3, G.fit * (cube + 1) + 1, 0)   -- видимое окно
               local mh = 32 * (cube + 1)
               if not drag and mx >= mx0 - 2 and mx < mx0 + 4 * (cube + 1) + 2 and my >= my0 and my < my0 + mh then
-                local rr = math.floor((my - my0) / (cube + 1))
+                local rr = 31 - math.floor((my - my0) / (cube + 1))
                 local cc = math.max(0, math.min(3, math.floor((mx - mx0) / (cube + 1))))
-                hover.dspkitmap = { key = kkey, row = rr, fit = G.fit, ki = rr * 4 + cc + 1, f = f }
+                hover.dspkitmap = { key = kkey, row = rr, fit = G.fit, ki = by_note[rr * 4 + cc], note = rr * 4 + cc, f = f }
               end
             end
-            -- пустые места страницы (до 4 × 4) — тусклые рамки
-            for slot = sc * 4 + 1, (sc + G.fit) * 4 do
-              if not f.kids[slot] then
-                local r, c = (slot - 1) // 4 - sc, (slot - 1) % 4
-                set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(gx0 + c * G.cw, gy0 + r * G.ch, G.cw - 2, G.ch - 2, 0)
+            -- пустые ноты окна — тусклые рамки с именем ноты
+            for rr = 0, G.fit - 1 do
+              for c = 0, 3 do
+                local note = (wb + rr) * 4 + c
+                if not by_note[note] then
+                  local ex, ey = gx0 + c * G.cw, gy0 + (G.fit - 1 - rr) * G.ch
+                  set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(ex, ey, G.cw - 2, G.ch - 2, 0)
+                  text(ex + L.pad, ey + 1, nname(note), U.mix(U.DIM, U.PANEL, 0.4))
+                end
               end
             end
             for ki, kid in ipairs(f.kids) do
-              local r, c = (ki - 1) // G.cols - sc, (ki - 1) % G.cols
-              if r >= 0 and r < G.fit then
+              local pn = pos(ki)
+              local r, c = G.fit - 1 - (pn // 4 - wb), pn % 4
+              if by_note[pn] == ki and r >= 0 and r < G.fit then
                 local cx0, cy0 = gx0 + c * G.cw, gy0 + r * G.ch
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
