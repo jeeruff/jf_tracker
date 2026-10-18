@@ -2361,6 +2361,13 @@ ctx = {
     return 'tracker'
   end,
   toggle_help = function()
+    -- 18 окт: панели — справка своей панелью help (17 окт), не на месте DSP (старая khelp рисовалась вместо dsp)
+    if state.panes_ui and state.panes then
+      state.khelp = false
+      if state.focus == 'help' then ctx.set_focus(ctx.pn_prev and ctx.pn_prev ~= 'help' and ctx.pn_prev or 'tracker'); vim.msg = 'help: back'
+      else ctx.pane_cmd('help show'); vim.msg = 'help pane: keys of the module you came from; F1 again - back' end
+      return
+    end
     state.khelp = not state.khelp
     if not state.khelp and state.focus == 'dsp' and not state.dsp then ctx.set_focus('tracker') end
     KH.pinned = false
@@ -17173,6 +17180,7 @@ local function frame()
     edit.rescued = nil
   end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
+  if state.panes_ui and state.khelp then state.khelp = false end   -- 18 окт: старая справка на месте DSP при панелях — никогда
   if (state.khelp or ctx.help_pane_on()) and state.focus ~= 'dsp' and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
   draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
   draw.pmark('snapshot + model rebuild')
