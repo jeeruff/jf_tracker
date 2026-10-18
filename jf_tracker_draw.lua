@@ -4291,7 +4291,7 @@ end
 -- клингонского, в pIqaD переводит klingon() ниже; слова без перевода — латиница как есть
 local MW = {
   --            Ponomar            Songti SC     Diwan Thuluth        клингонский
-  NORMAL     = { 'ВИМЪ',            '常规',       'عادي',             'motlh' },
+  NORMAL     = { 'ВИПЕРЪ',          '常规',       'عادي',             'motlh' },
   INSERT     = { 'ВСТАВКА',         '插入',       'إدراج',            'lIch' },
   VISUAL     = { 'ВИЙ',             '选择',       'تحديد',            'legh' },
   ['V-LINE'] = { 'СТРОКА',          '行选',       'سطر',              'tlhegh' },
