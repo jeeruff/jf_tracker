@@ -236,14 +236,16 @@ function MX.width(L, nregions, ncols)
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
   L.mx_arrow_w = U.measure('<')
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
-  L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4) or 0
+  -- 18 окт: секции — полоса их цвета с вертикальным именем слева от номеров тактов
+  MX.sec_w = (MX.ruler and not MX.fold and MX.has_sec) and (L.th + 4) or 0
+  L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4 + MX.sec_w) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
-  L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
+  L.mx_dur_w = MX.fold and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
   L.mx_sig_w = (MX.fold or (MX.sig_same and not MX.vismetro)) and 0 or (U.measure('15/16') + L.pad)   -- 18 окт: vismetro — колонка размера всегда
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
-  L.mx_bpm_w = (MX.fold or not MX.bpm) and 0 or (U.measure('999.9') + L.pad)
+  L.mx_bpm_w = (MX.fold or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
   L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_bpm_w + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
   L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
@@ -523,7 +525,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- 12 окт: секции (регион без кода поверх паттернов): полоса слева у их слотов, имя — вместо такта
   -- на первой строке секции
   local sec_of, sec_first = {}, {}
-  for _, sc in ipairs(ctx.sections and ctx.sections() or {}) do
+  local secs_all = ctx.sections and ctx.sections() or {}
+  MX.has_sec = #secs_all > 0
+  for _, sc in ipairs(secs_all) do
     local first = true
     for ri2, rg2 in ipairs(regions) do
       if not rg2.gap and rg2.pos >= sc.pos - 1e-6 and rg2.rgnend <= sc.rgnend + 1e-6 then
@@ -580,9 +584,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.set(U.LINE); gfx.rect(0, y, RW - 2, 1, 1)
       local sc = sec_first[ri]
       local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)
-      if sc then U.text(L.pad, y + 1, ctx.fit(sc.name, RW - L.pad - 9), scc)
-      elseif info.bar_label then U.text(L.pad, y + 1, info.bar_label(rg.pos), U.GREY) end
-      if scc then U.set(scc); gfx.rect(2, y, 2, rh, 1) end   -- x 0..1 — под рамкой модуля
+      local _ = sc
+      if info.bar_label then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
       if info.ticks then
         for _, tk in ipairs(info.ticks(rg)) do
           local ty = y + math.floor(tk.f * rh)
@@ -667,6 +670,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local bx1 = dx - L.mx_sig_w
         local bx0 = bx1 - L.mx_bpm_w
         local hot_bpm = hover.ri == ri and mx >= bx0 and mx < bx1
+        if bs:find('.', 1, true) then MX.bpm_frac = true end   -- 18 окт: дробный темп — колонка шире со следующего кадра
         U.text(bx1 - L.pad - U.measure(bs), y + 1, bs, hot_bpm and U.AMBER or (MX.bpm_diff and U.TEXT or U.DIM))
         if hot_bpm then hover.bpm = ri end
         if ctx.hint then ctx.hint('mxbpm', bx0, y, L.mx_bpm_w, L.rh, ri) end
@@ -828,7 +832,14 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
     local xr = math.min(W - 4, L.mx_label_w + (ncols - MX.hs) * L.mx_cell_w)
     for sc, b in pairs(box) do
-      U.set((info.region_rgb and info.region_rgb(sc.color)) or U.CYAN)
+      local c = (info.region_rgb and info.region_rgb(sc.color)) or U.CYAN
+      -- 18 окт: полоса цвета секции слева во всю её высоту, имя — вертикально
+      local sw = MX.sec_w or 0
+      if sw > 0 then
+        U.set(U.tint(c, 0.55)); gfx.rect(2, b.y0 + 1, sw - 2, b.y1 - b.y0 - 2, 1)
+        if ctx.vtext then ctx.vtext(2 + math.floor((sw - 2 - L.th) / 2), b.y0 + 3, b.y1 - b.y0 - 6, sc.name, U.readable and U.readable(U.TEXT, U.tint(c, 0.55), 4.5) or U.TEXT, U.tint(c, 0.55)) end
+      end
+      U.set(c)
       gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
     end
   end
