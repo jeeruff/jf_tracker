@@ -2805,6 +2805,30 @@ function E.drum_pads(track, c, paths, note0, title)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return c, n
 end
+-- 18 окт: mute group пэда drumrs5k (0 — без группы, 1..16). Группы — jf_tracker_choke первым в цепочке
+-- (MIDI идёт по цепочке — чок до рэка); в группе RS5K пэда слушает нота-оффы (Obey note-offs), иначе
+-- обрывать нечем; вне группы — снова не слушает (ударный доигрывает сэмпл)
+function E.drum_group(track, note, rs5k_addr, g)
+  if not (track and note) then return false end
+  local A = FA(track)
+  local ok = false
+  run(g > 0 and ('pad group ' .. g) or 'pad group off', function()
+    -- сначала RS5K: вставка чока первым сдвигает адреса всех эффектов (и пэдов в контейнере)
+    if rs5k_addr then
+      local pi = model.rs5k_pidx(A, track, rs5k_addr)
+      if pi.obey then A.SetParamNormalized(track, rs5k_addr, pi.obey, g > 0 and 1 or 0) end
+    end
+    local ci = model.choke_fx(A, track)
+    if not ci and g > 0 then
+      ci = add_fx(track, model.CHOKE, -1000)
+      if ci and ci >= 0 then A.Show(track, ci, 2) else ci = nil end
+    end
+    if ci then A.SetParamNormalized(track, ci, note, g / 16) end
+    ok = ci ~= nil or g == 0
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 -- один пэд: файл целиком, режим sample, нота (nil — не трогать), имя «Sxx файл»
 function E.drum_pad_set(track, addr, path, note, num)
   local A = FA(track)

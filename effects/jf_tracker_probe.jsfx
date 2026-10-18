@@ -1,0 +1,37 @@
+desc:jf_tracker_probe (level meter between effects for jf_tracker, sound passes unchanged)
+//tags: analysis utility
+//author: jeeruff
+options:gmem=jf_tracker_scope
+
+// Измеритель уровня между эффектами для роутера jf_tracker (gain staging, 18 окт).
+// Звук не трогает. Пишет в gmem пространства jf_tracker_scope (то же, что мост скопов):
+//   база = 20000 + slot*4: [0] пик L, [1] пик R (окно ~50 мс, линейно), [2] heartbeat, [3] RMS моно окна
+// Слот ставит трекер (slider1). Задержки нет (PDC 0).
+
+slider1:0<0,255,1>Slot
+
+in_pin:left
+in_pin:right
+out_pin:left
+out_pin:right
+
+@init
+base = 20000 + floor(slider1) * 4;
+win = max(64, floor(srate * 0.05));
+n = 0; pl = 0; pr = 0; ss = 0; hb = 0;
+
+@slider
+base = 20000 + floor(slider1) * 4;
+
+@sample
+a = abs(spl0); b = abs(spl1);
+a > pl ? pl = a;
+b > pr ? pr = b;
+ss += (spl0 * spl0 + spl1 * spl1) * 0.5;
+n += 1;
+n >= win ? (
+  gmem[base] = pl; gmem[base + 1] = pr;
+  hb += 1; gmem[base + 2] = hb;
+  gmem[base + 3] = sqrt(ss / n);
+  n = 0; pl = 0; pr = 0; ss = 0;
+);

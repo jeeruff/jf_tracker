@@ -7862,6 +7862,7 @@ function D.frame(L, snap, rows, state, info)
                 local nm = kid.name or ''
                 nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
                 local tag = #(kid.slots or {}) > 0 and ('+' .. #kid.slots) or ''
+                if (kid.group or 0) > 0 then tag = ('g%d'):format(kid.group) .. (tag ~= '' and (' ' .. tag) or '') end   -- 18 окт: mute group
                 local tw = ms(tag)
                 text(cx0 + L.pad, cy0 + 1, fit((kid.enabled and '' or '(off) ') .. nm, cw0 - 2 * L.pad - (tw > 0 and tw + L.pad or 0)), fg)
                 if tw > 0 then text(cx0 + cw0 - L.pad - tw, cy0 + 1, tag, U.CYAN) end
@@ -7934,7 +7935,22 @@ function D.frame(L, snap, rows, state, info)
               text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
               if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
             end
-            text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4), kid.enabled and U.CYAN or U.GREY)
+            -- 18 окт: mute group пэда — g (без группы) / g1..g16; щелчок — выпадашка групп
+            local gw = 0
+            if D.DR and kid.note then
+              local gl = (kid.group or 0) > 0 and ('g' .. kid.group) or 'g'
+              gw = ms('g16') + 2 * L.pad
+              local gx = cx + bw1 - 2 * kb2 - 3 - gw - 2
+              local hb = not drag and mx >= gx and mx < gx + gw and my >= hy and my < hy + L.rh
+              local lit = (kid.group or 0) > 0
+              set(hb and U.tint(U.AMBER, 0.35) or (lit and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(gx, hy, gw, L.rh - 1, 1)
+              set(hb and U.AMBER or (lit and U.CYAN or U.LINE)); gfx.rect(gx, hy, gw, L.rh - 1, 0)
+              text(gx + math.floor((gw - ms(gl)) / 2), hy, gl, hb and U.AMBER or (lit and U.CYAN or U.GREY))
+              if hb then hover.dspbtn = { fx = k, f = f, what = 'kgroup', kid = kid } end
+              hint('kgroup', gx, hy, gw, L.rh, { kid = kid })
+              gw = gw + 2
+            end
+            text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4 - gw), kid.enabled and U.CYAN or U.GREY)
           else
             text(cx + L.pad, hy, fit(('all %d slices - a change goes to every RS5K'):format(#f.kids), bw1 - 2 * L.pad), U.AMBER)
           end

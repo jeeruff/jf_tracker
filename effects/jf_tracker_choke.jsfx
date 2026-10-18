@@ -1,0 +1,163 @@
+desc:jf_tracker_choke (mute groups for drumrs5k pads: a hit in a group cuts the pad sounding in it)
+//tags: MIDI processing
+//author: jeeruff
+
+// Mute groups (choke) для drumrs5k (18 окт). Как стоковый MIDI Choke Group (Cockos), но группа — у каждой ноты
+// своя (стоковый умеет только сплошной диапазон нот): слайдер N+1 — группа ноты N (0 — без группы, 1..16).
+// Нота-он в группе → нота-офф звучащей ноте этой группы (RS5K пэда с «Obey note-offs» её обрывает);
+// свои нота-оффы нот группы глушатся — пэд звучит, пока его не оборвёт следующий удар группы (как на драм-машине).
+// Слайдеры ставит трекер. Звук не трогает.
+
+slider1:0<0,16,1>-note 0 group
+slider2:0<0,16,1>-note 1 group
+slider3:0<0,16,1>-note 2 group
+slider4:0<0,16,1>-note 3 group
+slider5:0<0,16,1>-note 4 group
+slider6:0<0,16,1>-note 5 group
+slider7:0<0,16,1>-note 6 group
+slider8:0<0,16,1>-note 7 group
+slider9:0<0,16,1>-note 8 group
+slider10:0<0,16,1>-note 9 group
+slider11:0<0,16,1>-note 10 group
+slider12:0<0,16,1>-note 11 group
+slider13:0<0,16,1>-note 12 group
+slider14:0<0,16,1>-note 13 group
+slider15:0<0,16,1>-note 14 group
+slider16:0<0,16,1>-note 15 group
+slider17:0<0,16,1>-note 16 group
+slider18:0<0,16,1>-note 17 group
+slider19:0<0,16,1>-note 18 group
+slider20:0<0,16,1>-note 19 group
+slider21:0<0,16,1>-note 20 group
+slider22:0<0,16,1>-note 21 group
+slider23:0<0,16,1>-note 22 group
+slider24:0<0,16,1>-note 23 group
+slider25:0<0,16,1>-note 24 group
+slider26:0<0,16,1>-note 25 group
+slider27:0<0,16,1>-note 26 group
+slider28:0<0,16,1>-note 27 group
+slider29:0<0,16,1>-note 28 group
+slider30:0<0,16,1>-note 29 group
+slider31:0<0,16,1>-note 30 group
+slider32:0<0,16,1>-note 31 group
+slider33:0<0,16,1>-note 32 group
+slider34:0<0,16,1>-note 33 group
+slider35:0<0,16,1>-note 34 group
+slider36:0<0,16,1>-note 35 group
+slider37:0<0,16,1>-note 36 group
+slider38:0<0,16,1>-note 37 group
+slider39:0<0,16,1>-note 38 group
+slider40:0<0,16,1>-note 39 group
+slider41:0<0,16,1>-note 40 group
+slider42:0<0,16,1>-note 41 group
+slider43:0<0,16,1>-note 42 group
+slider44:0<0,16,1>-note 43 group
+slider45:0<0,16,1>-note 44 group
+slider46:0<0,16,1>-note 45 group
+slider47:0<0,16,1>-note 46 group
+slider48:0<0,16,1>-note 47 group
+slider49:0<0,16,1>-note 48 group
+slider50:0<0,16,1>-note 49 group
+slider51:0<0,16,1>-note 50 group
+slider52:0<0,16,1>-note 51 group
+slider53:0<0,16,1>-note 52 group
+slider54:0<0,16,1>-note 53 group
+slider55:0<0,16,1>-note 54 group
+slider56:0<0,16,1>-note 55 group
+slider57:0<0,16,1>-note 56 group
+slider58:0<0,16,1>-note 57 group
+slider59:0<0,16,1>-note 58 group
+slider60:0<0,16,1>-note 59 group
+slider61:0<0,16,1>-note 60 group
+slider62:0<0,16,1>-note 61 group
+slider63:0<0,16,1>-note 62 group
+slider64:0<0,16,1>-note 63 group
+slider65:0<0,16,1>-note 64 group
+slider66:0<0,16,1>-note 65 group
+slider67:0<0,16,1>-note 66 group
+slider68:0<0,16,1>-note 67 group
+slider69:0<0,16,1>-note 68 group
+slider70:0<0,16,1>-note 69 group
+slider71:0<0,16,1>-note 70 group
+slider72:0<0,16,1>-note 71 group
+slider73:0<0,16,1>-note 72 group
+slider74:0<0,16,1>-note 73 group
+slider75:0<0,16,1>-note 74 group
+slider76:0<0,16,1>-note 75 group
+slider77:0<0,16,1>-note 76 group
+slider78:0<0,16,1>-note 77 group
+slider79:0<0,16,1>-note 78 group
+slider80:0<0,16,1>-note 79 group
+slider81:0<0,16,1>-note 80 group
+slider82:0<0,16,1>-note 81 group
+slider83:0<0,16,1>-note 82 group
+slider84:0<0,16,1>-note 83 group
+slider85:0<0,16,1>-note 84 group
+slider86:0<0,16,1>-note 85 group
+slider87:0<0,16,1>-note 86 group
+slider88:0<0,16,1>-note 87 group
+slider89:0<0,16,1>-note 88 group
+slider90:0<0,16,1>-note 89 group
+slider91:0<0,16,1>-note 90 group
+slider92:0<0,16,1>-note 91 group
+slider93:0<0,16,1>-note 92 group
+slider94:0<0,16,1>-note 93 group
+slider95:0<0,16,1>-note 94 group
+slider96:0<0,16,1>-note 95 group
+slider97:0<0,16,1>-note 96 group
+slider98:0<0,16,1>-note 97 group
+slider99:0<0,16,1>-note 98 group
+slider100:0<0,16,1>-note 99 group
+slider101:0<0,16,1>-note 100 group
+slider102:0<0,16,1>-note 101 group
+slider103:0<0,16,1>-note 102 group
+slider104:0<0,16,1>-note 103 group
+slider105:0<0,16,1>-note 104 group
+slider106:0<0,16,1>-note 105 group
+slider107:0<0,16,1>-note 106 group
+slider108:0<0,16,1>-note 107 group
+slider109:0<0,16,1>-note 108 group
+slider110:0<0,16,1>-note 109 group
+slider111:0<0,16,1>-note 110 group
+slider112:0<0,16,1>-note 111 group
+slider113:0<0,16,1>-note 112 group
+slider114:0<0,16,1>-note 113 group
+slider115:0<0,16,1>-note 114 group
+slider116:0<0,16,1>-note 115 group
+slider117:0<0,16,1>-note 116 group
+slider118:0<0,16,1>-note 117 group
+slider119:0<0,16,1>-note 118 group
+slider120:0<0,16,1>-note 119 group
+slider121:0<0,16,1>-note 120 group
+slider122:0<0,16,1>-note 121 group
+slider123:0<0,16,1>-note 122 group
+slider124:0<0,16,1>-note 123 group
+slider125:0<0,16,1>-note 124 group
+slider126:0<0,16,1>-note 125 group
+slider127:0<0,16,1>-note 126 group
+slider128:0<0,16,1>-note 127 group
+
+in_pin:none
+out_pin:none
+
+@init
+cur = 0; curch = 32;
+i = 0; loop(17, cur[i] = -1; curch[i] = 0; i += 1);
+
+@block
+while (midirecv(ofs, m1, m2, m3)) (
+  pass = 1;
+  st = m1 & 0xF0; ch = m1 & 0x0F;
+  (st == 0x90 || st == 0x80) ? (
+    g = slider(m2 + 1) | 0;
+    g > 0 ? (
+      st == 0x90 && m3 > 0 ? (
+        cur[g] >= 0 ? midisend(ofs, 0x80 | curch[g], cur[g], 0);
+        cur[g] = m2; curch[g] = ch;
+      ) : (
+        pass = 0;
+      );
+    );
+  );
+  pass ? midisend(ofs, m1, m2, m3);
+);

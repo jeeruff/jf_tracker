@@ -1166,6 +1166,14 @@ M.dsp_fold = false   -- 16 окт: zf — модули со страницами
 M.DR = nil           -- 16 окт: jf_tracker_drumrack.lua (drumrs5k), ставит main; M.drum_favs — избранное слотов
 -- 16 окт: индексы параметров RS5K по имени (один раз — у всех экземпляров одинаковы, не зашиваем)
 local rs5k_pi
+-- 18 окт: mute groups drumrs5k — JSFX перед рэком: группа на каждую ноту (слайдер ноты N — параметр N, 0..16)
+M.CHOKE = 'jf_tracker_choke'
+function M.choke_fx(A, tr)
+  for i = 0, A.GetCount(tr) - 1 do
+    local _, nm = A.GetFXName(tr, i, '')
+    if (nm or ''):find(M.CHOKE, 1, true) then return i end
+  end
+end
 function M.rs5k_pidx(A, tr, fx)
   if rs5k_pi then return rs5k_pi end
   local t = {}
@@ -1173,7 +1181,7 @@ function M.rs5k_pidx(A, tr, fx)
     local _, pn = A.GetParamName(tr, fx, p, ''); pn = (pn or ''):lower()
     if pn == 'sample start offset' then t.start = p elseif pn == 'sample end offset' then t.stop = p
     elseif pn == 'note range start' then t.note = p elseif pn == 'note range end' then t.note_end = p
-    elseif pn == 'volume' then t.vol = p end
+    elseif pn == 'volume' then t.vol = p elseif pn == 'obey note-offs' then t.obey = p end
   end
   if t.start then rs5k_pi = t end
   return t
@@ -1377,7 +1385,8 @@ function build_track_fx(tr)
   if not A.GetCount then return out end
   for fx = 0, A.GetCount(tr) - 1 do
     local _, nm = A.GetFXName(tr, fx, '')
-    if not (nm or ''):find('jf_tracker_probe', 1, true) then build_one(tr, fx, out) end   -- 18 окт: измерители роутера — не эффекты списка
+    -- 18 окт: измерители роутера и mute groups пэдов (jf_tracker_choke) — не эффекты списка
+    if not ((nm or ''):find('jf_tracker_probe', 1, true) or (nm or ''):find(M.CHOKE, 1, true)) then build_one(tr, fx, out) end
   end
   return out
 end
@@ -1433,6 +1442,7 @@ function build_one(tr, fx, out)
       -- файл, кусок a..b (доли файла), нота и категории эффектов (слоты)
       if M.DR and M.DR.is_rack(kids) then
         kit = true
+        local chi = M.choke_fx(A, tr)
         for _, kid in ipairs(kids) do
           local re, rid = M.DR.pad_rs5k(kid)
           kid.rs5k_i, kid.file = rid, re and re.file
@@ -1440,6 +1450,8 @@ function build_one(tr, fx, out)
           kid.pad_a = pi.start and A.GetParamNormalized(tr, rid, pi.start) or 0
           kid.pad_b = pi.stop and A.GetParamNormalized(tr, rid, pi.stop) or 1
           kid.note = pi.note and math.floor(A.GetParamNormalized(tr, rid, pi.note) * 127 + 0.5) or nil
+          -- 18 окт: mute group пэда — слайдер его ноты в jf_tracker_choke (0 — без группы)
+          kid.group = (chi and kid.note) and math.floor(A.GetParamNormalized(tr, chi, kid.note) * 16 + 0.5) or 0
           kid.slots = {}
           if kid.entry and kid.entry.container then
             for gi, g in ipairs(kid.entry.kids or {}) do

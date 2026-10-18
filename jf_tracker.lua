@@ -14938,6 +14938,7 @@ local function hint_go(t)
   elseif t.kind == 'dsprouting' and d == 'route' then ctx.dsp_big()
   elseif t.kind == 'dsptrkname' then ctx.dsptrack_toggle()
   elseif t.kind == 'tmpl' then ctx.tmpl_do(d)
+  elseif t.kind == 'kgroup' then ctx.pad_group_menu(d.kid)   -- 18 окт: mute group пэда
   elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
@@ -19143,7 +19144,7 @@ local function frame()
     state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
   elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
-  elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
+  elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or (hover.dspbtn.what == 'kgroup' and ' - mute group: a hit cuts the other pads of the group (hi-hat open / closed)' or ' - bypass on / off'))
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
@@ -20945,6 +20946,7 @@ local function frame()
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
+      elseif hover.dspbtn.what == 'kgroup' and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid)   -- 18 окт: mute group пэда
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
@@ -24320,6 +24322,27 @@ ctx.pattern_end_row = function(row)
   return rg and math.ceil(rg.r1 - 1e-6) or nil
 end
 -- 18 окт: пэд drumrs5k: mute — выкл / вкл (bypass), solo — включён только он (повтор — все включены). Один undo
+-- 18 окт: mute group пэда drumrs5k — выпадашка: off / 1..8 (удар в группе обрывает звучащий пэд той же группы:
+-- хэт закрытый / открытый). Группы держит jf_tracker_choke первым в цепочке — работает и без трекера
+ctx.pad_group_menu = function(kid)
+  local col = dsp_target()
+  if not (col and kid and kid.note) then vim.msg = 'pad group: no pad note'; return end
+  local used = {}
+  for _, f in ipairs(col.fx or {}) do for _, kd in ipairs(f.kids or {}) do
+    if (kd.group or 0) > 0 then used[kd.group] = (used[kd.group] or 0) + 1 end
+  end end
+  local labels = { 'off' }
+  for g = 1, 8 do labels[#labels + 1] = used[g] and ('%d  (%d pad%s)'):format(g, used[g], used[g] == 1 and '' or 's') or tostring(g) end
+  local cur = (kid.group or 0) > 0 and labels[kid.group + 1] or 'off'
+  ctx.choice_pick(('mute group of %s - a hit cuts the other pads of its group'):format(kid.name or 'pad'), cur, labels, function(v)
+    local g = v == 'off' and 0 or tonumber((v or ''):match('^%s*(%d+)'))
+    if not g or g < 0 or g > 16 then vim.msg = 'pad group: off or 1..16'; return end
+    if edit.drum_group(col.track, kid.note, kid.rs5k_i, g) then
+      vim.msg = g > 0 and ('%s: group %d - cuts / is cut by the pads of group %d (obeys note-offs)'):format(kid.name or 'pad', g, g)
+        or ((kid.name or 'pad') .. ': no group (plays its sample out)')
+    else vim.msg = 'pad group: could not add jf_tracker_choke' end
+  end)
+end
 ctx.pad_mute_solo = function(f, ki, solo)
   local col = dsp_target()
   local kid = f and f.kids and f.kids[ki]
