@@ -282,6 +282,7 @@ KH.PAGES = {
     { k = 'f', m = 'fill: lit cells or an empty grid', d = 'fill: cells show their content (lit) or stay an empty grid - only the view' },
     { k = 't', m = 'trim: cut items past their region', d = 'trim: cut items that run past their region (the button trim)' },
     { k = 'R', m = 'ruler of bars on / off', d = 'ruler of bars on the left on / off (button ruler)' },
+    { k = 'loop zone', t = {}, d = 'the bar ruler on the left of the slots: double-click - loop this slot, drag up / down - several, Cmd+click - pick slots (the loop jumps from one to the next, seamless), Shift+click - extend; the time selection / loop shows as a [ there' },
     { k = 'Cmd+wheel', t = {}, d = 'zoom: slots taller / shorter - the rows of the pattern inside (as in the tracker; option zoom with: split - Option + wheel)' },   -- 18 окт: зум вспыхивает здесь
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Opt+Tab', d = 'back to the tracker / next pane' },
@@ -651,6 +652,24 @@ KH.PAGES = {
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },
   } },
+  playlist = { title = 'playlist: the order of the song as text (the playlist button of the matrix, :pl)', e = {   -- 18 окт
+    { k = 'what', t = {}, d = 'words in a row, one per step: the song plays them in this order; named playlists are kept in the project, the song itself stays as it is' },
+    { k = 'A1', t = {}, d = 'a pattern by its name (any case)' },
+    { k = 'verse', t = {}, d = 'a section by its name - all its patterns in order' },
+    { k = '4', t = {}, d = 'a region by its REAPER number' },
+    { k = 'x2  *2', t = {}, d = 'repeat: A1x2 = A1 A1 (a section too: versex2)' },
+    { k = ':16', t = {}, d = 'only the first 16 rows of the pattern' },
+    { k = '/2', t = {}, d = 'only a part: /2 - the first half, /4 - a quarter' },
+    { k = '-8', t = {}, d = 'skip the first 8 rows (start later)' },
+    { k = '+8', t = {}, d = 'after the pattern, its first 8 rows once more' },
+    { k = 'A1-8:8x2', t = {}, d = 'together: rows 8..15 of A1, twice' },
+    { k = ', ; |', t = {}, d = 'separators like spaces' },
+    { k = 'Tab', t = {}, d = 'in :pl - completes the word with a pattern / section name (again - the next one)' },
+    { k = 'play', t = {}, d = 'plays the list: whole patterns follow seamlessly, shortened / skipped ones jump (a short gap); the list ends - stop' },
+    { k = 'write', t = {}, d = 'writes the list after the song: whole patterns as linked repeats, shortened ones as their own pattern; u - back' },
+    { k = '< > name', t = {}, d = 'the playlists of the project: < > - previous / next, a click on the name - :pl name; new dup del' },
+    { k = 'red word', t = {}, d = 'not found (no such pattern / section / number) - skipped, the status line under it says why' },
+  } },
   ctrl = { title = 'main module (control)', e = {
     { k = 'h j k l', d = 'move between cells (arrows too); focus lands on BPM' },
     { k = '+ -', d = 'value up / down (like the wheel): BPM, LPB, oct, step, vel, x-fade, font...' },
@@ -725,7 +744,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

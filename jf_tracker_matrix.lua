@@ -556,18 +556,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
-    -- 18 окт: полоска выделения слева у слота = time selection / луп REAPER (как скобка «[» у номеров трекера):
-    -- щелчок — слот, протяжка — несколько, Shift — продлить; выделенные — светлая спина, усы у первого и последнего
-    do
-      local ts0, ts1 = MX.ts0 or 0, MX.ts1 or 0
-      local inside = ts1 > ts0 + 1e-6 and rg.pos < ts1 - 1e-6 and rg.rgnend > ts0 + 1e-6
-      local hot_ts = my >= y and my < y + rh and mx >= 0 and mx < 6
-      if hot_ts then hover.tsel = ri end
-      U.set(hot_ts and U.AMBER or (inside and { 0.85, 0.85, 0.85 } or U.LINE))
-      gfx.rect(0, y + 1, 3, rh - 1, 1)
-      if inside and ts0 >= rg.pos - 1e-6 then gfx.rect(0, y + 1, 8, 2, 1) end
-      if inside and ts1 <= rg.rgnend + 1e-6 then gfx.rect(0, y + rh - 2, 8, 2, 1) end
-    end
+    -- 18 окт: колонка линейки — зона выделения / лупа (двойной щелчок — луп на слот, протяжка — несколько, Cmd — выборочно)
+    if my >= y and my < y + rh and mx >= 0 and mx < (RW > 0 and RW - 2 or 6) then hover.tsel = ri end
     -- 18 окт: vismetro, колонки размера не видно (свёрнута / узко) — счётчик долей яркой плашкой слева у играющей строки
     if playing and MX.vismetro and (L.mx_sig_w or 0) == 0 and info.play_row and not rg.gap then
       local n = (info.sig_at and info.sig_at(rg.pos)) or 4
@@ -839,8 +829,39 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local xr = math.min(W - 4, L.mx_label_w + (ncols - MX.hs) * L.mx_cell_w)
     for sc, b in pairs(box) do
       U.set((info.region_rgb and info.region_rgb(sc.color)) or U.CYAN)
-      gfx.rect(4, b.y0, xr - 3, b.y1 - b.y0, 0)   -- 18 окт: левее — полоска выделения слотов
+      gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
     end
+  end
+  -- 18 окт: выделение / луп REAPER — скобкой «[» в колонке линейки (левее рисок), по времени (высокий слот — точно внутри);
+  -- выборочный набор слотов (Cmd+щелчок) — янтарными скобками своих кусков
+  do
+    local function y_of(t)
+      local first, last
+      for i = 1, nvis do
+        local ri = MX.scroll + i
+        local rg = regions[ri]
+        if not rg then break end
+        local yy = top + (i - 1) * rh
+        first = first or { rg = rg, y = yy }; last = { rg = rg, y = yy }
+        if t >= rg.pos - 1e-9 and t <= rg.rgnend + 1e-9 then
+          return yy + math.floor((t - rg.pos) / math.max(1e-9, rg.rgnend - rg.pos) * rh + 0.5), true
+        end
+      end
+      if first and t < first.rg.pos then return top, false end
+      if last then return last.y + rh, false end
+    end
+    local bx = RW > 0 and math.max(2, RW - 13) or 1
+    local function bracket(t0, t1, col)
+      local y0, in0 = y_of(t0)
+      local y1, in1 = y_of(t1)
+      if not (y0 and y1) or y1 <= y0 then return end
+      U.set(col); gfx.rect(bx, y0, 2, y1 - y0, 1)
+      if in0 then gfx.rect(bx, y0, 6, 2, 1) end
+      if in1 then gfx.rect(bx, y1 - 2, 6, 2, 1) end
+    end
+    if MX.loopset and next(MX.loopset) then
+      for _, run in ipairs(MX.loop_runs(regions)) do bracket(run[1], run[2], U.AMBER) end
+    elseif (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6 then bracket(MX.ts0, MX.ts1, { 0.85, 0.85, 0.85 }) end
   end
   -- 9 окт, как в Renoise: край клетки (верх / низ, 3 px) — потянуть, и клетка
   -- повторится в следующих слотах (алиасы; Option — уникальные копии)
@@ -880,6 +901,21 @@ end
 -- MX.queued в кадре). Так edit-курсор и плейхед живут отдельно.
 MX.queued = nil
 
+-- 18 окт: выборочный луп (Cmd+щелчок по линейке): набор слотов по началу (pos) → куски подряд { t0, t1 } и слоты по порядку
+function MX.loop_slots(regions)
+  local o = {}
+  for _, rg in ipairs(regions or {}) do if MX.loopset and MX.loopset[rg.pos] and not rg.gap then o[#o + 1] = rg end end
+  table.sort(o, function(a, b) return a.pos < b.pos end)
+  return o
+end
+function MX.loop_runs(regions)
+  local runs = {}
+  for _, rg in ipairs(MX.loop_slots(regions)) do
+    local r = runs[#runs]
+    if r and math.abs(r[2] - rg.pos) < 1e-6 then r[2] = rg.rgnend else runs[#runs + 1] = { rg.pos, rg.rgnend } end
+  end
+  return runs
+end
 -- 18 окт: слот под экранной y (по строкам прошлого кадра)
 function MX.row_at(y)
   for ri, ry in pairs(MX.row_y or {}) do if y >= ry and y < ry + (MX.row_h or 1) then return ri end end

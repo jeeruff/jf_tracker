@@ -2345,6 +2345,9 @@ ctx = {
   -- страница справки для модуля в фокусе
   help_page = function()
     local f = state.focus
+    -- 18 окт: щёлкнул по плейлисту / набираешь :pl — справка о нём и его синтаксис
+    if vim.mode == 'cmd' and (vim.cmdline or ''):match('^pl') and ((vim.cmdline or ''):match('^pl ') or (vim.cmdline or ''):match('^playlist')) then return 'playlist' end
+    if ctx.pl_help and MX.plist and f == 'matrix' then return 'playlist' end
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
     elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
@@ -16838,6 +16841,43 @@ local function process_jumps(playpos)
   end
 end
 
+-- 18 окт: луп по слотам матрицы: время выделения и луп REAPER вместе; выборочный набор снят
+ctx.mx_loop_span = function(t0, t1)
+  MX.loopset = nil
+  reaper.GetSet_LoopTimeRange(true, false, t0, t1, false); reaper.GetSet_LoopTimeRange(true, true, t0, t1, false)
+end
+-- Cmd+щелчок: слот в выборочный набор / из него (выделенные до этого слоты — в набор); луп REAPER — на весь охват,
+-- а движок (ctx.mx_loop_tick) перепрыгивает невыбранные слоты бесшовно
+ctx.mx_loop_toggle = function(rg)
+  if rg.gap then vim.msg = 'loop pick: a pattern slot (not an empty bar)'; return end
+  if not MX.loopset then
+    MX.loopset = {}
+    local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    if t1 > t0 then for _, r in ipairs(seq) do if not r.gap and r.pos >= t0 - 1e-6 and r.rgnend <= t1 + 1e-6 then MX.loopset[r.pos] = true end end end
+  end
+  MX.loopset[rg.pos] = not MX.loopset[rg.pos] or nil
+  local sl = MX.loop_slots(seq)
+  if #sl == 0 then MX.loopset = nil; vim.msg = 'loop pick: none'; return end
+  reaper.GetSet_LoopTimeRange(true, false, sl[1].pos, sl[#sl].rgnend, false); reaper.GetSet_LoopTimeRange(true, true, sl[1].pos, sl[#sl].rgnend, false)
+  local nm = {}
+  for _, r in ipairs(sl) do nm[#nm + 1] = r.name end
+  vim.msg = 'loop: ' .. table.concat(nm, ' > ') .. ' (Cmd+click - add / remove; double-click - one slot)'
+end
+-- каждый кадр с позицией: в выбранном слоте — заранее нативный прыжок к следующему выбранному (после последнего — к первому)
+ctx.mx_loop_tick = function(pp)
+  if not (MX.loopset and next(MX.loopset)) then MX.loop_cur = nil; return end
+  local sl = MX.loop_slots(seq)
+  if #sl < 2 then return end
+  local cur = alias.region_at(regions, pp)
+  local k
+  for i, r in ipairs(sl) do if cur and math.abs(r.pos - cur.pos) < 1e-6 then k = i end end
+  local key = k and tostring(sl[k].pos) or 'out'
+  if MX.loop_cur == key then return end
+  MX.loop_cur = key
+  local nx = k and sl[k % #sl + 1] or sl[1]
+  if k and math.abs(nx.pos - sl[k].rgnend) < 1e-6 then return end   -- следующий встык — играет сам
+  reaper.GoToRegion(0, nx.idx, false)
+end
 -- 18 окт: очередь — нативным GoToRegion (smooth seek на конце играющего региона): REAPER готовит звук заранее,
 -- прыжок без паузы. Свой SetEditCurPos на границе давал ~0.2 с тишины (буфер render-ahead сбрасывался)
 MX.same_rg = function(a, b) return a and b and a.idx == b.idx and math.abs(a.pos - b.pos) < 1e-6 end
@@ -17061,8 +17101,8 @@ local function frame()
       if ri and ri ~= ctx.mx_tsel.last and seq[ri] and seq[ctx.mx_tsel.a] then
         ctx.mx_tsel.last = ri
         local A, B = seq[math.min(ri, ctx.mx_tsel.a)], seq[math.max(ri, ctx.mx_tsel.a)]
-        reaper.GetSet_LoopTimeRange(true, false, A.pos, B.rgnend, false); reaper.GetSet_LoopTimeRange(true, true, A.pos, B.rgnend, false)
-        vim.msg = ('selection: slots %d..%d (time selection + loop)'):format(math.min(ri, ctx.mx_tsel.a), math.max(ri, ctx.mx_tsel.a))
+        ctx.mx_loop_span(A.pos, B.rgnend)
+        vim.msg = ('loop: slots %d..%d'):format(math.min(ri, ctx.mx_tsel.a), math.max(ri, ctx.mx_tsel.a))
       end
     end
   end
@@ -17146,6 +17186,7 @@ local function frame()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
   if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
   if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
+  if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
     T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
@@ -18743,7 +18784,7 @@ local function frame()
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
   elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
-  elseif hover.matrix and hover.matrix.tsel then state.status = 'selection strip - click: this slot is the time selection and loop, drag: several slots, Shift+click: extend, click the only selected one: clear'
+  elseif hover.matrix and hover.matrix.tsel then state.status = 'loop zone - double-click: loop this slot, drag: several slots, Cmd+click: pick slots (the loop jumps between them), Shift+click: extend'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column, session (z)'
@@ -20293,24 +20334,19 @@ local function frame()
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
       click = { t = now2, zone = 'mxrep' }
     elseif hover.matrix and hover.matrix.tsel then
-      -- 18 окт: полоска выделения слотов — time selection и луп REAPER по слотам
+      -- 18 окт: колонка линейки — луп: двойной щелчок — этот слот, протяжка — несколько, Cmd — выборочно, Shift — продлить
       local ri = hover.matrix.tsel
       local rg = seq[ri]
       if rg then
-        local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
-        if gfx.mouse_cap & 8 == 8 and t1 > t0 then
-          local a, b = math.min(t0, rg.pos), math.max(t1, rg.rgnend)
-          reaper.GetSet_LoopTimeRange(true, false, a, b, false); reaper.GetSet_LoopTimeRange(true, true, a, b, false)
-          ctx.mx_tsel = nil
-        elseif math.abs(t0 - rg.pos) < 1e-6 and math.abs(t1 - rg.rgnend) < 1e-6 then
-          reaper.GetSet_LoopTimeRange(true, false, 0, 0, false); reaper.GetSet_LoopTimeRange(true, true, 0, 0, false)
-          vim.msg = 'selection cleared'; ctx.mx_tsel = nil
-        else
-          reaper.GetSet_LoopTimeRange(true, false, rg.pos, rg.rgnend, false); reaper.GetSet_LoopTimeRange(true, true, rg.pos, rg.rgnend, false)
-          ctx.mx_tsel = { a = ri, last = ri }
-        end
+        local m = gfx.mouse_cap
+        if m & 4 == 4 then ctx.mx_loop_toggle(rg)
+        elseif m & 8 == 8 then
+          local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+          if t1 > t0 then ctx.mx_loop_span(math.min(t0, rg.pos), math.max(t1, rg.rgnend)) else ctx.mx_loop_span(rg.pos, rg.rgnend) end
+        elseif dbl and click.zone == 'mxtsel' and click.row == ri then ctx.mx_loop_span(rg.pos, rg.rgnend); vim.msg = 'loop: ' .. (rg.gap and 'the bar' or rg.name)
+        else ctx.mx_tsel = { a = ri, last = ri }; vim.msg = 'double-click - loop this slot; drag - several; Cmd+click - pick slots, the loop jumps between them' end
       end
-      click = { t = now2, zone = 'mxtsel' }
+      click = { t = now2, zone = 'mxtsel', row = ri }
     elseif hover.matrix and hover.matrix.vis then
       -- 11 окт: клетка visor матрицы — сцена / пресет в начало слота (событие v:)
       local rg = seq[hover.matrix.vis.ri]
@@ -20337,7 +20373,7 @@ local function frame()
     elseif hover.matrix and hover.matrix.prev then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.prev, -1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.next then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.next, 1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.ri and hover.matrix.ci then
-      ctx.set_focus('matrix')
+      ctx.set_focus('matrix'); ctx.pl_help = nil
       -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки; Cmd+щелчок —
       -- ячейка в выделение вразброс (повтор — убрать), 9 окт
       if gfx.mouse_cap & 4 == 4 then
@@ -22605,6 +22641,7 @@ local function frame()
     elseif c == 63 and not typing then
       ctx.actions_picker(); c = 0                          -- ? (6 окт): действия REAPER; справка — F1
     elseif (state.khelp or ctx.help_pane_on()) and not typing then
+      if state.focus == 'matrix' then ctx.pl_help = nil end   -- клавиша в матрице — снова её справка
       KH.press(ctx.help_page(), c, reaper.time_precise())
     end
   end
@@ -23032,6 +23069,7 @@ if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
   end) then reaper.SetExtState(EXT, 'ss_mods', '1', true) end
 -- 11 окт: кнопка матрицы по id — щелчок и выпадашка » (кнопки, что не влезли в ширину модуля)
 ctx.mx_btn_do = function(b)
+  ctx.pl_help = (b == 'plist' or tostring(b):match('^pl') ~= nil) or nil   -- 18 окт: щелчок по плейлисту — справка о нём
   if b == 'more' then ctx.mx_more()
   elseif b == 'view' then ctx.mx_view_menu()
   elseif b == 'zoom' then ctx.mx_zoom()
