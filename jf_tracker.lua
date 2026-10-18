@@ -8178,6 +8178,9 @@ ctx = {
     for _, nm in ipairs(base) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
     vim.open_picker(title, items, function(it) on_done(it.clear and '' or it.label) end)
     vim.picker.free = true
+    -- 18 окт: текущее имя — в строке ввода (выделено): набор заменяет, BS стирает (Enter — без имени)
+    vim.picker.allow_empty = true
+    if (current or '') ~= '' then vim.picker.query, vim.picker.fresh = current, true end
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
@@ -17671,6 +17674,9 @@ local function frame()
       left = state.toptab == 'sample' and 'SAMPLER' or ((te and te.label) or state.toptab or 'top'):upper()
     else left = ((pe and pe.label) or state.focus):upper() end
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
+  -- 18 окт: свои режимы клавиатуры: patternkb (ноты — паттерны) в трекере, clipkb палитры в матрице
+  if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
+  elseif state.focus == 'matrix' and MX.palette and MX.pal_kb then left = 'CLIPKB' end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
   local wf = gfx.getchar(65536)

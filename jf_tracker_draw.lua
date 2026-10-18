@@ -4354,6 +4354,13 @@ local MW = {
   VIDEO      = { 'ВИДѢНІЕ',         '视频',       'فيديو',            'mIllogh' },
   VISOR      = { 'ЗЕРЦАЛО',         '视觉',       'مرئيات',           'legh' },
   TOP        = { 'ВЕРХЪ',           '顶部',       'أعلى',             'Dung' },
+  -- 18 окт: новые режимы и панели
+  PATTERNKB  = { 'УЗОРКЛАВЪ',       '图案键',     'أنماط',            "mIr leQ" },   -- ноты играют паттерны (MPC)
+  CLIPKB     = { 'ОТРЫВКЛАВЪ',      '片段键',     'مقاطع',            "pe' leQ" },   -- clipkb палитры матрицы
+  PERFORMANCE = { 'УСИЛІЕ',         '性能',       'أداء',             'HoS' },
+  ACTIONS    = { 'ДѢЯНІЯ',          '动作',       'إجراءات',          "ta'" },
+  HELP       = { 'ПОМОЩЬ',          '帮助',       'مساعدة',           'QaH' },
+  ['NOTE MOD'] = { 'НОТОИЗМѢНА',    '音符调制',   'تضمين',            'bom choH' },
   REAPER     = { 'ЖНЕЦЪ',           '收割者',     'حاصد',             "HoHwI'" },   -- 15 окт: клавиши у REAPER (окно без фокуса)
 }
 -- pIqaD (CSUR U+F8D0…): клингонская латиница → знаки; tlh ch gh ng — один знак
@@ -8898,7 +8905,10 @@ function D.popup(L, p, anchor)
     local tx, ty = x + L.pad, y + L.pad
     local head = fit(p.search_head, w - 2 * L.pad)
     text(tx, ty, head, U.CYAN); tx = tx + ms(head)
-    if p.search ~= '' then text(tx, ty, p.search, U.TEXT); tx = tx + ms(p.search) end
+    if p.search ~= '' then
+      if p.search_fresh then set(U.tint(U.AMBER, 0.35)); gfx.rect(tx - 1, ty, ms(p.search) + 2, L.rh, 1) end   -- 18 окт: текущее имя — выделено, набор заменит
+      text(tx, ty, p.search, U.TEXT); tx = tx + ms(p.search)
+    end
     if math.floor(reaper.time_precise() * 2.5) % 2 == 0 then set(U.AMBER); gfx.rect(tx, ty, 2, L.rh, 1) end
     tx = tx + 4
     if p.search == '' then local ph = 'type to search'; text(tx, ty, ph, U.DIM); tx = tx + ms(ph) end

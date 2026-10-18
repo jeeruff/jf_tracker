@@ -3065,9 +3065,10 @@ local function picker_filter()
   local out = {}
   -- 16 окт: папки (у пунктов group): без набора — пункты выбранной папки (и вложенных), с набором — поиск по всем
   local pre = pk.tree and pk.query == '' and picker_prefix(pk) or nil
+  local q = pk.fresh and '' or pk.query            -- 18 окт: текущее имя в строке (fresh) — список весь
   for i, it in ipairs(pk.items) do
     if not pre or it.group == pre or (it.group or ''):sub(1, #pre + 3) == pre .. ' / ' then
-      local sc = fuzzy_score(it.label, pk.query)
+      local sc = fuzzy_score(it.label, q)
       if sc then out[#out + 1] = { it = it, sc = sc, i = i } end
     end
   end
@@ -3076,7 +3077,7 @@ local function picker_filter()
   pk.matches = {}
   for i, m in ipairs(out) do pk.matches[i] = m.it end
   -- 18 окт: свободный текст (pk.free): набранное, которого нет в списке, — своей строкой; без совпадений — первой
-  if pk.free and pk.query ~= '' then
+  if pk.free and pk.query ~= '' and not pk.fresh then
     local exact = false
     for _, it in ipairs(pk.matches) do if it.label == pk.query then exact = true; break end end
     if not exact then
@@ -3152,7 +3153,12 @@ function V.picker_key(c)
       elseif c == 16 or c == UP or c == 11 then V.picker_pick(pk.col, math.max(1, gi - 1)); return end
     end
   end
+  if pk.fresh and c == BS then pk.query, pk.fresh, pk.sel = '', nil, 1; picker_filter(); return end      -- 18 окт: BS — имя стёрто
+  if pk.fresh and c >= 32 and c < 127 then pk.query, pk.fresh, pk.sel = '', nil, 1 end                   -- набор — заменяет
   if c == ESC then V.picker = nil
+  elseif c == ENTER and pk.free and pk.query == '' and not pk.fresh and pk.allow_empty then
+    V.picker = nil
+    if pk.on_pick then local ok, e = pcall(pk.on_pick, { label = '', free = true }); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
   elseif c == ENTER then
     local it = pk.matches[pk.sel]
     V.picker = nil
@@ -3240,7 +3246,7 @@ function V.popup()
     -- 9 окт: пусто — строкой, иначе окно сжималось до клочка заголовка («ro»)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no matches - Backspace (Ctrl+J / K or arrows move, letters search)', col = { 0.6, 0.6, 0.6 } } end
     -- 18 окт: строка поиска — мигающий курсор и «type to search» (рисует draw.popup по search_*); title — для ширины
-    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), search_head = pk.title .. ' > ', search = pk.query, search_tail = ('  (%d)'):format(#pk.matches) .. (#pk.matches > 0 and '   arrows / Ctrl+J K: choose, Enter: take' or ''), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil, groups = groups }
+    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), search_head = pk.title .. ' > ', search = pk.query, search_fresh = pk.fresh, search_tail = ('  (%d)'):format(#pk.matches) .. (#pk.matches > 0 and '   arrows / Ctrl+J K: choose, Enter: take' or ''), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil, groups = groups }
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
