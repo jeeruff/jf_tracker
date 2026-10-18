@@ -8105,7 +8105,45 @@ ctx = {
     if not rg then vim.msg = 'no region'; return end
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
-    vim.open_prompt('name ', rg.name or '')
+    -- 18 окт: выпадашка имён (частые в проекте сверху, потом общие; свой текст — тоже); код паттерна (A1) остаётся
+    local code = not rg.gap and model.SEC.code_of(rg.name or '')
+    local rest = code and (rg.name:sub(#code + 1):gsub('^%s+', '')) or (rg.name or '')
+    ctx.name_pick('region', code and ('name of ' .. code) or 'region name', rest, function(nm)
+      ctx.mx_name(code and (code .. (nm ~= '' and (' ' .. nm) or '')) or nm)
+    end)
+  end,
+  -- 18 окт: выбор имени выпадашкой: kind — 'region' | 'note' | 'track'; сверху — то, что уже чаще всего в проекте
+  name_pick = function(kind, title, current, on_done)
+    ctx.NAMES = ctx.NAMES or dofile(DIR .. '/jf_tracker_names.lua')
+    local cnt, order = {}, {}
+    local function add(nm, w)
+      nm = (nm or ''):gsub('^%s+', ''):gsub('%s+$', '')
+      if nm == '' or nm:match('^=') then return end
+      if not cnt[nm] then cnt[nm] = 0; order[#order + 1] = nm end
+      cnt[nm] = cnt[nm] + (w or 1)
+    end
+    if kind == 'region' or kind == 'note' then
+      for _, r in ipairs(regions) do
+        local c = model.SEC.code_of(r.name or '')
+        add(c and r.name:sub(#c + 1) or r.name, 2)
+      end
+      for _, s2 in ipairs(regions.sections or {}) do add(s2.name, 2) end
+      ctx.pnotes = ctx.pnotes or {}
+      for _, v in pairs(ctx.pnotes) do add(v, 2) end
+    end
+    if kind == 'note' or kind == 'track' then for _, c in ipairs(snap and snap.cols or {}) do add(c.name, 1) end end
+    local base = ctx.NAMES.list(kind == 'note' and 'track' or kind)
+    if kind == 'note' then local r2 = ctx.NAMES.list('region'); local both = {}; for _, v in ipairs(base) do both[#both + 1] = v end; for _, v in ipairs(r2) do both[#both + 1] = v end; base = both end
+    local used = {}
+    for i, nm in ipairs(order) do used[i] = nm end
+    table.sort(used, function(a, b) if cnt[a] ~= cnt[b] then return cnt[a] > cnt[b] end; return a:lower() < b:lower() end)
+    local items, seen = {}, {}
+    if (current or '') ~= '' then items[1] = { label = current }; seen[current:lower()] = true end   -- текущее — первым: Enter оставляет как есть
+    if kind == 'note' and (current or '') ~= '' then items[#items + 1] = { label = '- no note', clear = true } end
+    for _, nm in ipairs(used) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
+    for _, nm in ipairs(base) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
+    vim.open_picker(title .. '  -  pick, or type your own (Enter); " 2" etc. - a postfix', items, function(it) on_done(it.clear and '' or it.label) end)
+    vim.picker.free = true
   end,
   -- ── размер такта (5 окт) ─────────────────────────────────────────────
   autosync_on = function() return state.autosync end,
@@ -23693,8 +23731,7 @@ ctx.pat_note = function(name)
   return v
 end
 ctx.pat_note_prompt = function(name)
-  ctx.pnote_target = name
-  vim.open_prompt('pnote ', ctx.pat_note(name))
+  ctx.name_pick('note', 'note of ' .. ctx.pnote_key(name), ctx.pat_note(name), function(text) ctx.pnote_target = name; ctx.pat_note_set(text) end)   -- 18 окт: выпадашка, не строка
 end
 ctx.pat_note_set = function(text)
   local name = ctx.pnote_target or (seq[MX.cur.ri] and seq[MX.cur.ri].name)

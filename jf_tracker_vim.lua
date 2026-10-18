@@ -3070,6 +3070,15 @@ local function picker_filter()
   table.sort(out, function(a, b) if a.sc ~= b.sc then return a.sc > b.sc end return a.i < b.i end)
   pk.matches = {}
   for i, m in ipairs(out) do pk.matches[i] = m.it end
+  -- 18 окт: свободный текст (pk.free): набранное, которого нет в списке, — своей строкой; без совпадений — первой
+  if pk.free and pk.query ~= '' then
+    local exact = false
+    for _, it in ipairs(pk.matches) do if it.label == pk.query then exact = true; break end end
+    if not exact then
+      local fr = { label = pk.query, free = true }
+      if #pk.matches == 0 then pk.matches[1] = fr else pk.matches[#pk.matches + 1] = fr end
+    end
+  end
   if pk.sel > #pk.matches then pk.sel = math.max(1, #pk.matches) end
 end
 
