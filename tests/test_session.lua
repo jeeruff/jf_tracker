@@ -283,5 +283,38 @@ A.session_plant('tr', { pos = 0, rgnend = 4 }, 100, 108, 102.5, nil, 't', { 101,
 got = {}; for _, it in ipairs(items) do if it.pos >= 100 then got[#got + 1] = it.pos end end
 eq('fill skips the piece crossing the window', #got, 0)
 
+
+-- ── clipkb (18 окт): столбцы 1qaz 2wsx … = треки, сверху вниз — видимые сцены ──
+do
+  local k, r = SS.kb_pos('w'); eq('kb: w = column 2', k, 2); eq('kb: w = row 2', r, 2)
+  k, r = SS.kb_pos('/'); eq('kb: / = column 10', k, 10); eq('kb: / = row 4', r, 4)
+  SS.scroll = 0
+  eq('kb: label of scene 3, track 2', SS.key_of(3, 2, { 1, 2 }), 's')
+  eq('kb: scene 5 has no key', SS.key_of(5, 2, { 1, 2 }), nil)
+  local recs, launched, stopped = {}, {}, {}
+  local t_launch, t_stop = SS.launch, SS.stop
+  SS.launch = function(ri, ci) launched[#launched + 1] = ri .. ':' .. ci end
+  SS.stop = function(ci) stopped[#stopped + 1] = ci end
+  ctx.ss_record = function(ri, ci) recs[#recs + 1] = ri .. ':' .. ci end
+  local kseq = { { name = 'A' }, { name = 'B' }, { name = 'C' } }
+  local kgrid = { { { state = 'full' }, { state = 'empty' } }, { { state = 'full' }, { state = 'full' } } }
+  local ksnap = { cols = { {}, {} } }
+  SS.live = {}
+  SS.clip_key(('1'):byte(), kseq, ksnap, kgrid, { 1, 2 }, {})
+  eq('kb: 1 launches scene 1 track 1', launched[1], '1:1')
+  SS.clip_key(('2'):byte(), kseq, ksnap, kgrid, { 1, 2 }, {})
+  eq('kb: empty slot records', recs[1], '1:2')
+  SS.clip_key(('w'):byte(), kseq, ksnap, kgrid, { 1, 2 }, { ctrl = true })
+  eq('kb: Ctrl stops the track', stopped[1], 2)
+  SS.clip_key(('Q'):byte(), kseq, ksnap, kgrid, { 1, 2 }, { shift = true })
+  SS.clip_key(('@'):byte(), kseq, ksnap, kgrid, { 1, 2 }, { shift = true })
+  eq('kb: Shift picks, no launch yet', #launched, 1)
+  ctx.mods = function() return {} end
+  SS.kb_flush(kseq, kgrid)
+  eq('kb: let go of Shift - both start', #launched + #recs, 4)
+  eq('kb: picks cleared', next(SS.kb_pick), nil)
+  ctx.mods = nil
+  SS.launch, SS.stop = t_launch, t_stop
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

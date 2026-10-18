@@ -360,7 +360,7 @@ KH.PAGES = {
     { k = 'drop', t = {}, d = 'a file or a pm card dropped on a cell becomes its clip (goes into the slot of that track)' },
     { k = 'rclick', t = {}, d = 'menu: launch / scene / stop / quantize / off' },
     { k = 'zz Esc', d = 'back to the matrix - the clips keep playing' },
-    { k = 'zs', d = 'tracker <-> session: clips in place of the tracker (same columns); a clip is a 3-row block, a / A - its follow action (loop, next, previous, first, random, stop); in the session the keyboard is CLIP MODE - q..p a..l z..m launch the clip under the letter, Shift - the scene, 1..0 stop a track, ; jump labels' },
+    { k = 'c', d = 'clipkb: the keyboard columns launch clips - 1qaz the first track, 2wsx the second ... 0p;/ the tenth, top-down the 4 visible scenes; a clip - launch (playing - stop), an empty slot - record into it; Shift + keys - pick several, let go of Shift - they start together; Ctrl + key - stop the track; Backspace - stop all; Esc - clipkb off' },
     { k = 'A-Tab', d = 'next pane in the tree order (Shift - back)' },
     { k = 'R', d = 'record into the clip: arms the track, the slot as the auto-punch selection, a bar of count-in, stops at the slot end' },
     { k = 'dd Del', d = 'delete the clip (its items in the slot)' },
@@ -711,7 +711,7 @@ KH.BARS = {
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { 'F1', 'help' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
            { 'Space', 'listen' }, { '/', 'find' }, { 'F1', 'help' } },
-  session = { { 'Tab', 'clip mode' }, { 'click >', 'launch' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
+  session = { { 'c', 'clipkb' }, { 'click > x', 'launch / stop' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf

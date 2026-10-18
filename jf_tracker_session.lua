@@ -285,6 +285,7 @@ end
 
 -- каждый кадр: границы пройдены — выполнить. seq / snap — текущие
 function SS.tick(seq, snap, grid)
+  if SS.kb then SS.kb_flush(seq, grid) end
   if grid and not SS.halt then SS.follow_tick(seq, grid) end
   if not next(SS.pend) and not next(SS.todo) then return end
   local zone = ctx.ss_zone(); if not zone then return end
@@ -352,6 +353,7 @@ function SS.key(c, seq, snap, grid, mods)
     return c == 27
   end
   local r0, c0 = SS.cur.ri, SS.cur.ci
+  if SS.kb and ctx.ss_is_big() and SS.clip_key(c, seq, snap, grid, SS.vis_grid or {}, mods) then return true end   -- 18 окт: clipkb
   local eaten = SS.key_body(c, ch, seq, snap, grid, ncols)
   if eaten and (SS.cur.ri ~= r0 or SS.cur.ci ~= c0) and ctx.ss_focus then ctx.ss_focus(SS.cur.ri, SS.cur.ci, grid) end
   return eaten
@@ -419,6 +421,7 @@ function SS.key_body(c, ch, seq, snap, grid, ncols)
   elseif ch == 'X' then SS.stop_all(ncols)
   elseif ch == 'q' then ctx.msg('session quantize: ' .. SS.next_quant())
   elseif ch == 'Q' then SS.quit()
+  elseif ch == 'c' then SS.kb = not SS.kb; SS.kb_pick = {}; ctx.msg(SS.kb and 'clipkb: 1qaz 2wsx 3edc ... launch (column = track, top-down = scenes), Shift - pick several, Ctrl - stop, empty - record; Esc off' or 'clipkb off')   -- 18 окт
   elseif ch == ' ' then ctx.ss_transport()
   elseif ch == 'z' then SS.pending_z = true; ctx.msg(ctx.ss_is_big() and 'z: z - back to the matrix' or 'z: z - clips over the whole window')
   elseif c == 27 then if ctx.ss_is_big() then ctx.ss_big() else return false end
@@ -431,35 +434,60 @@ end
 -- стоп всех; стрелки — сцены / курсор; . — follow action курсора;
 -- , — квантизация; / — запись в клип курсора; Space — транспорт; Enter —
 -- клип курсора. vis — ci видимых колонок слева направо
-SS.KEYROWS = { 'qwertyuiop', 'asdfghjkl', 'zxcvbnm' }
+-- 18 окт (clipkb): столбцы клавиатуры — треки, сверху вниз — 4 видимые сцены: 1qaz — первый трек,
+-- 2wsx — второй … 0p;/ — десятый. Клавиша: клип — запуск (играет — стоп), пустой слот — запись в него;
+-- Shift + клавиши — набрать несколько, отпустил Shift — все стартуют разом (одна граница квантизации);
+-- Ctrl + клавиша — стоп трека. Backspace — стоп всех, стрелки — сцены / курсор, Esc — выйти из clipkb
+SS.KEYCOLS = { '1qaz', '2wsx', '3edc', '4rfv', '5tgb', '6yhn', '7ujm', '8ik,', '9ol.', '0p;/' }
+SS.KB_ROWS = 4
+SS.kb = false            -- режим clipkb (session на всё окно)
+SS.kb_pick = {}          -- набранные с Shift: «ri:ci» → { ri, ci }
+local SHIFTED = { ['!'] = '1', ['@'] = '2', ['#'] = '3', ['$'] = '4', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['*'] = '8', ['('] = '9', [')'] = '0', ['<'] = ',', ['>'] = '.', [':'] = ';', ['?'] = '/' }
+-- символ → столбец k, ряд r (или nil)
+function SS.kb_pos(ch)
+  for k, col in ipairs(SS.KEYCOLS) do
+    local r = col:find(ch, 1, true)
+    if r then return k, r end
+  end
+end
 function SS.key_of(ri, ci, vis)
   local r = ri - SS.scroll
-  local row = SS.KEYROWS[r]
-  if not row then return nil end
-  for k, v in ipairs(vis or SS.vis or {}) do if v == ci then return k <= #row and row:sub(k, k) or nil end end
+  if r < 1 or r > SS.KB_ROWS then return nil end
+  for k, v in ipairs(vis or SS.vis or {}) do
+    if v == ci then local col = SS.KEYCOLS[k]; return col and col:sub(r, r) or nil end
+  end
+end
+local function kb_launch(ri, ci, seq, grid)
+  local cell = grid[ri] and grid[ri][ci]
+  if cell and cell.state ~= 'empty' then SS.toggle(ri, ci, seq)
+  elseif ctx.ss_record then ctx.ss_record(ri, ci) end            -- пустой слот — запись в него
 end
 function SS.clip_key(c, seq, snap, grid, vis, mods)
   SS.vis = vis
-  local ch = c < 256 and string.char(c) or ''
+  mods = mods or {}
   local ncols = #snap.cols
-  local low = ch:lower()
-  for r, row in ipairs(SS.KEYROWS) do
-    local k = low ~= '' and row:find(low, 1, true)
-    if k and low:match('%a') then
-      local ri = SS.scroll + r
-      if not seq[ri] then ctx.msg('no scene on this key row'); return true end
-      if ch ~= low then SS.cur.ri = ri; SS.scene(ri, seq, grid, ncols); return true end   -- Shift — вся сцена
-      local ci = vis[k]
-      if not ci then ctx.msg('no track on this key'); return true end
-      SS.cur.ri, SS.cur.ci = ri, ci
-      local cell = grid[ri] and grid[ri][ci]
-      if cell and cell.state ~= 'empty' then SS.launch(ri, ci, seq) else SS.stop(ci) end   -- пустой слот — стоп трека (как в Ableton)
-      if ctx.ss_focus then ctx.ss_focus(ri, ci, grid) end
-      return true
-    end
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  local ctrl = mods.ctrl and c >= 1 and c <= 26 and c ~= 8 and c ~= 9 and c ~= 13
+  if ctrl then ch = string.char(c + 96) end
+  local base = SHIFTED[ch] or ch:lower()
+  local shift = mods.shift or SHIFTED[ch] ~= nil or (ch:match('%u') ~= nil)
+  local k, r = SS.kb_pos(base)
+  if k and base ~= '' then
+    local ri, ci = SS.scroll + r, vis[k]
+    if not seq[ri] then ctx.msg('no scene on this key row'); return true end
+    if not ci then ctx.msg('no track on this key'); return true end
+    SS.cur.ri, SS.cur.ci = ri, ci
+    if mods.ctrl or ctrl then SS.stop(ci)
+    elseif shift then
+      local key = ri .. ':' .. ci
+      if SS.kb_pick[key] then SS.kb_pick[key] = nil else SS.kb_pick[key] = { ri = ri, ci = ci } end
+      local n = 0; for _ in pairs(SS.kb_pick) do n = n + 1 end
+      ctx.msg(('clipkb: %d picked - let go of Shift to launch them together'):format(n))
+    else kb_launch(ri, ci, seq, grid) end
+    if ctx.ss_focus then ctx.ss_focus(ri, ci, grid) end
+    return true
   end
-  local d = tonumber(ch)
-  if d then local ci = vis[d == 0 and 10 or d]; if ci then SS.stop(ci) end; return true end
+  if c == 27 then SS.kb = false; SS.kb_pick = {}; ctx.msg('clipkb off'); return true end
   if c == 8 or c == 6579564 then SS.stop_all(ncols); return true end
   if c == 30064 then SS.scroll = math.max(0, SS.scroll - 1); SS.cur.ri = math.max(1, SS.cur.ri - 1); return true end            -- ↑
   if c == 1685026670 then SS.scroll = math.min(math.max(0, #seq - 1), SS.scroll + 1); SS.cur.ri = math.min(#seq, SS.cur.ri + 1); return true end   -- ↓
@@ -467,10 +495,17 @@ function SS.clip_key(c, seq, snap, grid, vis, mods)
   if c == 1919379572 then SS.cur.ci = math.min(math.max(1, ncols), SS.cur.ci + 1); return true end   -- →
   if c == 13 then SS.launch(SS.cur.ri, SS.cur.ci, seq); return true end
   if ch == ' ' then ctx.ss_transport(); return true end
-  if ch == ',' then ctx.msg('session quantize: ' .. SS.next_quant()); return true end
-  if ch == '.' then return SS.key_body(c, 'a', seq, snap, grid, ncols) end
-  if ch == '/' then if ctx.ss_record then ctx.ss_record(SS.cur.ri, SS.cur.ci) end; return true end
   return false
+end
+-- отпустил Shift — набранные клипы стартуют вместе (каждый кадр, из tick)
+function SS.kb_flush(seq, grid)
+  if not next(SS.kb_pick) then return end
+  local m = ctx.mods and ctx.mods() or {}
+  if m.shift then return end
+  local n = 0
+  for _, p in pairs(SS.kb_pick) do kb_launch(p.ri, p.ci, seq, grid or {}); n = n + 1 end
+  SS.kb_pick = {}
+  ctx.msg(('clipkb: %d clips launched together at %s'):format(n, SS.quant))
 end
 
 function SS.follow(seq)
@@ -500,6 +535,7 @@ function SS.click(hv, seq, snap, grid, now)
   elseif hv.sessbtn == 'stopall' then SS.stop_all(ncols)
   elseif hv.sessbtn == 'quit' then SS.quit()
   elseif hv.sessbtn == 'back' or hv.sessbtn == 'big' then ctx.ss_big()
+  elseif hv.sessbtn == 'clipkb' then SS.kb = not SS.kb; SS.kb_pick = {}; ctx.msg(SS.kb and 'clipkb on' or 'clipkb off')
   end
   return true
 end
@@ -554,6 +590,12 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
     if hot then hover.sesscol = ci end
   end
   local blink = (math.floor((now or 0) / SS.BLINK) % 2) == 0
+  -- 18 окт: видимые колонки (для clipkb) и последний клип колонки (под ним — o записи)
+  SS.vis_grid = {}
+  for k = 1, lay.cols_fit do if snap.cols[SS.hs + k] then SS.vis_grid[k] = SS.hs + k end end
+  local last_clip = {}
+  for ri2 = 1, nrows do for k = 1, lay.cols_fit do local ci = SS.hs + k; local c2 = grid[ri2] and grid[ri2][ci]; if c2 and c2.state ~= 'empty' then last_clip[ci] = ri2 end end end
+  local BTN = U.measure('>') + 4
   for r = 1, lay.rows_fit do
     local ri = SS.scroll + r
     local rg = seq[ri]; if not rg then break end
@@ -582,7 +624,24 @@ function SS.draw_grid(L, x, y, w, h, seq, snap, grid, now, playpos, hover, compa
       local ci = SS.hs + k
       local col = snap.cols[ci]; if not col then break end
       local cx = gx0 + (k - 1) * lay.cell_w
-      SS.draw_cell(L, cx, ry, lay.cell_w - 2, lay.cell_h - 2, grid[ri] and grid[ri][ci], col, ri, ci, rg, blink, playpos, hover)
+      local cell = grid[ri] and grid[ri][ci]
+      local busy = cell and cell.state ~= 'empty'
+      if busy then SS.cell_inset, SS.name_over = BTN + 2, true end
+      SS.draw_cell(L, cx, ry, lay.cell_w - 2, lay.cell_h - 2, cell, col, ri, ci, rg, blink, playpos, hover)
+      SS.cell_inset, SS.name_over = nil, nil
+      -- 18 окт: кнопки > / x / o, как были над трекером
+      local bx, byb = cx + 2, ry + lay.cell_h - 2 - L.rh - 1
+      if busy then
+        local on = SS.live[ci] and SS.live[ci].ri == ri
+        SS.corner(L, bx, byb, on and 'x' or '>', on and U.AMBER or U.GREEN, 'ssplay', { ri = ri, ci = ci, stop = on }, hover)
+      elseif not rg.gap and ri == (last_clip[ci] or 0) + 1 then
+        SS.corner(L, bx, byb, 'o', U.RED, 'ssrecbtn', { ri = ri, ci = ci }, hover)
+      end
+      if SS.kb then
+        local kl = SS.key_of(ri, ci, SS.vis_grid)
+        if kl then U.text(cx + lay.cell_w - 2 - L.pad - U.measure(kl), ry + 1, kl, SS.kb_pick[ri .. ':' .. ci] and U.CYAN or U.AMBER) end
+        if SS.kb_pick[ri .. ':' .. ci] then U.set(U.CYAN); gfx.rect(cx, ry, lay.cell_w - 2, lay.cell_h - 2, 0) end
+      end
     end
   end
   -- скроллбар рядов (6 окт) справа от клеток; колесо — над сеткой
@@ -857,6 +916,17 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
   return hover
 end
 
+-- 18 окт: кнопка-буква клипа (> запуск, x стоп, o запись) — общая для тела трекера и большой сетки
+function SS.corner(L, x, y, lab, col, key, data, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local bw = U.measure(lab) + 4
+  local hot = mx >= x and mx < x + bw and my >= y and my < y + L.rh
+  U.set(hot and U.tint(col, 0.45) or U.BG); gfx.rect(x, y, bw, L.rh - 1, 1)
+  U.set(col); gfx.rect(x, y, bw, L.rh - 1, 0)
+  U.text(x + 2, y, lab, hot and U.TEXT or col)
+  if hot then hover[key] = data end
+  return bw
+end
 -- строка кнопок сессии (big и вкладка clips); возвращает x после кнопок
 function SS.draw_buttons(L, bx, by, right, hover, big)
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -875,7 +945,8 @@ function SS.draw_buttons(L, bx, by, right, hover, big)
   btn('X stop all', 'stopall', SS.playing_any())
   btn('Q off', 'quit', false)
   btn(big and 'zz back' or 'zz big', big and 'back' or 'big', false)
-  local hint = 'Enter launch  O / F scene  x stop  f labels  Space transport  drop files (browser, Media Explorer) or a pm card onto a cell'
+  if big then btn('c clipkb', 'clipkb', SS.kb) end   -- 18 окт: столбцы 1qaz 2wsx … — запуск клипов
+  local hint = SS.kb and 'clipkb: 1qaz 2wsx 3edc ... column = track, top-down = scenes  Shift - pick, let go - all at once  Ctrl - stop  empty - record  Esc off' or 'Enter launch  O / F scene  x stop  f labels  Space transport  drop files (browser, Media Explorer) or a pm card onto a cell'
   if bx + U.measure(hint) < right then U.text(bx, by + 1, hint, U.GREY) end
   return bx
 end
