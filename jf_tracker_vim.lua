@@ -1828,7 +1828,7 @@ function V.key_impl(c)
   end
   -- 10 окт: Ctrl+цифра — длина шага (step 0..9; 0 — курсор стоит), step auto выкл
   if mods.ctrl and not mods.alt and not mods.cmd and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
-    V.step = c - ('0'):byte(); V.step_auto = false; V.step_next = false
+    V.step = math.floor(c) - ('0'):byte(); V.step_auto = false; V.step_next = false   -- 18 окт: floor — код клавиши float, шаг показывался 2.0
     V.msg = 'step ' .. V.step .. (V.step == 0 and ' - the cursor stays' or ' row(s)')
     V.count = nil; return
   end
