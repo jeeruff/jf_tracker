@@ -8829,6 +8829,30 @@ ctx = {
     if not rg then vim.msg = 'no region'; return end
     if text == '' then vim.msg = 'name: empty'; return end
     if rg.gap then
+      -- 18 окт: имя уже есть у паттерна — спросить: эти ноты новым вариантом (по умолчанию) или связанный повтор того
+      -- (клетки заменятся его содержимым; синхронизация явно от него — без хука, не наугад)
+      local src
+      if not ctx.mx_name_forced then for _, r2 in ipairs(seq) do if not r2.gap and r2.name == text then src = r2; break end end end
+      ctx.mx_name_forced = nil
+      if src then
+        local var = model.SEC.next_variant(regions, text) or alias.free_name(regions, text)
+        local bar = rg
+        OPT.ask.open(('"%s" is already a pattern'):format(text), 'this bar has its own notes - what should it be?', {
+          { key = 'n', label = ('keep these notes as a new pattern %s'):format(var), fn = function()
+              edit.run('add region', function() reaper.AddProjectMarker2(0, true, bar.pos, bar.rgnend, var, -1, 0) end)
+              ctx.mx_refresh(); vim.msg = 'region: ' .. var .. ' (its own notes)' end },
+          { key = 'l', label = ('make it %s - a linked repeat, its cells replaced by %s'):format(text, text), fn = function()
+              ctx.slot_op('bar becomes ' .. text, function()
+                reaper.AddProjectMarker2(0, true, bar.pos, bar.rgnend, text, -1, src.color or 0)
+                model.invalidate(); regions = model.regions(state.lpb)
+                local s2
+                for _, r3 in ipairs(regions) do if r3.idx == src.idx then s2 = r3 end end
+                alias.sync(regions, s2 or src)
+              end)
+              vim.msg = 'region: ' .. text .. ' (linked, the content of ' .. text .. ')' end },
+        })
+        return
+      end
       -- свободный такт → новый регион на нём
       edit.run('add region', function() reaper.AddProjectMarker2(0, true, rg.pos, rg.rgnend, text, -1, 0) end)
       ctx.mx_refresh(); vim.msg = 'region: ' .. text; return
