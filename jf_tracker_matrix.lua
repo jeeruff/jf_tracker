@@ -364,6 +364,13 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ch, W - 4, 1, 1)
     hy = hy + ch + 2
   end
+  -- 18 окт: палитра — все паттерны проекта с превью по трекам (view → p)
+  if MX.palette and ctx.palette_draw then
+    local ph, hv = ctx.palette_draw(L, 0, hy + L.rh + 2, W - 6)
+    for k, v in pairs(hv) do hover[k] = v end
+    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
+    hy = hy + ph + 2
+  end
   -- 18 окт: playlist — блок под кнопками (порядок паттернов текстом), матрица ниже
   MX.pl_y = nil
   if MX.plist and ctx.plist_draw then

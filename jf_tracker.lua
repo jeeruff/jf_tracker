@@ -1157,7 +1157,6 @@ ctx = {
     items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
     if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
-    items[#items + 1] = { key = 'S', label = 'session - clips over the whole window (zz in the matrix)', fn = function() ctx.ss_big() end }
     items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
@@ -7517,7 +7516,14 @@ ctx = {
         seen[s.name] = true
         if #alias.items_over(col.track, s.pos, s.rgnend) > 0 then
           local num = nums[s.name] or 0
-          items[#items + 1] = { label = ('%02d %s'):format(num, s.name), t = ('%02d'):format(num), v = sri, tip = ('%s on %s: %d steps'):format(s.name, col.name, math.floor(s.r1 - s.r0 + 0.5)) }
+          local it = { label = ('%02d %s'):format(num, s.name), t = ('%02d'):format(num), v = sri, tip = ('%s on %s: %d steps'):format(s.name, col.name, math.floor(s.r1 - s.r0 + 0.5)) }
+          -- 18 окт: превью — что этот паттерн играет на треке (волна / ноты)
+          local parts = ctx.mx_cell_parts(col.track, s.pos, s.rgnend)
+          it.draw = function(x, y, w, h, on)
+            U.text(x + 2, y, ctx.fit(it.label, w - 4), on and U.TEXT or U.GREY)
+            ctx.mx_cell_parts_draw(parts, x + 2, y + L.rh, w - 4, h - L.rh - 1, on)
+          end
+          items[#items + 1] = it
           if s.name == rg.name then sel = #items end
         end
       end
@@ -7526,7 +7532,9 @@ ctx = {
     items[#items + 1] = { label = 'clear', v = 0, tip = 'empty this cell' }
     local r = MX.cur_rect
     if r then ctx.smart_at = { x = r.x, y = r.y + r.h + 2, top = r.y } end
-    return ctx.smart_open({ title = ('%s @ slot %d - a pattern for this cell (Enter)'):format(col.name, ri), items = items, cols = 1, sel = sel,
+    items[#items].draw = function(x, y, w, h, on) U.text(x + 2, y, 'clear', on and U.TEXT or U.GREY) end
+    return ctx.smart_open({ title = ('%s @ slot %d - a pattern for this cell (Enter)'):format(col.name, ri), items = items, cols = math.min(4, #items), sel = sel,
+      cell_w = L.cw * 16, cell_rows = 3,   -- 18 окт: клетки с превью
       on_sel = function(it) if it.v and it.v > 0 then local s = seq[it.v]; ctx.mx_cell_preview(col.track, s.pos, s.rgnend) end end,
       on_pick = function(it)
         ctx.mx_cell_preview_end()
@@ -7539,6 +7547,75 @@ ctx = {
         ctx.mx_refresh()
         vim.msg = ('%s slot %d: the cell of %s (alias, %d item(s))'):format(col.name, ri, items[1] and it.label or '', n)
       end })
+  end,
+  -- 18 окт: превью паттерна на треке для выпадашки клетки: время слева направо; аудио — волна куска,
+  -- MIDI — ноты схемой (высота — по диапазону нот), прочее — блок. Считается один раз (при открытии)
+  mx_cell_parts = function(tr, t0, t1)
+    local parts, span = {}, math.max(1e-6, t1 - t0)
+    for _, it in ipairs(alias.items_over(tr, t0, t1)) do
+      local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local fin = pos + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local a, b = math.max(t0, pos), math.min(t1, fin)
+      local tk = reaper.GetActiveTake(it)
+      local pt = { a = (a - t0) / span, b = (b - t0) / span, muted = reaper.GetMediaItemInfo_Value(it, 'B_MUTE') == 1 }
+      if tk and reaper.TakeIsMIDI(tk) then
+        pt.kind, pt.notes = 'midi', {}
+        local _, nn = reaper.MIDI_CountEvts(tk)
+        for k = 0, math.min(nn, 512) - 1 do
+          local ok, _, mu, sp, ep, _, pitch = reaper.MIDI_GetNote(tk, k)
+          if ok and not mu then
+            local ns, ne = reaper.MIDI_GetProjTimeFromPPQPos(tk, sp), reaper.MIDI_GetProjTimeFromPPQPos(tk, ep)
+            ns, ne = math.max(a, ns), math.min(b, ne)
+            if ne > ns then
+              pt.notes[#pt.notes + 1] = { (ns - t0) / span, (ne - t0) / span, pitch }
+              pt.lo, pt.hi = math.min(pt.lo or pitch, pitch), math.max(pt.hi or pitch, pitch)
+            end
+          end
+        end
+      elseif tk then
+        local src = reaper.GetMediaItemTake_Source(tk)
+        local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+        if rate <= 0 then rate = 1 end
+        local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + (a - pos) * rate
+        local _, g = reaper.GetSetMediaItemInfo_String(it, 'GUID', '', false)
+        pt.kind, pt.head = 'audio', { src = src, guid = g .. ':mxp' .. ('%.4f'):format(offs), offs = offs, len = b - a, rate = rate }
+      else pt.kind = 'empty' end
+      parts[#parts + 1] = pt
+    end
+    return parts
+  end,
+  mx_cell_parts_draw = function(parts, x, y, w, h, on)
+    U.set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x, y, w, h, 0)
+    for _, pt in ipairs(parts) do
+      local px0, px1 = x + math.floor(pt.a * w), x + math.max(math.floor(pt.a * w) + 1, math.floor(pt.b * w))
+      local pw = px1 - px0
+      local col = pt.muted and U.GREY or (pt.kind == 'midi' and U.GREEN or U.CYAN)
+      if not on then col = U.mix(col, U.BG, 0.35) end
+      if pt.kind == 'audio' and pw >= 2 then
+        local pk = model.peaks(pt.head, pw)
+        local cy = y + math.floor(h / 2)
+        U.set(col)
+        if pk and pk.n and pk.n > 0 then
+          for i = 0, pw - 1 do
+            local k = math.floor(i * pk.n / pw) + 1
+            local a2, b2 = math.min(1, pk.max[k] or 0), math.max(-1, pk.min[k] or 0)
+            local y0, y1 = cy - math.floor(a2 * h / 2), cy - math.floor(b2 * h / 2)
+            gfx.rect(px0 + i, y0, 1, math.max(1, y1 - y0), 1)
+          end
+        else gfx.rect(px0, cy, pw, 1, 1) end
+      elseif pt.kind == 'midi' then
+        U.set(U.mix(col, U.BG, 0.8)); gfx.rect(px0, y, pw, h, 1)
+        local lo, hi = pt.lo or 60, pt.hi or 60
+        local rng = math.max(1, hi - lo)
+        U.set(col)
+        for _, nt in ipairs(pt.notes) do
+          local nx0 = x + math.floor(nt[1] * w)
+          local nw = math.max(1, math.floor((nt[2] - nt[1]) * w))
+          local ny = y + 1 + math.floor((1 - (nt[3] - lo) / rng) * math.max(0, h - 3))
+          gfx.rect(nx0, ny, nw, 2, 1)
+        end
+      else U.set(col); gfx.rect(px0, y + 1, pw, h - 2, 0) end
+    end
   end,
   mx_cell_preview = function(tr, t0, t1, owner)
     if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then return end   -- идёт игра — не перебивать
@@ -8565,8 +8642,8 @@ ctx = {
       { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
+      { key = 'p', label = 'palette: every pattern of the project (in the song or not) - hold a cell to listen' .. on(MX.palette), fn = function() MX.palette = not MX.palette; reaper.SetExtState(EXT, 'mxpal', MX.palette and '1' or '0', true); relayout() end },
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
-      { key = 'z', label = 'session: clips over the whole window', fn = function() if ctx.ss_big then ctx.ss_big() end end },
     }
     if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
     vim.open_hydra({ title = 'matrix view (z)', items = items })
@@ -9529,6 +9606,8 @@ ctx = {
     return c.root, c.obj, c.title
   end,
   ss_big = function()
+    -- 18 окт: session на всё окно выключен (полноразмерные клипы — против философии трекера); открытый — закрывается
+    if not state.ss_big then vim.msg = 'session over the whole window is off - patterns are auditioned in the matrix'; return end
     if state.ss_big then
       for k, v in pairs(state.ss_saved or {}) do state[k] = v end
       state.ss_big, state.ss_saved = false, nil
@@ -13434,6 +13513,7 @@ do   -- правки DSP big — через edit (undo), дерево после
     end,
   }) do ctx.db_ops[k] = v end
 end
+MX.palette = reaper.GetExtState(EXT, 'mxpal') == '1'   -- 18 окт: палитра паттернов в матрице
 MX.clips = false   -- 7 окт: вида clips в матрице больше нет (сессия — в теле трекера, zs; zz в матрице — на всё окно)
 -- инструмент ноты (6 окт): item-представитель из снимка — база транспоза
 edit.inst_ref = function(it)
@@ -15278,7 +15358,6 @@ function ctx.context_items(hover)
     add((MX.ruler and '!' or '') .. 'Ruler (R)', function() ctx.mx_ruler_toggle() end, 'R')
     add((MX.loops and '!' or '') .. 'Loops layer', function() ctx.mx_loops_toggle() end, 'l')
     add((MX.zoom == 'detail' and '!' or '') .. 'Detail view (z)', function() ctx.mx_zoom() end, 'z')
-    add('Session: clips over the whole window (zz)', function() ctx.ss_big() end, 's')
     add('Arrangement …', function() ctx.arr() end, 'a')
   else
     for _, a in ipairs(view_actions()) do add(a[1], a.fn, a.key) end
@@ -18312,6 +18391,8 @@ local function frame()
   -- session big (6 окт): клипы поверх всего
   if state.ss_big and not idle_skip and snap then
     HN.reset()
+    -- 18 окт: session на всё окно — клавиши его (клик по сетке ставил фокус трекеру под ней: c открывал оператор Vim, zz зумил трекер)
+    if state.focus ~= 'matrix' then state.focus = 'matrix' end
     hover = MX.SS.draw_big(L, 0, 0, gfx.w, gfx.h - L.status_h, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise(), reaper.GetPlayPosition())
   end
   idle.hover = hover
@@ -20464,6 +20545,10 @@ local function frame()
         else ctx.mx_tsel = { a = ri, last = ri }; vim.msg = 'double-click - loop this slot; drag - several; Cmd+click - pick slots, the loop jumps between them' end
       end
       click = { t = now2, zone = 'mxtsel', row = ri }
+    elseif hover.matrix and (hover.matrix.palcell or hover.matrix.palname) then   -- 18 окт: палитра — слушать
+      local pc = hover.matrix.palcell
+      ctx.palette_listen(pc and pc.p or hover.matrix.palname, pc and pc.ci)
+      click = { t = now2, zone = 'mxpal' }
     elseif hover.matrix and hover.matrix.vis then
       -- 11 окт: клетка visor матрицы — сцена / пресет в начало слота (событие v:)
       local rg = seq[hover.matrix.vis.ri]
@@ -23524,6 +23609,66 @@ ctx.pl_cmd = function(arg)
   vim.msg = l and ('playlist %d/%d "%s"'):format(P.cur, #P.lists, l.name) or 'no playlists - :pl new [name]'
 end
 -- панель в матрице (под кнопками, матрица ниже): имя, кнопки, текст словами (играющее — янтарём, ошибка — красным), итог
+-- 18 окт: палитра паттернов (матрица, view → p): все паттерны проекта — и те, что не стоят в песне;
+-- клетка — превью трека (волна / ноты), зажать клетку — слушать трек соло, имя — весь паттерн; отпустил — тишина
+ctx.palette_draw = function(Lx, x, y, w)
+  local hover = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local rh = 2 * Lx.rh
+  local list = ctx.pal_list
+  if not list or ctx.pal_regs ~= regions then
+    list = {}
+    for _, p in ipairs(model.patterns(regions)) do if not p.name:match('^=') and not (p.src and p.src.session) then list[#list + 1] = p end end   -- служебные (=SESSION …) — мимо
+    ctx.pal_list, ctx.pal_regs = list, regions
+  end
+  if ctx.pal_snap ~= snap then ctx.pal_parts, ctx.pal_snap = {}, snap end
+  local nvis = math.min(#list, 6)
+  MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll or 0))
+  U.text(x + Lx.pad, y, ctx.fit(('palette  %d patterns  -  hold a cell: listen to the track, the name: the pattern'):format(#list), w - 2 * Lx.pad - U.measure('+99 ')), U.GREY)
+  local y0 = y + Lx.rh + 1
+  if gfx.mouse_wheel ~= 0 and mx >= x and mx < x + w and my >= y0 and my < y0 + nvis * rh then
+    MX.pal_scroll = MX.pal_scroll + (gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
+  end
+  local W = x + w
+  for r = 1, nvis do
+    local p = list[MX.pal_scroll + r]; if not p then break end
+    local src = p.src
+    local ry = y0 + (r - 1) * rh
+    local nw = Lx.mx_label_w - Lx.pad
+    local hotn = mx >= x and mx < x + nw and my >= ry and my < ry + rh
+    if hotn then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, nw, rh - 1, 1); hover.palname = p end
+    U.text(x + Lx.pad, ry + 1, p.name, hotn and U.AMBER or U.TEXT)
+    if p.n == 0 then U.text(x + Lx.pad, ry + 1 + Lx.rh, 'not in the song', U.DIM) end
+    for ci, col in ipairs(snap.cols) do
+      local cx = Lx.mx_label_w + (ci - 1 - MX.hs) * Lx.mx_cell_w
+      if cx + Lx.mx_cell_w > W - 4 then break end
+      if ci > MX.hs and src and col.track then
+        local key = p.name .. ':' .. ci
+        local parts = ctx.pal_parts[key]
+        if not parts then parts = ctx.mx_cell_parts(col.track, src.pos, src.rgnend); ctx.pal_parts[key] = parts end
+        local hot = mx >= cx and mx < cx + Lx.mx_cell_w and my >= ry and my < ry + rh
+        if #parts > 0 then ctx.mx_cell_parts_draw(parts, cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3, true)
+        else U.set(U.DIM); MX.box(cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3) end
+        if hot then U.set(U.AMBER); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); hover.palcell = { p = p, ci = ci } end
+      end
+    end
+  end
+  if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
+  -- зажатая прослушка палитры: отпустил кнопку — стоп
+  if ctx.mx_solo and ctx.mx_solo_owner == 'palette' and gfx.mouse_cap & 1 == 0 then ctx.mx_cell_preview_end() end
+  return Lx.rh + 1 + nvis * rh + 2, hover
+end
+ctx.palette_listen = function(p, ci)
+  local src = p and p.src
+  if not src then return end
+  local only
+  if ci then local col = snap.cols[ci]; only = col and col.track
+  else only = {}; for _, c in ipairs(snap.cols) do if c.track then only[c.track] = true end end end
+  if not only then return end
+  if reaper.GetPlayState() & 1 == 1 then vim.msg = 'palette: the transport plays - stop it to listen'; return end
+  ctx.mx_cell_preview(only, src.pos, src.rgnend, 'palette')
+  vim.msg = ('palette: %s%s'):format(p.name, ci and (' on ' .. (snap.cols[ci].name or '')) or ' (all tracks)')
+end
 ctx.plist_draw = function(Lx, x, y, w)
   local P = ctx.PL
   ctx.pl_load()
