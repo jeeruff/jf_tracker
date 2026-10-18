@@ -1320,7 +1320,7 @@ local function mark_params(tr, A, out)
       local okm, act = A.GetNamedConfigParm and A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i))
       p.auto = (R.GetFXEnvelope and not M.is_take(tr) and R.GetFXEnvelope(tr, fx, p.i, false) ~= nil) or false
       p.mod = (okm and act == '1') or false
-      p.mk = (p.auto and ' ~' or '') .. (p.mod and ' %' or '')
+      p.mk = (p.auto and ' ~' or '') .. (p.mod and ' ≈' or '')   -- 18 окт: модулирован — ≈ (просьба), автоматизирован — ~
     end
   end
 end

@@ -8333,7 +8333,7 @@ function D.frame(L, snap, rows, state, info)
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
-        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)   -- 15 окт: ~ автоматизирован, % модулирован (знак после обрезки имени)
+        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)   -- 15 окт: ~ автоматизирован, ≈ модулирован (18 окт, было %; знак после обрезки имени)
         if vw > 4 and not steps_inline then
           -- 10 окт: вид значения из реестра (RS5K): нота именем, root — нота оригинала, канал 0 — all
           local vs = v.s
