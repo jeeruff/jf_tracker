@@ -5914,7 +5914,8 @@ function D.frame(L, snap, rows, state, info)
         elseif not bigf and state.panknob ~= false and col.panmode ~= 6 then
           -- 18 окт: над кнобом пана — слайдер width (правка в режиме без ширины включает stereo pan — edit.track_value)
           local wv = lv('width', col.width or 1)
-          slider(sx, pyy, fx_w, (wv + 1) / 2, true, 'w', math.floor(wv * 100 + 0.5) .. '', 'width', nil, true)
+          -- 18 окт: дорожкой без подписи (in_pop = true — не сворачиваться в кнопку w в узкой зоне); значение — в статусе
+          slider(sx, pyy, fx_w, (wv + 1) / 2, true, '', math.floor(wv * 100 + 0.5) .. '', 'width', true, true)
           local d = math.min(kd, 2 * L.rh - 2)
           knob(sx + math.floor((fx_w - d) / 2), pyy + L.rh, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
         elseif col.panmode == 5 then
