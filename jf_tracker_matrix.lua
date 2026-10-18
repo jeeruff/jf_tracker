@@ -620,9 +620,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if SEC and not rg.gap then cl, cn, crest = SEC.code_of(rg.name) end
     local hot_prev = hover.ri == ri and mx >= xa and mx < xn
     local hot_next = hover.ri == ri and mx >= xb and mx < xb + aw + 3
+    -- 18 окт: свободный такт, а в нём что-то есть (регион удалили, ноты остались) — ? янтарём, имя «unnamed»
+    local orphan = false
+    if rg.gap and grid[ri] then for _, g2 in pairs(grid[ri]) do if type(g2) == 'table' and g2.state and g2.state ~= 'empty' then orphan = true; break end end end
     if rg.gap then
       -- свободный такт (между регионами / до =END): без паттерна, имя → создаёт регион
-      U.text(xn, y + 1, '..', U.DIM)
+      U.text(xn, y + 1, orphan and ' ?' or '..', orphan and U.AMBER or U.DIM)
     else
       U.text(xa, y + 1, '<', hot_prev and U.AMBER or U.GREY)
       -- 12 окт: код паттерна (A1, D12) вместо номера; без кода — номер как раньше
@@ -644,8 +647,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
-    local rgn = rg.gap and 'bar' or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
-    U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (rg.gap and U.DIM or lc))
+    local rgn = rg.gap and (orphan and 'unnamed - n' or 'bar') or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
+    U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (orphan and U.AMBER or (rg.gap and U.DIM or lc)))
     -- 17 окт: pads вкл — клавиша паттерна справа у имени (запись — красным)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
     if pk and nw > U.measure(pk) + 4 then U.text(nx + nw - U.measure(pk), y + 1, pk, (ctx.PADS and ctx.PADS.rec) and U.RED or U.AMBER) end

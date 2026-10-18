@@ -8144,9 +8144,17 @@ ctx = {
     local code, rest
     if not rg.gap then local l, _, r2 = model.SEC.code_of(rg.name or ''); if l then code, rest = rg.name:match('^(%S+)'), r2 end end   -- code_of: буква, номер, остаток
     rest = rest or (rg.name or '')
-    ctx.name_pick('region', code and ('name of ' .. code) or 'region name', rest, function(nm)
+    -- 18 окт: свободный такт — сначала следующий свободный код (новый паттерн из того, что там лежит), потом имена
+    -- паттернов (то же имя — связанный повтор: содержимое станет как у него)
+    local pre
+    if rg.gap then
+      pre = { model.SEC.next_family(regions) }
+      local seen = {}
+      for _, r2 in ipairs(seq) do if not r2.gap and r2.name ~= '' and not seen[r2.name] then seen[r2.name] = true; pre[#pre + 1] = r2.name end end
+    end
+    ctx.name_pick('region', code and ('name of ' .. code) or (rg.gap and 'name this bar (a new pattern of what is in it)' or 'region name'), rest, function(nm)
       ctx.mx_name(code and (code .. (nm ~= '' and (' ' .. nm) or '')) or nm)
-    end)
+    end, pre)
   end,
   -- 18 окт: общая выпадашка ввода (вместо строки :команды): текущее — в строке (набор заменяет, BS стирает),
   -- ниже — варианты, своё — набором; on_done(текст)
@@ -8160,7 +8168,7 @@ ctx = {
     if #items == 0 then vim.picker.rows = 1 end
   end,
   -- выбор имени выпадашкой: kind — 'region' | 'note' | 'track'; сверху — то, что уже чаще всего в проекте
-  name_pick = function(kind, title, current, on_done)
+  name_pick = function(kind, title, current, on_done, pre)
     ctx.NAMES = ctx.NAMES or dofile(DIR .. '/jf_tracker_names.lua')
     local cnt, order = {}, {}
     local function add(nm, w)
@@ -8187,6 +8195,7 @@ ctx = {
     local items, seen = {}, {}
     if (current or '') ~= '' then items[1] = { label = current }; seen[current:lower()] = true end   -- текущее — первым: Enter оставляет как есть
     if kind == 'note' and (current or '') ~= '' then items[#items + 1] = { label = '- no note', clear = true } end
+    for _, nm in ipairs(pre or {}) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end   -- 18 окт: свои подсказки первыми
     for _, nm in ipairs(used) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
     for _, nm in ipairs(base) do if not seen[nm:lower()] then seen[nm:lower()] = true; items[#items + 1] = { label = nm } end end
     vim.open_picker(title, items, function(it) on_done(it.clear and '' or it.label) end)
