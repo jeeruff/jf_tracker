@@ -7778,6 +7778,8 @@ function D.frame(L, snap, rows, state, info)
             local cube = math.max(2, math.min(5, math.floor((gh - 2) / 32) - 1))
             local mw = 4 * (cube + 1) + 4
             gw = gw - mw
+            local mapx = gx0 + 1                               -- 18 окт: карта слева (просьба), пэды правее
+            gx0 = gx0 + mw
             local G = { cols = 4, rows = math.max(1, math.ceil(#f.kids / 4)), cw = gw // 4 }
             G.ch = math.max(2 * L.rh + 2, gh // 4)
             G.fit = math.max(1, math.min(4, gh // G.ch))
@@ -7791,7 +7793,7 @@ function D.frame(L, snap, rows, state, info)
             D.kit_scroll[kkey] = sc
             -- карта: 4 колонки × 32 ряда, ряд = 4 пэда
             do
-              local mx0, my0 = gx0 + gw + 3, gy0
+              local mx0, my0 = mapx + 2, gy0
               -- 18 окт: жёлтый — выбранный (его семплер справа), оранжевый — занятый, серый — пустой,
               -- красный — выключен (mute), зелёный мигает — соло (включён один из нескольких)
               local non = 0
