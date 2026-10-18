@@ -8106,8 +8106,9 @@ ctx = {
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
     -- 18 окт: выпадашка имён (частые в проекте сверху, потом общие; свой текст — тоже); код паттерна (A1) остаётся
-    local code = not rg.gap and model.SEC.code_of(rg.name or '')
-    local rest = code and (rg.name:sub(#code + 1):gsub('^%s+', '')) or (rg.name or '')
+    local code, rest
+    if not rg.gap then local l, _, r2 = model.SEC.code_of(rg.name or ''); if l then code, rest = rg.name:match('^(%S+)'), r2 end end   -- code_of: буква, номер, остаток
+    rest = rest or (rg.name or '')
     ctx.name_pick('region', code and ('name of ' .. code) or 'region name', rest, function(nm)
       ctx.mx_name(code and (code .. (nm ~= '' and (' ' .. nm) or '')) or nm)
     end)
@@ -8124,8 +8125,8 @@ ctx = {
     end
     if kind == 'region' or kind == 'note' then
       for _, r in ipairs(regions) do
-        local c = model.SEC.code_of(r.name or '')
-        add(c and r.name:sub(#c + 1) or r.name, 2)
+        local l, _, r2 = model.SEC.code_of(r.name or '')
+        add(l and r2 or r.name, 2)
       end
       for _, s2 in ipairs(regions.sections or {}) do add(s2.name, 2) end
       ctx.pnotes = ctx.pnotes or {}
@@ -23241,7 +23242,12 @@ local function frame()
   end
   if ctx.inject_pending then
     reaper.SetExtState(EXT, 'inject_ack', ('%s ok %s %s%s row%d fi%d fld%s msg=%s'):format(ctx.inject_pending, vim.mode, state.focus,
-      state.focus == 'top' and (':' .. tostring(state.toptab)) or '', vim.cur.row, vim.cur.fi, tostring(vim.cur.field) .. (vim.cur.sub and ('/' .. tostring(vim.cur.sub)) or ''), tostring(vim.msg or ''):sub(1, 80)), false)
+      state.focus == 'top' and (':' .. tostring(state.toptab)) or '', vim.cur.row, vim.cur.fi, tostring(vim.cur.field) .. (vim.cur.sub and ('/' .. tostring(vim.cur.sub)) or ''), tostring(vim.msg or ''):sub(1, 80))
+      -- 18 окт: открытые выбор / смарт-панель / выпадашка размера — для живых тестов
+      .. (vim.picker and (' picker=' .. tostring(vim.picker.title):sub(1, 40) .. ' q=' .. vim.picker.query .. ' n=' .. #vim.picker.matches .. ' top=' .. tostring(vim.picker.matches[1] and vim.picker.matches[1].label)) or '')
+      .. (vim.hydra and (' hydra=' .. tostring(vim.hydra.title):sub(1, 30)) or '')
+      .. (MX.SMART.p and (' smart=' .. tostring(MX.SMART.p.title):sub(1, 40) .. ' n=' .. #MX.SMART.p.items) or '')
+      .. (ctx.SP and ctx.SP.on and (' sig=' .. ctx.SP.cmd()) or ''), false)
     ctx.inject_pending = nil
   end
   inject_cap = nil
