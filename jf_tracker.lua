@@ -23851,7 +23851,7 @@ ctx.palette_draw = function(Lx, x, y, w)
         if MX.pal_kb and r <= 4 then   -- буква клавиши clipkb — справа сверху
           local col_k = MX.SS.KEYCOLS[ci - MX.hs]
           local kl = col_k and col_k:sub(r, r)
-          if kl and kl ~= '' then U.text(cx + Lx.mx_cell_w - 2 - U.measure(kl), ry + 1, kl, pk and U.CYAN or U.AMBER) end
+          if kl and kl ~= '' then U.text(cx + Lx.mx_cell_w - 2 - U.measure(kl), ry + rh - Lx.rh - 2, kl, pk and U.CYAN or U.AMBER) end   -- 18 окт: внизу справа, подпись A1-1 — сверху
         end
         if ctx.pal_on == p.name .. ':' .. ci and ctx.mx_solo then U.set(U.GREEN); gfx.rect(cx, ry + rh - 3, Lx.mx_cell_w, 2, 1) end
         if hot then U.set(U.AMBER); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); hover.palcell = { p = p, ci = ci } end
@@ -23861,6 +23861,7 @@ ctx.palette_draw = function(Lx, x, y, w)
   if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
   if ctx.vbar then ctx.vbar('palette', x, y0, w, nvis * rh, MX.pal_scroll, nvis, #list) end   -- 18 окт: скроллбар палитры
   if MX.pal_kb and MX.pal_shift and not ctx.mods().shift then MX.pal_shift = nil; ctx.palette_play_picks() end
+  if ctx.pal_mix and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_mix.t or 0) > 0.6 then ctx.palette_mix_stop() end   -- Space — стоп: луп вернуть
   -- прослушка с клавиши доиграла сама — соло снять, курсор вернуть
   if ctx.mx_solo and ctx.mx_solo_owner == 'palkb' and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_t or 0) > 0.6 then ctx.mx_cell_preview_end(); ctx.pal_on = nil end
   -- зажатая прослушка палитры: отпустил кнопку — стоп
@@ -23898,7 +23899,7 @@ ctx.palette_key = function(c)
   local m = ctx.mods()
   local ch = c > 0 and c < 256 and string.char(c) or ''
   if m.ctrl and c >= 1 and c <= 26 and c ~= 8 and c ~= 9 and c ~= 13 then ch = string.char(c + 96) end
-  if c == 27 then MX.pal_kb, MX.pal_pick = false, {}; ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette clipkb off'; return true end
+  if c == 27 then MX.pal_kb, MX.pal_pick = false, {}; ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette clipkb off'; return true end
   local SH = { ['!'] = '1', ['@'] = '2', ['#'] = '3', ['$'] = '4', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['*'] = '8', ['('] = '9', [')'] = '0', ['<'] = ',', ['>'] = '.', [':'] = ';', ['?'] = '/' }
   if ch == ':' then return false end            -- : — строка команды, не Shift+; палитры
   local base = SH[ch] or ch:lower()
@@ -23909,7 +23910,7 @@ ctx.palette_key = function(c)
   local p, ci = list[(MX.pal_scroll or 0) + r], MX.hs + k
   if not p or not (snap and snap.cols[ci]) then vim.msg = 'palette: nothing on this key'; return true end
   local key = p.name .. ':' .. ci
-  if m.ctrl then ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
+  if m.ctrl then ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
   if shift then
     MX.pal_pick = MX.pal_pick or {}
     if MX.pal_pick[key] then MX.pal_pick[key] = nil else MX.pal_pick[key] = { p = p, ci = ci } end
@@ -23919,17 +23920,59 @@ ctx.palette_key = function(c)
     return true
   end
   if ctx.pal_on == key and ctx.mx_solo then ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
+  ctx.palette_mix_stop()
   ctx.palette_listen(p, ci, 'palkb'); ctx.pal_on = key
   return true
 end
 ctx.palette_kb = function() MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end; vim.msg = 'palette clipkb ' .. (MX.pal_kb and 'on' or 'off') end
 -- набранное — вместе: треки одного паттерна звучат разом (соло на них); разные паттерны — только после render
+-- 18 окт: клетки разных паттернов — вместе: копии в зону =SESSION (за песней), по треку на клетку, зона — лупом;
+-- стоп (Ctrl+клавиша, Space, Esc) — луп, повтор и курсор как были. Главное: быстро найти, что с чем звучит
+ctx.palette_mix = function(by)
+  local need = 0
+  for _, pk in pairs(by) do local s0 = pk.p.src; need = math.max(need, reaper.TimeMap2_timeToQN(0, s0.rgnend) - reaper.TimeMap2_timeToQN(0, s0.pos)) end
+  if need <= 0 then return end
+  if reaper.GetPlayState() & 1 == 1 and not ctx.pal_mix then vim.msg = 'palette: the transport plays - stop it to hear the picks'; return end
+  if ctx.mx_solo then ctx.mx_cell_preview_end() end
+  local zone = ctx.ss_zone(need)
+  if not zone then vim.msg = 'palette: no session zone'; return end
+  if ctx.ss_zone_fit then zone = ctx.ss_zone_fit(zone, need, seq, true) or zone end
+  if not ctx.pal_mix then
+    local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
+    ctx.pal_mix = { l0 = l0, l1 = l1, rep = reaper.GetSetRepeat(-1), cur = reaper.GetCursorPosition() }
+  end
+  local n = 0
+  ctx.ss_apply('palette: hear together', function()
+    for _, c in ipairs(snap.cols) do if c.track then alias.session_clear(c.track, zone.pos, zone.rgnend) end end
+    for ci, pk in pairs(by) do
+      local col = snap.cols[ci]
+      if col and col.track then alias.session_plant(col.track, pk.p.src, zone.pos, zone.rgnend, zone.pos, nil, 'pal:' .. ci); n = n + 1 end
+    end
+  end)
+  ctx.ss_play(zone)
+  ctx.pal_mix.t = reaper.time_precise()
+  ctx.pal_on = 'mix'
+  local names = {}
+  for ci, pk in pairs(by) do names[#names + 1] = pk.p.name .. '-' .. ci end
+  table.sort(names)
+  vim.msg = ('palette: together %s (loop; Ctrl+key / Space - stop, render - keep as a pattern)'):format(table.concat(names, ' '))
+end
+ctx.palette_mix_stop = function()
+  local pm = ctx.pal_mix; if not pm then return end
+  ctx.pal_mix = nil
+  if reaper.GetPlayState() & 1 == 1 then reaper.OnStopButton() end
+  reaper.GetSet_LoopTimeRange(true, true, pm.l0, pm.l1, false)
+  reaper.GetSetRepeat(pm.rep)
+  reaper.SetEditCurPos(pm.cur, false, false)
+  if ctx.pal_on == 'mix' then ctx.pal_on = nil end
+end
 ctx.palette_play_picks = function()
-  local by, name = {}, nil
+  local by, name, mixed = {}, nil, false
   for _, pk in pairs(MX.pal_pick or {}) do
-    if name and name ~= pk.p.name then vim.msg = 'palette: picks of different patterns sound together after render (a new pattern of them)'; return end
+    if name and name ~= pk.p.name then mixed = true end
     name = pk.p.name; by[pk.ci] = pk
   end
+  if mixed then ctx.palette_mix(by); return end
   if not name then return end
   local only, src = {}, nil
   for ci, pk in pairs(by) do local col = snap.cols[ci]; if col and col.track then only[col.track] = true end; src = pk.p.src end
