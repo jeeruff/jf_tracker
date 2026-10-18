@@ -7633,6 +7633,8 @@ ctx = {
       reaper.SetProjExtState(0, EXT, 'solo_restore', table.concat(keep, ' '))
     end
     for _, o in ipairs(ctx.mx_solo) do reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', only[o[1]] and 2 or 0) end
+    -- 18 окт: follow во время прослушки уводил курсор трекера на паттерн — вернуть после
+    if not ctx.mx_keep_cur then ctx.mx_keep_cur = { row = vim.cur.row, row0 = state.row0 } end
     PV.midi(t0, math.min(t1, t0 + 8))
   end,
   mx_cell_preview_end = function()
@@ -7641,6 +7643,8 @@ ctx = {
     for _, o in ipairs(ctx.mx_solo) do if reaper.ValidatePtr(o[1], 'MediaTrack*') then reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', o[2]) end end
     ctx.mx_solo = nil
     reaper.SetProjExtState(0, EXT, 'solo_restore', '')
+    local kc = ctx.mx_keep_cur; ctx.mx_keep_cur = nil
+    if kc then vim.cur.row, state.row0 = kc.row, kc.row0 end
   end,
   -- 12 окт: автогромкость: фейдер трека так, чтобы удержанный пик выхода (сыгранное) стал target дБ
   auto_peak = function(col, target)
@@ -7958,8 +7962,12 @@ ctx = {
       end
     end)
     ctx.mx_refresh()
-    MX.goto_cell(seq, snap, #seq, MX.cur.ci)
+    -- 18 окт: новый слот — по имени (#seq — последний свободный такт в конце, не новый паттерн)
+    local at = #seq
+    for i2, r2 in ipairs(seq) do if r2.name == names[count] then at = i2 end end
+    MX.goto_cell(seq, snap, at, MX.cur.ci)
     ctx.set_focus('matrix')
+    ctx.mx_added = { name = names[count], ri = at }
     vim.msg = count > 1 and ('%d regions added (%s..%s) - n: name'):format(count, names[1], names[count])
       or ('region %d "%s" added - n: name, = / [ ]: length'):format(#seq, names[1])
   end,
@@ -19011,6 +19019,11 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column, session (z)'
+  elseif hover.matrix and hover.matrix.palbtn then
+    state.status = ({ kb = 'clipkb (c): keyboard columns 1qaz 2wsx ... = tracks, rows = palette rows; a key - listen, Shift - pick, Ctrl - silence, Esc - off',
+      render = 'render: the picked cells (one per track) become a new pattern at the end of the song (aliases)',
+      plist = '+playlist: the patterns of the picked cells (or of the cursor slot) go to the end of the current playlist',
+      rec = 'rec: record the order of the patterns played (patternkb), again - write it after the song' })[hover.matrix.palbtn] or ''
   elseif hover.matrix and hover.matrix.palname then
     local pn = hover.matrix.palname
     local nt = ctx.pat_note(pn.name)
@@ -20591,6 +20604,14 @@ local function frame()
         else ctx.mx_tsel = { a = ri, last = ri }; vim.msg = 'double-click - loop this slot; drag - several; Cmd+click - pick slots, the loop jumps between them' end
       end
       click = { t = now2, zone = 'mxtsel', row = ri }
+    elseif hover.matrix and hover.matrix.palbtn then   -- 18 окт: кнопки палитры
+      local b = hover.matrix.palbtn
+      ctx.set_focus('matrix')
+      if b == 'kb' then ctx.palette_kb()
+      elseif b == 'render' then ctx.palette_render()
+      elseif b == 'plist' then ctx.palette_to_playlist()
+      elseif b == 'rec' and ctx.PADS then ctx.pads_cmd('rec') end
+      click = { t = now2, zone = 'mxpalbtn' }
     elseif hover.matrix and (hover.matrix.palcell or hover.matrix.palname) then   -- 18 окт: палитра — слушать
       local pc = hover.matrix.palcell
       local pn = hover.matrix.palname
@@ -22868,7 +22889,8 @@ local function frame()
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
   -- только его длина (слайс — свой кусок), через трек курсора
   if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes') then
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
+      or (state.focus == 'matrix' and MX.palette and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
     if e and (e.take or e.src) then PV.slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
@@ -22968,6 +22990,8 @@ local function frame()
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if (state.ss_big or MX.clips) and MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then return end
+        if MX.palette and c == ('c'):byte() and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'palette clipkb: 1qaz 2wsx 3edc ... column = track, row = palette row; Shift - pick, Ctrl - silence, Esc - off'; return end   -- 18 окт
+        if MX.palette and MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
@@ -23682,7 +23706,24 @@ ctx.palette_draw = function(Lx, x, y, w)
   if ctx.pal_snap ~= snap then ctx.pal_parts, ctx.pal_snap = {}, snap end
   local nvis = math.min(#list, 6)
   MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll or 0))
-  U.text(x + Lx.pad, y, ctx.fit(('palette  %d patterns  -  hold a cell: listen to the track, the name: the pattern'):format(#list), w - 2 * Lx.pad - U.measure('+99 ')), U.GREY)
+  -- 18 окт: кнопки палитры — clipkb (столбцы 1qaz… — треки, ряды — паттерны), render (набранные клетки — новым
+  -- паттерном в конец песни), +playlist (их паттерны — в конец плейлиста), rec (порядок сыгранных паттернов — в песню)
+  local bx = x + Lx.pad
+  local function pbtn(label, id, on)
+    local bw = U.measure(label) + 2 * Lx.pad
+    if bx + bw > x + w - U.measure('+99 ') then return end
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.2) or U.BG)); gfx.rect(bx, y, bw, Lx.rh, 1)
+    U.set(on and U.CYAN or U.LINE); gfx.rect(bx, y, bw, Lx.rh, 0)
+    U.text(bx + Lx.pad, y + 1, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+    if hot then hover.palbtn = id end
+    bx = bx + bw + Lx.pad
+  end
+  local npick = 0; for _ in pairs(MX.pal_pick or {}) do npick = npick + 1 end
+  pbtn('c clipkb', 'kb', MX.pal_kb)
+  pbtn('render' .. (npick > 0 and (' ' .. npick) or ''), 'render', npick > 0)
+  pbtn('+playlist', 'plist', false)
+  pbtn('rec', 'rec', ctx.PADS and ctx.PADS.rec)
   local y0 = y + Lx.rh + 1
   if gfx.mouse_wheel ~= 0 and mx >= x and mx < x + w and my >= y0 and my < y0 + nvis * rh then
     MX.pal_scroll = MX.pal_scroll + (gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
@@ -23716,12 +23757,23 @@ ctx.palette_draw = function(Lx, x, y, w)
           U.set(U.BG); gfx.rect(cx + 2, ry + 2, U.measure(lab) + 2, Lx.rh - 1, 1)
           U.text(cx + 3, ry + 2, lab, U.TEXT)
         end
+        local pk = MX.pal_pick and MX.pal_pick[p.name .. ':' .. ci]
+        if pk then U.set(U.CYAN); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); gfx.rect(cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3, 0) end
+        if MX.pal_kb and r <= 4 then   -- буква клавиши clipkb — справа сверху
+          local col_k = MX.SS.KEYCOLS[ci - MX.hs]
+          local kl = col_k and col_k:sub(r, r)
+          if kl and kl ~= '' then U.text(cx + Lx.mx_cell_w - 2 - U.measure(kl), ry + 1, kl, pk and U.CYAN or U.AMBER) end
+        end
+        if ctx.pal_on == p.name .. ':' .. ci and ctx.mx_solo then U.set(U.GREEN); gfx.rect(cx, ry + rh - 3, Lx.mx_cell_w, 2, 1) end
         if hot then U.set(U.AMBER); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); hover.palcell = { p = p, ci = ci } end
       end
     end
   end
   if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
   if ctx.vbar then ctx.vbar('palette', x, y0, w, nvis * rh, MX.pal_scroll, nvis, #list) end   -- 18 окт: скроллбар палитры
+  if MX.pal_kb and MX.pal_shift and not ctx.mods().shift then MX.pal_shift = nil; ctx.palette_play_picks() end
+  -- прослушка с клавиши доиграла сама — соло снять, курсор вернуть
+  if ctx.mx_solo and ctx.mx_solo_owner == 'palkb' and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_t or 0) > 0.6 then ctx.mx_cell_preview_end(); ctx.pal_on = nil end
   -- зажатая прослушка палитры: отпустил кнопку — стоп
   if ctx.mx_solo and ctx.mx_solo_owner == 'palette' and gfx.mouse_cap & 1 == 0 then ctx.mx_cell_preview_end() end
   return Lx.rh + 1 + nvis * rh + 2, hover
@@ -23750,15 +23802,98 @@ ctx.pat_note_set = function(text)
   ctx.pnotes = ctx.pnotes or {}; ctx.pnotes[k] = text
   vim.msg = text == '' and ('pattern ' .. k .. ': note deleted') or ('pattern ' .. k .. ': ' .. text)
 end
-ctx.palette_listen = function(p, ci)
+-- 18 окт: clipkb палитры: столбец клавиатуры (1qaz, 2wsx … как SS.KEYCOLS) — видимый трек, ряд — видимая строка
+-- палитры (1..4). Клавиша — слушать клетку (ещё раз — тишина); Shift + клавиши — набор (голубые рамки), отпустил
+-- Shift — набранное звучит вместе (если из одного паттерна); Ctrl — тишина; Esc — выйти из clipkb
+ctx.palette_key = function(c)
+  local m = ctx.mods()
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  if m.ctrl and c >= 1 and c <= 26 and c ~= 8 and c ~= 9 and c ~= 13 then ch = string.char(c + 96) end
+  if c == 27 then MX.pal_kb, MX.pal_pick = false, {}; ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette clipkb off'; return true end
+  local SH = { ['!'] = '1', ['@'] = '2', ['#'] = '3', ['$'] = '4', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['*'] = '8', ['('] = '9', [')'] = '0', ['<'] = ',', ['>'] = '.', [':'] = ';', ['?'] = '/' }
+  if ch == ':' then return false end            -- : — строка команды, не Shift+; палитры
+  local base = SH[ch] or ch:lower()
+  local shift = m.shift or SH[ch] ~= nil or ch:match('%u') ~= nil
+  local k, r = MX.SS.kb_pos(base)
+  if not k or base == '' then return false end
+  local list = ctx.pal_list or {}
+  local p, ci = list[(MX.pal_scroll or 0) + r], MX.hs + k
+  if not p or not (snap and snap.cols[ci]) then vim.msg = 'palette: nothing on this key'; return true end
+  local key = p.name .. ':' .. ci
+  if m.ctrl then ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
+  if shift then
+    MX.pal_pick = MX.pal_pick or {}
+    if MX.pal_pick[key] then MX.pal_pick[key] = nil else MX.pal_pick[key] = { p = p, ci = ci } end
+    MX.pal_shift = true
+    local n = 0; for _ in pairs(MX.pal_pick) do n = n + 1 end
+    vim.msg = ('palette: %d picked - let go of Shift to hear them; render - a new pattern of them'):format(n)
+    return true
+  end
+  if ctx.pal_on == key and ctx.mx_solo then ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
+  ctx.palette_listen(p, ci, 'palkb'); ctx.pal_on = key
+  return true
+end
+ctx.palette_kb = function() MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end; vim.msg = 'palette clipkb ' .. (MX.pal_kb and 'on' or 'off') end
+-- набранное — вместе: треки одного паттерна звучат разом (соло на них); разные паттерны — только после render
+ctx.palette_play_picks = function()
+  local by, name = {}, nil
+  for _, pk in pairs(MX.pal_pick or {}) do
+    if name and name ~= pk.p.name then vim.msg = 'palette: picks of different patterns sound together after render (a new pattern of them)'; return end
+    name = pk.p.name; by[pk.ci] = pk
+  end
+  if not name then return end
+  local only, src = {}, nil
+  for ci, pk in pairs(by) do local col = snap.cols[ci]; if col and col.track then only[col.track] = true end; src = pk.p.src end
+  if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then vim.msg = 'palette: the transport plays - stop it to listen'; return end   -- своя прослушка — не помеха
+  ctx.mx_cell_preview(only, src.pos, src.rgnend, 'palkb'); ctx.pal_on = 'picks'; ctx.pal_t = reaper.time_precise()
+  vim.msg = 'palette: ' .. name .. ' - the picked tracks together'
+end
+-- render: набранные клетки (по одной на трек) — новым паттерном в конец песни (алиасы клеток)
+ctx.palette_render = function()
+  local by, n, len = {}, 0, 0
+  for _, pk in pairs(MX.pal_pick or {}) do by[pk.ci] = pk; n = n + 1; len = math.max(len, pk.p.src.rgnend - pk.p.src.pos) end
+  if n == 0 then vim.msg = 'render: pick cells first (clipkb: Shift + keys)'; return end
+  local qn = reaper.TimeMap2_timeToQN(0, len)
+  local bars = math.max(1, math.floor(qn / 4 + 0.5))
+  ctx.mx_added = nil
+  ctx.mx_add(bars)
+  local ri = ctx.mx_added and ctx.mx_added.ri
+  if not (ri and seq[ri] and seq[ri].name == ctx.mx_added.name) then vim.msg = 'render: the new pattern was not found - nothing pasted'; return end
+  local done = 0
+  edit.run('palette render', function()
+    for ci, pk in pairs(by) do
+      local clip = alias.cells_copy({ pk.p.src }, snap, 1, 1, ci, ci, true)
+      done = done + alias.cells_paste(seq, snap, ri, ci, clip, true)
+    end
+  end)
+  ctx.mx_refresh()
+  MX.pal_pick = {}
+  vim.msg = ('render: %s - %d track(s) from the palette (aliases, %d item(s))'):format(seq[ri] and seq[ri].name or 'new pattern', n, done)
+end
+-- +playlist: паттерны набранных (или курсора матрицы) — в конец текущего плейлиста
+ctx.palette_to_playlist = function()
+  ctx.pl_load()
+  local P = ctx.PL
+  local names, seen = {}, {}
+  for _, pk in pairs(MX.pal_pick or {}) do local c = pk.p.name:match('^%S+'); if not seen[c] then seen[c] = true; names[#names + 1] = c end end
+  table.sort(names)
+  if #names == 0 then local rg = seq[MX.cur.ri]; if rg and not rg.gap then names[1] = rg.name:match('^%S+') end end
+  if #names == 0 then vim.msg = '+playlist: pick cells (clipkb: Shift + keys)'; return end
+  if #P.lists == 0 then P.lists[1] = { name = P.free_name(P.lists), text = '' }; P.cur = 1 end
+  local l = P.lists[P.cur]
+  l.text = ((l.text or '') .. ' ' .. table.concat(names, ' ')):gsub('^%s+', '')
+  ctx.pl_save()
+  vim.msg = ('playlist %s: + %s'):format(l.name, table.concat(names, ' '))
+end
+ctx.palette_listen = function(p, ci, owner)
   local src = p and p.src
   if not src then return end
   local only
   if ci then local col = snap.cols[ci]; only = col and col.track
   else only = {}; for _, c in ipairs(snap.cols) do if c.track then only[c.track] = true end end end
   if not only then return end
-  if reaper.GetPlayState() & 1 == 1 then vim.msg = 'palette: the transport plays - stop it to listen'; return end
-  ctx.mx_cell_preview(only, src.pos, src.rgnend, 'palette')
+  if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then vim.msg = 'palette: the transport plays - stop it to listen'; return end   -- своя прослушка — не помеха
+  ctx.mx_cell_preview(only, src.pos, src.rgnend, owner or 'palette'); ctx.pal_t = reaper.time_precise()
   vim.msg = ('palette: %s%s'):format(p.name, ci and (' on ' .. (snap.cols[ci].name or '')) or ' (all tracks)')
 end
 ctx.plist_draw = function(Lx, x, y, w)
