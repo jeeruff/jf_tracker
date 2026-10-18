@@ -472,7 +472,7 @@ function SP.jump_label(x, y, label, col, maxw)
   local ch, i = SP.jump_char(label)
   if ch and i <= #t then
     local px = x + U.measure(label:sub(1, i - 1) .. '.') - U.measure('.')   -- пробел в конце measure не считает
-    U.text(px, y, label:sub(i, i), U.mix(col, U.TEXT, 0.6))
+    U.text(px, y, label:sub(i, i), U.TEXT)   -- 18 окт: буква прыжка ярче (была смесь 60 %)
   end
 end
 function SP.key(c, e, jump)
