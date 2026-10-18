@@ -635,7 +635,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
     if pk and nw > U.measure(pk) + 4 then U.text(nx + nw - U.measure(pk), y + 1, pk, (ctx.PADS and ctx.PADS.rec) and U.RED or U.AMBER) end
     if hot_name then hover.name = ri end
-    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени: Enter / i — имя
+    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' then U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени (18 окт: и без фокуса янтарём): Enter / i — имя
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
     do
@@ -792,8 +792,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
       if MX.cur.ri == ri and MX.cur.ci == ci then
         MX.cur_rect = { x = x, y = y, w = L.mx_cell_w, h = rh }      -- 12 окт: якорь смарт-панели клетки
-        U.set(MX.focus and U.AMBER or U.TEXT); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)   -- 18 окт: ярко и без фокуса (было цветом линий — терялась)
-        gfx.rect(x + 2, y + 2, L.mx_cell_w - 4, rh - 4, 0)
+        -- 18 окт (2): без фокуса — тот же янтарь, тише; внутри тёмная кромка — рамка видна и на белой (полной) ячейке
+        U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(x, y, L.mx_cell_w, rh, 0); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+        U.set(U.BG); gfx.rect(x + 2, y + 2, L.mx_cell_w - 4, rh - 4, 0)
       end
       if hover.ri == ri and mx >= x and mx < x + L.mx_cell_w then
         hover.ci = ci
