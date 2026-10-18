@@ -267,7 +267,7 @@ KH.PAGES = {
     { k = ':patternkb', d = 'MPC style (the patternkb button; = :pads): the note keys play the patterns of the song - 1 f1 2 ... = the 1st 2nd 3rd pattern, the key shows by its name; quant - seamless when the playing one ends (REAPER smooth seek), sudden - at once at the same place inside (a short gap: the render-ahead buffer refills); rec - record the order, again - write it after the song as linked repeats; off' },
     { k = ':pl', d = 'playlist (the playlist button - a block on top of the matrix): the order as text - A1 A1 B1x2 C1:16 D1-8 D1/2 B2+8 verse 4: pattern / section name or region number; xN repeat, :N the first N rows, /N a part, -N skip N rows, +N then its first N rows again; Tab completes names; play (seamless on whole patterns), write (after the song), new dup name del next prev - named playlists in the project' },
     { k = 'vismetro', d = 'matrix button: the size column always shown, the playing pattern counts its beats there - 1/4 2/4 3/4 4/4' },
-    { k = 'autoarm', d = 'master header button: auto-arm on every track (the selected track is armed for recording), again - off; lit when all have it' },
+    { k = 'autoarm', d = 'button under clips (top left corner): auto-arm on every track (the selected track is armed for recording), again - off; lit when all have it' },
     { k = 'h past the first track', m = 'cursor to the region name and number', d = 'the cursor goes to the region name (Enter / i - rename) and to its number < NN > (Enter - next pattern)' },
     { k = 'Ctrl+h j k l', d = 'move like h j k l' },
     { k = 'Ctrl+Up Down', m = 'duplicate the slot above / below', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },

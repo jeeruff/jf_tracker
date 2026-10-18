@@ -5453,21 +5453,6 @@ function D.frame(L, snap, rows, state, info)
           text(fx + 2, hy + 1, 'fold', fhot and U.AMBER or U.GREY)
           if fhot then hover.mfold = true end
         end
-        -- 18 окт: autoarm — все треки на автоарм (запись по выбору трека) и обратно; горит, если у всех
-        local all, nt = true, reaper.CountTracks(0)
-        for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
-        all = all and nt > 0
-        local lab = 'autoarm'
-        local aw = ms(lab) + 4
-        local ax = fx - aw - 2
-        if ax <= c.x + ms('master') + 2 * L.pad then lab = 'aa'; aw = ms(lab) + 4; ax = fx - aw - 2 end
-        if ax > c.x + ms('master') + 2 * L.pad then
-          local ahot = mx >= ax and mx < ax + aw and my >= hy and my < hy + L.rh
-          set(ahot and D.CURROW or (all and U.tint(D.ARM, 0.35) or U.PANEL)); gfx.rect(ax, hy + 1, aw, L.rh - 2, 1)
-          set(all and D.ARM or U.DIM); gfx.rect(ax, hy + 1, aw, L.rh - 2, 0)
-          text(ax + 2, hy + 1, lab, ahot and U.AMBER or (all and U.TEXT or U.GREY))
-          if ahot then hover.mautoarm = all and 'off' or 'on' end
-        end
       end
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
@@ -6467,6 +6452,17 @@ function D.frame(L, snap, rows, state, info)
       -- уголке микшера); не влезает слово — «p»
       local plb = (x2 + ms('param') + 4 <= bx + bw) and 'param' or ((x2 + ms('p') + 4 <= bx + bw) and 'p' or nil)
       if plb then small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn') end
+      -- 18 окт: autoarm — под clips (просьба; был в шапке мастера): все треки на автоарм / обратно, горит — у всех
+      local all, nt = true, reaper.CountTracks(0)
+      for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
+      all = all and nt > 0
+      local ay = hy + 1 + 2 * L.rh
+      local ny0 = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
+      if ny0 >= ay + L.rh then small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'aa', all and 'off' or 'on', all, 'mautoarm')
+      else
+        local xa = plb and (x2 + ms(plb) + 4) or x2
+        if xa + ms('aa') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'aa', all and 'off' or 'on', all, 'mautoarm') end
+      end
     end
     -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router);
     -- 9 окт: высокая шапка (микшер) — имя и кнопки внизу, прямо над длиной
