@@ -18972,6 +18972,11 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column, session (z)'
+  elseif hover.matrix and hover.matrix.palname then
+    local pn = hover.matrix.palname
+    local nt = ctx.pat_note(pn.name)
+    state.status = pn.name .. (nt ~= '' and (' - ' .. nt) or '') .. '  |  hold: listen to the pattern, dblclick: its note (:pnote text)'
+  elseif hover.matrix and hover.matrix.palcell then state.status = hover.matrix.palcell.p.name .. '-' .. hover.matrix.palcell.ci .. ': hold - listen to this track of the pattern (solo)'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e on: the matrix goes from =START to =END; off: the whole project as the REAPER timeline (library regions after =END too, 16 free bars at the end) - only the view, the markers stay'
   elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
@@ -20549,8 +20554,10 @@ local function frame()
       click = { t = now2, zone = 'mxtsel', row = ri }
     elseif hover.matrix and (hover.matrix.palcell or hover.matrix.palname) then   -- 18 окт: палитра — слушать
       local pc = hover.matrix.palcell
-      ctx.palette_listen(pc and pc.p or hover.matrix.palname, pc and pc.ci)
-      click = { t = now2, zone = 'mxpal' }
+      local pn = hover.matrix.palname
+      if pn and dbl and click.zone == 'mxpalname' and click.row == pn.name then ctx.mx_cell_preview_end(); ctx.set_focus('matrix'); ctx.pat_note_prompt(pn.name)   -- двойной — заметка
+      else ctx.palette_listen(pc and pc.p or pn, pc and pc.ci) end
+      click = { t = now2, zone = pn and 'mxpalname' or 'mxpal', row = pn and pn.name }
     elseif hover.matrix and hover.matrix.vis then
       -- 11 окт: клетка visor матрицы — сцена / пресет в начало слота (событие v:)
       local rg = seq[hover.matrix.vis.ri]
@@ -23644,8 +23651,11 @@ ctx.palette_draw = function(Lx, x, y, w)
     local nw = Lx.mx_label_w - Lx.pad
     local hotn = mx >= x and mx < x + nw and my >= ry and my < ry + rh
     if hotn then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, nw, rh - 1, 1); hover.palname = p end
-    U.text(x + Lx.pad, ry + 1, p.name, hotn and U.AMBER or U.TEXT)
-    if p.n == 0 then U.text(x + Lx.pad, ry + 1 + Lx.rh, 'not in the song', U.DIM) end
+    U.text(x + Lx.pad, ry + 1, ctx.fit(p.name, nw - Lx.pad), hotn and U.AMBER or U.TEXT)
+    -- 18 окт: вторая строка — заметка паттерна (:pnote, двойной щелчок по имени); не в песне — тусклой припиской
+    local note = ctx.pat_note(p.name)
+    local l2 = (note ~= '' and note or '') .. (p.n == 0 and ((note ~= '' and '  ' or '') .. 'not in the song') or '')
+    if l2 ~= '' then U.text(x + Lx.pad, ry + 1 + Lx.rh, ctx.fit(l2, nw - Lx.pad), note ~= '' and U.GREY or U.DIM) end
     for ci, col in ipairs(snap.cols) do
       local cx = Lx.mx_label_w + (ci - 1 - MX.hs) * Lx.mx_cell_w
       if cx + Lx.mx_cell_w > W - 4 then break end
@@ -23671,6 +23681,31 @@ ctx.palette_draw = function(Lx, x, y, w)
   -- зажатая прослушка палитры: отпустил кнопку — стоп
   if ctx.mx_solo and ctx.mx_solo_owner == 'palette' and gfx.mouse_cap & 1 == 0 then ctx.mx_cell_preview_end() end
   return Lx.rh + 1 + nvis * rh + 2, hover
+end
+-- 18 окт: заметки паттернов — в проекте (ProjExtState jf_tracker_pnotes), ключ — код паттерна (A1), без кода — имя;
+-- переименование «A1 verse» → «A1 chorus» заметку не теряет
+ctx.pnote_key = function(name) return (name or ''):match('^(%u%d+)%f[%s%z]') or name or '' end   -- поле ctx: у файла предел 200 local
+ctx.pat_note = function(name)
+  ctx.pnotes = ctx.pnotes or {}
+  local k = ctx.pnote_key(name)
+  local v = ctx.pnotes[k]
+  if v == nil then local _, t = reaper.GetProjExtState(0, 'jf_tracker_pnotes', k); v = t or ''; ctx.pnotes[k] = v end
+  return v
+end
+ctx.pat_note_prompt = function(name)
+  ctx.pnote_target = name
+  vim.open_prompt('pnote ', ctx.pat_note(name))
+end
+ctx.pat_note_set = function(text)
+  local name = ctx.pnote_target or (seq[MX.cur.ri] and seq[MX.cur.ri].name)
+  ctx.pnote_target = nil
+  if not name or name == '' then vim.msg = 'pnote: no pattern'; return end
+  local k = ctx.pnote_key(name)
+  text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  reaper.SetProjExtState(0, 'jf_tracker_pnotes', k, text)
+  reaper.MarkProjectDirty(0)
+  ctx.pnotes = ctx.pnotes or {}; ctx.pnotes[k] = text
+  vim.msg = text == '' and ('pattern ' .. k .. ': note deleted') or ('pattern ' .. k .. ': ' .. text)
 end
 ctx.palette_listen = function(p, ci)
   local src = p and p.src
