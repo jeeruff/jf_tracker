@@ -8509,16 +8509,7 @@ ctx = {
   dev_on = function() return state.dev end,
   sig_at = function(t) local n, d = reaper.TimeMap_GetTimeSigAtTime(0, t + 1e-6); return n, d end,
   -- строка :sig с текущим размером; rg — для паттерна (матрица), иначе спросит
-  sig_menu = function()
-    local n0, d0 = ctx.sig_at(edit.row_time(vim.cur.row, state.lpb, 0))
-    local list = {}
-    for _, s in ipairs({ { '4', 4, 4 }, { '3', 3, 4 }, { '2', 2, 4 }, { '5', 5, 4 }, { '7', 7, 4 }, { 'e', 6, 8 }, { 's', 7, 8 }, { 'f', 5, 8 }, { 'n', 9, 8 }, { 't', 12, 8 } }) do
-      list[#list + 1] = { key = s[1], label = ('%d/%d'):format(s[2], s[3]) .. ((s[2] == n0 and s[3] == d0) and '  *' or ''), fn = function() ctx.sig_cmd(('%d/%d'):format(s[2], s[3])) end }
-    end
-    list[#list + 1] = { key = 'c', label = 'other ... (:sig N/D)', fn = function() ctx.sig_prompt() end }
-    vim.open_hydra({ title = 'time signature', items = list, how = 'f + the label of sig, then 3 / 4 / 7 … - or :sig 7/8 (:sig 7/8 here - only this pattern); wheel on sig steps the numerator' })
-    state.popup_at = { kind = 'strip', id = 'sig' }
-  end,
+  sig_menu = function() ctx.sig_prompt() end,   -- 18 окт: тот же выбор размера, что в матрице (одно место)
   -- колесо по размеру: числитель ±1 сразу на весь проект, ноты как есть (сетка пересчитывается)
   sig_wheel = function(d)
     local n, dd = ctx.sig_at(0)
@@ -8569,12 +8560,29 @@ ctx = {
     }
     if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
     vim.open_hydra({ title = 'matrix view (z)', items = items })
-    if not state.popup_at then state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
+    -- 18 окт: выпадает от кнопки view (z с клавиатуры — тоже), не у мыши; кнопка в » — от »
+    local b = MX.btn_xy and (MX.btn_xy.view or MX.btn_xy.more)
+    if b then state.popup_at = { kind = 'xy', x = b[1], y = b[2] }
+    elseif not state.popup_at then state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
   end,
+  -- 18 окт: размер — выпадашка (крупно N/D, таблица, область), не строка :sig; rg — паттерн из матрицы
   sig_prompt = function(rg)
-    local n, d = ctx.sig_at(rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0))
-    if rg then state.sig_rg = rg.idx; state.popup_at = { kind = 'mxrow', ri = MX.cur.ri } else state.sig_rg = nil; state.popup_at = { kind = 'strip', id = 'sig' } end
-    vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = ('sig %d/%d%s'):format(n, d, rg and ' here' or '')
+    local t = rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0)
+    local n, d = ctx.sig_at(t)
+    local here = rg or alias.region_at(regions, t)
+    local x, y, above = gfx.mouse_x, gfx.mouse_y + 4, false
+    if rg and MX.row_y and MX.row_y[MX.cur.ri] then x, y = 2, MX.row_y[MX.cur.ri] + L.rh
+    elseif not rg and draw.strip_cell and draw.strip_cell.sig then x, y, above = draw.strip_cell.sig[1], draw.strip_cell.sig[2], true end
+    ctx.SP.open(n, d, rg and 'here' or 'all', here and here.idx, here and here.name, x, y)
+    if above then ctx.SP.y = y - ctx.SP.layout(L.cw, L.rh, L.pad, 3).h - 2 end
+    vim.msg = 'time signature: click a cell, or digits / Tab / h l j k, a - this pattern / whole project, Enter'
+  end,
+  sig_pick_apply = function()
+    local S = ctx.SP
+    state.sig_rg = S.scope == 'here' and S.rg or nil
+    local cmd = S.cmd()
+    S.close()
+    ctx.sig_cmd(cmd)
   end,
   -- :sig N/D [all|here]: весь проект или паттерн; такт длиннее прежнего —
   -- спросить, чем заполнить недостающие доли
@@ -18745,6 +18753,7 @@ local function frame()
   if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if ctx.LOGOPOP then ctx.logo_draw() end
+  if ctx.SP and ctx.SP.on then ctx.SP.draw(U, draw, L, gfx.w, gfx.h - L.status_h) end
   if bpm_menu then
     local r = draw.ctrl_rect and draw.ctrl_rect.bpm
     if r then
@@ -19942,6 +19951,14 @@ local function frame()
   end
   if U.click and hover.ssbig and snap and MX.SS.click(hover, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise()) then if not state.ss_big then ctx.set_focus(state.clipsview and 'session' or (hover.topclips and 'top' or 'matrix')) end; U.click = false end   -- session: клетка / сцена / кнопки; мимо — клик идёт дальше
   if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
+  if U.click and ctx.SP and ctx.SP.on then   -- 18 окт: выбор размера
+    local h = ctx.SP.hover
+    if h and h.cell then ctx.SP.n, ctx.SP.d = h.cell.n, h.cell.d; ctx.sig_pick_apply()
+    elseif h and h.scope then ctx.SP.scope = h.scope
+    elseif h and h.field then ctx.SP.field, ctx.SP.buf = h.field, ''
+    elseif not h then ctx.SP.close() end
+    U.click = false
+  end
   if U.click and bpm_menu then
     if bpm_menu.hover then
       local it = BPM_LIST[bpm_menu.hover]
@@ -22545,6 +22562,10 @@ local function frame()
     elseif ch:match('[%d%.]') and #state.bpm_edit < 7 then state.bpm_edit = state.bpm_edit .. ch end
     c = 0
   end
+  if ctx.SP and ctx.SP.on and c ~= 0 then
+    if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
+    c = 0
+  end
   if bpm_menu and c ~= 0 then
     local ch = c < 256 and string.char(c) or ''
     if c == 27 then bpm_menu = nil
@@ -23310,6 +23331,7 @@ end
 -- play — по порядку: целые паттерны встык через GoToRegion (без паузы), сокращённые / с проскоком — прыжком;
 -- write — дописать после песни (повторы связанные, сокращённые — свой паттерн)
 ctx.PL = dofile(DIR .. '/jf_tracker_playlist.lua')
+ctx.SP = dofile(DIR .. '/jf_tracker_sigpick.lua')   -- 18 окт: выпадашка размера такта
 ctx.pl_load = function()
   local P = ctx.PL
   local proj = reaper.EnumProjects(-1)

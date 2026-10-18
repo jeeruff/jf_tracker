@@ -342,6 +342,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
     U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
+    MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, hy + 1 + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
