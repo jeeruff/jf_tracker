@@ -752,7 +752,7 @@ local function toks(e)
   if e._t then return e._t end
   local t = {}
   if e.t then for _, x in ipairs(e.t) do t[#t + 1] = x end
-  else for x in e.k:gmatch('%S+') do t[#t + 1] = x end end
+  elseif not e.k:match('^[%w /]+:%s') then for x in e.k:gmatch('%S+') do t[#t + 1] = x end end   -- 18 окт: «env: field 2» — запись контекста, не клавиша 2
   e._t = t
   return t
 end

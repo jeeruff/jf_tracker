@@ -1623,6 +1623,15 @@ function V.mod_note(c)
   return ctx.piano[b] ~= nil
 end
 
+-- 18 окт: клавиша сейчас сыграет ноту (KEYS / INSERT с клавиатурой в поле ноты) — справка на ней не вспыхивает
+function V.plays_note(c)
+  if not (V.piano and ctx.piano) or V.pending or V.op or V.picker or V.hydra then return false end
+  local nm = V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline'
+  if not (nm or (V.mode == 'insert' and (V.cur.field or 1) == 1)) then return false end
+  local base, how = V.note_key(c, ctx.mods and ctx.mods() or {})
+  return how ~= 'cmd' and ctx.piano[base] ~= nil
+end
+
 function V.key_impl(c)
   if c <= 0 then return end
   local E = ctx.edit

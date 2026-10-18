@@ -22647,7 +22647,7 @@ local function frame()
       if r == 'leave' then ctx.set_focus('tracker'); c = 0 elseif r then c = 0 end
     elseif c == 63 and not typing then
       ctx.actions_picker(); c = 0                          -- ? (6 окт): действия REAPER; справка — F1
-    elseif (state.khelp or ctx.help_pane_on()) and not typing then
+    elseif (state.khelp or ctx.help_pane_on()) and not typing and not (state.focus == 'tracker' and vim.plays_note and vim.plays_note(c)) then   -- 18 окт: игра на клавиатуре — не справка
       if state.focus == 'matrix' then ctx.pl_help = nil end   -- клавиша в матрице — снова её справка
       KH.press(ctx.help_page(), c, reaper.time_precise())
     end
