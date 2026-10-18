@@ -705,10 +705,37 @@ end
 -- вставить пустое время [t, t+len) во все треки, регионы и маркеры после t
 -- едут; =START в точке t остаётся. Без своего undo — внутри edit.run.
 function A.open_time(t, len)
-  local trs = {}
-  for ti = 0, R.CountTracks(0) - 1 do trs[#trs + 1] = R.GetTrack(0, ti) end
+  local trs = tracks()   -- 18 окт: без LIB / DEPOT — инструменты библиотеки лежат с 0, вставка их не двигает
   A.shift_markers(t, len, { [model.START_MARKER or '=START'] = true })
   edit.time_insert(trs, t, len, math.huge)
+end
+
+-- 18 окт: перенести отрезок песни [t0, t1) в t (секция матрицы): пустое время в t, items и регионы / маркеры
+-- отрезка — сдвигом (не копии), дыра на старом месте закрывается. Песенные треки (без LIB / DEPOT). Без своего undo
+function A.move_span(t0, t1, t)
+  local L = t1 - t0
+  if L <= EPS or (t >= t0 - EPS and t <= t1 + EPS) then return false end
+  A.open_time(t, L)
+  local s0 = (t < t0) and (t0 + L) or t0                     -- отрезок после вставки
+  local d = t - s0
+  for _, tr in ipairs(tracks()) do
+    for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+      if p >= s0 - EPS and p < s0 + L - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', p + d) end
+    end
+  end
+  local mv, i = {}, 0
+  while true do
+    local ret, isrgn, pos, rend, name, idx, col = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if pos >= s0 - EPS and pos < s0 + L - EPS and not name:match('^=') then mv[#mv + 1] = { isrgn, pos, rend, name, idx, col } end
+    i = i + 1
+  end
+  for _, m in ipairs(mv) do R.SetProjectMarker3(0, m[5], m[1], m[2] + d, m[1] and (m[3] + d) or 0, m[4], m[6]) end
+  edit.time_delete(tracks(), s0, s0 + L, math.huge)
+  A.shift_markers(s0 + L, -L)
+  return true
 end
 
 -- новый слот в t длиной len: регион (если не пустой такт) + items снимка
@@ -770,8 +797,7 @@ function A.delete_slot(rg)
       R.DeleteProjectMarkerByIndex(0, i)
     else i = i + 1 end
   end
-  local trs = {}
-  for ti = 0, R.CountTracks(0) - 1 do trs[#trs + 1] = R.GetTrack(0, ti) end
+  local trs = tracks()   -- 18 окт: без LIB / DEPOT — удаление слота в начале песни стирало инструменты библиотеки
   edit.time_delete(trs, rg.pos, rg.rgnend, math.huge)
   A.shift_markers(rg.rgnend, -len)
 end

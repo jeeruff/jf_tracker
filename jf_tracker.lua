@@ -17626,7 +17626,12 @@ local function frame()
   -- вид reg (2 окт): только строки региона курсора (при игре с follow — плейхеда),
   -- прокрутка в его пределах, строки вне региона пустые
   local view_clip
-  if state.view_reg then
+  if not state.view_reg then state.view_sec = nil end
+  if state.view_reg and state.view_sec then   -- 18 окт: показ секции целиком (меню секции)
+    local r0, r1 = math.floor(model.row_of_time(state.view_sec[1], state.lpb) + 1e-6), math.ceil(model.row_of_time(state.view_sec[2], state.lpb) - 1e-6)
+    if not state.fixed then state.row0 = math.max(r0, math.min(state.row0, math.max(r0, r1 - L.nrows))) end
+    view_clip = { r0, r1 }
+  elseif state.view_reg then
     local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
     local rg = alias.region_at(regions, edit.row_time(ref, state.lpb, 0))
     if rg then
@@ -19060,7 +19065,7 @@ local function frame()
   elseif hover.sessbtn then state.status = ({ quant = 'quantize: bar / beat / now - when a launched clip starts', stopall = 'stop every clip at the next boundary (X)', quit = 'session off: stop the transport, clear the =SESSION zone, repeat off (Q)', back = 'back to the matrix (zz / Esc); clips keep playing' })[hover.sessbtn] or ''
   elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
-  elseif hover.matrix and hover.matrix.secloop then state.status = 'section ' .. (hover.matrix.secloop.name or '') .. ' - double-click: loop the whole section'
+  elseif hover.matrix and hover.matrix.secloop then state.status = 'section ' .. (hover.matrix.secloop.name or '') .. (hover.matrix.secedge and (' - drag: its ' .. (hover.matrix.secedge == 'top' and 'start' or 'end') .. ' by slots') or ' - click: select its slots, dblclick: loop, Cmd+dblclick: launch (quantized), rclick: menu, drag: move (Opt - copy, Cmd - alias)')
   elseif hover.matrix and hover.matrix.tsel then state.status = 'loop zone - double-click: loop this slot, drag: several slots, Cmd+click: pick slots (the loop jumps between them), Shift+click: extend'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
@@ -20632,10 +20637,10 @@ local function frame()
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
       click = { t = now2, zone = 'mxrep' }
     elseif hover.matrix and hover.matrix.secloop then
-      -- 18 окт: полоса секции: двойной щелчок — луп на всю секцию
+      -- 18 окт: полоса секции: щелчок — меню, протяжка — перенос (Opt копия, Cmd алиас), за край — граница
       local sc = hover.matrix.secloop
-      if dbl and click.zone == 'mxsec' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
-      else vim.msg = 'section ' .. (sc.name or '') .. ': double-click - loop the whole section' end
+      ctx.sec_press = { sc = sc, edge = hover.matrix.secedge, y0 = gfx.mouse_y }
+      MX.sec_drag = ctx.sec_press
       click = { t = now2, zone = 'mxsec' }
     elseif hover.matrix and hover.matrix.tsel then
       -- 18 окт: колонка линейки — луп: двойной щелчок — этот слот, протяжка — несколько, Cmd — выборочно, Shift — продлить
@@ -21565,6 +21570,7 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and hover.matrix and hover.matrix.secloop then ctx.sec_menu(hover.matrix.secloop); U.rclick = false   -- 18 окт: меню секции — ПКМ
   elseif U.rclick and hover.tlist then local c2 = snap and snap.cols[hover.tlist.ci]; if c2 then ctx.track_menu(c2) end   -- 11 окт: tracks — меню трека (скрыть — столбец T)
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
@@ -21877,6 +21883,34 @@ local function frame()
         end
       end
       dsp_drag = nil
+    end
+  end
+  -- 18 окт: протяжка секции матрицы
+  if ctx.sec_press then
+    local sp = ctx.sec_press
+    if gfx.mouse_cap & 1 == 1 then
+      if not sp.active and math.abs(gfx.mouse_y - sp.y0) > 6 then sp.active = true end
+      if sp.active then
+        sp.to = MX.row_at(gfx.mouse_y)
+        local m = ctx.mods()
+        sp.how = sp.edge and 'edge' or (m.alt and 'copy' or (m.cmd and 'alias' or 'move'))
+        state.status = sp.edge and ('section ' .. (sp.sc.name or '') .. ': ' .. (sp.edge == 'top' and 'start' or 'end') .. ' to slot ' .. tostring(sp.to or '-'))
+          or ('section ' .. (sp.sc.name or '') .. ': ' .. ({ move = 'move', copy = 'copy (Opt)', alias = 'linked copy (Cmd)' })[sp.how] .. ' before slot ' .. tostring(sp.to or '-') .. '  (Opt - copy, Cmd - alias)')
+      end
+    else
+      ctx.sec_press, MX.sec_drag = nil, nil
+      if not sp.active then
+        -- щелчок — выделить слоты секции целиком (все треки); двойной — луп на секцию; меню — ПКМ
+        local now4 = reaper.time_precise()
+        if ctx.sec_last and ctx.sec_last.sc == sp.sc.idx and now4 - ctx.sec_last.t < 0.4 then
+          if ctx.mods().cmd then ctx.sec_launch(sp.sc)   -- 18 окт: Cmd + двойной — запуск с квантизацией (очередь)
+          else ctx.mx_loop_span(sp.sc.pos, sp.sc.rgnend); vim.msg = 'loop: section ' .. (sp.sc.name or '') end
+          ctx.sec_last = nil
+        else
+          ctx.sec_select(sp.sc); ctx.sec_last = { sc = sp.sc.idx, t = now4 }
+        end
+      elseif sp.to and sp.edge then ctx.sec_resize(sp.sc, sp.edge, sp.to)
+      elseif sp.to then ctx.sec_move(sp.sc, sp.to, sp.how or 'move') end
     end
   end
   -- FX из браузера эффектов → на DSP-панель (место — янтарная черта)
@@ -24093,6 +24127,149 @@ ctx.plist_draw = function(Lx, x, y, w)
   local st = #errs > 0 and errs[1] or (('%d step(s) · %d rows · %.1f bars'):format(n, rows, rows / math.max(1, state.lpb * 4)))
   U.text(x + pad, sy + 1, ctx.fit(st, w - 2 * pad), #errs > 0 and U.RED or U.GREY)
   return sy + rh + 2 - y, hover
+end
+-- 18 окт: секция в матрице — щелчок по её полосе: меню; протяжка за середину — перенос (Opt — копия, Cmd — алиас),
+-- за край — начало / конец по слотам
+ctx.sec_pats = function(sc)
+  local out = {}
+  for ri, rg in ipairs(seq) do if not rg.gap and rg.pos >= sc.pos - 1e-6 and rg.rgnend <= sc.rgnend + 1e-6 then out[#out + 1] = { ri = ri, rg = rg } end end
+  return out
+end
+ctx.sec_free_name = function(name)
+  local used = {}
+  for _, s2 in ipairs(regions.sections or {}) do used[s2.name] = true end
+  for _, r in ipairs(regions) do used[r.name] = true end
+  local base = (name or 'section'):gsub('%s+%d+$', '')
+  local nm, k = base, 2
+  while used[nm] do nm = base .. ' ' .. k; k = k + 1 end
+  return nm
+end
+-- вставить паттерны секции в t: alias — связанные повторы, иначе свободные копии (новые имена); → конец вставки
+ctx.sec_insert = function(sc, t, linked)
+  local t1 = t
+  for _, e in ipairs(ctx.sec_pats(sc)) do
+    local len = e.rg.rgnend - e.rg.pos
+    if linked then alias.put_alias(e.rg, t1)
+    else
+      local sl = alias.slot_snapshot(seq, snap, e.ri)
+      if sl then sl.name = alias.free_name(regions, sl.name); alias.put_slot(snap, t1, sl) end
+    end
+    t1 = t1 + len
+  end
+  return t1
+end
+ctx.sec_show = function(sc)
+  state.view_reg = true; state.view_sec = { sc.pos, sc.rgnend }
+  local r0 = model.row_of_time(sc.pos, state.lpb)
+  vim.cur.row = math.floor(r0 + 0.5); state.row0 = vim.cur.row
+  local r1 = model.row_of_time(sc.rgnend, state.lpb)
+  ctx.set_focus('tracker')
+  vim.msg = ('section %s in the tracker: %d rows%s (proj in the corner - the whole track)'):format(sc.name or '', math.floor(r1 - r0 + 0.5), (r1 - r0) > (L.nrows or 0) and ' - more than fit, scroll' or '')
+end
+ctx.sec_repeat = function(sc, linked)
+  local nm = ctx.sec_free_name(sc.name)
+  edit.run('section repeat ' .. (sc.name or ''), function()
+    local t1 = ctx.sec_insert(sc, sc.rgnend, linked)
+    reaper.AddProjectMarker2(0, true, sc.rgnend, t1, nm, -1, sc.color or 0)
+  end)
+  ctx.mx_refresh()
+  vim.msg = ('section %s repeated after it as %s (%s)'):format(sc.name or '', nm, linked and 'linked repeats' or 'free copies')
+end
+ctx.sec_resize = function(sc, edge, ri)
+  local rg = seq[ri]
+  if not rg then return end
+  local p0, p1 = sc.pos, sc.rgnend
+  if edge == 'top' then p0 = rg.pos else p1 = rg.rgnend end
+  if p1 <= p0 + 1e-6 then vim.msg = 'section: the start must stay before the end'; return end
+  edit.run('section ' .. (sc.name or '') .. ' bounds', function() reaper.SetProjectMarker3(0, sc.idx, true, p0, p1, sc.name or '', sc.color or 0) end)
+  ctx.mx_refresh()
+  vim.msg = ('section %s: %s now at slot %d'):format(sc.name or '', edge == 'top' and 'start' or 'end', ri)
+end
+-- how: 'move' | 'copy' | 'alias'; ri — вставить перед этим слотом
+ctx.sec_move = function(sc, ri, how)
+  local rg = seq[ri]
+  if not rg then vim.msg = 'section: drop it on a slot'; return end
+  local t = rg.pos
+  local L0 = sc.rgnend - sc.pos
+  if how == 'move' and t >= sc.pos - 1e-6 and t <= sc.rgnend + 1e-6 then vim.msg = 'section: already here'; return end
+  if how == 'move' then
+    local ok
+    edit.run('section move ' .. (sc.name or ''), function() ok = alias.move_span(sc.pos, sc.rgnend, t) end)
+    ctx.mx_refresh()
+    vim.msg = ok and ('section %s moved before slot %d (u - undo)'):format(sc.name or '', ri) or 'section: nothing moved'
+  else
+    local nm = ctx.sec_free_name(sc.name)
+    edit.run('section ' .. how .. ' ' .. (sc.name or ''), function()
+      local t1 = ctx.sec_insert(sc, t, how == 'alias')
+      reaper.AddProjectMarker2(0, true, t, t1, nm, -1, sc.color or 0)
+    end)
+    ctx.mx_refresh()
+    vim.msg = ('section %s %s at slot %d as %s'):format(sc.name or '', how == 'alias' and 'linked (alias)' or 'copied', ri, nm)
+  end
+end
+-- :sec … — секция слота курсора матрицы
+ctx.sec_cmd = function(arg)
+  local rg = seq[MX.cur.ri]
+  local sc
+  for _, s2 in ipairs(regions.sections or {}) do if rg and rg.pos >= s2.pos - 1e-6 and rg.rgnend <= s2.rgnend + 1e-6 then sc = s2 end end
+  if not sc then vim.msg = 'sec: the cursor slot is not in a section'; return end
+  local w, n = (arg or ''):match('^(%S*)%s*(%d*)')
+  n = tonumber(n)
+  if w == 'launch' then ctx.sec_launch(sc) elseif w == 'show' then ctx.sec_show(sc) elseif w == 'repeat' then ctx.sec_repeat(sc, true) elseif w == 'copy' then ctx.sec_repeat(sc, false)
+  elseif w == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend)
+  elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif w == 'aliasto' and n then ctx.sec_move(sc, n, 'alias')
+  else ctx.sec_menu(sc) end
+end
+-- 18 окт: запуск секции: играет — первый её слот в очередь матрицы (прыжок на границе играющего паттерна), луп — на секцию;
+-- стоит — луп на секцию и игра с её начала
+ctx.sec_launch = function(sc)
+  local ps = ctx.sec_pats(sc)
+  if #ps == 0 then return end
+  ctx.mx_loop_span(sc.pos, sc.rgnend); reaper.GetSetRepeat(1)
+  if playing() then
+    local r = ps[1].rg
+    MX.queued = { idx = r.idx, pos = r.pos, name = r.name }
+    vim.msg = ('section %s queued: from the end of the playing pattern, then it loops'):format(sc.name or '')
+  else
+    reaper.SetEditCurPos(sc.pos, false, false); reaper.OnPlayButton()
+    vim.msg = ('section %s plays (loop)'):format(sc.name or '')
+  end
+end
+ctx.sec_select = function(sc)
+  local ps = ctx.sec_pats(sc)
+  if #ps == 0 then return end
+  MX.anchor = { ri = ps[1].ri, ci = 0 }
+  MX.cur.ri, MX.cur.ci = ps[#ps].ri, 0
+  ctx.set_focus('matrix')
+  vim.msg = ('section %s: %d slots selected (y d M - copy / cut / mute the block; double-click - loop, rclick - menu)'):format(sc.name or '', #ps)
+end
+ctx.sec_menu = function(sc)
+  local items = {
+    { label = 'launch (quantized)', v = 'launch' },
+    { label = 'show in the tracker', v = 'show' },
+    { label = 'repeat after it (linked)', v = 'rep' },
+    { label = 'copy after it (new patterns)', v = 'copy' },
+    { label = 'loop it', v = 'loop' },
+    { label = 'rename', v = 'name' },
+    { label = 'remove the section (patterns stay)', v = 'del' },
+  }
+  ctx.smart_at = { x = gfx.mouse_x + 4, y = gfx.mouse_y, top = gfx.mouse_y }
+  ctx.smart_open({ title = 'section ' .. (sc.name or ''), items = items, cols = 1, sel = 1, on_pick = function(it)
+    if it.v == 'launch' then ctx.sec_launch(sc)
+    elseif it.v == 'show' then ctx.sec_show(sc)
+    elseif it.v == 'rep' then ctx.sec_repeat(sc, true)
+    elseif it.v == 'copy' then ctx.sec_repeat(sc, false)
+    elseif it.v == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
+    elseif it.v == 'name' then
+      ctx.name_pick('region', 'section name', sc.name or '', function(nm)
+        if nm == '' then vim.msg = 'section: a name is needed'; return end
+        edit.run('section rename', function() reaper.SetProjectMarker3(0, sc.idx, true, sc.pos, sc.rgnend, nm, sc.color or 0) end); ctx.mx_refresh()
+      end)
+    elseif it.v == 'del' then
+      edit.run('section remove ' .. (sc.name or ''), function() reaper.DeleteProjectMarker(0, sc.idx, true) end); ctx.mx_refresh()
+      vim.msg = 'section ' .. (sc.name or '') .. ' removed - its patterns stay'
+    end
+  end })
 end
 -- 18 окт: time selection REAPER → секция (Tr в матрице, кнопка timesel): имя из быстрых — intro verse chorus …
 ctx.SEC_NAMES = { 'intro', 'verse', 'pre-chorus', 'chorus', 'hook', 'build', 'drop', 'break', 'breakdown', 'bridge', 'solo', 'outro' }

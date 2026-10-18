@@ -860,12 +860,21 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local sw = MX.sec_w or 0
       if sw > 0 then
         local hot = gfx.mouse_x >= 0 and gfx.mouse_x < sw and gfx.mouse_y >= b.y0 and gfx.mouse_y < b.y1
-        if hot then hover.secloop = sc end   -- 18 окт: двойной щелчок — луп на всю секцию
+        if hot then
+          hover.secloop = sc
+          if gfx.mouse_y < b.y0 + 4 then hover.secedge = 'top' elseif gfx.mouse_y >= b.y1 - 4 then hover.secedge = 'bottom' end   -- 18 окт: край — граница
+        end
         U.set(U.tint(c, hot and 0.75 or 0.55)); gfx.rect(2, b.y0 + 1, sw - 2, b.y1 - b.y0 - 2, 1)
         if ctx.vtext then ctx.vtext(2 + math.floor((sw - 2 - L.th) / 2), b.y0 + 3, b.y1 - b.y0 - 6, sc.name, U.readable and U.readable(U.TEXT, U.tint(c, 0.55), 4.5) or U.TEXT, U.tint(c, 0.55)) end
       end
       U.set(c)
       gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
+    end
+    -- 18 окт: протяжка секции — куда встанет (черта у слота)
+    local sd = MX.sec_drag
+    if sd and sd.active and sd.to and MX.row_y and MX.row_y[sd.to] then
+      local yy = MX.row_y[sd.to] + ((sd.edge == 'bottom') and rh or 0)
+      U.set(U.AMBER); gfx.rect(0, yy - 1, xr, 2, 1)
     end
   end
   -- 18 окт: выделение / луп REAPER — скобкой «[» в колонке линейки (левее рисок), по времени (высокий слот — точно внутри);
