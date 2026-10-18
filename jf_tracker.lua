@@ -24021,6 +24021,17 @@ ctx.palette_mix_stop = function()
   reaper.GetSetRepeat(pm.rep)
   reaper.SetEditCurPos(pm.cur, false, false)
   if ctx.pal_on == 'mix' then ctx.pal_on = nil end
+  -- 18 окт: копии прослушки (метка pal:) — убрать: зона сдвигалась с песней, копии оставались мусором за концом
+  ctx.ss_apply('palette: stop', function()
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for k = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local _, tg = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+        if tg:sub(1, 4) == 'pal:' then reaper.DeleteTrackMediaItem(tr, it) end
+      end
+    end
+  end)
 end
 ctx.palette_play_picks = function()
   local by, name, mixed = {}, nil, false
