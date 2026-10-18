@@ -7774,15 +7774,46 @@ function D.frame(L, snap, rows, state, info)
             end
             local gx0, gy0 = bx + 2, hy + L.rh + 1
             local gw, gh = bw1 - 4, by + bh - 3 - gy0
-            local G = D.DR.grid(#f.kids, gw, gh, 6 * L.cw, 2 * L.rh + 2)
+            -- 18 окт: всегда 4 × 4 (как пэды MPC), справа — карта всех 128 пэдов кубиками 4 × 32 (прокрутка / прыжок)
+            local cube = math.max(2, math.min(5, math.floor((gh - 2) / 32) - 1))
+            local mw = 4 * (cube + 1) + 4
+            gw = gw - mw
+            local G = { cols = 4, rows = math.max(1, math.ceil(#f.kids / 4)), cw = gw // 4 }
+            G.ch = math.max(2 * L.rh + 2, gh // 4)
+            G.fit = math.max(1, math.min(4, gh // G.ch))
             D.kit_scroll = D.kit_scroll or {}
             local sc = D.kit_scroll[kkey] or 0                 -- ряд сверху
             if ks > 0 then
               local r0 = (ks - 1) // G.cols
               if r0 < sc then sc = r0 elseif r0 >= sc + G.fit then sc = r0 - G.fit + 1 end
             end
-            sc = math.max(0, math.min(sc, math.max(0, G.rows - G.fit)))
+            sc = math.max(0, math.min(sc, math.max(0, math.max(G.rows, 32) - G.fit)))
             D.kit_scroll[kkey] = sc
+            -- карта: 4 колонки × 32 ряда, ряд = 4 пэда
+            do
+              local mx0, my0 = gx0 + gw + 3, gy0
+              for r = 0, 31 do
+                for c = 0, 3 do
+                  local ki = r * 4 + c + 1
+                  local kid = f.kids[ki]
+                  local cxm, cym = mx0 + c * (cube + 1), my0 + r * (cube + 1)
+                  set(ki == ks and U.AMBER or (kid and (kid.enabled and U.mix(U.CYAN, U.PANEL, 0.35) or U.GREY) or U.mix(U.LINE, U.PANEL, 0.5)))
+                  gfx.rect(cxm, cym, cube, cube, kid and 1 or 0)
+                end
+              end
+              set(U.AMBER); gfx.rect(mx0 - 2, my0 + sc * (cube + 1) - 1, 4 * (cube + 1) + 3, G.fit * (cube + 1) + 1, 0)   -- видимое окно
+              local mh = 32 * (cube + 1)
+              if not drag and mx >= mx0 - 2 and mx < mx0 + 4 * (cube + 1) + 2 and my >= my0 and my < my0 + mh then
+                hover.dspkitmap = { key = kkey, row = math.floor((my - my0) / (cube + 1)), fit = G.fit }
+              end
+            end
+            -- пустые места страницы (до 4 × 4) — тусклые рамки
+            for slot = sc * 4 + 1, (sc + G.fit) * 4 do
+              if not f.kids[slot] then
+                local r, c = (slot - 1) // 4 - sc, (slot - 1) % 4
+                set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(gx0 + c * G.cw, gy0 + r * G.ch, G.cw - 2, G.ch - 2, 0)
+              end
+            end
             for ki, kid in ipairs(f.kids) do
               local r, c = (ki - 1) // G.cols - sc, (ki - 1) % G.cols
               if r >= 0 and r < G.fit then

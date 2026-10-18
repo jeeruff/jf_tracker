@@ -19702,6 +19702,13 @@ local function frame()
   end
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
   if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
+  if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов — туда (ряд под мышью — по центру страницы)
+    local km = hover.dspkitmap
+    draw.kit_scroll = draw.kit_scroll or {}
+    draw.kit_scroll[km.key] = math.max(0, km.row - math.floor((km.fit or 4) / 2))
+    vim.msg = ('pads %d-%d'):format(draw.kit_scroll[km.key] * 4 + 1, (draw.kit_scroll[km.key] + (km.fit or 4)) * 4)
+    U.click = false
+  end
   if U.click and (hover.dbplus or hover.dbpar) then
     ctx.set_focus('dsp')
     if hover.dbpar then ctx.db_ops.add(hover.dbpar, true)
