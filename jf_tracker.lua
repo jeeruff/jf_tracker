@@ -19601,7 +19601,7 @@ local function frame()
     local r = draw.popup_rect
     local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
     if U.click and draw.popup_group then vim.picker_pick(draw.popup_group[1], draw.popup_group[2]); if vim.picker then vim.picker.col = math.min(vim.picker.depth + 1, draw.popup_group[1] + 1) end; U.click = false   -- 16 окт: папка пикера — выбрать, фокус правее
-    elseif U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker_key(13); U.click = false
+    elseif U.click and draw.popup_pick then vim.picker.sel = draw.popup_pick; vim.picker.moved = true; vim.picker_key(13); U.click = false
     elseif (U.click or U.rclick) and not inside then vim.picker_key(27); U.click, U.rclick = false, false
     elseif U.click or U.rclick then U.click, U.rclick = false, false end
     if inside and gfx.mouse_wheel ~= 0 and vim.picker then

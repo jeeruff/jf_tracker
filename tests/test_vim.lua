@@ -1076,6 +1076,21 @@ do
   V.picker = nil
 end
 
+-- 18 окт: пустая строка (allow_empty) + Enter после стрелок — берётся выбранный пункт, не пустое имя
+do
+  local got
+  V.open_picker('name', { { label = 'F1' }, { label = 'A1' }, { label = 'B1' } }, function(it) got = it.label end)
+  V.picker.free, V.picker.allow_empty = true, true
+  V.picker_key(1685026670); V.picker_key(1685026670); V.picker_key(13)
+  eq('arrows then Enter take the item', got, 'B1')
+  got = nil
+  V.open_picker('name', { { label = 'F1' } }, function(it) got = it.label end)
+  V.picker.free, V.picker.allow_empty = true, true
+  V.picker_key(13)
+  eq('Enter on untouched empty input gives empty', got, '')
+  V.picker = nil
+end
+
 -- 17 окт: умное выделение — первый a: колонка на весь паттерн; a шире, i уже; курсор на месте (такт 16, регион 0..31)
 do
   V.key(27); V.mode = 'normal'; V.cur.fi, V.cur.row = 1, 21

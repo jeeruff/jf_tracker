@@ -3160,10 +3160,10 @@ function V.picker_key(c)
       elseif c == 16 or c == UP or c == 11 then V.picker_pick(pk.col, math.max(1, gi - 1)); return end
     end
   end
-  if pk.fresh and c == BS then pk.query, pk.fresh, pk.sel = '', nil, 1; picker_filter(); return end      -- 18 окт: BS — имя стёрто
+  if pk.fresh and c == BS then pk.query, pk.fresh, pk.sel, pk.moved = '', nil, 1, nil; picker_filter(); return end      -- 18 окт: BS — имя стёрто
   if pk.fresh and c >= 32 and c < 127 then pk.query, pk.fresh, pk.sel = '', nil, 1 end                   -- набор — заменяет
   if c == ESC then V.picker = nil
-  elseif c == ENTER and pk.free and pk.query == '' and not pk.fresh and pk.allow_empty then
+  elseif c == ENTER and pk.free and pk.query == '' and not pk.fresh and pk.allow_empty and not pk.moved then   -- 18 окт: стрелками выбран пункт — берём его
     V.picker = nil
     if pk.on_pick then local ok, e = pcall(pk.on_pick, { label = '', free = true }); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
   elseif c == ENTER then
@@ -3171,8 +3171,8 @@ function V.picker_key(c)
     V.picker = nil
     if it and pk.on_pick then local ok, e = pcall(pk.on_pick, it); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
   elseif c == BS then pk.query = pk.query:sub(1, -2); picker_filter()
-  elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1)
-  elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1)
+  elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1); pk.moved = true
+  elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1); pk.moved = true
   elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); pk.typing = pk.tree and true or nil; picker_filter() end
 end
 
