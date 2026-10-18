@@ -51,7 +51,7 @@ end
 local function draw_jftop(U, L, bx, by, bw, bh, hb, fit)
   U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
   local x, y = bx + L.pad, by + 2
-  U.text(x, y, fit('jftop  r: reset  t: performance  Esc: close', bw - 2 * L.pad), U.AMBER)
+  U.text(x, y, fit('jftop  t: performance  r: reset  j k: scroll  Esc: back', bw - 2 * L.pad), U.AMBER)
   y = y + L.rh + 4
   local list, total = {}, 0
   for k, p in pairs(P.prof or {}) do list[#list + 1] = { name = k, p = p }; total = total + p.ema end
@@ -94,7 +94,7 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   P.refresh()
   U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
   local x, y = bx + L.pad, by + 2
-  U.text(x, y, fit('performance  n: REAPER meter  Esc: close', bw - 2 * L.pad), U.AMBER)
+  U.text(x, y, fit('performance  t: jftop  n: REAPER meter  j k: scroll  Esc: back', bw - 2 * L.pad), U.AMBER)
   y = y + L.rh + 4
   -- полоски — то, что считается без внешних процессов (6 окт): доля кадра
   -- трекера на работу и память Lua; CPU / RAM самого REAPER — n (его метр)

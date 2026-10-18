@@ -290,6 +290,13 @@ KH.PAGES = {
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Opt+Tab', d = 'back to the tracker / next pane' },
   } },
+  perf = { title = 'performance - what takes the time (REAPER and the tracker)', e = {
+    { k = 't', d = 'jftop <-> performance: the tracker frame by parts (ms, max, %) / REAPER - audio, latency, tracks and their FX' },
+    { k = 'n', d = 'the REAPER performance meter window' },
+    { k = 'r', d = 'jftop: reset the max values' },
+    { k = 'j k', d = 'scroll' },
+    { k = 'Esc', d = 'back to the tracker (:jftop / the performance option again - hide the pane)' },
+  } },
   undotree = { title = 'undo - the undo tree (as undotree in Vim)', e = {
     { k = 'j k  g G', d = 'move over the nodes (newest on top); the status says what the node is' },
     { k = 'Enter / dblclick', d = 'go there: on the current line - plain REAPER undo / redo steps; on another branch - its snapshot is restored (one new undo step, u - back)' },
@@ -708,6 +715,7 @@ KH.BARS = {
   insert_rn = { { 'zsx q2w', 'notes' }, { '[ ]', 'oct' }, { '{ }', 'vel' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' },
              { 'arrows', 'move' }, { 'Esc', 'normal' }, { '?', 'actions' } },
   actions = { { 'j k', 'move' }, { 'h l', 'groups / list' }, { '/', 'find' }, { 'Enter', 'run' }, { '[ ]', 'section' }, { 'f', 'favourite' }, { 'a x', 'shortcut' }, { 'y', 'copy id' }, { 'Esc', 'tracker' } },
+  perf = { { 't', 'jftop / perf' }, { 'n', 'REAPER meter' }, { 'r', 'reset' }, { 'j k', 'scroll' }, { 'Esc', 'tracker' } },
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { 'F1', 'help' } },
