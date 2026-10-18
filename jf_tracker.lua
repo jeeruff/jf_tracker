@@ -13405,6 +13405,7 @@ ctx.np_draw = function()
   local x = math.max(2, math.min(gfx.w - w - 2, (NP.at and NP.at.x) or 40))
   local y = (NP.at and NP.at.y) or 40
   if y + h > gfx.h - 2 then y = math.max(2, y - h - L.rh) end
+  ctx.np_rect = { x, y, w, h, y + L.pad + (NP.sel or 1) * L.rh }   -- 18 окт: меню строки — рядом с окном, у выбранной строки
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
   U.text(x + L.pad, y + L.pad, ctx.fit('note: ' .. (e.name or ''), w - 2 * L.pad), U.AMBER)
@@ -13418,7 +13419,9 @@ ctx.np_draw = function()
     if hot and U.click then NP.sel = i; U.click = false end
     if hot and gfx.mouse_wheel ~= 0 then ctx.sp_adjust(e, r.k, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0; NP.key = nil end
   end
-  if (U.click or U.rclick) and not (mx >= x and mx < x + w and my >= y and my < y + h) then ctx.NP = nil end
+  local pr = draw.popup_rect   -- 18 окт: щелчок по меню рядом — не «мимо окна»
+  local inpop = pr and mx >= pr[1] and mx < pr[1] + pr[3] and my >= pr[2] and my < pr[2] + pr[4]
+  if (U.click or U.rclick) and not inpop and not (mx >= x and mx < x + w and my >= y and my < y + h) then ctx.NP = nil end
 end
 -- 13 окт: clipboard — история yank (панель clipboard, клавиша y в PANE)
 ctx.CB = { hist = {}, sel = 1 }
@@ -18519,8 +18522,11 @@ local function frame()
     local ih = draw.input_line(L, ia, istr)
     anchor = { x = ia.x, y = ia.y + ih }
   end
-  draw.popup(L, pop, anchor)
+  -- 18 окт: попапы не наслаиваются — меню из окна ноты встаёт рядом справа (не влезает — слева), окно ноты под ним
   if ctx.NP then ctx.np_draw() end   -- 13 окт: свойства ноты
+  local nr = ctx.NP and ctx.np_rect
+  if pop and nr and not (anchor and anchor.box) then anchor = { x = nr[1] + nr[3] + 4, y = nr[5] or nr[2], right = nr[1] - 4 } end
+  draw.popup(L, pop, anchor)
   -- 10 окт: «Automation envelope (in the tracker)» — курсор на колонку огибающей, когда она появилась
   if ctx.env_jump and L and L.flat then
     for i, f in ipairs(L.flat) do
