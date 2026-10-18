@@ -9576,6 +9576,8 @@ ctx = {
       state.rb_top = { state.top, state.toptab }
       state.top, state.toptab = true, 'automation'           -- наверху — автоматизация (7 окт)
       state.rb_bmode = B.mode; B.mode = 'fx'; state.side = true   -- браузер — на вкладку fx (эффекты бросать в роутер)
+      -- 18 окт: панели — трекер на всё окно (zoom): роутер во всю ширину под шапками (рисовался в старой раскладке —
+      -- чёрная колонка слева, цепочка в углу, панели справа торчали)
       ctx.db_cache = nil; relayout(); ctx.set_focus('dsp'); vim.msg = 'router big: drag the sliders, dblclick - default, h l j k walk, zR / Esc back'
     else
       if state.rb_saved ~= nil and not state.dsp_big then state.dsp = state.rb_saved end
@@ -18571,7 +18573,17 @@ local function frame()
       local y0 = L.body_y
       local h0 = gfx.h - L.status_h - y0
       local x0, w0 = lx, L.win_w - lx            -- эффекты — во вкладке fx браузера (7 окт), не отдельным списком
-      if not L.browser_left then U.set(U.BG); gfx.rect(0, L.header_y, L.matrix_w, L.body_y - L.header_y, 1) end   -- колонка матрицы над телом
+      -- 18 окт: панели — роутер до колонки справа с lib / slices / браузером эффектов (они остаются: бросать эффекты),
+      -- всё левее — его (раньше — до края трекера: снизу и слева торчали панели)
+      if state.panes_ui and L.pn then
+        local rx = gfx.w
+        for _, id in ipairs({ 'inst', 'slices', 'fxb', 'browser' }) do
+          local c = L.pn.by_panel[id]
+          if c and c.x > (L.win_w + 0) - 4 and c.x < rx then rx = c.x end
+        end
+        x0, w0 = 0, rx - 1
+        U.set(U.BG); gfx.rect(0, 0, L.matrix_w, L.body_y, 1)   -- левая колонка над телом (help / matrix) — под роутер
+      elseif not L.browser_left then U.set(U.BG); gfx.rect(0, L.header_y, L.matrix_w, L.body_y - L.header_y, 1) end   -- колонка матрицы над телом
       if not HN.active then
         local keep = {}
         for _, t in ipairs(HN.targets) do
@@ -18580,6 +18592,7 @@ local function frame()
         end
         HN.targets = keep
       end
+      U.set(U.BG); gfx.rect(x0, y0, w0, h0, 1)   -- 18 окт: свой фон — строки трекера (линии регионов) не просвечивают
       local hv = MX.DB.draw(L, x0, y0, w0, h0, root, title, false, true)
       local mx, my = gfx.mouse_x, gfx.mouse_y
       if my >= y0 and my < y0 + h0 and mx >= x0 and mx < x0 + w0 then hover = hv; idle.hover = hover end

@@ -194,13 +194,17 @@ function SM.draw(d)
   SM.hot_prev = SM.hot
   -- кнопка listen справа внизу
   local by = gy + rows * crh
-  local lw = ms('listen') + 2 * L.pad
+  -- 18 окт: listen — только когда выбор звучит (p.on_sel); в меню аранжировок и т. п. смысла нет
+  local lw = p.on_sel and (ms('listen') + 2 * L.pad) or 0
   local lx = x + w - L.pad - lw
-  local lhot = mx >= lx and mx < lx + lw and my >= by and my < by + L.rh
-  set(SM.listen and C.SELF or C.PANEL); gfx.rect(lx, by, lw, L.rh, 1)
-  set(SM.listen and C.AMBER or C.GREY); gfx.rect(lx, by, lw, L.rh, 0)
-  text(lx + L.pad, by, 'listen', (SM.listen or lhot) and C.AMBER or C.GREY)
-  SM.lbtn = { lx, by, lw, L.rh }
+  local lhot = p.on_sel and mx >= lx and mx < lx + lw and my >= by and my < by + L.rh
+  SM.lbtn = nil
+  if p.on_sel then
+    set(SM.listen and C.SELF or C.PANEL); gfx.rect(lx, by, lw, L.rh, 1)
+    set(SM.listen and C.AMBER or C.GREY); gfx.rect(lx, by, lw, L.rh, 0)
+    text(lx + L.pad, by, 'listen', (SM.listen or lhot) and C.AMBER or C.GREY)
+    SM.lbtn = { lx, by, lw, L.rh }
+  end
   -- подсказка: под мышью, иначе выбранное
   local ti = p.items[SM.hot or p.sel]
   local tip = lhot and ('listen: the choice sounds when it changes - ' .. (SM.listen and 'on' or 'off')) or (ti and (ti.tip or ti.label) or '')
