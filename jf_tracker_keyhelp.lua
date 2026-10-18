@@ -97,7 +97,7 @@ KH.PAGES = {
     { k = ':mackey', d = ':mackey name x - a hotkey for the macro: @x plays it; :keys - all keys and commands as text (Data/jf_tracker_keys.md)' },
     { k = 'π (Opt+P)', t = {}, d = 'smart paste: the clipboard buffers at the cursor - a digit / Enter pastes that one, π again - the last yank (layout qwerty: with the keyboard / INSERT π is still the note p beside)' },
     { k = 'clipboard', t = {}, d = 'yank history with the wave of each buffer (w - peaks / spectral); zz - on the whole window: buttons, a big wave, the rows. Space listen, s save as a file, a add to drumrs5k, e open in the external editor, m a subproject in pm with tags; Enter / p - use it' },
-    { k = 'macros tab', t = {}, d = 'list left, the editor of the picked one right (buttons = keys): Enter play, a new, e edit the body, n name, K hotkey (press the keys, Esc removes; it plays the macro anywhere), r register (@x), t description, S share (a .jfm file in Data/jf_tracker_macros), i import a shared one into saved, d delete; dblclick plays' },
+    { k = 'macros tab', t = {}, d = 'as lf: folders left (recorded / saved / shared / built-in, h l - between folders and the list, j k), the macros of the folder in the middle, the editor of the picked one right (buttons = keys): Enter play, a new, e edit the body, n name, K hotkey (press the keys, Esc removes; it plays the macro anywhere), r register (@x), t description, S share (a .jfm file in Data/jf_tracker_macros), i import a shared one into saved, d delete; dblclick plays' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },
     { k = 'x', d = 'delete event under cursor' },
@@ -941,7 +941,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
     -- последнее совершённое действие (или то, к которому вернулись стрелками)
     local h = KH.hist[KH.hpos or #KH.hist]
     local he = h and KH.PAGES[h.page] and KH.PAGES[h.page].e[h.i]
-    if he then qs, qc = (KH.hpos and ('%d/%d '):format(KH.hpos, #KH.hist) or 'last: ') .. he.k .. ' - ' .. he.d, U.TEXT
+    if he then qs, qc = '[' .. (KH.hpos and ('%d/%d: '):format(KH.hpos, #KH.hist) or 'last used: ') .. he.k .. ' - ' .. he.d .. ']', U.GREY   -- 18 окт: скобками, тише строк справки
     else qs, qc = focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up', U.GREY end
   end
   U.text(qx, y + 3, fit(qs, math.max(0, qend - qx)), qc)
@@ -984,6 +984,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
       local ey = top + rr * L.rh
       local fl = KH.flash and KH.flash.page == r.page and KH.flash.i == r.i and (now - KH.flash.t0) < FLASH_T
       local kc, dc = U.AMBER, U.TEXT
+      if not focused then kc, dc = U.mix(U.AMBER, U.PANEL, 0.15), U.GREY end   -- 18 окт: модуль не в фокусе — чуть тише
       if fl then
         local t = now - KH.flash.t0
         local a = 1 - t / FLASH_T

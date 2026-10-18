@@ -33,7 +33,10 @@ eq('pretty cmd as is', MR.pretty(':xf rotate 4'), ':xf rotate 4')
 local r3 = MR.rows({}, {}, nil, { { name = 'sh', body = ':off', file = 'sh.jfm' } })
 local has_sh = false; for _, r in ipairs(r3) do if r.kind == 'shared' then has_sh = true end end
 eq('shared section', has_sh, true)
-MR.sel = 1; MR.fix_sel(r3)
+MR.sel, MR.dir = 0, 3; MR.fix_sel(r3)   -- 18 окт: lf — папка shared (recorded, saved, shared)
+eq('lf: first of the folder', r3[MR.sel] and r3[MR.sel].kind, 'shared')
+MR.key(('h'):byte(), r3); MR.key(('k'):byte(), r3); eq('lf: k in folders - the previous folder', MR.dir, 2)
+MR.key(('j'):byte(), r3); MR.key(('l'):byte(), r3); eq('lf: back to shared', MR.dir, 3)
 eq('e edits', MR.key(('e'):byte(), r3).kind, 'edit')
 eq('a new', MR.key(('a'):byte(), r3).kind, 'new')
 -- 16 окт: хоткеи

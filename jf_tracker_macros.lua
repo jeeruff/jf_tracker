@@ -158,10 +158,25 @@ function MR.rows(regs, saved, builtin, shared)
   return rows
 end
 local function selectable(r) return r and r.kind ~= nil end
-function MR.fix_sel(rows)
-  if not selectable(rows[MR.sel]) then
-    for i, r in ipairs(rows) do if selectable(r) then MR.sel = i; return end end
+-- 18 окт: вид lf — папки (recorded / saved / shared / built-in) слева, макросы папки посередине, свойства справа
+MR.dir, MR.incol = MR.dir or 1, MR.incol or 'list'
+function MR.dirs(rows)
+  local out = {}
+  for i, r in ipairs(rows) do
+    if r.hdr then out[#out + 1] = { name = r.hdr:match('^(%S+)'), note = r.hdr:match('^%S+%s+(.*)$'), i0 = i + 1, i1 = i, n = 0 }
+    elseif out[#out] then local d = out[#out]; d.i1 = i; if r.kind then d.n = d.n + 1 end end
   end
+  return out
+end
+local function dir_of(ds, i) for k, d in ipairs(ds) do if i >= d.i0 and i <= d.i1 then return k end end end
+local function first_in(rows, d) for i = d.i0, d.i1 do if selectable(rows[i]) then return i end end return d.i0 end
+function MR.fix_sel(rows)
+  local ds = MR.dirs(rows)
+  if #ds == 0 then return end
+  -- выбранный макрос задаёт папку (щелчок, новый); иначе — первый в папке
+  local k = selectable(rows[MR.sel]) and dir_of(ds, MR.sel)
+  if k then MR.dir = k
+  else MR.dir = math.max(1, math.min(#ds, MR.dir)); MR.sel = first_in(rows, ds[MR.dir]) end
 end
 
 -- 16 окт: кнопки редактора — клавиша → действие (одна функция — одна клавиша)
@@ -172,15 +187,25 @@ MR.KEYS = { a = 'new', e = 'edit', n = 'name', r = 'reg', t = 'desc', S = 'share
 function MR.key(c, rows)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   MR.fix_sel(rows)
+  local ds = MR.dirs(rows)
+  local cd = ds[MR.dir] or { i0 = 1, i1 = #rows }
   local function step(d)
     local i = MR.sel
-    repeat i = i + d until i < 1 or i > #rows or selectable(rows[i])
-    if i >= 1 and i <= #rows then MR.sel = i end
+    repeat i = i + d until i < cd.i0 or i > cd.i1 or selectable(rows[i])
+    if i >= cd.i0 and i <= cd.i1 then MR.sel = i end
   end
-  if ch == 'j' or c == 1685026670 then step(1); return true
-  elseif ch == 'k' or c == 30064 then step(-1); return true
-  elseif ch == 'g' then MR.sel = 1; MR.fix_sel(rows); return true
-  elseif ch == 'G' then MR.sel = #rows; step(0); for i = #rows, 1, -1 do if selectable(rows[i]) then MR.sel = i; break end end; return true
+  local function go_dir(d)
+    if #ds == 0 then return end
+    MR.dir = (MR.dir - 1 + d) % #ds + 1
+    MR.sel, MR.scroll = first_in(rows, ds[MR.dir]), 0
+  end
+  -- h / l (← →) — между папками и списком, как в lf; в папках j k — папка
+  if ch == 'h' or c == 1818584692 then MR.incol = 'dirs'; return true
+  elseif ch == 'l' or c == 1919379572 then MR.incol = 'list'; return true
+  elseif ch == 'j' or c == 1685026670 then if MR.incol == 'dirs' then go_dir(1) else step(1) end; return true
+  elseif ch == 'k' or c == 30064 then if MR.incol == 'dirs' then go_dir(-1) else step(-1) end; return true
+  elseif ch == 'g' then MR.sel = first_in(rows, cd); return true
+  elseif ch == 'G' then for i = cd.i1, cd.i0, -1 do if selectable(rows[i]) then MR.sel = i; break end end; return true
   elseif c == 13 or ch == ' ' then return selectable(rows[MR.sel]) and { kind = 'play', row = rows[MR.sel] } or true
   elseif ch == 'd' or ch == 'x' then local r = rows[MR.sel]; return (r and (r.kind == 'rec' or r.kind == 'saved')) and { kind = 'delete', row = r } or true
   elseif ch == 's' then local r = rows[MR.sel]; return (r and r.kind == 'rec') and { kind = 'save', row = r } or true
@@ -195,20 +220,47 @@ function MR.draw(d, x, y, w, h, rows)
   local U, L, fit = d.U, d.L, d.fit
   MR.fix_sel(rows)
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local nvis = math.max(1, math.floor(h / L.rh))
-  if MR.sel > MR.scroll + nvis then MR.scroll = MR.sel - nvis end
-  if MR.sel <= MR.scroll then MR.scroll = MR.sel - 1 end
-  MR.scroll = math.max(0, math.min(MR.scroll, math.max(0, #rows - nvis)))
   local hv
   -- 16 окт: справа — редактор выбранного (шире 60 знаков — делим), слева список
   local ew = w >= L.cw * 60 and math.floor(w * 0.5) or 0
   local full_w = w
   w = w - ew
-  if U.vbar then U.vbar('macros', x, y, w, nvis * L.rh, MR.scroll, nvis, #rows) end   -- 15 окт: полоса всегда
-  local nw = math.min(math.floor(w * 0.4), L.cw * 18)
-  for i = MR.scroll + 1, math.min(#rows, MR.scroll + nvis) do
+  -- 18 окт: lf — колонка папок (имя и число), список — только выбранной папки, её подсказка первой строкой
+  local ds = MR.dirs(rows)
+  local dw = 0
+  for _, dd in ipairs(ds) do dw = math.max(dw, U.measure(dd.name .. ' 99')) end
+  dw = dw + 3 * L.pad
+  for k, dd in ipairs(ds) do
+    local ry = y + (k - 1) * L.rh
+    if ry + L.rh > y + h then break end
+    local on = k == MR.dir
+    local hot = mx >= x and mx < x + dw and my >= ry and my < ry + L.rh
+    if on then U.set(U.tint(U.AMBER, (d.focused and MR.incol == 'dirs') and 0.30 or 0.15)); gfx.rect(x + 1, ry, dw - 2, L.rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x + 1, ry, dw - 2, L.rh, 1) end
+    U.text(x + L.pad, ry, dd.name, on and U.AMBER or U.TEXT)
+    local ns = tostring(dd.n)
+    U.text(x + dw - L.pad - U.measure(ns), ry, ns, dd.n > 0 and U.GREY or U.DIM)
+    if hot then hv = { dir = k } end
+  end
+  U.set(U.LINE); gfx.rect(x + dw, y, 1, h, 1)
+  local cd = ds[MR.dir] or { i0 = 1, i1 = #rows }
+  local lx = x + dw + L.pad
+  local note_h = (cd.note and cd.note ~= '') and L.rh or 0
+  if note_h > 0 then U.text(lx + L.pad, y, fit(cd.note, w - dw - 3 * L.pad), U.DIM) end
+  local ly = y + note_h
+  local n_in = cd.i1 - cd.i0 + 1
+  local nvis = math.max(1, math.floor((h - note_h) / L.rh))
+  local p = MR.sel - cd.i0
+  if p >= MR.scroll + nvis then MR.scroll = p - nvis + 1 end
+  if p < MR.scroll then MR.scroll = p end
+  MR.scroll = math.max(0, math.min(MR.scroll, math.max(0, n_in - nvis)))
+  local sbw = 6
+  local lw = w - dw - L.pad - sbw
+  local nw = math.min(math.floor(lw * 0.4), L.cw * 18)
+  for i = cd.i0 + MR.scroll, math.min(cd.i1, cd.i0 + MR.scroll + nvis - 1) do
     local r = rows[i]
-    local ry = y + (i - MR.scroll - 1) * L.rh
+    local ry = ly + (i - cd.i0 - MR.scroll) * L.rh
+    local x, w = lx - 2 * L.pad, lw + 2 * L.pad
     if r.hdr then
       U.text(x + L.pad, ry, fit(r.hdr, w - 2 * L.pad), U.AMBER)
     elseif r.empty then
@@ -224,6 +276,14 @@ function MR.draw(d, x, y, w, h, rows)
       if hot then hv = { i = i, row = r } end
       if d.hint then d.hint('macro', x, ry, w, L.rh, i) end
     end
+  end
+  -- 18 окт: полоса прокрутки списка папки — своя, видна, когда не влезло
+  if n_in > nvis then
+    local sx, sh = lx + lw + 1, nvis * L.rh
+    U.set(U.LINE); gfx.rect(sx + 2, ly, 1, sh, 1)
+    local th = math.max(L.rh, math.floor(sh * nvis / n_in))
+    local ty = ly + math.floor((sh - th) * MR.scroll / math.max(1, n_in - nvis))
+    U.set(U.GREY); gfx.rect(sx, ty, sbw - 1, th, 1)
   end
   if ew > 0 then
     local r = rows[MR.sel]

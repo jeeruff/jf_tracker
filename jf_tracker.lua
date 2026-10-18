@@ -5963,9 +5963,12 @@ ctx = {
   mac_set_hotkey = function(r, hk)
     if not r then return end
     local list, hit = ctx.mac_saved(), nil
-    for _, m in ipairs(list) do if r.kind == 'saved' and m.name == r.name and m.body == r.body then hit = m end end
+    -- 18 окт: своя копия того же макроса (имя + тело) — она и есть; снять хоткей у того, у кого его нет — ничего не копировать
+    local nm = r.kind == 'rec' and ('macro ' .. r.name) or r.name
+    for _, m in ipairs(list) do if m.name == nm and m.body == r.body then hit = m end end
+    if not hit and not hk then vim.msg = ('macro %s: no hotkey'):format(nm); return end
     if not hit then   -- встроенный / записанный / чужой — копией в свои (хоткей живёт в файле своих)
-      hit = { name = r.kind == 'rec' and ('macro ' .. r.name) or r.name, body = r.body, desc = r.desc }
+      hit = { name = nm, body = r.body, desc = r.desc }
       list[#list + 1] = hit
     end
     if hk then for _, m in ipairs(list) do if m.hotkey == hk and m ~= hit then m.hotkey = nil end end end   -- один хоткей — один макрос
@@ -20442,11 +20445,12 @@ local function frame()
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
-    elseif hover.macros and (hover.macros.btn or hover.macros.i) then
+    elseif hover.macros and (hover.macros.btn or hover.macros.i or hover.macros.dir) then
       -- 16 окт: вкладка macros — строка: выбрать (двойной — проиграть), кнопка редактора — её действие
       local hm = hover.macros
       state.focus = 'top'
-      if hm.btn then
+      if hm.dir then MX.MR.dir, MX.MR.incol, MX.MR.sel, MX.MR.scroll = hm.dir, 'dirs', 0, 0   -- 18 окт: папка lf
+      elseif hm.btn then
         local kind = hm.btn
         ctx.mac_do({ kind = kind, row = hm.row })
       else
@@ -22024,7 +22028,9 @@ local function frame()
   -- нажатие хоткея в любом модуле проигрывает макрос (кроме набора команды / поиска / меню)
   if c > 0 and ctx.mac_hk_capture then
     local r = ctx.mac_hk_capture; ctx.mac_hk_capture = nil
-    ctx.mac_set_hotkey(r, c == 27 and nil or MX.MR.hk_encode(c, ctx.mods()))
+    -- 18 окт: было «c == 27 and nil or …» — в Lua это всегда второе (nil ложен): Esc записывался хоткеем -27.0
+    local ci = math.floor(c)
+    if ci == 27 then ctx.mac_set_hotkey(r, nil) else ctx.mac_set_hotkey(r, MX.MR.hk_encode(ci, ctx.mods())) end
     c = 0
   end
   -- 16 окт: π (Opt+P) — умная вставка из буферов; в qwerty при клавиатуре / INSERT π — нота p рядом, не трогаем
