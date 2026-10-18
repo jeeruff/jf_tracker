@@ -798,7 +798,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
       if MX.cur.ri == ri and MX.cur.ci == ci then
         MX.cur_rect = { x = x, y = y, w = L.mx_cell_w, h = rh }      -- 12 окт: якорь смарт-панели клетки
-        U.set(MX.focus and U.AMBER or U.LINE); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+        U.set(MX.focus and U.AMBER or U.TEXT); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)   -- 18 окт: ярко и без фокуса (было цветом линий — терялась)
         gfx.rect(x + 2, y + 2, L.mx_cell_w - 4, rh - 4, 0)
       end
       if hover.ri == ri and mx >= x and mx < x + L.mx_cell_w then
