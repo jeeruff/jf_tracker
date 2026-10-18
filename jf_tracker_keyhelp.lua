@@ -153,6 +153,7 @@ KH.PAGES = {
     { k = ':', d = 'command line (Tab completes)' },
     { k = '\\', d = 'the main menu of everything (v view, P project, o options ...)' },
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },
+    { k = '\\ k', t = {}, d = 'keyboard modes: m - notes, p - patternkb (the note keys play the patterns), c - clipkb (1qaz 2wsx ... play the palette cells; the palette opens); the mode word shows it (УЗОРКЛАВЪ / ОТРЫВКЛАВЪ)' },
     { k = '\\\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
     { k = '?', d = 'any REAPER action in the tracker style (fuzzy, the recent ones on top)' },
     { k = 'F1', d = 'the help (all modules): j k line by line through all sections, J K section, / search, o - the help in the browser; :tutorial - the tour' },

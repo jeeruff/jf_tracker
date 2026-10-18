@@ -13196,6 +13196,17 @@ ctx = {
           { key = 'l', label = 'fixed lanes on/off (:lanes)', fn = ctx.toggle_lanes },
         } } end },
       { key = 'i', label = 'insert: note / slice / whole sample / automation', sub = function() return ctx.insert_hydra() end },
+      -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb), клетки палитры (clipkb)
+      { key = 'k', label = 'keyboard: notes / patterns / clips', sub = function() return { title = 'keyboard', items = {
+          { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
+          { key = 'p', label = 'patternkb - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
+          { key = 'c', label = 'clipkb - 1qaz 2wsx ... play the palette cells (the palette opens)' .. (MX.pal_kb and '  (on)' or ''), fn = function()
+              if not MX.palette then MX.palette = true; reaper.SetExtState(EXT, 'mxpal', '1', true); relayout() end
+              MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end
+              if MX.pal_kb then ctx.pane_focus('matrix') end
+              vim.msg = MX.pal_kb and 'clipkb: 1qaz 2wsx ... column = track, row = palette row; Shift - pick (together), Ctrl - silence, Esc - off' or 'clipkb off'
+            end },
+        } } end },
       { key = 'I', label = 'instrument (pool)', sub = function()
           local it = {}
           for i, e in ipairs(col and col.pool or {}) do
