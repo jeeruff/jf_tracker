@@ -11262,7 +11262,7 @@ ctx = {
     -- 10 окт: вкладка theme — темы и шрифты с примерами (jf_tracker_themetab.lua рисует сам)
     -- 14 окт: вкладки theme и audio нет — разделы общего списка options (поиск находит всё)
     items[#items + 1] = { gap = true, sep = true }
-    items[#items + 1] = { sep = true, title = 'theme and fonts', group = 'options' }
+    items[#items + 1] = { sep = true, title = 'theme and fonts', group = 'theme' }   -- 18 окт: снова своя вкладка theme (просьба) — опциям вся ширина
     ctx.theme_tab.sync()
     items[#items + 1] = { kind = 'block', label = 'themes and fonts',
       height = function() return (ctx.theme_tab.last and ctx.theme_tab.last.total) or 40 * L.rh end,
@@ -12857,8 +12857,8 @@ ctx = {
   -- Space на регионе: играет — в очередь (прыжок на границе текущего), стоит — play отсюда
   region_space = function(rg)
     if playing() then
-      if MX.queued and MX.queued.idx == rg.idx then MX.queued = nil; vim.msg = 'queue cleared'
-      else MX.queued = rg; vim.msg = 'queued: ' .. (rg.name ~= '' and rg.name or rg.idx) end
+      if MX.queued and MX.queued.idx == rg.idx then ctx.mx_dequeue(); vim.msg = 'queue cleared'
+      else ctx.mx_enqueue(rg); vim.msg = 'queued: ' .. (rg.name ~= '' and rg.name or rg.idx) end
     else
       reaper.SetEditCurPos(rg.pos, false, false); reaper.OnPlayButton()
     end
@@ -16795,7 +16795,7 @@ local function process_orca(playpos)
     elseif o.op == ';' then
       local n = (ORCA.b36(a[1]) or 0) * 36 + (ORCA.b36(a[2]) or 0)
       local s = seq[n]
-      if s and not (MX.queued and MX.queued.pos == s.pos) then MX.queued = s end
+      if s and not (MX.queued and MX.queued.pos == s.pos) then ctx.mx_enqueue(s) end
     elseif o.op == '=' then
       local col = col_of(a[1])
       local fx = math.max(1, ORCA.b36(a[2]) or 1) - 1
@@ -16827,11 +16827,39 @@ local function process_jumps(playpos)
   end
 end
 
+-- 18 окт: очередь — нативным GoToRegion (smooth seek на конце играющего региона): REAPER готовит звук заранее,
+-- прыжок без паузы. Свой SetEditCurPos на границе давал ~0.2 с тишины (буфер render-ahead сбрасывался)
+MX.same_rg = function(a, b) return a and b and a.idx == b.idx and math.abs(a.pos - b.pos) < 1e-6 end
+ctx.mx_enqueue = function(rg)
+  MX.queued, MX.queued_native = rg, nil
+  local cur = playing() and alias.region_at(regions, reaper.GetPlayPosition())
+  if rg and not rg.gap and rg.idx and cur then
+    reaper.GoToRegion(0, rg.idx, false); MX.queued_native = true
+    MX.queued_rep, MX.queued_pp = MX.same_rg(cur, rg), reaper.GetPlayPosition()   -- тот же, что играет — повтор: снять, когда позиция вернётся назад
+  end
+end
+-- снять очередь: нативный прыжок не отменить — перенацелить на естественное продолжение (регион встык за играющим)
+ctx.mx_dequeue = function()
+  if MX.queued_native and playing() then
+    local cur = alias.region_at(regions, reaper.GetPlayPosition())
+    for _, r in ipairs(cur and regions or {}) do
+      if not r.gap and r.idx and math.abs(r.pos - cur.rgnend) < 1e-6 and not r.section then reaper.GoToRegion(0, r.idx, false); break end
+    end
+  end
+  MX.queued, MX.queued_native = nil, nil
+end
 -- очередь регионов: прыжок на границе текущего региона (или такта)
 local function process_queue(playpos)
   if not MX.queued then return end
-  if not playing() then MX.queued = nil; return end
+  if not playing() then MX.queued, MX.queued_native = nil, nil; return end
   local cur = alias.region_at(regions, playpos)
+  if MX.queued_native then   -- прыгнет сам REAPER; дошли — очередь снята; страховка — граница прошла на 0.25 с
+    local back = playpos < (MX.queued_pp or playpos) - 0.01
+    MX.queued_pp = playpos
+    if MX.same_rg(cur, MX.queued) and (not MX.queued_rep or back) then MX.queued, MX.queued_native = nil, nil; return end
+    if not (cur and playpos < cur.rgnend + 0.25) then reaper.SetEditCurPos(MX.queued.pos, false, true); MX.queued, MX.queued_native = nil, nil end
+    return
+  end
   local boundary
   if cur then boundary = cur.rgnend
   else
@@ -16921,6 +16949,7 @@ local function frame()
     if gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0 or (gfx.mouse_cap & 3 ~= 0 and mxy ~= prof.mxy) then prof.input = true end
     prof.mxy = mxy
   end
+  PV.trace = state.debug and ctx.dlog or nil   -- 18 окт: debug — старт / стоп превью слайса с причиной
   PV.tick()
   ctx.notes_dev_poll()
   if ctx.PM then ctx.PM.tick() end                                    -- jf_pm: загрузка по кускам, запись, превью (6 окт)
@@ -17081,6 +17110,7 @@ local function frame()
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
   if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
+  if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
     T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
@@ -18629,6 +18659,7 @@ local function frame()
   elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
+  elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
   elseif hover.mfold_meter then state.status = ('master: L R meter, red at the right - gain reduction %.1f dB (the strongest compressor / limiter on the master)'):format(hover.mfold_meter)
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
@@ -19185,6 +19216,14 @@ local function frame()
     end
   end
   if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.click and hover.mautoarm then   -- 18 окт: autoarm на шапке мастера — все треки
+    local on = hover.mautoarm == 'on'
+    edit.run('auto-arm all tracks ' .. (on and 'on' or 'off'), function()
+      for i = 0, reaper.CountTracks(0) - 1 do reaper.SetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM', on and 1 or 0) end
+    end)
+    U.click = false; model.invalidate()
+    vim.msg = on and 'auto-arm on every track: the selected track records (click again - off)' or 'auto-arm off on every track'
+  end
   if U.click and hover.mfold then state.mfold = not state.mfold; U.click = false; relayout(); vim.msg = state.mfold and 'master folded: L R meter and gain reduction (click < to open)' or 'master open' end   -- 17 окт
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
   -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
@@ -22943,6 +22982,22 @@ ctx.mx_btn_do = function(b)
   elseif b == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
+  elseif b == 'vismetro' then
+    MX.vismetro = not MX.vismetro; reaper.SetExtState(EXT, 'vismetro', MX.vismetro and '1' or '0', true)
+    vim.msg = 'vismetro ' .. (MX.vismetro and 'on: the beats of a slot as vertical strips, the playing beat lights up' or 'off: the quarters as lines')
+  elseif b == 'plist' then ctx.plist_toggle()
+  elseif b == 'plprev' then ctx.pl_cmd('prev')
+  elseif b == 'plnext' then ctx.pl_cmd('next')
+  elseif b == 'plname' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pl name ' .. ((ctx.pl_cur() or {}).name or '')
+  elseif b == 'plplay' then if ctx.pl_playing() then ctx.pl_cmd('stop') else ctx.pl_play() end
+  elseif b == 'plwrite' then ctx.pl_write()
+  elseif b == 'plnew' then ctx.pl_cmd('new')
+  elseif b == 'pldel' then
+    local l = ctx.pl_cur()
+    if l then OPT.ask.open('delete the playlist?', '"' .. l.name .. '" - its text goes (the song stays)', {
+      { key = 'k', label = 'keep', fn = function() vim.msg = 'playlist kept' end },
+      { key = 'd', label = 'delete', fn = function() ctx.pl_cmd('del') end } }) end
+  elseif b == 'pltext' then ctx.pl_edit()
   elseif b == 'menu' then ctx.mx_menu()
   elseif b == 'rglen-' or b == 'rglen+' then ctx.region_len_step(b == 'rglen+' and 1 or -1)   -- 11 окт: регион над матрицей
   elseif b == 'ruler' then ctx.mx_ruler_toggle()
@@ -23006,6 +23061,7 @@ ctx.patternize = function(cuts, how)
 end
 -- 17 окт: pads (MPC): паттерны на нотных клавишах. :pads — вкл / выкл, :pads quant | sudden — режим,
 -- :pads rec — запись порядка сыгранных; ещё раз :pads rec — дописать его в конец песни (связанные повторы)
+MX.vismetro = reaper.GetExtState(EXT, 'vismetro') ~= '0'   -- 18 окт: метроном в клетках матрицы (кнопка vismetro)
 ctx.PADS = dofile(DIR .. '/jf_tracker_padseq.lua')
 ctx.pad_list = function() return ctx.PADS.list(ctx.sequence()) end
 ctx.pad_key = function(name)
@@ -23017,6 +23073,7 @@ ctx.pad_key = function(name)
 end
 ctx.pad_launch = function(off)
   local P = ctx.PADS
+  if ctx.pl_cancel then ctx.pl_cancel() end
   local dst = P.pick(ctx.pad_list(), off)
   if not dst then vim.msg = ('pads: no pattern on this key (%d patterns)'):format(#ctx.pad_list()); return end
   if reaper.GetPlayState() & 1 == 0 then
@@ -23025,11 +23082,11 @@ ctx.pad_launch = function(off)
   elseif P.mode == 'sudden' then
     local pp = reaper.GetPlayPosition()
     reaper.SetEditCurPos(P.sudden_pos(alias.region_at(regions, pp), pp, dst), false, true)
-    MX.queued = nil
+    MX.queued, MX.queued_native = nil, nil
     vim.msg = 'pads: ' .. dst.name .. ' now'
   else
-    MX.queued = dst
-    vim.msg = 'pads: ' .. dst.name .. ' after this one'
+    ctx.mx_enqueue(dst)
+    vim.msg = 'patternkb: ' .. dst.name .. ' after this one (seamless)'
   end
 end
 ctx.pads_write = function()
@@ -23062,6 +23119,257 @@ ctx.pads_cmd = function(arg)
   else P.on = not P.on; if not P.on then P.rec = false end end
   vim.msg = P.on and ('pads on (%s%s): the note keys play the patterns - %s; :pads quant | sudden | rec | off'):format(P.mode, P.rec and ', REC' or '',
     P.mode == 'sudden' and 'at once, the same place inside' or 'when the playing one ends') or 'pads off'
+end
+-- 18 окт: playlist (region playlist) — порядок паттернов текстом прямо в матрице (кнопка playlist): имена паттернов /
+-- секций с автодополнением (Tab), номера регионов, xN повтор, :N / /N сокращение, +N проскок. Именованные, в проекте.
+-- play — по порядку: целые паттерны встык через GoToRegion (без паузы), сокращённые / с проскоком — прыжком;
+-- write — дописать после песни (повторы связанные, сокращённые — свой паттерн)
+ctx.PL = dofile(DIR .. '/jf_tracker_playlist.lua')
+ctx.pl_load = function()
+  local P = ctx.PL
+  local proj = reaper.EnumProjects(-1)
+  if P.proj == proj then return end
+  P.proj = proj
+  local _, s = reaper.GetProjExtState(0, EXT, 'plists')
+  local _, c = reaper.GetProjExtState(0, EXT, 'plcur')
+  P.lists = P.decode(s)
+  P.cur = math.max(1, math.min(#P.lists, tonumber(c) or 1))
+end
+ctx.pl_save = function()
+  local P = ctx.PL
+  reaper.SetProjExtState(0, EXT, 'plists', P.encode(P.lists))
+  reaper.SetProjExtState(0, EXT, 'plcur', tostring(P.cur))
+end
+ctx.pl_cur = function() ctx.pl_load(); return ctx.PL.lists[ctx.PL.cur] end
+-- паттерны и секции песни (без служебных)
+ctx.pl_song = function()
+  local pats = {}
+  for _, rg in ipairs(ctx.real_seq()) do
+    if not rg.session and not rg.lib and rg.name ~= '' and not rg.name:match('^=') then pats[#pats + 1] = rg end
+  end
+  return pats, regions.sections or {}   -- секции модель держит отдельно (не слоты)
+end
+ctx.pl_find = function(ref)
+  local pats, secs = ctx.pl_song()
+  local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
+  local function sec(s)
+    local o = {}
+    for _, p in ipairs(pats) do if p.pos >= s.pos - 1e-6 and p.rgnend <= s.rgnend + 1e-6 then o[#o + 1] = one(p) end end
+    return o
+  end
+  local n, lo = tonumber(ref), ref:lower()
+  for _, rg in ipairs(pats) do if (n and rg.idx == n) or (not n and rg.name:lower() == lo) then return { one(rg) } end end
+  for _, s in ipairs(secs) do if (n and s.idx == n) or (not n and s.name:lower() == lo) then return sec(s) end end
+end
+ctx.pl_words = function()
+  local pats, secs = ctx.pl_song()
+  local o = {}
+  for _, r in ipairs(secs) do o[#o + 1] = r.name end
+  for _, r in ipairs(pats) do o[#o + 1] = r.name end
+  return o
+end
+ctx.pl_cache = {}
+ctx.pl_parsed = function()
+  local l = ctx.pl_cur()
+  local text = l and l.text or ''
+  local key = text .. '|' .. tostring(regions) .. '|' .. state.lpb
+  if ctx.pl_cache.key ~= key then
+    local steps, toks, errs = ctx.PL.parse(text, ctx.pl_find)
+    ctx.pl_cache = { key = key, steps = steps, toks = toks, errs = errs }
+  end
+  return ctx.pl_cache.steps, ctx.pl_cache.toks, ctx.pl_cache.errs
+end
+ctx.pl_cancel = function() ctx.PLY = nil end
+ctx.pl_playing = function() return ctx.PLY and ctx.PLY.segs[ctx.PLY.i] end
+ctx.pl_play = function()
+  local steps, _, errs = ctx.pl_parsed()
+  if #steps == 0 then vim.msg = 'playlist: nothing to play' .. (#errs > 0 and (' - ' .. errs[1]) or ' - type it: :pl A1 A1 B1x2 …'); return end
+  local segs = {}
+  for i, st in ipairs(steps) do
+    local rg = st.rg
+    segs[i] = { rg = rg, tok = st.tok,
+      t0 = st.from == 0 and rg.pos or edit.row_time(rg.r0 + st.from, state.lpb, 0),
+      t1 = (st.from + st.len >= st.rows) and rg.rgnend or edit.row_time(rg.r0 + st.from + st.len, state.lpb, 0) }
+  end
+  MX.queued, MX.queued_native = nil, nil
+  ctx.PLY = { segs = segs, i = 1, pp = segs[1].t0 }
+  if playing() then reaper.SetEditCurPos(segs[1].t0, false, true)
+  else reaper.SetEditCurPos(segs[1].t0, false, false); reaper.OnPlayButton() end
+  vim.msg = ('playlist: %d step(s)%s'):format(#segs, #errs > 0 and (' - skipped: ' .. errs[1]) or '')
+end
+-- каждый кадр с позицией воспроизведения
+ctx.pl_tick = function(pp)
+  local P = ctx.PLY
+  if not P then return end
+  if not playing() then ctx.PLY = nil; return end
+  local s, nx = P.segs[P.i], P.segs[P.i + 1]
+  -- нативный прыжок случился: позиция в следующем шаге (назад — повтор того же паттерна)
+  if P.armed and nx and pp >= nx.t0 - 1e-3 and pp < nx.t1 and (pp < P.pp - 0.01 or pp >= s.t1 - 1e-3) then
+    P.i, P.armed, P.pp = P.i + 1, nil, pp
+    return
+  end
+  local back = pp < P.pp - 0.05
+  P.pp = pp
+  if back or pp < s.t0 - 0.05 or pp > s.t1 + 0.3 then ctx.PLY = nil; vim.msg = 'playlist: stopped following (the play position moved)'; return end
+  if not nx then
+    if pp >= s.t1 - 0.005 then ctx.PLY = nil; reaper.OnStopButton(); vim.msg = 'playlist: end' end
+    return
+  end
+  local seamless = math.abs(s.t1 - s.rg.rgnend) < 1e-6 and math.abs(nx.t0 - nx.rg.pos) < 1e-6
+  if seamless then
+    if not P.armed then reaper.GoToRegion(0, nx.rg.idx, false); P.armed = true end
+    if pp >= s.t1 + 0.25 then reaper.SetEditCurPos(nx.t0, false, true); P.i, P.armed, P.pp = P.i + 1, nil, nx.t0 end   -- страховка
+  elseif pp >= s.t1 - 0.035 then
+    reaper.SetEditCurPos(nx.t0, false, true); P.i, P.armed, P.pp = P.i + 1, nil, nx.t0
+  end
+end
+-- дописать после песни: целые — связанные повторы, сокращённые / с проскоком — копия, обрезанная, своим именем
+ctx.pl_write = function()
+  local steps = ctx.pl_parsed()
+  if #steps == 0 then vim.msg = 'playlist: nothing to write'; return end
+  local t = 0
+  for _, rg in ipairs(ctx.real_seq()) do if not rg.session and not rg.lib and rg.rgnend > t then t = rg.rgnend end end
+  local n = 0
+  ctx.slot_op('playlist: write after the song', function()
+    local trs = {}
+    for i = 0, reaper.CountTracks(0) - 1 do trs[#trs + 1] = reaper.GetTrack(0, i) end
+    for _, st in ipairs(steps) do
+      local rg = st.rg
+      local full = rg.rgnend - rg.pos
+      alias.put_alias(rg, t)
+      local nt = t + full
+      if not ctx.PL.whole(st) then
+        local a = (st.from > 0 and edit.row_time(rg.r0 + st.from, state.lpb, 0) or rg.pos) - rg.pos
+        local b = ((st.from + st.len < st.rows) and edit.row_time(rg.r0 + st.from + st.len, state.lpb, 0) or rg.rgnend) - rg.pos
+        if b < full - 1e-6 then edit.time_delete(trs, t + b, t + full, math.huge); alias.shift_markers(t + full, -(full - b)) end
+        if a > 1e-6 then edit.time_delete(trs, t, t + a, math.huge); alias.shift_markers(t + a, -a) end
+        nt = t + (b - a)
+        local i = 0
+        while true do   -- регион копии: новый конец и своё имя (иначе синхронизация связанных вернула бы ему полную длину)
+          local ret, isr, p, _, nm, idx = reaper.EnumProjectMarkers3(0, i)
+          if not ret or ret == 0 then break end
+          if isr and math.abs(p - t) < 1e-6 and nm == rg.name then
+            local cp = { idx = idx, pos = t, rgnend = t + full, name = nm }
+            alias.set_end(cp, nt); cp.rgnend = nt
+            model.invalidate(); regions = model.regions(state.lpb)
+            alias.make_unique(regions, cp)
+            break
+          end
+          i = i + 1
+        end
+      end
+      t = nt; n = n + 1
+    end
+  end)
+  model.invalidate(); regions = model.regions(state.lpb)
+  vim.msg = ('playlist: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
+end
+ctx.plist_toggle = function()
+  MX.plist = not MX.plist
+  if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'playlist: :pl A1 A1 B1x2 C1:16 … (Tab completes names) - or click the text line' end end
+end
+ctx.pl_edit = function()
+  local l = ctx.pl_cur()
+  vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pl ' .. (l and l.text or '')
+end
+ctx.pl_cmd = function(arg)
+  local P = ctx.PL
+  ctx.pl_load()
+  arg = (arg or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  local w, rest = arg:match('^(%S*)%s*(.-)$')
+  MX.plist = true
+  if arg == '' then ctx.pl_edit(); return
+  elseif arg == 'play' then ctx.pl_play(); return
+  elseif arg == 'stop' then ctx.PLY = nil; vim.msg = 'playlist: stopped following'; return
+  elseif arg == 'write' then ctx.pl_write(); return
+  elseif arg == 'next' or arg == 'prev' then
+    if #P.lists > 0 then P.cur = (P.cur - 1 + (arg == 'next' and 1 or -1)) % #P.lists + 1; ctx.pl_save() end
+  elseif w == 'new' then
+    P.lists[#P.lists + 1] = { name = rest ~= '' and rest or P.free_name(P.lists), text = '' }; P.cur = #P.lists; ctx.pl_save()
+  elseif w == 'dup' then
+    local l = P.lists[P.cur]
+    if l then P.lists[#P.lists + 1] = { name = P.free_name(P.lists, l.name), text = l.text }; P.cur = #P.lists; ctx.pl_save() end
+  elseif w == 'name' and rest ~= '' then
+    if not P.lists[P.cur] then P.lists[1] = { name = rest, text = '' }; P.cur = 1 else P.lists[P.cur].name = rest end; ctx.pl_save()
+  elseif arg == 'del' then
+    if P.lists[P.cur] then table.remove(P.lists, P.cur); P.cur = math.max(1, math.min(P.cur, #P.lists)); ctx.pl_save() end
+  else
+    if not P.lists[P.cur] then P.lists[#P.lists + 1] = { name = P.free_name(P.lists), text = '' }; P.cur = #P.lists end
+    P.lists[P.cur].text = arg; ctx.pl_save()
+    local steps, _, errs = ctx.pl_parsed()
+    local _, rows = P.summary(steps)
+    vim.msg = ('playlist "%s": %d step(s), %d rows%s'):format(P.lists[P.cur].name, #steps, rows, #errs > 0 and (' - ' .. errs[1]) or '')
+    return
+  end
+  local l = P.lists[P.cur]
+  vim.msg = l and ('playlist %d/%d "%s"'):format(P.cur, #P.lists, l.name) or 'no playlists - :pl new [name]'
+end
+-- панель в матрице (под кнопками, матрица ниже): имя, кнопки, текст словами (играющее — янтарём, ошибка — красным), итог
+ctx.plist_draw = function(Lx, x, y, w)
+  local P = ctx.PL
+  ctx.pl_load()
+  local hover = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local rh, pad = Lx.rh, Lx.pad
+  local l = P.lists[P.cur]
+  local function btn(bx, by, label, id, on)
+    local bw = U.measure(label) + 2 * pad
+    if bx + bw > x + w then return bx end
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
+    U.set(U.LINE); gfx.rect(bx, by, bw, rh, 0)
+    U.text(bx + pad, by + 1, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+    if hot then hover.btn = id end
+    if ctx.hint then ctx.hint('mxbtn', bx, by, bw, rh, id) end
+    return bx + bw + pad
+  end
+  -- строка 1: < имя > play write new del
+  local bx = btn(x + pad, y, '<', 'plprev')
+  local tail = { { 'play', 'plplay', ctx.PLY ~= nil }, { 'write', 'plwrite' }, { 'new', 'plnew' }, { 'del', 'pldel' } }
+  local tw = U.measure('>') + 3 * pad
+  for _, b in ipairs(tail) do tw = tw + U.measure(b[1]) + 3 * pad end
+  local nw = math.max(4 * Lx.cw, x + w - bx - tw)
+  local hot = mx >= bx and mx < bx + nw and my >= y and my < y + rh
+  U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, nw, rh, 1)
+  U.set(U.LINE); gfx.rect(bx, y, nw, rh, 0)
+  local nm = l and (('%d/%d %s'):format(P.cur, #P.lists, l.name)) or 'playlist - new makes one'
+  U.text(bx + pad, y + 1, ctx.fit(nm, nw - 2 * pad), hot and U.AMBER or (l and U.CYAN or U.GREY))
+  if hot then hover.btn = 'plname' end
+  bx = btn(bx + nw + pad, y, '>', 'plnext')
+  for _, b in ipairs(tail) do bx = btn(bx, y, b[1], b[2], b[3]) end
+  -- строки текста: слова с переносом
+  local steps, toks, errs = ctx.pl_parsed()
+  local cur = ctx.PLY and ctx.PLY.segs[ctx.PLY.i]
+  local ty, tx = y + rh + 2, x + pad
+  local x1 = x + w - pad
+  local lines = 1
+  local area_y = ty
+  if not toks or #toks == 0 then
+    U.text(tx, ty + 1, ctx.fit('click - type the order: A1 A1 B1x2 C1:16 D1+8 verse … (Tab completes)', w - 2 * pad), U.DIM)
+  else
+    local sp = Lx.cw   -- пробел битмап-шрифта измеряется в 0
+    for i, t in ipairs(toks) do
+      local tw2 = U.measure(t.text)
+      if tx + tw2 > x1 and tx > x + pad then tx = x + pad; ty = ty + rh; lines = lines + 1 end
+      if lines > 4 then break end
+      local on = cur and cur.tok == i
+      if on then U.set(U.tint(U.AMBER, 0.35)); gfx.rect(tx - 1, ty, tw2 + 2, rh, 1) end
+      U.text(tx, ty + 1, t.text, t.err and U.RED or (on and U.AMBER or U.TEXT))
+      tx = tx + tw2 + sp
+    end
+  end
+  local th = lines * rh
+  if mx >= x and mx < x + w and my >= area_y and my < area_y + th then
+    hover.btn = 'pltext'
+    U.set(U.LINE); gfx.rect(x + 1, area_y - 1, w - 2, th + 1, 0)
+  end
+  if ctx.hint then ctx.hint('mxbtn', x, area_y, w, th, 'pltext') end
+  -- итог
+  local sy = area_y + th + 1
+  local n, rows = P.summary(steps or {})
+  local st = #errs > 0 and errs[1] or (('%d step(s) · %d rows · %.1f bars'):format(n, rows, rows / math.max(1, state.lpb * 4)))
+  U.text(x + pad, sy + 1, ctx.fit(st, w - 2 * pad), #errs > 0 and U.RED or U.GREY)
+  return sy + rh + 2 - y, hover
 end
 -- 17 окт: :section имя — секция (регион без кода) поверх слотов блока матрицы (Shift+J K на именах), иначе слота курсора
 ctx.section_make = function(name)

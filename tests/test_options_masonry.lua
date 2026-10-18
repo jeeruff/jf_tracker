@@ -18,7 +18,7 @@ for s, cnt in ipairs({ 6, 21, 21, 19, 11, 14 }) do
 end
 O.open(items)
 local L = { rh = 16, pad = 4, cw = 8 }
-O.draw(L, 2000, 1000)
+O.draw(L, 2400, 1200)   -- 18 окт: окно опций в 1.5 раза меньше трекера
 eq('wide window: frames in columns', O.masonry_on, true)
 local plan = O.masonry_plan(L, 0, 0, 2000, 50 * 16)
 eq('plan exists', plan ~= nil, true)

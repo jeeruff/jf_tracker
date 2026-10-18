@@ -5149,7 +5149,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if info.perf_draw then info.perf_draw(L, ct.x, ct.y, ct.w, ct.h)
         elseif MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
-            return MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+            return MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
@@ -5450,6 +5450,21 @@ function D.frame(L, snap, rows, state, info)
           text(fx + 2, hy + 1, 'fold', fhot and U.AMBER or U.GREY)
           if fhot then hover.mfold = true end
         end
+        -- 18 окт: autoarm — все треки на автоарм (запись по выбору трека) и обратно; горит, если у всех
+        local all, nt = true, reaper.CountTracks(0)
+        for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
+        all = all and nt > 0
+        local lab = 'autoarm'
+        local aw = ms(lab) + 4
+        local ax = fx - aw - 2
+        if ax <= c.x + ms('master') + 2 * L.pad then lab = 'aa'; aw = ms(lab) + 4; ax = fx - aw - 2 end
+        if ax > c.x + ms('master') + 2 * L.pad then
+          local ahot = mx >= ax and mx < ax + aw and my >= hy and my < hy + L.rh
+          set(ahot and D.CURROW or (all and U.tint(D.ARM, 0.35) or U.PANEL)); gfx.rect(ax, hy + 1, aw, L.rh - 2, 1)
+          set(all and D.ARM or U.DIM); gfx.rect(ax, hy + 1, aw, L.rh - 2, 0)
+          text(ax + 2, hy + 1, lab, ahot and U.AMBER or (all and U.TEXT or U.GREY))
+          if ahot then hover.mautoarm = all and 'off' or 'on' end
+        end
       end
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
@@ -5507,6 +5522,16 @@ function D.frame(L, snap, rows, state, info)
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
           return
         end
+        -- 18 окт: ~ (автоматизация) — тоже просто знак, поярче: огибающие показаны — голубой, есть — текст, нет — серый
+        -- (≈ — будущий знак модуляции)
+        if b[4] == 'auto' then
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          text(x + math.floor((bwk - ms('~')) / 2), tyc, '~', hot and U.AMBER or (on and (env_shown and U.CYAN or U.TEXT) or U.GREY))
+          if hot then hover.btn = { col = col, what = 'auto' } end
+          hint('btn', x, by, bwk, bh + 2, { col = col, what = 'auto' })
+          D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk }
+          return
+        end
         -- 15 окт: круглые — запись (кружок внутри; A — автоарм при выборе трека) и фаза (ø)
         if round then
           local r = math.floor((math.min(bwk, bh + 2) - 1) / 2)   -- 16 окт: размером с соседние кнопки (как A в микшере REAPER)
@@ -5548,16 +5573,24 @@ function D.frame(L, snap, rows, state, info)
       local gap = L.pad
       -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
-      trim_w = bwh; trim_x = c.x + c.w - L.pad - trim_w   -- ~ — кнопкой той же ширины
+      trim_w = ms('~') + 4; trim_x = c.x + c.w - L.pad - trim_w   -- 18 окт: ~ — знак, по своей ширине
       local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
       by = by - 1
-      local ph_x = trim_x - 1 - bwh
+      local phw = ms('ø') + 4
+      local ph_x = trim_x - 1 - phw
+      -- 18 окт: узкий трек — r i m s сжимаются (до ширины буквы), чтобы /// влезли в первую строку
+      do
+        local sw0 = ms(D.sroslash and '///' or 'sro') + 4
+        local bmin = ms('m') + 4
+        while bwh > bmin and bx + 4 * (bwh + 1) + 2 * L.pad + sw0 > ph_x - L.pad do bwh = bwh - 1 end
+        D.hbtn_w = bwh
+      end
       -- 16 окт: не влезло в строку кнопок — во вторую, свободную строку над − + (узкий трек: m s ø ~ sro не пропадают)
       local rest = {}
       for k, b in ipairs(c.master and {} or labels) do
         local x = bx + (k - 1) * (bwh + 1) + (k >= 3 and gap or 0)
         local bwk = bwh
-        if b[4] == 'phase' then x = ph_x end
+        if b[4] == 'phase' then x, bwk = ph_x, phw end
         if b[4] == 'auto' then x, bwk = trim_x, trim_w end
         if ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
           rest[#rest + 1] = b
@@ -5637,7 +5670,7 @@ function D.frame(L, snap, rows, state, info)
         -- 15 окт: SRO — после M S (фаза ушла к trim)
         local hw1 = (D.hbtn_w or L.btn_w) + 1
         local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad)
-        local lim = mixcol and (c.x + c.w - 1) or (trim_x - hw1 - L.pad)
+        local lim = mixcol and (c.x + c.w - 1) or (ph_x - L.pad)
         local sw0 = ms(D.sroslash and '///' or 'sro') + 4               -- 16 окт: по настоящей ширине (было по заглавным SRO — не влезало между s и ø)
         local rw = math.max(sw0, math.min(2 * sw0, lim - rx))   -- 12 окт: SRO шире, сколько влезает
         if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false)
@@ -7169,7 +7202,7 @@ function D.frame(L, snap, rows, state, info)
     local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
     info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
     -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
     -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)

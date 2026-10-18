@@ -60,7 +60,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' }, { 'fold', 'cell' },   -- 12 окт: menu — patternize и прочее
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'pads' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC)
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'playlist' }, { 'vismetro', 'vismetro' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -240,7 +240,7 @@ function MX.width(L, nregions, ncols)
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
   L.mx_dur_w = MX.fold and 0 or (U.measure('9999') + L.pad)          -- колонка длины региона в шагах
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
-  L.mx_sig_w = (MX.fold or MX.sig_same) and 0 or (U.measure('15/16') + L.pad)
+  L.mx_sig_w = (MX.fold or (MX.sig_same and not MX.vismetro)) and 0 or (U.measure('15/16') + L.pad)   -- 18 окт: vismetro — колонка размера всегда
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
   L.mx_bpm_w = (MX.fold or not MX.bpm) and 0 or (U.measure('999.9') + L.pad)
@@ -337,7 +337,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -358,6 +358,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     hover.sess_view = true
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ch, W - 4, 1, 1)
     hy = hy + ch + 2
+  end
+  -- 18 окт: playlist — блок под кнопками (порядок паттернов текстом), матрица ниже
+  MX.pl_y = nil
+  if MX.plist and ctx.plist_draw then
+    local ph, hv = ctx.plist_draw(L, 0, hy + L.rh + 2, W - 6)
+    for k, v in pairs(hv) do hover[k] = v end
+    MX.pl_y = hy + L.rh + 2
+    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
+    hy = hy + ph + 2
   end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
@@ -545,6 +554,14 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
+    -- 18 окт: vismetro, колонки размера не видно (свёрнута / узко) — счётчик долей яркой плашкой слева у играющей строки
+    if playing and MX.vismetro and (L.mx_sig_w or 0) == 0 and info.play_row and not rg.gap then
+      local n = (info.sig_at and info.sig_at(rg.pos)) or 4
+      local bs = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, (ctx.state and ctx.state.lpb) or 4)) % n + 1, n)
+      local bw2 = U.measure(bs) + 2 * L.pad
+      U.set(U.AMBER); gfx.rect(1, y + 1, bw2, L.rh - 1, 1)
+      U.text(1 + L.pad, y + 1, bs, U.BG)
+    end
     -- цвет региона (2 окт): полоска у края и подкраска под номером и именем —
     -- тот же цвет, что на таймлайне REAPER, в уголке трекера и у номеров шагов
     if not rg.gap and info.region_rgb then
@@ -630,9 +647,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if L.mx_sig_w > 0 and info.sig_at and not rg.gap then
         local n, d = info.sig_at(rg.pos)
         local ss = ('%d/%d'):format(n or 4, d or 4)
+        -- 18 окт: vismetro — у играющего паттерна размер считает доли: 1/4 2/4 3/4 4/4 (доля под плейхедом)
+        local beat = MX.vismetro and playing and info.play_row and ctx.state
+        if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
         local sx = dx - L.mx_sig_w
         local hot_sig = hover.ri == ri and mx >= sx and mx < dx
-        U.text(dx - L.pad - U.measure(ss), y + 1, ss, hot_sig and U.AMBER or U.DIM)
+        U.text(dx - L.pad - U.measure(ss), y + 1, ss, (hot_sig or beat) and U.AMBER or U.DIM)
         if hot_sig then hover.sig = ri end
         if ctx.hint then ctx.hint('mxsig', sx, y, L.mx_sig_w, L.rh, ri) end
       end
@@ -681,6 +701,34 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
                 px, py = vx, vy
               end
             end
+          end
+        elseif MX.beat_strips then   -- 18 окт: полоски долей в клетке — отложено для клипов (показать их размер); vismetro теперь в колонке размера
+          -- 18 окт: vismetro — доли такта вертикальными полосками слева направо (размер паттерна: 4/4 — четыре);
+          -- полоска с событиями — цветом item, у играющего слота доля под плейхедом горит, как счётчик метронома
+          local n = 4
+          if info.sig_at and not rg.gap then n = math.max(1, math.min(8, (info.sig_at(rg.pos)) or 4)) end
+          local q = {}
+          for k = 1, n do q[k] = 0 end
+          for _, e in ipairs(g.ev) do
+            local a, b = e.pos, e.pos + e.len
+            for k = 1, n do
+              local ov = math.min(b, k / n) - math.max(a, (k - 1) / n)
+              if ov > 0 then q[k] = math.min(1, q[k] + ov * n) end
+            end
+          end
+          local lit
+          if playing then
+            local lpb = (ctx.state and ctx.state.lpb) or 4
+            lit = math.floor((info.play_row - rg.r0) / lpb) % n + 1
+          end
+          local rgb = g.ev[1] and g.ev[1].rgb or U.TEXT
+          local sw = math.max(1, math.floor((iw - (n - 1)) / n))
+          local ih = rh - 4
+          for k = 1, n do
+            local sx = x + 2 + (k - 1) * (sw + 1)
+            if k == lit then U.set(U.AMBER); gfx.rect(sx, y + 2, sw, ih, 1)
+            elseif q[k] > 0 then U.set(g.state == 'muted' and U.GREY or U.mix(rgb, U.BG, 0.35)); gfx.rect(sx, y + 2, sw, ih, 1)
+            else U.set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(sx, y + 2, sw, ih, 0) end
           end
         else
           -- схема: четыре четверти региона сверху вниз — линия там, где есть события

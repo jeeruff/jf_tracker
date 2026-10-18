@@ -624,8 +624,9 @@ function O.draw(L, W, H)
   nvis = nvis2
   -- 13 окт: окно опций — одного размера на всех вкладках, почти во всё окно (раньше прыгало по вкладкам)
   if not O.compact then
-    bw = W - 4 * L.pad
-    nvis = math.max(3, math.floor((H - 4 * L.pad) / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
+    -- 18 окт: в полтора раза меньше окна трекера (просьба: трекер вокруг виден)
+    bw = math.floor((W - 4 * L.pad) / 1.5)
+    nvis = math.max(3, math.floor((H - 4 * L.pad) / 1.5 / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
   end
   local bh = (nvis + 5 + ((#O.tabs > 0) and 1 or 0)) * rh   -- 14 окт: +1 строка — поиск в 2 строки
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
@@ -746,7 +747,7 @@ function O.draw(L, W, H)
       if not O.items[i] then break end
       local col, rr = (r - 1) // nvis, (r - 1) % nvis
       local x, w = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
-      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = O.tab == 'hotkeys' and w or math.min(w, O.roww or w) }   -- 17 окт: хоткеи — во всю ширину (описания резались)
+      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = (O.tab == 'hotkeys' or O.tab == 'theme') and w or math.min(w, O.roww or w) }   -- 17 окт: хоткеи — во всю ширину (описания резались); 18 окт: и theme
     end
   end
   O.masonry_on = masonry and true or nil

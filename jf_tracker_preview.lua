@@ -38,7 +38,8 @@ P.vol = 1                     -- громкость прослушивания �
 P.cur_path, P.cur_len = nil, 0  -- что играет из браузера (мини-волна с позицией)
 
 local cur2                    -- 13 окт: хвост лупа удержания (второе превью ноты)
-local function stop_audio()
+local function stop_audio(why)
+  if cur and P.trace then P.trace(('slice preview stop: %s'):format(why or 'new / stop')) end
   if cur then pcall(R.CF_Preview_Stop, cur); cur = nil end
   if cur2 then pcall(R.CF_Preview_Stop, cur2); cur2 = nil end
   P.geo = nil
@@ -310,6 +311,7 @@ function P.slice(track, entry, t0, t1, semis)
   if base + (semis or 0) ~= 0 then R.CF_Preview_SetValue(pv, 'B_PPITCH', pp); R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0)) end
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
+  if P.trace then P.trace(('slice preview %.3f-%.3f s (stop at src %.3f, rate %.2f, semis %s) from %s'):format(t0, t1, P.stop_pos, rate, tostring(semis), debug.traceback('', 2):gsub('%s+', ' '):sub(1, 300))) end   -- 18 окт: debug — кто и сколько
   cur = pv
   -- плейхед слайса на волне инструмента (3 окт: Shift+нота / MIDI-клавиатура)
   P.cur_item, P.cur_offs, P.cur_rate = entry.item, entry.offs or 0, rate ~= 0 and rate or 1
@@ -368,9 +370,9 @@ function P.tick()
     -- 11 окт: стоп с упреждением на полкадра — иначе короткий слайс (70 мс) проигрывал до 30 мс соседнего
     local ok2, rate = R.CF_Preview_GetValue(cur, 'D_PLAYRATE')
     local lead = 0.5 * dt * ((ok2 and rate and rate > 0) and rate or 1)
-    if ok and pos >= P.stop_pos - 0.002 - lead then audio_stop_at = nil; stop_audio() end
+    if ok and pos >= P.stop_pos - 0.002 - lead then audio_stop_at = nil; stop_audio(('end of slice, pos %.3f'):format(pos)) end
   end
-  if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio() end
+  if audio_stop_at and R.time_precise() >= audio_stop_at then audio_stop_at = nil; stop_audio('timer') end
   for k, v in pairs(P.voices) do
     if v.stop_at and now >= v.stop_at then for _, pv in ipairs(v.pvs) do pcall(R.CF_Preview_Stop, pv) end; if P.geo == v.geo then P.geo = nil end; P.voices[k] = nil end
   end
