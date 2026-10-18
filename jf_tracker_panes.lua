@@ -47,7 +47,7 @@ PN.PANELS = {
   { id = 'retro',      label = 'rec',        key = 'r', hint = 'retro',   side = 'top', tab = true },
   { id = 'sample',     label = 'item',       key = 'i', hint = 'sample',  side = 'top', tab = true },
   { id = 'automation', label = 'automation', key = 'a', hint = 'automation', side = 'top', tab = true },   -- 12 окт: огибающие по времени (был id modulation)
-  { id = 'modulation', label = 'modulation', key = 'u', hint = 'modulation', side = 'top', tab = true },   -- 12 окт: матрица LFO / ACS / link REAPER — своя вкладка
+  { id = 'modulation', label = 'modulation', key = 'u', hint = 'modulation', side = 'top', tab = true, avail = 'merged' },   -- 18 окт: страница automation (M) — сама вкладка не показывается   -- 12 окт: матрица LFO / ACS / link REAPER — своя вкладка
   { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
   { id = 'clips',      label = 'clips',      key = 'C', hint = 'session', side = 'top', tab = true },   -- 10 окт: клипы сессии — своя панель (свои шапки треков), куда угодно

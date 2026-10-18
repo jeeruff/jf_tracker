@@ -392,6 +392,7 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'ut_tab2') ~= '1' and draw.panes.keep_in(m, 'undotree', 'browser') then reaper.SetExtState(EXT, 'ut_tab2', '1', true) end   -- 15 окт: undo — вкладкой у браузера (один раз; браузер спрятан — когда появится)
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
+    if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
     return m
   end
   return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
@@ -571,7 +572,7 @@ local idle = { n = 0, active_t = 0, input_t = 0, mkey = '' }   -- простой
 local fps_buf = { w = 0, h = 0, last = 0 }  -- буфер кадров для опции fps (1021)
 local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
-local mod_pane = 'params'     -- 'params' | 'lfo' | 'curve' | 'ai': страница вкладки automation (12 окт: матрица — вкладка modulation)
+local mod_pane = 'params'     -- 'params' | 'lfo' (shape) | 'curve' | 'ai' | 'mod': страница вкладки automation (18 окт: матрица модуляции — снова страницей, вкладки modulation нет)
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
 local lfo_drag = nil          -- протяжка слайдера генератора кривых
 local mm_drag = nil           -- слайдер полосы матрицы модуляции
@@ -4396,6 +4397,7 @@ ctx = {
     return state.focus
   end,
   pane_focus = function(id)
+    if id == 'modulation' then id = 'automation'; mod_pane = 'mod' end   -- 18 окт: модуляция — страница automation
     local PN = draw.panes
     if not (id and PN.BY[id]) then return end
     ctx.pn_prev = ctx.pane_cur()
@@ -18061,7 +18063,7 @@ local function frame()
     hint_bars = state.hints and function(p) return (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
-    top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or state.toptab,   -- 15 окт: холст — свои подсказки
+    top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or (state.toptab == 'automation' and mod_pane == 'mod' and 'modulation') or state.toptab,   -- 15 окт: холст — свои подсказки
     notes_win = state.notes_win,
     vp_editor = ctx.vp_editor,
     keycast = state.keycast and ctx.kc or nil, now = reaper.time_precise(), keycast_scale = state.kc_scale, tl_get = ctx.tlist_get, inst_cur = function() return vim.inst end,
@@ -18196,12 +18198,16 @@ local function frame()
           if ph then ctx.aied_hover = ph end
           return nil
         end
+        if mod_pane == 'mod' then   -- 18 окт: матрица модуляции REAPER (LFO / ACS / link) — страница automation
+          -- наведение матрицы — наверх как hover.mm (клики / колесо / статус — те же, что у бывшей вкладки)
+          return MMX.draw(Lx, lx, ly, lw2, lh, col and col.mods or {}, focused and mod_pane == 'mod', col and (col.name .. ' modulation') or 'modulation')
+        end
         local hv = MMX.PP.draw(Lx, lx, ly, lw2, lh, col, focused)    -- params — страница по умолчанию
         if hv then lfo_hover = lfo_hover or { pane = 'params', pp = hv } end
         return nil
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' }, { 'curves', 'lfo' } } or { { 'params', 'params' }, { 'curve', 'curve' }, { 'curves', 'lfo' } })
+        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' }, { 'shape', 'lfo' } } or { { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' }, { 'shape', 'lfo' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         if mod_pane == 'lfo' then
           local tgt = ctx.lfo_target()
@@ -18211,10 +18217,14 @@ local function frame()
         end
         return left(x, y, w, h)
       end
+      if mod_pane == 'mod' then   -- 18 окт: матрица модуляции — во всю ширину (без колонки формы)
+        pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' } } or { { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' } })
+        return left(x, y + Lx.rh + 2, w, h - Lx.rh - 2)
+      end
       local tgt = ctx.lfo_target()
       lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
       U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
-      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' } } or { { 'params', 'params' }, { 'curve', 'curve' } })   -- 9 окт: curve — кривая целиком
+      pages(x, state.ai_edit and { { 'item', 'ai' }, { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' } } or { { 'params', 'params' }, { 'curve', 'curve' }, { 'mod', 'mod' } })   -- 9 окт: curve — кривая целиком; 18 окт: mod
       return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
     end,
     -- 12 окт: вкладка modulation — нативная матрица REAPER (LFO / ACS / link) во всю ширину
@@ -23398,13 +23408,18 @@ local function frame()
           elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
           elseif r == 'pick' then ctx.lfo_pick_env()
           elseif not r then return vim.key(c) end
+        elseif state.toptab == 'automation' and c == 77 and mod_pane ~= 'mod' then mod_pane = 'mod'; vim.msg = 'mod: the modulation of the track (LFO / audio follower / link) - a add, x remove, Enter toggle, o w windows; P params, C curve, L shape'   -- 18 окт: M — модуляция
+        elseif state.toptab == 'automation' and mod_pane == 'mod' and c ~= 80 and c ~= 76 and c ~= 67 then
+          local col = cur_col(); local mods = col and col.mods or {}
+          if c == 27 then ctx.set_focus('tracker')
+          elseif not MMX.key(c, mods) then return vim.key(c) end
         elseif state.toptab == 'automation' and mod_pane == 'params' then
           local r = MMX.PP.key(c, cur_col())
           if r == 'leave' then ctx.set_focus('tracker')
           elseif not r then return vim.key(c) end
         elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and c ~= 76 and ctx.acv_key(c) then   -- 15 окт: холст (L P — страницы, как в подсказке)
         elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
-        elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'LFO: j k field, h l value, g auto-item, p write points, L back'
+        elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'shape: j k field, h l value, g auto-item, p write points, L back'
         elseif state.toptab == 'automation' then
           if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
         elseif state.toptab == 'modulation' then

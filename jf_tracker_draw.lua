@@ -368,6 +368,7 @@ function D.panes_layout(state, L, nregions, ncols)
     if a == 'itemtab' then return it == 1 end
     if a == 'slices_on' then return sl == 1 elseif a == 'gridtab' then return gr == 1 elseif a == 'dev' then return dv == 1 end
     if a == 'mixer' then return mxa == 1 end            -- 11 окт: модуль mixer — когда микшер включён и он снизу
+    if a == 'merged' then return false end              -- 18 окт: modulation — страница automation
     return true
   end
   D.pn_lay = D.panes.layout(m, gfx.w, H, M)

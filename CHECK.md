@@ -1298,3 +1298,4 @@
 - \ k — режимы клавиатуры: m ноты, p patternkb, c clipkb (палитра откроется сама, фокус в матрицу); (on) у включённого.
 - Меню матрицы (кнопка menu / \ в матрице): сверху — queue, go here, undo …; остальное в подменю pattern … / slot … / block … / section … / view … / move …. В section … — меню секции слота, секция из выделенных слотов (выпадашка имени), секция из time selection.
 - step next — только внутри паттерна курсора (вне паттерна — не дальше 4 тактов); дальше — шаг 1, без прыжков на объекты за песней.
+- automation + modulation — одна вкладка automation со страницами params / curve / mod / shape (+ item при открытом automation item). M — mod (бывшая вкладка modulation: матрица LFO / ACS / link, клики, колесо, клавиши те же), L — shape (бывшая lfo / curves: генератор формы точками), C — curve, P — params. Вкладка modulation спрятана (один раз), Ctrl+W g u / :pane modulation / метки mm ведут на страницу mod.
