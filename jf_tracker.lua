@@ -23085,6 +23085,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'sync' then vim.msg = 'synced ' .. tostring(ctx.sync_here())
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
+  elseif b == 'timesel' then ctx.tsel_menu()
   elseif b == 'vismetro' then
     MX.vismetro = not MX.vismetro; reaper.SetExtState(EXT, 'vismetro', MX.vismetro and '1' or '0', true)
     vim.msg = 'vismetro ' .. (MX.vismetro and 'on: the beats of a slot as vertical strips, the playing beat lights up' or 'off: the quarters as lines')
@@ -23473,6 +23474,55 @@ ctx.plist_draw = function(Lx, x, y, w)
   local st = #errs > 0 and errs[1] or (('%d step(s) · %d rows · %.1f bars'):format(n, rows, rows / math.max(1, state.lpb * 4)))
   U.text(x + pad, sy + 1, ctx.fit(st, w - 2 * pad), #errs > 0 and U.RED or U.GREY)
   return sy + rh + 2 - y, hover
+end
+-- 18 окт: time selection REAPER → секция (Tr в матрице, кнопка timesel): имя из быстрых — intro verse chorus …
+ctx.SEC_NAMES = { 'intro', 'verse', 'pre-chorus', 'chorus', 'hook', 'build', 'drop', 'break', 'breakdown', 'bridge', 'solo', 'outro' }
+ctx.tsel_get = function()
+  local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+  if t1 > t0 + 1e-6 then return t0, t1 end
+end
+ctx.tsel_section_named = function(name)
+  name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  local t0, t1 = ctx.tsel_get()
+  if not t0 then vim.msg = 'no time selection - select slots on the bar ruler of the matrix (drag) first'; return end
+  if name == '' then vim.msg = 'section: give it a name'; return end
+  if model.SEC.code_of(name) then vim.msg = 'section: a name without a pattern code (not "A1 ...")'; return end
+  local used = {}
+  for _, s in ipairs(regions.sections or {}) do used[s.name] = true end
+  for _, r in ipairs(regions) do used[r.name] = true end
+  local nm, k = name, 2
+  while used[nm] do nm = name .. ' ' .. k; k = k + 1 end   -- второй verse — «verse 2»
+  edit.run('section ' .. nm, function() reaper.AddProjectMarker2(0, true, t0, t1, nm, -1, 0) end)
+  model.invalidate(); regions = model.regions(state.lpb)
+  vim.msg = ('section "%s" over the time selection'):format(nm)
+end
+ctx.tsel_section = function()
+  if not ctx.tsel_get() then vim.msg = 'no time selection - select slots on the bar ruler of the matrix (drag) first'; return end
+  local items = {}
+  for i, n in ipairs(ctx.SEC_NAMES) do items[#items + 1] = { label = n, v = n, key = i <= 9 and tostring(i) or nil } end
+  items[#items + 1] = { label = 'other name …', v = '', dim = true }
+  ctx.smart_at = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y }
+  ctx.smart_open({ title = 'section from the time selection (Enter)', items = items, cols = 2, sel = 1, on_pick = function(it)
+    if it.v == '' then vim.open_prompt('tsec ', '') else ctx.tsel_section_named(it.v) end
+  end })
+end
+ctx.tsel_menu = function()
+  local t0, t1 = ctx.tsel_get()
+  if not t0 then vim.msg = 'no time selection - drag on the bar ruler of the matrix, or double-click a slot there'; return end
+  local items = {
+    { label = 'section from it (Tr) …', v = 'section' },
+    { label = 'play it as a loop', v = 'loop' },
+    { label = 'clear the selection', v = 'clear' },
+  }
+  ctx.smart_at = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y }
+  ctx.smart_open({ title = ('time selection %.2f..%.2f s'):format(t0, t1), items = items, cols = 1, sel = 1, on_pick = function(it)
+    if it.v == 'section' then ctx.tsel_section()
+    elseif it.v == 'loop' then
+      reaper.GetSet_LoopTimeRange(true, true, t0, t1, false)
+      if reaper.GetSetRepeat(-1) == 0 then reaper.GetSetRepeat(1) end
+      reaper.SetEditCurPos(t0, false, false); reaper.OnPlayButton()
+    elseif it.v == 'clear' then ctx.mx_loop_span(0, 0); vim.msg = 'selection cleared' end
+  end })
 end
 -- 17 окт: :section имя — секция (регион без кода) поверх слотов блока матрицы (Shift+J K на именах), иначе слота курсора
 ctx.section_make = function(name)

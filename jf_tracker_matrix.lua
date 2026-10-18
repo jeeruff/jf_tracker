@@ -60,7 +60,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' }, { 'fold', 'cell' },   -- 12 окт: menu — patternize и прочее
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'playlist' }, { 'vismetro', 'vismetro' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'playlist' }, { 'vismetro', 'vismetro' }, { 'timesel', 'timesel' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -340,7 +340,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
@@ -970,9 +970,10 @@ local MX_HINT = {
   c = 'c: c / w rename region | Esc',
   g = 'g: g first slot | Esc',
   z = 'z: the view menu',
+  T = 'T: r time selection -> a section (pick a name) | Esc',   -- 18 окт
 }
 function MX.pending_hint() return MX.pending and MX_HINT[MX.pending] or nil end
-local OPS = { d = true, y = true, g = true }   -- 13 окт: z — меню вида (ctx.mx_view_menu)
+local OPS = { d = true, y = true, g = true, T = true }   -- 18 окт: T r — выделение в секцию   -- 13 окт: z — меню вида (ctx.mx_view_menu)
 
 function MX.key(c, regions, snap)
   local ch = c < 256 and string.char(c) or ''
@@ -989,6 +990,7 @@ function MX.key(c, regions, snap)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
     elseif op == 'z' and ch == 'z' then if ctx.ss_big then ctx.ss_big() end   -- session (6 окт)
     elseif op == 'z' and ch == 'i' then MX.toggle_zoom()
+    elseif op == 'T' and ch == 'r' then ctx.tsel_section()
     else ctx.msg(op .. ch .. ': not a matrix command (? - help)') end
     return true
   end

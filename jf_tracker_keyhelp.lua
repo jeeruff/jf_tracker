@@ -282,6 +282,7 @@ KH.PAGES = {
     { k = 'f', m = 'fill: lit cells or an empty grid', d = 'fill: cells show their content (lit) or stay an empty grid - only the view' },
     { k = 't', m = 'trim: cut items past their region', d = 'trim: cut items that run past their region (the button trim)' },
     { k = 'R', m = 'ruler of bars on / off', d = 'ruler of bars on the left on / off (button ruler)' },
+    { k = 'Tr', d = 'the time selection becomes a section: pick a quick name - intro verse pre-chorus chorus hook build drop break breakdown bridge solo outro, or another (:tsec name); a taken name gets a number (verse 2). The timesel button - the same and more (loop it, clear)' },
     { k = 'loop zone', t = {}, d = 'the bar ruler on the left of the slots: double-click - loop this slot (on the section strip - the whole section), drag up / down - several, Cmd+click - pick slots (the loop jumps from one to the next, seamless), Shift+click - extend; the time selection / loop shows as a [ there' },
     { k = 'Cmd+wheel', t = {}, d = 'zoom: slots taller / shorter - the rows of the pattern inside (as in the tracker; option zoom with: split - Option + wheel)' },   -- 18 окт: зум вспыхивает здесь
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
