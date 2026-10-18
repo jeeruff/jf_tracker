@@ -5922,8 +5922,11 @@ function D.frame(L, snap, rows, state, info)
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
         elseif col.panmode == 6 then
-          slider(sx, pyy, fx_w, (lv('panl', col.panL or -1) + 1) / 2, true, 'L', pan_txt(lv('panl', col.panL or -1)), 'panl', nil, true)
-          slider(sx, pyy + L.rh, fx_w, (lv('panr', col.panR or 1) + 1) / 2, true, 'R', pan_txt(lv('panr', col.panR or 1)), 'panr', nil, true)
+          -- 18 окт: dual pan в узкой полоске — две дорожки (L сверху, R снизу, как в микшере REAPER), не кнопки L R;
+          -- in_pop = true — не сворачиваться; без подписи, значение — в статусе
+          local narrow = not bigf and fx_w - ms('L') - 2 * L.pad < ms('000')
+          slider(sx, pyy, fx_w, (lv('panl', col.panL or -1) + 1) / 2, true, narrow and '' or 'L', pan_txt(lv('panl', col.panL or -1)), 'panl', narrow or nil, true)
+          slider(sx, pyy + L.rh, fx_w, (lv('panr', col.panR or 1) + 1) / 2, true, narrow and '' or 'R', pan_txt(lv('panr', col.panR or 1)), 'panr', narrow or nil, true)
         else
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
         end
