@@ -407,8 +407,14 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- аранжировка (9 окт): пустой угол над слотами, левее имён треков —
   -- имя и управление: < имя >, new dup del; строки — сколько влезает
   do
-    local ax0, ax1, ay = L.pad, L.mx_label_w - L.pad, ny
-    local nrow = math.floor((MX.name_h + 2) / L.rh)
+    -- 18 окт: внизу матрицы во всю ширину (была в углу над слотами) — слоты кончаются над ним
+    local nrow = 4
+    local ah = nrow * (L.rh + 1) + 3
+    local ax0, ax1, ay = L.pad, W - L.pad - 4, ybot - ah + 2
+    if ybot - ah > hy + 6 * L.rh then
+      U.set(U.LINE); gfx.rect(0, ybot - ah, W - 4, 1, 1)
+      ybot = ybot - ah
+    else nrow = 0 end
     local an, ac, anum = nil, 0, 0
     if ctx.arr_name then an, ac, anum = ctx.arr_name() end
     local function btn(bx, by, label, id, on)
