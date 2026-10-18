@@ -383,9 +383,15 @@ end
 
 -- шаг next (3 окт): строк до следующего объекта трека курсора (любая его
 -- подколонка; в колонке огибающей — следующая точка); нет дальше — 1
+-- 18 окт: только внутри паттерна курсора (вне паттерна — не дальше 4 тактов): за его концом — шаг 1,
+-- а не прыжок к объекту через 10 минут (мусор за песней уводил курсор на строку 6944)
 function V.next_rows()
   local r = next_head(V.cur.fi, V.cur.row, 1, true)
-  return r and math.max(1, r - V.cur.row) or 1
+  if not r then return 1 end
+  local lim = ctx.pattern_end_row and ctx.pattern_end_row(V.cur.row)
+  if not lim then lim = V.cur.row + 16 * ((ctx.state and ctx.state.lpb) or 4) end
+  if r >= lim then return 1 end
+  return math.max(1, r - V.cur.row)
 end
 
 -- W / B — следующее / предыдущее событие в ЛЮБОЙ колонке (все треки, подколонки

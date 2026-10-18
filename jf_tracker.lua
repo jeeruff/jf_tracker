@@ -14910,16 +14910,20 @@ function region_actions(rg)
   return {
     { 'Queue: play this pattern after the current one (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
     { 'Go here now: the play cursor to this pattern, no waiting', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
-    { 'Mute cell (M)', key = 'm', fn = function() MX.toggle_mute(seq, snap) end },
-    { 'Next pattern in slot (>)', key = 'n', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
-    { 'Previous pattern in slot (<)', key = 'b', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
-    { 'Yank pattern (y)', key = 'y', fn = function() ctx.alias_yank(rg) end },
-    { 'Alias: linked repeat to the right (A)', key = 'a', fn = function() ctx.region_btn('alias') end },
-    { 'Duplicate: free copy to the right (yp)', key = 'c', fn = function() ctx.region_btn('clone') end },
-    { 'Make unique: unlink this repeat (U)', key = 'u', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
-    { 'Paste pattern copy at end (p)', key = 'p', fn = function() ctx.alias_paste() end },
-    { 'Sync this pattern', key = 's', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
-    { 'Matrix zoom (z)', key = 'z', fn = ctx.mx_zoom },
+    { 'Mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
+    { 'Next pattern in slot (>)', key = 'n', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
+    { 'Previous pattern in slot (<)', key = 'b', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
+    { 'Yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
+    { 'Alias: linked repeat to the right (A)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
+    { 'Duplicate: free copy to the right (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
+    { 'Make unique: unlink this repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
+    { 'Paste pattern copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
+    { 'Sync this pattern', key = 's', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
+    { 'Matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
+    -- 18 окт: секции — своим подменю (создать из выделенных слотов / time selection, меню секции этого слота)
+    { 'Section of this slot: menu (rclick on its strip)', key = 'm', g = 'section', fn = function() ctx.sec_cmd('') end },
+    { 'Section from the selected slots (Shift+J K on the names)', key = 's', g = 'section', fn = function() vim.open_prompt('section ', '') end },
+    { 'Section from the time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
   }
 end
 
@@ -15065,6 +15069,15 @@ local function context_menu(hover, anchor)
   if hover.header_col and not hover.header_env and ctx.track_menu then ctx.track_menu(hover.header_col); return end
   local items = ctx.context_items(hover) or {}
   local used, hitems, have = { ['?'] = true }, {}, {}
+  -- 18 окт: подменю по смыслу: g у пункта действия / строки справки → { name = { items } } по порядку
+  local mg, mgo = {}, {}
+  ctx.mgroup_add = function(g, key, label, fn)
+    if not mg[g] then mg[g] = { used = {} }; mgo[#mgo + 1] = g end
+    local G = mg[g]
+    local k = key and not G.used[key] and key or nil
+    if not k then for ch in label:lower():gmatch('%a') do if not G.used[ch] then k = ch; break end end end
+    if k then G.used[k] = true; G[#G + 1] = { key = k, label = label, fn = fn } end
+  end
   local function pick_key(want, label)
     local k = want and not used[want] and want or nil
     if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
@@ -15089,9 +15102,13 @@ local function context_menu(hover, anchor)
         for t in hk:gmatch('[^%s/,]+') do if not keyish(t) then hk = nil; break end end
       else hk = nil end
       if hk then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end end
+      if it.g then   -- 18 окт: группа — своё подменю (меню не простыней)
+        ctx.mgroup_add(it.g, it.key, label .. (on and '  (on)' or ''), it[2])
+      else
       local k = pick_key(it.key, label)
       if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
       if k then hitems[#hitems + 1] = { key = k, label = label .. (on and '  (on)' or ''), fn = it[2], hk = hk } end   -- 10 окт: «(on)» вместо непонятной звёздочки
+      end
     end
   end
   if #rp > 0 then
@@ -15132,7 +15149,8 @@ local function context_menu(hover, anchor)
         end
         -- 13 окт: клавиша из двух букв (zt, ts) — в подменю своей первой буквы, внутри вторая:
         -- в меню те же клавиши, что в трекере (раньше — подставные цифры 1..9)
-        if #first == 2 and first:match('^%a%a$') then
+        if e.g then ctx.mgroup_add(e.g, #first == 1 and first or nil, lbl, run_it)
+        elseif #first == 2 and first:match('^%a%a$') then
           local p1 = first:sub(1, 1)
           groups = groups or {}
           if not groups[p1] then groups[p1] = {}; gorder[#gorder + 1] = p1 end
@@ -15152,6 +15170,17 @@ local function context_menu(hover, anchor)
       local names = {}
       for i = 1, math.min(3, #list) do names[#names + 1] = list[i].label:match('^(%S+)') end
       hitems[#hitems + 1] = { key = k, label = p1 .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return { title = p1 .. ' …', items = list } end }
+    end
+  end
+  for _, g in ipairs(mgo) do
+    local list = mg[g]
+    local k = pick_key(g:sub(1, 1), g)
+    if k and #list > 0 then
+      local names = {}
+      for i = 1, math.min(3, #list) do names[#names + 1] = (list[i].label:match('^(%S+)') or ''):lower() end
+      local sub = { title = g, items = {} }
+      for _, it in ipairs(list) do sub.items[#sub.items + 1] = { key = it.key, label = it.label, fn = it.fn } end
+      hitems[#hitems + 1] = { key = k, label = g .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return sub end }
     end
   end
   -- 10 окт: быстрое меню модуля (\ в модуле) — последним пунктом \ главное меню
@@ -24163,6 +24192,11 @@ ctx.plist_draw = function(Lx, x, y, w)
 end
 -- 18 окт: секция в матрице — щелчок по её полосе: меню; протяжка за середину — перенос (Opt — копия, Cmd — алиас),
 -- за край — начало / конец по слотам
+-- 18 окт: строка конца паттерна под строкой row (nil — вне паттерна): граница step next
+ctx.pattern_end_row = function(row)
+  local rg = alias.region_at(regions, edit.row_time(row, state.lpb, 0))
+  return rg and math.ceil(rg.r1 - 1e-6) or nil
+end
 ctx.sec_pats = function(sc)
   local out = {}
   for ri, rg in ipairs(seq) do if not rg.gap and rg.pos >= sc.pos - 1e-6 and rg.rgnend <= sc.rgnend + 1e-6 then out[#out + 1] = { ri = ri, rg = rg } end end
@@ -24256,6 +24290,7 @@ ctx.ASK = {
   ['fxname '] = { 'effect name', {} },
   ['arr name '] = { 'arrangement name', { 'main', 'alt', 'live', 'break', 'short', 'long' } },
   ['tsec '] = { 'section name', 'section' },
+  ['section '] = { 'section name (over the selected slots)', 'section' },
   ['ssave '] = { 'save the view as', { 'mix', 'edit', 'live', 'sample', 'arrange' } },
   ['optsave '] = { 'save the options as', { 'default', 'live', 'studio' } },
   ['presetsave '] = { 'preset name', {} },
