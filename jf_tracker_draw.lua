@@ -7792,19 +7792,32 @@ function D.frame(L, snap, rows, state, info)
             -- карта: 4 колонки × 32 ряда, ряд = 4 пэда
             do
               local mx0, my0 = gx0 + gw + 3, gy0
+              -- 18 окт: жёлтый — выбранный (его семплер справа), оранжевый — занятый, серый — пустой,
+              -- красный — выключен (mute), зелёный мигает — соло (включён один из нескольких)
+              local non = 0
+              for _, kd2 in ipairs(f.kids) do if kd2.enabled then non = non + 1 end end
+              local blink = math.floor(reaper.time_precise() * 3) % 2 == 0
               for r = 0, 31 do
                 for c = 0, 3 do
                   local ki = r * 4 + c + 1
                   local kid = f.kids[ki]
                   local cxm, cym = mx0 + c * (cube + 1), my0 + r * (cube + 1)
-                  set(ki == ks and U.AMBER or (kid and (kid.enabled and U.mix(U.CYAN, U.PANEL, 0.35) or U.GREY) or U.mix(U.LINE, U.PANEL, 0.5)))
-                  gfx.rect(cxm, cym, cube, cube, kid and 1 or 0)
+                  local solo = kid and kid.enabled and non == 1 and #f.kids > 1
+                  local col2 = not kid and U.mix(U.LINE, U.PANEL, 0.5)
+                    or (solo and (blink and U.GREEN or U.mix(U.GREEN, U.PANEL, 0.5)))
+                    or (not kid.enabled and U.RED)
+                    or (ki == ks and U.YELLOW) or U.AMBER
+                  set(col2); gfx.rect(cxm, cym, cube, cube, kid and 1 or 0)
+                  if ki == ks and kid and not kid.enabled then set(U.YELLOW); gfx.rect(cxm - 1, cym - 1, cube + 2, cube + 2, 0) end
+                  if not drag and kid and mx >= cxm and mx < cxm + cube + 1 and my >= cym and my < cym + cube + 1 then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
                 end
               end
               set(U.AMBER); gfx.rect(mx0 - 2, my0 + sc * (cube + 1) - 1, 4 * (cube + 1) + 3, G.fit * (cube + 1) + 1, 0)   -- видимое окно
               local mh = 32 * (cube + 1)
               if not drag and mx >= mx0 - 2 and mx < mx0 + 4 * (cube + 1) + 2 and my >= my0 and my < my0 + mh then
-                hover.dspkitmap = { key = kkey, row = math.floor((my - my0) / (cube + 1)), fit = G.fit }
+                local rr = math.floor((my - my0) / (cube + 1))
+                local cc = math.max(0, math.min(3, math.floor((mx - mx0) / (cube + 1))))
+                hover.dspkitmap = { key = kkey, row = rr, fit = G.fit, ki = rr * 4 + cc + 1, f = f }
               end
             end
             -- пустые места страницы (до 4 × 4) — тусклые рамки

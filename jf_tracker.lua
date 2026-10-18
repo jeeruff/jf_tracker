@@ -19702,11 +19702,16 @@ local function frame()
   end
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
   if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
-  if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов — туда (ряд под мышью — по центру страницы)
+  if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов: щелчок — пэд (семплер справа) и страница с ним; Opt — mute, Shift — solo
     local km = hover.dspkitmap
-    draw.kit_scroll = draw.kit_scroll or {}
-    draw.kit_scroll[km.key] = math.max(0, km.row - math.floor((km.fit or 4) / 2))
-    vim.msg = ('pads %d-%d'):format(draw.kit_scroll[km.key] * 4 + 1, (draw.kit_scroll[km.key] + (km.fit or 4)) * 4)
+    local kid = km.f and km.f.kids[km.ki]
+    if kid and (ctx.mods().alt or ctx.mods().shift) then ctx.pad_mute_solo(km.f, km.ki, ctx.mods().shift)
+    else
+      draw.kit_scroll = draw.kit_scroll or {}
+      draw.kit_scroll[km.key] = math.max(0, km.row - math.floor((km.fit or 4) / 2))
+      if kid then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[km.key] = km.ki; ctx.set_focus('dsp') end
+      vim.msg = kid and ('pad %d: %s'):format(km.ki, kid.name or '') or ('pads %d-%d'):format(draw.kit_scroll[km.key] * 4 + 1, (draw.kit_scroll[km.key] + (km.fit or 4)) * 4)
+    end
     U.click = false
   end
   if U.click and (hover.dbplus or hover.dbpar) then
@@ -20894,6 +20899,9 @@ local function frame()
         if dbl and click.zone == 'macrow' then ctx.mac_do({ kind = 'play', row = hm.row }) end
       end
       click = { t = now2, zone = hm.btn and 'macbtn' or 'macrow' }
+    elseif hover.dspkit and hover.dspkid and hover.dspkid.f and (ctx.mods().alt or ctx.mods().shift) then
+      ctx.pad_mute_solo(hover.dspkid.f, hover.dspkid.ki, ctx.mods().shift)   -- 18 окт: Opt — mute пэда, Shift — solo
+      click = { t = now2, zone = 'dspkit' }
     elseif hover.dspkit then
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
@@ -24227,6 +24235,26 @@ end
 ctx.pattern_end_row = function(row)
   local rg = alias.region_at(regions, edit.row_time(row, state.lpb, 0))
   return rg and math.ceil(rg.r1 - 1e-6) or nil
+end
+-- 18 окт: пэд drumrs5k: mute — выкл / вкл (bypass), solo — включён только он (повтор — все включены). Один undo
+ctx.pad_mute_solo = function(f, ki, solo)
+  local col = dsp_target()
+  local kid = f and f.kids and f.kids[ki]
+  if not (col and kid and kid.i) then return end
+  local A = model.fxapi(col.track)
+  if not solo then
+    edit.fx_bypass(col.track, kid.i)
+    vim.msg = ('pad %d %s: %s'):format(ki, kid.name or '', kid.enabled and 'muted' or 'on')
+  else
+    local others_on = false
+    for j, kd in ipairs(f.kids) do if j ~= ki and kd.enabled then others_on = true end end
+    local unsolo = not others_on and kid.enabled
+    edit.run(unsolo and 'pads: solo off' or ('pad solo ' .. (kid.name or '')), function()
+      for j, kd in ipairs(f.kids) do if kd.i then A.SetEnabled(col.track, kd.i, unsolo or j == ki) end end
+    end)
+    vim.msg = unsolo and 'pads: solo off - all on' or ('pad %d solo (Shift+click again - all on)'):format(ki)
+  end
+  model.invalidate()
 end
 ctx.sec_pats = function(sc)
   local out = {}
