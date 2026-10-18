@@ -14623,7 +14623,7 @@ local function hint_go(t)
     MX.SS.scene_mode = false; MX.SS.cur.ri, MX.SS.cur.ci = d.ri, d.ci
   elseif t.kind == 'sprop' then ctx.set_focus('top'); state.toptab = 'sample'; SPROP.sel = d   -- параметр сэмпла (8 окт: метки были, прыжка не было)
   elseif t.kind == 'sessrow' then MX.SS.scene_mode = false; MX.SS.cur.ri = d; MX.SS.scene(d, seq, ctx.ss_G(), #ctx.ss_V().cols)
-  elseif t.kind == 'ssplay' then MX.SS.launch(d.ri, d.ci, seq)
+  elseif t.kind == 'ssplay' then MX.SS.toggle(d.ri, d.ci, seq)
   elseif t.kind == 'ssrecbtn' then if ctx.ss_record then ctx.ss_record(d.ri, d.ci) end
   elseif t.kind == 'hdrparam' then ctx.hdr_pick('fx', d.col, d.k)
   elseif t.kind == 'trkio' then ctx.track_io(d.col, d.what)   -- ø фазы в шапке (8 окт)
@@ -19883,7 +19883,7 @@ local function frame()
   if U.click and (hover.ssplay or hover.ssrecbtn) and snap then
     local h2 = hover.ssplay or hover.ssrecbtn
     MX.SS.cur.ri, MX.SS.cur.ci = h2.ri, h2.ci
-    if hover.ssplay then MX.SS.launch(h2.ri, h2.ci, seq) elseif ctx.ss_record then ctx.ss_record(h2.ri, h2.ci) end
+    if hover.ssplay then MX.SS.toggle(h2.ri, h2.ci, seq) elseif ctx.ss_record then ctx.ss_record(h2.ri, h2.ci) end
     U.click = false
   end
   if U.click and hover.ssfa and snap then   -- буква follow action клипа (7 окт): клик — следующее действие

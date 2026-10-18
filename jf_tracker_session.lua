@@ -197,6 +197,10 @@ function SS.loop(ci, k1, k2)
   return arm_mod(ci, { seg = { k1, k2 } }, ('loop steps %d-%d'):format(k1 + 1, k2 + 1))
 end
 
+-- кнопка клипа: играет — стоп трека, иначе запуск (18 окт)
+function SS.toggle(ri, ci, seq)
+  if SS.live[ci] and SS.live[ci].ri == ri then SS.stop(ci) else SS.launch(ri, ci, seq) end
+end
 function SS.stop(ci)
   if not SS.live[ci] and not SS.pend[ci] then ctx.msg('nothing plays on ' .. ctx.ss_colname(ci)); return end
   arm(ci, 'stop')
@@ -815,7 +819,9 @@ function SS.draw_body(L, x0, lw, y, h, cols, seq, snap, grid, now, playpos, hove
           SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = BTN + 2, 0, 0, true
           SS.draw_cell(L, cx, cy, cw, bh - 1, cell, c.col, ri, vi, rg, blink, playpos, hover)
           SS.cell_inset, SS.hint_dy, SS.hint_dx, SS.name_over = nil, nil, nil, nil
-          if cell and cell.state ~= 'empty' then corner(bx, byb, '>', U.GREEN, 'ssplay', { ri = ri, ci = vi }) end
+          -- 18 окт: играет — оранжевый x (стоп трека), иначе зелёный > (запуск)
+          local on = SS.live[vi] and SS.live[vi].ri == ri
+          if cell and cell.state ~= 'empty' then corner(bx, byb, on and 'x' or '>', on and U.AMBER or U.GREEN, 'ssplay', { ri = ri, ci = vi, stop = on }) end
         else
           -- пустой слот — сразу пустым клипом (7 окт): рамка; курсор / наведение — ярче
           local hot2 = mx >= cx and mx < cx + cw and my >= cy and my < cy + bh
