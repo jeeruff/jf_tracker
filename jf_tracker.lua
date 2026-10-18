@@ -8234,55 +8234,7 @@ ctx = {
     vim.msg = ok and ('profile %s deleted'):format(name) or ('no profile ' .. tostring(name))
   end,
   opt_tab = function(t) state.opt_tab = t end,
-  -- ── свойства item под курсором (5 окт): гидра вместо окна REAPER ──────
-  -- числа — строкой :iprop key value (с текущим), переключатели — сразу
-  item_props = function(item, anchor)
-    if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'no item'; return end
-    local tk = reaper.GetActiveTake(item)
-    local function iv(k) return reaper.GetMediaItemInfo_Value(item, k) end
-    local function tv(k) return tk and reaper.GetMediaItemTakeInfo_Value(tk, k) or 0 end
-    -- правка: свой undo-шаг, item обновить, модель — заново
-    local function put(desc, fn) edit.run('item ' .. desc, function() fn(); reaper.UpdateItemInProject(item) end); model.invalidate() end
-    local function itog(key, desc) return { label = desc, kind = 'toggle', get = function() return iv(key) >= 0.5 end, set = function(v) put(desc, function() reaper.SetMediaItemInfo_Value(item, key, v and 1 or 0) end) end } end
-    local srclen = 0
-    if tk then local src = reaper.GetMediaItemTake_Source(tk); srclen = src and reaper.GetMediaSourceLength(src) or 0 end
-    local nm = tk and reaper.GetTakeName(tk) or ''
-    local items = {
-      { label = 'volume', kind = 'num', min = -60, max = 12, step = 0.5, fmt = '%+.1f dB',
-        get = function() local v = iv('D_VOL'); return v > 1e-6 and math.floor(20 * math.log(v, 10) * 10 + 0.5) / 10 or -60 end,
-        set = function(v) put('volume', function() reaper.SetMediaItemInfo_Value(item, 'D_VOL', v <= -60 and 0 or 10 ^ (v / 20)) end) end },
-      { label = 'pan', kind = 'num', min = -100, max = 100, step = 1, fmt = '%+d',
-        get = function() return math.floor(tv('D_PAN') * 100 + 0.5) end,
-        set = function(v) if tk then put('pan', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PAN', v / 100) end) end end },
-      { label = 'transpose', kind = 'num', min = -48, max = 48, step = 1, fmt = '%+g st',
-        get = function() return math.floor(tv('D_PITCH') * 100 + 0.5) / 100 end,
-        set = function(v) if tk then put('transpose', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', v) end) end end },
-      { label = 'rate', kind = 'num', min = 0.1, max = 10, step = 0.01, fmt = '%.3f',
-        get = function() return tv('D_PLAYRATE') end,
-        set = function(v) if tk then put('rate', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', math.max(0.01, v)) end) end end },
-      { label = 'keep pitch', kind = 'toggle', get = function() return tv('B_PPITCH') >= 0.5 end,
-        set = function(v) if tk then put('keep pitch', function() reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', v and 1 or 0) end) end end },
-      itog('B_LOOPSRC', 'loop'), itog('B_MUTE', 'mute'),
-      { label = 'swing', kind = 'toggle', get = function() return edit.item_swing(item) end,   -- 6 окт: свинг сетки для вставки / квантизации в этот item
-        set = function(v) put('swing', function() edit.set_item_swing(item, v) end) end },
-      { label = 'fade in', kind = 'num', min = 0, max = 5000, step = 5, fmt = '%d ms',
-        get = function() return math.floor(iv('D_FADEINLEN') * 1000 + 0.5) end,
-        set = function(v) put('fade in', function() reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', v / 1000) end) end },
-      { label = 'fade out', kind = 'num', min = 0, max = 5000, step = 5, fmt = '%d ms',
-        get = function() return math.floor(iv('D_FADEOUTLEN') * 1000 + 0.5) end,
-        set = function(v) put('fade out', function() reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', v / 1000) end) end },
-      { label = 'start offset', kind = 'num', min = 0, max = math.max(0.001, srclen), step = 0.01, fmt = '%.3f s',
-        get = function() return tv('D_STARTOFFS') end,
-        set = function(v) if tk then put('start offset', function() reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', v) end) end end },
-      { label = 'name', kind = 'text', get = function() return tk and reaper.GetTakeName(tk) or '' end, fn = function()
-          state.iprop_item = item; OPT.close()
-          vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'
-          vim.cmdline = 'iprop name ' .. (tk and reaper.GetTakeName(tk) or '') end },
-      { label = 'REAPER item properties window', kind = 'action', value = 'w', fn = function() OPT.close(); select_item_in_reaper(item); reaper.Main_OnCommand(40009, 0) end },
-    }
-    local a = anchor or ctx.cursor_anchor()
-    OPT.open_panel(items, 'item ' .. nm .. '   j k row, h l / digits value, Enter, Esc', { x = a.x, y = a.y })
-  end,
+  -- 18 окт: гидра свойств item (5 окт) убрана — дубль окна Ctrl+Enter (ctx.np_open): двойной щелчок и меню открывают его
   -- :iprop key value — число / имя в item из item_props
   item_prop = function(key, val)
     local item = state.iprop_item
@@ -13578,12 +13530,16 @@ draw.tl_insts = ctx.track_insts                           -- 13 окт: плаг
 -- уровня note (правка только этой ноты); j k строка, h l значение (Shift — мелко), Enter — список /
 -- действие, R сброс, Esc закрыть. Ячейка трекера остаётся чистой — детали тут
 ctx.NP = nil
-ctx.np_open = function()
-  local f = L and L.flat and L.flat[vim.cur.fi]
-  local cell = f and f.sub and f.sub[vim.cur.row]
-  if cell and cell.kind == 'cont' then cell = cell.of end
-  if not (cell and cell.kind == 'audio' and cell.item and reaper.ValidatePtr(cell.item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
-  ctx.NP = { item = cell.item, sel = (ctx.NP and ctx.NP.sel) or 1, at = ctx.cursor_anchor() }
+-- item / at — открыть для этого item у этой точки (двойной щелчок, меню); без них — нота под курсором
+ctx.np_open = function(item, at)
+  if not item then
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local cell = f and f.sub and f.sub[vim.cur.row]
+    if cell and cell.kind == 'cont' then cell = cell.of end
+    item = cell and cell.kind == 'audio' and cell.item
+  end
+  if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
+  ctx.NP = { item = item, sel = (ctx.NP and ctx.NP.sel) or 1, at = at or ctx.cursor_anchor() }
 end
 ctx.np_entry = function()
   local NP = ctx.NP
@@ -13607,6 +13563,7 @@ ctx.np_key = function(c)
   elseif ch == 'l' or ch == 'L' or c == keys.right then ctx.sp_adjust(e, r.k, 1); NP.key = nil
   elseif c == 13 then if not ctx.sp_menu(e, r.k) then ctx.sp_adjust(e, r.k, 1) end; NP.key = nil
   elseif ch == 'R' then ctx.sp_reset(e, r.k); NP.key = nil
+  elseif ch == 'W' then local it = NP.item; ctx.NP = nil; select_item_in_reaper(it); reaper.Main_OnCommand(40009, 0)   -- 18 окт: окно свойств item REAPER (было в гидре 5 окт)
   elseif ch:match('^%l$') then local i = SPROP.jump(R2, NP.sel, ch); if i then NP.sel = i end   -- 17 окт: буква — прыжок на строку
   end
   model.invalidate()
@@ -14928,7 +14885,7 @@ function event_actions(hover)
   local head = cell and (cell.kind == 'audio' or cell.kind == 'midi') and cell or (cell and cell.of)
   if head and head.item then
     add(head.kind == 'audio' and 'Item properties' or 'Open in MIDI editor', function()
-      if head.kind == 'audio' then ctx.item_props(head.item); return end          -- своя гидра (5 окт)
+      if head.kind == 'audio' then ctx.np_open(head.item, { x = gfx.mouse_x, y = gfx.mouse_y + 4 }); return end   -- 18 окт: окно свойств ноты (Ctrl+Enter)
       select_item_in_reaper(head.item)
       reaper.Main_OnCommand(40153, 0)
     end, 'i')
@@ -21147,7 +21104,7 @@ local function frame()
         if head and head.item then
           select_item_in_reaper(head.item)
           if dbl and click.zone == 'body' and click.fi == hover.fi and click.row == hover.row.row then
-            if head.kind == 'audio' then ctx.item_props(head.item, { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 })   -- своя гидра (5 окт)
+            if head.kind == 'audio' then ctx.np_open(head.item, { x = gfx.mouse_x, y = gfx.mouse_y + 4 })   -- 18 окт: окно свойств ноты (Ctrl+Enter), не гидра
             else reaper.Main_OnCommand(40153, 0) end
           end
         end
@@ -23291,6 +23248,7 @@ local function frame()
       -- 18 окт: открытые выбор / смарт-панель / выпадашка размера — для живых тестов
       .. (vim.picker and (' picker=' .. tostring(vim.picker.title):sub(1, 40) .. ' q=' .. vim.picker.query .. ' n=' .. #vim.picker.matches .. ' top=' .. tostring(vim.picker.matches[1] and vim.picker.matches[1].label)) or '')
       .. (vim.hydra and (' hydra=' .. tostring(vim.hydra.title):sub(1, 30)) or '')
+      .. (ctx.NP and (' note=' .. tostring(ctx.NP.e and ctx.NP.e.name or '?')) or '')
       .. (MX.SMART.p and (' smart=' .. tostring(MX.SMART.p.title):sub(1, 40) .. ' n=' .. #MX.SMART.p.items) or '')
       .. (ctx.SP and ctx.SP.on and (' sig=' .. ctx.SP.cmd()) or ''), false)
     ctx.inject_pending = nil

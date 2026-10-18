@@ -95,8 +95,8 @@ local function set(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 U.set = set
 
 -- 13 окт: слайдер-ромбик: тонкая дорожка, тонкая заливка (от центра или от края) и ромбик на значении
--- 18 окт: стороны панорамы — L фиолетовый, R зелёный (как в REAPER)
-U.PAN_L = function() return U.mix(U.RED, U.CYAN, 0.45) end
+-- 18 окт: стороны панорамы — L бордовый, R зелёный
+U.PAN_L = function() return U.mix(U.RED, U.BG, 0.3) end   -- бордовый (просьба)
 U.PAN_R = function() return U.GREEN end
 function U.dslider(sx, cy, sw, fr, centered, col, hot, rh, lr)
   fr = math.max(0, math.min(1, fr or 0))
