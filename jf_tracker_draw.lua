@@ -8893,7 +8893,19 @@ function D.popup(L, p, anchor)
     set(U.AMBER); gfx.rect(cx, ty, 2, L.rh, 1)
     return
   end
-  text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
+  if p.search_head then
+    -- 18 окт: поиск выбора — набранное, мигающий курсор; пусто — тусклое приглашение
+    local tx, ty = x + L.pad, y + L.pad
+    local head = fit(p.search_head, w - 2 * L.pad)
+    text(tx, ty, head, U.CYAN); tx = tx + ms(head)
+    if p.search ~= '' then text(tx, ty, p.search, U.TEXT); tx = tx + ms(p.search) end
+    if math.floor(reaper.time_precise() * 2.5) % 2 == 0 then set(U.AMBER); gfx.rect(tx, ty, 2, L.rh, 1) end
+    tx = tx + 4
+    if p.search == '' then local ph = 'type to search'; text(tx, ty, ph, U.DIM); tx = tx + ms(ph) end
+    text(tx, ty, fit(p.search_tail or '', math.max(0, x + w - L.pad - tx)), U.GREY)   -- не за рамку
+  else
+    text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
+  end
   if p.groups then
     local cx = x
     for k, G in ipairs(p.groups.cols) do
@@ -8925,7 +8937,8 @@ function D.popup(L, p, anchor)
     local mhot = (p.kind == 'hydra' or pick_ok) and gfx.mouse_x >= lx and gfx.mouse_x < lx + colw - L.pad and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
     if mhot and p.kind == 'hydra' then D.popup_hot = ln.key end
     if mhot and pick_ok then D.popup_pick = p.first + i - 1 end
-    if p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
+    if p.hl == i and p.kind == 'picker' then set(U.tint(U.AMBER, 0.3)); gfx.rect(lx, ly, colw - L.pad, L.rh, 1)   -- 18 окт: выбранное в поиске — заметно
+    elseif p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
     if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
     if ln.chips then   -- 16 окт: «клавиша имя» подряд, клавиша — янтарём
@@ -8936,7 +8949,7 @@ function D.popup(L, p, anchor)
         text(cx, ly + 1, ch[1], U.AMBER); text(cx + ms(ch[1]) + ms('W'), ly + 1, ch[2], U.TEXT)
         cx = cx + wd
       end
-    else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), ln.col or U.GREY) end
+    else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), (p.hl == i and p.kind == 'picker') and U.TEXT or (ln.col or U.GREY)) end
   end
 end
 

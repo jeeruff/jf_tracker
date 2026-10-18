@@ -1047,10 +1047,10 @@ do
   local pk = V.picker
   eq('tree made', pk.tree ~= nil, true); eq('depth 2', pk.depth, 2); eq('focus on folders', pk.col, 1)
   local pop = V.popup()
-  eq('two folder columns', #pop.groups.cols, 2)
+  eq('under all: one folder column (the empty level 2 takes no room, 18 окт)', #pop.groups.cols, 1)
   eq('level 1: all + 2', #pop.groups.cols[1].lines, 3)
   eq('level 1 sorted', pop.groups.cols[1].lines[2]:match('^%S+'), 'Bass')
-  eq('level 2 hidden under all', #pop.groups.cols[2].lines, 0)
+  eq('level 2 hidden under all', pop.groups.cols[2], nil)
   V.picker_key(('j'):byte())                                -- Bass
   eq('folder filters', #pk.matches, 2)
   V.picker_key(('l'):byte())                                -- в колонку авторов

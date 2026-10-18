@@ -3192,6 +3192,14 @@ ctx = {
   -- fzf по всем установленным эффектам → добавить на трек курсора (DSP: a или /, hydra \f)
   fx_picker = function()
     local col = dsp_target(); if not col then return end
+    -- 18 окт: панели — обычный браузер эффектов (панель fx), не всплывашка: набор ищет, Enter — на трек, фокус — назад
+    if state.panes_ui and state.panes then
+      if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+      FB.query, FB.cur, FB.scroll = '', 1, 0
+      ctx.pane_cmd('fxb show')
+      vim.msg = ('fx: type to search, arrows / Ctrl+J K choose, Enter adds to %s, Esc back'):format(col.take and ('take fx of ' .. col.name) or col.name)
+      return
+    end
     vim.open_picker('add fx to ' .. (col.take and ('take fx of ' .. col.name) or col.name), ctx.fx_list(), function(it)
       edit.fx_add(col.track, it.data); state.dsp = true
       vim.msg = '+ ' .. it.label
@@ -6698,8 +6706,9 @@ ctx = {
     for t in (arg or ''):gmatch('%S+') do w[#w + 1] = t end
     if #w == 0 then vim.msg = PN.encode(m); return end
     if w[1] == 'reset' then ctx.pane_do(function() state.panes = PN.DEFAULT(); state.panes.v = m.v + 1; return true end, 'panes: default layout'); return end
+    -- 18 окт: пресет — только одним словом (:pane tracker show показывал панель, а применял раскладку tracker)
     for _, nm in ipairs(PN.LAYOUTS) do
-      if w[1] == nm then local p = PN.preset(nm, m); ctx.pane_do(function() state.panes = p; return true end, 'layout: ' .. nm); return end
+      if w[1] == nm and #w == 1 then local p = PN.preset(nm, m); ctx.pane_do(function() state.panes = p; return true end, 'layout: ' .. nm); return end
     end
     local id = PN.parse_name(w[1])
     if not id then vim.msg = 'pane: unknown panel ' .. w[1] .. ' (matrix browser lib main slices notes fx dsp rec item automation midi harmonizer scopes master video)'; return end
@@ -22823,7 +22832,25 @@ local function frame()
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
     elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' then ctx.acv_key(back and 25 or 9)   -- 15 окт: холст — активная кривая
-    else vim.msg = 'Tab: only in the tracker (next track) for now' end   -- 10 окт: в панелях Tab пока ничего не делает
+    elseif state.focus == 'fxb' then   -- 18 окт: браузер эффектов — по его вкладкам all fav dev type cat rec
+      local F, k = FB.FOLDERS, 1
+      for i, f in ipairs(F) do if f == FB.folder then k = i end end
+      FB.folder = F[(k - 1 + (back and -1 or 1)) % #F + 1]; FB.cur, FB.scroll = 1, 0; FB.skip_hdr(1)
+      vim.msg = 'fx: ' .. FB.folder .. '  (Tab / Shift+Tab)'
+    else
+      -- 18 окт: панель в стеке вкладок — Tab / Shift+Tab по вкладкам стека (фокус — на новую)
+      local id = ctx.pane_cur()
+      local lf = state.panes_ui and state.panes and id and draw.panes.find(state.panes, id)
+      local list = {}
+      if lf then for _, pid in ipairs(lf.panes) do if not (L.pn and L.pn.by_panel and not L.pn.by_panel[pid]) then list[#list + 1] = pid end end end
+      if #list > 1 then
+        local k = 1
+        for i, pid in ipairs(list) do if pid == id then k = i end end
+        local nx = list[(k - 1 + (back and -1 or 1)) % #list + 1]
+        ctx.pane_focus(nx)
+        vim.msg = 'tab: ' .. ((draw.panes.BY[nx] or {}).label or nx) .. '  (Tab / Shift+Tab)'
+      else vim.msg = 'Tab: this pane has no other tabs' end
+    end
     c = 0
   end
   if c == 27 and MMX.CM.count() > 0 and not HN.active and not vim.picker and not vim.hydra and vim.mode == 'normal' then MMX.CM.clear(); vim.msg = 'ctrl-mouse: selection cleared'; c = 0 end
@@ -23103,6 +23130,7 @@ local function frame()
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if c == 58 and FB.query == '' then return vim.key(c) end   -- 18 окт: : в пустом поиске — строка команды (тест набрал :pane в поиск и Enter добавил эффект)
         local r = FB.key(c, ctx.mods())
         if r == 'add' then ctx.fxb_add()
         elseif r == 'leave' then ctx.toggle_focus() end

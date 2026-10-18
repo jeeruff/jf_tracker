@@ -3218,7 +3218,7 @@ function V.popup()
       lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = named and (m.name or m.label) or m.label, col = m.col }   -- col: свой цвет строки (маршрутизация, 9 окт)
     end
     local groups
-    if pk.tree then
+    if pk.tree and pk.query == '' then   -- 18 окт: набор ищет по всему — папки прячутся, список во всю ширину
       -- колонки папок по уровням (пустая — колонки нет); focus — номер колонки
       groups = { cols = {}, focus = pk.query == '' and pk.col or nil, items_focus = pk.col > pk.depth }
       for k = 1, pk.depth do
@@ -3232,12 +3232,14 @@ function V.popup()
             col.lines[#col.lines + 1] = (g.node and #g.node.list > 0 and k < pk.depth) and ('%s  %d >'):format(g.name, g.n) or ('%s  %d'):format(g.name, g.n)
           end
         end
-        groups.cols[k] = col
+        if #col.lines > 0 then groups.cols[#groups.cols + 1] = col end   -- 18 окт: пустая колонка — без места (была пустота посередине)
       end
+      if groups.focus and groups.focus > #groups.cols then groups.focus = nil end
     end
     -- 9 окт: пусто — строкой, иначе окно сжималось до клочка заголовка («ro»)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no matches - Backspace (Ctrl+J / K or arrows move, letters search)', col = { 0.6, 0.6, 0.6 } } end
-    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil, groups = groups }
+    -- 18 окт: строка поиска — мигающий курсор и «type to search» (рисует draw.popup по search_*); title — для ширины
+    return { title = pk.title .. ' > ' .. pk.query .. '_' .. ('  (%d)'):format(#pk.matches), search_head = pk.title .. ' > ', search = pk.query, search_tail = ('  (%d)'):format(#pk.matches) .. (#pk.matches > 0 and '   arrows / Ctrl+J K: choose, Enter: take' or ''), lines = lines, kind = 'picker', first = first, nmatch = #pk.matches, hl = #pk.matches > 0 and (pk.sel - first + 1) or nil, groups = groups }
   elseif V.hydra then
     local lines = {}
     for _, it in ipairs(V.hydra.items or {}) do
