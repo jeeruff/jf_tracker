@@ -26,7 +26,7 @@ local PN = {}
 -- при показе без истории (сплитом от трекера)
 PN.PANELS = {
   { id = 'tracker',    label = 'tracker',    key = 't', hint = 'tracker', fixed = true },
-  { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left', avail = 'merged' },   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
+  { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт вечер: снова своя панель — кубики + chain (из матрицы убраны)   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },

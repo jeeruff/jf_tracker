@@ -383,7 +383,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     hy = hy + ph + 2
   end
   -- 19 окт: кубики всех паттернов на всю ширину (матрица ниже) и строка chain под ними
-  if ctx.patlist_draw and not MX.fold then
+  if MX.cubes_old and ctx.patlist_draw and not MX.fold then   -- 19 окт вечер: кубики и chain — своя панель patterns
     local used = 1
     for _, r in ipairs(regions) do local l = ctx.SEC and ctx.SEC.code_of(r.name or ''); if l then used = math.max(used, l:byte() - 64) end end
     local nr = math.max(3, math.min(8, used + 2))

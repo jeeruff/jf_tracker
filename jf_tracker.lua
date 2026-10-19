@@ -397,6 +397,8 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
     if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
+    -- 19 окт вечер: patterns + chain — своя панель над матрицей (один раз)
+    if reaper.GetExtState(EXT, 'pat_pane2') ~= '1' then draw.panes.split(m, 'matrix', 'patterns', 'u', 0.3); reaper.SetExtState(EXT, 'pat_pane2', '1', true) end
     if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
     return m
   end
@@ -18148,7 +18150,7 @@ local function frame()
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
-    patlist_draw = ctx.patlist_draw,
+    patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
@@ -23609,6 +23611,7 @@ local function frame()
         if ch == ' ' then ctx.patlist_do('listen'); return end
         if c == 13 then ctx.patlist_do('go'); return end
         if ch == 'n' then ctx.patlist_do('note'); return end
+        if ch == 'C' then ctx.pl_edit(); return end   -- 19 окт вечер: chain — набрать (как в матрице)
         return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
