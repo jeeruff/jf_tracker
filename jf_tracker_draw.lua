@@ -7014,7 +7014,10 @@ function D.frame(L, snap, rows, state, info)
         for k, h in ipairs(hs) do
           if h.row > r1 then break end
           if h.c.kind == 'midi' and h.c.pitch and h.row >= r0 - 2048 then
-            local ph = info.kit_wave(f.col, h.c.pitch, h.row)
+            -- 19 окт: голова-волна — раз на снимок (h живёт, пока жив f.sub), не каждый кадр
+            local ph = h.ph
+            if ph == nil then ph = info.kit_wave(f.col, h.c.pitch, h.row) or false; h.ph = ph end
+            if ph == false then ph = nil end
             if ph then
               local e = h.row + math.ceil(ph.rows_f)
               for k2 = k + 1, #hs do

@@ -112,5 +112,14 @@ do
   eq('dump: dead', T2.nodes[2].live, false)
   eq('dump: snap', s2[3], 'SNAP3')
 end
+-- 19 окт: регрессия — сессия из файла (UT.session с текстом): падала на snap_keep (локальная ниже по файлу)
+do
+  local T = UT.new(); UT.add(T, 'a', 1)
+  local txt = UT.dump(T, { [1] = 'S1' })
+  local api = { read = function() return txt end, undo_desc = function() return '' end, redo_desc = function() return '' end, count = function() return 0 end }
+  local ok, S = pcall(UT.session, api, '/tmp/x.jf-undo')
+  eq('session from a file', ok, true)
+  eq('session snap', ok and S.snaps[1], 'S1')
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

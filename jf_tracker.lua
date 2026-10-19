@@ -24992,8 +24992,14 @@ ctx.kit_wave = function(col, pitch, row)
   local rows_f = model.row_of_time(t0 + secs, state.lpb) - row
   if rows_f <= 0 then return nil end
   local file, a, b = kd.file, kd.pad_a or 0, kd.pad_b or 1
+  local memo = {}   -- 19 окт: пики — раз на размер (draw_wave зовёт на каждую строку каждый кадр)
   return { rows_f = rows_f, start_f = 0, obey = kd.obey, muted = not kd.enabled,
-    kpk = function(n, spec) return model.file_peaks(file, n, a, b, spec) end }
+    kpk = function(n, spec)
+      local k2 = n * 2 + (spec and 1 or 0)
+      local p = memo[k2]
+      if p == nil then p = model.file_peaks(file, n, a, b, spec) or false; if p then memo[k2] = p end end
+      return p or nil
+    end }
 end
 -- 19 окт: строка chain ячейками (Vim) в панели patterns: j с нижнего ряда / Tab — туда, k / Esc — к кубикам
 MX.ch_ed = MX.ch_ed or { toks = {}, i = 1 }

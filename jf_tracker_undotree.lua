@@ -228,7 +228,7 @@ function UT.session(api, path)
       local ids = {}
       for id in pairs(S.snaps) do ids[#ids + 1] = id end
       table.sort(ids)
-      for _, id in ipairs(ids) do snap_keep(S, id) end
+      for _, id in ipairs(ids) do UT.snap_keep(S, id) end   -- через UT: локальная snap_keep объявлена ниже
     end
     for id, n in pairs(S.T.nodes) do n.live = (id == S.T.cur) end   -- после открытия стека REAPER у старых узлов нет
     S.path, S.flushed = path, true
