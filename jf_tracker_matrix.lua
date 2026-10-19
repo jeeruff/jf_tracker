@@ -373,6 +373,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
     hy = hy + ph + 2
   end
+  -- 19 окт: sketchpad — эскизы X1 X2 … (набор clipkb Enter), строкой под кнопками
+  if ctx.sketch_draw then
+    local sh, shv = ctx.sketch_draw(L, 0, hy + L.rh + 2, W - 6)
+    for k, v in pairs(shv) do hover[k] = v end
+    if sh > 0 then hy = hy + sh end
+  end
   -- 18 окт: playlist — блок под кнопками (порядок паттернов текстом), матрица ниже
   MX.pl_y = nil
   if MX.plist and ctx.plist_draw then
