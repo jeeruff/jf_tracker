@@ -401,6 +401,7 @@ state.panes = (function()
     -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
     if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
     -- 19 окт вечер: patterns + chain — своя панель над матрицей (один раз)
+    if reaper.GetExtState(EXT, 'hum_tab') ~= '1' and draw.panes.keep_in(m, 'humanizer', 'help') then reaper.SetExtState(EXT, 'hum_tab', '1', true) end   -- 19 окт: humanizer — вкладкой у help
     if reaper.GetExtState(EXT, 'pat_pane2') ~= '1' then draw.panes.split(m, 'matrix', 'patterns', 'u', 0.3); reaper.SetExtState(EXT, 'pat_pane2', '1', true) end
     if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
     return m
@@ -6004,11 +6005,16 @@ ctx = {
     return set
   end,
   human_menu = function()
-    local function set(v) return function() state.human = v; edit.human = v; vim.msg = v > 0 and ('human %d%%: timing, pitch and velocity of every inserted note vary a little'):format(v) or 'human off' end end
+    -- 19 окт: проценты — amount панели humanizer (диапазоны и точки DSP — там: h)
+    local function set(v) return function()
+      local s = ctx.hum_load(); s.v.amt = v; s.ins = v > 0; ctx.hum_save()
+      vim.msg = v > 0 and ('human %d%%: every inserted note varies a little (the ranges - humanizer pane, gH)'):format(v) or 'human off'
+    end end
     local function mark(v) return (state.human or 0) == v and '  *' or '' end
     vim.open_hydra({ title = 'human - every inserted note a little different', items = {
       { key = '0', label = 'off' .. mark(0), fn = set(0) }, { key = '1', label = '25 %' .. mark(25), fn = set(25) },
-      { key = '2', label = '50 %' .. mark(50), fn = set(50) }, { key = '4', label = '100 %' .. mark(100), fn = set(100) } } })
+      { key = '2', label = '50 %' .. mark(50), fn = set(50) }, { key = '4', label = '100 %' .. mark(100), fn = set(100) },
+      { key = 'h', label = 'humanizer - ranges, dsp variation points (gH)', fn = function() ctx.pane_focus('humanizer') end } } })
     state.popup_at = { kind = 'strip', id = 'human' }
   end,
   ins_menu = function()
@@ -6018,10 +6024,7 @@ ctx = {
       { key = 'f', label = 'instrument: fixed (the selected one)' .. mark(m == 'fixed'), fn = function() state.insmode = 'fixed'; vim.msg = 'insert: fixed instrument' end },
       { key = 'r', label = 'instrument: random from the lib, every note' .. mark(m == 'random'), fn = function() state.insmode = 'random'; vim.msg = 'insert: random instrument' end },
       { key = 's', label = 'instrument: sequence - the next one every note' .. mark(m == 'seq'), fn = function() state.insmode = 'seq'; vim.msg = 'insert: instruments in sequence' end },
-      { key = '0', label = 'human off' .. mark((state.human or 0) == 0), fn = function() state.human = 0; edit.human = 0; vim.msg = 'human off' end },
-      { key = '1', label = 'human 25 %' .. mark(state.human == 25), fn = function() state.human = 25; edit.human = 25; vim.msg = 'human 25 %' end },
-      { key = '2', label = 'human 50 %' .. mark(state.human == 50), fn = function() state.human = 50; edit.human = 50; vim.msg = 'human 50 %' end },
-      { key = '4', label = 'human 100 %' .. mark(state.human == 100), fn = function() state.human = 100; edit.human = 100; vim.msg = 'human 100 %' end },
+      { key = 'h', label = 'human ' .. ((state.human or 0) > 0 and (state.human .. ' %') or 'off') .. ' - the menu (0 1 2 4, humanizer pane)', fn = function() ctx.human_menu() end },   -- 19 окт: одна точка входа
       { key = 'v', label = 'velocity: random +-8 every note' .. mark(state.velrand), fn = function() state.velrand = not state.velrand; vim.msg = 'velocity random ' .. (state.velrand and 'on' or 'off') end },
       { key = 'l', label = 'slices: ' .. ({ key = 'by key', random = 'random', seq = 'sequence' })[state.slicepick or 'key'] .. ' - switch (by key / random / sequence)', fn = function() ctx.slicepick_cycle() end },
       { key = 'm', label = (state.slicemono and 'mono (a new note cuts the track) - switch to poly' or 'poly - switch to mono'), fn = function() ctx.mono_toggle() end },
@@ -18287,6 +18290,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
+    hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
       ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
       ctx.PERF.active = true; ctx.PERF.seen = reaper.time_precise()
@@ -20016,6 +20020,21 @@ local function frame()
   end
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
   if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
+  -- 19 окт: панель humanizer мышью: галки, слайдеры (тянуть), insert, apply
+  if hover.hum and U.click then
+    local hh = hover.hum
+    ctx.hum_load(); ctx.set_focus('humanizer')
+    if hh.toggle then local r = ctx.HU.ROWS[hh.toggle]; ctx.hum_s.on[r.k] = not (ctx.hum_s.on[r.k] ~= false); ctx.hum_save()
+    elseif hh.dtoggle then local t = ctx.hum_s.dsp[hh.dtoggle]; t.off = not t.off; ctx.hum_save()
+    elseif hh.ins then ctx.hum_s.ins = not ctx.hum_s.ins; ctx.hum_save()
+    elseif hh.apply then ctx.hum_apply()
+    elseif hh.slider then ctx.hum_drag = hh.slider; ctx.HU.sel = hh.slider.i
+    elseif hh.row then ctx.HU.sel = hh.row end
+  end
+  if ctx.hum_drag then
+    if gfx.mouse_cap & 1 == 1 then local dg = ctx.hum_drag; ctx.HU.set_from_x(ctx.hum_s, dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w)); ctx.hum_dirty = true
+    else ctx.hum_drag = nil; if ctx.hum_dirty then ctx.hum_dirty = nil; ctx.hum_save() end end
+  end
   if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов: щелчок — пэд (семплер справа) и страница с ним; Opt — mute, Shift — solo
     local km = hover.dspkitmap
     local kid = km.f and km.f.kids[km.ki]
@@ -23824,6 +23843,15 @@ local function frame()
       elseif state.focus == 'actions' then   -- 16 окт: панель actions
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not ctx.act_key(c) then return vim.key(c) end
+      elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        ctx.hum_load()
+        local r = ctx.HU.key(ctx.hum_s, c, ctx.mods().shift)
+        if r == 'changed' then ctx.hum_save()
+        elseif r == 'apply' then ctx.hum_apply()
+        elseif r == 'add' then ctx.hum_add()
+        elseif r == 'leave' then ctx.set_focus('tracker')
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'perf' then   -- 18 окт: панель performance
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local pch = c > 0 and c < 256 and string.char(c) or ''
@@ -24282,7 +24310,90 @@ end
 -- play — по порядку: целые паттерны встык через GoToRegion (без паузы), сокращённые / с проскоком — прыжком;
 -- write — дописать после песни (повторы связанные, сокращённые — свой паттерн)
 ctx.PL = dofile(DIR .. '/jf_tracker_playlist.lua')
-ctx.SP = dofile(DIR .. '/jf_tracker_sigpick.lua')   -- 18 окт: выпадашка размера такта
+ctx.SP = dofile(DIR .. '/jf_tracker_sigpick.lua')
+-- 19 окт: humanizer — диапазоны глобально (ExtState hum), точки вариации DSP — в проекте (humdsp)
+ctx.HU = dofile(DIR .. '/jf_tracker_humanizer.lua')
+ctx.hum_load = function()
+  if not ctx.hum_s then
+    ctx.hum_s = ctx.HU.decode(reaper.GetExtState(EXT, 'hum'))
+    if reaper.GetExtState(EXT, 'hum') == '' then ctx.hum_s.v.amt = state.human or 0; ctx.hum_s.ins = (state.human or 0) > 0 end
+  end
+  local proj = reaper.EnumProjects(-1)
+  if ctx.hum_proj ~= proj then
+    ctx.hum_proj = proj; ctx.hum_s.dsp = {}
+    local _, s = reaper.GetProjExtState(0, EXT, 'humdsp')
+    for ln in (s or ''):gmatch('[^\n]+') do
+      local tg, fg, pi, rg, off, nm = ln:match('^(.-)|(.-)|(%d+)|([%d%.]+)|(%d)|(.*)$')
+      if tg then ctx.hum_s.dsp[#ctx.hum_s.dsp + 1] = { tguid = tg, fguid = fg, param = tonumber(pi), range = tonumber(rg), off = off == '1', name = nm } end
+    end
+  end
+  edit.HUM = ctx.hum_s
+  return ctx.hum_s
+end
+ctx.hum_save = function()
+  local s = ctx.hum_s; if not s then return end
+  reaper.SetExtState(EXT, 'hum', ctx.HU.encode(s), true)
+  local o = {}
+  for _, t in ipairs(s.dsp or {}) do o[#o + 1] = ('%s|%s|%d|%g|%d|%s'):format(t.tguid, t.fguid, t.param, t.range or 5, t.off and 1 or 0, (t.name or ''):gsub('[|\n]', ' ')) end
+  reaper.SetProjExtState(0, EXT, 'humdsp', table.concat(o, '\n'))
+  state.human = s.ins and math.floor(s.v.amt or 0) or 0; edit.human = state.human
+  edit.HUM = s
+end
+-- a — параметр, выбранный в DSP (трек курсора), в точки вариации
+ctx.hum_add = function()
+  local col = cur_col()
+  local tr = col and col.track
+  local f = tr and dsp_sel and col.fx and col.fx[dsp_sel.fx]
+  local p = f and f.params and f.params[dsp_sel.param or 1]
+  if not (f and p) then vim.msg = 'humanizer: pick a parameter in DSP first (its track = the cursor track), then a here'; return end
+  local fx = p.fx or f.i   -- параметр пэда / ребёнка контейнера — свой адрес
+  local pi = p.i or ((dsp_sel.param or 1) - 1)
+  local s = ctx.hum_load()
+  s.dsp[#s.dsp + 1] = { tguid = reaper.GetTrackGUID(tr), fguid = reaper.TrackFX_GetFXGUID(tr, fx) or '', param = pi, range = 5, name = (col.name or '') .. ': ' .. (f.name or '') .. ' / ' .. (p.name or ('param ' .. pi)) }
+  ctx.hum_save()
+  vim.msg = 'humanizer: ' .. s.dsp[#s.dsp].name .. ' ±5 % on every step (h l - range, Space - off, x - remove)'
+end
+-- Enter — ноты (как :human, по галкам) и точки вариации DSP на шагах с нотами того же отрезка
+ctx.hum_apply = function()
+  local s = ctx.hum_load()
+  local amt = (s.v.amt or 0) / 100
+  if amt <= 0 then amt = 1 end   -- amount 0 — только вставка выключена; применение — во всю силу
+  local opt = {}
+  for _, k in ipairs({ 'time', 'pitch', 'vol', 'pan', 'attack', 'len' }) do opt[k] = s.on[k] ~= false end
+  opt.vol = opt.vol or s.on.vel ~= false
+  local hs = vim.hum_heads and vim.hum_heads() or {}
+  local n = edit.humanize_notes(hs, state.lpb, opt, amt)
+  -- точки DSP: на каждой голове — ступенька value ± range × amt (свой трек цели, ноты любого трека отрезка)
+  local np = 0
+  if #(s.dsp or {}) > 0 and #hs > 0 then
+    edit.run('humanizer dsp variation', function()
+      for _, t in ipairs(s.dsp) do
+        if not t.off then
+          local tr = reaper.BR_GetMediaTrackByGUID and reaper.BR_GetMediaTrackByGUID(0, t.tguid)
+          if not tr then for ti = 0, reaper.CountTracks(0) - 1 do local x = reaper.GetTrack(0, ti); if reaper.GetTrackGUID(x) == t.tguid then tr = x end end end
+          local fx
+          if tr then for k = 0, reaper.TrackFX_GetCount(tr) - 1 do if reaper.TrackFX_GetFXGUID(tr, k) == t.fguid then fx = k end end end
+          if tr and fx then
+            local env = reaper.GetFXEnvelope(tr, fx, t.param, true)
+            local base = reaper.TrackFX_GetParamNormalized(tr, fx, t.param)
+            if env then
+              local mode = reaper.GetEnvelopeScalingMode(env)
+              for _, h in ipairs(hs) do
+                local ht = edit.row_time(h.row0 or h.row or 0, state.lpb, h.delay or 0)
+                local v = math.max(0, math.min(1, base + (math.random() * 2 - 1) * (t.range or 5) / 100 * amt))
+                reaper.InsertEnvelopePoint(env, ht, reaper.ScaleToEnvelopeMode(mode, v), 1, 0, false, true)
+                np = np + 1
+              end
+              reaper.Envelope_SortPoints(env)
+            end
+          end
+        end
+      end
+    end)
+  end
+  vim.msg = ('humanizer: %d note(s)%s, amount %d %% (u - undo)'):format(n, np > 0 and (', ' .. np .. ' dsp point(s)') or '', math.floor(amt * 100 + 0.5))
+end
+ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)   -- 18 окт: выпадашка размера такта
 ctx.pl_load = function()
   local P = ctx.PL
   local proj = reaper.EnumProjects(-1)

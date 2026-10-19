@@ -2240,8 +2240,8 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
       -- 15 окт: human — и у MIDI-нот: тайминг ±10 мс, velocity ±12 (при 100 %)
       local hh = (E.human or 0) / 100
       if hh > 0 then
-        t0 = math.max(0, t0 + (math.random() * 2 - 1) * hh * 0.010)
-        vel = math.max(1, math.min(127, math.floor((vel or 100) + (math.random() * 2 - 1) * hh * 12 + 0.5)))
+        t0 = math.max(0, t0 + (math.random() * 2 - 1) * hh * E.hum_v('time', 10) / 1000)
+        vel = math.max(1, math.min(127, math.floor((vel or 100) + (math.random() * 2 - 1) * hh * E.hum_v('vel', 12) + 0.5)))
       end
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
     elseif depot_item then
@@ -2266,14 +2266,18 @@ end
 -- нота-слайс — чуть другая, как живой удар: питч ±8 центов, громкость
 -- ±1 dB, скорость ±0.3 %, тайминг ±10 мс (при 100 %; MIDI — тайминг и velocity ±12); 0 — выкл. E.human ставит main
 E.human = 0
+-- 19 окт: диапазоны при 100 % — из панели humanizer (main ставит E.HUM = { v = …, on = … }); без неё — прежние
+E.HUM = nil
+local function HV(k, d) local h = E.HUM; if h and h.on and h.on[k] == false then return 0 end; return (h and h.v and h.v[k]) or d end
+E.hum_v = HV
 function E.humanize(it, tk)
   local h = (E.human or 0) / 100
   if h <= 0 then return end
   local function r() return (math.random() * 2 - 1) * h end
-  R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * 0.08)
-  R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * 1.0 / 20))
-  R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * (1 + r() * 0.003))
-  R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * 0.010))   -- 15 окт: и тайминг ±10 мс
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * HV('pitch', 8) / 100)
+  R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * HV('vol', 1.0) / 20))
+  R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * (1 + r() * HV('rate', 0.3) / 100))
+  R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * HV('time', 10) / 1000))   -- 15 окт: и тайминг ±10 мс
 end
 
 -- 17 окт: humanizer (макрос) — у уже стоящих нот, по флагам opt: time (±10 мс), pitch (±8 центов), vol (±1.5 dB,
@@ -2287,12 +2291,12 @@ function E.humanize_notes(heads, lpb, opt, amt)
       if h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then
         local it = h.item
         local tk = R.GetActiveTake(it)
-        if opt.time then R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * 0.010)) end
-        if opt.pitch and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * 0.08) end
-        if opt.vol then R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * 1.5 / 20)) end
-        if opt.pan and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', math.max(-1, math.min(1, R.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + r() * 0.10))) end
-        if opt.attack then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', math.abs(r()) * 0.006) end
-        if opt.len then R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(0.005, R.GetMediaItemInfo_Value(it, 'D_LENGTH') * (1 + r() * 0.04))) end
+        if opt.time then R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * HV('time', 10) / 1000)) end
+        if opt.pitch and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * HV('pitch', 8) / 100) end
+        if opt.vol then R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * HV('vol', 1.5) / 20)) end
+        if opt.pan and tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PAN', math.max(-1, math.min(1, R.GetMediaItemTakeInfo_Value(tk, 'D_PAN') + r() * HV('pan', 10) / 100))) end
+        if opt.attack then R.SetMediaItemInfo_Value(it, 'D_FADEINLEN', math.abs(r()) * HV('attack', 6) / 1000) end
+        if opt.len then R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(0.005, R.GetMediaItemInfo_Value(it, 'D_LENGTH') * (1 + r() * HV('len', 4) / 100))) end
         n = n + 1
       elseif h.kind == 'midi' then
         local i, nt = midi_note(h, lpb)
@@ -2300,9 +2304,9 @@ function E.humanize_notes(heads, lpb, opt, amt)
           local sp, ep, vel = nt.sppq, nt.eppq, nt.vel or 100
           local ppq = R.MIDI_GetPPQPosFromProjQN(h.take, 1) - R.MIDI_GetPPQPosFromProjQN(h.take, 0)
           local ppms = ppq * R.TimeMap2_GetDividedBpmAtTime(0, R.MIDI_GetProjTimeFromPPQPos(h.take, sp)) / 60000
-          if opt.time then local d = math.floor(r() * 10 * ppms + 0.5); sp, ep = math.max(0, sp + d), ep + d end
-          if opt.len then ep = math.max(sp + 1, sp + math.floor((ep - sp) * (1 + r() * 0.04) + 0.5)) end
-          if opt.vol then vel = math.max(1, math.min(127, math.floor(vel + r() * 12 + 0.5))) end
+          if opt.time then local d = math.floor(r() * HV('time', 10) * ppms + 0.5); sp, ep = math.max(0, sp + d), ep + d end
+          if opt.len then ep = math.max(sp + 1, sp + math.floor((ep - sp) * (1 + r() * HV('len', 4) / 100) + 0.5)) end
+          if opt.vol then vel = math.max(1, math.min(127, math.floor(vel + r() * HV('vel', 12) + 0.5))) end
           R.MIDI_SetNote(h.take, i, nt.sel, nt.muted, sp, ep, nt.ch, nt.pitch, vel, false)
           n = n + 1
         end

@@ -1351,19 +1351,7 @@ local function run_cmd(line)
     local amt = (tonumber((arg or ''):match('(%d+)%%?')) or 100) / 100
     local opt = { time = true, pitch = true, vol = true, pan = true, attack = true, len = true }
     if mode == 'nopitch' then opt.pitch = false elseif mode == 'notime' then opt.time = false end
-    local hs
-    if V.cmd_from == 'visual' or V.cmd_from == 'vline' then
-      local f0, f1, r0, r1 = V.visual_range(); hs = V.heads_in(f0, f1, r0, r1)
-    else
-      local F = flat(); local col = F[V.cur.fi] and F[V.cur.fi].col
-      local r0, r1
-      if ctx.region_rows then r0, r1 = ctx.region_rows() end
-      r0, r1 = r0 or 0, r1 or 1000000
-      hs = {}
-      for fi, f in ipairs(F) do
-        if f.col == col and not f.env then for _, h in ipairs(V.heads_in(fi, fi, r0, r1)) do hs[#hs + 1] = h end end
-      end
-    end
+    local hs = V.hum_heads(V.cmd_from == 'visual' or V.cmd_from == 'vline')
     local n = ctx.edit.humanize_notes(hs, lpb(), opt, amt)
     V.mode = 'normal'
     V.msg = ('human %s %d%%: %d note(s) a little different (u - undo)'):format(mode, math.floor(amt * 100 + 0.5), n)
@@ -3473,6 +3461,20 @@ function V.key(c)
 end
 
 -- команда из кнопки (4 окт): как набранная после : в текущем режиме
+-- 19 окт: ноты для humanizer (:human и панель): VISUAL — блок, иначе трек курсора в регионе курсора
+function V.hum_heads(vis)
+  if vis == nil then vis = V.mode == 'visual' or V.mode == 'vline' end
+  if vis then local f0, f1, r0, r1 = V.visual_range(); return V.heads_in(f0, f1, r0, r1) end
+  local F = flat(); local col = F[V.cur.fi] and F[V.cur.fi].col
+  local r0, r1
+  if ctx.region_rows then r0, r1 = ctx.region_rows() end
+  r0, r1 = r0 or 0, r1 or 1000000
+  local hs = {}
+  for fi, f in ipairs(F) do
+    if f.col == col and not f.env then for _, h in ipairs(V.heads_in(fi, fi, r0, r1)) do hs[#hs + 1] = h end end
+  end
+  return hs
+end
 function V.run_cmd(line)
   V.cmd_from = V.mode
   local r = run_cmd(line)

@@ -40,7 +40,8 @@ PN.PANELS = {
   { id = 'undotree',   label = 'undo',       key = 'U', hint = 'undotree', side = 'right' },
   { id = 'perf',       label = 'performance', key = 'P', hint = 'perf',   side = 'left' },       -- 18 окт: performance / jftop — своя панель (была на месте матрицы)    -- 15 окт: дерево undo (как undotree в Vim)
   { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
-  { id = 'help',       label = 'help',       key = 'H', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
+  { id = 'humanizer',  label = 'humanizer',  key = 'H', hint = 'humanizer', side = 'right' },   -- 19 окт: тонкий humanizer (help — на ?)
+  { id = 'help',       label = 'help',       key = '?', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)

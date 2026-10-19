@@ -70,7 +70,7 @@ KH.PAGES = {
     { k = 'Ctrl+W', d = 'pane mode (sticky, Esc out): the keys below, the pane numbers on the borders' },
     { k = 'h j k l  H J K L', d = 'focus / move by direction' },
     { k = 'w W  1..9', d = 'next / previous pane, pane by number' },
-    { k = 'g + key', d = 'go to a panel (a hidden one appears): m matrix b browser l lib n main s slices o notes f fx d dsp r rec i item a automation M midi h harmonizer c scopes S master v video V visor k tracks y clipboard U undo A actions H help N note mod x mixer q macros e properties u modulation p pm C clips g grid' },
+    { k = 'g + key', d = 'go to a panel (a hidden one appears): m matrix b browser l lib n main s slices o notes f fx d dsp r rec i item a automation M midi h harmonizer c scopes S master v video V visor k tracks y clipboard U undo A actions ? help H humanizer N note mod x mixer q macros H humanizer ? help e properties u modulation p pm C clips g grid' },
     { k = 's v + key', d = 'split below / right with that panel (it moves here)' },
     { k = 'T + key  B', d = 'that panel into this stack (a tab) / this tab out of the stack' },
     { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
@@ -302,6 +302,17 @@ KH.PAGES = {
     { k = 'Cmd+wheel', t = {}, d = 'zoom: slots taller / shorter - the rows of the pattern inside (as in the tracker; option zoom with: split - Option + wheel)' },   -- 18 окт: зум вспыхивает здесь
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
     { k = 'Esc Opt+Tab', d = 'back to the tracker / next pane' },
+  } },
+  humanizer = { title = 'humanizer - every note a little different (gH)', e = {
+    { k = 'j k', d = 'row: amount, the ranges (at 100 %) of time, velocity, volume, pitch, speed, pan, attack, length; then the dsp variation points' },
+    { k = 'h l', d = 'value / range (Shift: fine)' },
+    { k = 'Space', d = 'this row on / off (on amount: human on insert on / off)' },
+    { k = 'i', d = 'human on insert on / off (amount % - every inserted note)' },
+    { k = 'a', d = 'add the parameter selected in DSP as a variation point: on every step with a note it moves a little (automation, a step shape)' },
+    { k = 'x', d = 'remove the variation point under the cursor' },
+    { k = 'Enter', d = 'apply: the notes (as :human) and the dsp points - to the selection, else the cursor track in the region (u - undo)' },
+    { k = '0', d = 'the ranges back to the defaults' },
+    { k = 'Esc', d = 'back to the tracker' },
   } },
   perf = { title = 'performance - what takes the time (REAPER and the tracker)', e = {
     { k = 't', d = 'jftop <-> performance: the tracker frame by parts (ms, max, %) / REAPER - audio, latency, tracks and their FX' },
