@@ -25,6 +25,10 @@ key('M', sel); eq('M mute', last(), 'ms:false')
 key('S', sel); eq('S solo', last(), 'ms:true')
 DK.key(13, sel, 3, 5, {}); eq('Enter listens', last(), 'listen')
 eq('pads: h does not move the fx', sel.fx, 2)
+ctx.pad_param_key = function(sl, ch) if ch == 'v' then sl.param = 4; return true end return false end
+key('v', sel); eq('v: to the volume of the pad', sel.param, 4); eq('…slider mode', DK.pslider, true); eq('…pads paused', DK.pads, nil)
+DK.key(27, sel, 3, 5, {}); eq('Esc from the param: pads again', DK.pads, true)
+ctx.pad_param_key = nil
 DK.key(27, sel, 3, 5, {}); eq('Esc leaves pads', DK.pads, nil)
 key('h', sel); eq('then h moves fx again', sel.fx, 1)
 print(('%d checks, %d failed'):format(n, bad))

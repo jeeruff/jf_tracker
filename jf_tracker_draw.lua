@@ -1020,6 +1020,9 @@ local function rrect(x, y, w, h, fill, r)
   end
 end
 D.rrect = rrect
+-- 19 окт: хоткеи параметров сэмплера пэда (режим пэдов: буква — прыжок к параметру; буквы свободны в режиме пэдов)
+D.PADKEYS = { volume = 'v', pan = 'n', ['min vol'] = 'i', root = 'o', pitch = 't', bend = 'b', attack = 'a', decay = 'd',
+  sustain = 's', release = 'e', ['note-off'] = 'f', loop = 'u', ['vel lo'] = 'w', ['vel hi'] = 'q', chance = 'c' }
 -- 19 окт: ADSR поверх волны — линия в 2 px контрастным зелёным, на узлах ромбики (hot — янтарём, залитый)
 function D.adsr_line(pts, bg, hot_i)
   local c = U.readable(U.mix(U.GREEN, U.TEXT, 0.25), bg or U.PANEL, 4.5)
@@ -7895,7 +7898,7 @@ function D.frame(L, snap, rows, state, info)
           if D.DR and zoomed and (D.kit_list[kkey] or 'list') == 'list' then
             local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 14 }, { 'vol', 'volume', 7 }, { 'pan', 'pan', 6 }, { 'pitch', 'pitch', 7 },
               { 'att', 'attack', 6 }, { 'dec', 'decay', 6 }, { 'sus', 'sustain', 6 }, { 'rel', 'release', 6 },
-              { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'g', 'g', 4 }, { 'cg', 'cg', 4 }, { 'on', 'on', 4 } }
+              { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 4 } }
             local tot = 0
             for _, c2 in ipairs(COLS) do tot = tot + c2[3] end
             local cwx = math.max(L.cw, math.floor((bw - 2 * L.pad) / tot))
@@ -7928,8 +7931,8 @@ function D.frame(L, snap, rows, state, info)
                 local s2, col2, what = '', kid.enabled and U.TEXT or U.DIM, nil
                 if c2[1] == 'name' then s2 = kid.name or ''
                 elseif c2[1] == 'note' then local nn = kid.note; s2 = nn and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[nn % 12 + 1] .. math.max(0, nn // 12 - 1)) or '---'
-                elseif c2[1] == 'g' then s2 = (kid.group or 0) > 0 and ('g' .. kid.group) or '-'; col2 = (kid.group or 0) > 0 and U.CYAN or U.DIM; what = 'kgroup'
-                elseif c2[1] == 'cg' then s2 = (kid.choke or 0) > 0 and ('c' .. kid.choke) or '-'; col2 = (kid.choke or 0) > 0 and U.RED or U.DIM; what = 'kchoke'
+                elseif c2[1] == 'grp' then s2 = (kid.group or 0) > 0 and ('grp' .. kid.group) or '-'; col2 = (kid.group or 0) > 0 and U.CYAN or U.DIM; what = 'kgroup'
+                elseif c2[1] == 'chk' then s2 = (kid.choke or 0) > 0 and ('chk' .. kid.choke) or '-'; col2 = (kid.choke or 0) > 0 and U.RED or U.DIM; what = 'kchoke'
                 elseif c2[1] == 'on' then s2 = kid.enabled and 'on' or 'off'; col2 = kid.enabled and U.GREEN or U.RED; what = 'kbypass'
                 else s2 = kv(ki, c2[2]) end
                 local hc = hotr and mx >= x2 and mx < x2 + cw3
@@ -7971,7 +7974,7 @@ function D.frame(L, snap, rows, state, info)
               if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
             end
             local gx0, gy0 = bx + 2, hy + L.rh + 1
-            local gw, gh = bw1 - 4, by + bh - 3 - gy0
+            local gw, gh = bw1 - 4, by + bh - 3 - gy0 - (L.rh + 3)   -- 19 окт: внизу — строка grp / chk / r
             -- 18 окт: всегда 4 × 4 (как пэды MPC), справа — карта всех 128 пэдов кубиками 4 × 32 (прокрутка / прыжок)
             local cube = math.max(2, math.min(5, math.floor((gh - 2) / 32) - 1))
             local mw = 4 * (cube + 1) + 4
@@ -8069,7 +8072,9 @@ function D.frame(L, snap, rows, state, info)
                 nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
                 local tag = #(kid.slots or {}) > 0 and ('+' .. #kid.slots) or ''
                 -- 19 окт: на пэде — его группы: g1 (играют вместе), c1 (choke)
-                local gtag = ((kid.group or 0) > 0 and ('g' .. kid.group) or '') .. ((kid.choke or 0) > 0 and (((kid.group or 0) > 0 and ' ' or '') .. 'c' .. kid.choke) or '')
+                local long = ms('grp1 chk1') <= cw0 - 2 * L.pad      -- 19 окт: влезает — grp / chk, как у кнопок; тесно — g / c
+                local gp, cp = long and 'grp' or 'g', long and 'chk' or 'c'
+                local gtag = ((kid.group or 0) > 0 and (gp .. kid.group) or '') .. ((kid.choke or 0) > 0 and (((kid.group or 0) > 0 and ' ' or '') .. cp .. kid.choke) or '')
                 if gtag ~= '' then tag = gtag .. (tag ~= '' and (' ' .. tag) or '') end
                 local tw = ms(tag)
                 text(cx0 + L.pad, cy0 + 1, fit((kid.enabled and '' or '(off) ') .. nm, cw0 - 2 * L.pad - (tw > 0 and tw + L.pad or 0)), fg)
@@ -8147,7 +8152,9 @@ function D.frame(L, snap, rows, state, info)
               hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
             end
           end
-          set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1)
+          if D.DR and ks > 0 then   -- 19 окт: свойства пэда (его сэмплер) — своей серой рамкой, отдельно от рамки рэка
+            set(U.mix(U.LINE, U.GREY, 0.45)); rrect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, false)
+          else set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1) end
           -- шапка второй колонки: выбранный слайс с B / x, или all
           local cx = bx + bw1
           local kid = ks > 0 and f.kids[ks] or nil
@@ -8161,34 +8168,25 @@ function D.frame(L, snap, rows, state, info)
               text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
               if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
             end
-            -- 19 окт: g — group (пэды группы звучат вместе), cg — choke group (обрывают друг друга); щелчок — выпадашка
+            -- 19 окт: grp (пэды группы звучат вместе), chk (choke — обрывают друг друга), r (пэд в роутере) — строкой
+            -- под пэдами в левой колонке: имя пэда в шапке целиком; щелчок — выпадашка / роутер
             local gw = 0
             if D.DR and kid.note then
-              local gx = cx + bw1 - 2 * kb2 - 3
-              for _, gb in ipairs({ { 'kchoke', 'cg', kid.choke, U.RED }, { 'kgroup', 'g', kid.group, U.CYAN } }) do
+              local by2 = by + bh - L.rh - 4
+              local gx = bx + L.pad
+              for _, gb in ipairs({ { 'kgroup', 'grp', kid.group, U.CYAN }, { 'kchoke', 'chk', kid.choke, U.RED }, { 'kroute', 'r', (kid.entry and kid.entry.container) and 1 or 0, U.CYAN } }) do
                 local n = gb[3] or 0
-                local gl = n > 0 and (gb[2] .. n) or gb[2]
-                local bw2 = ms(gb[2] .. '16') + 2 * L.pad
-                gx = gx - bw2 - 2
-                local hb = not drag and mx >= gx and mx < gx + bw2 and my >= hy and my < hy + L.rh
-                set(hb and U.tint(U.AMBER, 0.35) or (n > 0 and U.tint(gb[4], 0.25) or U.BG)); gfx.rect(gx, hy, bw2, L.rh - 1, 1)
-                set(hb and U.AMBER or (n > 0 and gb[4] or U.LINE)); gfx.rect(gx, hy, bw2, L.rh - 1, 0)
-                text(gx + math.floor((bw2 - ms(gl)) / 2), hy, gl, hb and U.AMBER or (n > 0 and gb[4] or U.GREY))
-                if hb then hover.dspbtn = { fx = k, f = f, what = gb[1], kid = kid } end
-                hint(gb[1], gx, hy, bw2, L.rh, { kid = kid })
-                gw = gw + bw2 + 2
+                local gl = gb[1] == 'kroute' and 'r' or (n > 0 and (gb[2] .. n) or gb[2])
+                local bw2 = gb[1] == 'kroute' and (ms('r') + 2 * L.pad) or (ms(gb[2] .. '16') + 2 * L.pad)
+                if gx + bw2 > bx + bw1 - L.pad then break end
+                local hb = not drag and mx >= gx and mx < gx + bw2 and my >= by2 and my < by2 + L.rh
+                set(hb and U.tint(U.AMBER, 0.35) or (n > 0 and U.tint(gb[4], 0.25) or U.BG)); gfx.rect(gx, by2, bw2, L.rh - 1, 1)
+                set(hb and U.AMBER or (n > 0 and gb[4] or U.LINE)); gfx.rect(gx, by2, bw2, L.rh - 1, 0)
+                text(gx + math.floor((bw2 - ms(gl)) / 2), by2, gl, hb and U.AMBER or (n > 0 and gb[4] or U.GREY))
+                if hb then hover.dspbtn = { fx = k, f = f, what = gb[1], kid = kid, ki = ks } end
+                hint(gb[1], gx, by2, bw2, L.rh, { kid = kid })
+                gx = gx + bw2 + 2
               end
-              gw = gw - 2
-              -- 19 окт: r — ячейка в роутере: слои инструментов и эффектов параллельно, контейнеры внутри
-              local rw = ms('r') + 2 * L.pad
-              local rx = gx - rw - 2   -- левее g / cg
-              local hr = not drag and mx >= rx and mx < rx + rw and my >= hy and my < hy + L.rh
-              local nested = kid.entry and kid.entry.container
-              set(hr and U.tint(U.AMBER, 0.35) or (nested and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(rx, hy, rw, L.rh - 1, 1)
-              set(hr and U.AMBER or (nested and U.CYAN or U.LINE)); gfx.rect(rx, hy, rw, L.rh - 1, 0)
-              text(rx + L.pad, hy, 'r', hr and U.AMBER or (nested and U.CYAN or U.GREY))
-              if hr then hover.dspbtn = { fx = k, f = f, what = 'kroute', kid = kid, ki = ks } end
-              gw = gw + rw + 2
             end
             text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4 - gw), kid.enabled and U.CYAN or U.GREY)
           else
@@ -8695,7 +8693,13 @@ function D.frame(L, snap, rows, state, info)
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
-        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)   -- 15 окт: ~ автоматизирован, ≈ модулирован (18 окт, было %; знак после обрезки имени)
+        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)
+        -- 19 окт: пэд drumrs5k — буква-хоткей параметра оранжевым (прыжок в режиме пэдов)
+        if f.kit and D.DR and p.kid and not psel then
+          local hk = D.PADKEYS[(p.name or ''):lower()]
+          local at = hk and (p.name or ''):lower():find(hk, 1, true)
+          if at and ms(p.name:sub(1, at)) <= nw - L.pad then text(bxc + L.pad + ms(p.name:sub(1, at - 1)), py, p.name:sub(at, at), U.mix(U.AMBER, U.RED, 0.25)) end
+        end   -- 15 окт: ~ автоматизирован, ≈ модулирован (18 окт, было %; знак после обрезки имени)
         if vw > 4 and not steps_inline then
           -- 10 окт: вид значения из реестра (RS5K): нота именем, root — нота оригинала, канал 0 — all
           local vs = v.s

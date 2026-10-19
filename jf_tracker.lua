@@ -24860,6 +24860,19 @@ ctx.drum_audition_toggle = function(on)
   model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
   vim.msg = n > 0 and ('drum off: %d pad(s) keep the new sample (u - back)'):format(n) or 'drum off'
 end
+-- 19 окт: буква параметра сэмплера выбранного пэда (D.PADKEYS) → sel.param на него; true — прыгнули
+ctx.pad_param_key = function(sel, ch)
+  if ch == '' then return false end
+  local key
+  for nm, hk in pairs(draw.PADKEYS or {}) do if hk == ch then key = nm end end
+  if not key then return false end
+  local _, f, _, ki = ctx.pad_cur(sel.fx)
+  if not (f and ki and ki > 0) then return false end
+  for pi, p in ipairs(f.params or {}) do
+    if p.kid == ki and (p.name or ''):lower() == key then sel.param = pi; vim.msg = ('%s: h l change, j k next, Esc - pads'):format(p.name); return true end
+  end
+  return false
+end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)
   if col and f and f.kids and model.DR and model.DR.is_rack(f.kids) then return col, f end

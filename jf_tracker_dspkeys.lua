@@ -82,6 +82,7 @@ function DK.key(c, sel, n, np, mods)
   if DK.anchor and ch == 'c' then local r0, r1 = DK.range(sel); ctx.dsp_pack(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'y' then ctx.dsp_yank(sel.fx); DK.anchor = nil; return true end
   -- 19 окт: режим пэдов drumrs5k
+  if DK.pads and ctx.pad_param_key and ctx.pad_param_key(sel, ch) then DK.pads = nil; DK.pslider = true; DK.pads_back = true; return true end   -- буква параметра — к нему (h l значение)
   if DK.pads then
     if not (ctx.pad_rack and ctx.pad_rack(sel.fx)) then DK.pads = nil
     else
@@ -102,7 +103,11 @@ function DK.key(c, sel, n, np, mods)
   -- 8 окт: режим слайдера параметра (f на параметр / щелчок): h l — значение
   -- (H L крупно), j k — соседний параметр, Esc — обратно к эффектам
   if DK.pslider then
-    if c == 27 then DK.pslider = nil; ctx.msg('DSP: h l - effects again'); return true end
+    if c == 27 then
+      DK.pslider = nil
+      if DK.pads_back then DK.pads_back = nil; DK.pads = true; ctx.msg('pads again: h l j k move'); return true end   -- 19 окт: из параметра пэда — к пэдам
+      ctx.msg('DSP: h l - effects again'); return true
+    end
     if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT then
       ctx.dsp_value(sel.fx, sel.param, (ch == 'h' or ch == 'H' or c == LEFT) and -1 or 1, ch == 'H' or ch == 'L'); return true
     end
