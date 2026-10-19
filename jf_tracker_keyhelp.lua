@@ -250,6 +250,7 @@ KH.PAGES = {
   matrix = { title = 'matrix of regions (slots)', e = {
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
     { k = 'gg G', d = 'first slot / last slot' },
+    { k = 'patterns (pane)', t = {}, d = 'the palette of every pattern is its own pane above the matrix (Ctrl+W T, gtT): c - clipkb (1qaz… = track, row = pattern; Shift picks, Ctrl silence, Esc off), j k scroll, hold a cell - listen; render / +playlist / rec as before' },
     { k = 'c', g = 'view', d = 'palette on (view p): clipkb - the keyboard columns 1qaz 2wsx ... are the tracks, the rows the palette rows: a key - listen to that cell (again - silence), Shift + keys - pick (render - a new pattern of them at the end, +playlist), Ctrl - silence, Esc - off' },
     { k = 'w b e', g = 'move', m = 'next / previous slot with a pattern', d = 'next / previous slot with a pattern (free bars .. skipped) / the last bar before the next slot' },
     { k = '0 ^ $', g = 'move', d = 'name column / last track' },

@@ -127,7 +127,10 @@ end
 do
   local ids = {}
   for _, b in ipairs(D.transport_sub({})) do ids[#ids + 1] = b[1] or '-' end
-  eq(table.concat(ids, ' '), 'tp_start freeze slowplay shiftrec tp_end dub', 'transport sub row: under rew pause play rec ff loop')
+  eq(table.concat(ids, ' '), 'tp_start freeze slowplay dub shiftrec tp_end', 'transport sub row: under rew pause play loop rec ff (19 окт)')
+  local top = {}
+  for _, b in ipairs(D.transport_buttons({ tptext = true })) do top[#top + 1] = b[1] end
+  eq(table.concat(top, ' '), 'tp_rew tp_pause tp_play loop rec tp_fwd', 'transport: loop next to play, ff at the right end')
   local function slow(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'slowplay' then return b end end end
   local function half(c, k) return slow(c).halves[k] end   -- 12 окт: x0.5 | x2
   NOW = 0.1; eq(half({ halfplay = 0.5 }, 1)[3], TEXT, 'x0.5 on: lit in the first half second'); eq(half({ halfplay = 0.5 }, 2)[3], nil, 'x2 off meanwhile')

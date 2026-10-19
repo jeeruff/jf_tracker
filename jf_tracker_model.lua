@@ -563,6 +563,8 @@ function M.build(lpb)
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then lane = nil end
         -- 13 окт: копии ретриггера (0Rxy, P_EXT:jf_gen) — часть своей ноты: своих ячеек и подколонок нет
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false)) ~= '' then lane = nil end
+        -- 19 окт: слои ноты слоёного инструмента (¥, P_EXT:jf_lof) — часть своей ноты, как копии ретриггера
+        if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) ~= '' then lane = nil end
         if lane then
           local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
           local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
@@ -919,6 +921,9 @@ local function pool_add(pool, seen, it, from_depot)
   local take = R.GetActiveTake(it)
   if not take then return end
   if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then return end   -- хвост лупа удержания (13 окт)
+  -- 19 окт: слой ¥ — не свой инструмент (живёт в своём корне), производный item слоя — тоже
+  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layerof', '', false)) ~= '' then return end
+  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) ~= '' then return end
   -- MIDI-клипы (9 окт): только из зоны lib / трека LIB — MIDI-item песни это
   -- контейнеры нот трекера, не инструменты; каждый клип — свой (без склейки)
   local midi = R.TakeIsMIDI(take)
@@ -994,6 +999,11 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     fpath = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }
+  -- 19 окт: слоёный инструмент ¥ — его слои (метка P_EXT:jf_layers); каждый слой знает свой item в LIB
+  do
+    local _, lt = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layers', '', false)
+    if lt and lt ~= '' and M.LY then pool[at].layers = M.LY.parse(lt) end
+  end
   -- 13 окт: вариант лупа (looploom → slices): «GUID корня|номер» — ребёнок корня, не кусок по диапазону
   do
     local _, lv = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lvar', '', false)

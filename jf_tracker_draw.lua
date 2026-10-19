@@ -3648,8 +3648,8 @@ function D.transport_buttons(c)
     -- 9 окт: кнопки как на кассетнике — сверху символ, снизу слово; [5] — символ
     return { { 'tp_rew', 'rew', nil, nil, '<<' }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil, nil, '||' },
              { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil, nil, playing and '[]' or '>' },
-             { 'rec', 'rec', c.recording and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' },
-             { 'loop', 'loop', c.loop and U.CYAN or nil, nil, (D.ttf or D.hybrid) and '∞' or 'oo' } }
+             { 'loop', 'loop', c.loop and U.CYAN or nil, nil, (D.ttf or D.hybrid) and '∞' or 'oo' },   -- 19 окт: loop — рядом с play, ff — крайний справа
+             { 'rec', 'rec', c.recording and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' } }
   end
   if not c.tpbuttons then
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
@@ -3668,8 +3668,9 @@ function D.transport_sub(c)
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
              { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
+           { 'dub', '++', nil },   -- 19 окт: под loop (он теперь рядом с play)
            { 'shiftrec', '^O^', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
-           { 'tp_end', '>>|' }, { 'dub', '++', nil } }
+           { 'tp_end', '>>|' } }
 end
 function D.transport_groups(c, L)   -- 15 окт: L — для ширины вертикальной подписи step
   local sig = (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4'
@@ -3831,12 +3832,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       text(x + L.pad, vy, vl, vhot and U.AMBER or (dim and U.GREY or U.AMBER))
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
-      local bx = x + L.pad + vw + 2 * L.pad
+      local bx = x + L.pad + vw + L.pad + 2
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
       local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
       -- 19 окт: слайдер + $pt + pedal — в ширину клавиатуры (слайдер масштабируется), дальше не лезут (там row / col)
       local kr = kx + #D.PIANO_WHITE * kwv - 1
-      local tail = (ms('$pt') + 2 * L.pad) + 2 + (ms('pedal') + 2 * L.pad) + 2 * L.pad
+      local tail = (ms('$pt') + 2 * L.pad) + 2 + (ms('ped') + 2 * L.pad) + L.pad   -- 19 окт: ped — короче, vel длиннее
       local bw = math.max(L.cw * 2, kr - bx - tail)
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
       U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
@@ -3847,7 +3848,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       do
         local pl = '$pt'   -- 19 окт: короче (было $pitch)
         local pw2 = ms(pl) + 2 * L.pad
-        local px2 = bx + bw + 2 * L.pad
+        local px2 = bx + bw + L.pad
         if px2 + pw2 <= math.max(kr, x + L.pad) + 1 then
           local on = cc.slicepitch
           local ph = mx >= px2 and mx < px2 + pw2 and my >= vy and my < vy + L.rh
@@ -3857,7 +3858,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           if ph then hover.ctrl = 'slicepitch' end
           hint('ctrl', px2, vy, pw2, L.rh, 'slicepitch')
           -- 16 окт: pedal — сустейн (CC64), горит, когда нажат (и педалью MIDI-клавиатуры)
-          local dl = 'pedal'
+          local dl = 'ped'
           local dw2 = ms(dl) + 2 * L.pad
           local dx2 = px2 + pw2 + 2
           if dx2 + dw2 <= kr + 1 then
@@ -4069,6 +4070,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- text (9 окт): одна строка кнопок высотой в две строки — символ сверху по
   -- центру, слово снизу; ширина у всех одна (по самому длинному слову)
   local tbw
+  local TW = {}   -- 19 окт: ширина каждой колонки транспорта
   if c.tptext then
     tbw = 0
     for _, b in ipairs(blist) do tbw = math.max(tbw, ms(b[5] or b[2])) end   -- 15 окт: слов нет — ширина по символу и нижнему ряду
@@ -4080,7 +4082,29 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 16 окт: маркеры — одна кнопка markers (выпадашка с номерами), запись — на 4 колонки: кнопки уже
       tbw = math.max(tbw, ms('mark') + 2 * L.pad, ms('x1.10') + 2 * L.pad, math.ceil((rec - 6) / 4))
     end
-    btot = #blist * (tbw + 2) - 2
+    -- 19 окт: колонки — по своему содержимому (верх + низ), play — широкая (прежняя общая ширина);
+    -- третья строка: mark над rew, rate над pause, тоглы записи — от play до конца (не влезли — play шире)
+    local wide = tbw
+    local sub0 = c.tpfull and D.transport_sub(c) or {}
+    local pi
+    for i, b in ipairs(blist) do
+      local w2 = ms(b[5] or b[2])
+      local sb = sub0[i]
+      if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 4 * L.pad + 2) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[2])) end
+      TW[i] = w2 + 2 * L.pad
+      if b[1] == 'tp_play' then pi = i end
+    end
+    if c.tpfull then
+      TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
+      TW[2] = math.max(TW[2], ms('x1.10') + 2 * L.pad)
+      local need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad
+      local have = 0
+      for i = 3, #blist do have = have + TW[i] + (i > 3 and 2 or 0) end
+      if pi and have < need then TW[pi] = TW[pi] + (need - have) end
+    end
+    if pi then TW[pi] = math.max(TW[pi], wide) end
+    btot = -2
+    for i = 1, #blist do btot = btot + TW[i] + 2 end
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
@@ -4092,7 +4116,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     local sub_on = c.tpfull
     for bi, b in ipairs(blist) do
-      local bw = tbw
+      local bw = TW[bi] or tbw
       local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] ~= nil
       local tc = hot and U.AMBER or (b[4] or b[3] or U.TEXT)
@@ -4123,11 +4147,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local sub = D.transport_sub(c)
       local sx, sy = bx0, by + bh + 2
       for si, b in ipairs(sub) do
+        local tw = TW[si] or tbw   -- 19 окт: своя ширина колонки
         if b.halves then
-          local hw = math.floor((tbw - 2) / 2)
+          local hw = math.floor((tw - 2) / 2)
           for k, h in ipairs(b.halves) do
             local hx = sx + (k - 1) * (hw + 2)
-            local w2 = k == 2 and (tbw - hw - 2) or hw
+            local w2 = k == 2 and (tw - hw - 2) or hw
             local hot = mx >= hx and mx < hx + w2 and my >= sy and my < sy + L.rh
             local on = h[3] ~= nil
             set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(h[3], 0.3) or U.BG)); gfx.rect(hx, sy, w2, L.rh, 1)
@@ -4137,25 +4162,25 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             hint('ctrl', hx, sy, w2, L.rh, h[1])
           end
         elseif b[1] then
-          local hot = mx >= sx and mx < sx + tbw and my >= sy and my < sy + L.rh
+          local hot = mx >= sx and mx < sx + tw and my >= sy and my < sy + L.rh
           local on = b[3] ~= nil
-          set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tbw, L.rh, 1)
+          set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tw, L.rh, 1)
           local fr2 = hot and U.AMBER or (on and b[3] or U.LINE)
-          set(fr2); gfx.rect(sx, sy, tbw, L.rh, 0)
+          set(fr2); gfx.rect(sx, sy, tw, L.rh, 0)
           if si == 1 then cut(sx, sy + L.rh - 1, 1, -1, fr2) end
-          if si == #sub then cut(sx + tbw - 1, sy + L.rh - 1, -1, -1, fr2) end
+          if si == #sub then cut(sx + tw - 1, sy + L.rh - 1, -1, -1, fr2) end
           -- 15 окт: |<< прижат влево, >>| вправо (к своему краю); у ^O буква O — красная, как у rec
-          local lab, lc = fit(b[2], tbw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
-          local tx = sx + math.floor((tbw - ms(lab)) / 2)
+          local lab, lc = fit(b[2], tw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
+          local tx = sx + math.floor((tw - ms(lab)) / 2)
           -- 16 окт: << / >> — ровно под << / >> верхнего ряда (по центру ячейки), черта | торчит наружу
-          if b[1] == 'tp_start' then tx = sx + math.floor((tbw - ms('<<')) / 2) - ms('|') elseif b[1] == 'tp_end' then tx = sx + math.floor((tbw - ms('>>')) / 2) end
+          if b[1] == 'tp_start' then tx = sx + math.floor((tw - ms('<<')) / 2) - ms('|') elseif b[1] == 'tp_end' then tx = sx + math.floor((tw - ms('>>')) / 2) end
           if b[1] == 'shiftrec' and lab == '^O^' then   -- 15 окт: ^O^ (просьба), O — красное, как у rec
             text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC); text(tx + ms('^O'), sy, '^', lc)
           else text(tx, sy, lab, lc) end
           if hot then hover.ctrl = b[1] end
-          hint('ctrl', sx, sy, tbw, L.rh, b[1])
+          hint('ctrl', sx, sy, tw, L.rh, b[1])
         end
-        sx = sx + tbw + 2
+        sx = sx + tw + 2
       end
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
@@ -4163,7 +4188,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- под rec и дальше — тоглы записи (punch pre-roll rec>lib slow; не влезли — короче)
     if c.tpfull then
       local ry = ly + 2 * L.rh + 2   -- 15 окт: маркеры / punch — третьей строкой (кнопки в одну строку)
-      local colx = function(i) return bx0 + (i - 1) * (tbw + 2) end
+      local colx = function(i) local x2 = bx0; for k = 1, i - 1 do x2 = x2 + (TW[k] or tbw) + 2 end; return x2 end   -- 19 окт: колонки разной ширины
       local function cellb(id, lab, x0, w0, on, dimc)
         local hot = cell_hot(x0, ry, w0, L.rh)
         if hot then set(D.CURROW); gfx.rect(x0 - 1, ry, w0 + 2, L.rh, 1); hover.ctrl = id end
@@ -4173,22 +4198,24 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 16 окт: маркеры — кнопка markers (не влезло — mk), щелчок — выпадашка 1..0
       local any = false
       for k = 1, 10 do if c.marks and c.marks[k] then any = true end end
-      cellb('markers', fit(ms('markers') + 2 * L.pad <= tbw and 'markers' or 'mark', tbw), colx(1), tbw, false, not any)   -- 16 окт: mark (не mk)
+      local w1 = TW[1] or tbw
+      cellb('markers', fit(ms('markers') + 2 * L.pad <= w1 and 'markers' or 'mark', w1), colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
       -- rate: значение и слайдер — вторая колонка
       local rx0 = colx(2)
+      local w2c = TW[2] or tbw
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
-      local rhot = cell_hot(rx0, ry, tbw, L.rh)
+      local rhot = cell_hot(rx0, ry, w2c, L.rh)
       text(rx0, ry, rl, rhot and U.AMBER or (math.abs(rv - 1) > 1e-3 and U.AMBER or U.GREY))
       -- слайдер — только в своей колонке (ромбик не на соседей); не влезает — одно значение (тянуть / колесо)
       local dr = math.max(3, math.floor((L.rh - 6) / 2)) + 2
       local sx2 = rx0 + ms(rl) + L.pad + dr
-      local sw2 = rx0 + tbw - dr - sx2
+      local sw2 = rx0 + w2c - dr - sx2
       local r = math.max(0.25, math.min(2, rv))
       if sw2 >= L.cw * 2 then U.dslider(sx2, ry + math.floor(L.rh / 2), sw2, (r - 0.25) / 1.75, false, rhot and U.AMBER or U.TEXT, rhot, L.rh)
-      else sx2, sw2 = rx0, tbw end
+      else sx2, sw2 = rx0, w2c end
       if rhot then hover.ctrl = 'ratebar' end
-      hint('ctrl', rx0, ry, tbw, L.rh, 'ratebar')
+      hint('ctrl', rx0, ry, w2c, L.rh, 'ratebar')
       D.strip_cell.ratebar = { sx2, ry, sw2 }
       -- запись: от колонки rec до конца кнопок
       local ax, a1 = colx(3), bx0 + btot
@@ -5204,6 +5231,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
       if id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
+      elseif id == 'patterns' then   -- 19 окт: палитра паттернов — своя панель (клетки — под треками матрицы)
+        if info.palette_draw and L.mx_label_w then local _, hv = info.palette_draw(L, ct.x, ct.y + 2, ct.w - 4, ct.h - 4); hover.patpane = inside and hv or nil end
       elseif id == 'matrix' then
         if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()

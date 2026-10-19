@@ -17813,7 +17813,7 @@ local function frame()
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свои режимы клавиатуры: patternkb (ноты — паттерны) в трекере, clipkb палитры в матрице
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
-  elseif state.focus == 'matrix' and MX.palette and MX.pal_kb then left = 'CLIPKB' end
+  elseif (state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb then left = 'CLIPKB' end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
   local wf = gfx.getchar(65536)
@@ -18004,6 +18004,7 @@ local function frame()
     vorder = vim.vorder,                            -- 10 окт: линейка прыжков по ячейкам
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
+    palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
@@ -18599,6 +18600,8 @@ local function frame()
       return hv
     end or nil,
   })
+  -- 19 окт: панель patterns — её hover там же, где палитра в матрице (щелчки и статус — одним кодом)
+  if hover.patpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.patpane) do hover.matrix[k] = v end end
   -- 15 окт: строка курсора — из этого кадра (курсор без фиксации ходит; прошлый кадр давал лупу с опозданием)
   if ctx.bigcur and draw.cur_y and draw.cur_y >= L.body_y and draw.cur_y + 2 * L.rh <= ctx.bigcur.yb then ctx.bigcur.yc = draw.cur_y end
   if ctx.bigcur then draw.bigcur(ctx.bigcur) end
@@ -23190,7 +23193,7 @@ local function frame()
   -- только его длина (слайс — свой кусок), через трек курсора
   if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
       or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
-      or (state.focus == 'matrix' and MX.palette and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
+      or ((state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
     if e and (e.take or e.src) then PV.slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
@@ -23286,11 +23289,20 @@ local function frame()
         elseif c == 13 then MX.mkedit = nil; ctx.seq_marker(me.which, me.buf ~= '' and me.buf or nil)
         elseif c == 8 then me.buf = me.buf:sub(1, -2)
         elseif (c >= 48 and c <= 57) or c == 46 then if #me.buf < 7 then me.buf = me.buf .. string.char(c) end end
+      elseif state.focus == 'patterns' then
+        -- 19 окт: панель patterns: c — clipkb (1qaz… — трек, ряд — паттерн), j k — прокрутка, остальное — Vim
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local ch = c < 256 and string.char(c) or ''
+        if ch == 'c' and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'patterns clipkb: 1qaz 2wsx 3edc ... column = track, row = pattern; Shift - pick, Ctrl - silence, Esc - off'; return end
+        if MX.pal_kb and ctx.palette_key(c) then return end
+        if ch == 'j' or c == 1685026670 then MX.pal_scroll = (MX.pal_scroll or 0) + 1; return end
+        if ch == 'k' or c == 30064 then MX.pal_scroll = math.max(0, (MX.pal_scroll or 0) - 1); return end
+        return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if (state.ss_big or MX.clips) and MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then return end
-        if MX.palette and c == ('c'):byte() and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'palette clipkb: 1qaz 2wsx 3edc ... column = track, row = palette row; Shift - pick, Ctrl - silence, Esc - off'; return end   -- 18 окт
+        if MX.palette and not ctx.pal_in_pane() and c == ('c'):byte() and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'palette clipkb: 1qaz 2wsx 3edc ... column = track, row = palette row; Shift - pick, Ctrl - silence, Esc - off'; return end   -- 18 окт
         if MX.palette and MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
@@ -24008,7 +24020,11 @@ end
 -- панель в матрице (под кнопками, матрица ниже): имя, кнопки, текст словами (играющее — янтарём, ошибка — красным), итог
 -- 18 окт: палитра паттернов (матрица, view → p): все паттерны проекта — и те, что не стоят в песне;
 -- клетка — превью трека (волна / ноты), зажать клетку — слушать трек соло, имя — весь паттерн; отпустил — тишина
-ctx.palette_draw = function(Lx, x, y, w)
+ctx.pal_in_pane = function()
+  local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
+  return bp and bp.patterns ~= nil
+end
+ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя панель patterns (рядов сколько влезет)
   local hover = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local rh = 2 * Lx.rh
@@ -24019,7 +24035,7 @@ ctx.palette_draw = function(Lx, x, y, w)
     ctx.pal_list, ctx.pal_regs = list, regions
   end
   if ctx.pal_snap ~= snap then ctx.pal_parts, ctx.pal_snap = {}, snap end
-  local nvis = math.min(#list, 6)
+  local nvis = math.min(#list, h and math.max(1, math.floor((h - Lx.rh - 3) / rh)) or 6)
   MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll or 0))
   -- 18 окт: кнопки палитры — clipkb (столбцы 1qaz… — треки, ряды — паттерны), render (набранные клетки — новым
   -- паттерном в конец песни), +playlist (их паттерны — в конец плейлиста), rec (порядок сыгранных паттернов — в песню)
@@ -24057,7 +24073,7 @@ ctx.palette_draw = function(Lx, x, y, w)
     local l2 = (note ~= '' and note or '') .. (p.n == 0 and ((note ~= '' and '  ' or '') .. 'not in the song') or '')
     if l2 ~= '' then U.text(x + Lx.pad, ry + 1 + Lx.rh, ctx.fit(l2, nw - Lx.pad), note ~= '' and U.GREY or U.DIM) end
     for ci, col in ipairs(snap.cols) do
-      local cx = Lx.mx_label_w + (ci - 1 - MX.hs) * Lx.mx_cell_w
+      local cx = x + Lx.mx_label_w + (ci - 1 - MX.hs) * Lx.mx_cell_w   -- x: в своей панели — её левый край
       if cx + Lx.mx_cell_w > W - 4 then break end
       if ci > MX.hs and src and col.track then
         local key = p.name .. ':' .. ci

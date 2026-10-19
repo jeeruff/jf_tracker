@@ -26,6 +26,7 @@ local PN = {}
 -- при показе без истории (сплитом от трекера)
 PN.PANELS = {
   { id = 'tracker',    label = 'tracker',    key = 't', hint = 'tracker', fixed = true },
+  { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
@@ -589,6 +590,7 @@ PN.LATE = {
   -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
   { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },
   { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
+  { 'patterns', function(m) return PN.visible(m, 'matrix') and PN.split(m, 'matrix', 'patterns', 'u', 0.3) end },   -- 19 окт: над матрицей
   { 'macros', function(m)
     for _, at in ipairs({ 'sample', 'retro', 'automation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
   end },

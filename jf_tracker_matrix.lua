@@ -367,7 +367,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     hy = hy + ch + 2
   end
   -- 18 окт: палитра — все паттерны проекта с превью по трекам (view → p)
-  if MX.palette and ctx.palette_draw then
+  if MX.palette and ctx.palette_draw and not (ctx.pal_in_pane and ctx.pal_in_pane()) then   -- 19 окт: есть панель patterns — там
     local ph, hv = ctx.palette_draw(L, 0, hy + L.rh + 2, W - 6)
     for k, v in pairs(hv) do hover[k] = v end
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
