@@ -18043,6 +18043,7 @@ local function frame()
   if vim.mode == 'visual' or vim.mode == 'vline' then
     local f0, f1, r0, r1 = vim.visual_range()
     vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1, field = vim.mode == 'visual' and vim.vfield or nil }   -- 19 окт: поле-колонка
+    ctx.rf_lastvis = { f0, f1, r0, r1, vim.mode == 'visual' and vim.vfield or nil }   -- 19 окт: для reform из панели
     ctx.vis_sync(vis)
   else ctx.vis_key = nil end
   -- простой (3 окт): 1.5 с без мыши / клавиш / правок проекта, не играет,
@@ -18291,7 +18292,11 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
-    rf_draw = function(Lx, x, y, w, h, foc) local S = ctx.RFS; return ctx.RF.draw(U, Lx, ctx.rf_p, S and { n = #S.heads, target = S.code or 'vol' } or nil, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 19 окт
+    rf_draw = function(Lx, x, y, w, h, foc)   -- 19 окт: без сессии — сколько нот в выделении (возьмётся при первом движении)
+      local S = ctx.RFS
+      local info2 = S and { n = #S.heads, target = S.code or 'vol' } or (ctx.rf_lastvis and { n = #vim.heads_in(ctx.rf_lastvis[1], ctx.rf_lastvis[2], ctx.rf_lastvis[3], ctx.rf_lastvis[4]), target = 'vol', pending = true }) or nil
+      return ctx.RF.draw(U, Lx, ctx.rf_p, info2, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y)
+    end,
     hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
       ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
@@ -24436,9 +24441,12 @@ ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)
 -- каждое изменение — откат прошлого шага (undo) и применение заново от снимка одним undo; Enter — оставить, Esc — вернуть
 ctx.RF = dofile(DIR .. '/jf_tracker_reform.lua')
 ctx.rf_p = ctx.RF.defaults()
-ctx.rf_open = function()
-  if not (vim.mode == 'visual' or vim.mode == 'vline') then vim.msg = 'reform: select notes first (v / V, or a right drag), then gr'; return end
-  local f0, f1, r0, r1 = vim.visual_range()
+ctx.rf_open = function(auto)
+  -- 19 окт: панель без gr — последнее выделение трекера (запоминается каждый кадр VISUAL)
+  local f0, f1, r0, r1, vfield
+  if vim.mode == 'visual' or vim.mode == 'vline' then f0, f1, r0, r1 = vim.visual_range(); vfield = vim.vfield
+  elseif ctx.rf_lastvis then local lv = ctx.rf_lastvis; f0, f1, r0, r1, vfield = lv[1], lv[2], lv[3], lv[4], lv[5]
+  else vim.msg = 'reform: select notes first (v / V, or a right drag), then gr'; return end
   local hs = vim.heads_in(f0, f1, r0, r1)
   -- 19 окт: и точки автоматизации (колонки огибающих в выделении): время и значения, как у нот
   local envs = {}
@@ -24459,7 +24467,7 @@ ctx.rf_open = function()
     end
   end
   if #hs == 0 and #envs == 0 then vim.msg = 'reform: no notes or automation points in the selection'; return end
-  local fld = vim.vfield or vim.cur.field or 1
+  local fld = vfield or vim.cur.field or 1
   local code
   if fld >= 4 then for _, h in ipairs(hs) do local x = (h.fx or {})[fld - 3]; if x then code = x:sub(1, 2); break end end end
   local ev = {}
@@ -24469,16 +24477,20 @@ ctx.rf_open = function()
     else v = tonumber(h.vol or '', 16) end
     ev[i] = { row = (h.row0 or 0) + (h.delay or 0) / 256, v = v }
   end
-  ctx.RFS = { heads = hs, ev = ev, r0 = r0, r1 = r1, fld = fld, code = code, applied = false, envs = envs, ta = ta, tb = tb }
-  ctx.rf_p = ctx.RF.defaults()
+  ctx.RFS = { heads = hs, ev = ev, r0 = r0, r1 = r1, fld = fld, code = code, applied = false, envs = envs, ta = ta, tb = tb, key = ('%d:%d:%d:%d'):format(f0, f1, r0, r1) }
+  if not auto then ctx.rf_p = ctx.RF.defaults() end   -- из панели (auto) — уже покрученные значения остаются
   vim.mode = 'normal'; vim.vfield = nil
-  ctx.pane_focus('reform')
+  if not auto then ctx.pane_focus('reform') end
   local np = 0; for _, g in ipairs(envs) do np = np + #g.pts end
   vim.msg = ('reform: %d note(s)%s - j k row, h l value, Space switch, Enter keep, Esc revert'):format(#hs, np > 0 and (', ' .. np .. ' automation point(s)') or '')
 end
 ctx.rf_apply = function()
+  -- 19 окт: выделили другое — прошлый результат остаётся, снимок — с нового выделения
+  local lv = ctx.rf_lastvis
+  if ctx.RFS and lv and (vim.mode == 'visual' or vim.mode == 'vline') and ctx.RFS.key ~= ('%d:%d:%d:%d'):format(lv[1], lv[2], lv[3], lv[4]) then ctx.RFS = nil end
+  if not ctx.RFS then ctx.rf_open(true) end   -- 19 окт: крутят панель без gr — взять выделение сейчас
   local S = ctx.RFS
-  if not S then vim.msg = 'reform: select notes (v) and press gr'; return end
+  if not S then vim.msg = 'reform: select notes (v / V or a right drag) - the pane takes the selection'; return end
   if S.applied then
     if (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then edit.undo() end   -- откат только своего шага (другое действие между — не трогать)
     S.applied = false

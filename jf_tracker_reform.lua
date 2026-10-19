@@ -115,7 +115,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
   for _, r in ipairs(RF.ROWS) do lw = math.max(lw, U.measure(r.label)) end
   local vw = U.measure('+64 rows')
   local yy = y + 2
-  local head = info and info.n and ('reform: %d note(s), values - %s'):format(info.n, info.target or 'vol') or 'reform: select notes (v), then gr'
+  local head = info and info.n and (info.pending and ('reform: the selection - %d note(s) (moves on the first change)'):format(info.n) or ('reform: %d note(s), values - %s'):format(info.n, info.target or 'vol')) or 'reform: select notes (v / V or a right drag)'
   U.text(x + pad, yy, head, info and info.n and U.GREY or U.DIM)
   yy = yy + rh + 2
   for i, r in ipairs(RF.ROWS) do
