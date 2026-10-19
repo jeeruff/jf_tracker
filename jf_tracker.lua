@@ -8844,10 +8844,10 @@ ctx = {
       { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
-      { key = 'p', label = 'palette: every pattern of the project (in the song or not) - hold a cell to listen' .. on(MX.palette), fn = function() MX.palette = not MX.palette; reaper.SetExtState(EXT, 'mxpal', MX.palette and '1' or '0', true); relayout() end },
+      -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
     }
-    if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
+    if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops (dev): the cells show item loop periods, digits+Enter - loop N steps' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
     vim.open_hydra({ title = 'matrix view (z)', items = items })
     -- 18 окт: выпадает от кнопки view (z с клавиатуры — тоже), не у мыши; кнопка в » — от »
     local b = MX.btn_xy and (MX.btn_xy.view or MX.btn_xy.more)
@@ -13446,7 +13446,7 @@ ctx = {
       { key = 'k', label = 'keyboard: notes / patterns / clips', sub = function() return { title = 'keyboard', items = {
           { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
           { key = 'p', label = 'patternkb - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
-          { key = 'c', label = 'clipkb - 1qaz 2wsx ... play the palette cells (the palette opens)' .. (MX.pal_kb and '  (on)' or ''), fn = function()
+          { key = 'c', label = 'clipkb - 1qaz 2wsx ... play the matrix cells' .. (MX.pal_kb and '  (on)' or ''), fn = function()
               if not MX.palette then MX.palette = true; reaper.SetExtState(EXT, 'mxpal', '1', true); relayout() end
               MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end
               if MX.pal_kb then ctx.pane_focus('matrix') end

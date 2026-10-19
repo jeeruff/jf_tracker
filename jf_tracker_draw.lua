@@ -450,6 +450,14 @@ function D.layout(snap, state, nregions)
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_pan = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
+  -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево
+  do
+    local d = L.w_slc + L.pad
+    local fx2 = {}
+    for k, v in ipairs(L.x_fx) do fx2[k] = v - d end
+    L.GK = setmetatable({ x_slc = false, x_vol = L.x_vol - d, x_pan = L.x_pan and (L.x_pan - d) or false, x_fx = fx2, x_del = L.x_del - d,
+      x_fold = L.x_fold and (L.x_fold - d) or nil, sub_w = L.sub_w - d }, { __index = L })
+  end
   L.fold_w = ms('o') + 2 * L.pad
   L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
   -- уровни ширины колонки (7 окт): колесо (высота трека REAPER при sync
@@ -799,6 +807,7 @@ function D.layout(snap, state, nregions)
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
+          if G == nil and D.col_is_kit(col) then G = L.GK end   -- 19 окт: кит — без Sxx
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -1859,6 +1868,17 @@ function D.ic(name, text)
   return g .. ' ' .. text
 end
 
+-- 19 окт: трек с рэком drumrs5k (кэш на снимок: col живёт до перестройки)
+local kit_cols = setmetatable({}, { __mode = 'k' })
+function D.col_is_kit(col)
+  local v = kit_cols[col]
+  if v == nil then
+    v = false
+    for _, f in ipairs(col.fx or {}) do if f.kit then v = true; break end end
+    kit_cols[col] = v
+  end
+  return v
+end
 function D.field_rect(L, fld)
   if fld == 'inst' then return L.x_inst or L.x_note, ms('00') end      -- поле инструмента (5 окт)
   if fld == 'slc' then return L.x_slc or L.x_note, L.w_slc or ms('S00') end   -- 11 окт: поле слайса
