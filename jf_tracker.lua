@@ -19948,6 +19948,24 @@ local function frame()
         vim.vel = v0
       end
     else ctx.drum_last_pad = nil; ctx.drum_pad_glide = nil end
+    -- 19 окт: Ctrl+Cmd над матрицей — палец по клеткам: заехал на клетку — она звучит (трек × паттерн), отпустил — тишина
+    local hm = hover.matrix
+    if mm.ctrl and mm.cmd and hm and hm.ri and hm.ci and hm.ci > 0 and not hk then
+      ctx.drum_pad_glide = true
+      local key = hm.ri .. ':' .. hm.ci
+      if ctx.mx_glide ~= key then
+        ctx.mx_glide = key
+        local rg = seq[hm.ri]; local col = snap and snap.cols[hm.ci]
+        if rg and not rg.gap and col and col.track then
+          if ctx.mx_solo then ctx.mx_cell_preview_end() end
+          ctx.mx_cell_preview(col.track, rg.pos, rg.rgnend, 'glide')
+          vim.msg = ('%s - %s (Ctrl+Cmd: slide over the cells)'):format(rg.name or '', col.name or '')
+        end
+      end
+    elseif ctx.mx_glide then
+      ctx.mx_glide = nil
+      if ctx.mx_solo and ctx.mx_solo_owner == 'glide' then ctx.mx_cell_preview_end() end
+    end
   end
   -- мышь с Ctrl (8 окт, jf_tracker_ctrlmouse): Control зажат — движение мыши
   -- крутит выделенные / под мышью / в фокусе клавиатуры (относительно, вверх —
