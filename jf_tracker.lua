@@ -2555,13 +2555,16 @@ ctx = {
   tab_menu = function(n)
     local PN = draw.panes
     local tabs, cur = {}, ctx.pane_cur()
-    for _, id in ipairs(ctx.top_tabs()) do if PN.BY[id] then tabs[#tabs + 1] = id end end
+    -- 19 окт: все модули раскладки (dsp, fx, lib …), не только верхние вкладки; без панелей — верхние вкладки
+    local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
+    if bp then for _, p in ipairs(PN.PANELS) do if bp[p.id] then tabs[#tabs + 1] = p.id end end
+    else for _, id in ipairs(ctx.top_tabs()) do if PN.BY[id] then tabs[#tabs + 1] = id end end end
     if n then local id = tabs[n]; if id then ctx.pane_focus(id); vim.msg = 'tab ' .. n .. ': ' .. PN.BY[id].label else vim.msg = ('gt: %d tabs'):format(#tabs) end; return end
     local items = {}
     for i, id in ipairs(tabs) do
       items[#items + 1] = { key = PN.BY[id].key, label = (id == cur and '* ' or '') .. i .. ' ' .. PN.BY[id].label, fn = function() ctx.pane_focus(id) end }
     end
-    vim.open_hydra({ title = 'module tab (Ngt - the Nth)', items = items })
+    vim.open_hydra({ title = 'go to module', items = items })
   end,
   -- 12 окт: gT — вкладки проектов REAPER выпадашкой (* — текущая, + — несохранённые правки), NgT — сразу N-я
   project_menu = function(n)
@@ -22446,6 +22449,16 @@ local function frame()
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
+  -- 19 окт: gt / gT из любого модуля, не только трекера: g модуля отрабатывает как раньше (наверх / свой префикс),
+  -- t сразу за ней — меню модулей (gT — вкладки проектов). Модули с набором текста (notes, browser, fx, pm, actions) — без этого
+  if c > 0 and state.focus ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or MX.SMART.p) then
+    local GT = { top = true, dsp = true, inst = true, matrix = true, slices = true, undotree = true, session = true, mixer = true, clipboard = true }
+    if ctx.g_at and (c == 116 or c == 84) and GT[state.focus] and reaper.time_precise() - ctx.g_at < 1.5 then
+      ctx.g_at = nil; SL.gpend = nil; MX.pending = nil
+      if c == 116 then ctx.tab_menu() else ctx.project_menu() end
+      c = 0
+    else ctx.g_at = (c == 103 and GT[state.focus]) and reaper.time_precise() or nil end
+  end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
   -- 11 окт: rec follows selection — и за треком курсора трекера: сменился трек курсора — армлен он,
   -- остальные треки с авто-армом — нет (выбор REAPER курсор не меняет, поэтому REAPER сам этого не делал)
@@ -24329,6 +24342,15 @@ ctx.set_baseoct = function(o)
 end
 model.SLICE_BASE = 12 * (state.baseoct + 1); draw.slice_base_note = model.SLICE_BASE; vim.octave = state.baseoct   -- при запуске
 -- 18 окт: строка конца паттерна под строкой row (nil — вне паттерна): граница step next
+-- 19 окт: секция строки (регион без кода, поверх паттернов): первая и последняя строки — для gs / gS
+ctx.section_rows = function(row)
+  local t = edit.row_time(row, state.lpb, 0)
+  for _, sc in ipairs(regions.sections or {}) do
+    if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then
+      return math.floor(model.row_of_time(sc.pos, state.lpb) + 0.5), math.ceil(model.row_of_time(sc.rgnend, state.lpb) - 1e-6) - 1
+    end
+  end
+end
 ctx.pattern_end_row = function(row)
   local rg = alias.region_at(regions, edit.row_time(row, state.lpb, 0))
   return rg and math.ceil(rg.r1 - 1e-6) or nil

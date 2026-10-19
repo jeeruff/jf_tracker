@@ -54,5 +54,37 @@ local a, b = doc:find('<!%-%- files:begin %-%->'), doc:find('<!%-%- files:end %-
 assert(a and b, 'ARCHITECTURE.md: метки files:begin / files:end не найдены')
 local head = doc:sub(1, doc:find('\n', a) or a)
 doc = head .. table.concat(out, '\n') .. '\n' .. doc:sub(b)
+-- 19 окт: карта структуры — модули окна (реестр PN.PANELS) и префиксы клавиш NORMAL (which-key).
+-- Переставил модуль / букву / префикс — перезапусти archmap: правка видна в git diff ARCHITECTURE.md
+do
+  local PN = dofile('jf_tracker_panes.lua')
+  local m = { '| модуль (id) | подпись | буква (gt, Ctrl+W g) | место по умолчанию | когда есть |', '|---|---|---|---|---|' }
+  local keys, dup = {}, {}
+  for _, pn in ipairs(PN.PANELS) do
+    if keys[pn.key] then dup[#dup + 1] = pn.key .. ': ' .. keys[pn.key] .. ' / ' .. pn.id end
+    keys[pn.key] = pn.id
+    m[#m + 1] = ('| `%s` | %s | `%s` | %s%s | %s |'):format(pn.id, pn.label, pn.key, pn.side or '', pn.tab and ', вкладка сверху' or '', pn.avail == 'merged' and 'влита (не показывается)' or (pn.avail or 'всегда'))
+  end
+  if #dup > 0 then m[#m + 1] = ''; m[#m + 1] = '**Дубли букв:** ' .. table.concat(dup, '; ') end
+  local WK = dofile('jf_tracker_whichkey.lua')
+  local names = {}
+  for k in pairs(WK.T or {}) do names[#names + 1] = k end
+  table.sort(names)
+  local w = { '| префикс | заголовок | клавиши дальше |', '|---|---|---|' }
+  for _, k in ipairs(names) do
+    local h = WK.T[k]
+    local ks = {}
+    for _, it in ipairs(h.items or {}) do ks[#ks + 1] = '`' .. tostring(it[1]):gsub('|', '/') .. '`' end
+    w[#w + 1] = ('| `%s` | %s | %s |'):format(k, (h.title or ''):gsub('|', '/'), table.concat(ks, ' '))
+  end
+  local txt = '### Модули окна\n\n' .. table.concat(m, '\n') .. '\n\n### Префиксы клавиш (NORMAL, which-key)\n\n' .. table.concat(w, '\n') .. '\n'
+  local a2, b2 = doc:find('<!%-%- keys:begin %-%->'), doc:find('<!%-%- keys:end %-%->')
+  if not (a2 and b2) then
+    doc = doc .. '\n## Карта модулей и клавиш\n\nСобирает `lua tools/archmap.lua` из `PN.PANELS` (jf_tracker_panes.lua) и which-key\n(jf_tracker_whichkey.lua). Руками не править. Перед перестановкой модуля, буквы\nили префикса — сверься с этой картой; после — перезапусти скрипт и посмотри diff.\n\n<!-- keys:begin -->\n<!-- keys:end -->\n'
+    a2, b2 = doc:find('<!%-%- keys:begin %-%->'), doc:find('<!%-%- keys:end %-%->')
+  end
+  doc = doc:sub(1, doc:find('\n', a2)) .. txt .. doc:sub(b2)
+  if #dup > 0 then print('archmap: DUPLICATE pane keys: ' .. table.concat(dup, '; ')) end
+end
 io.open('ARCHITECTURE.md', 'w'):write(doc)
 print(('archmap: %d files, %d without a group'):format(#files, #rest))

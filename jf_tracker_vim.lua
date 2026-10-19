@@ -2553,9 +2553,24 @@ function V.key_impl(c)
         -- 13 окт: gm — меню метронома (вкл / выкл, скорость, акценты, пре-ролл)
         V.count = nil; finish_move(); if ctx.metro_menu then ctx.metro_menu() end; return
       end
-      if c == ('s'):byte() and not V.op then
-        -- gs (9 окт): смарт-панель — сетка значений поля курсора (мышью / h j k l + Enter)
-        V.count = nil; finish_move(); V.smart(); return
+      -- 19 окт: gp / gP — начало / последняя строка паттерна (региона) курсора, gs / gS — секции;
+      -- с оператором — движение (dgP — до конца паттерна). gs раньше дублировал Enter (смарт-панель)
+      if c == ('p'):byte() or c == ('P'):byte() or c == ('s'):byte() or c == ('S'):byte() then
+        local sec = c == ('s'):byte() or c == ('S'):byte()
+        local r0, r1
+        if sec then if ctx.section_rows then r0, r1 = ctx.section_rows(V.cur.row) end
+        elseif ctx.region_rows then r0, r1 = ctx.region_rows() end
+        V.count = nil
+        if not r0 then V.op = nil; V.msg = sec and 'no section here' or 'no pattern here'; finish_move(); return end
+        local t = { fi = V.cur.fi, row = (c == ('p'):byte() or c == ('s'):byte()) and r0 or r1, linewise = true }
+        if V.op then
+          local f0, f1, q0, q1 = range_or_event(V.op, t)
+          local e = apply(V.op, f0, f1, q0, q1); V.op = nil; if e then finish_edit() else finish_move() end
+        else
+          if t.row ~= V.cur.row and ctx.jump_mark then ctx.jump_mark() end
+          V.cur.row = t.row; finish_move()
+        end
+        ensure_visible(); return
       end
       if c == ('w'):byte() then
         -- gw (4 окт): событие под курсором меняется местами с N-м вперёд в
