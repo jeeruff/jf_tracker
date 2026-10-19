@@ -8065,6 +8065,11 @@ function D.frame(L, snap, rows, state, info)
                 hover.dspkitmap = { key = kkey, row = rr, fit = G.fit, ki = by_note[rr * 4 + cc], note = rr * 4 + cc, f = f }
               end
             end
+            -- 19 окт: Ctrl+Cmd — тачпад играет нижние 4 ряда окна: рамка вокруг них
+            if D.pad_zone and D.pad_zone.key == kkey then
+              local ry0 = gy0 + math.max(0, G.fit - 4) * G.ch
+              set(U.AMBER); gfx.rect(gx0 - 2, ry0 - 2, 4 * G.cw + 2, math.min(4, G.fit) * G.ch + 2, 0)
+            end
             -- пустые ноты окна — тусклые рамки с именем ноты
             for rr = 0, G.fit - 1 do
               for c = 0, 3 do
@@ -8085,7 +8090,7 @@ function D.frame(L, snap, rows, state, info)
                 local cx0, cy0 = gx0 + c * G.cw, gy0 + r * G.ch
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
-                local on = ki == ks
+                local on = ki == ks or (D.pad_zone and D.pad_zone.key == kkey and D.pad_zone.note == pn)   -- 19 окт: зона тачпада 4 × 4
                 local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
                 local flash = hit and reaper.time_precise() - hit < 0.25        -- 19 окт: сыгранный (клавиатура / щелчок) — вспышка
                 set(flash and U.tint(U.GREEN, 0.45) or (on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL))); rrect(cx0, cy0, cw0, ch0, true)
