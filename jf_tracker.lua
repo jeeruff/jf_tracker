@@ -395,6 +395,8 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'ut_tab2') ~= '1' and draw.panes.keep_in(m, 'undotree', 'browser') then reaper.SetExtState(EXT, 'ut_tab2', '1', true) end   -- 15 окт: undo — вкладкой у браузера (один раз; браузер спрятан — когда появится)
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
+    -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
+    if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
     if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
     return m
   end

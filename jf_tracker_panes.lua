@@ -590,7 +590,6 @@ PN.LATE = {
   -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
   { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },
   { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
-  { 'patterns', function(m) return PN.visible(m, 'matrix') and PN.split(m, 'matrix', 'patterns', 'u', 0.3) end },   -- 19 окт: над матрицей
   { 'macros', function(m)
     for _, at in ipairs({ 'sample', 'retro', 'automation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
   end },
