@@ -1514,12 +1514,12 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
       local lbl, colr
       if rw.k == 's' then
         -- слайс: клавиша, что его играет (раскладка октавы курсора), Sxx — команда в трекере, имя / длина
-        local kl = info.slice_key and info.slice_key(rw.sk) or nil
+        local kl = info.slice_note and info.slice_note(rw.sk) or nil   -- 19 окт: нота слайса (была клавиша)
         local t0 = e and e.slices and e.slices[rw.sk] or 0
         local t1 = e and e.slices and (e.slices[rw.sk + 1] or e.len) or t0
         local ss = info.ssel and info.ssel()
         local son = ss and e and ss.item == e.item and ss.k == rw.sk
-        lbl = ('%s  S%02X  %.2fs'):format(kl or ' ', rw.sk, math.max(0, t1 - t0))
+        lbl = ('%-3s  S%02X  %.2fs'):format(kl or '---', rw.sk, math.max(0, t1 - t0))
         colr = son and U.AMBER or U.TEXT
         if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, rhh, 1) end
         -- зум: волна куска строкой ниже подписи (как было в модуле slices)
@@ -4839,8 +4839,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       else
         local t0 = e.slices and e.slices[row.k] or 0
         local t1 = e.slices and (e.slices[row.k + 1] or e.len) or t0
-        local kl = info.slice_key and info.slice_key(row.k) or ' '
-        lbl = ('%s  S%02X  %.2fs'):format(kl or ' ', row.k, math.max(0, t1 - t0))
+        local nl = info.slice_note and info.slice_note(row.k) or '---'   -- 19 окт: нота слайса вместо клавиши
+        lbl = ('%-3s  S%02X  %.2fs'):format(nl or '---', row.k, math.max(0, t1 - t0))
       end
       text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, w - 12 - 4 * L.cw), on and U.AMBER or U.TEXT)
       if hot then hover.pool = { ci = info.pool_ci, i = row.i, sub = row.sub, k = row.k } end

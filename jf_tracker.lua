@@ -4930,6 +4930,13 @@ ctx = {
     end
     return c.t[k]
   end,
+  -- 19 окт: нота, что играет слайс k (как клавиша, только нотой: C-3 C#3 …) — колонка слайсов в lib / tracks
+  slice_note = function(k)
+    local sh = (state.slice1 or keys.frow()) and 1 or 0
+    local n = (model.SLICE_BASE or 48) + k - sh
+    if n < 0 or n > 127 then return nil end
+    return ({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[n % 12 + 1] .. math.max(0, n // 12 - 1)
+  end,
   -- MIDI-клипы трека для дерева tracks (кэш на снимок)
   tl_midi = function(col)
     local c = ctx.tlm_cache
@@ -18159,7 +18166,7 @@ local function frame()
     ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
     act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
-    slice_key = function(k) return ctx.slice_key(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
+    slice_key = function(k) return ctx.slice_key(k) end, slice_note = function(k) return ctx.slice_note(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
       local sc = state.notes_scale or 0
