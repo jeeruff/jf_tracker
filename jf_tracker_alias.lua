@@ -656,6 +656,13 @@ function A.move_to_lib(regions, rg)
   local t = lib
   for _, r in ipairs(regions) do if r.lib and r.rgnend > t then t = r.rgnend end end
   if edit and edit.lib_tail then t = math.max(t, edit.lib_tail(lib)) end   -- 8 окт: и после семплов зоны
+  -- 19 окт: библиотека — не вплотную к =END: 4 такта зазора (проигрывание / правка «чуть за конец» её не задевают)
+  do
+    local num, den = R.TimeMap_GetTimeSigAtTime(0, lib)
+    local bar_qn = (num and den and den > 0) and (num * 4 / den) or 4
+    local gap_t = R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, lib) + 4 * bar_qn)
+    if t < gap_t then t = gap_t end
+  end
   t = bar_ceil(t)
   local len = rg.rgnend - rg.pos
   local dst = { pos = t, rgnend = t + len, name = rg.name }

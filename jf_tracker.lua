@@ -3097,14 +3097,15 @@ ctx = {
     -- 19 окт: опция BS mode: pattern (по умолчанию, как Renoise) — в регионе, клип до конца паттерна держит длину;
     -- track — по всей дорожке до =LIB (клипы следующих регионов подтягиваются)
     local trackwide = state.bsmode == 'track'
-    if trackwide then rg = nil; limit = (model.lib_pos and model.lib_pos()) or (reaper.GetProjectLength(0) + 60) end
+    -- 19 окт: граница — =END (маркера =LIB с 8 окт нет: по дорожке сдвигалась бы и библиотека паттернов за =END)
+    if trackwide then rg = nil; limit = model.marker_pos(model.END_MARKER) or (reaper.GetProjectLength(0) + 60) end
     if t1 > limit then t1 = limit end
     local trs = {}
     if all then for _, c in ipairs(snap.cols) do trs[#trs + 1] = c.track end else trs[1] = f.col.track end
     -- 17 окт: сдвиг строками по сетке со свингом (не на время) — ноты не получают «свинговых» задержек
     local nrows = math.floor((reaper.TimeMap2_timeToQN(0, t1) - reaper.TimeMap2_timeToQN(0, t0)) * state.lpb + 0.5)
     if what == 'delete' then edit.time_delete(trs, t0, t1, limit, true, state.lpb, nrows, not trackwide) else edit.time_insert(trs, t0, t1 - t0, limit, true, state.lpb, nrows) end   -- 12 окт: ноты не режутся
-    vim.msg = ('%s time: %d row(s) %s%s'):format(what, n or 1, all and 'all tracks' or f.col.name, trackwide and ' (BS mode track: the whole track up to =LIB)' or (rg and (' in ' .. (rg.name ~= '' and rg.name or 'region')) or ' (no region: to project end)'))
+    vim.msg = ('%s time: %d row(s) %s%s'):format(what, n or 1, all and 'all tracks' or f.col.name, trackwide and ' (BS mode track: the whole track up to =END)' or (rg and (' in ' .. (rg.name ~= '' and rg.name or 'region')) or ' (no region: to project end)'))
   end,
   -- блок матрицы: mute / cut / copy / paste (буфер — state.mx_clip)
   mx_block = function(what)
@@ -11548,8 +11549,8 @@ ctx = {
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
-      { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column is drawn as a line inside the row instead of a new lane (the fd button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate() end },
-      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows): pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =LIB, the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
+      { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - an o in a narrow column at the side of the cell (O - several) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
+      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows): pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =END (the pattern library after =END stays), the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
       flag('hdrmeter', 'header meter', 'a thin meter under v in the track header (armed audio - the input level; MIDI on the track input - a yellow flash); the yellow MIDI bar on the track itself stays'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
       { key = 'armsel', label = 'rec follows selection', kind = 'toggle', desc = 'record arm follows the selected tracks: REAPER auto record-arm (track menu: Automatic record-arm when track selected) on every track, new ones too; off - removed from all tracks', get = function() return state.armsel end, set = function(v) state.armsel = v; ctx.armsel_apply(v) end },
@@ -19522,7 +19523,7 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
-  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column is a line inside the row - no new lane (white - a note, under the commands - it has a command); zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
+  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - an o at the side of the cell (O - several), no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
@@ -24660,8 +24661,8 @@ ctx.mx_follow_tick = function()
   if f and f.col then for ci, c in ipairs(snap.cols or {}) do if c == f.col then MX.cur.ci = ci; break end end end
 end
 ctx.foldfast_toggle = function()
-  state.foldfast = not state.foldfast; model.FOLD = state.foldfast; model.invalidate()
-  vim.msg = state.foldfast and 'fold on: fast notes are lines inside the row (no new lanes); LPB + shows them' or 'fold off: every note gets its row and column'
+  state.foldfast = not state.foldfast; model.FOLD = state.foldfast; model.invalidate(); relayout()
+  vim.msg = state.foldfast and 'fold on: a fast note with no free column folds into its row - an o at the side of the cell (O - several); + (LPB) shows them' or 'fold off: every note gets its row and column'
 end
 model.FOLD = state.foldfast
 ctx.rf_close = function(keep)

@@ -435,6 +435,8 @@ function D.layout(snap, state, nregions)
   for k = 1, L.nfx do L.x_fx[k] = x; x = x + L.w_fx + L.pad end
   L.x_del = x
   x = L.x_del + L.w_del + L.pad
+  -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
+  if state.foldfast then L.x_fold = x; x = x + ms('O') + L.pad else L.x_fold = nil end
   L.sub_w = x
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
@@ -2120,12 +2122,17 @@ local function draw_cell(L, cell, x, y, ty, inv)
   end
   if D.cur_box then D.cur_box(); D.cur_box = nil end
   -- 19 окт: fold — сложенные быстрые ноты строки: линия в своё время внутри строки (белая — нота; под командами — цвет команд)
+  -- 19 окт (2): линии поверх текста читались как зачёркивание — вместо них знак «o» сбоку ячейки (как колонка Orca)
   if cell and cell.fold then
-    for _, fh in ipairs(cell.fold) do
-      local yy = y + math.max(1, math.min(L.rh - 2, math.floor((fh.delay or 0) / 256 * L.rh + 0.5)))
-      set(fh.muted and U.GREY or U.TEXT); gfx.rect(x + L.x_note, yy, math.max(4, L.w_note), 1, 1)
-      if fh.fx and #fh.fx > 0 and L.x_fx and L.x_fx[1] then set(D.RN_OTHER or U.CYAN); gfx.rect(x + L.x_fx[1], yy, L.w_fx or 8, 1, 1) end
-    end
+    local mark = #cell.fold > 1 and 'O' or 'o'
+    local mw = ms(mark)
+    local sx = (L.x_fold and L.sub_w and L.x_fold < L.sub_w) and (x + L.x_fold) or (x + (L.sub_w or (L.x_note + L.w_note + mw + 2)) - mw - 1)   -- узкая подколонка — у правого края
+    text(sx, ty, mark, U.CYAN)
+    -- for _, fh in ipairs(cell.fold) do   -- линии в своё время внутри строки (пока выключено)
+    --   local yy = y + math.max(1, math.min(L.rh - 2, math.floor((fh.delay or 0) / 256 * L.rh + 0.5)))
+    --   set(fh.muted and U.GREY or U.TEXT); gfx.rect(x + L.x_note, yy, math.max(4, L.w_note), 1, 1)
+    --   if fh.fx and #fh.fx > 0 and L.x_fx and L.x_fx[1] then set(D.RN_OTHER or U.CYAN); gfx.rect(x + L.x_fx[1], yy, L.w_fx or 8, 1, 1) end
+    -- end
   end
   draw_inst()
   if k == 'audio' or k == 'midi' then
