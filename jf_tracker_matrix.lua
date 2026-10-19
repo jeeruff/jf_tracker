@@ -60,7 +60,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'chain' }, { 'timesel', 'timesel' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -396,7 +396,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   -- 18 окт: playlist — блок под кнопками (порядок паттернов текстом), матрица ниже
   MX.pl_y = nil
-  if MX.plist and ctx.plist_draw then
+  if MX.plist_old and MX.plist and ctx.plist_draw then   -- 19 окт: старый блок chain (< имя > play write new del, текст, итог) убран — строка chain под кубиками
     local ph, hv = ctx.plist_draw(L, 0, hy + L.rh + 2, W - 6)
     for k, v in pairs(hv) do hover[k] = v end
     MX.pl_y = hy + L.rh + 2
