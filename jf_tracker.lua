@@ -13426,16 +13426,36 @@ ctx = {
         model.invalidate()
         vim.msg = (col.name or 'track') .. ': input -> all MIDI inputs (option auto MIDI input)'
       end
-      if reaper.GetMediaTrackInfo_Value(track, 'I_RECARM') ~= 1 then
-        vim.msg = 'instrument preview: arm the track (R) with a MIDI input - the plugin hears the keys then'
-        return
-      end
+      -- 19 окт: трек не взведён — взвести на время прослушки (вход MIDI с виртуальной клавиатурой, мониторинг),
+      -- потом вернуть как было; нота — со следующего кадра, когда арм уже действует (пэды рэка молчали без R)
       local p = math.max(0, math.min(127, math.floor(pitch)))
+      local now = reaper.time_precise()
+      local delay = 0
+      if reaper.GetMediaTrackInfo_Value(track, 'I_RECARM') ~= 1 or (ctx.arm_tmp and ctx.arm_tmp.track == track) then
+        if reaper.GetPlayState() & 4 == 4 then vim.msg = 'instrument preview: recording - arm the track (R) yourself'; return end
+        local ar = ctx.arm_tmp
+        if not (ar and ar.track == track) then
+          if ar then ctx.arm_restore() end
+          ar = { track = track, inp = reaper.GetMediaTrackInfo_Value(track, 'I_RECINPUT'), mon = reaper.GetMediaTrackInfo_Value(track, 'I_RECMON') }
+          ctx.arm_tmp = ar
+          if ar.inp < 4096 then reaper.SetMediaTrackInfo_Value(track, 'I_RECINPUT', 4096 | (63 << 5)) end
+          if ar.mon == 0 then reaper.SetMediaTrackInfo_Value(track, 'I_RECMON', 1) end
+          reaper.SetMediaTrackInfo_Value(track, 'I_RECARM', 1)
+          delay = 0.15   -- арм вступает не сразу (0.04 с не хватало — нота терялась)
+        end
+        ar.t = now + 0.8
+      end
       ctx.stuffed = ctx.stuffed or {}
-      ctx.stuffed[#ctx.stuffed + 1] = { p = p, t = reaper.time_precise() }   -- вход MIDI их пропустит
-      reaper.StuffMIDIMessage(0, 0x90, p, math.max(1, math.min(127, vim.vel or 100)))
       ctx.note_offs = ctx.note_offs or {}
-      ctx.note_offs[#ctx.note_offs + 1] = { p = p, t = reaper.time_precise() + 0.4 }
+      local vel = math.max(1, math.min(127, vim.vel or 100))
+      if delay > 0 then
+        ctx.note_ons = ctx.note_ons or {}
+        ctx.note_ons[#ctx.note_ons + 1] = { p = p, v = vel, t = now + delay }
+      else
+        ctx.stuffed[#ctx.stuffed + 1] = { p = p, t = now }   -- вход MIDI их пропустит
+        reaper.StuffMIDIMessage(0, 0x90, p, vel)
+      end
+      ctx.note_offs[#ctx.note_offs + 1] = { p = p, t = now + delay + 0.4 }
       return
     end
     if not has_midi then return end
@@ -17723,6 +17743,16 @@ local function frame()
     if reaper.time_precise() - (ch.t_last or 0) > 1.5 or vim.cur.row ~= ch.row then ctx.chord_end() end
   end
   -- 9 окт: note-off превью плагина-инструмента
+  -- 19 окт: отложенные ноты превью (трек только что взведён) и возврат временного арма
+  if ctx.note_ons and #ctx.note_ons > 0 then
+    local now, keep = reaper.time_precise(), {}
+    for _, o in ipairs(ctx.note_ons) do
+      if now >= o.t then ctx.stuffed = ctx.stuffed or {}; ctx.stuffed[#ctx.stuffed + 1] = { p = o.p, t = now }; reaper.StuffMIDIMessage(0, 0x90, o.p, o.v)
+      else keep[#keep + 1] = o end
+    end
+    ctx.note_ons = keep
+  end
+  if ctx.arm_tmp and reaper.time_precise() > (ctx.arm_tmp.t or 0) then ctx.arm_restore() end
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
     for _, o in ipairs(ctx.note_offs) do
@@ -24753,6 +24783,15 @@ ctx.layer_align = function(root, list, lk, save)
   save(('L%d aligned: offset %.2f ms (match %.2f)'):format(lk, l.offs, cval or 0))
 end
 -- 19 окт: пэды с клавиатуры (режим пэдов DSP, jf_tracker_dspkeys.lua): курсор — пэд (draw.kit_sel) или пустая нота (draw.kit_note)
+-- 19 окт: вернуть трек после временного арма прослушки (вход, мониторинг, арм выкл)
+ctx.arm_restore = function()
+  local ar = ctx.arm_tmp
+  ctx.arm_tmp = nil
+  if not (ar and reaper.ValidatePtr(ar.track, 'MediaTrack*')) then return end
+  reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECARM', 0)
+  if ar.inp then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECINPUT', ar.inp) end
+  if ar.mon then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECMON', ar.mon) end
+end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)
   if col and f and f.kids and model.DR and model.DR.is_rack(f.kids) then return col, f end
