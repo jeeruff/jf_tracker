@@ -3498,28 +3498,7 @@ function D.pool_rows(pool, sort, col, cols)
     for _, i in ipairs(idx) do if not pool[i].parent then rows[#rows + 1] = { i = i } end end   -- слайсы вложены (3 окт)
     return add_empty(rows, pool)
   end
-  -- 11 окт: по умолчанию — просто lib по номерам; кнопка track — группы по трекам,
-  -- где инструмент УЖЕ лежит (на двух треках — в обеих), в конце — не используемые
-  if D.lib_bytrack then
-    local used = {}
-    for _, c in ipairs(cols or {}) do
-      local first = true
-      for i, e in ipairs(pool) do
-        if not e.parent and e.track_set and e.track_set[c.name] then
-          if first then rows[#rows + 1] = { hdr = c.name ~= '' and c.name or '?', name = c.name }; first = false end
-          rows[#rows + 1] = { i = i }; used[i] = true
-        end
-      end
-    end
-    local first = true
-    for i, e in ipairs(pool) do
-      if not e.parent and not used[i] then
-        if first then rows[#rows + 1] = { hdr = 'not used', name = '' }; first = false end
-        rows[#rows + 1] = { i = i }
-      end
-    end
-    return add_empty(rows, pool)
-  end
+  -- 19 окт: кнопка track (группы по трекам) убрана — это вкладка tracks (дерево трек → инструменты)
   if true then
     rows[#rows + 1] = { hdr = 'audio', name = '' }
     for i, e in ipairs(pool) do if not e.parent then rows[#rows + 1] = { i = i } end end
@@ -4610,10 +4589,6 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local sw2 = ms('sort') + 2 * L.pad
   local sx2 = bx2 - sw2 - L.pad
   if sx2 > ix + L.pad + ms('kit') + 2 * L.pad then hbtn(sx2, sw2, 'sort', false, U.CYAN, 'poolsort'); bx2 = sx2 end
-  -- 11 окт: track — группы по трекам, где инструменты уже лежат
-  D.lib_bytrack = info.lib_bytrack and true or false
-  local tw2 = ms('track') + 2 * L.pad
-  if bx2 - tw2 - L.pad > ix + L.pad + ms('load') + 2 * L.pad then hbtn(bx2 - tw2 - L.pad, tw2, 'track', D.lib_bytrack, U.CYAN, 'pooltrack'); bx2 = bx2 - tw2 - L.pad end
   -- 11 окт: пресет lib — справа, как у эффекта в DSP: < имя > (имя — список и сохранить, < > — соседний; заменяет всю lib)
   do
     local nm = info.kit_name or 'no preset'

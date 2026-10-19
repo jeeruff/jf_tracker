@@ -18136,7 +18136,7 @@ local function frame()
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
-    inspreview = state.preview, lib_bytrack = state.libtrack, visor_namethumb = ctx.visor_namethumb,
+    inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
     trsel = (function()
@@ -19261,7 +19261,6 @@ local function frame()
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
-  elseif hover.pooltrack then state.status = 'track: group the lib by the tracks the instruments already lie on (off - one list)'
   elseif hover.poolload then state.status = 'load: kits - the samples of a kit are ADDED to the lib (the preset < > replaces the whole lib)'
   elseif hover.poolsort then state.status = 'lib order: ' .. (state.poolsort or 'track') .. ' - click: the list (track / name / len / marks / type), or click a column head; numbers stay'
   elseif hover.caption then state.status = ({
@@ -20390,10 +20389,6 @@ local function frame()
       ctx.set_focus('inst')
       ctx.sort_menu()
       click = { t = now2, zone = 'poolsort' }
-    elseif hover.pooltrack then
-      state.libtrack = not state.libtrack; reaper.SetExtState(EXT, 'libtrack', state.libtrack and '1' or '0', true)
-      vim.msg = state.libtrack and 'lib by track: where the instruments already lie (one on two tracks - in both)' or 'lib: one list by number'
-      click = { t = now2, zone = 'pooltrack' }
     elseif hover.poolload then
       ctx.set_focus('inst'); ctx.kit_add_menu(); click = { t = now2, zone = 'poolload' }
     elseif hover.garden then
