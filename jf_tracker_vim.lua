@@ -226,6 +226,7 @@ function V.heads_in(f0, f1, r0, r1)
         for r = r0, r1 do
           local c = sub[r]
           if is_head(c) and not seen[c] then seen[c] = true; c.fi = fi; out[#out + 1] = c end
+          if c and c.fold then for _, h in ipairs(c.fold) do if not seen[h] then seen[h] = true; h.fi = fi; out[#out + 1] = h end end end   -- 19 окт: сложенные (fold) — тоже ноты строки
         end
       end
     end

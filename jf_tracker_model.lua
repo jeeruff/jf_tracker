@@ -196,11 +196,20 @@ function M.run_step(run, own)
   return out
 end
 
+-- 19 окт: fold (опция) — быстрая MIDI-нота в строку, которой нет свободной подколонки, не плодит лейн: ложится
+-- в ячейку строки списком cell.fold (рисуется линией в своё время внутри строки); зумом (LPB) — своей строкой
+M.FOLD = false
 local function place(lane, r0, r1, head, cont, tail, e1)
   if r1 < r0 then r1 = r0; e1 = nil end
   local sub
   for _, s in ipairs(lane.subs) do
     if sub_free(s, r0, r1, head.delay, e1) then sub = s; break end
+  end
+  if not sub and M.FOLD and r1 == r0 and head.kind == 'midi' and lane.subs[1] then
+    for _, s in ipairs(lane.subs) do
+      local c = s[r0]
+      if c then c.fold = c.fold or {}; c.fold[#c.fold + 1] = head; head.rows = 1; head.folded = true; return s end
+    end
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
   sub[r0] = head

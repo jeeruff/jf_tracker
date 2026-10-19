@@ -2119,6 +2119,14 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
   end
   if D.cur_box then D.cur_box(); D.cur_box = nil end
+  -- 19 окт: fold — сложенные быстрые ноты строки: линия в своё время внутри строки (белая — нота; под командами — цвет команд)
+  if cell and cell.fold then
+    for _, fh in ipairs(cell.fold) do
+      local yy = y + math.max(1, math.min(L.rh - 2, math.floor((fh.delay or 0) / 256 * L.rh + 0.5)))
+      set(fh.muted and U.GREY or U.TEXT); gfx.rect(x + L.x_note, yy, math.max(4, L.w_note), 1, 1)
+      if fh.fx and #fh.fx > 0 and L.x_fx and L.x_fx[1] then set(D.RN_OTHER or U.CYAN); gfx.rect(x + L.x_fx[1], yy, L.w_fx or 8, 1, 1) end
+    end
+  end
   draw_inst()
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
@@ -6697,6 +6705,7 @@ function D.frame(L, snap, rows, state, info)
         for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
         local pw = ms('als') + ms('cln') + 6
         local px = bx + bw - pw
+        if x + ms('fd') + 4 <= px then x = small(x, by2, 'fd', 'foldfast', state.foldfast, 'viewbtn') end   -- 19 окт: fold быстрых нот
         if px >= x then px = small(px, by2, 'als', 'alias', false, 'rgbtn'); small(px, by2, 'cln', 'clone', false, 'rgbtn')
         elseif x + ms('cln') + 2 <= bx + bw then small(x, by2, 'cln', 'clone', false, 'rgbtn') end
       end
