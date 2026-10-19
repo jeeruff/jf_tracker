@@ -1767,6 +1767,13 @@ ctx = {
   fxb_add = function(it, pos)
     it = it or FB.selected()
     local ins = ctx.fxb_insert; ctx.fxb_insert = nil
+    -- 19 окт: слот пэда drumrs5k (b в меню слота) — эффект в пэд, не на трек
+    local pad = ctx.fxb_pad; ctx.fxb_pad = nil
+    if pad and it and not pos then
+      pad(it.data or it.label); FB.push_recent(it); ctx.fxb_save()
+      if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
+      return
+    end
     if ins and it and not pos then   -- 18 окт: точка вставки роутера (+ / = по клику)
       if edit.fx_insert(ins.o, ins.parent, ins.pos, it.data, ins.pv) then
         FB.push_recent(it); ctx.fxb_save(); ctx.db_cache = nil
@@ -5466,7 +5473,16 @@ ctx = {
       items[#items + 1] = { key = tostring(i), label = model.DR.short(nm) .. (cur and '  (on)' or ''), fn = function() put(nm) end }
     end
     items[#items + 1] = { key = 'b', label = 'browse - any installed fx (it joins the favourites of ' .. model.DR.CAT_NAME[cat] .. ')', fn = function()
-      vim.open_picker(model.DR.CAT_NAME[cat] .. ' for ' .. (kid.name or 'pad'), ctx.fx_list(), function(x) put(x.label) end)
+      -- 19 окт: браузер эффектов (панель fx: all fav dev type cat rec, поиск набором), Enter — в этот слот пэда
+      if state.panes_ui and state.panes then
+        if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+        FB.query, FB.cur, FB.scroll = '', 1, 0
+        ctx.fxb_pad = put
+        ctx.pane_cmd('fxb show')
+        vim.msg = ('fx for %s (%s): type to search, all fav dev type cat rec, Enter - into the pad, Esc back'):format(kid.name or 'pad', model.DR.CAT_NAME[cat])
+      else
+        vim.open_picker(model.DR.CAT_NAME[cat] .. ' for ' .. (kid.name or 'pad'), ctx.fx_list(), function(x) put(x.label) end)
+      end
     end }
     if sl then
       items[#items + 1] = { key = 'o', label = 'open the window of ' .. sl.name, fn = function() reaper.TrackFX_Show(tr, sl.i, 3) end }
@@ -13141,6 +13157,7 @@ ctx = {
     relayout()
   end,
   set_focus = function(f)
+    if f ~= 'fxb' then ctx.fxb_pad = nil end   -- 19 окт: ушли из браузера эффектов — слот пэда больше не ждёт
     -- 11 окт: модуль mixer — часть трекера (полоски его колонок): фокус — трекер с флагом
     -- mixfocus (рамка — у mixer, Cmd+hjkl от него, k j громкость / h l пан трека курсора)
     local mixf = f == 'mixer'
