@@ -1020,6 +1020,12 @@ function B.key(c)
   elseif ch == 'a' and ctx.browser_send_menu then ctx.browser_send_menu()   -- 16 окт: add to: lib / drumrs5k / сэмплер / список / слайсы
   elseif ch == 'm' then B.toggle_mark()                                -- 10 окт: отметка строк
   elseif ch == 'u' then B.clear_marks()                                -- 12 окт: u — снять все отметки, как в lf (было M)
+  elseif c == 13 and ctx.drum_browser_enter and (function()   -- 19 окт: выбран пэд drumrs5k — файл(ы) в рэк
+      local fs = {}
+      if #B.sel_order > 0 then for _, o in ipairs(B.sel_order) do if o.full then fs[#fs + 1] = o.full end end
+      else local e = B.entries[B.cur]; if e and not e.dir and not e.pm and not e.db and not e.kit then fs[1] = B.full(e) end end
+      return #fs > 0 and ctx.drum_browser_enter(fs)
+    end)() then
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()

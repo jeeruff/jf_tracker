@@ -13170,7 +13170,8 @@ ctx = {
     relayout()
   end,
   set_focus = function(f)
-    if f ~= 'fxb' then ctx.fxb_pad = nil end   -- 19 окт: ушли из браузера эффектов — слот пэда больше не ждёт
+    if f ~= 'fxb' then ctx.fxb_pad = nil end
+    if f == 'tracker' then ctx.drum_target = nil end   -- 19 окт: вернулся в трекер — браузер снова шлёт на трек   -- 19 окт: ушли из браузера эффектов — слот пэда больше не ждёт
     -- 11 окт: модуль mixer — часть трекера (полоски его колонок): фокус — трекер с флагом
     -- mixfocus (рамка — у mixer, Cmd+hjkl от него, k j громкость / h l пан трека курсора)
     local mixf = f == 'mixer'
@@ -21142,6 +21143,7 @@ local function frame()
       -- 19 окт: щелчок по пэду drumrs5k — режим пэдов DSP (h j k l, x yy yp p, M S) на этом рэке
       if hover.dspkid and hover.dspkid.kid and hover.dspkit.k and ctx.pad_rack(hover.dspkit.k) then
         dsp_sel.fx = hover.dspkit.k; DK.pads = true
+        ctx.drum_target = { k = hover.dspkit.k, t = reaper.time_precise() }   -- 19 окт: выбран пэд — браузер шлёт файлы в рэк
         draw.kit_note = draw.kit_note or {}; draw.kit_note[hover.dspkit.key] = hover.dspkid.kid.note
       end
       -- 16 окт: пэд drumrs5k звучит по щелчку (его нота в трек; трек взведён — см. preview)
@@ -21945,7 +21947,7 @@ local function frame()
       if B.drag.active then
         if hover.fi and hover.row then state.status = ('drop %s → %s @ %04d'):format(B.drag.e.name, hover.col and hover.col.name or '', hover.row.row)
         elseif type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac)) then state.status = 'drop ' .. B.drag.e.name .. ' → a new slice of the selected instrument (a files kit &)'
-        elseif hover.dspkit and B.is_marked(B.drag.e) and B.nmarked() > 1 then state.status = ('drop %d marked files → %s'):format(B.nmarked(), hover.dspkit.ki > 0 and 'the pads from this one on (more - new pads)' or 'new pads of the drumrs5k')
+        elseif hover.dspkit and B.is_marked(B.drag.e) and B.nmarked() > 1 then state.status = ('drop %d marked files → the pads from this note on, %s'):format(B.nmarked(), ctx.mods().shift and 'Shift: the old ones stay, into the free notes' or 'over the old ones (hold Shift - keep the old ones)')
         elseif hover.dspkit then state.status = 'drop ' .. B.drag.e.name .. (hover.dspkit.ki > 0 and ' → this pad (its sample)' or ' → a new pad of the drumrs5k')
         elseif ctx.layer_drop_target(hover) and not B.drag.e.dir then state.status = 'drop ' .. B.drag.e.name .. ' → a layer of ' .. (ctx.layer_drop_target(hover).e.name or '')   -- 19 окт
         elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
@@ -21967,16 +21969,11 @@ local function frame()
         -- 17 окт: тащат отмеченный файл, отмечено несколько — все: по пэдам с этого и дальше, лишние — новыми пэдами
         local many = {}
         if B.is_marked(bd.e) and B.nmarked() > 1 then for _, o in ipairs(B.sel_order) do if o.full then many[#many + 1] = o.full end end end
-        if #many > 1 then
-          local rest = {}
-          local kids = hover.dspkit.ki > 0 and hover.dspkid and hover.dspkid.f and hover.dspkid.f.kids or nil
-          local ki0 = hover.dspkit.ki
-          for j, f in ipairs(many) do
-            local kid = kids and kids[ki0 + j - 1]
-            if kid and kid.rs5k_i then ctx.drum_pad_file(kid, f) else rest[#rest + 1] = f end
-          end
-          if #rest > 0 then ctx.drum_add_files(rest) end
-          vim.msg = ('drumrs5k: %d file(s) - %d into pads from this one, %d new pad(s)'):format(#many, #many - #rest, #rest)
+        local dk = hover.dspkid and hover.dspkid.kid
+        local fr = hover.dspkid and hover.dspkid.f
+        if #many > 1 and fr then
+          -- 19 окт: по нотам подряд с этого пэда: занятые — переписать, Shift — оставить и класть в свободные
+          ctx.drum_drop_files(fr, (dk and dk.note) or (draw.kit_note or {})[hover.dspkit.key] or 36, many, ctx.mods().shift)
         elseif hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
@@ -24924,6 +24921,38 @@ ctx.stop_here = function()
   if r >= 0 then vim.cur.row = r; vim.ensure_visible() end
   vim.msg = ('stopped at row %04d (Esc / |>; Space stops and goes back)'):format(math.max(0, r))
 end
+-- 19 окт: файлы в рэк по нотам подряд с note0: пэд на ноте есть — новый сэмпл (keep — пропустить, класть в свободные),
+-- ноты нет — новый пэд на ней; одним undo
+ctx.drum_drop_files = function(f, note0, files, keep)
+  local col = dsp_target()
+  if not (col and col.track and f and f.i) then return end
+  local by = {}
+  for _, kd in ipairs(f.kids or {}) do if kd.note then by[kd.note] = kd end end
+  local note, nre, nnew = math.max(0, math.floor(note0)), 0, 0
+  edit.run(('drumrs5k: %d files'):format(#files), function()
+    for _, pth in ipairs(files) do
+      while keep and by[note] and note < 127 do note = note + 1 end
+      if note > 127 then break end
+      local kd = by[note]
+      if kd and kd.rs5k_i then edit.drum_pad_set(col.track, kd.rs5k_i, pth, nil, nil); nre = nre + 1
+      else edit.drum_pads(col.track, f.i, { pth }, note); nnew = nnew + 1 end
+      by[note] = by[note] or true
+      note = note + 1
+    end
+  end)
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = ('drumrs5k: %d file(s) - %d replaced, %d new pad(s)%s'):format(#files, nre, nnew, keep and ' (Shift: kept the old ones)' or ' (Shift - keep the old ones)')
+end
+-- 19 окт: выбран пэд (щелчок / режим пэдов) — Enter в браузере шлёт файл (отмеченные — все) в рэк, а не на трек
+ctx.drum_browser_enter = function(files)
+  local t = ctx.drum_target
+  if not (t and reaper.time_precise() - t.t < 600 and dsp_target()) then return false end
+  local _, f, _, ki, kid, note = ctx.pad_cur(t.k)
+  if not f then return false end
+  if #files == 1 and kid and kid.rs5k_i then ctx.drum_pad_file(kid, files[1]); return true end
+  ctx.drum_drop_files(f, note or 36, files, ctx.mods().shift)
+  return true
+end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)
   if col and f and f.kids and model.DR and model.DR.is_rack(f.kids) then return col, f end
@@ -24942,6 +24971,7 @@ end
 ctx.pad_at = function(f, note) for ki, kd in ipairs(f.kids) do if kd.note == note then return ki, kd end end end
 ctx.pad_go = function(f, kkey, note)
   local ki = ctx.pad_at(f, note)
+  ctx.drum_target = { k = dsp_sel.fx, t = reaper.time_precise() }   -- 19 окт: браузер шлёт сюда
   draw.kit_sel[kkey] = ki or 0; draw.kit_note[kkey] = note
   local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
   local nm = NN[note % 12 + 1] .. math.max(0, note // 12 - 1)
