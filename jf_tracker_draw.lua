@@ -1020,6 +1020,22 @@ local function rrect(x, y, w, h, fill, r)
   end
 end
 D.rrect = rrect
+-- 19 окт: ADSR поверх волны — линия в 2 px контрастным зелёным, на узлах ромбики (hot — янтарём, залитый)
+function D.adsr_line(pts, bg, hot_i)
+  local c = U.readable(U.mix(U.GREEN, U.TEXT, 0.25), bg or U.PANEL, 4.5)
+  set(c)
+  for i = 1, #pts - 1 do
+    local a, b = pts[i], pts[i + 1]
+    gfx.line(a[1], a[2], b[1], b[2]); gfx.line(a[1], a[2] - 1, b[1], b[2] - 1)
+  end
+  local r = math.max(3, math.floor((D.L_rh or 16) / 4))
+  for i = 2, #pts - 1 do
+    local x, y = pts[i][1], pts[i][2]
+    set(i == hot_i and U.AMBER or c)
+    gfx.triangle(x, y - r, x + r, y, x, y + r, x - r, y)
+    if i ~= hot_i then set(bg or U.PANEL); gfx.triangle(x, y - r + 2, x + r - 2, y, x, y + r - 2, x - r + 2, y) end
+  end
+end
 
 local function fit(s, w)
   if ms(s) <= w then return s end
@@ -8241,8 +8257,8 @@ function D.frame(L, snap, rows, state, info)
               local function Y(v) return ay0 + ah0 - math.floor(v * ah0) end
               local x1, x2 = X(tA), X(tA + tD)
               local x3 = math.max(x2, gx1 - math.floor(tR * pps + 0.5))
-              set(U.GREEN)
-              gfx.line(gx0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), gx1, Y(0))
+              D.L_rh = L.rh
+              D.adsr_line({ { gx0, Y(0) }, { x1, Y(1) }, { x2, Y(sl) }, { x3, Y(sl) }, { gx1, Y(0) } }, U.PANEL)
               cnt = 1 + WR
             end
           end
@@ -8549,8 +8565,6 @@ function D.frame(L, snap, rows, state, info)
             local function Y(v) return ay0 + ah0 - math.floor(v * ah0) end
             local x1, x2 = X(tA), X(tA + tD)
             local x3 = math.max(x2, gx1 - math.floor(tR * pps + 0.5))
-            set(U.GREEN)
-            gfx.line(gx0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), gx1, Y(0))
             local lab = ('A %s  D %s  S %s  R %s'):format(at.s, de.s, su.s, re.s)
             text(wx + ww - ms(lab) - 4 >= wx + math.floor(ww * 0.4) and (wx + ww - ms(lab) - 4) or (wx + math.floor(ww * 0.4)), wy + 1, fit(lab, math.floor(ww * 0.6) - 4), U.GREEN)
             local hs = { { 'a', x1, Y(1) }, { 'ds', x2, Y(sl) }, { 'r', x3, Y(sl) } }
@@ -8559,11 +8573,11 @@ function D.frame(L, snap, rows, state, info)
               for _, hp in ipairs(hs) do local dd = math.abs(mx - hp[2]) + math.abs(my - hp[3]); if dd <= 1.5 * L.rh and (not nd or dd < nd) then near, nd = hp[1], dd end end
             end
             local ad = info.adsr_drag and info.adsr_drag()
-            local rr = math.max(2, math.floor(L.rh / 4))
-            for _, hp in ipairs(hs) do
-              local on = (near == hp[1]) or (ad and ad.f == f and ad.part == hp[1])
-              set(on and U.AMBER or U.GREEN); gfx.rect(hp[2] - rr, hp[3] - rr, 2 * rr + 1, 2 * rr + 1, on and 1 or 0)
-            end
+            -- 19 окт: линия и ромбики на узлах (ручки a / ds / r — узлы 2..4) одной функцией с волной пэда
+            local hot_i
+            for hi, hp in ipairs(hs) do if (near == hp[1]) or (ad and ad.f == f and ad.part == hp[1]) then hot_i = hi + 1 end end
+            D.L_rh = L.rh
+            D.adsr_line({ { gx0, Y(0) }, { x1, Y(1) }, { x2, Y(sl) }, { x3, Y(sl) }, { gx1, Y(0) } }, U.PANEL, hot_i)
             if near then hover.dspadsr = { fx = k, f = f, part = near, w = math.max(1, gx1 - gx0), h = ah0 } end
           end
         end
