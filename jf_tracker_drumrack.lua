@@ -115,12 +115,16 @@ end
 
 -- пэд из ребёнка контейнера: RS5K сам или первый ребёнок подконтейнера;
 -- kid.entry — модуль ребёнка (model.build_one), kid.entry.kids — внуки
-function DR.pad_rs5k(kid)
+-- 19 окт: в ячейке — любые контейнеры: первый RS5K в глубину (слой RS5K параллельно, эффекты, вложенные контейнеры)
+function DR.pad_rs5k(kid, depth)
   local e = kid and kid.entry
   if not e then return nil end
   if e.rs5k then return e, kid.i end
-  if e.container and e.kids and e.kids[1] and e.kids[1].entry and e.kids[1].entry.rs5k then
-    return e.kids[1].entry, e.kids[1].i
+  if e.container and (depth or 0) < 4 then
+    for _, g in ipairs(e.kids or {}) do
+      local re, ri = DR.pad_rs5k(g, (depth or 0) + 1)
+      if re then return re, ri end
+    end
   end
   return nil
 end

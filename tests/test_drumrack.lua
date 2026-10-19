@@ -50,6 +50,11 @@ local rs = { entry = { rs5k = true }, i = 5 }
 local padc = { i = 9, entry = { container = true, kids = { { i = 11, entry = { rs5k = true } }, { i = 12, entry = {} } } } }
 local _, id = DR.pad_rs5k(padc)
 eq('pad in sub-container -> its RS5K', id, 11)
+-- 19 окт: ячейка — слой (контейнер в контейнере): RS5K найден в глубину; эффект первым — тоже
+local layer = { i = 20, entry = { container = true, kids = { { i = 21, entry = { container = true, kids = { { i = 22, entry = { rs5k = true } }, { i = 23, entry = { rs5k = true } } } } }, { i = 24, entry = {} } } } }
+eq('layered pad -> the first RS5K deep inside', select(2, DR.pad_rs5k(layer)), 22)
+local fxfirst = { i = 30, entry = { container = true, kids = { { i = 31, entry = {} }, { i = 32, entry = { rs5k = true } } } } }
+eq('pad with an fx before the RS5K', select(2, DR.pad_rs5k(fxfirst)), 32)
 eq('rack: RS5K + pad', DR.is_rack({ rs, padc }), true)
 eq('rack: one pad is not a rack', DR.is_rack({ rs }), false)
 eq('rack: foreign fx', DR.is_rack({ rs, { entry = {} } }), false)

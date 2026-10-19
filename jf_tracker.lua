@@ -19144,7 +19144,11 @@ local function frame()
     state.status = (hover.dspmeter == 'out' and 'o - out: the track after all fx and the fader' or 'i / p - the record input when the track is armed (i), else the items before the fx (p)') .. '   ' .. dt
   elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
-  elseif hover.dspbtn and hover.dspbtn.kid then state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (hover.dspbtn.what == 'kdel' and ' - remove this plugin from the container' or (hover.dspbtn.what == 'kgroup' and ' - mute group: a hit cuts the other pads of the group (hi-hat open / closed)' or ' - bypass on / off'))
+  elseif hover.dspbtn and hover.dspbtn.kid then
+    local KT = { kdel = ' - remove this plugin from the container', kgroup = ' - mute group: a hit cuts the other pads of the group (hi-hat open / closed)',
+      kpm = ' - mute (= Opt+click on the pad)', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
+      kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
+    state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (KT[hover.dspbtn.what] or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
@@ -20947,6 +20951,14 @@ local function frame()
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
       elseif hover.dspbtn.what == 'kgroup' and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid)   -- 18 окт: mute group пэда
+      elseif (hover.dspbtn.what == 'kpm' or hover.dspbtn.what == 'kps') and hover.dspbtn.ki then
+        ctx.pad_mute_solo(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kps')   -- 19 окт: m / s внизу пэда
+      elseif hover.dspbtn.what == 'kroute' and hover.dspbtn.ki then ctx.pad_route(hover.dspbtn.f, hover.dspbtn.ki)   -- 19 окт: ячейка в роутере
+      elseif hover.dspbtn.what == 'kpp' and hover.dspbtn.kid then   -- 19 окт: > — послушать пэд (выбрать тоже)
+        local dk = hover.dspbtn.kid
+        local kkey = hover.dspkit and hover.dspkit.key
+        if kkey then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[kkey] = hover.dspbtn.ki end
+        if dk.note and dk.rs5k_i then local col = dsp_target(); if col then ctx.preview(col.track, dk.note, 'midi') end end
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }
@@ -24342,6 +24354,21 @@ ctx.pad_group_menu = function(kid)
         or ((kid.name or 'pad') .. ': no group (plays its sample out)')
     else vim.msg = 'pad group: could not add jf_tracker_choke' end
   end)
+end
+-- 19 окт: ячейка drumrs5k в роутере — пэд-RS5K сначала заворачивается в подконтейнер (вход RS5K — тишина),
+-- выбор роутера — на нём: l войти, A — слой параллельно, a — после, контейнеры внутри
+ctx.pad_route = function(f, ki)
+  local col = dsp_target()
+  if not (col and col.track and f and f.i and ki) then return end
+  if col.take then vim.msg = 'pad router: a track rack (not take fx)'; return end
+  local addr
+  edit.run('drumrs5k pad in router', function() addr = edit.drum_wrap(col.track, f.i, ki - 1) end)
+  if not addr then vim.msg = 'pad router: could not make a container of the pad'; return end
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  MX.DB.sel = reaper.TrackFX_GetFXGUID(col.track, addr)
+  ctx.db_cache = nil
+  if not state.dsp_big then ctx.dsp_big() end
+  vim.msg = 'pad in the router: l - inside, A - a layer in parallel (RS5K / synth / fx), a - after, zz - back to the pads'
 end
 ctx.pad_mute_solo = function(f, ki, solo)
   local col = dsp_target()

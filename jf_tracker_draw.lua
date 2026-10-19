@@ -1002,6 +1002,24 @@ function D.small_text(x, y, s, col)
   end
   local s0 = D.SCALE; D.SCALE = 1; text(x, y, s, col); D.SCALE = s0   -- ровно x1 (x1.5 · 2/3 давал 0.999…)
 end
+-- 19 окт: прямоугольник со срезанными углами (r px) — заливка или рамка, пиксельно (без сглаживания)
+local function rrect(x, y, w, h, fill, r)
+  r = r or 2
+  if w <= 2 * r or h <= 2 * r then gfx.rect(x, y, w, h, fill and 1 or 0); return end
+  if fill then
+    gfx.rect(x + r, y, w - 2 * r, h, 1); gfx.rect(x, y + r, w, h - 2 * r, 1)
+    for k = 1, r - 1 do gfx.rect(x + r - k, y + k, w - 2 * (r - k), h - 2 * k, 1) end
+  else
+    gfx.line(x + r, y, x + w - 1 - r, y); gfx.line(x + r, y + h - 1, x + w - 1 - r, y + h - 1)
+    gfx.line(x, y + r, x, y + h - 1 - r); gfx.line(x + w - 1, y + r, x + w - 1, y + h - 1 - r)
+    for k = 1, r - 1 do
+      gfx.rect(x + r - k, y + k, 1, 1, 1); gfx.rect(x + w - 1 - r + k, y + k, 1, 1, 1)
+      gfx.rect(x + r - k, y + h - 1 - k, 1, 1, 1); gfx.rect(x + w - 1 - r + k, y + h - 1 - k, 1, 1, 1)
+    end
+  end
+end
+D.rrect = rrect
+
 local function fit(s, w)
   if ms(s) <= w then return s end
   local n = #s
@@ -7782,8 +7800,9 @@ function D.frame(L, snap, rows, state, info)
             gx0 = gx0 + mw
             -- 18 окт (2): кубик = нота MIDI 0..127, снизу вверх по 4 в ряду (как пэды MPC / drum rack): ряд — 4 ноты,
             -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
-            local G = { cols = 4, cw = gw // 4 }
-            G.ch = math.max(2 * L.rh + 2, gh // 4)
+            -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
+            local side = math.max(3 * L.rh + 6, math.min(gw // 4, gh // 4))
+            local G = { cols = 4, cw = side, ch = side }
             G.fit = math.max(1, math.min(4, gh // G.ch))
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
             local by_note = {}
@@ -7843,11 +7862,13 @@ function D.frame(L, snap, rows, state, info)
                 local note = (wb + rr) * 4 + c
                 if not by_note[note] then
                   local ex, ey = gx0 + c * G.cw, gy0 + (G.fit - 1 - rr) * G.ch
-                  set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(ex, ey, G.cw - 2, G.ch - 2, 0)
+                  set(U.mix(U.LINE, U.PANEL, 0.5)); rrect(ex, ey, G.cw - 2, G.ch - 2, false)
                   text(ex + L.pad, ey + 1, nname(note), U.mix(U.DIM, U.PANEL, 0.4))
                 end
               end
             end
+            local non_on = 0
+            for _, kd2 in ipairs(f.kids) do if kd2.enabled then non_on = non_on + 1 end end
             for ki, kid in ipairs(f.kids) do
               local pn = pos(ki)
               local r, c = G.fit - 1 - (pn // 4 - wb), pn % 4
@@ -7856,8 +7877,8 @@ function D.frame(L, snap, rows, state, info)
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
                 local on = ki == ks
-                set(on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL)); gfx.rect(cx0, cy0, cw0, ch0, 1)
-                set(on and U.AMBER or (hot and U.GREY or U.LINE)); gfx.rect(cx0, cy0, cw0, ch0, 0)
+                set(on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL)); rrect(cx0, cy0, cw0, ch0, true)
+                set(on and U.AMBER or (hot and U.GREY or U.LINE)); rrect(cx0, cy0, cw0, ch0, false)
                 local fg = kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM
                 local nm = kid.name or ''
                 nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
@@ -7866,7 +7887,25 @@ function D.frame(L, snap, rows, state, info)
                 local tw = ms(tag)
                 text(cx0 + L.pad, cy0 + 1, fit((kid.enabled and '' or '(off) ') .. nm, cw0 - 2 * L.pad - (tw > 0 and tw + L.pad or 0)), fg)
                 if tw > 0 then text(cx0 + cw0 - L.pad - tw, cy0 + 1, tag, U.CYAN) end
-                local ay, ah2 = cy0 + L.rh + 1, ch0 - L.rh - 2
+                -- 19 окт: нижний ряд пэда — m (mute) слева, > (послушать) шире посередине, s (solo) справа
+                do
+                  local byb = cy0 + ch0 - L.rh - 1
+                  local wm = ms('m') + 2 * L.pad
+                  local bxs = { { 'm', 'kpm', cx0 + 2, wm }, { '>', 'kpp', cx0 + 2 + wm + 2, cw0 - 2 * wm - 8 }, { 's', 'kps', cx0 + cw0 - 2 - wm, wm } }
+                  local soloed = kid.enabled and non_on == 1 and #f.kids > 1
+                  for _, b in ipairs(bxs) do
+                    if b[4] >= ms(b[1]) + 2 then
+                      local hb = not drag and mx >= b[3] and mx < b[3] + b[4] and my >= byb and my < byb + L.rh
+                      local lit = (b[2] == 'kpm' and not kid.enabled) or (b[2] == 'kps' and soloed)
+                      local lc = b[2] == 'kpm' and U.RED or (b[2] == 'kps' and U.GREEN or U.AMBER)
+                      set(hb and U.tint(lc, 0.35) or (lit and U.tint(lc, 0.3) or U.BG)); rrect(b[3], byb, b[4], L.rh, true, 2)
+                      set(hb and lc or (lit and lc or U.LINE)); rrect(b[3], byb, b[4], L.rh, false, 2)
+                      text(b[3] + math.floor((b[4] - ms(b[1])) / 2), byb, b[1], (hb or lit) and lc or U.GREY)
+                      if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid, ki = ki } end
+                    end
+                  end
+                end
+                local ay, ah2 = cy0 + L.rh + 1, ch0 - 2 * L.rh - 3
                 if cm == 'wave' or cm == 'spec' then
                   local npx = cw0 - 4
                   local pk = kid.file and npx > 4 and ah2 > 3 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b, cm == 'spec')
@@ -7949,6 +7988,16 @@ function D.frame(L, snap, rows, state, info)
               if hb then hover.dspbtn = { fx = k, f = f, what = 'kgroup', kid = kid } end
               hint('kgroup', gx, hy, gw, L.rh, { kid = kid })
               gw = gw + 2
+              -- 19 окт: r — ячейка в роутере: слои инструментов и эффектов параллельно, контейнеры внутри
+              local rw = ms('r') + 2 * L.pad
+              local rx = gx - rw - 2
+              local hr = not drag and mx >= rx and mx < rx + rw and my >= hy and my < hy + L.rh
+              local nested = kid.entry and kid.entry.container
+              set(hr and U.tint(U.AMBER, 0.35) or (nested and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(rx, hy, rw, L.rh - 1, 1)
+              set(hr and U.AMBER or (nested and U.CYAN or U.LINE)); gfx.rect(rx, hy, rw, L.rh - 1, 0)
+              text(rx + L.pad, hy, 'r', hr and U.AMBER or (nested and U.CYAN or U.GREY))
+              if hr then hover.dspbtn = { fx = k, f = f, what = 'kroute', kid = kid, ki = ks } end
+              gw = gw + rw + 2
             end
             text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4 - gw), kid.enabled and U.CYAN or U.GREY)
           else
@@ -7980,6 +8029,47 @@ function D.frame(L, snap, rows, state, info)
               sxb = sxb + w2 + 2
             end
             cnt = 1
+            -- 19 окт: волна сэмпла пэда с зоной start..end и ADSR поверх — как в модуле RS5K (показ; правка — слайдеры ниже)
+            local avail = math.floor((bh - 3 * L.rh) / L.rh)
+            local WR = avail >= 14 and 4 or (avail >= 9 and 3 or 0)
+            if WR > 0 and kid.file then
+              local wx, wy = cx + L.pad, sy + L.rh + 1
+              local ww, wh = bw1 - 2 * L.pad, WR * L.rh - 3
+              set(U.PANEL); rrect(wx, wy, ww, wh, true)
+              set(U.LINE); rrect(wx, wy, ww, wh, false)
+              local na, nb = kid.pad_a or 0, kid.pad_b or 1
+              local pk = info.file_peaks and info.file_peaks(kid.file, ww)
+              local cyw, hh = wy + math.floor(wh / 2), math.floor(wh / 2) - 2
+              if pk and pk.n and pk.n > 0 then
+                for px = 1, ww - 2 do
+                  local fr = px / ww
+                  set((fr >= na and fr <= nb) and U.TEXT or U.DIM)
+                  local i2 = math.floor(fr * pk.n) + 1
+                  local lo, hi = pk.min[i2] or 0, pk.max[i2] or 0
+                  if hi - lo < 0.03 then lo, hi = -0.015, 0.015 end
+                  gfx.line(wx + px, cyw - hi * hh, wx + px, cyw - lo * hh)
+                end
+              end
+              local gx0 = wx + math.floor(na * (ww - 1) + 0.5)
+              local gx1 = math.max(gx0 + 8, wx + math.floor(nb * (ww - 1) + 0.5))
+              set(U.AMBER); gfx.rect(gx0, wy, 1, wh, 1); gfx.rect(gx1, wy, 1, wh, 1)
+              local tA = (tonumber(kv(ks, 'attack')) or 1) / 1000
+              local tD = (tonumber(kv(ks, 'decay')) or 250) / 1000
+              local tR = (tonumber(kv(ks, 'release')) or 1) / 1000
+              local sdb = tonumber(kv(ks, 'sustain')) or 0
+              local sl = sdb <= -60 and 0 or math.min(1, 10 ^ (sdb / 20) / 2)
+              local flen = info.file_len and info.file_len(kid.file)
+              local dur = flen and flen > 0 and (nb - na) * flen or nil
+              local pps = dur and (gx1 - gx0) / math.max(1e-3, dur) or (gx1 - gx0) / math.max(1e-3, tA + tD + tR + 0.3)
+              local function X(t) return math.min(gx1, gx0 + math.floor(t * pps + 0.5)) end
+              local ay0, ah0 = wy + 2, wh - 4
+              local function Y(v) return ay0 + ah0 - math.floor(v * ah0) end
+              local x1, x2 = X(tA), X(tA + tD)
+              local x3 = math.max(x2, gx1 - math.floor(tR * pps + 0.5))
+              set(U.GREEN)
+              gfx.line(gx0, Y(0), x1, Y(1)); gfx.line(x1, Y(1), x2, Y(sl)); gfx.line(x2, Y(sl), x3, Y(sl)); gfx.line(x3, Y(sl), gx1, Y(0))
+              cnt = 1 + WR
+            end
           end
           for pi, p in ipairs(f.params) do
             if p.kid == show and not p.macro then cl[pi] = { 1, cnt }; cnt = cnt + 1 else cl[pi] = { 99, 0 } end
