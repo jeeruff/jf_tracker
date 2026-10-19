@@ -15,6 +15,6 @@ p = RF.defaults(); p.curve = 1; o = RF.compute(ev, 0, 15, p); eq('curve keeps en
 p = RF.defaults(); p.vals = true; p.lo = 0; p.hi = 100; o = RF.compute(ev, 0, 15, p); eq('remap max', o[3].v, 100); eq('remap min', o[4].v, 0); eq('remap mid', o[1].v, 50)
 p.even = true; o = RF.compute(ev, 0, 15, p); eq('even first', o[1].v, 0); eq('even last', o[4].v, 100); eq('even 2', o[2].v, 33)
 RF.sel = 1; p = RF.defaults(); RF.key(p, ('l'):byte()); eq('key scale', p.scale, 1.05)
-RF.sel = 4; RF.key(p, (' '):byte()); eq('toggle redist', p.redist and 1 or 0, 1)
+RF.sel = 4; RF.key(p, ('l'):byte()); eq('toggle redist', p.redist and 1 or 0, 1)
 RF.sel = 7; RF.key(p, ('l'):byte()); eq('lo +8 turns values on', p.lo, 8); eq('vals on', p.vals and 1 or 0, 1)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

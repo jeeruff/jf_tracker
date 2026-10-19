@@ -23882,7 +23882,8 @@ local function frame()
       elseif state.focus == 'reform' then   -- 19 окт: панель reform
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local r = ctx.RF.key(ctx.rf_p, c, ctx.mods().shift)
-        if r == 'changed' then ctx.rf_apply()
+        if r == 'play' then ctx.rf_play()
+        elseif r == 'changed' then ctx.rf_apply()
         elseif r == 'keep' then ctx.rf_close(true)
         elseif r == 'revert' then ctx.rf_close(false)
         elseif not r then return vim.key(c) end
@@ -24534,6 +24535,16 @@ ctx.rf_apply = function()
   end)
   S.applied = true
   vim.msg = ('reform: scale x%.2f curve %+.2f shift %+d%s'):format(ctx.rf_p.scale, ctx.rf_p.curve, ctx.rf_p.shift, ctx.rf_p.vals and (' values %02X..%02X'):format(ctx.rf_p.lo, ctx.rf_p.hi) or '')
+end
+-- 19 окт: Space в reform — играть выделение (от первой строки; рамка — после правки), ещё раз — стоп
+ctx.rf_play = function()
+  if reaper.GetPlayState() & 1 == 1 then reaper.OnStopButton(); vim.msg = 'reform: stop'; return end
+  local lv = ctx.rf_lastvis
+  local r0 = (ctx.RFS and ctx.RFS.r0) or (lv and lv[3])
+  if not r0 then vim.msg = 'reform: select notes first'; return end
+  reaper.SetEditCurPos(edit.row_time(r0, state.lpb, 0), false, false)
+  reaper.OnPlayButton()
+  vim.msg = 'reform: playing the selection (Space - stop)'
 end
 ctx.rf_close = function(keep)
   local S = ctx.RFS

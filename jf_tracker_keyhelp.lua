@@ -309,8 +309,8 @@ KH.PAGES = {
   } },
   reform = { title = 'reform - reshape the selected notes and automation live (gr in VISUAL; idea: Reform for Renoise, aqu.surf/reform)', e = {
     { k = 'j k', d = 'row: scale, curve, shift, redistribute, anchor (notes / selection), values on, value from / to, value curve, value mode (remap / even)' },
-    { k = 'h l', d = 'value (Shift: fine); toggles switch' },
-    { k = 'Space', d = 'switch the row (redistribute, anchor, values, mode)' },
+    { k = 'h l', d = 'value (Shift: fine); on a switch row - switch it' },
+    { k = 'Space', d = 'listen: play the selection from its start (again - stop)' },
     { k = '0', d = 'the row back to its default' },
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },

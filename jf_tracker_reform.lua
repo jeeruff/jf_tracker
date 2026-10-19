@@ -5,7 +5,7 @@
 -- redistribute (равномерно); якорь — note (от первой ноты до последней) / sel (рамка выделения).
 -- Значения: vol (velocity / громкость) или команда поля — новый диапазон lo..hi с кривой; mode remap (по исходным
 -- значениям) / even (равномерно по порядку). Всё считается от исходного снимка — слайдеры можно крутить туда-обратно.
--- Клавиши: j k — строка, h l — значение (Shift — мелко), Space — переключатель строки, 0 — сброс строки,
+-- Клавиши: j k — строка, h l — значение / переключатель (Shift — мелко), Space — прослушать выделение, 0 — сброс строки,
 -- Enter — оставить, Esc — вернуть как было. Без reaper.* — тест tests/test_reform.lua; применение — main.
 
 local RF = { sel = 1 }
@@ -83,10 +83,11 @@ function RF.key(p, c, shift)
   if ch == 'g' then RF.sel = 1; return true end
   if ch == 'G' then RF.sel = #RF.ROWS; return true end
   if c == 13 then return 'keep' end
+  if ch == ' ' then return 'play' end   -- 19 окт: Space — прослушать выделение (как в Reform)
   if c == 27 then return 'revert' end
   if ch == '0' then p[r.k] = r.def; return 'changed' end
   if r.toggle then
-    if ch == ' ' or ch == 'h' or ch == 'l' or c == 1818584692 or c == 1919379572 then p[r.k] = not p[r.k]; return 'changed' end
+    if ch == 'h' or ch == 'l' or c == 1818584692 or c == 1919379572 then p[r.k] = not p[r.k]; return 'changed' end
     return true
   end
   if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == 1818584692 or c == 1919379572 then
