@@ -8113,6 +8113,17 @@ function D.frame(L, snap, rows, state, info)
                 set((lon or hl) and U.AMBER or U.LINE); gfx.rect(lxb, hy, lw2, L.rh - 1, 0)
                 text(lxb + L.pad, hy, 'list', (lon or hl) and U.AMBER or U.TEXT)
                 if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = lon and 'pads' or 'list', key = kkey } end
+                -- 19 окт: размер пэдов s / m / l — кнопка с выпадашкой (3 значения — не перебор по кругу)
+                local szl = 'size ' .. (info.kitsize or 'l')
+                local szw = ms(szl) + 2 * L.pad
+                local szx = lxb - szw - 2
+                if not lon and szx > bx + 2 + ah + L.pad + ms('20 pads') + L.pad then
+                  local hs = not drag and mx >= szx and mx < szx + szw and my >= hy and my < hy + L.rh
+                  set(hs and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(szx, hy, szw, L.rh - 1, 1)
+                  set(hs and U.AMBER or U.LINE); gfx.rect(szx, hy, szw, L.rh - 1, 0)
+                  text(szx + L.pad, hy, szl, hs and U.AMBER or U.TEXT)
+                  if hs then hover.dspbtn = { fx = k, f = f, what = 'ksize' } end
+                end
               end
               local cnt_s = ('%d pads'):format(#f.kids)
               if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end

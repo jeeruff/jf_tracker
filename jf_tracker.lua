@@ -5583,6 +5583,17 @@ ctx = {
     vim.msg = out and ('%s: baked x%.2f %+g st -> %s'):format(kid.name or 'pad', opt.rate or 1, opt.pitch or 0, out:match('[^/]+$') or out) or 'drumrs5k: bake failed'
   end,
   -- 16 окт: drumrs5k — подпись ячеек пэдов (выпадашка: 4 значения)
+  -- 19 окт: размер пэдов рэка — выпадашка от кнопки в шапке (как zss / zsm / zsl)
+  drum_size_menu = function()
+    local items = {}
+    for _, m in ipairs({ { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4' } }) do
+      items[#items + 1] = { key = m[1], label = m[2] .. ' (zs' .. m[1] .. ')' .. ((state.kitsize or 'l') == m[1] and '  (on)' or ''), fn = function()
+        state.kitsize = m[1]; reaper.SetExtState(EXT, 'kitsize', m[1], true); vim.msg = 'drumrs5k pads: ' .. m[2] .. ' (zs' .. m[1] .. ')'
+      end }
+    end
+    vim.open_hydra({ title = 'drumrs5k pad size', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  end,
   drum_cell_menu = function()
     local items = {}
     for _, m in ipairs(model.DR.CELL_MODES) do
@@ -19386,6 +19397,7 @@ local function frame()
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+    ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
@@ -21307,6 +21319,7 @@ local function frame()
       elseif hover.dspbtn.what == 'del' and not (dbl and click.zone == 'dspbtn') then ctx.dsp_delete(hover.dspbtn.fx, hover.dspbtn.fx)   -- двойной клик не удаляет второй
       elseif hover.dspbtn.what == 'kdel' and hover.dspbtn.kid and not (dbl and click.zone == 'dspbtn') then
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
+      elseif hover.dspbtn.what == 'ksize' then ctx.drum_size_menu()   -- 19 окт: размер пэдов
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
@@ -23860,6 +23873,15 @@ local function frame()
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
+        -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
+        if state.dsp_zs and not DK.pending then
+          state.dsp_zs = nil
+          if ch == 's' or ch == 'm' or ch == 'l' then
+            state.kitsize = ch; reaper.SetExtState(EXT, 'kitsize', ch, true)
+            vim.msg = 'drumrs5k pads: ' .. ({ s = 'small (more rows)', m = 'medium 4 x 4', l = 'large 4 x 4' })[ch]
+          else vim.msg = 'zs: s / m / l - pad size' end
+          return
+        end
         -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
         if not DK.pending and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
@@ -23871,15 +23893,6 @@ local function frame()
         if DK.pads and state.dsp_z and ch == 'z' and not DK.pending then
           state.dsp_z = nil
           ctx.pane_do(function() return draw.panes.zoom(state.panes, 'dsp') end, state.panes.zoom == 'dsp' and 'dsp back in its pane' or 'drumrs5k on the whole window: pads | list (zz - back)')
-          return
-        end
-        -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
-        if state.dsp_zs and not DK.pending then
-          state.dsp_zs = nil
-          if ch == 's' or ch == 'm' or ch == 'l' then
-            state.kitsize = ch; reaper.SetExtState(EXT, 'kitsize', ch, true)
-            vim.msg = 'drumrs5k pads: ' .. ({ s = 'small (more rows)', m = 'medium 4 x 4', l = 'large 4 x 4' })[ch]
-          else vim.msg = 'zs: s / m / l - pad size' end
           return
         end
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
