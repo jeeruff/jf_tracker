@@ -9272,7 +9272,7 @@ ctx = {
     slowplay = 'play at /2 - half speed (Ctrl+Cmd+Space); again or Space - stop, x1 back',
     fastplay = 'play at x2 - double speed; again or Space - stop, x1 back',
     shiftrec = 'shift rec: waits for a MIDI note, then records from the cursor row at the project rate (record slow at x0.5 - it plays back fast); again - cancel',
-    dub = 'dub: copy the loop forward and keep going (rclick - copy / move / random mutes)',
+    stophere = '|>: stop where it plays - the cursor stays there (as Esc while playing)',
     punch = 'punch: records only inside the time selection (cursor region)',
     preroll = 'pre-roll: playback / recording starts a bit earlier (count-in)',
     reclib = 'rec -> lib: every recorded take also becomes a lib instrument',
@@ -16768,7 +16768,7 @@ function ctrl_action(name, delta)
       if not state.slowrate then state.slowrate = 0.5 end
       ctx.slow_rec()
     end
-  elseif name == 'dub' then if delta == 0 then ctx.dub(state.dubmode or 'move') end
+  elseif name == 'stophere' then if delta == 0 then ctx.stop_here() end   -- 19 окт: |> — стоп на месте (как Esc)
   elseif name == 'ratebar' then
     if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
@@ -21903,7 +21903,6 @@ local function frame()
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
-  elseif U.rclick and hover.ctrl == 'dub' then ctx.dub_menu()
   elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
@@ -23038,13 +23037,7 @@ local function frame()
   if c == 27 and state.escstop and not ctx.mods().shift and (reaper.GetPlayState() & 1) == 1 and (reaper.GetPlayState() & 4) == 0
      and not vim.picker and not vim.hydra and not vim.pending and not vim.op and vim.mode ~= 'cmd' and vim.mode ~= 'search'
      and vim.mode ~= 'visual' and vim.mode ~= 'vline' and not OPT.active and not (MX.SMART and MX.SMART.active()) then
-    -- 17 окт: стоп на месте — курсор трекера и edit cursor на позиции плейхеда (как 40328), без прыжка на старт
-    local pos = reaper.GetPlayPosition()
-    reaper.OnStopButton()
-    reaper.SetEditCurPos(pos, false, false)
-    local r = math.floor(model.row_of_time(pos, state.lpb) + 1e-6)
-    if state.focus == 'tracker' and r >= 0 then vim.cur.row = r; vim.ensure_visible() end
-    vim.msg = ('stopped at row %04d (Esc again - %s; Space stops and goes back)'):format(math.max(0, r), vim.mode == 'insert' and 'leave INSERT' or 'INSERT')
+    ctx.stop_here()
     c = 0
   end
   if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
@@ -24904,6 +24897,17 @@ ctx.pad_ms_all = function(f, ki, solo)
     model.invalidate(); vim.msg = 'pads: all on'
   elseif ki and ki > 0 then ctx.pad_mute_solo(f, ki, solo)
   else vim.msg = 'pads: select a pad first' end
+end
+-- 17 окт: стоп на месте — курсор трекера и edit cursor на позиции плейхеда (как 40328), без прыжка на старт
+-- 19 окт: общая функция — Esc в игре и кнопка |> транспорта
+ctx.stop_here = function()
+  if reaper.GetPlayState() & 1 == 0 then vim.msg = '|>: not playing'; return end
+  local pos = reaper.GetPlayPosition()
+  reaper.OnStopButton()
+  reaper.SetEditCurPos(pos, false, false)
+  local r = math.floor(model.row_of_time(pos, state.lpb) + 1e-6)
+  if r >= 0 then vim.cur.row = r; vim.ensure_visible() end
+  vim.msg = ('stopped at row %04d (Esc / |>; Space stops and goes back)'):format(math.max(0, r))
 end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)
