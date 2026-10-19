@@ -1122,7 +1122,7 @@ end
 
 -- off (12 окт) — строка внутри ноты, четверти от её начала (команды-огибающие / генераторы /
 -- песня); свойства item (0S 0M 0P SI …) — у всей ноты, off не нужен
--- 19 окт: 0Sxx ноты кита drumrs5k — сдвиг окна пэда (start и end RS5K) на xx/256 длины слайса. Метка — notation-
+-- 19 окт: 0Sxx ноты кита drumrs5k — старт пэда (Sample start offset RS5K) сдвигается на xx/256 длины слайса, конец на месте. Метка — notation-
 -- событие у ноты (едет с ней при Ins / BS), автоматизация start / end пэда собирается по всем его нотам на треке:
 -- ступенька за 5 мс до ноты; база (исходные start / end) — P_EXT трека jf_soffb:<GUID пэда>. E.kit_pad ставит main
 E.kit_pad = nil
@@ -1169,7 +1169,7 @@ function E.kit_soff_rebuild(track, pitch)
   local any = false
   for _, p in ipairs(pts) do if p.xx > 0 then any = true end end
   local eS = R.GetFXEnvelope(track, pad.fx, pad.start_i, any)
-  local eE = R.GetFXEnvelope(track, pad.fx, pad.stop_i, any)
+  local eE = R.GetFXEnvelope(track, pad.fx, pad.stop_i, false)   -- 19 окт: конец не двигается (sample offset, как Renoise) — старые точки долой
   for _, env in ipairs({ eS, eE }) do if env then R.DeleteEnvelopePointRange(env, -1, 1e9) end end
   if not any then
     R.TrackFX_SetParamNormalized(track, pad.fx, pad.start_i, a); R.TrackFX_SetParamNormalized(track, pad.fx, pad.stop_i, b)
@@ -1178,12 +1178,13 @@ function E.kit_soff_rebuild(track, pitch)
   end
   local len = b - a
   local function put(env, t, v) if env then R.InsertEnvelopePoint(env, math.max(0, t), R.ScaleToEnvelopeMode(R.GetEnvelopeScalingMode(env), math.max(0, math.min(1, v))), 1, 0, false, true) end end
-  put(eS, 0, a); put(eE, 0, b)
+  if eE then R.TrackFX_SetParamNormalized(track, pad.fx, pad.stop_i, b) end
+  put(eS, 0, a)
   local prev = 0
   for _, p in ipairs(pts) do
     local d = p.xx / 256 * len
     local t = math.max(prev + 0.0005, p.t - 0.005)
-    put(eS, t, a + d); put(eE, t, b + d)
+    put(eS, t, math.min(b - 1e-4, a + d))   -- старт внутри окна: играет от смещения до конца пэда
     prev = t
   end
   for _, env in ipairs({ eS, eE }) do if env then R.Envelope_SortPoints(env) end end
