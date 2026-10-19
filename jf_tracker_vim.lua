@@ -742,7 +742,10 @@ local function apply(op, f0, f1, r0, r1)
     local fld = V.cur.field or 1
     if fld == 1 and V.cur.sub == 'slc' then
       -- 11 окт: слайс ±d
-      for _, h in ipairs(heads) do if ctx.set_slice then ctx.set_slice({ h }, math.max(0, (h.slice or 0) + d)) end end
+      for _, h in ipairs(heads) do
+        local s0 = h.slice or (h.kind == 'midi' and ctx.midi_kit_slice and ctx.midi_kit_slice(h.item, h.pitch)) or 0   -- 19 окт: пэд кита — от своего Sxx
+        if ctx.set_slice then ctx.set_slice({ h }, math.max(0, s0 + d)) end
+      end
     elseif fld == 1 and V.cur.sub == 'inst' then
       -- инструмент ±d (5 окт)
       for _, h in ipairs(heads) do
@@ -2394,6 +2397,8 @@ function V.key_impl(c)
         local lane = f.lane or f.col.lanes[1]
         local inst = (f.col.pool or {})[V.inst]
         if ctx.inst_fx and ctx.inst_fx(f.col) then inst = nil end   -- 9 окт: плагин-инструмент — MIDI
+        -- 19 окт: кит drumrs5k — клавиша = пэд (как слайс нарезанного сэмпла): высота — нота этого пэда
+        if ctx.kit_key_pitch and how ~= 'beside' then local kp = ctx.kit_key_pitch(f.col, pitch); if kp then pitch = kp end end
         -- живой арпеджиатор (3 окт, :arp live): нота — в держимый аккорд
         if V.arp_live and how == 'insert' and ctx.arp_live_key then
           ctx.arp_live_key({ track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil, row = V.cur.row, pitch = pitch,

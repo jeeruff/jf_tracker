@@ -4874,6 +4874,42 @@ ctx = {
     return v or nil
   end,
   inst_fx = function(col) return col and state.instfx and state.instfx[col.guid] end,
+  -- 19 окт: пэд drumrs5k как слайс — номер пэда k у MIDI-ноты кита (по диапазону нот RS5K детей); nil — не кит
+  midi_kit_slice = function(item, pitch)
+    if not (item and pitch and snap) then return nil end
+    local mc = ctx.mk_cache
+    if not mc or mc.snap ~= snap then mc = { snap = snap, n = {} }; ctx.mk_cache = mc end
+    local key = tostring(item) .. ':' .. pitch
+    local v = mc.n[key]
+    if v ~= nil then return v or nil end
+    v = false
+    local tr = reaper.ValidatePtr(item, 'MediaItem*') and reaper.GetMediaItem_Track(item)
+    for _, c in ipairs(snap.cols) do
+      if c.track == tr then
+        for _, fi in ipairs(ctx.track_insts(c)) do
+          for k, ke in ipairs(fi.kids or {}) do if ke.lo and pitch >= math.min(ke.lo, ke.hi or ke.lo) and pitch <= math.max(ke.lo, ke.hi or ke.lo) then v = k; break end end
+          if v then break end
+        end
+        break
+      end
+    end
+    mc.n[key] = v
+    return v or nil
+  end,
+  -- 19 окт: набор на ките: клавиша = пэд, как у нарезанного сэмпла (1 / q = S01 …); → высота пэда, k; не кит — nil
+  kit_key_pitch = function(col, pitch)
+    local fx = ctx.inst_fx(col)
+    if not fx then return nil end
+    for _, fi in ipairs(ctx.track_insts(col)) do
+      if fi.fx == fx and fi.kids then
+        local sh = (state.slice1 or keys.frow()) and 1 or 0
+        local k = pitch - (model.SLICE_BASE or 48) + sh
+        local ke = fi.kids[k]
+        if ke and ke.lo then return ke.lo, k end
+        return nil
+      end
+    end
+  end,
   mono_on = function() return state.slicemono end,
   -- 11 окт: квантизация старта слайсов (кнопка q во вкладке item): шаг auto ставит
   -- следующий слайс не в точный конец предыдущего, а на ближайшую клетку сетки
@@ -14824,6 +14860,7 @@ if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; re
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
+draw.midi_slice = function(it, p) return ctx.midi_kit_slice(it, p) end   -- 19 окт: пэд drumrs5k — Sxx у MIDI-ноты
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
 local function hint_go(t)
@@ -19189,7 +19226,8 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (KT[hover.dspbtn.what] or ' - bypass on / off')
-  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)' })[hover.dspbtn.what]
+  elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+    kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or ''   -- 19 окт: незнакомая кнопка не роняет кадр
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'

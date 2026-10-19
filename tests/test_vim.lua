@@ -105,6 +105,7 @@ local function reset()
   V.init({
     keys_renoise = function() return RENOISE end,
     keys_frow = function() return FROW end,   -- 16 окт: раскладка frow
+    kit_key_pitch = function(col, p) return KIT_MAP and KIT_MAP(p) end,   -- 19 окт: кит — клавиша = пэд
     edit = E, state = state, piano = keys.piano, SM = dofile(DIR .. '/jf_tracker_smart.lua'),
     esc_vim = function() return ESC_VIM end,   -- 10 окт: опция Esc mode
     track_toggle = function(what) calls[#calls + 1] = 'track:' .. what end,   -- 9 окт: Shift+M / S — трек
@@ -1117,6 +1118,13 @@ do
   local g0, g1, q0, q1 = V.visual_range()
   eq('visual: Ctrl+Shift+J moves the selection a row down', ('%d-%d'):format(q0, q1), ('%d-%d'):format(math.floor(21 / L0) * L0 + 1, math.floor(21 / L0) * L0 + L0))
   V.key(27)
+end
+
+do
+-- 19 окт: кит drumrs5k — клавиша = пэд: высота — нота пэда (ctx.kit_key_pitch)
+KIT_MAP = function(p) return p == 60 and 36 or nil end
+reset(); V.cur.row = 2; keysin('iq'); eq('kit: the key writes the pad note', last(), 'ins:trA@2:36:1')
+KIT_MAP = nil; V.mode = 'normal'
 end
 
 print(('%d checks, %d failed'):format(checks, fails))

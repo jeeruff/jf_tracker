@@ -2055,7 +2055,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
     else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     if L.x_slc then
-      local sk = cell and cell.kind == 'audio' and cell.slice
+      local sk = cell and ((cell.kind == 'audio' and cell.slice) or (cell.kind == 'midi' and D.midi_slice and D.midi_slice(cell.item, cell.pitch)))   -- 19 окт: пэд кита — Sxx
       if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), c('slc', cell.muted and U.GREY or D.RN_OTHER))   -- своё поле: курсор инструмента его не красит
       else text(x + L.x_slc, ty, '...', c('slc',  (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
     end
@@ -7701,7 +7701,7 @@ function D.frame(L, snap, rows, state, info)
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
-      set(in_rng and U.tint(U.CYAN, 0.22) or (is_sel and U.tint(U.AMBER, 0.18) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
+      set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
       if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       if vtw > 0 then
