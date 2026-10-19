@@ -41,9 +41,9 @@ eq('coded region is never a section', #s3, 0)
 -- служебные имена
 local _, s4 = S.split({ { idx = 1, name = '=SESSION', pos = 0, rgnend = 8, session = true }, rg(2, 'A1', 0, 2) })
 eq('session zone is not a section', #s4, 0)
--- одинаковый по размеру — не секция (дубль)
+-- 19 окт: одинаковый по размеру поверх паттерна с кодом — секция из одного паттерна (два паттерна в одной точке запрещены)
 local _, s5 = S.split({ rg(1, 'verse', 0, 2), rg(2, 'A1', 0, 2) })
-eq('same span is not a section', #s5, 0)
+eq('same span over a coded pattern: a one-pattern section', #s5, 1)
 
 -- census / resync: A2 вырос на 2 → конец verse за ним
 local c = S.census(pats, secs)
@@ -116,6 +116,10 @@ do
   local R5 = { rg(1, 'C1', 2, 3), rg(2, 'C1', 2, 3) }
   local p5, s5 = S.split(R5)
   eq('stacked C1: not a section', #s5, 0); eq('stacked C1: two slots', #p5, 2)
+  -- 19 окт: секция ровно в один паттерн — секция, паттерн — слот
+  local R6 = { rg(1, 'C2', 8, 9), rg(2, 'breakdown', 8, 9) }
+  local p6, s6 = S.split(R6)
+  eq('one-pattern section: a section', #s6, 1); eq('…the pattern is the slot', p6[1] and p6[1].name, 'C2')
 end
 
 print(('%d checks, %d failed'):format(checks, fails))

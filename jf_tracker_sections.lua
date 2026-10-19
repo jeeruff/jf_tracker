@@ -95,6 +95,8 @@ function S.split(regions)
     if not r.session and not r.lib and r.name ~= '' and not S.code_of(r.name) and not r.name:match('^=') then
       for _, o in ipairs(regions) do
         if not o.session and inside(o, r) then sec = true; break end
+        -- 19 окт: секция ровно в один паттерн (breakdown = C2 по границам) — тоже секция, если внутри паттерн с кодом
+        if not o.session and o ~= r and S.code_of(o.name) and o.pos >= r.pos - EPS and o.rgnend <= r.rgnend + EPS then sec = true; break end
       end
     end
     if sec then r.section = true; secs[#secs + 1] = r else pats[#pats + 1] = r end
