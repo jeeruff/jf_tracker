@@ -1544,7 +1544,7 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
           if kl then lbl = lbl .. '  ' .. kl .. ' whole' end
         end
         colr = on and U.AMBER or (rw.k == 'c' and U.GREY or U.TEXT)
-      elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~~ automation  %d'):format(rw.n); colr = U.GREY
+      elseif rw.k == 'a' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. ('~ automation  %d'):format(rw.n); colr = U.GREY
       elseif rw.k == 'p' then
         local sel = info.inst_fx and info.inst_fx(cols[rw.ci]) == rw.fx
         lbl = '~ ' .. (rw.name or 'instrument'); colr = sel and U.AMBER or U.CYAN
@@ -4796,7 +4796,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local sel = info.auto_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, fit(('%02d ~~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
+      text(ix + 6, y + 1, fit(('%02d ~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
     elseif row.sep then
@@ -4882,6 +4882,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local lib = e.depot and not (e.tracks and e.tracks[1])
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif inr then set(U.tint(U.CYAN, 0.22)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      if D.lib_layer_t == i then set(U.CYAN); gfx.rect(ix + 1, y, w - 2, L.rh, 0) end   -- 19 окт: сюда — слоем
       set(rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
       -- метки: @ трек курсора, $ нарезан; ребёнок (слайс / кусок исходника) —
       -- с отступом и sN вместо имени исходника (дерево как в Renoise, 2 окт)
@@ -5007,7 +5008,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
-    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  N$ slices  # drumrs5k  ~~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
+    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  N$ slices  # drumrs5k  ~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
   end
   D.pool_dbg = table.concat(dbg, ' | ')
 end

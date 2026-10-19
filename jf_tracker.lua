@@ -21815,6 +21815,7 @@ local function frame()
         elseif type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac)) then state.status = 'drop ' .. B.drag.e.name .. ' → a new slice of the selected instrument (a files kit &)'
         elseif hover.dspkit and B.is_marked(B.drag.e) and B.nmarked() > 1 then state.status = ('drop %d marked files → %s'):format(B.nmarked(), hover.dspkit.ki > 0 and 'the pads from this one on (more - new pads)' or 'new pads of the drumrs5k')
         elseif hover.dspkit then state.status = 'drop ' .. B.drag.e.name .. (hover.dspkit.ki > 0 and ' → this pad (its sample)' or ' → a new pad of the drumrs5k')
+        elseif ctx.layer_drop_target(hover) and not B.drag.e.dir then state.status = 'drop ' .. B.drag.e.name .. ' → a layer of ' .. (ctx.layer_drop_target(hover).e.name or '')   -- 19 окт
         elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
         elseif hover.sess or (hover.matrix and hover.matrix.ri) then state.status = 'drop ' .. B.drag.e.name .. ' → a clip in this slot'
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column, the lib, the slices, the item wave or a clip' end
@@ -21850,6 +21851,9 @@ local function frame()
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
              and (type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac))) then
         ctx.lib_append_slice(bd.e.pm and bd.e.path or B.full(bd.e))   -- 10 окт: на слайсы / волну item — новым слайсом (набор &)
+      elseif bd.active and ctx.layer_drop_target(hover) and not bd.e.fromlib and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
+        local lt = ctx.layer_drop_target(hover)                             -- 19 окт: на слоёный ¥ — файл его слоем
+        pool_select(lt.i); ctx.layer_add_files({ bd.e.pm and bd.e.path or B.full(bd.e) })
       elseif bd.active and hover.pool and not bd.e.fromlib and not bd.e.trk and not bd.e.rgn and not bd.e.mark then
         ctx.add_to_depot(bd.e.pm and bd.e.path or B.full(bd.e))       -- бросок на инструменты — в библиотеку трека
       elseif bd.active and hover.matrix and hover.matrix.ri and hover.matrix.ci and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
@@ -21984,10 +21988,19 @@ local function frame()
         draw.lib_drag, draw.lib_drop = nil, nil
         goto lib_drag_done
       end
-      if d.active then state.status = 'lib: drop to place the sample here (numbers follow the order); out of the lib - as a file' end
+      -- 19 окт: над слоёным ¥ (строка инструмента или его слой) — бросок сделает перетаскиваемое его слоем
+      local lt = d.active and ctx.layer_drop_target(hover, d.i)
+      draw.lib_layer_t = lt and lt.i or nil
+      if lt then state.status = ('lib: drop - %s becomes a layer of %s'):format(cur_col().pool[d.i].name or '', lt.e.name or '')
+      elseif d.active then state.status = 'lib: drop to place the sample here (numbers follow the order); out of the lib - as a file' end
     else
-      if d.active and draw.lib_drop then ctx.lib_move(d.i, draw.lib_drop.before) end
-      draw.lib_drag, draw.lib_drop = nil, nil
+      local lt = d.active and ctx.layer_drop_target(hover, d.i)
+      if lt then
+        local src = cur_col().pool[d.i]
+        local n = edit.layer_add(lt.e.item, src.item); model.invalidate()
+        vim.msg = n and ('%s: layer %d = %s'):format(lt.e.name or '', n, src.name or '') or 'layer: failed'
+      elseif d.active and draw.lib_drop then ctx.lib_move(d.i, draw.lib_drop.before) end
+      draw.lib_drag, draw.lib_drop, draw.lib_layer_t = nil, nil, nil
     end
   end
   ::lib_drag_done::
@@ -24562,6 +24575,14 @@ ctx.lib_tree_key = function(c)
 end
 -- 19 окт: слоёный инструмент ¥ (движок — edit.layers_sync / layer_add, формат — jf_tracker_layers.lua).
 -- L в lib — другой инструмент слоем этого; в дереве tracks слои — папкой у инструмента, Enter на слое — его меню
+-- 19 окт: цель броска «слоем»: под мышью строка слоёного ¥ инструмента или его слоя (не сам перетаскиваемый)
+ctx.layer_drop_target = function(hv, skip_i)
+  local hp = hv and hv.pool
+  if not (hp and hp.i) or hp.empty or hp.instfx or hp.auto or hp.midi then return nil end
+  local e = cur_col() and (cur_col().pool or {})[hp.i]
+  if not (e and e.layers and #e.layers > 0 and e.depot) or hp.i == skip_i then return nil end
+  return { i = hp.i, e = e }
+end
 ctx.layer_add_files = function(paths)
   local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
   if not (e and e.item and e.depot and e.stype == 'audio') then vim.msg = 'layers: select an audio instrument of the lib first'; return end
