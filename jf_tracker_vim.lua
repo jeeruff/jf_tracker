@@ -3447,6 +3447,8 @@ function V.key(c)
   if ctx.piano_on then V.piano = ctx.piano_on() end    -- клавиатура = видна снизу (m), 5 окт
   local p0 = V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)
   local r = V.key_impl(c)
+  local E0 = ctx.edit
+  if E0 and E0.skip_msg then V.msg = E0.skip_msg; E0.skip_msg = nil end   -- 19 okt: команда, которую нота не умеет
   if ctx.piano_on then V.piano = ctx.piano_on() end
   -- набор сокращения формы живёт только на месте: курсор ушёл — сброс (ревью 2 окт)
   if V.shapebuf and (V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)) ~= p0 then V.shapebuf = nil end
@@ -3673,8 +3675,10 @@ function V.smart()
       local p = vals(have:sub(1, 2), tonumber(have:sub(3), 16))
       return ctx.smart_open(p)
     end
-    items, cols, sel = SM.fx_letters()
-    title = 'command  ' .. where
+    -- 19 окт: MIDI-нота — только команды, которые она умеет (система команд: 0U 0D 0G …); 0S, SI, SO, SL … — у аудио
+    local midi = h1 and h1.kind == 'midi'
+    items, cols, sel = SM.fx_letters(midi and function(code) return E.cmds and E.cmds.CODES[code] end or nil)
+    title = 'command  ' .. where .. (midi and '  (MIDI note: 0S offset and item commands - audio only; drumrs5k: the slice column picks the pad)' or '')
     pick = function(it) return vals(it.v, nil) end
   end
   return ctx.smart_open({ title = title, items = items, cols = cols, sel = sel, on_pick = pick, on_sel = listen, cell_rows = crows, cell_w = cellw })

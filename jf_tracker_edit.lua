@@ -1102,6 +1102,8 @@ function E.set_fx(heads, lpb, cmd, xx, off)
     for _, h in ipairs(heads) do
       if E.cmds and E.cmds.CODES[cmd] then
         if h.item then E.cmds.put(h.item, cmd, xx, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
+      elseif h.kind == 'midi' then   -- 19 окт: команды item (0S, SI, SO, SL …) — только у аудио; MIDI молча не писал
+        E.skip_msg = cmd .. 'xx: a MIDI note cannot take it (audio notes only' .. (cmd == '0S' and '; drumrs5k: the slice column picks the pad, a start offset - later in jf_slixer)' or ')')
       else
         apply_fx(h, lpb, cmd, xx)
       end

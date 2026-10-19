@@ -312,14 +312,16 @@ SM.FX_MEAN = {
   ZT = function(v) return ('tempo %d BPM'):format(v) end,
   ZJ = function(v) return ('jump to sequence slot %d'):format(v) end,
 }
-function SM.fx_letters()
+function SM.fx_letters(only)   -- only(code) → false: команда этой ноте не подходит (19 окт: MIDI — без 0S, SI, SO …)
   local items = {}
   -- 17 окт: буква эффекта — сразу на него: 0x — одна буква (M = 0M), S_ Z_ — две (S I = SI; S и Enter — 0S); буквы светлее
   for _, e in ipairs(SM.FX) do
     local code = e[1]
+    if only and not only(code) then goto fxl_next end
     local ta = code:sub(1, 1) == '0' and code:sub(2) or code
     items[#items + 1] = { label = code .. ' ' .. (SM.FX_NAME[code] or ''), t = code, ta = ta, v = code, tip = code .. 'xx  ' .. e[2],
                           hl = code:sub(1, 1) == '0' and { 2, 2 } or { 1, 2 } }
+    ::fxl_next::
   end
   return items, 4, 1
 end
