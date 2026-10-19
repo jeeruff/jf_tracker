@@ -7254,7 +7254,9 @@ function D.frame(L, snap, rows, state, info)
         local v = math.min(1, math.max(pl or 0, pr or 0))
         if v > 0 then
           local x0, w0 = c.x + 2, math.max(2, math.min(c.w - 4, 3 * L.cw))   -- 8 окт: одной ширины на всех треках (было — треть колонки)
-          for _, sg in ipairs({ { 0, 0.6, U.GREEN }, { 0.6, 0.85, U.AMBER }, { 0.85, 1, U.RED } }) do
+          local segs = c.col.armed and { { 0, 0.6, U.mix(U.RED, U.BG, 0.5) }, { 0.6, 0.85, U.mix(U.RED, U.BG, 0.25) }, { 0.85, 1, U.RED } }   -- 19 окт: взведён — метр записи красной гаммой
+            or { { 0, 0.6, U.GREEN }, { 0.6, 0.85, U.AMBER }, { 0.85, 1, U.RED } }
+          for _, sg in ipairs(segs) do
             local s0, s1 = math.floor(sg[1] * maxh), math.floor(math.min(v, sg[2]) * maxh)
             if s1 > s0 then gfx.set(sg[3][1], sg[3][2], sg[3][3], 0.45); gfx.rect(x0, math.max(L.body_y, by - s1), w0, s1 - s0, 1) end
           end
@@ -7279,6 +7281,7 @@ function D.frame(L, snap, rows, state, info)
             local part = math.min(8, eighths)
             local frac = (cell + 1) / ncell
             local col = frac > 0.85 and U.RED or (frac > 0.6 and U.AMBER or U.GREEN)
+            if c.col.armed then col = U.mix(U.RED, U.BG, 0.55 * (1 - frac)) end   -- 19 окт: взведён — метр записи: красный, ярче к верху
             local cy1 = by - cell * rh - 1                  -- низ клетки (зазор 1 px сверху и снизу)
             local hh = math.max(1, math.floor((rh - 2) * part / 8 + 0.5))
             gfx.set(col[1], col[2], col[3], 0.5)
@@ -7298,11 +7301,25 @@ function D.frame(L, snap, rows, state, info)
     local hh = math.floor(L.body_h * 0.575)
     for _, c in ipairs(L.cols) do
       if c.x and not c.folded and c.col and not c.col.master then
-        local age = info.midi_in_age(c.col)
-        if age and age < 0.3 then
+        local age, vel = info.midi_in_age(c.col)
+        local DEC = 0.4
+        if age and age < DEC then
+          -- 19 окт: метр MIDI — высота по velocity, спад за 0.4 с; клетками строк, низ тусклый, верх ярче (как L R)
           local yl = U.YELLOW or U.AMBER
           local x0 = (state.meterstyle == 'pt') and (c.x + 2 + math.max(2, math.min(c.w - 4, 3 * L.cw)) + 2) or (c.x + 2 + 2 * (cwm + 1) + 1)
-          gfx.set(yl[1], yl[2], yl[3], 0.9 * (1 - age / 0.3)); gfx.rect(x0, math.max(L.body_y, by - hh), math.max(2, math.floor(cwm / 2)), hh, 1)
+          local v = math.max(0, math.min(1, (vel or 100) / 127)) * (1 - age / DEC)
+          local ncell = math.max(1, math.floor(L.nrows * 0.575))
+          local eighths = math.floor(v * ncell * 8 + 0.5)
+          local cell = 0
+          while eighths > 0 and cell < ncell do
+            local part = math.min(8, eighths)
+            local frac = (cell + 1) / ncell
+            local cc = U.mix(yl, U.BG, 0.55 * (1 - frac))
+            local cy1 = by - cell * L.rh - 1
+            local h1 = math.max(1, math.floor((L.rh - 2) * part / 8 + 0.5))
+            gfx.set(cc[1], cc[2], cc[3], 0.85); gfx.rect(x0, cy1 - h1, cwm, h1, 1)
+            eighths = eighths - part; cell = cell + 1
+          end
         end
       end
     end
