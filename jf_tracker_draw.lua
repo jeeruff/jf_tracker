@@ -8257,6 +8257,9 @@ function D.frame(L, snap, rows, state, info)
                 local fg = kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM
                 local nm = kid.name or ''
                 nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
+                -- 19 окт: заголовок пэда — его нота (key — клавиша); Sxx на пэде уже не нужен
+                if cm == 'key' then nm = kid.note and info.drum_key and info.drum_key(kid.note) or nm
+                elseif kid.note then nm = ({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[kid.note % 12 + 1] .. math.max(0, kid.note // 12 - 1) end
                 local tag = #(kid.slots or {}) > 0 and ('+' .. #kid.slots) or ''
                 -- 19 окт: на пэде — его группы: g1 (играют вместе), c1 (choke)
                 local long = ms('grp1 chk1') <= cw0 - 2 * L.pad      -- 19 окт: влезает — grp / chk, как у кнопок; тесно — g / c
@@ -8312,10 +8315,7 @@ function D.frame(L, snap, rows, state, info)
                       gfx.line(cx0 + 2 + px, mid - math.min(1, pk.max[idx] or 0) * hh, cx0 + 2 + px, mid - math.max(-1, pk.min[idx] or 0) * hh)
                     end
                   end
-                  local lbl
-                  if cm == 'key' then lbl = kid.note and info.drum_key and info.drum_key(kid.note) or '-'
-                  else lbl = kid.note and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[kid.note % 12 + 1] .. math.max(0, kid.note // 12 - 1)) or '---' end
-                  text(cx0 + L.pad, ay, fit(lbl, cw0 - 2 * L.pad), kid.enabled and (on and U.AMBER or U.TEXT) or U.DIM)
+                  -- 19 окт: нота — в заголовке пэда; второй строкой поверх волны больше не пишется
                 end
                 if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid, rect = { cx0, cy0, cw0, ch0 } }; if info.dragging then D.drop_note = kid.note end end
                 if D.drop_lit(info, kid.note, hot) then D.drop_mark(cx0, cy0, cw0, ch0) end   -- 19 окт: ячейка, куда ляжет брошенный файл
