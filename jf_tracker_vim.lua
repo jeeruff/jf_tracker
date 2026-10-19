@@ -1949,7 +1949,7 @@ function V.key_impl(c)
       if not valf and (SH[chs] or (chs == 's' and V.mode == 'insert')) then
         if V.mode ~= 'visual' and V.mode ~= 'vline' then
           if V.mode == 'insert' then V.back_insert = true end
-          V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
+          V.mode = 'visual'; V.vfield, V.vtrack = nil, nil; V.anchor = { fi = V.cur.fi, row = V.cur.row }
         end
         if SH[chs] then
           local m = motion(SH[chs]:byte(), V.count or 1)
@@ -2513,6 +2513,9 @@ function V.key_impl(c)
     V.pending = nil
     if c == ESC then V.count = nil; finish_move(); return end
     if p == 'g' then
+      if c == ('i'):byte() and (V.mode == 'visual' or V.mode == 'vline') and not V.op then
+        V.interp_menu(); return   -- 19 окт: gi — интерполятор (формы кривой)
+      end
       -- 10 окт: g + цифры + Enter (или g) — на строку с этим номером (g12 ↵ → 0012); Esc — отмена
       if c >= 48 and c <= 57 and not V.op then
         V.gnum = (V.gnum or '') .. string.char(c); V.pending = 'g'
@@ -2721,6 +2724,18 @@ function V.key_impl(c)
         V.count = math.floor((V.count or 0) * 10 + (c - 48)); V.pending = p; return
       end
       if c == ('g'):byte() then V.op = p; V.pending = 'g'; return end
+      -- 19 окт: yc — поле курсора (vol / delay / команда) на весь паттерн в регистр
+      if p == 'y' and c == ('c'):byte() then
+        local fld = V.cur.field or 1
+        if fld < 2 or env_of(V.cur.fi) then V.msg = 'yc: put the cursor on vol, delay or a command field'
+        else
+          local r0, r1
+          if ctx.region_rows then r0, r1 = ctx.region_rows() end
+          local cnt = V.field_yank(V.cur.fi, V.cur.fi, r0 or 0, r1 or 1000000, fld)
+          V.msg = ('yc: %d value(s) of the field in the pattern - p puts them at the cursor row'):format(cnt)
+        end
+        V.count = nil; finish_move(); return
+      end
       -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
       -- курсора в регионе (вне региона — до =END). Просьба 2 окт.
       -- 13 окт: dc — колонка огибающей курсора целиком: точки, automation items, сама колонка
@@ -2845,6 +2860,9 @@ function V.key_impl(c)
       done = true
     elseif c == ctrl('a') or c == ctrl('x') then
       apply(c == ctrl('a') and '+' or '-', f0, f1, r0, r1); V.mode = 'normal'; finish_edit(); done = true
+    elseif c == ('p'):byte() and V.regs['"'] and V.regs['"'].kind == 'field' then
+      local n = V.field_paste(V.regs['"'], f0, r0); V.msg = ('field: %d value(s) put'):format(n)
+      V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; finish_edit(); done = true
     elseif c == ('p'):byte() then
       local reg = V.regs['"']
       local env = f0 == f1 and env_of(f0)
@@ -2859,7 +2877,24 @@ function V.key_impl(c)
     elseif c == ('r'):byte() then V.pending = 'r'; return
     elseif c == ('V'):byte() then V.mode = 'vline'; done = true
     elseif (c == ('a'):byte() or c == ('i'):byte()) and V.mode == 'visual' then V.smart_expand(c == ('a'):byte() and 1 or -1); done = true   -- 17 окт: a шире / i уже (Paketti; v — режим)
-    elseif c == ('v'):byte() then V.mode = 'visual'; done = true
+    elseif c == ('v'):byte() then
+      -- 19 окт: v по кругу: поле → весь трек → выход
+      if V.mode ~= 'visual' then V.mode = 'visual'; V.vfield = nil; V.vtrack = nil
+      elseif V.vfield then V.vfield = nil; V.vtrack = true; V.msg = 'visual: the whole track (v - off)'
+      elseif not V.vtrack then V.vtrack = true; V.msg = 'visual: the whole track (v - off)'
+      else V.vtrack = nil; V.mode = 'normal'; finish_move() end
+      done = true
+    elseif V.vfield and (c == ('y'):byte() or c == ('d'):byte() or c == ('x'):byte()) then
+      -- 19 окт: поле-колонка: y — значения поля в регистр, d / x — очистить поле (ноты остаются)
+      local fld = V.vfield
+      if c == ('y'):byte() then
+        local n = V.field_yank(f0, f1, r0, r1, fld); V.msg = ('yank: %d value(s) of the field - p puts them into the notes of the rows'):format(n); finish_move()
+      else
+        local hs = V.heads_in(f0, f1, r0, r1)
+        ctx.edit.run('clear field', function() for _, h in ipairs(hs) do V.field_set(h, fld, nil) end end)
+        V.msg = ('field cleared on %d note(s)'):format(#hs); finish_edit()
+      end
+      V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; done = true
     end
     if done then V.count = nil; ensure_visible(); return end
     -- иначе — движение расширяет выделение
@@ -2899,7 +2934,9 @@ function V.key_impl(c)
   elseif ch == '<' then ctx.loop('region'); V.count = nil; finish_edit(); return
   elseif ch == 'A' then ctx.automation_picker(); V.count = nil; return
   elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }; V.sx, V.vbox = nil, nil
-  elseif ch == 'V' then V.mode = 'vline'; V.anchor = { fi = V.cur.fi, row = V.cur.row }
+    -- 19 окт: первое v — только поле курсора (vol / delay / команда); на ноте — подколонка, как было
+    V.vtrack = nil; V.vfield = ((V.cur.field or 1) >= 2 and not env_of(V.cur.fi)) and V.cur.field or nil
+  elseif ch == 'V' then V.mode = 'vline'; V.vfield, V.vtrack = nil, nil; V.anchor = { fi = V.cur.fi, row = V.cur.row }
   elseif ch == ':' then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil; return
   -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
   -- :команды); поиск по содержимому — f (метки прыжка)
@@ -2955,7 +2992,9 @@ function V.key_impl(c)
   elseif c == ctrl('x') then apply('-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
   elseif ch == 'p' or ch == 'P' then
     local reg = V.regs['"']
-    if reg and reg.kind == 'env' then
+    if reg and reg.kind == 'field' then   -- 19 окт: значения поля (yc / y в поле) — в ноты строк
+      local cnt = V.field_paste(reg, V.cur.fi, V.cur.row); V.msg = ('field: %d value(s) put'):format(cnt); finish_edit()
+    elseif reg and reg.kind == 'env' then
       local env = env_of(V.cur.fi)
       if env then for k = 0, n - 1 do ctx.env_paste(env, V.cur.row + k * (reg.rows or 1), reg) end; finish_edit()
       else V.msg = 'register has envelope points - put the cursor on an envelope column' end
@@ -3388,7 +3427,7 @@ function V.smart_expand(dir)
       if o.row < mid then r1 = mid - 1 else r0 = mid end
     end
   end
-  V.mode = 'visual'
+  V.mode = 'visual'; V.vfield, V.vtrack = nil, nil
   V.vbox = { f0, f1, r0, r1, at = { fi = V.cur.fi, row = V.cur.row } }   -- рамка выделения; курсор на месте
   V.msg = ('select: %s (a - wider, i - narrower, Esc - off)'):format(SX[o.step])
 end
@@ -3399,6 +3438,12 @@ function V.visual_range()
   local a, b = V.anchor or V.cur, V.cur
   local f0, f1 = math.min(a.fi, b.fi), math.max(a.fi, b.fi)
   if V.mode == 'vline' then f0, f1 = 1, nflat() end
+  if V.vtrack and V.mode == 'visual' then   -- 19 окт: второе v — все подколонки треков выделения
+    local F = flat()
+    local c0, c1 = F[f0] and F[f0].col, F[f1] and F[f1].col
+    while f0 > 1 and F[f0 - 1] and F[f0 - 1].col == c0 do f0 = f0 - 1 end
+    while F[f1 + 1] and F[f1 + 1].col == c1 do f1 = f1 + 1 end
+  end
   return f0, f1, math.min(a.row, b.row), math.max(a.row, b.row)
 end
 
@@ -3463,6 +3508,106 @@ function V.key(c)
 end
 
 -- команда из кнопки (4 окт): как набранная после : в текущем режиме
+-- 19 окт: поле как колонка — v (первый раз) выделяет только поле курсора, yc копирует поле на весь паттерн,
+-- p кладёт значения поля в ноты строк. Поле: 2 vol, 3 delay, 4+ команда k (значение — код + xx)
+local function field_get(h, fld)
+  if fld == 2 then return tonumber(h.vol or '', 16) elseif fld == 3 then return h.delay
+  else return (h.fx or {})[fld - 3] end
+end
+local function field_set(h, fld, v)
+  local E = ctx.edit
+  if v == nil then
+    if fld == 2 then E.set_vol({ h }, lpb(), 128) elseif fld == 3 then E.set_delay({ h }, lpb(), 0)
+    else local cur = (h.fx or {})[fld - 3]; if cur then E.clear_fx({ h }, lpb(), cur:sub(1, 2)) end end
+    return
+  end
+  if fld == 2 then E.set_vol({ h }, lpb(), v) elseif fld == 3 then E.set_delay({ h }, lpb(), v)
+  elseif type(v) == 'string' then E.set_fx({ h }, lpb(), v:sub(1, 2), tonumber(v:sub(3), 16) or 0) end
+end
+V.field_get, V.field_set = field_get, field_set
+function V.field_yank(f0, f1, r0, r1, fld)
+  local reg = { kind = 'field', fld = fld, rows = r1 - r0 + 1, vals = {} }
+  local n = 0
+  for _, h in ipairs(V.heads_in(f0, f1, r0, r1)) do
+    local v = field_get(h, fld)
+    if v ~= nil then reg.vals[#reg.vals + 1] = { dr = (h.row0 or r0) - r0, v = v }; n = n + 1 end
+  end
+  V.regs['"'] = reg
+  return n
+end
+function V.field_paste(reg, fi, row)
+  local fld = (reg.fld >= 4 and (V.cur.field or 1) >= 4) and V.cur.field or reg.fld   -- команда — в колонку команды курсора
+  local n = 0
+  ctx.edit.run('paste field', function()
+    for _, e in ipairs(reg.vals) do
+      for _, h in ipairs(V.heads_in(fi, fi, row + e.dr, row + e.dr)) do field_set(h, fld, e.v); n = n + 1 end
+    end
+  end)
+  return n
+end
+-- 19 окт: интерполяция с формой: ноты между первой и последней получают значение поля по кривой
+-- shape: lin | log | exp | sin (туда и обратно: к последней ноте — снова начальное значение); b — конец (nil — у последней)
+function V.interp_shape(f0, f1, r0, r1, fld, shape, b0)
+  local E = ctx.edit
+  local n = 0
+  local code
+  E.run('interpolate ' .. shape, function()
+    for fi = f0, f1 do
+      local hs = V.heads_in(fi, fi, r0, r1)
+      table.sort(hs, function(a, b) return a.row0 < b.row0 end)
+      if #hs >= 2 then
+        local va = field_get(hs[1], fld)
+        local vb = b0 or field_get(hs[#hs], fld)
+        if type(va) == 'string' then code = va:sub(1, 2); va = tonumber(va:sub(3), 16) end
+        if type(vb) == 'string' then code = code or vb:sub(1, 2); vb = tonumber(vb:sub(3), 16) end
+        if va and vb then
+          local ra, rb = hs[1].row0, hs[#hs].row0
+          for k = 2, #hs do
+            local t = (hs[k].row0 - ra) / math.max(1, rb - ra)
+            local f
+            if shape == 'log' then f = math.log(1 + 9 * t) / math.log(10)
+            elseif shape == 'exp' then f = (10 ^ t - 1) / 9
+            elseif shape == 'sin' then f = math.sin(math.pi * t)
+            else f = t end
+            local v = math.floor(va + (vb - va) * f + 0.5)
+            if k < #hs or shape == 'sin' or b0 then
+              field_set(hs[k], fld, code and (code .. ('%02X'):format(math.max(0, math.min(255, v)))) or v); n = n + 1
+            end
+          end
+        end
+      end
+    end
+  end)
+  return n, code
+end
+-- 19 окт: gi — выпадашка форм; нет значения у последней ноты — сетка значений (конец / вершина синуса)
+function V.interp_menu()
+  local f0, f1, r0, r1 = V.visual_range()
+  local fld = V.vfield or V.cur.field or 1
+  if fld < 2 then V.msg = 'gi: put the cursor on vol, delay or a command field (notes - Cmd+I)'; return end
+  local function go(shape)
+    local hs = V.heads_in(f0, f1, r0, r1)
+    table.sort(hs, function(a, b) return a.row0 < b.row0 end)
+    local last = hs[#hs]
+    local function run(b0)
+      local n = V.interp_shape(f0, f1, r0, r1, fld, shape, b0)
+      V.mode = 'normal'; V.vfield = nil
+      V.msg = n > 0 and ('interpolate %s: %d note(s)'):format(shape, n) or 'interpolate: needs 2+ notes and a value on the first'
+      if ctx.model and ctx.model.invalidate then ctx.model.invalidate() end
+    end
+    if #hs >= 2 and (shape == 'sin' or field_get(last, fld) == nil) and ctx.smart_open and ctx.SM then
+      local va = field_get(hs[1], fld); if type(va) == 'string' then va = tonumber(va:sub(3), 16) end
+      local its, cs, sl = ctx.SM.values(256, va, true)
+      ctx.smart_open({ title = shape == 'sin' and 'sine: the peak value (it comes back)' or 'interpolate: the end value', items = its, cols = cs, sel = sl,
+        on_pick = function(it) if type(it.v) == 'number' then run(it.v) end end })
+    else run(nil) end
+  end
+  V.open_hydra({ title = 'interpolate ' .. (fld == 2 and 'vol' or (fld == 3 and 'delay' or 'command')), items = {
+    { key = 'l', label = 'linear', fn = function() go('lin') end },
+    { key = 'g', label = 'logarithmic (fast, then slow)', fn = function() go('log') end },
+    { key = 'e', label = 'exponential (slow, then fast)', fn = function() go('exp') end },
+    { key = 's', label = 'sine - up to a value and back', fn = function() go('sin') end } } })
+end
 -- 19 окт: ноты для humanizer (:human и панель): VISUAL — блок, иначе трек курсора в регионе курсора
 function V.hum_heads(vis)
   if vis == nil then vis = V.mode == 'visual' or V.mode == 'vline' end

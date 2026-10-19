@@ -6954,7 +6954,10 @@ function D.frame(L, snap, rows, state, info)
         local f = L.flat[fi]
         if f and f.x then
           if f.env then set(U.TEXT, 0.10) else set(U.CYAN, 0.16) end
-          gfx.rect(f.x, y0, f.w, y1 - y0, 1)
+          if vis.field and not f.env and not f.ml then   -- 19 окт: v на поле — только оно
+            local fx2, fw2 = D.field_rect(f.G or L, vis.field)
+            if fx2 then gfx.rect(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0, 1) end
+          else gfx.rect(f.x, y0, f.w, y1 - y0, 1) end
         end
       end
       gfx.a = 1

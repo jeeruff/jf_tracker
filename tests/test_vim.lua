@@ -1127,5 +1127,12 @@ reset(); V.cur.row = 2; keysin('iq'); eq('kit: the key writes the pad note', las
 KIT_MAP = nil; V.mode = 'normal'
 end
 
+-- 19 окт: v по кругу — поле курсора → весь трек → выход
+V.mode = 'normal'; V.cur.field = 2
+keysin('v'); eq('v on vol: field only', V.vfield, 2); eq('visual', V.mode, 'visual')
+keysin('v'); eq('v again: whole track', V.vtrack, true); eq('field off', V.vfield, nil)
+keysin('v'); eq('v third: off', V.mode, 'normal')
+V.cur.field = 1; keysin('v'); eq('v on a note: the subcolumn', V.vfield, nil); V.key(27)
+V.mode = 'normal'
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

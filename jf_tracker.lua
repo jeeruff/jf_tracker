@@ -18041,7 +18041,7 @@ local function frame()
   local vis
   if vim.mode == 'visual' or vim.mode == 'vline' then
     local f0, f1, r0, r1 = vim.visual_range()
-    vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1 }
+    vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1, field = vim.mode == 'visual' and vim.vfield or nil }   -- 19 окт: поле-колонка
     ctx.vis_sync(vis)
   else ctx.vis_key = nil end
   -- простой (3 окт): 1.5 с без мыши / клавиш / правок проекта, не играет,
