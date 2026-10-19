@@ -1209,7 +1209,7 @@ end
 local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
   'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
   'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent', 'SetNamedConfigParm',
-  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings' }   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
+  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings', 'GetFloatingWindow' }   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
 local function fx_table(prefix)
   local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
   for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end

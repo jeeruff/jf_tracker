@@ -132,7 +132,8 @@ KH.PAGES = {
     { k = 'za zM', d = 'fold track: wave + notes, envelopes as a thin line / all <-> open all (:fold, :unfold)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },
     { k = 'Ctrl+Cmd+F12', d = 'restart the tracker from its files (as :reload) - after an update, no REAPER restart' },
-    { k = 'zf', d = 'DSP: modules with pages (Surge XT) - all pages in one pane (default) / one page with vertical tabs on the right of the module; drumrs5k: big 4 x 4 pads (m > s, wave, labels, group) / folded - small pads, more rows' },
+    { k = 'zf', d = 'DSP: modules with pages (Surge XT) - all pages in one pane (default) / one page with vertical tabs on the right of the module' },
+    { k = 'zss zsm zsl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
     { k = '- +', d = 'zoom rows: LPB down / up (as Cmd + wheel) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь

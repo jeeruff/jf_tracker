@@ -319,7 +319,8 @@ local state = {
   wavebar = reaper.GetExtState(EXT, 'wavebar') ~= '0',
   waveinv = reaper.GetExtState(EXT, 'waveinv') == '1',
   tababc = reaper.GetExtState(EXT, 'tababc') ~= '0',   -- 17 окт: по умолчанию вкл
-  hdrmeter = reaper.GetExtState(EXT, 'hdrmeter') ~= '0',   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
+  hdrmeter = reaper.GetExtState(EXT, 'hdrmeter') ~= '0',
+  kitsize = ({ s = 's', m = 'm', l = 'l' })[reaper.GetExtState(EXT, 'kitsize')] or 'l',   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
@@ -735,7 +736,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges ~= false and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -4347,7 +4348,7 @@ ctx = {
       added = true
     end
     if not fx or fx < 0 then vim.msg = 'cc: ReaControlMIDI not found'; return end
-    if added then reaper.TrackFX_Show(tr, fx, 3) end
+    if added then edit.fx_show(tr, fx) end
     local items = {}
     for p = 0, reaper.TrackFX_GetNumParams(tr, fx) - 1 do
       local _, pn = reaper.TrackFX_GetParamName(tr, fx, p, '')
@@ -5491,7 +5492,7 @@ ctx = {
       end
     end }
     if sl then
-      items[#items + 1] = { key = 'o', label = 'open the window of ' .. sl.name, fn = function() reaper.TrackFX_Show(tr, sl.i, 3) end }
+      items[#items + 1] = { key = 'o', label = 'open the window of ' .. sl.name, fn = function() edit.fx_show(tr, sl.i) end }
       items[#items + 1] = { key = 'B', label = (sl.enabled and 'bypass ' or 'enable ') .. sl.name, fn = function() edit.fx_bypass(tr, sl.i); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end }
       items[#items + 1] = { key = 'x', label = 'remove ' .. sl.name, fn = function() edit.drum_slot_del(tr, sl.i); vim.msg = 'removed ' .. sl.name end }
     end
@@ -6439,7 +6440,7 @@ ctx = {
       local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
       for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then vim.inst = nsamp + k end end
     end
-    if dbl then reaper.TrackFX_Show(col.track, fx, 3); return end
+    if dbl then edit.fx_show(col.track, fx); return end
     if keys then
       for k, f in ipairs(col.fx or {}) do if f.i == fx then dsp_sel.fx = k; dsp_sel.param = 1; break end end
       local _, nm = reaper.TrackFX_GetFXName(col.track, fx, '')
@@ -18204,7 +18205,7 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, hdrmeter = state.hdrmeter,
+    dsp_fold = model.dsp_fold, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
     kit_wave = ctx.kit_wave,
     midi_in_age = function(col)   -- 19 окт: метр MIDI: возраст события и velocity последней ноты
       local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]
@@ -19112,7 +19113,7 @@ local function frame()
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
-      or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
+      or (state.focus == 'dsp' and state.dsp_zs and MX.WK.get('dsp_zs')) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
       for _, e in ipairs(wk.items) do lines[#lines + 1] = { key = e[1], text = e[2] } end
@@ -23866,18 +23867,28 @@ local function frame()
           ctx.pane_do(function() return draw.panes.zoom(state.panes, 'dsp') end, state.panes.zoom == 'dsp' and 'dsp back in its pane' or 'drumrs5k on the whole window: pads | list (zz - back)')
           return
         end
+        -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
+        if state.dsp_zs and not DK.pending then
+          state.dsp_zs = nil
+          if ch == 's' or ch == 'm' or ch == 'l' then
+            state.kitsize = ch; reaper.SetExtState(EXT, 'kitsize', ch, true)
+            vim.msg = 'drumrs5k pads: ' .. ({ s = 'small (more rows)', m = 'medium 4 x 4', l = 'large 4 x 4' })[ch]
+          else vim.msg = 'zs: s / m / l - pad size' end
+          return
+        end
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
+          if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'f' then   -- 16 окт: zf — модули со страницами (Surge): все сразу ↔ по одной, вкладки справа
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-            vim.msg = model.dsp_fold and 'zf: folded - one page, tabs on the right; drumrs5k: small pads' or 'zf: unfolded - all pages in one pane; drumrs5k: big 4 x 4 pads'
+            vim.msg = model.dsp_fold and 'zf: pages folded - one page, tabs on the right of the module' or 'zf: pages unfolded - all of them in one pane'
           end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages, s - pad size (s m l)'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

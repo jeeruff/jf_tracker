@@ -3089,7 +3089,13 @@ function E.fx_bypass(track, fx)
   local A = FA(track)
   run('fx bypass', function() A.SetEnabled(track, fx, not A.GetEnabled(track, fx)) end)
 end
-function E.fx_show(track, fx) FA(track).Show(track, fx, 3) end
+-- 19 окт: окно эффекта — поверх (pin, как галка в окне REAPER): иначе трекер его перекрывал
+function E.fx_show(track, fx)
+  local A = FA(track)
+  A.Show(track, fx, 3)
+  local hw = A.GetFloatingWindow and A.GetFloatingWindow(track, fx)
+  if hw and R.JS_Window_SetZOrder then R.JS_Window_SetZOrder(hw, 'TOPMOST') end
+end
 -- параметр в track controls REAPER (8 окт): API на запись нет — правка chunk
 -- трека: строка PARM_TCP после FXID эффекта (« N[:…]» на параметр; формат
 -- REAPER — число и необязательный хвост). on = nil — переключить

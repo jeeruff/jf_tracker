@@ -1926,6 +1926,9 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     if q >= 0 and idx <= pk.n then
     local mx, mn = pk.max[idx] or 0, pk.min[idx] or 0
     if mx > 1 then mx = 1 end; if mn < -1 then mn = -1 end
+    if column then   -- 19 окт: тихие госты не ниткой — пики сжаты степенью 0.6 (громкие почти те же)
+      mx = mx > 0 and mx ^ 0.6 or -((-mx) ^ 0.6); mn = mn > 0 and mn ^ 0.6 or -((-mn) ^ 0.6)
+    end
     if column and mode == 'spec' and pk.spec and not inv then
       local c = spec_colour(pk.spec[idx]); set(muted and U.mix(c, U.BG, 0.5) or c)
     end
@@ -4126,16 +4129,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if b[1] == 'tp_play' then pi = i end
     end
     local need = 0
-    if c.tpfull then
-      TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
-      TW[2] = math.max(TW[2], ms('x1.10') + 2 * L.pad)
-      need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad
+    if c.tpfull then   -- 19 окт: mark и rate — в конце третьей строки (колонки << и || — по своим знакам)
+      need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad + ms('mark') + 2 * L.pad + ms('x1.10') + L.pad + 3 * L.cw + 4
     end
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
     btot = -2
     for i = 1, #blist do btot = btot + TW[i] + 2 end
     -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
-    if need > 0 then btot = math.max(btot, TW[1] + TW[2] + 4 + need) end
+    if need > 0 then btot = math.max(btot, need) end
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
@@ -4229,11 +4230,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 16 окт: маркеры — кнопка markers (не влезло — mk), щелчок — выпадашка 1..0
       local any = false
       for k = 1, 10 do if c.marks and c.marks[k] then any = true end end
-      local w1 = TW[1] or tbw
-      cellb('markers', fit(ms('markers') + 2 * L.pad <= w1 and 'markers' or 'mark', w1), colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
-      -- rate: значение и слайдер — вторая колонка
-      local rx0 = colx(2)
-      local w2c = TW[2] or tbw
+      -- 19 окт: третья строка: тоглы записи с первой колонки, затем mark и rate (x1.00 + слайдер) — до конца группы
+      local a1e = bx0 + btot
+      local w2c = ms('x1.10') + L.pad + 3 * L.cw
+      local rx0 = a1e - w2c
+      local w1 = ms('mark') + 2 * L.pad
+      local mkx = rx0 - 2 - w1
+      cellb('markers', 'mark', mkx, w1, false, not any)   -- 16 окт: mark (не mk)
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
       local rhot = cell_hot(rx0, ry, w2c, L.rh)
@@ -4248,8 +4251,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if rhot then hover.ctrl = 'ratebar' end
       hint('ctrl', rx0, ry, w2c, L.rh, 'ratebar')
       D.strip_cell.ratebar = { sx2, ry, sw2 }
-      -- запись: от колонки rec до конца кнопок
-      local ax, a1 = colx(3), bx0 + btot
+      -- запись: с первой колонки до mark
+      local ax, a1 = colx(1), mkx - 2
       local full = { { 'punch', 'punch', c.punch }, { 'preroll', 'pre-roll', c.preroll }, { 'reclib', 'rec>lib', c.reclib }, { 'slow', c.slowrate and 'slow*' or 'slow', c.slowrec or c.slowrate },
                      { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
       local tot = 0
@@ -7819,7 +7822,12 @@ function D.frame(L, snap, rows, state, info)
       local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
       local bw1 = math.max(L.cw * 14, math.min(L.cw * (f.colw or 22), share))   -- 13 окт: модуль может просить колонку шире
       -- 19 окт: рэк drumrs5k не свёрнут (zf) — колонки вдвое шире: пэды 4 × 4 крупно (m > s, волна, подписи, группа)
-      if f.kit and D.DR and not info.dsp_fold and bx + 4 * bw1 <= right then bw1 = 2 * bw1 end
+      -- 19 окт: размер пэдов рэка zs + s / m / l: l — колонки вдвое шире, m — в 1.5 раза меньше l, s — мелкие (прежний вид)
+      if f.kit and D.DR and info.kitsize ~= 's' then
+        local k2 = info.kitsize == 'm' and (4 / 3) or 2
+        local b2 = math.floor(bw1 * k2)
+        if bx + 2 * b2 <= right then bw1 = b2 end
+      end
       local by = boxy
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
@@ -8121,9 +8129,9 @@ function D.frame(L, snap, rows, state, info)
             -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
             -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
             local side = math.min(gw // 4, math.max(4 * L.rh + 6, gh // 4))   -- 19 окт: крупнее (имя + мини-волна + кнопки)   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
-            if not info.dsp_fold then side = math.max(2 * L.rh, math.min(gw // 4, gh // 4)) end   -- 19 окт: развёрнуто — строго 4 × 4 на всё место
+            if info.kitsize ~= 's' then side = math.max(2 * L.rh, math.min(gw // 4, gh // 4)) end   -- 19 окт: m / l — строго 4 × 4 на всё место
             local G = { cols = 4, cw = side, ch = side }
-            G.fit = info.dsp_fold and math.max(1, math.min(32, gh // G.ch)) or math.max(1, math.min(4, gh // G.ch))   -- zf (свёрнуто) — сколько влезает рядов мелко
+            G.fit = info.kitsize == 's' and math.max(1, math.min(32, gh // G.ch)) or math.max(1, math.min(4, gh // G.ch))   -- s — сколько влезает рядов мелко
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
             local by_note = {}
             for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not by_note[pn] then by_note[pn] = ki2 end end
@@ -8277,12 +8285,13 @@ function D.frame(L, snap, rows, state, info)
                 elseif ah2 >= L.rh - 2 then
                   -- 19 окт: мини-волна сэмпла пэда фоном под подписью (тускло)
                   local npx = cw0 - 4
-                  local pk = kid.file and npx > 4 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b)
+                  local pk = kid.file and npx > 4 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b, true)   -- 19 окт: спектральные пики
                   if pk and pk.n and pk.n > 0 then
                     local mid, hh = ay + ah2 / 2, ah2 / 2 - 1
                     set(U.mix(kid.enabled and U.CYAN or U.DIM, U.PANEL, 0.6))
                     for px = 0, npx - 1 do
                       local idx = math.floor(px / npx * pk.n) + 1
+                      if pk.spec and kid.enabled then set(U.mix(D.spec_colour(pk.spec[idx]), U.PANEL, 0.3)) end   -- цвет = частота, чуть приглушён под подписью
                       gfx.line(cx0 + 2 + px, mid - math.min(1, pk.max[idx] or 0) * hh, cx0 + 2 + px, mid - math.max(-1, pk.min[idx] or 0) * hh)
                     end
                   end
