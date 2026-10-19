@@ -14609,19 +14609,25 @@ ctx.ut_draw = function(Lx, x, y, w, h, foc, hv)
   local rows, maxc = UTM.layout(T)
   local rh = Lx.rh
   local nv = math.max(1, math.floor(h / rh))
-  local si = 1
-  for i, r in ipairs(rows) do if r.id == ST.sel then si = i end end
+  -- 19 окт: индекс строк — вместе с раскладкой (не каждый кадр); к выбранному — только когда выбор сменился
+  -- (иначе колесо тут же перебивалось и прокрутка не работала)
+  if T._rowof_for ~= rows then T._rowof = {}; for i, r in ipairs(rows) do T._rowof[r.id] = i end; T._rowof_for = rows end
+  local rowof = T._rowof
+  local si = rowof[ST.sel] or 1
   ST.scroll = math.max(0, math.min(ST.scroll or 0, #rows - nv))
-  if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
+  if ST.last_sel ~= ST.sel or ST.last_n ~= #rows then
+    ST.last_sel, ST.last_n = ST.sel, #rows
+    if si <= ST.scroll then ST.scroll = si - 1 elseif si > ST.scroll + nv then ST.scroll = si - nv end
+  end
   local cw = math.max(8, math.floor(Lx.cw * 1.2))
   local gw = (math.min(maxc, 12) + 1) * cw
   local sbw = #rows > nv and ((draw.SBW or 3) + 4) or 0
-  local rowof = {}
-  for i, r in ipairs(rows) do rowof[r.id] = i end
   local function cy(i) return y + (i - ST.scroll - 1) * rh + math.floor(rh / 2) end
   local function cx(c) return x + math.min(c, 12) * cw + math.floor(cw / 2) end
   -- линии к родителю: вниз по своей колонке, вбок — к колонке родителя
-  for i, r in ipairs(rows) do
+  -- 19 окт: только строки до нижнего края (родитель старше — ниже; линия строки ниже экрана не видна)
+  for i = 1, math.min(#rows, ST.scroll + nv) do
+    local r = rows[i]
     local n = r.node
     local pi = n.parent ~= nil and rowof[n.parent]
     if pi then
@@ -24562,7 +24568,7 @@ ctx.rf_apply = function()
   local S = ctx.RFS
   if not S then vim.msg = 'reform: select notes (v / V or a right drag) - the pane takes the selection'; return end
   if S.applied then
-    if (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then edit.undo() end   -- откат только своего шага (другое действие между — не трогать)
+    if (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then ctx.raw_undo() end   -- откат только своего шага (другое действие между — не трогать)
     S.applied = false
   end
   local out = ctx.RF.compute(S.ev, S.r0, S.r1, ctx.rf_p)
@@ -24623,6 +24629,15 @@ ctx.preview_bend = function(ch, slope, dur, tr)
   local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0   -- трек только что взведён — нота уйдёт через 0.15 с
   ctx.bend_q = { ch = ch, slope = slope, t0 = now + delay, t1 = now + delay + dur, range = tr and CM.bend_range(tr) or 2 }
 end
+-- 19 окт: undo без снимка дерева undo (промежуточные шаги reform): снимок проекта на каждое движение слайдера съедал память
+ctx.raw_undo = function()
+  local ST = ctx.ut_state and ctx.ut_state()
+  if ST then ST.in_nav = true end
+  reaper.Undo_DoUndo2(0)
+  model.invalidate()
+  if ST then pcall(ctx.UTM.poll, ST); ST.in_nav = false end
+  if edit.after_undo then pcall(edit.after_undo) end
+end
 ctx.foldfast_toggle = function()
   state.foldfast = not state.foldfast; model.FOLD = state.foldfast; model.invalidate()
   vim.msg = state.foldfast and 'fold on: fast notes are lines inside the row (no new lanes); LPB + shows them' or 'fold off: every note gets its row and column'
@@ -24630,7 +24645,7 @@ end
 model.FOLD = state.foldfast
 ctx.rf_close = function(keep)
   local S = ctx.RFS
-  if S and not keep and S.applied and (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then edit.undo() end
+  if S and not keep and S.applied and (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then ctx.raw_undo() end
   ctx.RFS = nil
   vim.msg = keep and 'reform: kept (u - undo)' or 'reform: reverted'
   ctx.set_focus('tracker')

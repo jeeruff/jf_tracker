@@ -200,6 +200,12 @@ function UT.session(api, path)
   local txt = path and api.read(path)
   if txt then
     S.T, S.snaps = UT.load(txt)
+    do   -- 19 окт: из файла — в памяти только последние SNAP_MAX снимков
+      local ids = {}
+      for id in pairs(S.snaps) do ids[#ids + 1] = id end
+      table.sort(ids)
+      for _, id in ipairs(ids) do snap_keep(S, id) end
+    end
     for id, n in pairs(S.T.nodes) do n.live = (id == S.T.cur) end   -- после открытия стека REAPER у старых узлов нет
     S.path, S.flushed = path, true
   else
@@ -224,12 +230,25 @@ end
 function UT.write(S, s)
   if S.flushed and S.path then S.api.append(S.path, s) else S.buf[#S.buf + 1] = s end
 end
+-- 19 окт: снимок — весь проект (chunk каждого трека): в памяти — не больше SNAP_MAX последних (было без предела:
+-- reform откатывал шаг на каждое движение слайдера — 1.4 ГБ); у несохранённого проекта снимки в буфер не идут
+UT.SNAP_MAX = 24
+local function snap_keep(S, id)
+  S.snap_order = S.snap_order or {}
+  S.snap_order[#S.snap_order + 1] = id
+  while #S.snap_order > UT.SNAP_MAX do
+    local old = table.remove(S.snap_order, 1)
+    if old ~= id and S.snaps[old] then S.snaps[old] = nil; if S.T.nodes[old] then S.T.nodes[old].snap = nil end end
+  end
+end
+UT.snap_keep = snap_keep
 function UT.snap(S, id)
   if S.snaps[id] or not S.T.nodes[id] then return end
   local data = S.api.capture()
   if not data then return end
   S.snaps[id] = data; S.T.nodes[id].snap = true
-  UT.write(S, UT.ev_snap(id, data))
+  snap_keep(S, id)
+  if S.flushed and S.path then UT.write(S, UT.ev_snap(id, data)) end
 end
 function UT.edit(S, label)
   local id, dead = UT.add(S.T, label, S.api.now())

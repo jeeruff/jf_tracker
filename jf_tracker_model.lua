@@ -2042,9 +2042,14 @@ end
 -- кеш волн с пределом (5 окт): новый ключ на каждую ширину / зум / item —
 -- без предела рос всю сессию; > 600 — сброс, видимые пересчитаются за кадры
 local peaks_n = 0
+local peaks_pts = 0   -- 19 окт: объём кэша в точках (запись — до 16384 точек max + min + spec; по числу записей 600 — до сотен МБ)
+M.PEAKS_PTS_MAX = 1500000
 local function new_peaks()
-  peaks_n = 0
-  return setmetatable({}, { __newindex = function(t, k, v) rawset(t, k, v); peaks_n = peaks_n + 1 end })
+  peaks_n, peaks_pts = 0, 0
+  return setmetatable({}, { __newindex = function(t, k, v)
+    rawset(t, k, v); peaks_n = peaks_n + 1
+    if type(v) == 'table' and v.n then peaks_pts = peaks_pts + v.n * (v.spec and 3 or 2) end
+  end })
 end
 local peaks = new_peaks()
 local building = {}
@@ -2155,7 +2160,7 @@ end
 M.OVERSAMPLE = 1   -- 1/2/4: пиков на пиксель (Options → wave detail); max/min по группе
 function M.peaks(head, npix, want_spec)
   if not head.src or npix < 2 then return nil end
-  if peaks_n > 600 then peaks = new_peaks() end
+  if peaks_n > 600 or peaks_pts > M.PEAKS_PTS_MAX then peaks = new_peaks() end
   npix = math.floor(npix)
   -- луп (2 окт): пики одного периода источника, разложенные по item по модулю
   -- периода (раньше читался «источник» за его концом — волна сбивалась)
@@ -2374,6 +2379,6 @@ end
 function M.file_len(path) local e = file_src[path]; return e and e.len or nil end
 
 function M.clear_peaks() peaks = new_peaks(); building = {} end
-M.peaks_cache_size = function() local n = 0; for _ in pairs(peaks) do n = n + 1 end; return n end
+M.peaks_cache_size = function() return peaks_n end   -- 19 окт: счётчик, не обход каждый кадр
 
 return M
