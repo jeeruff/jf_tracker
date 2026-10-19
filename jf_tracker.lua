@@ -16681,7 +16681,7 @@ function ctrl_action(name, delta)
   elseif name == 'ratebar' then
     if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
-  elseif name == 'slicepitch' then if delta == 0 then state.slicepitch = not state.slicepitch; vim.msg = state.slicepitch and '$pitch on: the keys play the selected slice at their pitch (Shift+Option does it one-off)' or '$pitch off: a key - a slice' end   -- 16 окт
+  elseif name == 'slicepitch' then if delta == 0 then state.slicepitch = not state.slicepitch; vim.msg = state.slicepitch and '$pt on: the keys play the selected slice at their pitch (Shift+Option does it one-off)' or '$pt off: a key - a slice' end   -- 16 окт
   elseif name == 'pedal' then if delta == 0 then local W = ctx.wheels(); ctx.wheel_send('pedal', not W.pedal); vim.msg = 'pedal (sustain, CC64) ' .. (W.pedal and 'down' or 'up') end   -- 16 окт
   elseif name == 'markers' then   -- 16 окт: маркеры 1..0 — выпадашкой (была строка цифр под кнопками)
     local items = {}
