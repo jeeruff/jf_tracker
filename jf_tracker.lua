@@ -24652,6 +24652,7 @@ ctx.mx_follow_tick = function()
   local key = vim.cur.row .. ':' .. vim.cur.fi
   if key == ctx.mx_follow_key then return end
   ctx.mx_follow_key = key
+  MX.cur.sec = nil
   local t = edit.row_time(vim.cur.row, state.lpb, 0)
   local sq = ctx.sequence and ctx.sequence() or seq
   for i, rg in ipairs(sq or {}) do

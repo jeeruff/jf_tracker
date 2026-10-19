@@ -704,7 +704,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
     if pk and nw > U.measure(pk) + 4 then U.text(nx + nw - U.measure(pk), y + 1, pk, (ctx.PADS and ctx.PADS.rec) and U.RED or U.AMBER) end
     if hot_name then hover.name = ri end
-    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' then U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени (18 окт: и без фокуса янтарём): Enter / i — имя
+    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени (18 окт: и без фокуса янтарём): Enter / i — имя
     -- 18 окт: выделение (блок / ячейки вразброс) — и на имени паттерна: видно, какие слоты взяты
     do
       local insel = false
@@ -739,7 +739,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         right(ss, beat and U.AMBER or U.DIM, 'sig')
       end
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
-      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len'
+      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
       local lxd = right(ds, U.GREY, 'dur')
       if oncur and lxd then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(lxd - 2, y2, U.measure(ds) + 4, L.rh, 0) end
@@ -759,7 +759,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local dx = L.mx_label_w - L.mx_dur_w
       -- 12 окт: длина — ячейка ввода: курсор встаёт (l с имени), цифры — набор шагов
-      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len'
+      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
       if oncur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(dx + 1, y, L.mx_dur_w - 2, L.rh, 0) end
       local hot_dur = hover.ri == ri and mx >= dx and mx < L.mx_label_w
@@ -1075,7 +1075,7 @@ function MX.row_at(y)
 end
 function MX.goto_cell(regions, snap, ri, ci)
   if ci == 0 and MX.fold then ci = MX.cur.ci > 0 and -1 or 1 end   -- свёрнута: имени нет — через него
-  if ci ~= MX.cur.ci then MX.cur.sub = nil; MX.lenbuf = nil end
+  if ci ~= MX.cur.ci then MX.cur.sub = nil; MX.lenbuf = nil; MX.cur.sec = nil end   -- 19 окт: и курсор секции
   MX.cur.ri, MX.cur.ci = ri, ci
   clamp(regions, #snap.cols)
   local rg = regions[MX.cur.ri]
@@ -1135,7 +1135,7 @@ function MX.key(c, regions, snap)
     if ch == ' ' then if sc and ctx.sec_launch then ctx.sec_launch(sc) end; return true end
     if ch == 'h' or c == 1818584692 then return true end
   end
-  if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then
+  if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and MX.cur.sub ~= 'len' and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then   -- с длины h — сначала на имя
     MX.cur.sec = true
     ctx.msg('section ' .. (MX.sec_at(regions, MX.cur.ri).name or '') .. ': Enter menu, c change name, x remove (patterns stay), Space launch, l back')
     return true
