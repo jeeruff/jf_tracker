@@ -22505,27 +22505,23 @@ local function frame()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
-  if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end
-  -- 19 окт: gt / gT из любого модуля, не только трекера: g модуля отрабатывает как раньше (наверх / свой префикс),
-  -- t сразу за ней — меню модулей (gT — вкладки проектов). Модули с набором текста (notes, browser, fx, pm, actions) — без этого
-  if c > 0 and state.focus ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or MX.SMART.p) then
-    local GT = { top = true, dsp = true, inst = true, matrix = true, slices = true, undotree = true, session = true, mixer = true, clipboard = true }
-    if ctx.g_at and (c == 116 or c == 84) and GT[state.focus] and reaper.time_precise() - ctx.g_at < 1.5 then
-      ctx.g_at = nil; SL.gpend = nil; MX.pending = nil
-      -- 19 окт: g модуля уже увела выбор наверх — вернуть его (lib: инструмент, матрица: клетка, dsp: параметр)
-      local gr = ctx.g_restore
-      if gr then
-        if gr.inst then pool_select(gr.inst) end
-        if gr.mx then MX.cur.ri, MX.cur.ci = gr.mx[1], gr.mx[2] end
-        if gr.dsp then dsp_sel.fx, dsp_sel.param = gr.dsp[1], gr.dsp[2] end
-        ctx.g_restore = nil
-      end
-      if c == 116 then ctx.tab_menu() else ctx.project_menu() end
-      c = 0
-    else
-      ctx.g_at = (c == 103 and GT[state.focus]) and reaper.time_precise() or nil
-      ctx.g_restore = ctx.g_at and { inst = state.focus == 'inst' and vim.inst or nil, mx = state.focus == 'matrix' and { MX.cur.ri, MX.cur.ci } or nil,
-        dsp = state.focus == 'dsp' and { dsp_sel.fx, dsp_sel.param } or nil } or nil
+  local from_q = false
+  if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
+  -- 19 окт: g — префикс во всех модулях (как в Vim): gt / gT — меню модулей / вкладок проектов, gg — наверх
+  -- (своя g модуля), g + другое — модулю обе клавиши, как раньше (у матрицы, слайсера g — свой префикс).
+  -- Отложенные клавиши идут через ctx.keyq (их второй раз не перехватываем). Модули с набором текста — без этого
+  if c > 0 and not from_q and state.focus ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or MX.SMART.p or vim.mode == 'cmd' or vim.mode == 'search') then
+    local GT = { top = true, dsp = true, inst = true, matrix = true, undotree = true, session = true, mixer = true, clipboard = true, patterns = true, perf = true, help = true, ctrl = true }
+    local own = state.focus == 'matrix' or (state.focus == 'top' and state.toptab == 'sample')   -- у них g — свой префикс
+    if ctx.g_at and GT[state.focus] then
+      ctx.g_at = nil
+      if c == 116 then ctx.tab_menu(); c = 0
+      elseif c == 84 then ctx.project_menu(); c = 0
+      elseif c == 103 then ctx.keyq[#ctx.keyq + 1] = 103; if own then ctx.keyq[#ctx.keyq + 1] = 103 end; c = 0   -- gg — наверх
+      elseif c == 27 then c = 0
+      else ctx.keyq[#ctx.keyq + 1] = 103; ctx.keyq[#ctx.keyq + 1] = c; c = 0 end
+    elseif c == 103 and GT[state.focus] then
+      ctx.g_at = reaper.time_precise(); vim.msg = 'g: t - module, T - project tab, g - to the top'; c = 0
     end
   end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена

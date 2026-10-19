@@ -339,7 +339,7 @@ KH.PAGES = {
     { k = 'j k', d = 'instrument down / up' },
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
     { k = 'L', d = 'layer (¥): another lib instrument sounds together with this one on one note; tracks - its layers in the folder (Space listen, Enter offset / pan / random / cycle / phase); browser a y - files as layers' },
-    { k = 'g G', d = 'first / the bottom row - midi clips (G; Cmd+G from anywhere - automation)' },
+    { k = 'gg G', d = 'first / the bottom row - midi clips (G; Cmd+G from anywhere - automation); g is a prefix in every module: gt - go to a module, gT - a project tab' },
     { k = 'h l', d = 'as in lf: l - open the instrument folder (its layers ¥ and slices) / into it, h - back / close; inside: j k, Space listen, Enter - a layer: its menu, a slice: insert, x remove, e - the slice in the item tab (Tab / Shift+Tab - another track)' },
     { k = 'Shift+click', t = {}, d = 'select several instruments: from the selected one to the clicked one (as v)' },
     { k = 'dd', d = 'cut instrument: its events on the tracks and the library item (to the register)' },
