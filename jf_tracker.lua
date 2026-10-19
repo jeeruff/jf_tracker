@@ -21025,7 +21025,7 @@ local function frame()
       end
       click = { t = now2, zone = 'mxtsel', row = ri }
     elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
-      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow
+      ctx.set_focus('matrix'); MX.pl_sel = hover.matrix.patrow
       if dbl and click.zone == 'patrow' then ctx.patlist_do('go') else ctx.patlist_do('listen') end
       click = { t = now2, zone = 'patrow' }
     elseif hover.matrix and hover.matrix.palbtn then   -- 18 окт: кнопки палитры
@@ -24289,26 +24289,20 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   local list = {}
   for _, p in ipairs(model.patterns(regions)) do if not p.name:match('^=') and not (p.src and p.src.session) then list[#list + 1] = p end end
   ctx.pat_rows = list
-  -- раскладка: буквы по алфавиту рядами, вариант — колонкой; без кода — свой ряд
-  local rows, byl, other, maxv = {}, {}, {}, 1
-  for i, p in ipairs(list) do
-    local l, v = model.SEC.code_of(p.name)
-    if l and v then
-      if not byl[l] then byl[l] = {}; rows[#rows + 1] = l end
-      byl[l][v] = i; maxv = math.max(maxv, v)
-    else other[#other + 1] = i end
-  end
-  table.sort(rows)
-  local ncol = math.max(4, math.min(16, maxv))
-  local lw = U.measure('W') + Lx.pad
-  local cw = math.max(U.measure('W00') + Lx.pad, math.floor((w - lw) / ncol))
-  if #other > 0 then ncol = math.max(ncol, math.min(16, #other)) end
-  local ch = math.max(Lx.rh + 2, math.min(2 * Lx.rh, math.floor(h / math.max(1, #rows + (#other > 0 and 1 or 0) + 1))))
+  -- 19 окт: плотно — кубики подряд по коду (A1 A2 … B1 …, без кода — в конце), подпись — сам код; без шапок и счётчиков
+  local order = {}
+  for i, p in ipairs(list) do order[#order + 1] = i end
+  table.sort(order, function(a, b)
+    local la, va = model.SEC.code_of(list[a].name); local lb, vb = model.SEC.code_of(list[b].name)
+    if (la ~= nil) ~= (lb ~= nil) then return la ~= nil end
+    if la and lb then if la ~= lb then return la < lb end return (va or 0) < (vb or 0) end
+    return list[a].name < list[b].name
+  end)
+  local cw = U.measure('W00') + 2 * Lx.pad
+  local ch = Lx.rh + 2
+  local per = math.max(1, math.floor(w / cw))
   local cells = {}
-  local function cell(i, r, c) cells[#cells + 1] = { i = i, r = r, c = c } end
-  for r, l in ipairs(rows) do for v = 1, ncol do cell(byl[l][v], r, v) end end
-  local orow = #rows + 1
-  for k, i in ipairs(other) do cell(i, orow + (k - 1) // ncol, (k - 1) % ncol + 1) end
+  for k, i in ipairs(order) do cells[#cells + 1] = { i = i, r = (k - 1) // per + 1, c = (k - 1) % per + 1 } end
   ctx.pat_cells = cells
   MX.pl_sel = math.max(1, math.min(#list, MX.pl_sel or 1))
   local play_name
@@ -24318,28 +24312,19 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   end
   local uses = {}
   for _, rg in ipairs(seq) do if not rg.gap then uses[rg.name] = (uses[rg.name] or 0) + 1 end end
-  -- шапка: номера вариантов hex
-  for v = 1, math.min(16, ncol) do U.text(x + lw + (v - 1) * cw + Lx.pad, y, ('%X'):format(v), U.DIM) end
-  for r, l in ipairs(rows) do U.text(x + 2, y + Lx.rh + (r - 1) * ch + math.floor((ch - Lx.rh) / 2), l, U.GREY) end
   for _, cl in ipairs(cells) do
-    local cx, cy = x + lw + (cl.c - 1) * cw, y + Lx.rh + (cl.r - 1) * ch
+    local cx, cy = x + (cl.c - 1) * cw, y + (cl.r - 1) * ch
     if cy + ch > y + h then break end
-    local p = cl.i and list[cl.i]
-    local hot = mx >= cx and mx < cx + cw - 2 and my >= cy and my < cy + ch - 2
-    if p then
-      local on = cl.i == MX.pl_sel
-      local n = uses[p.name] or 0
-      local playing = play_name == p.name
-      local fill = playing and U.tint(U.GREEN, 0.35) or (n > 0 and U.tint(p.src and p.src.color and p.src.color ~= 0 and U.CYAN or U.CYAN, 0.18) or U.PANEL)
-      U.set(fill); draw.rrect(cx, cy, cw - 2, ch - 2, true)
-      U.set(on and U.AMBER or (hot and U.TEXT or (n > 0 and U.GREY or U.LINE))); draw.rrect(cx, cy, cw - 2, ch - 2, false)
-      local code = p.name:match('^(%S+)') or p.name
-      U.text(cx + Lx.pad, cy + math.floor((ch - 2 - Lx.rh) / 2), ctx.fit(code, cw - 2 * Lx.pad), on and U.AMBER or (playing and U.GREEN or (n > 0 and U.TEXT or U.DIM)))
-      if n > 1 and ch >= 2 * Lx.rh - 2 then U.text(cx + cw - 3 - U.measure('x' .. n), cy + ch - Lx.rh - 2, 'x' .. n, U.GREY) end
-      if hot then hv.patrow = cl.i end
-    else
-      U.set(U.mix(U.LINE, U.PANEL, 0.6)); draw.rrect(cx, cy, cw - 2, ch - 2, false)
-    end
+    local p = list[cl.i]
+    local on = cl.i == MX.pl_sel
+    local n = uses[p.name] or 0
+    local playing = play_name == p.name
+    local hot = mx >= cx and mx < cx + cw - 1 and my >= cy and my < cy + ch - 1
+    U.set(playing and U.tint(U.GREEN, 0.35) or (n > 0 and U.tint(U.CYAN, 0.18) or U.PANEL)); gfx.rect(cx, cy, cw - 1, ch - 1, 1)
+    U.set(on and U.AMBER or (hot and U.TEXT or U.mix(U.LINE, U.PANEL, 0.3))); gfx.rect(cx, cy, cw - 1, ch - 1, 0)
+    local code = model.SEC.code_of(p.name) and (p.name:match('^(%S+)') or p.name) or p.name
+    U.text(cx + Lx.pad, cy + 1, ctx.fit(code, cw - 2 * Lx.pad), on and U.AMBER or (playing and U.GREEN or (n > 0 and U.TEXT or U.DIM)))
+    if hot then hv.patrow = cl.i end
   end
   if #list == 0 then U.text(x + Lx.pad, y + Lx.rh, 'no patterns yet - n in the matrix names a bar', U.DIM) end
   -- в статус: выбранный / под мышью — сколько раз и на каких тактах

@@ -104,9 +104,9 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 25350 | трекерный вид таймлайна REAPER с Vim-редактированием. |
-| `jf_tracker_model.lua` | 2322 | снимок проекта REAPER в трекерных строках. |
-| `jf_tracker_edit.lua` | 4632 | ВСЕ записи трекера в проект REAPER. |
+| `jf_tracker.lua` | 25611 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker_model.lua` | 2323 | снимок проекта REAPER в трекерных строках. |
+| `jf_tracker_edit.lua` | 4633 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 839 | алиасы паттернов (этап 6). |
 | `jf_tracker_arr.lua` | 101 | аранжировки (9 окт): фиксированные лейны трека — его версии, аранжировка — именованный набор играющих лейнов всех треков (C_LANEPLAYS). |
 | `jf_tracker_cmds.lua` | 373 | команды-огибающие и генераторы (этап 7). |
@@ -116,14 +116,14 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_vim.lua` | 3714 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 128 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 69 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1069 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1071 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 138 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 101 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 146 | клавиши DSP-панели в духе Vim (2 окт). |
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 9333 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 9392 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 828 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 243 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 102 | темы трекера (3 окт). |
@@ -132,11 +132,11 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_png.lua` | 78 | PNG без внешних программ (8 окт, снимки measure). |
 | `jf_tracker_logo.lua` | 517 | логотип JFTRACKER для about (главный модуль, 3 окт). |
 | **панели и вкладки** | | |
-| `jf_tracker_matrix.lua` | 1208 | матрица паттернов (этап 3). |
+| `jf_tracker_matrix.lua` | 1222 | матрица паттернов (этап 3). |
 | `jf_tracker_session.lua` | 1027 | session: клипы как в Ableton поверх линейного таймлайна REAPER (6 окт). |
-| `jf_tracker_browser.lua` | 1318 | сайдбар-браузер (справа от трекера). |
+| `jf_tracker_browser.lua` | 1324 | сайдбар-браузер (справа от трекера). |
 | `jf_tracker_fxbrowser.lua` | 298 | браузер эффектов слева от DSP-панели (2 окт). |
-| `jf_tracker_sampleprops.lua` | 494 | панель свойств сэмпла справа от волны (вкладка Sample, 2 окт; как свойства сэмпла в Renoise, но всё нативное: item и take REAPER). |
+| `jf_tracker_sampleprops.lua` | 495 | панель свойств сэмпла справа от волны (вкладка Sample, 2 окт; как свойства сэмпла в Renoise, но всё нативное: item и take REAPER). |
 | `jf_tracker_slicer.lua` | 1850 | виртуальная нарезка сэмпла (инструмента пула). |
 | `jf_tracker_preview.lua` | 394 | предпрослушивание вставляемого события. |
 | `jf_tracker_params.lua` | 369 | панель «params» во вкладке modulation (3 окт). |
@@ -200,7 +200,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | модуль (id) | подпись | буква (gt, Ctrl+W g) | место по умолчанию | когда есть |
 |---|---|---|---|---|
 | `tracker` | tracker | `t` |  | всегда |
-| `patterns` | patterns | `T` | left | всегда |
+| `patterns` | patterns | `T` | left | влита (не показывается) |
 | `matrix` | matrix | `m` | left | всегда |
 | `browser` | browser | `b` | right | всегда |
 | `inst` | lib | `l` | right | всегда |

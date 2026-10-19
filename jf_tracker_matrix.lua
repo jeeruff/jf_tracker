@@ -367,7 +367,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     hy = hy + ch + 2
   end
   -- 18 окт: палитра — все паттерны проекта с превью по трекам (view → p)
-  if MX.palette and ctx.palette_draw and not (ctx.pal_in_pane and ctx.pal_in_pane()) then   -- 19 окт: есть панель patterns — там
+  if MX.palette_old and MX.palette and ctx.palette_draw then   -- 19 окт: палитра заменена кубиками в углу и clipkb в клетках (c)
     local ph, hv = ctx.palette_draw(L, 0, hy + L.rh + 2, W - 6)
     for k, v in pairs(hv) do hover[k] = v end
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
@@ -384,6 +384,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
+  -- 19 окт: пустой угол над колонкой имён слотов — кубики всех паттернов (A1 A2 … B1 …), как панель patterns
+  if ctx.patlist_draw and not MX.fold and (L.mx_label_w or 0) > 4 * L.cw then
+    local _, phv = ctx.patlist_draw(L, 2, ny, L.mx_label_w - 6, MX.name_h - 2)
+    for k, v in pairs(phv or {}) do hover[k] = v end
+  end
   local nmax = 0                                      -- 8 окт: самое длинное имя среди ВИДИМЫХ колонок
   for ci, col in ipairs(snap.cols) do
     local x = L.mx_label_w + (ci - 1 - MX.hs) * L.mx_cell_w
