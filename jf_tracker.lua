@@ -17847,6 +17847,7 @@ local function frame()
   -- step listen (4 окт): транспорт стоит, курсор трекера сменил строку — эта
   -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
   -- 12 окт: listen line (step listen) — строка под курсором, все треки; listen step — та же строка, только трек курсора
+  if gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0 then ctx.wheel_t = reaper.time_precise() end   -- 19 окт: колесо — листание, не шаг
   if (state.steplisten or state.trklisten) and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
     local r = vim.cur.row
     local cf = L and L.flat[vim.cur.fi]
@@ -17855,7 +17856,7 @@ local function frame()
     if ctx.sl_row ~= k then
       local prev = ctx.sl_row
       ctx.sl_row = k
-      if prev and (not is_playing or ctx.sl_own) and (vim.mode == 'normal' or vim.mode == 'insert' or vim.mode == 'visual' or vim.mode == 'vline') then
+      if prev and reaper.time_precise() - (ctx.wheel_t or 0) > 0.35 and (not is_playing or ctx.sl_own) and (vim.mode == 'normal' or vim.mode == 'insert' or vim.mode == 'visual' or vim.mode == 'vline') then
         local t0, t1 = edit.row_time(r, state.lpb, 0), edit.row_time(r + 1, state.lpb, 0)
         if state.steplisten then PV.midi(t0, t1) elseif ctr then ctx.mx_cell_preview(ctr, t0, t1, 'step') end
         ctx.sl_own = true
