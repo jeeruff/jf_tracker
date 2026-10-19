@@ -2829,6 +2829,77 @@ function E.drum_group(track, note, rs5k_addr, g)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 19 окт: пэды с клавиатуры (x yy yp p в рэке). RS5K пэда — в глубину через container_item.N (любая вложенность)
+local function find_rs5k(obj, addr, depth)
+  local A = FA(obj)
+  local _, nm = A.GetFXName(obj, addr, '')
+  if (nm or ''):lower():find('reasamplomatic', 1, true) then return addr end
+  if (depth or 0) > 4 then return nil end
+  local _, cnt = A.GetNamedConfigParm(obj, addr, 'container_count')
+  for j = 0, (tonumber(cnt) or 0) - 1 do
+    local ok, a2 = A.GetNamedConfigParm(obj, addr, 'container_item.' .. j)
+    local r = ok and tonumber(a2) and find_rs5k(obj, tonumber(a2), (depth or 0) + 1)
+    if r then return r end
+  end
+  return nil
+end
+E.find_rs5k = find_rs5k
+-- адрес эффекта по GUID: верхний уровень и дети контейнеров
+function E.fx_by_guid(obj, guid)
+  local A = FA(obj)
+  local function walk(addr, depth)
+    if A.GetFXGUID(obj, addr) == guid then return addr end
+    if depth > 4 then return nil end
+    local _, cnt = A.GetNamedConfigParm(obj, addr, 'container_count')
+    for j = 0, (tonumber(cnt) or 0) - 1 do
+      local ok, a2 = A.GetNamedConfigParm(obj, addr, 'container_item.' .. j)
+      local r = ok and tonumber(a2) and walk(tonumber(a2), depth + 1)
+      if r then return r end
+    end
+  end
+  for i = 0, A.GetCount(obj) - 1 do local r = walk(i, 0); if r then return r end end
+  return nil
+end
+-- копия (move — перенос) пэда src_obj/src_addr в конец рэка c трека track, на ноту note; → true
+function E.drum_pad_put(src_obj, src_addr, track, c, note, move)
+  local A = FA(track)
+  local ok = false
+  run(move and 'drumrs5k pad move' or 'drumrs5k pad copy', function()
+    local n = cont_count(track, c) or 0
+    copy_fx(src_obj, src_addr, track, child_addr(track, c, n), move)
+    local dst = child_addr(track, c, n)
+    if not A.GetFXGUID(track, dst) then return end
+    if R.TrackFX_SetOffline and not model.is_take(track) then R.TrackFX_SetOffline(track, dst, false) end
+    local rs = find_rs5k(track, dst)
+    if rs and note then
+      local pi = model.rs5k_pidx(A, track, rs)
+      if pi.note then A.SetParamNormalized(track, rs, pi.note, note / 127) end
+      if pi.note_end then A.SetParamNormalized(track, rs, pi.note_end, note / 127) end
+    end
+    ok = true
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+-- вырезать пэд: на трек LIB (заглушён) выключенным — буфер; прежний буфер (old_guid) удаляется; → GUID в буфере
+function E.drum_pad_cut(track, addr, old_guid)
+  local lib
+  for i = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, i)
+    local _, nm = R.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
+    if model.LIB_NAMES[nm] then lib = tr; break end
+  end
+  if not lib then return nil, 'no LIB track (the lib keeps the cut pad)' end
+  local guid
+  run('drumrs5k pad cut', function()
+    if old_guid then local oa = E.fx_by_guid(lib, old_guid); if oa then R.TrackFX_Delete(lib, oa) end end
+    local di = R.TrackFX_GetCount(lib)
+    copy_fx(track, addr, lib, di, true)
+    if R.TrackFX_GetCount(lib) > di then R.TrackFX_SetOffline(lib, di, true); guid = R.TrackFX_GetFXGUID(lib, di) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return guid, lib
+end
 -- один пэд: файл целиком, режим sample, нота (nil — не трогать), имя «Sxx файл»
 function E.drum_pad_set(track, addr, path, note, num)
   local A = FA(track)

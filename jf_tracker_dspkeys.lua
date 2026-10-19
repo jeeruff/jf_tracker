@@ -16,6 +16,9 @@
 --   v            выделить диапазон эффектов (h l тянут), Esc — снять
 --   o            окно эффекта, Space play, Esc — назад в трекер
 --   t            цепочка трека ↔ take FX инструмента (обрабатывает main)
+--   Enter на drumrs5k — режим пэдов (19 окт): h l нота ∓1, j k ряд (∓4), x вырезать пэд, yy взять,
+--                yp дубль на свободную ноту рядом, p вставить на ноту курсора, M mute, S solo,
+--                Enter послушать, r пэд в роутере, Esc — обратно к эффектам
 -- Ожидающий оператор показывает продолжения в статусе (DK.pending_hint).
 --
 -- Без reaper.*: действия — ctx.dsp_* (main), тестируется стабами.
@@ -53,6 +56,10 @@ function DK.key(c, sel, n, np, mods)
     local op = DK.pending
     DK.pending = nil
     if c == 27 then return true end
+    if DK.pads and op == 'y' then
+      if ch == 'y' then ctx.pad_yank(sel.fx) elseif ch == 'p' then ctx.pad_dup(sel.fx) end
+      return true
+    end
     local r0, r1 = DK.range(sel)
     if op == 'd' and ch == 'd' then ctx.dsp_delete(r0, r1); DK.anchor = nil
     elseif op == 'd' and ch == 'c' then ctx.dsp_unpack(sel.fx)
@@ -74,6 +81,23 @@ function DK.key(c, sel, n, np, mods)
   if DK.anchor and (ch == 'd' or ch == 'x') then local r0, r1 = DK.range(sel); ctx.dsp_delete(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'c' then local r0, r1 = DK.range(sel); ctx.dsp_pack(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'y' then ctx.dsp_yank(sel.fx); DK.anchor = nil; return true end
+  -- 19 окт: режим пэдов drumrs5k
+  if DK.pads then
+    if not (ctx.pad_rack and ctx.pad_rack(sel.fx)) then DK.pads = nil
+    else
+      if c == 27 then DK.pads = nil; ctx.msg('DSP: effects (h l), Enter on the rack - pads again'); return true end
+      if ch == 'h' or c == LEFT then ctx.pad_nav(sel.fx, -1); return true end
+      if ch == 'l' or c == RIGHT then ctx.pad_nav(sel.fx, 1); return true end
+      if ch == 'k' or c == UP then ctx.pad_nav(sel.fx, 4); return true end
+      if ch == 'j' or c == DOWN then ctx.pad_nav(sel.fx, -4); return true end
+      if ch == 'x' or c == 8 or c == 6579564 then ctx.pad_cut(sel.fx); return true end
+      if ch == 'y' then DK.pending = 'y'; ctx.msg('y: y take the pad, p duplicate it onto the next free note | Esc'); return true end
+      if ch == 'p' or ch == 'P' then ctx.pad_paste(sel.fx); return true end
+      if ch == 'M' or ch == 'S' then ctx.pad_ms(sel.fx, ch == 'S'); return true end
+      if c == 13 then ctx.pad_listen(sel.fx); return true end
+      if ch == 'r' then ctx.pad_route_cur(sel.fx); return true end
+    end
+  end
   -- 8 окт: режим слайдера параметра (f на параметр / щелчок): h l — значение
   -- (H L крупно), j k — соседний параметр, Esc — обратно к эффектам
   if DK.pslider then
@@ -98,6 +122,8 @@ function DK.key(c, sel, n, np, mods)
   elseif ch == 'v' then DK.anchor = DK.anchor and nil or sel.fx
   elseif ch == '+' or ch == '=' or c == 1 then ctx.dsp_value(sel.fx, sel.param, 1, mods.shift)
   elseif ch == '-' or c == 24 then ctx.dsp_value(sel.fx, sel.param, -1, mods.shift)
+  elseif c == 13 and ctx.pad_rack and ctx.pad_rack(sel.fx) then
+    DK.pads = true; ctx.msg('pads: h l j k move, x cut, yy yp p, M mute, S solo, Enter listen, r router, Esc back')   -- 19 окт
   elseif c == 13 then ctx.dsp_enter(sel.fx, sel.param)
   elseif ch == 'b' then ctx.dsp_bypass(sel.fx)
   elseif ch == 'o' then ctx.dsp_show(sel.fx)

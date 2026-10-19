@@ -13342,6 +13342,7 @@ ctx = {
     return { title = 'keys (Esc)', items = items }
   end,
   preview = function(track, pitch, inst_item, row, step, lp, key)   -- lp — луп удержания (13 окт: только удержания, звучит до PV.stop)
+    if pitch then draw.pad_hit = draw.pad_hit or {}; draw.pad_hit[math.floor(pitch + 0.5)] = reaper.time_precise() end   -- 19 окт: сыгранный пэд drumrs5k вспыхивает
     if state.debug and ctx.dlog then ctx.dlog('preview from: ' .. (debug.traceback('', 2):gsub('%s+', ' '):sub(1, 500))) end   -- 15 окт: кто позвал (debug)
     if inst_item == 'midi' then inst_item = nil end          -- 9 окт: плагин-инструмент — MIDI-превью
     -- 9 окт: сэмпл (аудио-item lib) звучит сам всегда — раньше MIDI-ноты на
@@ -15546,7 +15547,7 @@ function ctx.context_items(hover)
     add((MX.fill and '!' or '') .. 'Fill: cells show their content (f)', function() MX.fill = not MX.fill end, 'f')
     add('Trim items to their regions (t)', function() ctx.mx_trim() end, 't')
     add((MX.ruler and '!' or '') .. 'Ruler (R)', function() ctx.mx_ruler_toggle() end, 'R')
-    add((MX.loops and '!' or '') .. 'Loops layer', function() ctx.mx_loops_toggle() end, 'l')
+    if MX.loops or (ctx.dev_on and ctx.dev_on()) then add((MX.loops and '!' or '') .. 'Loops layer (dev: Garden loops per cell)', function() ctx.mx_loops_toggle() end, 'l') end   -- 19 окт: непонятен — только dev, как в \\-меню
     add((MX.zoom == 'detail' and '!' or '') .. 'Detail view (z)', function() ctx.mx_zoom() end, 'z')
     add('Arrangement …', function() ctx.arr() end, 'a')
   else
@@ -20985,6 +20986,11 @@ local function frame()
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
       if hover.dsp then ctx.set_focus('dsp') end
+      -- 19 окт: щелчок по пэду drumrs5k — режим пэдов DSP (h j k l, x yy yp p, M S) на этом рэке
+      if hover.dspkid and hover.dspkid.kid and hover.dspkit.k and ctx.pad_rack(hover.dspkit.k) then
+        dsp_sel.fx = hover.dspkit.k; DK.pads = true
+        draw.kit_note = draw.kit_note or {}; draw.kit_note[hover.dspkit.key] = hover.dspkid.kid.note
+      end
       -- 16 окт: пэд drumrs5k звучит по щелчку (его нота в трек; трек взведён — см. preview)
       local dk = hover.dspkid and hover.dspkid.kid
       if dk and dk.note and dk.rs5k_i then local col = dsp_target(); if col then ctx.preview(col.track, dk.note, 'midi') end end
@@ -23423,6 +23429,8 @@ local function frame()
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
+        -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
+        if not DK.pending and (ch == 'm' or vim.plays_note(c) or (vim.piano and (ch == '[' or ch == ']'))) then return vim.key(c) end
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()
           if root and MX.DB.key(c, root, o) then return end
@@ -24391,6 +24399,84 @@ ctx.pad_route = function(f, ki)
   ctx.db_cache = nil
   if not state.dsp_big then ctx.dsp_big() end
   vim.msg = 'pad in the router: l - inside, A - a layer in parallel (RS5K / synth / fx), a - after, zz - back to the pads'
+end
+-- 19 окт: пэды с клавиатуры (режим пэдов DSP, jf_tracker_dspkeys.lua): курсор — пэд (draw.kit_sel) или пустая нота (draw.kit_note)
+ctx.pad_rack = function(k)
+  local col, f = ctx.dsp_fx(k)
+  if col and f and f.kids and model.DR and model.DR.is_rack(f.kids) then return col, f end
+end
+ctx.pad_cur = function(k)
+  local col, f = ctx.pad_rack(k)
+  if not f then return end
+  local kkey = tostring(cur_col() and cur_col().guid or '') .. ':' .. tostring(f.i)
+  draw.kit_sel = draw.kit_sel or {}; draw.kit_note = draw.kit_note or {}
+  local ki = draw.kit_sel[kkey] or 0
+  local kid = ki > 0 and f.kids[ki] or nil
+  local note = kid and kid.note or draw.kit_note[kkey]
+  if not note then for _, kd in ipairs(f.kids) do if kd.note and (not note or kd.note < note) then note = kd.note end end end
+  return col, f, kkey, ki, kid, note or 36
+end
+ctx.pad_at = function(f, note) for ki, kd in ipairs(f.kids) do if kd.note == note then return ki, kd end end end
+ctx.pad_go = function(f, kkey, note)
+  local ki = ctx.pad_at(f, note)
+  draw.kit_sel[kkey] = ki or 0; draw.kit_note[kkey] = note
+  local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+  local nm = NN[note % 12 + 1] .. math.max(0, note // 12 - 1)
+  vim.msg = ki and ('pad %s: %s'):format(nm, f.kids[ki].name or '') or ('%s: empty - p pastes a pad here'):format(nm)
+end
+ctx.pad_nav = function(k, d)
+  local _, f, kkey, _, _, note = ctx.pad_cur(k)
+  if not f then return end
+  ctx.pad_go(f, kkey, math.max(0, math.min(127, note + d)))
+end
+ctx.pad_yank = function(k)
+  local col, f, _, _, kid = ctx.pad_cur(k)
+  if not kid then vim.msg = 'pads: no pad here'; return end
+  state.pad_reg = { track = col.track, guid = reaper.TrackFX_GetFXGUID(col.track, kid.i), name = kid.name }
+  vim.msg = ('yank pad %s - p pastes it on the cursor note'):format(kid.name or '')
+end
+ctx.pad_cut = function(k)
+  local col, f, kkey, _, kid, note = ctx.pad_cur(k)
+  if not kid then vim.msg = 'pads: no pad here'; return end
+  local old = state.pad_reg and state.pad_reg.cut and state.pad_reg.guid
+  local guid, lib = edit.drum_pad_cut(col.track, kid.i, old)
+  if not guid then vim.msg = 'pad cut: ' .. tostring(lib); return end
+  state.pad_reg = { track = lib, guid = guid, name = kid.name, cut = true }
+  draw.kit_sel[kkey] = 0; draw.kit_note[kkey] = note
+  vim.msg = ('cut pad %s (kept off on the LIB track) - p pastes it, u undo'):format(kid.name or '')
+end
+-- вставить пэд из регистра на ноту (занята — на ближнюю свободную выше)
+ctx.pad_put = function(k, note)
+  local reg = state.pad_reg
+  local col, f, kkey = ctx.pad_cur(k)
+  if not f then return end
+  if not (reg and reaper.ValidatePtr(reg.track, 'MediaTrack*')) then vim.msg = 'pad register empty (yy / x)'; return end
+  local src = edit.fx_by_guid(reg.track, reg.guid)
+  if not src then vim.msg = 'the yanked pad is gone'; return end
+  while ctx.pad_at(f, note) and note < 127 do note = note + 1 end
+  if ctx.pad_at(f, note) then vim.msg = 'pads: no free note above'; return end
+  if edit.drum_pad_put(reg.track, src, col.track, f.i, note, false) then
+    draw.kit_note[kkey] = note; draw.kit_sel[kkey] = #f.kids + 1      -- новый пэд — последний ребёнок
+    vim.msg = ('pad %s -> note %d'):format(reg.name or '', note)
+  else vim.msg = 'pad paste failed' end
+end
+ctx.pad_paste = function(k) local _, _, _, _, _, note = ctx.pad_cur(k); if note then ctx.pad_put(k, note) end end
+ctx.pad_dup = function(k)
+  local _, _, _, _, kid, note = ctx.pad_cur(k)
+  if not kid then vim.msg = 'pads: no pad here'; return end
+  ctx.pad_yank(k); ctx.pad_put(k, note + 1)
+end
+ctx.pad_ms = function(k, solo)
+  local _, f, _, ki = ctx.pad_cur(k)
+  if f and ki > 0 then ctx.pad_mute_solo(f, ki, solo) else vim.msg = 'pads: no pad here' end
+end
+ctx.pad_listen = function(k)
+  local col, _, _, _, kid = ctx.pad_cur(k)
+  if kid and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+end
+ctx.pad_route_cur = function(k)
+  local _, f, _, ki = ctx.pad_cur(k)
+  if f and ki > 0 then ctx.pad_route(f, ki) end
 end
 ctx.pad_mute_solo = function(f, ki, solo)
   local col = dsp_target()

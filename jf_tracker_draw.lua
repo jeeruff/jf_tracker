@@ -7814,8 +7814,9 @@ function D.frame(L, snap, rows, state, info)
               for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not lo or pn < lo then lo = pn end end
               wb = (lo or (D.slice_base_note or 48)) // 4     -- нижний пэд, без пэдов — базовая октава (C3)
             end
-            if ks > 0 then
-              local kr = pos(ks) // 4
+            local kn = ks == 0 and D.kit_note and D.kit_note[kkey] or nil      -- 19 окт: курсор режима пэдов на пустой ноте
+            if ks > 0 or kn then
+              local kr = (ks > 0 and pos(ks) or kn) // 4
               if kr < wb then wb = kr elseif kr >= wb + G.fit then wb = kr - G.fit + 1 end
             end
             wb = math.max(0, math.min(wb, 32 - G.fit))
@@ -7843,6 +7844,8 @@ function D.frame(L, snap, rows, state, info)
                     or (solo and (blink and U.GREEN or U.mix(U.GREEN, U.PANEL, 0.5)))
                     or (not kid.enabled and U.RED)
                     or (ki == ks and U.YELLOW) or U.AMBER
+                  local hit2 = D.pad_hit and D.pad_hit[note]
+                  if hit2 and reaper.time_precise() - hit2 < 0.25 then col2 = U.GREEN end
                   set(col2); gfx.rect(cxm, cym, cube, cube, kid and 1 or 0)
                   if ki == ks and kid and not kid.enabled then set(U.YELLOW); gfx.rect(cxm - 1, cym - 1, cube + 2, cube + 2, 0) end
                   if not drag and kid and mx >= cxm and mx < cxm + cube + 1 and my >= cym and my < cym + cube + 1 then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
@@ -7862,7 +7865,7 @@ function D.frame(L, snap, rows, state, info)
                 local note = (wb + rr) * 4 + c
                 if not by_note[note] then
                   local ex, ey = gx0 + c * G.cw, gy0 + (G.fit - 1 - rr) * G.ch
-                  set(U.mix(U.LINE, U.PANEL, 0.5)); rrect(ex, ey, G.cw - 2, G.ch - 2, false)
+                  set(note == kn and U.AMBER or U.mix(U.LINE, U.PANEL, 0.5)); rrect(ex, ey, G.cw - 2, G.ch - 2, false)
                   text(ex + L.pad, ey + 1, nname(note), U.mix(U.DIM, U.PANEL, 0.4))
                 end
               end
@@ -7877,7 +7880,9 @@ function D.frame(L, snap, rows, state, info)
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
                 local on = ki == ks
-                set(on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL)); rrect(cx0, cy0, cw0, ch0, true)
+                local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
+                local flash = hit and reaper.time_precise() - hit < 0.25        -- 19 окт: сыгранный (клавиатура / щелчок) — вспышка
+                set(flash and U.tint(U.GREEN, 0.45) or (on and U.tint(U.AMBER, 0.28) or (hot and U.tint(U.AMBER, 0.12) or U.PANEL))); rrect(cx0, cy0, cw0, ch0, true)
                 set(on and U.AMBER or (hot and U.GREY or U.LINE)); rrect(cx0, cy0, cw0, ch0, false)
                 local fg = kid.enabled and (on and U.AMBER or (hot and U.TEXT or U.GREY)) or U.DIM
                 local nm = kid.name or ''
